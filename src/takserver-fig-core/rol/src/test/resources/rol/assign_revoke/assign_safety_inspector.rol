@@ -1,0 +1,1 @@
+assign role "SafetyInspector" for CONSUMER { "dn" : "CN=HomerJay, OU=DEV, O=AFRL, ST=NY, C=US", "port" : "1234", "protocol" : "tcp" };

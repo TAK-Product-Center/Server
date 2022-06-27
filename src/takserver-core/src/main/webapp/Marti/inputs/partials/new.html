@@ -1,0 +1,255 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+  
+  .rowHeader {
+  	text-align:right;
+  	padding-right:5px;
+  	width:200px;
+  	vertical-align:top;
+  }
+  
+  .rowValue {
+  	width:400px;
+  	text-align:right;
+  	vertical-align:top;
+  }
+  
+  .rowValue select {
+  	width:100%;
+  }
+
+  .rowValue input {
+  	width:400px;
+  }
+  
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+
+  table {
+  	border-collapse: separate;
+  	border-spacing:10px
+  }
+
+  .inlineHelp {
+  	font:13px arial, sans-serif;
+  	font-style:italic;
+  	text-align:right;
+  	color:green;
+  }  
+</style>
+
+<div>
+  <h3>Create Input Definition</h3>
+
+  <div data-ng-show="serviceReportedMessages">
+  	<ul>
+  		<li class="error" data-ng-repeat="message in messages">{{message}}</li>
+  	</ul>
+  </div>
+  
+  <form name="inputForm" novalidate data-ng-submit="inputForm.$valid && saveInput(input)">
+  	<table>
+  		<tr>
+  			<td class="rowHeader"><label for="name">*Name</label></td>
+  			<td class="rowValue">
+  				<input type="text" data-ng-model="input.name" name="name" required  maxlength="30" data-ng-pattern="/^[A-Za-z0-9_\s]+$/" data-ng-change="isInputNameUnique(input.name)"/>
+  				<br/><span class="inlineHelp">Name may contain upper and lower case letters, numbers, spaces and underscores up to 30 characters.</span>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="inputForm.$submitted || inputForm.name.$touched">
+  					<span data-ng-show="inputForm.name.$error.required">Input name is required</span>
+  					<span data-ng-show="inputForm.name.$error.maxLength">Input Name must be between 1 and 30 characters</span>  					
+  					<span data-ng-show="inputForm.name.$error.pattern">The input name may contain only upper and lower case letters, numbers, spaces and underscores</span>
+  					<span data-ng-show="inputNameDuplicate">The input name you've provided is already in use.</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="protocol">*Protocol</label></td>
+  			<td class="rowValue">
+				<select name="protocol" data-ng-model="input.protocol" required>
+      		<option value="tcp">Standard TCP (TCP)</option>
+					<option value="udp">Standard UDP (UDP)</option>
+					<option value="stcp">Streaming TCP (STCP)</option>
+          <option value="tls">Secure Streaming TCP (TLS) CoT or Protobuf</option>
+          <option value="grpc">Secure Streaming with gRPC</option>
+					<option value="cottls">Secure Streaming TCP (COTTLS) CoT Only</option>
+					<option value="mcast">Multicast (MCAST)</option>
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="inputForm.$submitted || inputForm.protocol.$touched">
+  					<span data-ng-show="inputForm.protocol.$error.required">Protocol is required</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="auth">*Authentication Type</label></td>
+  			<td class="rowValue">
+				<select name="auth" data-ng-model="input.auth" required>
+      				<option value="LDAP">LDAP</option>
+					<option value="FILE">File</option>
+					<option value="X_509">X.509</option>
+					<option value="ANONYMOUS">None (Anonymous)</option>
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="inputForm.$submitted || inputForm.auth.$touched">
+  					<span data-ng-show="inputForm.auth.$error.required">Authentication Type is required</span>
+  				</span>
+  			</td>
+  		</tr>
+  		  		
+  		<tr>
+  			<td class="rowHeader"><label for="port">*Port</label></td>
+  			<td class="rowValue">
+  				<input type="number" data-ng-model="input.port" name="port" required min="1" max="65535" data-ng-pattern="/^[0-9]+$/"/>
+  				<br/><span class="inlineHelp">Port must be an integer between 1 and 65535.</span>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="inputForm.$submitted || inputForm.port.$touched">
+  					<span data-ng-show="inputForm.port.$error.required">Port value is required. </span>
+  					<span data-ng-show="inputForm.port.$error.min || inputForm.port.$error.max">Port value must be an integer between 1 and 65535. </span>
+  					<span data-ng-show="inputForm.port.$error.number">Port value must be an integer. </span>
+  					<span data-ng-show="inputForm.port.$error.pattern">Port value may only contain digits. </span>
+  				</span>
+  			</td>
+  		</tr>
+  		
+  		<tr>
+  			<td class="rowHeader"><label for="coreVersion">Core Messaging Version</label></td>
+  			<td class="rowValue">
+				<select name="coreVersion" data-ng-model="input.coreVersion" required>
+				    <option value="2">2 (high performance)</option>
+					<option value="1">1 (legacy)</option>
+				</select>
+				<br/>
+			</td>
+			<td class="error">
+  				<span data-ng-show="inputForm.$submitted || input.coreVersion.$touched">
+  					<span data-ng-show="input.coreVersion.$error.required">Core Version is required</span>
+  				</span>
+  			</td>
+  		</tr>
+  		
+  		<tr data-ng-show="input.coreVersion == 2" style="width:400px;">
+  			<td class="rowHeader"></td>
+  			<td>
+  				<span style="width:100%; display:block; text-align:center" class="inlineHelp">Core Messaging 2 TLS Version(s):</span>
+  				<table style="font-size:13px">
+                  <tr>
+                    <td>TLSv1: <input data-ng-model="tls['TLSv1']" type="checkbox"></td>
+                    <td>TLSv1.1: <input data-ng-model="tls['TLSv1.1']" type="checkbox"></td>
+                    <td>TLSv1.2: <input data-ng-model="tls['TLSv1.2']" type="checkbox"></td>
+                    <td>TLSv1.3: <input data-ng-model="tls['TLSv1.3']" type="checkbox"></td>
+                  </tr>
+                </table>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="input.coreVersion2TlsVersions === ''">At least one TLS Version is required</span>
+  			</td>
+  		</tr>
+  		
+  		<tr>
+  			<td class="rowHeader"><label for="group">Multicast Group</label></td>
+  			<td class="rowValue">
+  				<input type="text" data-ng-model="input.group" name="group" data-ng-pattern="/^([0-9]{1,3}\.){3}[0-9]{1,3}$/"/>
+  				<br/><span class="inlineHelp">Provide an optional valid IPv4 multicast address.</span>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="inputForm.$submitted || inputForm.group.$touched">
+  					<span data-ng-show="inputForm.group.$error.pattern">Provide a valid IPv4 multicast address containing only digits and periods.</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="iface">Interface</label></td>
+  			<td class="rowValue">
+  				<input type="text" data-ng-model="input.iface" name="iface" data-ng-maxlength="15" data-ng-minlength="1" data-ng-pattern="/^[A-Za-z0-9]+$/"/>
+  				<br/><span class="inlineHelp">Provide an optional valid network interface name (e.g., en0).</span>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="inputForm.$submitted || inputForm.iface.$touched">
+  					<span data-ng-show="inputForm.iface.$error.pattern">Provide a valid network interface name containing only letters and numbers.</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="archive">Archive</label></td>
+  			<td class="rowValue">
+				<select name="archive" data-ng-model="input.archive" required>
+      				<option value="true">True</option>
+					<option value="false">False</option>
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="inputForm.$submitted || inputForm.archive.$touched">
+  					<span data-ng-show="inputForm.archive.$error.required">Archive is required</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="anongroup">Anonymous Group</label></td>
+  			<td class="rowValue">
+				<select name="anongroup" data-ng-model="input.anongroup" required>
+      				<option value="true">True</option>
+					<option value="false">False</option>
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="inputForm.$submitted || inputForm.anongroup.$touched">
+  					<span data-ng-show="inputForm.anongroup.$error.required">Anonymous Group is required</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="archiveOnly">Archive Only</label></td>
+  			<td class="rowValue">
+				<select name="archiveOnly" data-ng-model="input.archiveOnly" required>
+      				<option value="true">True</option>
+					<option value="false">False</option>
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="inputForm.$submitted || inputForm.archiveOnly.$touched">
+  					<span data-ng-show="inputForm.archiveOnly.$error.required">Archive Only is required</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="filtergroup">Filter Groups</label></td>
+  			<td class="rowValue">
+				<textarea style="width:100%;resize:none;" data-ng-model="input.filtergroup" data-ng-list="&#10;" data-ng-trim="false"></textarea>
+  				<br/><span class="inlineHelp">Provide 0 or more LDAP distinguished names separated by newlines.
+  				Example: cn=John Smith,ou=test,dc=xyz,dc=gov</span>
+			</td>
+			<td>&nbsp;</td>
+  		</tr>
+
+		<tr>
+			<td style="text-align:right;">*Required</td>
+			<td style="padding:10px;" align="right">
+				<input type="button" data-ng-click="cancelInput()" value="Cancel" />&nbsp;
+				<input type="submit" value="Save" data-ng-disabled="submitInProgress" />
+			</td>
+			<td>&nbsp;</td>
+		</tr>
+
+  	</table>
+  </form>
+</div>

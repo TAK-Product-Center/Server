@@ -1,0 +1,40 @@
+site_name: 'angular-gantt'
+
+site_url: https://www.angular-gantt.com
+site_description: Gantt chart component for AngularJS
+
+repo_url: https://github.com/angular-gantt/angular-gantt
+
+theme: spacelab
+
+pages:
+- [index.md, Home]
+- [get-started.md, Get Started]
+- [configuration/data.md, Configuration, Data]
+- [configuration/timespans.md, Configuration, Timespans]
+- [configuration/attributes.md, Configuration, Attributes]
+- [configuration/plugins.md, Configuration, Plugins]
+- [configuration/customize.md, Configuration, Customize]
+- [configuration/api.md, Configuration, API]
+- [configuration/write_plugin.md, Configuration, Write a Plugin]
+- [plugins/labels.md, Plugins, Labels]
+- [plugins/table.md, Plugins, Table]
+- [plugins/tree.md, Plugins, Tree]
+- [plugins/groups.md, Plugins, Groups]
+- [plugins/dependencies.md, Plugins, Dependencies]
+- [plugins/sortable.md, Plugins, Sortable]
+- [plugins/movable.md, Plugins, Movable]
+- [plugins/drawtask.md, Plugins, Draw Task]
+- [plugins/tooltips.md, Plugins, Tooltips]
+- [plugins/bounds.md, Plugins, Bounds]
+- [plugins/progress.md, Plugins, Progress]
+- [plugins/overlap.md, Plugins, Overlap]
+- [plugins/resizeSensor.md, Plugins, Resize Sensor]
+- [sources.md, Sources]
+- [contribute.md, Contribute]
+- [faq.md, FAQ]
+- [about.md, About]
+
+
+
+copyright: Copyright &copy; 2014, <a href="https://github.com/Schweigi">Marco Schweighauser</a>, <a href="https://twitter.com/Toilal">Rémi Alvergnat</a>.

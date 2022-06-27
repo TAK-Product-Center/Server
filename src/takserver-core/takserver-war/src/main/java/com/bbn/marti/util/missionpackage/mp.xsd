@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	
+	<xs:element name="MissionPackageManifest">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="Configuration" type="ConfigurationType" minOccurs="0" maxOccurs="1" />
+				<xs:element name="Contents" type="ContentsType" minOccurs="0" maxOccurs="1" />
+				<xs:element name="Groups" type="GroupsType" minOccurs="0" maxOccurs="1" />
+			</xs:sequence>
+			<xs:attribute name="version" type="xs:string"/>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:complexType name="ConfigurationType">
+		<xs:sequence>
+			<xs:element name="Parameter" type="ParameterType" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+	
+	<xs:complexType name="GroupsType">
+		<xs:sequence>
+			<xs:element name="Group" type="GroupType" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+		
+	<xs:complexType name="GroupType">
+		<xs:attribute name="name"    type="xs:string"/>
+	</xs:complexType>
+
+	<xs:complexType name="ContentsType">
+		<xs:sequence>
+			<xs:element name="Content" type="ContentType" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+	
+	<xs:complexType name="ParameterType">
+		<xs:attribute name="name"    type="xs:string"/>
+		<xs:attribute name="value"    type="xs:string"/>
+	</xs:complexType>
+
+	<xs:complexType name="ContentType">
+		<xs:sequence>
+			<xs:element name="Parameter" type="ParameterType" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attribute name="zipEntry"    type="xs:string"/>
+		<xs:attribute name="ignore"    type="xs:boolean"/>
+	</xs:complexType>
+
+</xs:schema>

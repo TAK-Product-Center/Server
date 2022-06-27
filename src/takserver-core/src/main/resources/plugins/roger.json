@@ -1,0 +1,75 @@
+{
+    "name": "TAK Server Plug-ins Example",
+    "description": "Configuration that allows CoT messages to flow from Takserver to ROGER and out to an external client, and allows messages to come in from a (different) external client, through ROGER, to Takserver",
+    "pluginDirectories": ["plugins"],
+    "orchestratorQueuePlugin": "com.bbn.roger.plugin.example.ArrayBlockingQueuePlugin",
+    "ifpConfigurationFile": "plugins/ifp.xml",
+    "dependencyDirectory": "plugins/dependencies",
+    "loadPluginsFromClasspath": false,
+    "serviceConfigurations": [
+        {   "serviceType": "ProgrammaticService",
+            "pluginConfigurations": []
+        },
+        {
+            "serviceType": "NetworkCommunication",
+            "pluginConfigurations": [
+		{
+				"name": "TCPClientToExternalServer",
+	            "className": "com.bbn.roger.plugin.core.io.client.TcpNettyClientPlugin",
+				"deploymentModel": "InProcess",
+				"port": 8321,
+				"protocol": "tcp",
+				"ip_address": "127.0.0.1",
+				"parse_mode": "delimiter",
+				"delimiter": "</event>",
+				"max_frame_length": 8192,
+				"strip_delimiter": false,
+				"delimiter_type": "string"
+			},{
+				"name": "TCPServerToExternalClient", 
+				"className": "com.bbn.roger.plugin.core.io.server.TcpNettyServerPlugin",
+				"server_port": 8123, 
+				"protocol": "tcp", 
+				"server_ip_address": "127.0.0.1",
+				"parse_mode": "delimiter",
+				"delimiter": "</event>",
+				"max_frame_length": 8192,
+				"strip_delimiter": false,
+				"delimiter_type": "string"
+			}
+	    ]
+            
+	},  
+        {
+            "serviceType": "BaseService",
+			"defaultMessageDisposal": "My Message Disposal",
+            "pluginConfigurations": [
+			{
+					"name": "My Message Disposal",
+					"className": "com.bbn.roger.plugin.core.MessageDisposalCounterPlugin",
+					"deploymentModel": "InProcess"
+			},
+			{
+				"name": "routeToNetcat",
+				"className": "com.bbn.roger.plugin.core.routing.FixedRoutingPlugin",
+				"deploymentModel": "InProcess",
+				"destination_class": "java.net.URI",
+				"destination": "tcp://127.0.0.1:0"
+			},
+			{
+				"name": "ByteArrayToStringPayload",
+				"className": "com.bbn.roger.plugin.core.payloadTransformation.ByteArrayToStringPayloadPlugin",
+				"deploymentModel": "InProcess"
+			},
+			{
+				"name": "StringToBytes",
+				"className": "com.bbn.roger.plugin.core.payloadTransformation.StringToByteArrayPayloadPlugin",
+				"deploymentModel": "InProcess"
+			}
+
+
+			
+				]
+			}
+    ]
+}

@@ -1,0 +1,67 @@
+### ------ TAK CLUSTER PROPERTIES ------ ###
+
+# Absolute path to the takserver cluster directory. (eg. /Users/user/takserver-cluster-<version>/cluster)
+export CLUSTER_HOME_DIR=
+
+# Unique Cluster Name - This will be used to keep naming conventions consistent across resources. No capitals or underscores (eg. bbn-cluster)
+export TAK_CLUSTER_NAME=
+
+# Set the AWS zones for the cluster region. At least 2 zones are required. (eg. "us-east-1a,us-east-1b")
+export TAK_CLUSTER_ZONES=${ZONES:-"<zone1>,<zone2>"}
+
+# Set the number of cluster nodes
+export TAK_CLUSTER_NODE_COUNT=20
+
+# Set if takserver plugins should be enabled (0 false, 1 true)
+export TAK_PLUGINS=0
+
+### ------ Configure Route 53 Domain Name or Gossip-based DNS ------ ###
+# By default, gossip-based DNS is used in the cluster. The domain name must end with k8s.local
+# Or, set the Domain Name of the hosted zone you registered with Route53. (eg. yourorg.tak.net) (leave off trailing .)
+export TAK_CLUSTER_DOMAIN_NAME=k8s.local
+
+### ------ DATABASE PROPERTIES ------ ###
+
+# Master username for RDS
+export TAK_DB_USERNAME=martiuser
+
+# Master password for RDS
+export TAK_DB_PASSWORD=
+
+# RDS DB Instance Size (db.t2.micro is smallest) (see: https://aws.amazon.com/rds/instance-types/)
+export TAK_DB_SIZE=db.m4.16xlarge
+
+# RDS DB Initial Storage
+export TAK_DB_ALLOCATED_STORAGE=500
+
+
+### ------ CERTIFICATE PROPERTIES ------ ###
+
+# (Can Leave Blank If Reusing Certs)
+
+# Set Certificate Authority Name (at least 5 characters)
+export TAK_CA_NAME=
+
+# Set Certificate State
+export TAK_STATE=
+
+# Set Certificate City
+export TAK_CITY=
+
+# Set Certificate Organizational Unit
+export TAK_ORGANIZATIONAL_UNIT=
+
+# Absolute path to the takserver configmap file that will override the default cert values (eg. /Users/user/takserver-cluster-<version>/cluster).
+# Leave empty if you want to use the defaults.
+export CERT_CONFIGMAP_FILE=
+
+### ------ PRESET VARIABLES - DO NOT EDIT  ------ ###
+
+export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id)
+export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key)
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export AWS_S3_KOPS_STORE_NAME=tak.server-$TAK_CLUSTER_NAME
+export TAK_CLUSTER_REGION=$(aws configure get region)
+export KOPS_STATE_STORE=s3://$AWS_S3_KOPS_STORE_NAME
+# get or refresh ECR token
+aws ecr get-login-password --region $TAK_CLUSTER_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$TAK_CLUSTER_REGION.amazonaws.com

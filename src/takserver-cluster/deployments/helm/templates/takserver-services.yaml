@@ -1,0 +1,35 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: takserver-api-service
+spec:
+  selector:
+    app: takserver-api
+  ports:
+  - protocol: TCP
+    port: 8443
+    name: https-8443
+  - protocol: TCP
+    port: 8444
+    name: https-8444
+  - protocol: TCP
+    port: 8446
+    name: https-8446
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: takserver-messaging-service
+spec:
+  selector:
+    app: takserver-messaging
+  ports:
+  - protocol: TCP
+    port: 8089
+    name: streaming-8089
+  - protocol: TCP
+    port: 9000
+    name: fed-9000
+  - protocol: TCP
+    port: 9001
+    name: fed-9001

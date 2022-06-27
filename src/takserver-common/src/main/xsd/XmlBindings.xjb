@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jxb:bindings xmlns:jxb="http://java.sun.com/xml/ns/jaxb" jxb:version="2.0"
+              xmlns:xjc="http://java.sun.com/xml/ns/jaxb/xjc">
+
+  <jxb:globalBindings>
+    <xjc:serializable uid="6107951534079953"/>
+  </jxb:globalBindings>
+
+  <jxb:bindings schemaLocation="CoreConfig.xsd">
+    <jxb:schemaBindings>
+      <jxb:package name="com.bbn.marti.config"/>
+    </jxb:schemaBindings>
+  </jxb:bindings>
+
+  <jxb:bindings schemaLocation="UserAuthenticationFile.xsd">
+    <jxb:schemaBindings>
+      <jxb:package name="com.bbn.marti.xml.bindings"/>
+    </jxb:schemaBindings>
+  </jxb:bindings>
+
+  <jxb:bindings schemaLocation="TAKCLCommon.xsd">
+    <jxb:schemaBindings>
+      <jxb:package name="com.bbn.marti.takcl.config.common"/>
+    </jxb:schemaBindings>
+  </jxb:bindings>
+
+  <jxb:bindings schemaLocation="TAKCLConfig.xsd">
+    <jxb:schemaBindings>
+      <jxb:package name="com.bbn.marti.takcl.config"/>
+    </jxb:schemaBindings>
+  </jxb:bindings>
+
+  <jxb:bindings schemaLocation="TAKAConfig.xsd">
+    <jxb:schemaBindings>
+      <jxb:package name="com.bbn.marti.takcl.taka.config"/>
+    </jxb:schemaBindings>
+  </jxb:bindings>
+
+  <jxb:bindings schemaLocation="CoT_shape.xsd">
+    <jxb:schemaBindings>
+      <jxb:package name="com.bbn.marti.cot"/>
+    </jxb:schemaBindings>
+  </jxb:bindings>
+
+</jxb:bindings>

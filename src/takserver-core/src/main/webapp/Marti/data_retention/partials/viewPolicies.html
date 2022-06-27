@@ -1,0 +1,101 @@
+<div class="container-fluid">
+  <div>
+    <button ng-click="viewMissionArchive()" class="btn btn-secondary">View Mission Archiving</button>
+  </div>
+  
+  <h2>Data Retention Policies</h2>
+
+  <div class="container-fluid">
+
+    <br>
+
+    <div>
+      <span>Retention Policies</span>
+    </div>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th scope="col">Data</th>
+          <th scope="col">Time to Live</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr scope="row" data-ng-repeat="(data_type, policy) in policy_map">
+          <td>{{data_types[data_type]}}</td>
+          <td data-ng-show="!edit_policy[data_type]">
+            <span>{{policy.ttl_display}}</span>
+            <span style="float:right">
+              <button class="btn btn-info" data-ng-click="edit_policy[data_type] = true">Edit</button>
+            </span>
+          </td>
+          <td data-ng-show="edit_policy[data_type]">
+            <input type="number" min="0" data-ng-model="policy.ttl_number">
+            <select data-ng-model="policy.ttl_type">
+              <option value="hours">Hours</option>
+              <option value="days">Days</option>
+              <option value="weeks">Weeks</option>
+              <option value="months">Months</option>
+              <option value="years">Years</option>
+            </select>
+            <button class="btn btn-default" data-ng-click="setPolicyNull(data_type)">Set to None</button>
+            <span style="float:right">
+              <button class="btn btn-primary" data-ng-click="savePolicy(data_type)">Save</button>
+              <button class="btn btn-warning" data-ng-click="edit_policy[data_type] = false">Cancel</button>
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="container-fluid">
+    <h4>Retention Service Schedule</h4>
+    <small>How often do we run the policy?</small>
+    <div>
+      <span>{{cron_english}}</span>
+    </div>
+    <div>
+      <span>
+        Every:
+        <select data-ng-model="freq">
+          <option value="hour">Hour</option>
+          <option value="day">Day</option>
+          <option value="week">Week</option>
+          <option value="month">Month</option>
+          <option value="disabled">Never</option>
+        </select>
+      </span>
+      <span data-ng-show="freq === 'month'">
+        on day:
+        <select data-ng-model="split_cron.day">
+          <option data-ng-repeat="x in [].constructor(31) track by $index" data-ng-value='$index + 1'>{{$index + 1}}</option>
+        </select>
+      </span>
+      <span data-ng-show="freq === 'week'">
+        on:
+        <select data-ng-model="split_cron.day_of_week">
+          <option data-ng-repeat="dow in days_of_week" data-ng-value='$index'>{{dow}}</option>
+        </select>
+      </span>
+      <span data-ng-show="['month', 'week', 'day'].indexOf(freq) >= 0">
+        at:
+        <select data-ng-model="split_cron.hour">
+          <option data-ng-repeat="x in [].constructor(24) track by $index" data-ng-value='$index'>{{$index}}</option>
+        </select>
+        :
+        <select data-ng-model="split_cron.minute">
+          <option data-ng-repeat="x in [].constructor(60) track by $index" data-ng-value='$index'>{{("0" + $index).slice(-2)}}</option>
+        </select>
+      </span>
+      <span data-ng-show="freq === 'hour'">
+        at:
+        <select data-ng-model="split_cron.minute">
+          <option data-ng-repeat="x in [].constructor(60) track by $index" data-ng-value='$index'>{{("0" + $index).slice(-2)}}</option>
+        </select>
+        past the hour.
+      </span>
+      <button type="button" class="btn btn-primary" data-ng-click=saveCron()>Save</button>
+    </div>
+  </div>
+
+</div>

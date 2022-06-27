@@ -1,0 +1,6 @@
+ARG TAKSERVER_IMAGE_REPO=docker-devtest-local.artifacts.tak.gov/takserver-cluster/takserver-base
+ARG TAKSERVER_IMAGE_TAG=core-base
+FROM ${TAKSERVER_IMAGE_REPO}:${TAKSERVER_IMAGE_TAG}
+COPY takserver-core/takserver-pm.jar takserver-pm.jar
+COPY takserver-core/plugins/takserver-plugins-cluster.sh takserver-plugins-cluster.sh
+CMD ["sh", "takserver-plugins-cluster.sh"]

@@ -1,0 +1,70 @@
+<div class="modal-header">
+  <h3 class="modal-title pull-left">Lifecycle Commands</h3>
+  <h3 class="modal-title pull-right">{{lifecycleType}}</h3>
+</div>
+<div class="modal-body" data-ng-init="initialize()">
+  <form name="command">
+    <div class="panel-body">
+      <div ng-repeat="command in lifecycle.commands" class="rounded-corners-block" ng-init="commandType=command['@class'].substring(command['@class'].lastIndexOf('.') + 1)">
+        <!-- <span>{{commandType}} </span> -->
+        <div class="rounded-corners-block" ng-class="{'label-primary' : commandType === 'PrimeSoapRequest' , 'label-default': commandType === 'PrimeJolokiaRequest'}">
+          <div style="margin-bottom: 12px;">{{commandType === 'PrimeSoapRequest' ? 'SOAP Command' : 'Jolokia Command'}}
+            <div class="pull-right btn-group">
+              <button class="btn btn-default" ng-click="deleteLifecycleCommand(command)">
+                <span class="glyphicon glyphicon-trash"></span>
+              </button>
+            </div>
+          </div>
+
+          <div ng-show="commandType === 'PrimeSoapRequest'">
+            <textarea class="form-control ng-pristine" ng-model="command.message" ng-maxlength="2048" style="width: 100%; height: 150px;" ng-blur="updateLifecycleCommand(command)"></textarea>
+          </div>
+
+          <div ng-show="commandType === 'PrimeJolokiaRequest'">
+            <div class="command-row">
+              <input style="width: 40%; margin-right: 10px;" type="text" placeholder="Service" class="form-control ng-pristine" ng-model="command.service" ng-maxlength="64" ng-blur="updateLifecycleCommand(command)"></input>
+              <input style="width: 40%; margin-right: 10px;" type="text" placeholder="Operation" class="form-control ng-pristine" ng-model="command.operation" ng-maxlength="64" ng-blur="updateLifecycleCommand(command)"></input>
+            </div>
+
+            <div class="rounded-corners-block panel panel-default">
+              <div ng-repeat="argument in command.arguments track by $index">
+                <div class="">
+                  <p class="input-group">
+                    <input type="text" class="form-control ng-pristine" ng-model="command.arguments[$index]" placeholder="Argument" ng-blur="updateLifecycleCommand(command)" />
+                    <span class="input-group-btn">
+   	                	<button type="button" class="btn btn-default" ng-click="remove_argument(command, $index)">
+                        <span class="glyphicon glyphicon-trash"></span>
+                    </button>
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <div class="btn-group">
+                <button class="btn btn-primary" type="button" data-ng-click="add_argument(command);" style="float: left;">
+                  <span class="glyphicon glyphicon-plus"></span> Argument
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <label class="btn btn-primary" ng-model="newCommand.type" uib-btn-radio="'PrimeSoapRequest'">SOAP</label>
+        <label class="btn btn-primary" ng-model="newCommand.type" uib-btn-radio="'PrimeJolokiaRequest'">Jolokia</label>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" type="button" data-ng-click="addLifecycleCommand()" style="float: left;">
+          <span class="glyphicon glyphicon-plus"></span>
+        </button>
+      </div>
+
+    </div>
+
+</div>
+<div class="modal-footer">
+  <button class="btn btn-primary" type="submit" ng-click="submit()">OK</button>
+</div>
+</form>
+</div>

@@ -1,0 +1,8 @@
+create subscription
+matchrole abcd or (matchrole xxxx and matchrole yyyy)
+{"type" : "XPATH",
+ "filter" : "*",
+ "name" : "mySubcription"};
+  
+ remove subscription {"id" : "old_sub"};
+  

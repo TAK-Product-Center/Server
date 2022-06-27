@@ -1,0 +1,59 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: takserver-core
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  selector:
+    app: takserver-core
+  ports:
+  - protocol: TCP
+    port: 8443
+    name: http-8443
+  - protocol: TCP
+    port: 8444
+    name: fed-8444
+  - protocol: TCP
+    port: 8446
+    name: certs-8446
+  - protocol: TCP
+    port: 8089
+    name: tls-8089
+  - protocol: TCP
+    port: 9000
+    name: fedv1-9000
+  - protocol: TCP
+    port: 9001
+    name: fedv2-9001
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: takserver-core
+spec:
+  selector:
+      matchLabels:
+        app: takserver-core
+  replicas: 6 
+  template:
+    metadata:
+      labels:
+        app: takserver-core
+    spec:
+      serviceAccountName: ignite
+      containers:
+        - name: takserver-core
+          image: <AWS_ECR_URI>:core-provisioned
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: "2000m"
+          ports:
+            - containerPort: 8443
+            - containerPort: 8444
+            - containerPort: 8446
+            - containerPort: 8089
+            - containerPort: 9000
+            - containerPort: 9001

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TAKCLConfiguration xmlns="http://bbn.com/marti/takcl/config"
+  xmlns:common="http://bbn.com/marti/takcl/config/common">
+
+  <!-- If the TemporaryDirectory exists, it will be used. Otherwise, FallbackTemporaryDirectory in TAKCLCommon.xsd will be used-->
+  <common:TemporaryDirectory>${HOME}/.takcl/tmp/</common:TemporaryDirectory>
+  <common:FallbackTemporaryDirectory>TEST_TMP/</common:FallbackTemporaryDirectory>
+
+  <!-- modelServerDir: The directory of the martiRouter build to base all generated servers on-->
+  <!-- jarName: The name of the server's executable jar-->
+  <!-- serverFarmDir: The directory where generated servers will be placed-->
+  <!-- certificateDirectory: The directory that contains the certificates to use with the servers identified by the server identifier followed by the certificate file type.  Since these are also built into the jar now, this shouldn't need to be touched.-->
+  <common:RunnableTAKServerConfig
+    modelServerDir="../takserver-package/build/takArtifacts/"
+    jarName="takserver.war"
+    serverFarmDir="${TAKCL_TMP}/TEST_FARM"
+    certificateDirectory="${TAKCL_TMP}/TEST_CERTS/"
+    certToolDirectory="../takserver-package/build/takArtifacts/certs/"
+    />
+  <!-- url: the url of the server to connect to -->
+  <!-- truststoreJKSFilepath: The filepath for the truststore file.  If a certificate directory is set in RunnableTAKServerConfig, this should be file within that path.-->
+  <!-- truststorePass: The password for the truststore -->
+  <!-- clientKeystoreP12Filepath: The filepath for the client key file.  If a certificate directory is set in RunnableTAKServerConfig, this should be file within that path.-->
+  <!-- clientKeystorePass: The password for the client certificate to be used by spun up clients. -->
+  <common:ConnectableTAKServerConfig
+    url="127.0.0.1"
+    truststoreJKSFilepath="${TAKCL_TMP}/TEST_CERTS/truststore-root.jks"
+    truststorePass="atakatak"
+    clientKeystoreP12Filepath="${TAKCL_TMP}/TEST_CERTS/TAKCL.p12"
+    clientKeystorePass="atakatak"
+    />
+
+  <!-- If you do not know what this is, you can probably safely ignore it.-->
+  <common:TAKCLTestSourceGenerationConfig
+    javaSrcDir="src/"
+    javaTemplatePackage="com.bbn.marti.test.shared.data.templates"
+    javaGenerationPackage="com.bbn.marti.test.shared.data.generated"
+    />
+
+</TAKCLConfiguration>

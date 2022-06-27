@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration xmlns="http://bbn.com/marti/xml/config"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="CoreConfig.xsd">
+
+	<submission ignoreStaleMessages="false" validateXml="true"/>
+
+	<security>
+		<tls ></tls>
+	</security>
+	
+</Configuration>

@@ -1,0 +1,94 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+  
+  .rowHeader {
+  	text-align:right;
+  	padding-right:5px;
+  	width:200px;
+  	vertical-align:top;
+  }
+  
+  .rowValue {
+  	width:400px;
+  	text-align:right;
+  	vertical-align:top;
+  }
+  
+  .rowValue select {
+  	width:100%;
+  }
+
+  .rowValue input {
+  	width:400px;
+  }
+  
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+
+  .formTable {
+  	border-collapse: separate;
+  	border-spacing:10px
+  }
+
+  .inlineHelp {
+  	font:13px arial, sans-serif;
+  	font-style:italic;
+  	text-align:right;
+  	color:green;
+  }  
+  
+  .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+</style>
+
+<div id="injectionConfigurationView" data-ng-cloak>
+    <div id="injectorList" class="content" class="listContainer" data-ng-cloak>
+
+   	    <div data-ng-show="!showRmiError">
+		    <h3>Injectors</h3>
+		    <a data-ng-click="createInjector()" href="#!/createInjector">Create Injector</a>
+		            
+		    <!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+		    tablesorter js files, etc., results in a conflict with angular -->
+		</div>
+		
+		<div data-ng-show="injectors.length > 0">
+		    <table id="injectorsList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+		    	<thead>
+				  	<tr>
+					  	<th>UID</th>
+					  	<th>Injection</th>
+					  	<th>&nbsp;</th>
+					</tr>
+				</thead>
+				
+				<tbody>
+					<tr data-ng-repeat="x in injectors">
+					    <td data-ng-bind="x.uid"></td>
+					    <td data-ng-bind="x.toInject"></td>
+					    <td><a href="" data-ng-click="deleteObject(x.uid, x.toInject)">Delete</a></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div data-ng-show="!showRmiError && injectors.length == 0">
+			<table class="tablesorter" style="border-collapse:separate;border-spacing:2px;"><tr><td colspan="2">No Injectors Are Currently Configured</td></tr></table>
+	    </div>
+		
+		<div data-ng-show="showRmiError" data-ng-cloak>
+			<h2><font color="dc143c">Injector List Unavailable</font></h2>
+			<p>The injector list cannot be displayed because the Web application failed to connect to the TakServer broker.</p>
+			<p>Please ensure the broker is running and reload this page.</p>
+			<hr/>
+	    </div>
+		
+    </div>
+</div>

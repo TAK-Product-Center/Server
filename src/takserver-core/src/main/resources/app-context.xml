@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+    <beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:c="http://www.springframework.org/schema/c"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+    xmlns:jpa="http://www.springframework.org/schema/data/jpa"
+    xmlns:task="http://www.springframework.org/schema/task"
+    xmlns:cache="http://www.springframework.org/schema/cache"
+    xmlns:websocket="http://www.springframework.org/schema/websocket"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="
+        http://www.springframework.org/schema/beans     
+        http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context-4.0.xsd
+        http://www.springframework.org/schema/mvc
+        http://www.springframework.org/schema/mvc/spring-mvc-4.0.xsd
+        http://www.springframework.org/schema/tx
+        http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
+        http://www.springframework.org/schema/data/jpa
+        http://www.springframework.org/schema/data/jpa/spring-jpa.xsd
+        http://www.springframework.org/schema/task
+        http://www.springframework.org/schema/task/spring-task-4.0.xsd
+        http://www.springframework.org/schema/cache
+        http://www.springframework.org/schema/cache/spring-cache.xsd
+        http://www.springframework.org/schema/websocket
+        http://www.springframework.org/schema/websocket/spring-websocket.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+         
+  <!-- dataSource is autoconfigured by spring, from application.properties -->
+  <!-- Entity Manager Factory, including hibernate configuration. Expects container-managed connection pool to be configured in Tomcat -->
+  <!-- See https://docs.jboss.org/hibernate/orm/current/javadocs/org/hibernate/dialect/package-summary.html for postgres dialects if postgres version is updated -->
+ <bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean" lazy-init="true">
+    <property name="dataSource" ref="dataSource"/>
+    <property name="persistenceUnitName" value="martiPersistenceUnit"/>
+    <property name="persistenceProviderClass" value="org.hibernate.jpa.HibernatePersistenceProvider"/>
+    <property name="jpaPropertyMap">
+      <map>                               
+       <entry key="hibernate.connection.driver_class" value="org.postgresql.Driver"/>
+        <entry key="hibernate.hbm2ddl.auto" value=""/>
+        <entry key="hibernate.cache.use_query_cache" value="false"/>
+        <entry key="hibernate.cache.use_second_level_cache" value="false"/>
+        <entry key="hibernate.dialect" value="org.hibernate.spatial.dialect.postgis.PostgisPG95Dialect"/>
+        <entry key="javax.persistence.sharedCache.mode" value="ENABLE_SELECTIVE" />
+      </map>
+    </property>
+    <property name="jpaDialect">
+      <bean class="org.springframework.orm.jpa.vendor.HibernateJpaDialect" />
+	</property>
+    <property name="jpaVendorAdapter">
+      <bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter" />
+    </property>
+    <property name="packagesToScan" value="com.bbn.marti.model.kml, com.bbn.marti.sync.model, com.bbn.tak.tls, com.bbn.marti.device.profile.model,
+              com.bbn.marti.maplayer.model, com.bbn.user.registration.model"/>
+  </bean>
+ 
+  <bean class="org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor"/>
+  
+  <tx:annotation-driven transaction-manager="transactionManager"/>
+  
+  <bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+    <property name="entityManagerFactory" ref="entityManagerFactory"/>
+  </bean>
+  
+  <jpa:repositories base-package="com.bbn.marti.dao.kml, com.bbn.marti.sync.repository, com.bbn.tak.tls.repository, com.bbn.marti.device.profile.repository,
+com.bbn.marti.maplayer.repository, com.bbn.user.registration.repository" />
+  
+   <!-- Object/	ML Marshaller/Unmarshaller for Iconsets -->
+   <bean id="jaxb2Marshaller" class="org.springframework.oxm.jaxb.Jaxb2Marshaller" scope="prototype" >
+        <property name="classesToBeBound">
+            <list>
+                <value>com.bbn.marti.model.kml.Iconset</value>
+                <value>com.bbn.marti.model.kml.Icon</value>
+                <value>com.bbn.marti.sync.model.MissionChanges</value>
+                <value>com.bbn.marti.sync.model.MissionChange</value>
+                <value>com.bbn.marti.sync.model.UidDetails</value>
+                <value>com.bbn.marti.sync.model.Resource</value>
+            </list>
+        </property>
+    </bean>
+    
+  
+    
+    <!--  async task executor and scheduler for iconset loader and HTTP CoT search -->
+<!--     <task:annotation-driven executor="executor" scheduler="scheduler"/> -->
+<!--    <task:executor id="executor" pool-size="6"/>
+    <task:scheduler id="scheduler" pool-size="6"/> -->
+</beans>

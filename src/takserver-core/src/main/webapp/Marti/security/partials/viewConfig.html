@@ -1,0 +1,45 @@
+<div>
+    <h2>Security Configuration</h2>
+    <strong>Keystore File:</strong> {{secConfig.keystoreFile}}<br>
+    <strong>Truststore File:</strong> {{secConfig.truststoreFile}}<br>
+    <strong>TLS Version:</strong> {{secConfig.tlsVersion}}<br>
+    <strong>x509 Groups:</strong> {{secConfig.x509Groups}}<br>
+    <strong>x509 Add Anonymous:</strong> {{secConfig.x509addAnon}}<br>
+
+    <strong>Enable Certificate Enrollment:</strong> {{secConfig.enableEnrollment}}<br>
+
+    <div ng-hide="!secConfig.enableEnrollment">
+        <strong>CA Type:</strong> {{secConfig.caType}}<br>
+        <div ng-hide="secConfig.caType != 'TAKServer'">
+            <strong>Signing Keystore File:</strong> {{secConfig.signingKeystoreFile}}<br>
+            <strong>Validity Days:</strong> {{secConfig.validityDays}}<br>
+        </div>
+        <div ng-hide="secConfig.caType != 'MicrosoftCA'">
+            <strong>Username:</strong> {{secConfig.mscaUserName}}<br>
+            <strong>Truststore File:</strong> {{secConfig.mscaTruststore}}<br>
+            <strong>Template Name:</strong> {{secConfig.mscaTemplateName}}<br>
+        </div>
+    </div>
+
+    <a class="nav" href="#!/modifySecConfig">Edit Security</a><br>
+    <h2>Authentication Configuration (LDAP)</h2>
+	<div id="noLdapDiv" data-ng-show="noLDAP">
+		<p>LDAP is not currently defined in configuration.<br>To define LDAP edit the configuration and restart the server</p>
+    </div>
+    <strong>URL:</strong> {{authConfig.url}}<br>
+    <strong>User String:</strong> {{authConfig.userString}}<br>
+    <strong>Update Interval:</strong> {{authConfig.updateInterval}}<br>
+    <strong>Group Prefix:</strong> {{authConfig.groupPrefix}}<br>
+    <strong>Service Account DN:</strong> {{authConfig.serviceAccountDN}}<br>
+    <strong>Group Base RDN:</strong> {{authConfig.groupBaseRDN}}<br>
+    <div data-ng-show="showTest && testPassed">
+        <p style="background-color: #c4f5c3; width: fit-content;">
+            Your Authentication Configuration looks good!
+        </p>
+    </div>
+    <div data-ng-show="showTest && !testPassed">
+        <p style="background-color: #ecd2d1; width: fit-content;">
+            There was a problem with your Authentication Configuration.
+    </div>
+    <a class="nav" href="#!/modifyAuthConfig">Edit Authentication</a> <a class="nav" data-ng-click="testAuthConfig(cc)" href>Test Service Account</a>
+</div>

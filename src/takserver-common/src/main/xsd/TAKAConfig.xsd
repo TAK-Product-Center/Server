@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://bbn.com/marti/takcl/taka/config"
+           xmlns="http://bbn.com/marti/takcl/taka/config"
+           xmlns:common="http://bbn.com/marti/takcl/config/common"
+           elementFormDefault="qualified">
+
+  <xs:import schemaLocation="TAKCLCommon.xsd"
+             namespace="http://bbn.com/marti/takcl/config/common"/>
+
+  <xs:element name="TAKAConfiguration">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Configuration settings for TAKA</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element ref="common:TemporaryDirectory" minOccurs="1" maxOccurs="1"/>
+        <xs:element ref="common:FallbackTemporaryDirectory" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="common:RunnableTAKServerConfig" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="common:ConnectableTAKServerConfig" minOccurs="1" maxOccurs="1"/>
+        <xs:element name="ClientConfigurations" minOccurs="1" maxOccurs="1">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>TAKA Client sending configuration</xs:documentation>
+            </xs:annotation>
+            <xs:sequence>
+              <xs:element name="TAKAClientConfiguration" minOccurs="1" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:annotation>
+                    <xs:documentation>TCP Input Client configuration</xs:documentation>
+                  </xs:annotation>
+                  <xs:attribute name="protocol" type="common:Protocol" use="required"/>
+                  <xs:attribute name="clientCount" type="xs:nonNegativeInteger" use="required"/>
+                  <xs:attribute name="sendFrequencyMS" type="xs:nonNegativeInteger" use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute name="sendingDurationMS" type="xs:nonNegativeInteger" use="required"/>
+            <xs:attribute name="connectionDurationMS" type="xs:nonNegativeInteger" use="required"/>
+            <xs:attribute name="sendVariance" type="xs:boolean" use="required"/>
+            <xs:attribute name="clientReceiveNotificationInterval" type="xs:nonNegativeInteger" use="required"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

@@ -1,0 +1,37 @@
+<div class="modal-header">
+  <h3 class="modal-title">Edit Attributes</h3>
+</div>
+<div class="modal-body" data-ng-init="initialize()">
+  <form name="attributesForm" ng-submit="submit()">
+    <div class="panel-body">
+      <div class="row form-group" ng-class="{ 'has-error': attributesForm.name.$touched && attributesForm.name.$invalid }">
+        <label class="col-sm-3">Name</label>
+        <div class="col-sm-9">
+          <input type="text" class="form-control" name="name" ng-model="attributes.name" required />
+          <div class="help-block" ng-messages="attributesForm.name.$error" ng-if="attributesForm.name.$touched">
+            <p ng-message="required">A name is required.</p>
+          </div>
+        </div>
+      </div>
+      <div class="row form-group" ng-class="{ 'has-error': attributesForm.creator.$touched && attributesForm.creator.$invalid }">
+        <label class="col-sm-3">Creator</label>
+        <div class="col-sm-9">
+          <input type="text" name="creator" class="form-control" ng-model="attributes.creatorName" required />
+          <div class="help-block" ng-messages="attributesForm.creator.$error" ng-if="attributesForm.creator.$touched">
+            <p ng-message="required">A creator is required.</p>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <label class="col-sm-3">Description</label>
+        <div class="col-sm-9">
+          <input type="text" class="form-control" ng-model="attributes.description" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" type="submit">OK</button>
+      <!-- <button class="btn btn-warning" type="button" ng-click="cancel()">Cancel</button> -->
+    </div>
+  </form>
+</div>

@@ -1,0 +1,46 @@
+<div class="modal-header">
+  <h3 class="modal-title">Login</h3>
+</div>
+<div class="modal-body" data-ng-init="initialize()">
+
+  <form name="login" ng-submit="submit(credentials)" novalidate>
+    <div class="form-group">
+      <label for="username">Username</label>
+      <input type="text" name="username" class="form-control" ng-model="credentials.username" ng-class="{ 'has-error': credentials.username.$touched && credentials.username.$invalid }" required>
+      <p ng-show="credentials.username.$error.required">A username is required.</p>
+    </div>
+    <!-- <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" name="password" class="form-control" ng-model="credentials.password" ng-class="{ 'has-error': credentials.password.$touched && credentials.password.$invalid }" required>
+      <p ng-show="credentials.password.$error.required">A password is required.</p>
+    </div> -->
+
+
+    <div class="form-group">
+      <label for="amtName">AMT Server IP Address/Name</label>
+      <input type="text" name="amtName" class="form-control" ng-model="serverInfo.amt.name" ng-class="{ 'has-error': serverInfo.amt.name.$touched && serverInfo.amt.name.$invalid }" required>
+      <p ng-show="serverInfo.amt.name.$error.required">An AMT server name or ip address is required.</p>
+    </div>
+    <div class="form-group">
+      <label for="amtPort">AMT Server Port</label>
+      <input type="number" name="amtPort" class="form-control" ng-model="serverInfo.amt.port" ng-class="{ 'has-error': serverInfo.amt.port.$touched && serverInfo.amt.port.$invalid }" required>
+      <p ng-show="serverInfo.amt.port.$error.required">An AMT server port is required.</p>
+    </div>
+    <div>
+      <span title="{{serverStatus.Message}}">
+            <label>Server Status</label>
+            <i ng-show="serverStatus.amtOK && serverStatus.fusekiOK" class="fa fa-circle fa-fw" style="color:green;"></i>
+            <i ng-show="serverStatus.amtOK && !serverStatus.fusekiOK" class="ng-hide fa fa-exclamation-triangle fa-fw" style="color:orange;"></i>
+            <i ng-show="!serverStatus.amtOK" class="ng-hide fa fa-exclamation-circle fa-fw" style="color:red;"></i>
+        </span>
+      <div ng-if="serverStatus.amtOK">
+        <label>Fuseki Server URI:</label> {{serverInfo.fuseki.uri}}
+        <label>AMT Server Version:</label> {{serverInfo.amt.version}}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" type="submit" value="Submit" ng-disabled="credentials.$invalid">Login</button>
+      <!--             <button class="btn btn-warning" type="button" ng-click="cancel()">Cancel</button> -->
+    </div>
+  </form>
+</div>

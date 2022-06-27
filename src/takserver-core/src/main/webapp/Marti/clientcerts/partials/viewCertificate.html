@@ -1,0 +1,19 @@
+<style>
+    .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+</style>
+
+<div id="viewCertificateView">
+    <div id="clientCertificateContainer" class="content" >
+
+        <div data-ng-show="!showRmiError">
+            <h3>Client Certificate</h3>
+        </div>
+
+        <div data-ng-show="!showRmiError">
+            <p>{{ clientCertificate.subjectDn }} </p>
+            <pre style="font-family:courier;">{{ clientCertificate.certificate }}</pre>
+        </div>
+
+        <input type="button" data-ng-click="backToClientCertificates()" value="Back To Client Certificates" />&nbsp;
+    </div>
+</div>

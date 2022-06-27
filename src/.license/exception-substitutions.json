@@ -1,0 +1,14 @@
+{
+  "projects" :
+  [
+    { "in":"A Java implementation of the Amazon Ion data notation. ", "out":"Java Amazon Ion Notation" },
+	{ "in":"Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs", "out":"Bouncy Castle PKIX" },
+	{ "in":"Byte Buddy (without dependencies)", "out":"Byte Buddy" },
+	{ "in":"Castor CORE - Core code/functionality", "out":"Castor CORE" },
+	{ "in":"Castor XML - core", "out":"Castor XML" }
+  ],
+  "licenses" :
+  [
+    { "in":"MIT", "out":"MIT License" }
+  ]
+}

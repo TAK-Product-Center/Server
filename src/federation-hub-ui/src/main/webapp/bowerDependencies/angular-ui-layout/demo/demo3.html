@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html ng-app="x">
+<head lang="en">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width">
+
+  <title>Angular UI Layout Demo 2</title>
+
+  <link rel="stylesheet" type="text/css" href="../src/ui-layout.css"/>
+
+  <script type="application/javascript" src="../bower_components/angular/angular.js"></script>
+  <script type="application/javascript" src="../src/ui-layout.js"></script>
+  <script type="application/javascript">
+
+    var app = angular.module('x', ['ui.layout']);
+    app.controller('DemoController', function($scope, $timeout) {
+      $scope.config = {
+        flow: 'column'
+      };
+
+
+      $scope.layout = {
+        top: true,
+        one: true,
+        four: false
+      };
+
+      $scope.cloak = Object.keys($scope.layout).map(function(k) {return $scope.layout[k]}).includes(true);
+
+      $scope.toggle = function(which) {
+        $scope.layout[which] = !$scope.layout[which];
+      };
+
+      $scope.close = function(which) {
+        $scope.layout[which] = true;
+      };
+
+      $scope.open = function(which) {
+        $scope.layout[which] = false;
+      }
+
+      $scope.$on('ui.layout.loaded', function(evt, id){
+        console.error('loaded', typeof id, id)
+        if (id === null) {
+          $timeout(function(){
+            $scope.cloak = false;
+          }, 500)
+        } else {
+          $timeout(function(){
+            $scope.layout.one = true;
+            $scope.layout.top = true;
+          });
+        }
+
+      });
+
+      $scope.$on('ui.layout.toggle', function(){
+        console.error("toggle", new Date())
+      })
+    });
+
+  </script>
+  <style>
+    .red {
+      background-color: red;
+    }
+    .green {
+      background-color: green;
+    }
+    .ui-splitbar {
+      background-color: red;
+    }
+    .ui-layout-container {
+      background-color: rgba(255, 175, 89, 0.23);
+    }
+
+    .cloak {
+      position: absolute;
+      top: 0;
+      bottom:0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      background-color: cornflowerblue;
+    }
+
+  </style>
+</head>
+<body ng-controller="DemoController" >
+  <div class="cloak" ng-if="cloak"></div>
+  <div ui-layout="{flow: 'row'}" ui-layout-loaded>
+      <div id="top" ui-layout-container collapsed="layout.top" size="50px">TOP</div>
+      <div ui-layout-container>
+          <div ui-layout="config" >
+            <div id="one" ui-layout-container size="100px" max-size="50%" min-size="100px" collapsed="layout.one">
+              <div ui-layout="{flow: 'row'}">
+                <div ui-layout-container>One-One</div>
+                <div ui-layout-container>One-Two</div>
+                <div ui-layout-container>One-Three</div>
+              </div>
+            </div>
+            <div ui-layout-container>Two
+
+            </div>
+            <div ui-layout-container>
+              <!--Three-->
+              <div ui-layout="{ flow:'row', dividerSize:'12' }">
+                <div ui-layout-container>Three-One one={{ layout.one }}, top={{ layout.top }}</div>
+                <div ui-layout-container min-size="50px">
+                  Three-Two
+                  <div ng-include="demo/testinclude.html"></div>
+                </div>
+              </div>
+            </div>
+            <div ui-layout-container collapsed="layout.four">
+              Four
+            </div>
+          </div>
+      </div>
+  </div>
+
+</body>
+</html>

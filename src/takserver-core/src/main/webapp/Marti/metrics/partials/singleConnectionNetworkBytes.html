@@ -1,0 +1,56 @@
+<style type="text/css">
+	.axis path,
+	.axis line {
+		fill: none;
+		stroke: #000;
+		shape-rendering: crispEdges;
+	}
+
+	.x.axis path{
+		display: none;
+	}
+
+	.a.line{
+		fill: none;
+		stroke: red;
+		stroke-width: 2px;
+	}
+
+	.b.line{
+		fill: none;
+		stroke: green;
+		stroke-width: 2px;
+	}
+
+	.a.area {
+	  fill: orange;
+	}
+
+	.b.area {
+	  fill: lightgreen;
+	}
+
+	.x.grid, .y.grid line {
+	  stroke: white;
+	  stroke-opacity: 0.2;
+	  shape-rendering: crispEdges;
+	}
+
+	.grid path {
+	  stroke-width: 0;
+	}
+</style>
+
+<div id="singleBytesContent" class="d3content">
+   <div id="singleBytesLabel" style="text-align: center; margin-top: 5px">
+      <div style="padding: 0; margin: 0;">
+         <strong><u>Connection I/O (bytes/second)</u></strong>
+         <br><br>
+         <div class="legendRow">
+            <div class="legendElem" style="color: cyan;">Bytes Written: {{ curSingleBytesWritten }} </div>
+            <div class="legendElem" style="color: red;">Bytes Read: {{ curSingleBytesRead }} </div>
+         </div>
+      </div>
+   </div>
+   <div style="position: absolute; width: 100%" id="singleBytesChart" data-ng-init="initSingleBytesChart()"></div>
+</div>

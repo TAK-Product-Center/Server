@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://bbn.com/marti/xml/bindings"
+           xmlns:uaf="http://bbn.com/marti/xml/bindings"
+           elementFormDefault="qualified">
+  <xs:element name="UserAuthenticationFile">
+    <xs:complexType>
+      <xs:sequence minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="User">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>A User</xs:documentation>
+            </xs:annotation>
+            <xs:sequence>
+              <xs:element name="groupList" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+              <xs:element name="groupListIN" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+              <xs:element name="groupListOUT" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+            <xs:attribute name="identifier" type="xs:string" use="required"/>
+	    <xs:attribute name="fingerprint" type="xs:string" use="optional"/>
+            <xs:attribute name="password" type="xs:string" use="optional"/>
+            <xs:attribute name="passwordHashed" type="xs:boolean" use="optional"/>
+            <xs:attribute name="role" type="uaf:Role" default="ROLE_ANONYMOUS"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:simpleType name="Role">
+    <xs:annotation>
+      <xs:documentation>The role of the user</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ROLE_NONEXISTENT"/>
+      <xs:enumeration value="ROLE_ADMIN"/>
+      <xs:enumeration value="ROLE_READONLY"/>
+      <xs:enumeration value="ROLE_ANONYMOUS"/>
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>

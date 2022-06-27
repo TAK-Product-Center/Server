@@ -1,0 +1,241 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+  
+  .rowHeader {
+  	text-align:right;
+  	padding-right:5px;
+  	width:200px;
+  	vertical-align:top;
+  }
+  
+  .rowValue {
+  	width:400px;
+  	text-align:right;
+  	vertical-align:top;
+  }
+  
+  .rowValue select {
+  	width:100%;
+  }
+
+  .rowValue input {
+  	width:400px;
+  }
+  
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+
+  .formTable {
+  	border-collapse: separate;
+  	border-spacing:10px
+  }
+
+  .inlineHelp {
+  	font:13px arial, sans-serif;
+  	font-style:italic;
+  	text-align:right;
+  	color:green;
+  }  
+  
+  .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+</style>
+
+<div id="federateGroupsView">
+	<div id="federateGroupsViewContainer" class="content">
+
+    <h3>Federate Groups</h3>
+    
+    <p>You are configuring groups for federate: <b>{{federateName}}</b></p>
+    
+    <p>
+    A federate is another TAK installation with which you wish to share events.
+    </p>
+    <p>
+    When events arrive from this federate, you may direct them to devices in the local inbound groups you configure below.
+    Similarly, you may send events to this federate from devices in the outbound groups you configure.
+    </p>
+    <p>Note: Adding and Removing groups affects the runtime environment
+    immediately, and changes are saved to the configuration file.  This
+		configuration is associated with connections based on the certificate
+		provided when the TLS connection is initiated.  What is stored in the configuration
+		file is the SHA256 fingerprint of the certificate.
+    </p>
+    <p>
+    You must select at least one inbound or outbound group to effectively activate this federate.
+    </p>
+
+		<div data-ng-show="serviceReportedMessages">
+			<ul>
+				<li class="error" data-ng-repeat="message in messages">{{message}}</li>
+			</ul>
+		</div>
+
+	    <form name="federateGroupsForm" novalidate data-ng-submit="save()">
+	    
+		    <div style="border: 1px solid gray; padding:5px;">
+			  	<table class="formTable">
+			  		<tr>
+			  			<td class="rowHeader"><label style="font-weight:normal;" for="group">Group</label></td>
+			  			<td class="rowValue">
+			  				<input type="text" data-ng-model="group" name="group" maxlength="255" data-ng-pattern="/^[\w\d\s\.\(\)@#$_\=\-\+\[\]\{\}:,\|\\]*$/"/>
+			  			</td>
+			  			<td class="error">
+			  				<span data-ng-show="federateGroupsForm.group.$touched">
+			  					<span data-ng-show="federateGroupsForm.group.$error.maxLength">Group Name must be between 1 and 255 characters.</span>
+  								<span data-ng-show="federateGroupsForm.group.$error.pattern">The group name contains invalid characters.</span>
+			  				</span>
+			  			</td>
+			  		</tr>
+			  		<tr>
+			  			<td style="text-align:right;"colspan="2">
+			  				<button type="button" class="btn btn-default" data-ng-click="searchGroups()">Search LDAP</button>
+			  			</td>
+			  			<td></td>
+			  		</tr>
+			  		<tr>
+			  			<td class="rowHeader"><label style="font-weight:normal;" for="direction">Direction</label></td>
+			  			<td class="rowValue">
+					    	<select name="direction" data-ng-model="direction" required>
+							<option value="BOTH">Both (Inbound/Outbound)</option>
+				      			<option value="INBOUND">Inbound</option>
+							<option value="OUTBOUND">Outbound</option>
+							</select>
+			  			</td>
+			  			<td></td>
+			  		</tr>
+			  		
+			  		<tr>
+			  			<td style="text-align:right;"colspan="2">
+			  				<button type="button" class="btn btn-default" data-ng-click="addGroup(group, direction)">Add Group</button>
+			  			</td>
+			  			<td></td>
+			  		</tr>
+				</table>
+	    	</div>
+			    
+	    	<br/>
+	   
+		    Groups configured for this federate:
+		    <br/>
+		    <table data-ng-show="federateGroups.length > 0" id="groupList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+		    	<thead>
+				  	<tr>
+					  	<th>Group</th>		  
+					  	<th>Direction</th>
+					  	<th>&nbsp;</th>
+					</tr>
+				</thead>
+				
+				<tbody>
+					<tr data-ng-repeat="fg in federateGroups">
+					    <td data-ng-bind="fg.group"></td>
+					    <td data-ng-bind="fg.direction"></td>
+					    <td><a class="nav" data-ng-click="deleteObject(fg.group, fg.direction)">Remove</a></td>
+					</tr>
+				</tbody>
+			</table>
+	
+			<div data-ng-show="federateGroups.length == 0">
+				<table class="tablesorter"><tr><td colspan="2">No Groups Configured</td></tr></table>
+		    </div>
+
+			<br/>
+		</form>
+
+			<form name="federateGroupsMapForm" novalidate data-ng-submit="save()">
+				<h3>Federated Group Mapping </h3>
+
+				<div style="border: 1px solid gray; padding:5px;">
+					<p>
+						Add remote group and map to local group of this federate. The Remote Group List will only be populated when the federate
+						is connected. Manual entry can be added in the Remote Group field. A remote group may be mapped to many local groups.
+					</p>
+
+					<table class="formTable">
+						<tr>
+							<td class="rowHeader"><label style="font-weight:normal;" for="remoteGroups">Remote Group List</label></td>
+							<td class="rowValue">
+								<select name="remoteGroup" data-ng-model="remoteGroup" id="remoteGroup" data-ng-click="remoteGroup(remoteGroup)">
+									<option value ="">-- Select Group -- </option>
+									<option data-ng-repeat="remoteGroup in federateRemoteGroups" value="{{remoteGroup}}">{{remoteGroup}}</option>
+								</select>
+							</td>
+						</tr>
+						<tr>
+
+						<tr>
+							<td class="rowHeader"><label style="font-weight:normal;" for="remoteGroup">Remote Group</label></td>
+							<td class="rowValue">
+								<input type="text" data-ng-model="remoteGroup" name="remoteGroup" maxlength="255" data-ng-pattern="/^[\w\d\s\.\(\)@#$_\=\-\+\[\]\{\},\|\\]*$/"/>
+							</td>
+							<td class="error">
+			  				<span data-ng-show="federateGroupsMapForm.remoteGroup.$touched">
+			  					<span data-ng-show="federateGroupsMapForm.remoteGroup.$error.maxLength">Remote group Name must be between 1 and 255 characters.</span>
+  								<span data-ng-show="federateGroupsMapForm.remoteGroup.$error.pattern">The remote group name contains invalid characters.</span>
+			  				</span>
+							</td>
+						</tr>
+
+						<tr>
+							<td class="rowHeader"><label style="font-weight:normal;" for="localGroup">Local Group</label></td>
+							<td class="rowValue">
+								<input type="text" data-ng-model="localGroup" name="localGroup" maxlength="255" data-ng-pattern="/^[\w\d\s\.\(\)@#$_\=\-\+\[\]\{\},\|\\]*$/"/>
+							</td>
+							<td></td>
+							<td class="error">
+			  				<span data-ng-show="federateGroupsMapForm.localGroup.$touched">
+			  					<span data-ng-show="federateGroupsMapForm.localGroup.$error.maxLength">Local group Name must be between 1 and 255 characters.</span>
+  								<span data-ng-show="federateGroupsMapForm.localGroup.$error.pattern">The local group name contains invalid characters.</span>
+			  				</span>
+							</td>
+						</tr>
+
+						<tr>
+							<td style="text-align:right;"colspan="2">
+								<button type="button" class="btn btn-default" data-ng-click="addGroupMap(remoteGroup, localGroup)" >Map Group</button>
+							</td>
+							<td></td>
+						</tr>
+					</table>
+				</div>
+				</br>
+				Group Mapping configured for this federate:
+				<br/>
+				<table id="groupMultiMap" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+					<thead>
+					<tr>
+						<th>Remote Group</th>
+						<th>Local Groups</th>
+						<th>Group Removal</th>
+					</tr>
+					</thead>
+					<tbody>
+					<tr data-ng-repeat="(key, value) in federateGroupsMap">
+						<td>{{key}}</td><td>{{value}}</td>
+						<td>
+							<select data-ng-model="selectedGroup" data-ng-click="selectLocalGroup(selectedGroup)">
+							<option value ="">-- Select Group -- </option>
+							<option data-ng-repeat="v in value" value="{{v}}">{{v}}</option>
+							</select><a class="nav" data-ng-click="deleteGroupMap(key, selectedGroup)">Remove</a>
+						</td>
+					</tr>
+					</tbody>
+				</table>
+				<div data-ng-show="federateGroupsMap.length == 0">
+					<table class="tablesorter"><tr><td colspan="2">No Groups Configured</td></tr></table>
+				</div>
+
+				<br/>
+				<input type="button" data-ng-click="backToFederates()" value="Back To Federates" />&nbsp;
+				<br/><br/>
+		</form>
+	</div>
+</div>

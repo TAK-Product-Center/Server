@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xs:schema version="1.0" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <xs:element name="feed" type="feed"/>
+
+  <xs:element name="videoConnections" type="videoConnections"/>
+
+  <xs:complexType name="feed">
+    <xs:sequence>
+      <xs:element name="address" type="xs:string" minOccurs="0"/>
+      <xs:element name="alias" type="xs:string" minOccurs="0"/>
+      <xs:element name="buffer" type="xs:string" minOccurs="0"/>
+      <xs:element name="fov" type="xs:string" minOccurs="0"/>
+      <xs:element name="heading" type="xs:string" minOccurs="0"/>
+      <xs:element name="id" type="xs:int"/>
+      <xs:element name="ignoreEmbeddedKLV" type="xs:string" minOccurs="0"/>
+      <xs:element name="latitude" type="xs:string" minOccurs="0"/>
+      <xs:element name="longitude" type="xs:string" minOccurs="0"/>
+      <xs:element name="preferredMacAddress" type="xs:string" minOccurs="0"/>
+      <xs:element name="timeout" type="xs:string" minOccurs="0"/>
+      <xs:element name="path" type="xs:string" minOccurs="0"/>
+      <xs:element name="port" type="xs:string" minOccurs="0"/>
+      <xs:element name="protocol" type="xs:string" minOccurs="0"/>
+      <xs:element name="range" type="xs:string" minOccurs="0"/>
+      <xs:element name="roverPort" type="xs:string" minOccurs="0"/>
+      <xs:element name="rtspReliable" type="xs:string" minOccurs="0"/>
+      <xs:element name="source" type="xs:string" minOccurs="0"/>
+      <xs:element name="type" type="type" minOccurs="0"/>
+      <xs:element name="uuid" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="videoConnections">
+    <xs:sequence>
+      <xs:element ref="feed" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:simpleType name="type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="VIDEO"/>
+      <xs:enumeration value="SENSOR_POINT"/>
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>
+

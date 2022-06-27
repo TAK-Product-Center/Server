@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-configuration
+data:
+  pg_hba.conf: |-
+    {{- $.Files.Get "extras/pg_hba.conf"  | nindent 4 -}}
+  postgres.conf: |-
+    {{- $.Files.Get "extras/postgres.conf"  | nindent 4 -}}

@@ -1,0 +1,45 @@
+<div class="modal-header">
+  <h3 class="modal-title">New {{workflow.diagramType}} Diagram</h3>
+</div>
+<div class="modal-body" data-ng-init="setRoleProductSetOptions()">
+
+  <form name="workflowForm" ng-submit="submit(workflowForm.$valid)">
+    <div class="form-group" ng-if="workflow.diagramType == 'Workflow'" ng-class="{ 'has-error': workflowForm.roleProductSet.$invalid }">
+      <label for="roleProductSet">Role/Product Ontology</label>
+      <select class="form-control" name="workflowForm.roleProductSet" id="roleProductSet" ng-model="workflow.roleProductSet" required autofocus>
+        <option value="">-- Select role-product ontology set --</option>
+        <option ng-repeat="roleProductSet in roleProductSetOptions" value={{roleProductSet.id}}>{{roleProductSet.name}}</option>
+      </select>
+      <div class="help-block" ng-messages="workflowForm.roleProductSet.$error" ng-if="workflow.roleProductSet.$touched">
+        <p ng-message="required">A role-product ontology must be selected.</p>
+      </div>
+    </div>
+
+    <div class="form-group" ng-class="{ 'has-error': workflowForm.workflowName.$touched && workflowForm.workflowName.$invalid }">
+      <label for="workflowName">Diagram Name</label>
+      <input type="text" name="workflowName" class="form-control" ng-model="workflow.name" required/>
+      <div class="help-block" ng-messages="workflowForm.workflowName.$error" ng-if="workflowForm.workflowName.$touched">
+        <p ng-message="required">A Diagram name is required.</p>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="federationVersion">Federation Version</label>
+      <input type="text" name="federationVersion" class="form-control" ng-model="workflow.version" />
+    </div>
+    <div class="form-group">
+      <label for="federationType">Federation Type</label>
+      <input type="text" name="federationType" class="form-control" ng-model="workflow.type" />
+    </div>
+    <div class="form-group">
+      <label for="workflowDescription">Diagram Description</label>
+      <input type="text" name="workflowDescription" class="form-control" ng-model="workflow.description" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" type="submit" value="Submit" ng-disabled="workflowForm.$invalid">OK</button>
+      <button class="btn btn-info" type="button" ng-click="useActivePolicy()">Use Active Policy</button>
+      <button class="btn btn-warning" type="button" ng-click="cancel()">Cancel</button>
+    </div>
+  </form>
+
+
+</div>

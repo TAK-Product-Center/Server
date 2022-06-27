@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html ng-app="takUserManagementApp" >
+<head>
+
+    <link rel="icon" type="image/x-icon" href="../Marti/favicon.ico" />    
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+    <meta content="utf-8" http-equiv="encoding">
+    <title>Manage Users</title> 
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <!-- This jQuery 3.5.0 is needed for the standard TAK header to work -->
+    <script type="text/javascript" src="../Marti/jquery/jquery-3.5.0.js"></script> 
+  
+    <script src="bower_components/angular/angular.min.js"></script>
+    <script src="bower_components/angular-route/angular-route.min.js"></script>
+
+    <link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.min.css">
+    <script src="bower_components/jquery/dist/jquery.min.js"></script>
+    <script src="bower_components/popper.js/dist/umd/popper.min.js"></script>    
+    <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+
+    <link rel="stylesheet" href="bower_components/components-font-awesome/css/font-awesome.min.css">
+
+    <link rel="stylesheet" href="css/main.css">
+
+    <link rel="stylesheet" href="bower_components/ng-dialog/css/ngDialog.min.css">
+    <link rel="stylesheet" href="bower_components/ng-dialog/css/ngDialog-theme-default.min.css">
+    <script src="bower_components/ng-dialog/js/ngDialog.min.js"></script>
+    <script src="bower_components/ngDraggable/ngDraggable.js"></script>
+        
+</head>
+<body>
+
+<!-- <div style="font:18px arial, sans-serif;" ng-include="'../Marti/menubar.html'"></div> -->
+<div style="font:18px arial, sans-serif;" ng-include="'menubar_modified.html'"></div>
+
+<div ng-controller="takUserManagementController">
+
+<!--    <div class="header">
+        <h1>TAK User Management</h1>
+    </div> -->
+    
+    <div class="topnav">
+        <!-- <a href="#/!">Home</a> -->
+        <a href="#!new_user" ng-click="init_new_user()"> <i class="fa fa-user-plus" aria-hidden="true"></i> Add User</a>
+        <a href="#!new_users" ng-click="init_new_users()"> <i class="fa fa-user-plus" aria-hidden="true"></i><i class="fa fa-user-plus" aria-hidden="true"></i> Add Users</a>
+
+    </div>
+
+    <div class="three_columns_parent">
+    <div class="column left" style="background-color:#F3F2F1;">
+        <h3>Users <button style="font-size:20px;" ng-click="refresh_users()"> <i class="fa fa-refresh"></i> </button> </h3> 
+        <p>Search <input type="text" ng-model="user_search_term"></p>
+
+        <div class="list_container">
+            <div ng-repeat="x in users | filter:{username:user_search_term} | orderBy:'username' ">
+
+                <div class="dropright user_object" id="button_user_{{ x.username }}">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton_user_{{ x.username }}" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        {{ x.username }}
+                    </button>
+                    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton_user_{{ x.username }}">
+                      <a class="dropdown-item" href="#!user_edit_groups" ng-click="user_edit_groups(x.username)">View/Edit groups</a>
+                      <a class="dropdown-item" href="#!user_change_password" ng-click="user_change_password(x.username)">Change password</a>
+                      <a class="dropdown-item" ng-click="user_delete(x.username)">Delete User</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+
+
+    </div>
+    <div class="column middle" style="background-color:white;">
+        <div ng-view></div>
+
+    </div>
+    <div class="column right" style="background-color:#F3F2F1;">
+        <h4 style="display:inline;"> Groups </h4> 
+        <button style="font-size:18px;" ng-click="refresh_groups()"> <i class="fa fa-refresh"></i> </button> 
+        &nbsp; 
+        <button style="margin-top:10px;" ng-click="open_new_group_dialog()"><i class="fa fa-users" aria-hidden="true"></i>Add New Group</button>
+        
+        <p style="margin-top:10px;">Search <input type="text" ng-model="group_search_term"></p>
+
+        <div class="list_container" ng-drop="true" ng-drop-success="onDropCompleteToGroupListRepo($data,$event)" > 
+            <div ng-repeat="x in groupnames | filter:{groupname:group_search_term} | orderBy:'groupname' ">
+                
+                <div class="dropright group_object" id="button_group_{{ x.groupname }}" ng-drag="true" ng-drag-data="{'groupname': x.groupname, 'from': 'GroupListRepo'}" data-allow-transform="true" ng-drag-success="onDragComplete($data,$event)">
+                    <button class="btn btn-info dropdown-toggle" type="button" id="dropdownMenuButton_group_{{ x.groupname }}" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        {{ x.groupname }}
+                    </button>
+                    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton_group_{{ x.groupname }}">
+                      <a class="dropdown-item" href="#!group_list_users" ng-click="group_list_users(x.groupname)">List users</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        <div ng-drag-clone="">
+            <button class="btn btn-info" type="button">{{ clonedData.groupname }}</button>
+        </div>
+
+    </div>
+    </div>
+    
+    <div ng-include="'/Marti/footer.jsp'"></div>
+
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/controllers/takUserManagerController.js"></script>
+<script src="js/controllers/newUserController.js"></script>
+<script src="js/controllers/newUsersController.js"></script>
+<script src="js/controllers/newGroupController.js"></script>
+<script src="js/controllers/userEditGroupsController.js"></script>
+<script src="js/controllers/userChangePasswordController.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,25 @@
+
+/**
+  Demo CSS
+*************************************/
+.layout-mock *:not(.ui-splitbar){
+  background : #eee no-repeat center;
+}
+
+
+.layout-mock .center-back{
+  background-image: url("http://placehold.it/400x300/eee/666&text=CENTER");
+}
+.layout-mock .north-back{
+  background-image: url("http://placehold.it/400x300/eee/666&text=NORTH");
+}
+.layout-mock .south-back{
+  background-image: url("http://placehold.it/400x300/eee/666&text=SOUTH");
+}
+.layout-mock .east-back{
+  background-image: url("http://placehold.it/400x300/eee/666&text=EAST");
+}
+.layout-mock .west-back{
+  background-image: url("http://placehold.it/400x300/eee/666&text=WEST");
+}
+

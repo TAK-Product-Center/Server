@@ -1,0 +1,259 @@
+<style>
+.blur-filter {
+  -webkit-filter: blur(2px);
+  -moz-filter: blur(2px);
+  -o-filter: blur(2px);
+  -ms-filter: blur(2px);
+  filter: blur(2px);
+}
+
+.selectedCon{
+   background-color: green;
+}
+
+#metrics-container {
+   word-wrap: break-word; 
+   color: white;
+   padding-right: 2%;
+   padding-left: 2%;
+   padding-top: 10px;
+   background-color: #26282f;
+   height: 100%;
+}
+
+#header {
+   text-align: center
+}
+
+.aspect{
+   position: relative; 
+   padding-top: 75%;
+}
+.aspect-50{
+   position: relative; 
+   padding-top: 50%;
+}
+
+.t7 {
+   color: black;
+   width: calc(50% - 7.75px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+}
+
+.row-2 {
+   margin-bottom: 10px;
+   color: black;
+   width: calc(100%);
+   display: inline-block;
+   font-size: 0;
+   vertical-align: top;
+   display: flex
+}
+
+.row-3 {
+   margin-bottom: 10px;
+   color: black;
+   width: calc(100%);
+   display: inline-block;
+   font-size: 0;
+   vertical-align: top;
+   display: flex
+}
+
+.row-2-c1 {
+   color: white;
+   width: calc(50%);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   margin-right: 0.5%;
+}
+.row-2-c2 {
+   color: white;
+   width: calc(50% );
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+}
+
+.row-3-c1 {
+   color: white;
+   width: calc(33.33% - 3px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   margin-right: 0.375%;
+}
+.row-3-c2 {
+   color: white;
+   width: calc(33.33% - 3px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   margin-right: 0.375%;
+}
+.row-3-c3 {
+   color: white;
+   width: calc(33.33% - 3px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+}
+
+.donut {
+   margin-bottom: 5%
+}
+
+.donutLabel{
+   padding-top: 2%;
+   padding-bottom: 2%
+}
+.rb {
+   border: 1px solid black;
+   border-radius: 15px;
+   background: #393c47;
+   color: white
+}
+.d3content {
+   position: absolute;
+   top: 0; bottom: 0; left: 0; right: 0; 
+}
+.legendRow {
+   color: black;
+   width: calc(100%);
+   display: inline-block;
+   font-size: 0;
+   vertical-align: top;
+   display: flex
+}
+.legendElem{
+   width: 50%; 
+   font-size: 15px;
+}
+</style>	
+<div id="metrics-container">
+   <!-- HEADER -->
+<div style="text-align: center; background-color: #FF4000;" data-ng-show="hasAdminRole && !dbIsConnected">Database Unavailable: Check Connectivity </div>
+<div style="text-align: center; background-color: #FF4000;" data-ng-if="hasAdminRole && actualNum > maxConnections">
+  PostgreSQL database configuration suggestion <a href="/Marti/database/index.html"> available.</a>
+</div>
+<div id="header" class="rb">
+  <h2>Metrics Dashboard</h2>
+</div>
+<hr style="background-color: white">
+
+<button ng-click="closeRow1()" style="font-size: 15px;"> {{ hideRow1 ? "+" : "-" }} </button>
+<div class="row-3" ng-hide="hideRow1">
+  <div class="row-3-c1">
+     <div data-ng-init="initStartTime()" class="rb" style="width: 100%; height: calc(33.333% - 2.667px); margin-bottom: 4px; text-align: center;">
+        <strong><u>Server Start Time</u></strong>
+        <p style="margin-top: 10px"> {{ startTime }} </p>
+     </div>
+     <div data-ng-init="initUptime()" class="rb" style="width: 100%; height: calc(33.333% - 2.667px); margin-bottom: 4px; text-align: center;">
+        <strong><u>Server Up Time</u></strong>
+        <p style="margin-top: 10px"> {{ upTime }} </p>
+     </div>
+     <div data-ng-init="initClients()" class="rb" style="width: 100%; height: calc(33.333% - 2.667px); text-align: center;">
+        <strong><u>Clients Connected</u></strong>
+        <p style="margin-top: 10px"> {{ clientsConnected }} </p>
+     </div>
+  </div>
+  <div class="rb row-3-c2">
+     <div class="aspect">
+        <div id="cpuContent" class="d3content">
+           <div id="cpuLabel" class="donutLabel" style="text-align: center;"> 
+              <strong><u>CPU Usage</u></strong>
+              <br><br>
+              <span><strong>Cores:</strong> {{cpuCores}}</span> | <span><strong>Usage</strong>: {{cpuRatio}}</span>
+           </div>
+           <div data-ng-init="initCpuGauge()" id="donut" class="donut" style="text-align: center;"></div>
+        </div>
+     </div>
+  </div>
+  <div class="rb row-3-c3" style="text-align: center;">
+     <div class="aspect">
+        <div data-ng-include="'./partials/heapMemory.html'"></div>
+     </div>
+  </div>
+</div>
+<!-- ROW BREAK -->
+<hr style="background-color: white">
+
+<button ng-click="closeRow2()" style="font-size: 15px;"> {{ hideRow2 ? "+" : "-" }} </button>
+<div class="row-2" ng-hide="hideRow2">
+  <div class="rb row-2-c1" style="text-align: center;">
+     <div class="aspect-50">
+        <div data-ng-include="'./partials/networkBytesRead.html'"></div>
+     </div>
+  </div>
+  <div class="rb row-2-c2" style="text-align: center;">
+     <div class="aspect-50">
+        <div data-ng-include="'./partials/networkBytesWritten.html'"></div>
+     </div>
+  </div>
+</div>
+
+<hr style="background-color: white">
+
+<button ng-click="closeRow3()" style="font-size: 15px;"> {{ hideRow3 ? "+" : "-" }} </button>
+<div class="row-2" ng-hide="hideRow3">
+  <div class="rb row-2-c1" style="text-align: center;">
+     <div class="aspect-50">
+        <div data-ng-include="'./partials/networkReads.html'"></div>
+     </div>
+  </div>
+  <div class="rb row-2-c2" style="text-align: center;">
+     <div class="aspect-50">
+        <div data-ng-include="'./partials/networkWrites.html'"></div>
+     </div>
+  </div>
+</div>
+
+<hr style="background-color: white">
+
+<button ng-click="closeRow4()" style="font-size: 15px;"> {{ hideRow4 ? "+" : "-" }} </button>
+<div class="row-3" ng-hide="hideRow4">
+  <div class="rb row-3-c1" style="text-align: center;">
+     <div class="aspect">
+        <div id="submissionQueueGaugeContent" class="d3content">
+           <div id="submissionQueueGaugeLabel" class="donutLabel" style="text-align: center;"> 
+              <strong><u>Submission Queue</u></strong>
+              <br><br>
+              <span><strong>Current Size:</strong> {{submissionSize}}</span> | <span><strong>Capacity</strong>: {{submissionCapacity}}</span>
+           </div>
+           <div data-ng-init="initSubmissionQueueGauge()" id="submissionQueueGauge" class="donut" style="text-align: center;"></div>
+        </div>
+     </div>
+  </div>
+  <div class="rb row-3-c2" style="text-align: center;">
+     <div class="aspect">
+        <div id="brokerQueueGaugeContent" class="d3content">
+           <div id="brokerQueueGaugeLabel" class="donutLabel" style="text-align: center;"> 
+              <strong><u>Broker Queue</u></strong>
+              <br><br>
+              <span><strong>Current Size:</strong> {{brokerSize}}</span> | <span><strong>Capacity</strong>: {{brokerCapacity}}</span>
+           </div>
+           <div data-ng-init="initBrokerQueueGauge()" id="brokerQueueGauge" class="donut" style="text-align: center;"></div>
+        </div>
+     </div>
+  </div>
+  <div class="rb row-3-c3" style="text-align: center;">
+     <div class="aspect">
+        <div id="repositoryQueueGaugeContent" class="d3content">
+           <div id="repositoryQueueGaugeLabel" class="donutLabel" style="text-align: center;"> 
+              <strong><u>Repository Queue</u></strong>
+              <br><br>
+              <span><strong>Current Size:</strong> {{repositorySize}}</span> | <span><strong>Capacity</strong>: {{repositoryCapacity}}</span>
+           </div>
+           <div data-ng-init="initRepositoryQueueGauge()" id="repositoryQueueGauge" class="donut" style="text-align: center;"></div>
+            </div>
+         </div>
+      </div>
+   </div>
+   <br>
+   <br>
+   <br>
+   <br>
+</div>

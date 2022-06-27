@@ -1,0 +1,30 @@
+<configuration debug="false">
+  
+   <!-- console logger -->
+   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+	  <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>     
+   </appender>
+
+<appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>logs/TAKServer.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <!-- daily rollover -->
+      <fileNamePattern>logs/TAKServer.%d{yyyy-MM-dd}.log</fileNamePattern>
+
+      <!-- keep 90 days worth of history -->
+      <maxHistory>90</maxHistory>
+    </rollingPolicy>
+
+    <encoder>
+      <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %-5level - %msg %ex{0}  %n</pattern>
+    </encoder>
+  </appender> 
+
+  <root level="debug">
+    <appender-ref ref="STDOUT" />
+    <appender-ref ref="FILE" />
+  </root>
+
+</configuration>

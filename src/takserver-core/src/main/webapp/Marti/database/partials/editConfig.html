@@ -1,0 +1,19 @@
+<div style="text-align: center; background-color: #FF4000;" data-ng-if="hasAdminRole && actualNum > maxConnections">  PostgreSQL database configuration suggestion <a href="/Marti/database/index.html"> available.</a></div>
+<div class="container-fluid">
+  <div>
+      <h3>Database Configuration</h3>
+      PostgreSQL Version: <strong>{{dbVersion}}</strong><br>
+      Enable Latest SA (share location of other users at connection time): <strong><input id="latestSA" type="checkbox" data-ng-model="dbConfig.latestSA"></strong><br>
+      Default Connection Pool Size (only applies if pool size auto-detection is disabled): <strong><input id="numDBConnections" type="number" data-ng-change="changeNumDbConn()" data-ng-model="dbConfig.numDbConnections" data-ng-disabled="dbConfig.connectionPoolAutoSize"></strong><br>
+      Connection Pool Auto Size: <strong><input id="connectionPoolAutoSize" type="checkbox" data-ng-change="changeNumDbConn()" data-ng-model="dbConfig.connectionPoolAutoSize"></strong><br>
+      <div>The pool size is determined by the server CPU count, and can be changed by updating the database postgresql.conf configuration file.
+       See PostgreSQL <a href="https://www.postgresql.org/docs/10/runtime-config-connection.html">documentation</a> for further information.</div><br>
+      Enable Archive (saving messages in database): <strong><input id="archive" type="checkbox" data-ng-model="dbConfig.archive"/></strong><br><br>
+      Database URL: <strong><input id="dbUrl" type="text" data-ng-model="dbConfig.dbUrl"></strong><br>
+      Database Username: <strong><input id="dbUser" type="text" data-ng-model="dbConfig.dbUsername"></strong><br>
+      Database Password: <strong><input id="dbPass" type="password" data-ng-model="dbConfig.dbPassword" autocomplete="off"></strong><br>
+      <button class="btn btn-primary" type="button" data-ng-click="saveDatabaseConfig(dbConfig)">Save</button><br><br>
+  	<p><strong>Changes to configuration will not apply until server is restarted.</strong></p>
+  	<br><a class="nav" href="#!/">Back</a><br>
+  </div>
+</div>

@@ -1,0 +1,81 @@
+<div id="container" ng-init="initialize()">
+  <div ui-layout style="position: relative; height: 100%">
+    <div ui-layout="{flow : 'column' }">
+      <!-- <div ui-layout-container min-size="260px" size="30%">
+        <div ng-include="'views/workflows/workflow_editor_sidebar.html'" style="height: 100%; overflow: auto;"></div>
+      </div> -->
+      <div ui-layout-container min-size="300px" style="overflow: hidden;">
+        <div style="height: 100%; overflow: hidden;">
+          <nav class="navbar navbar-inverse nav navbar-top-links" style="margin:0px; white-space:nowrap; background-color: #337ab7; border-color: #337ab7;">
+            <div class="container-fluid">
+              <div class="navbar-header">
+                <a class="navbar-brand" ng-click="openAttributesEditor()" style="color:white;">{{workflow.name}}</a>
+                <ul class="nav navbar-nav" ng-if="workflow.diagramType === 'Workflow'">
+                  <li ng-if="criticResults.length > 0"><a id="criticIcon" href="" ng-click="" class="fa fa-exclamation-triangle" style="color:yellow; font-size: 24px"> ({{criticResults.length}})</a></li>
+
+                  <li class="dropdown">
+                      <a class="dropdown-toggle" data-toggle="dropdown" title="{{workflow.federationName !== ''  ?  'Federation: ' + workflow.federationName : 'Choose Federation'}}" style="color:white; font-size: 24px">
+                          <i class="fa fa-sitemap fa-fw"></i>
+                          <i ng-if="!workflow.federationId" class="fa fa-times" style="position: absolute; left: 42px; font-size: 16px; color:rgba(208, 208, 208, 0.72)"></i>
+                          <i ng-if="workflow.federationId" class="fa fa-check" style="position: absolute; left: 42px; font-size: 16px; color:#3eff3e"></i>
+                      </a>
+                      <ul class="dropdown-menu dropdown-user" style="left:0; right:auto;">
+                          <li class="dropdown-header">Federation</li>
+                          <li><a href="" ng-click="chooseFederation()">Choose a Federation</a></li>
+                          <!-- <li><a href="" ng-click="editFederation()" ng-if="workflow.federationId">Edit the Federation</a></li> -->
+                          <li><a href="" ng-click="removeFederation()" ng-if="workflow.federationId">Remove the Federation from the Workflow</a></li>
+                      </ul>
+                  </li>
+                  <li><a href="" ng-click="instantiateAndExecute()" title="Instantiate and Execute" class="fa fa-cogs" style="color:white; font-size: 24px"></a></li>
+                  <li><a href="" ng-click="downloadTemplateContainer()" title="Download Template Container" class="fa fa-download" style="color:white; font-size: 24px"></a></li>
+
+                  <li class="dropdown">
+                      <a class="dropdown-toggle" data-toggle="dropdown" title="Semantic Subscriptions" style="color:white; font-size: 24px">
+                          <i class="fa fa fa-envelope-open"></i>
+                          <span class="" style="position: absolute; left: 24px; font-size: 12px; font-weight: bold; color: #777;">{{workflow.semanticRequests.length}}</span>
+                      </a>
+                      <ul class="dropdown-menu dropdown-user" style="left:0; right:auto;">
+                          <li class="dropdown-header">Semantic Subscriptions</li>
+                          <li><a href="" ng-click="addSemanticSubscription()">
+                            <span class="btn btn-default btn-sm glyphicon glyphicon-plus" ng-click="addSemanticSubscription()"/>
+                            Create New Semantic Subscription
+                          </a>
+                        </li>
+                           <li class="divider"></li>
+                          <li ng-repeat="request in workflow.semanticRequests">
+                            <a>
+                                <span class="btn btn-default btn-sm glyphicon glyphicon-pencil" ng-click="editSemanticSubscription(request)"/>
+                                <span class="btn btn-default btn-sm glyphicon glyphicon-trash"  ng-click="deleteSemanticSubscription(request)"/>
+                              {{request.name}}
+                            </a>
+                          </li>
+                      </ul>
+                  </li>
+
+                </ul>
+              </div>
+              <ul class="nav navbar-nav navbar-right">
+                <li><a href="" ng-click="zoomToFit()" title="Zoom To Fit"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAYdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuOWwzfk4AAAKPSURBVEhLrZTPShxBEMajhoCICXgIK1m9Sa5CwFMkR+9egpCzSHwCfYHFBxAPHnLIC5hbyMl7PCuYv3gKnqKwuDs93ZPfV6lZ1jAzrmQ/KLr766qvqqt75sG/KIriYUppPYT4PoRwFmP8xfocO8rzfJNx1l3vD8RfIiDRAjGWRcE6aszzWIjHLuE2oCY8bDQQ9BrLJBJC/pMEO4gsw833er3nWZZtM/+sZPgkTtcZOQmOqjyjytTv9w9YP/KtW4CfJPE24kFJwJZv1YMg9dzaInGnG0ES3YVwTXzL6WrgtF62pawcDo08ypgPTIXTqlWdhPVHjLjQMaE66LUgpEvdcUoVSvwTArulIbSvQpivyodxjaJ0H6cWVAcCz6hIWHbKEkjUlwb2X8hpKMEc4n1GPbcpc6oCTnrnEpx3SsF3JmCqu7sSB+rvAadzeegpOlWbAG74BI+xGwpkSNPmVAU2+UJjoXfulCVQzyVaGm17o56zVyZYwXTJF+zXfw8Ebvrl6SOaFEcQlH3Ahr9CJj5IwP47v+RDrWtBwCxOly70VpyeooSqDLcn7L+iCFWRwS2ZUBNw2sBZn3/QiRCxk1RB4lkWfhOjgvaafAfAaQLtjpI49BGtYXPs6bXoQlfYpy0hMJf4EfaU+ztmXHCpeigJjlvYNWY9R1Dv/Aq7GeLUlj0M8fwEE/eD+EWXagaOLT/NKSL2z2au9l0wHsItQfHTi8cSLwH/DWu7zGggbgprETjNeOspwi2QV5Ub9NRJ+BX+mbv8P9BdVOUS53SWiPWXsSZBrK3KTd1BO+/friaoYlUucb90neQ7dvfrGhXdbretystWCcxPfHs8UFtUucQZ9X/74Fvjg9qiyiWeUpr5A57Ozp+2UOyWAAAAAElFTkSuQmCC"/></a></li>
+                <li><a href="" ng-click="JointPaper.paperScroller.zoom(JointPaper.options.zoom.step, { max: JointPaper.options.zoom.max })" title="Zoom In"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAYdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuOWwzfk4AAAKmSURBVEhLrZW/TxRBFMflYmgUi6vulKOhkMKCxITKioaexpBQExITIq38AZf4HxgKC/8BJDFSai2tWJwgoTJcI+R+7uzO+vmObzec7q1H4Ju8zLw3b77z5r03u3f+Rpqmd733q84l75xz35Ik+YneQvbiON5gnDHX6wPyZxCINIUMNU3RE41xnKSyI+fY1jBN2bbJwKbnSCQS5+JT5juQLDLWB4PB4yiKXjD/osPw8dyuOfEhOCryiCj9cOjeoE/b0giwV/DbgtzpELBpS+PBJuU8pMXI86g6nU4d/Snr82YKsFoIl6zXzFwMnFaztOA8EjlESpPq8N5MAZh0kwOEfa5p5mKoWyASyY6ZcmB7VXSAgG2FoFSPIzMVQ60oErAonfE+B25D8BL5oAV8vsaxDzbUBfkxr0I+ZFS7FdYsACf1uSpWl874EPEiFnQ7pTADS+vyY6raXfyxltQBp5Y81IqmV5GPyAGRt0TOXEHsS7Atm98DpM+6b7fb4x8fTrzQJFWfmykHa1kN9s2UA9sSovSd4TL+PZCCDYtSj6hi5oCyA9jz1oq8a6ZisHkGp3Mj2jJzAPoTZD1LS4Z+v7+MTY8tYlsoeikgWcNZz9/pRmwauclViDyK3C/2KKDXZb45cJqCu6lDDHpEK0iVNXWLCrrEOmlxjrnI91irUb9PzBtGNR46BMdN5FIEll/1+QXSv2KLmCtyyONDa+Mf6HNGVQ5ttNscQRS+2cyVvjPGXdQFpALxZ5FnwPcYmTWaycC+aaSmPmccaUXIGogiD1Crc+B3bI/M5eaAdw7Ck+xnJKDr73d7h/R6vQa1OQ7sBtJ5/XSVQRErcpFb0XWTE+T/3TUput3urCLPUiUwP7Tl24HSoshFzqjv2z//kRtDaVHkIvfe3/sNzVit6EoXpswAAAAASUVORK5CYII="/></a></li>
+                <li><a href="" ng-click="JointPaper.paperScroller.zoom(-JointPaper.options.zoom.step, { min: JointPaper.options.zoom.min })" title="Zoom Out"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAYdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuOWwzfk4AAAJ3SURBVEhLrZW/SlxBFMbjEmzEFDauZLVJESGNELBKmjT2NsEXCEJAkrQ+gLBvECws8gL+aVKmj7Up/JNgFdxGXZa7d2bu3Py+m3NBZe/dK+wHh5k595tvzpxzZvfJQ+R5/jTGuO599s17/yvLsr+sT7H9EMIHxlmjPh6Iv0FAojliLPOcdaYxhCyXH7vCt4FryrY1A5veY04i3oc/zLcRWWFcGA6HL51zH5n/1GFwIrfbaXwIREXuiDKmqf/Keto+3QP+FrwtxL0OAZv2qRpsUs6LtJj42KisFsIt/La5RwPSepmWqsgfwm7yHWOf75p7NNQtKijkbXM1Avw1glI9Tsw1GmpFIhJWtO73+/MhxM8IfCqNAn+543suHuMc4imj2q365pDU56rYgtaQXxfHGXQ7pbAEvLfGU+1u/ntr6gDpVAy1oq1fYAcy58IR4sVcxvwwTeMr4z3DEnyx1+tVPz5IvNAsV5+bqxHYt4qpyJfEV915ajmlALIeUcvcY8GePSvyrrlGA+FZSFdKE/Mtc9ciSZJ39tgc25bNXQ2ENyDr+XvdqO4mEnfOXys9WLfRrSFNob2jQwx6RGvYHN/ULSroKt9Ji/fMJb7Ptzb1+8F80aSqoUMgbmK3ErD8qs9vsOSOzzFX5IiHY2vj36yXTKoe2kiQXTadIFT8ZjNX+i4Zd1kuYy1FLvEScM+xjsk0A/umsbb6nPFeKyK2yLmKvIBanQPP8BcvfSJAd0mRS5zbFQex1r/f5A5BrKPIC3UD6Xx8uuqgiBW5xK3ouskFNr67mmIwGHQUeZkqgfmxfZ4MlBZFLnFG/b4d2KfJQWlR5BKPMc78AxFabIDaWUOjAAAAAElFTkSuQmCC"/></a></li>
+                <li><a href="" ng-click="JointPaper.commandManager.undo()" title="Undo"><img height="24" width="24" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH3gUJFB8F9xfmuAAAAXVJREFUWMPFVyFvhDAY7ZY5wgWDB0OCGgK/zYDcEv4A9xP2A0huqUGgMBgSpjHbZNUlSBCcQmBGMMguJOhOkZALcBtw7VNtEO/1o1/f+wBYAIRQBFgBIRQRQghTciYChuTUBZyTUxUwRk5NwBT5lgJu5sgNw7Cnvvu+/zTct217chzn5+onn0Nd198IoSgIghfq5GNiwjC0mZAPkWXZEUIoMCHvURRFPiXilkY3qaqqWZZ1ZFoFQgiJ4/jAVATGGDO/D+edcTcmwDTNPUII/PUh4jhO2u12kizLD7quP84dTlGUZwDA+9WeYgihEMfxAWOMp34DFTNyXVcqiiLfxEeW2jGEUBgTQTWQeJ6nbeakSyNZkiQfm1n5klAahqE9NKmLbTiHvkX/g67rqn5dVdVptReYprlfWsGyLL+om9EQTdN8Uo/0/R0Ym6ioVEAUxXsAAMjz/I3JRNVnRSaBxPM8jed5IU3TV2bz5KqUvAau60qXUtAvgjDx+TUgP8EAAAAASUVORK5CYII="/></a></li>
+                <li><a href="" ng-click="JointPaper.commandManager.redo()" title="Redo"><img height="24" width="24" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH3gUJFB4vNbceLwAAAX5JREFUWMPFlrFugzAQhk9V1yCW7J0iZSpPAWMr8QL0BSL1DahuyZCdBYnOXtqOZqHNmESiEwMLiCWjJaTM16VIJAVCHYK/CSHb9/ts/3cAA8E5D0AlRERKRdAvykRQDSUi6ITRRVADo4qgFs6JuJUJhoi6pmlGn7GmaTqcc7As6+miHXqe98g5D4qiyEgC6ePwfd+RDXqRCETUt9ttRAPTSwQi6kmSxHQl6iJumgTYth3N53NDiaMxxly6Ip1HgIi6EEIoCV7d+LGDHxnRbDZ7OHdEu93uM8uyr7Is88PhkFf/F4tF1DYnDMPXXkbUln4hhGCMuYioD23FZxdJkiReLpd3oxSjpuBdux68HJ8uslqtDJm50r5fX2S9Xr+N3pLVi47v+84YTemRFed5/l19159YH3o/tS4BaZp+yGZPtuE4ErDf799BNZzzQOYOyPKnHMdx/AIAMJ1O75VmoSiKTEkGAAA2m83zZDLR/2NEg1N1wUovJGPM7VOILuEHm1L39Jz2+jIAAAAASUVORK5CYII="/> </a></li>
+                <li><a href="" ng-click="policyToJson()" title="Export Policy to Json" class="fa fa-file-code-o" style="color:white; font-size: 24px"></a></li>
+                <li><a href="" ng-click="policyToYaml()" title="Export Policy to YAML" class="fa fa-file-o" style="color:white; font-size: 24px"></a></li>
+                <li><a href="" ng-click="graphToJson()" title="Export Graph to Json" class="fa fa-sitemap" style="color:white; font-size: 24px"></a></li>
+                <li><a href="" ng-click="graphToPNG()" title="Export to PNG"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAYdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuOWwzfk4AAANUSURBVEhLtZVLSJRRFMdHHV/lKx8UFRnUvkUuhVYRBC2KNi3TaNsiqK2VmRZFmWS4CFpWixYFpVEDJW6CBLEywwTRQWcc5+W8fMz0+9/ujKPOaIs68J9z73n8zzn3ft83jlySSqUKlpeXjyeTyZvboB2U2rS/l5WVlRYSY8AFXm+BVzSzw6ZtLwSXSZP4Fjw0xjxCrBMUak1sLetm48gnBBRZ7SRhANwBpVugnNgCgXUDiGxbRKJCBGuCDmsygn0PtiM50ARO4E+hF8Exm5JbgsFgHUG5CrRZglyIqoCE9VdUsU3bLDjXTcBex1AIdOYlG0FcJdjHWuSTqIOGKJ8oaXV19R3BXVNTU+XoKmxl+YBf96E7+AlUyGmpHDMzM/V2uSZer3cvBd4Q+JwEXWQNqM4HYirRFWlyC/N00eBhQ5otY2Nj9QQ0k+ADOt8QCOYCcQF0g/KyyHV0erLqDOFGmZ6eNg4CdoMz4KzVuXAasgpLbB5zbIekJawb7XJNGKtWWknZOp/gV8eGXALp+mPBWTw/P9/K2V8HbdIej6cTW6d09hp9KwudxF6zORnMzc0Zm9/vP+9yuZyOaDT6gCL/RRYXF7s1kl6M/yI8jT8yBfg8r/AWd4XD4Rvojng8PoQvSRefsbWjH2tPXIJ9RywWG7IkCdbP+AJfAVdZv5RdIm59mse1gTA+OjpaYe9FF+fk+Po5+x7WxQTvJOQDtrBeQIrcVr1AIHCO+6girmV2dvYiMU/EJzEF6OC7NtkFRIapCLIeLqzP7XY3+ny+k5FIpAn4RRgKhe4vLS19Ia6Eru+yDqO90HjgTIrTFNCPNjgSg4ODlSpAcr3ImM5NV4+Gh4dr6FhkZdj7FhYWDhDTDdF7bAUQv9CTw1rfLL3VIXRKp5MpkEgkzASc/ynOeQLnkuyM3jsxMVFNAxFO5/L4+HiVjog70QSTmob1BfJDfHsukZIpQANjKvBNGxVQMvtW7dMCQe/IyMgu/BEI/epeU0J6T34me8oRNjBRAw2WEL8fjrB8aj5zyRLG9zGucaaFaeKyE2z2+INcrIeJMv8BcEQp8AtM03Xcmv8UoLMBu//nwsT9DrppostPun26U2dzWdhks/uNcbLrCUrvZ+H8GAgEjv4G4pE3OLEvYrYAAAAASUVORK5CYII="/> </a></li>
+                <li><a href="" ng-click="graphToSVG()" title="Export to PNG"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAYdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuOWwzfk4AAALXSURBVEhLtZU7aFNRGMfbmjZNaa32gU+SQhV0iC90suIUH4jgo+hane0mzg4+KF0EHVQQdLCKtZOKooiOcXBQECoOQk2opUiMNO/cxN//cErTm3vbDvqHP9/7+853zm3a4IVqtdpYKpVilUrl6jK8AoO2bOUol8vnKczBd/D5EnzGYdps2fIguVWSwlfwpnH6gNwAbJJObhf6gAn4gYRVVgYoeA1HYXAJhshtFNF7YWbZIYIGkawNrlmXAf71+HZ6cC88TLyKnIMHbYk30ul0N0leAy7bBl7MaoCA/gXRbMvqQXDRBti6hiaoO29xk7wOuAldzb8j+kwjP6jIcZw3JI9MTU2FkKvxtfqRuN5Db/ANalDAtmpIJpM9Vl3A7OzsRga8JPEJBXrINbDTj+R0INvnm1uar4sDbjFNazE5OdlDwgAFv6Du9w9Me5G838he1dU019Xpy+o2Dd1IJBImQMI6eAoOWunFkzRrt43NZ46vX1JAj1h1AazVJamiWukH4jqxaS7QtP5aBCVZar0gcv4BPUm8DZq7XhIkNfPDdowirXzGypVQV3fa5avlUXoHtNIYrGD8U6gnGNMA61oMPtUSsYLVHfSyCYDaGvQ5q9ZBebqiOhB4lM1m9xeLxX30flEoFG7ju6UY9udcLneOn/QivgupVKqPKz6O/tUUu+A3oB+OUngXcxfyIfZuxRhwneZnsS/BPfBtPp+/CE8o7obngEwmM4zQH9wQDeKVipNEhmg+w1YHkPpHE8Z3B5awJ+BH1brhOYDkT/AxJz/Cybai6z2i2DcIr0Wf4QojGsA275Hd+LeZYhfqBpBcVVOk+T2CnQyYo/k99BYaDimPTYbJGyT2g9wRuF1+Nzw3mACRSKQvHA5H7gP5pqenf24G8Xj8g2weNxWLxQ5tANFodMf4+PhT+d3w/Uzxl2HJmgbyWdUAW9D1Oda1CPjNBuaE/wOO4zz4C6+7JGBwVQXOAAAAAElFTkSuQmCC"/> </a></li>
+                <li><a href="" ng-click="JointPaper.paper.print()" title="Print"><img height="24" width="24" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAFMAAABTAFphr05AAAAB3RJTUUH3gUJFB4h0g8zKAAABBZJREFUaN7tmk9II1ccx38JY0AmWjcQi6jkz9IaCppEK+KheCi0WKgXmat62D0UQrYH/8SVkAFNEfQkal3BtYIoq4R6qig9rGLEkEOR0qKsYWrSQ2aiM5MOTaoZM73sQpJqMyYzcQL7hXeZvDfv93nz+73f+81EJQgC5NP8/PzXra2tDrPZbIUCdXR09Kqnp+fZysrKN/39/d+DVBIE4X/b9PS0XZBAOzs7PwiCACRJRjc2NvB884pt6nyAFovlCUgsDMM8m5ubuBT3ygtQXV1dDzJIKgikkEHJZDJ5fX19fZ8xqVQqcQcEYBiGyxYD+/v7W5m+HAqFTjwej7pQnyVJMpobH8XExL0Bjo+Pj4oJutsAioFQg0JUaEwoBqBQiJIDcBxHSwlRcoBAIPBSyidRcgCCIBa3tramGYZhpIBASg0wNjb2FwAM4Tj+HEEQ9EESmRTCcTwFAGzOtUqNRvNBzjUVjuOC4gBuk9Fo7B8YGMg6qU5MTDzKBVXsNlqQC+E4rtLr9V/odDr7bR3a29s/ekgDm5qavl1fX/8n9zpN07/EYrFdpLm5eaK3t/e5UlcYwzDPXb/5fL7vVOFwmGhsbDSKvWEsFqOCweCPchhbV1f3id1u/0xs/0gk8oeKJMlobW3th+Xo/xRFkVm70M3Nzc3q6qozHo//brVaHV1dXb2Kp8g83oZCoZOMWtgmKFwkSUaztlGtVlvj9XqrAABQFDWWgxv9JwbOz89DFxcXf1oslk9RFEXLKgYAAAwGw2ODwfC4XAK57DPxe4D3AFLWAyzLsoeHh6+UbHBDQ4OtpaWlI28iU2pbW1tz3ZnI3ml3d3eZoqjouxYMBn8u9UovLy8/zbSBoqio1+utFlWRVVZWPspMbjRNRzNLvI6Ojhf19fUtUhqcSCTiBwcHg4ODg78CAFRUVKC5h0xBENRFl5RVVVW27u7upzJl1icA8EzWXSiRSIQ5juPkAKBp+jfZ30q43e7L8fFxk1arlbTUTKVS7PDw8ElJXqu43e5LALhURB7gOI65b0W2tLTUp9frW6U05Orqij07O5sdHR29EDuG4zgG8fv9syaTaUatVouKh6mpqY+HhoZW5FhNn8+nAQBRLxjS6XTa7/fPIn19fXOTk5M/1dTUWHme5xwOR76BV+l0Oi0W+D7ieT6Zr084HPYtLCycsCx77HK5CAQAwOVyEQBAiJlkZGTkfGZm5nOdTmeT2oUikciGiPnfAMCbooLY6XS+BoDXZXMaValUJT+1ip1T1BMwmUxN29vbi7d9KpXL/s7Ozi8lA9BoNBq5jg+yuFA8Ho8ozVCGYRie5/8WBXB6evpCaQB7e3tLbz+KZPvaXX+3mZub+6qtrc1pNpttD2k4x3F0IBB4SRDE4tvPU1n6F+1BrqV/fUaVAAAAAElFTkSuQmCC"/> </a></li>
+                  <li><a href="" ng-click="policyJsonAsFile()" title="Download policy as json file" class="fa fa-floppy-o" style="color:white; font-size: 24px"></a></li>
+                  <li><a href="" ng-click="sendToFederationManagerAndFile()" title="Set policy as active policy, and save it to the server" class="fa fa-cloud-upload" style="color:white; font-size: 24px"></a></li>
+                  <li><a href="" ng-click="sendToFederationManagerWithoutDownload()" title="Send policy to Federation Manager" class="fa fa-upload" style="color:white; font-size: 24px"></a></li>
+              </ul>
+            </div>
+          </nav>
+          <div id="paper-container" style="margin-left:240px; overflow: auto;height: 100%; border: 1px solid #ddd; border-radius: 4px;">
+            <joint-diagram id="joint-diagram" graph="workflow.graph" grid-size="1" />
+          </div>
+          <div id="stencil-container"></div>
+        </div>
+      </div>
+    </div>

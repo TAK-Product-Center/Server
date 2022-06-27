@@ -1,0 +1,17 @@
+create subscription
+matchrole JTAC or (matchrole RESCUEESCORT and matchrole PLANE)
+{type : "XPATH",
+ filter : "*",
+ topics : [CAS_REQUEST, BLUE_FORCE_TRACKING],
+ name : "mySubscription"};
+create subscription
+matchrole WARFIGHTER
+{type : SPARQL,
+ filter : "SELECT  ?io
+     WHERE { ?producer <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://ontology.ihmc.us/IMS/IMSActor.owl#IMSClient> .
+             ?io <http://ontology.ihmc.us/IMS/IMSEntity.owl#hasPublisher>
+             ?producer ;
+       <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>  <http://ontology.ihmc.us/IMS/IMSEntity.owl#InformationObject> .}",
+ name : "warfighter_semantic_sub"};
+
+

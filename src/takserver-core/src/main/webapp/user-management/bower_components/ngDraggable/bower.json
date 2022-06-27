@@ -1,0 +1,16 @@
+{
+  "name": "ngDraggable",
+  "main": "ngDraggable.js",
+  "version": "0.1.10",
+  "homepage": "https://github.com/fatlinesofcode/ngDraggable",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "angular": "latest"
+  }
+}

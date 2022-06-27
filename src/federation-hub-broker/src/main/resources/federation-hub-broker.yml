@@ -1,0 +1,31 @@
+keystoreType: JKS
+keystoreFile: /opt/tak/certs/files/takserver.jks
+keystorePassword: atakatak
+
+truststoreType: JKS
+truststoreFile: /opt/tak/certs/files/fed-truststore.jks
+truststorePassword: atakatak
+
+keyManagerType: SunX509
+
+# v1 federation only.
+v1Enabled: true
+v1Port: 9101
+useEpoll: true
+context: TLSv1.2
+allow128cipher: true
+allowNonSuiteB: true
+enableOCSP: false
+tlsVersions:
+ - TLSv1.2
+ - TLSv1.3
+
+# v2 federation only.
+v2Enabled: true
+v2Port: 9102
+maxMessageSizeBytes: 67108864
+metricsLogIntervalSeconds: 5
+clientTimeoutTime: 15
+clientRefreshTime: 5
+enableHealthCheck: true
+useCaGroups: true

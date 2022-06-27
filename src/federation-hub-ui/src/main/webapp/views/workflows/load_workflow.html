@@ -1,0 +1,55 @@
+
+<div class="modal-header">
+  <h3 class="modal-title">{{mode.charAt(0).toUpperCase() + mode.slice(1)}} {{diagramType}} Diagram</h3>
+</div>
+<div class="modal-body" data-ng-init="initialize()">
+  <!--
+<div class="row">
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3>Load Workflow</h3>
+      </div>
+-->
+  <div class="panel-body">
+
+    <table st-table="displayedCollection" class="table table-striped" st-safe-src="rowCollection">
+      <thead>
+        <tr>
+          <th st-sort="name">Diagram Name</th>
+          <th st-sort="creatorName">Creator</th>
+          <th st-sort="creationDate">Creation Date</th>
+          <th st-sort="modifiedDate">Modified Date</th>
+          <th>Description</th>
+          <th>Thumbnail</th>
+        </tr>
+        <tr>
+          <th colspan="6"><input st-search="" placeholder="global search..." class="input-sm form-control"
+            type="text" /></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr st-select-row="row" st-select-mode="single" ng-repeat="row in displayedCollection | filter: diagramTypeFilter track by row.name ">
+          <td>{{row.name}}</td>
+          <td>{{row.creatorName}}</td>
+          <td>{{row.creationDate | date}}</td>
+          <td>{{row.modifiedDate | date}}</td>
+          <td>{{row.description}}</td>
+          <td><img width=150 height=75 src="{{row.thumbnail}}"/></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5" class="text-center">
+            <div st-pagination="" st-items-by-page="itemsByPage" st-displayed-pages="7"></div>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button class="btn btn-primary" type="submit" ng-click="submit()" ng-disabled="selectedRowId==-1">OK</button>
+  <button class="btn btn-warning" type="button" ng-click="cancel()">Cancel</button>
+</div>

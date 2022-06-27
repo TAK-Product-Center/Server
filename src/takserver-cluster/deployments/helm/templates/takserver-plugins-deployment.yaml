@@ -1,0 +1,37 @@
+{{ if .Values.takserver.plugins.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: takserver-plugins
+spec:
+  selector:
+      matchLabels:
+        app: takserver-plugins
+  replicas: {{ .Values.takserver.plugins.replicas }}
+  template:
+    metadata:
+      labels:
+        app: takserver-plugins
+    spec:
+      serviceAccountName: takserver-ignite
+      containers:
+        - name: takserver-plugins 
+          image: "{{ .Values.takserver.plugins.image.repository }}:{{ .Values.takserver.plugins.image.tag }}"
+          env:
+            - name: "spring_profiles_active"
+              value: "k8cluster"
+          resources:
+            requests:
+              cpu: {{ .Values.takserver.plugins.resources.requests.cpu }}
+            limits:
+              cpu: {{ .Values.takserver.api.resources.limits.cpu }}
+          volumeMounts:
+            - name: config #The name(key) value must match pod volumes name(key) value
+              mountPath: /certs/files/
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Values.certConfigMapName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+{{- end }}

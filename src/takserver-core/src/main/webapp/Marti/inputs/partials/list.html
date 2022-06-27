@@ -1,0 +1,145 @@
+<div style="text-align: center; background-color: #FF4000;" data-ng-show="hasAdminRole && !dbIsConnected">Database Unavailable: Check Connectivity </div>
+<div style="text-align: center; background-color: #FF4000;" data-ng-if="hasAdminRole && actualNum > maxConnections">
+  PostgreSQL database configuration suggestion <a href="/Marti/database/index.html"> available.</a>
+</div>
+<div id="inputView" data-ng-cloak>
+  <div id="inputList" class="content" class="listContainer" data-ng-cloak>
+    <h3>Inputs (Server Ports)</h3>
+    <a data-ng-click="createInput()" href="#!/createInput">Add Input (Server Port)</a>
+		<div data-ng-show="inputMetrics.length">
+
+			<!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+           tablesorter js files, etc., results in a conflict with angular -->
+			<table id="inputMetricsList" class="tablesorter">
+				<thead>
+					<tr>
+						<th>Auth Type</th>
+						<th>Name</th>
+						<th>Protocol</th>
+						<th>Port</th>
+						<th>Core Messaging Version</th>
+						<th>TLS</th>
+						<th>Group</th>
+						<th>Interface</th>
+						<th>Archive</th>
+						<th>Filter Group</th>
+						<th>Anonymous Group</th>
+						<th>Archive Only</th>
+						<th>Reads Received</th>
+						<th>Messages Received</th>
+						<th>Number Connected</th>
+						<th>&nbsp;</th>
+						<th>&nbsp;</th>
+					</tr>
+				</thead>
+
+				<tbody>
+					<tr data-ng-repeat="x in inputMetrics">
+						<td data-ng-bind="x.input.auth"></td>
+						<td data-ng-bind="x.input.name"></td>
+						<td data-ng-bind="x.input.protocol"></td>
+						<td data-ng-bind="x.input.port"></td>
+						<td data-ng-bind="x.input.coreVersion"></td>
+						<td>{{x.input.protocol === 'tls' ? (x.input.coreVersion == 2
+							? x.input.coreVersion2TlsVersions : secConfig.tlsVersion) : ''}}</td>
+						<td data-ng-bind="x.input.group"></td>
+						<td data-ng-bind="x.input.iface"></td>
+						<td data-ng-bind="x.input.archive"></td>
+						<td data-ng-bind="x.input.filtergroup"></td>
+						<td data-ng-bind="x.input.anongroup"></td>
+						<td data-ng-bind="x.input.archiveOnly"></td>
+						<td data-ng-bind="x.readsReceived"></td>
+						<td data-ng-bind="x.messagesReceived"></td>
+						<td data-ng-bind="x.numClients"></td>
+						<td><a href="" data-ng-click="deleteObject(x.input.name)">Delete</a></td>
+						<td><a class="nav"
+							href="#!/modifyInput/{{x.input.name | encodeURIComponent}}">Modify</a></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<h3>QoS (Quality of Service)</h3>
+		<div>
+			<div>When enabled, rate limiters will be applied based on the number of connected clients, as shown in the tables.</div>
+			<div>&nbsp;</div>
+			<div>Active Clients <b>{{activeClients}}</b></div>
+			<div>&nbsp;</div>
+
+			<div>
+				<b>Enable Dynamic Reporting Rate Limiting (writes)&nbsp;</b><input type="checkbox" data-ng-model="deliveryEnabled" data-ng-change="toggleDeliveryEnabled()"/>
+				<div>
+					Active Client Threshold <b>{{activeDeliveryThreshold < 1 ? 'none' : activeDeliveryThreshold}}</b>&nbsp;&nbsp;
+					Active Rate Limit <b>{{activeDeliveryRateLimit < 1 ? 'no limit' : activeDeliveryRateLimit}}</b>
+				</div>
+				<table style="border: 2px solid black;" id="qosDeliveryConfig" class="qostable">
+					<thead>
+						<tr>
+							<th>Client Count Threshold</th>
+							<th>Client Reporting Rate Limit (seconds)</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr data-ng-repeat="rule in deliveryRateRules">
+							<td data-ng-bind="rule.clientThresholdCount"></td>
+							<td>{{rule.reportingRateLimitSeconds  === -1 ? 'no limit' : rule.reportingRateLimitSeconds}}</td>
+						</tr>
+					</tbody>
+				</table>
+
+				<b>Enable Dynamic Reporting Rate Limiting (reads)&nbsp;</b><input type="checkbox" data-ng-model="readEnabled" data-ng-change="toggleReadEnabled()"/>
+				<div>
+					Active Client Threshold <b>{{activeReadThreshold < 1 ? 'none' : activeReadThreshold}}</b>&nbsp;&nbsp;
+					Active Rate Limit <b>{{activeReadRateLimit < 1 ? 'no limit' : activeReadRateLimit}}</b>
+				</div>
+				<table style="border: 2px solid black;" id="qosReadConfig" class="qostable">
+					<thead>
+						<tr>
+							<th>Client Count Threshold</th>
+							<th>Client Reporting Rate Limit (seconds)</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr data-ng-repeat="rule in readRateRules">
+							<td data-ng-bind="rule.clientThresholdCount"></td>
+							<td>{{rule.reportingRateLimitSeconds  === -1 ? 'no limit' : rule.reportingRateLimitSeconds}}</td>
+						</tr>
+					</tbody>
+				</table>
+
+				<b>Enable Dynamic DOS Protection&nbsp;</b><input type="checkbox" data-ng-model="dosEnabled" data-ng-change="toggleDOSEnabled()"/>
+				<div>
+					Active Client Threshold <b>{{activeDOSThreshold < 1 ? 'none' : activeDOSThreshold}}</b>&nbsp;&nbsp;
+					Active Message Limit per Interval <b>{{activeDOSRateLimit < 1 ? 'no limit' : activeDOSRateLimit}}</b>&nbsp;&nbsp;
+					Message Rate Limit (seconds) by IP Address <b>{{dosIntervalSeconds}}</b>
+				</div>
+				<table style="border: 2px solid black;" id="qosDOSConfig" class="qostable">
+					<thead>
+						<tr>
+							<th>Client Count Threshold</th>
+							<th>Message Rate Limit (seconds) by IP Address </th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr data-ng-repeat="rule in dosRateRules">
+							<td data-ng-bind="rule.clientThresholdCount"></td>
+							<td>{{rule.messageLimitPerInterval  === -1 ? 'no limit' : rule.messageLimitPerInterval}}</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+
+	    <h3>Store and Forward</h3>
+	    <div>
+		  Enable Store and Forward for Chat Messages&nbsp;<input type="checkbox" data-ng-model="storeForwardChatEnabled" data-ng-change="toggleStoreForwardChatEnabled()"/>
+		  (Applies Immediately)
+	    </div>
+
+		<div data-ng-show="showRmiError" data-ng-cloak>
+      <h2><font color="dc143c">Input List Unavailable</font></h2>
+      <p>The input list cannot be displayed, TAK Server API process unavailable.</p>
+      <hr/>
+    </div>
+  </div>
+</div>

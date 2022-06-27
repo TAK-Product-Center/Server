@@ -1,0 +1,23 @@
+.meter-wrap{
+   position: relative;
+}
+
+.meter-wrap, .meter-value, .meter-text {
+   /* The width and height of your image */
+   width: 155px; height: 30px;
+}
+
+.meter-wrap, .meter-value {
+   background: #bdbdbd url(progress.png) top left no-repeat;
+}
+
+.meter-text {
+   position: absolute;
+   top:0; left:0;
+
+   padding-top: 5px;
+
+   color: #fff;
+   text-align: center;
+   width: 100%;
+}

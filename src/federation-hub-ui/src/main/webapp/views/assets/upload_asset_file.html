@@ -1,0 +1,34 @@
+<div class="modal-header">
+  <h3 class="modal-title">Upload Asset File</h3>
+</div>
+<div class="modal-body" data-ng-init="initializeUploadAssetFile()">
+
+  <form name="assetForm" ng-submit="submit(asset.$valid)" novalidate action="">
+    <div class="form-group">
+      <label for="assetName">Asset File Name</label> <input type="text" name="assetName" class="form-control" ng-model="assetUploadData.name"
+        ng-class="{ 'has-error': assetForm.assetName.$touched &amp;&amp; assetForm.assetName.$invalid }" required>
+      <p ng-show="assetForm.assetName.$error.required">An asset file name is required.</p>
+    </div>
+
+    <div class="form-group">
+      <label for="assetFile">Asset File</label>
+      <input type="file" name="assetFile" ngf-select="" accept="*" ng-model="assetUploadData.assetFile"
+        ng-class="{ 'has-error': assetForm.assetFile.$touched &amp;&amp; assetForm.assetFile.$invalid }" required>
+      <p ng-show="assetForm.assetFile.$error.required">An asset file is required.</p>
+    </div>
+
+    <div class="form-group">
+      <label for="assetDescription">Asset File Description</label> <input type="text" name="assetDescription" class="form-control"
+        ng-model="assetUploadData.description">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" type="button" ng-click="uploadAssetFile()" ng-disabled="asset.$invalid">OK</button>
+      <button class="btn btn-warning" type="button" ng-click="cancelUploadAssetModal()">Cancel</button>
+    </div>
+  </form>
+</div>
+
+
+
+
+

@@ -1,0 +1,53 @@
+<style>
+  .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+</style>
+
+<div id="federateContactsView">
+    <div id="federateContactsListContainer" class="content" class="listContainer" >
+
+	    <div data-ng-show="!showRmiError">
+		    <h3>Federate Contacts</h3>
+		</div>
+    
+	    <span>You are viewing contacts for federate: <b>{{federateName}}</b></span>
+	    
+	    <br/>
+
+	    <div data-ng-show="!showRmiError && federateContacts.length > 0">
+		    <!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+		    tablesorter js files, etc., results in a conflict with angular -->
+
+		    <table id="federateContactsList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+		    	<thead>
+				  	<tr>
+					  	<th>UID</th>
+					  	<th>Contact Name</th>
+					  	<th>Last Heard From (ms)</th>
+					</tr>
+				</thead>
+				
+				<tbody>
+					<tr data-ng-repeat="fc in federateContacts">
+					    <td data-ng-bind="fc.uid"></td>
+						<td data-ng-bind="fc.contactName"></td>
+					    <td data-ng-bind="fc.lastHeardFromMillis"></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div data-ng-show="!showRmiError && federateContacts.length == 0">
+			<table class="tablesorter" style="border-collapse:separate;border-spacing:2px;"><tr><td colspan="2">No Federate Contacts</td></tr></table>
+	    </div>
+
+
+		<div data-ng-show="showRmiError">
+			<h2><font color="dc143c">Federate List Unavailable</font></h2>
+			<p>The federate contacts list cannot be displayed because the Web application failed to connect to the Federation Manager.</p>
+			<p>Please ensure the broker is running and reload this page.</p>
+			<hr/>
+	    </div>
+	    
+		<input type="button" data-ng-click="backToFederates()" value="Back To Federates" />&nbsp;
+    </div>
+</div>

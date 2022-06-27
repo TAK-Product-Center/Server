@@ -1,0 +1,24 @@
+<configuration scan="true" scanPeriod="30 seconds">
+    <appender name="federation_hub_ui_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>/opt/tak/federation-hub/logs/federation-hub-ui.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>/opt/tak/federation-hub/logs/federation-hub-ui.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <root level="INFO">
+        <appender-ref ref="federation_hub_ui_log" />
+    </root>
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <root level="info">
+        <appender-ref ref="console" />
+    </root>
+    <logger name="org.apache.ignite" level="ERROR" />
+</configuration>

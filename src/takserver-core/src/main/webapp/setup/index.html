@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" data-ng-app="wizard" xmlns="http://www.w3.org/1999/html">
+<head>
+<link rel="icon" type="image/x-icon" href="../favicon.ico" />
+<meta charset="utf-8">
+<title>TAK Server Setup Wizard</title>
+
+
+<link rel="stylesheet" href="css/bootstrap-theme.min.css" />
+<link rel="stylesheet" href="css/bootstrap.min.css">
+
+
+
+<script type="text/javascript" src="../Marti/jquery/jquery-3.5.0.js"></script>
+<script type="text/javascript" src="../Marti/jquery/jquery-ui.min.js"></script>
+
+<script type="text/javascript" src="../Marti/lib/angular/angular.min.js"></script>
+<script type="text/javascript" src="../Marti/lib/angular/angular-animate.min.js"></script>
+<script type="text/javascript" src="../Marti/lib/angular/smart-table.min.js"></script>
+<script type="text/javascript" src="../Marti/lib/angular/angular-route.min.js"></script>
+<script type="text/javascript" src="../Marti/lib/angular/angular-resource.min.js"></script>
+<script type="text/javascript" src="../Marti/lib/angular/angular-ui-router.min.js"></script>
+<script type="text/javascript" src="js/ui-bootstrap-tpls-2.5.0.min.js"></script>
+<script src="//unpkg.com/d3@3"></script>
+<script src="//npmcdn.com/@uirouter/visualizer@4.0.2"></script>
+
+
+
+
+<script src="js/app.js"></script>
+<script src="js/controllers.js"></script>
+<script src="js/services.js"></script>
+
+
+
+<style>
+.content .active:after {
+    content: none;
+}
+</style>
+</head>
+
+<body>
+    <div data-ng-include="'../Marti/menubar.html'"></div>
+    <!-- <div>
+        <script type="text/ng-template" id="alert.html">
+            <div ng-transclude></div>
+        </script>
+        <div uib-alert ng-repeat="alert in alerts" ng-class="'alert-' + (alert.type || 'success')"
+            close="closeAlert($index)">{{alert.msg}}</div>
+    </div> -->
+    <h1>Welcome to TAK</h1>
+    <h2>This configuration wizard will help you get set up quickly</h2>
+    <div class="content">
+        <div data-ng-controller="ProgressBarCtrl">
+            <h6>Configuration Progress</h6>
+            <uib-progressbar value="progress" class="progress-striped active" type="{{progress_type}}">{{progress_txt}}</uib-progressbar>
+        </div>
+        <div style="float:left; width:200px">
+            <ul class="nav flex-column">
+                <li><a ui-sref-active="active" ui-sref="security">Security</a></li>
+                <li ui-sref-active="active"><a ui-sref="federation">Federation</a></li>
+            </ul>
+        </div>
+        <div style="margin-left:220px;margin-bottom:150px">
+            <div ui-view="question"></div>
+            <div ui-view="">
+                <a class="btn btn-primary" ui-sref="security">Begin</a>
+            </div>
+        </div>
+    </div>
+    <div data-ng-include="'../Marti/footer.jsp'"></div>
+</body>
+
+</html>

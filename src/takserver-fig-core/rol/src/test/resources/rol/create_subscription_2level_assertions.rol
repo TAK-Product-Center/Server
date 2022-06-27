@@ -1,0 +1,1 @@
+assign role "http://ontology.ihmc.us/Military/MilitaryActor.owl#RescueCombatAirPatrol" match attribute identity : "CN=JP Jones,OU=Accounting,DC=Work,DC=COM" or (match attribute callsign : maverick and match attribute name : sporty){uid : "xyz123"};

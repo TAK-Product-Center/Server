@@ -1,0 +1,13 @@
+<div>
+    <h2>Authentication Configuration (LDAP)</h2>
+    <strong>URL:</strong><input type="text" data-ng-model="authConfig.url"><br>
+    <strong>User String:</strong><input type="text" data-ng-model="authConfig.userString"><br>
+    <strong>Update Interval:</strong><input type="number" data-ng-model="authConfig.updateInterval"><br>
+    <strong>Group Prefix:</strong><input type="text" data-ng-model="authConfig.groupPrefix"><br>
+    <strong>Service Account DN:</strong><input type="text" data-ng-model="authConfig.serviceAccountDN"><br>
+    <strong>Service Account Password:</strong><input type="password" data-ng-model="authConfig.serviceAccountCredential"><br>
+    <strong>Group Base RDN:</strong><input type="text" data-ng-model="authConfig.groupBaseRDN"><br>
+	<button class="btn btn-primary" type="button" data-ng-click="saveAuthConfig(authConfig)">Submit</button><br>
+    <a class="nav" href="#!/">Back to view Configuration</a><br>
+	<p><strong>Note:</strong>Any changes to configuration will not take full effect until server restart.</p>
+</div>

@@ -1,0 +1,98 @@
+<style>
+  .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+  
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+  
+</style>
+
+<div id="groupSearchView">
+    <div style="padding:10px;" id="groupSearchContainer" style="padding:15px;" class="content" >
+
+	    <div data-ng-show="!showRmiError">
+		    <h3>LDAP Group Search</h3>
+		</div>
+
+	    <div data-ng-show="!showRmiError">
+	    	<p>
+	    		To search for an LDAP group, provide an optional partial group name below as a filter
+	    		and click the Search button.
+	    	</p>
+	    	<p>
+	    		DO NOT include special wildcard search characters in your filter (e.g., *). TakServer will return all LDAP groups that contain
+	    		the sequence of characters you provide in the filter.
+	    	</p>
+	    	<p>
+	    		To return all groups in the configured LDAP repository, leave the Group Name Filter blank and click Search.
+	    	</p>
+	    	<br/>
+	    	<div>
+			  <form name="groupSearchForm" novalidate data-ng-submit="groupSearchForm.$valid && searchGroups(groupNameFilter)">
+			  	<table>
+			  		<tr>
+			  			<td>
+					    	Group Name Filter: &nbsp;<input type="text" data-ng-model="groupNameFilter" name="groupNameFilter" maxlength="20" data-ng-pattern="/^[\w\d\s\.\(\)@#$_\'\&\-\+\[\]\{\}:,\/\|\\]*$/"/>
+						    <input type="submit" value="Search" />
+						</td>
+						<td class="error">
+			  				<span data-ng-show="groupSearchForm.$submitted || groupSearchForm.groupNameFilter.$touched">
+			  					<span data-ng-show="groupSearchForm.groupNameFilter.$error.maxLength">The Group Name Filter must be between 0 and 20 characters</span>
+			  					<span data-ng-show="groupSearchForm.groupNameFilter.$error.pattern">The Group Name Filter contains invalid characters.</span>
+			  				</span>
+			  			</td>
+			  		</tr>
+			  	</table>
+			  </form>
+		    </div>
+			&nbsp;	
+
+		    <div data-ng-show="!showRmiError && groupResults.length > 0" style="overflow-y:scroll;height:300px;">
+			    <table id="groupResultsList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+			    	<thead>
+					  	<tr>
+						  	<th>Common Name</th>
+						  	<th>Distinguished Name</th>
+						  	<th>Description</th>
+						  	<th>Selection</th>
+						</tr>
+					</thead>
+					
+					<tbody>
+						<tr data-ng-repeat="g in groupResults">
+						    <td data-ng-bind="g.cn"></td>
+							<td data-ng-bind="g.dn"></td>
+							<td data-ng-bind="g.description"></td>
+							<td><input type="radio" name="selectedGroup" data-ng-model="groupSelection.dn" value="{{g.dn}}" /></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<div style="margin-top:10px;" data-ng-show="!showRmiError && groupResults.length > 0">
+				<input type="button" value="Cancel" data-ng-click="cancel()" />&nbsp;
+				<input type="button" value="Select Group" data-ng-click="selectGroup()" />			
+			</div>
+			
+			<div data-ng-show="!showRmiError && (groupResults == null || groupResults.length == 0)">
+				<table class="tablesorter" style="border-collapse:separate;border-spacing:2px;"><tr><td colspan="2">No Matching Groups</td></tr></table>
+		    </div>
+		</div>
+
+		<div data-ng-show="showRmiError">
+			<h2><font color="dc143c">Group Search Unavailable</font></h2>
+			<p>The group search screen cannot be displayed.</p>
+			<p>Please ensure the broker is running and reload this page.</p>
+			<hr/>
+	    </div>		
+    </div>
+</div>

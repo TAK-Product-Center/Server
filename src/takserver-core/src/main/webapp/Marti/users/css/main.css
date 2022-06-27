@@ -1,0 +1,432 @@
+
+/* 
+  Allow angular.js to be loaded in body, hiding cloaked elements until 
+  templates compile.  The !important is important given that there may be 
+  other selectors that are more specific or come later and might alter display.  
+ */
+[ng\:cloak], [ng-cloak], .ng-cloak {
+  display: none !important;
+}
+
+.content {
+	color: #222;
+    font-family: "Open Sans", Arial, sans;
+    outline: none;
+    width: auto;
+    margin: auto;
+}
+
+img {
+    outline: none;
+}
+
+/* hr {
+    display: block;
+    height: 1px;
+    border: 0;
+    margin: 0.5em 0;
+    padding: 0;
+    clear: both;
+} */
+
+img {
+    vertical-align: middle;
+}
+
+/*
+ * Remove default fieldset styles.
+ */
+
+fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+}
+
+/*
+ * Allow only vertical resizing of textareas.
+ */
+
+textarea {
+    resize: vertical;
+}
+
+/* ==========================================================================
+   Chrome Frame prompt
+   ========================================================================== */
+
+.chromeframe {
+    margin: 0.2em 0;
+    background: #ccc;
+    color: #000;
+    padding: 0.2em 0;
+}
+
+/* Structure */
+/* html, body {
+    height: 100%;
+} */
+
+/* Header */
+header {
+	font-size: 36px;
+	color: #666;
+	padding: 15px 0 5px;
+}
+
+dl {
+    margin: 0;
+    min-height: 1px;
+    overflow: hidden;
+    padding: 24px 0 0 0;
+    position: relative;
+}
+
+dt {
+    background: #bcd4b4;
+    border-bottom: 1px solid #989EA4;
+    border-top: 1px solid #717D85;
+    color: #222;
+    font-size: 12px;
+    line-height: 12px;
+    font-weight: 300;
+    margin: 0;
+    padding: 0px 20px 0 0;
+    text-align: right;
+    position: absolute;
+    text-shadow: 0 1px #d4c9af;
+    -moz-text-shadow: 0 1px #d4c9af;
+    -webkit-text-shadow: 0 1px #d4c9af;
+}
+
+dt {
+    bottom: auto;
+    top: 0;
+    width: 290px;
+}
+
+.animated dt {
+    bottom: 0;
+    top: auto;
+}
+
+dd {
+    text-decoration: none;
+    font-weight: 300;
+    font-size: 20px;
+    color: #828e8a;
+    margin: 0;
+    padding: 0 0 5px 15px;
+    white-space: nowrap;
+    background-position: center center;
+    -moz-transition: all .3s ease 0s;
+    -webkit-transition: all .3s ease 0s;
+}
+
+/* dd:hover {
+    background: url("../img/arrows.png") #46514f center right no-repeat;
+} */
+
+dd + dd {
+    border-top: 1px solid #46514f;
+}
+
+
+a.cnt {
+    text-decoration: none;
+    display: block;
+    width: 100%;
+    color: #828e8a;
+
+}
+
+a.cnt:hover {
+    color: #cdd9d7;
+}
+
+/* Right View */
+
+#rightViewContainer {
+    float: left;
+    margin: 0 0px 0 50px;
+}
+
+#userList {
+    float: left;
+}
+
+/* Form Design */
+
+.formdesign {
+    padding: 0 0 10px 25px;
+    float: right;
+    border-left: dotted 1px #46514f;
+}
+
+.formdesign label {
+    display: block;
+    color: #797979;
+    font-weight: 700;
+    line-height: 1.4em;
+}
+
+.formdesign input, select, textarea {
+    clear: both;
+    float: none;
+    display: block;
+    width: 600px;
+    border: none;
+    border-bottom: solid 1px #828e8a;
+    margin: 10px 0px 8px 0px;
+    padding: 6px 0px;
+    background: none;
+    outline: none;
+    font-size: 24px;
+    line-height: 24px;
+    letter-spacing: -0.03em;
+    height: 48px;
+    color: white;
+    position: relative;
+    z-index: 1;
+}
+
+.formdesign input:invalid {
+    box-shadow: none;
+    outline: none;
+}
+
+.formdesign div {
+    height: 103px;
+}
+
+.formdesign div span {
+    text-align: right;
+    color: #A89999;
+    font-size: 12px;
+
+}
+
+@-webkit-keyframes shake {
+  0%, 100% {
+    -webkit-transform: translateX(0);
+  }
+
+  10%, 30%, 50%, 70%, 90% {
+    -webkit-transform: translateX(-10px);
+  }
+
+  20%, 40%, 60%, 80% {
+    -webkit-transform: translateX(10px);
+  }
+}
+
+.formdesign .ng-invalid.ng-dirty {
+    -webkit-animation-duration: 1s;
+    -webkit-animation-iteration-count: 1;
+    -webkit-transition-timing-function: ease;
+    animation-duration: 1s;
+    animation-iteration-count: 1;
+    transition-timing-function: ease;
+    -webkit-animation-name: shake;
+    animation-name: shake;
+}
+
+.formdesign button, .btn {
+    border-radius: 3px;
+    padding: 10px;
+    display: block;
+    background: #515c5a;
+    color: #cdd9d7;
+    text-decoration: none;
+    float: right;
+    border: none;
+    margin-left: 10px;
+}
+
+.formdesign button.btn-danger, a.btn-danger {
+    background: #bf6e62;
+}
+
+.formdesign button:hover, .btn:hover {
+    -webkit-box-shadow: inset 0 1px 2px rgba(0, 0, 0, .1);
+    -moz-box-shadow: inset 0 1px 2px rgba(0, 0, 0, .1);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .1);
+    background: rgba(0, 0, 0, .05);
+}
+
+.formdesign button.btn-danger:hover, a.btn-danger:hover {
+    -webkit-box-shadow: inset 0 1px 2px rgba(0, 0, 0, .1);
+    -moz-box-shadow: inset 0 1px 2px rgba(0, 0, 0, .1);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .1);
+    background: #814d3e;
+}
+
+.formdesign button.btn-left, a.btn-left {
+    float: left;
+    margin-left: 0;
+}
+a.back {
+    text-indent: -9999px;
+    background: url("../img/back.png") no-repeat center center #909795;
+    padding: 10px 5px;
+}
+a.back:hover {
+    background-image: url("../img/back.png");
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+.formdesign button[disabled] {
+    cursor: default;
+    background-image: none;
+    background-color: #2f3534;
+    opacity: 0.65;
+    color: #3f4746;
+    -webkit-box-shadow: none;
+    -moz-box-shadow: none;
+    box-shadow: none;
+}
+
+/* View Contact */
+
+h2, p {
+    color: #cdd9d7;
+/*     padding: 0; */
+ }
+
+
+h2 {
+    margin-top: 10px;
+    margin-bottom: 5px;
+    font-size: 26px;
+    font-weight: 300;
+}
+
+p {
+    font-size: 22px;
+    background: no-repeat left center;
+    padding-left: 35px;
+    padding-bottom: 5px;
+}
+
+p.generic_field { }
+    
+p.email {
+    background-image: url("../img/email.png");
+}
+p.phone {
+    background-image: url("../img/phone.png");
+}
+.col1, .col2 {
+    width: 270px;
+    float: left;
+}
+
+.col2 {
+    margin-top: 75px;
+    margin-right: 30px;
+    float: right;
+}
+
+/*END*/
+
+/* ==========================================================================
+Helper classes
+========================================================================== */
+
+/*
+ * Image replacement
+ */
+
+.ir {
+    background-color: transparent;
+    border: 0;
+    overflow: hidden;
+    /* IE 6/7 fallback */
+    *text-indent: -9999px;
+}
+
+.ir:before {
+    content: "";
+    display: block;
+    width: 0;
+    height: 100%;
+}
+
+/*
+ * Hide from both screenreaders and browsers: h5bp.com/u
+ */
+
+.hidden {
+    display: none !important;
+    visibility: hidden;
+}
+
+/*
+ * Hide only visually, but have it available for screenreaders: h5bp.com/v
+ */
+
+.visuallyhidden {
+    border: 0;
+    clip: rect(0 0 0 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+}
+
+/*
+ * Extends the .visuallyhidden class to allow the element to be focusable
+ * when navigated to via the keyboard: h5bp.com/p
+ */
+
+.visuallyhidden.focusable:active,
+.visuallyhidden.focusable:focus {
+    clip: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    position: static;
+    width: auto;
+}
+
+/*
+ * Hide visually and from screenreaders, but maintain layout
+ */
+
+.invisible {
+    visibility: hidden;
+}
+
+/*
+ * Clearfix: contain floats
+ *
+ * For modern browsers
+ * 1. The space content is one way to avoid an Opera bug when the
+ *    `contenteditable` attribute is included anywhere else in the document.
+ *    Otherwise it causes space to appear at the top and bottom of elements
+ *    that receive the `clearfix` class.
+ * 2. The use of `table` rather than `block` is only necessary if using
+ *    `:before` to contain the top-margins of child elements.
+ */
+
+.clearfix:before,
+.clearfix:after {
+    content: " "; /* 1 */
+    display: table; /* 2 */
+}
+
+.clearfix:after {
+    clear: both;
+}
+
+/*
+ * For IE 6/7 only
+ * Include this rule to trigger hasLayout and contain floats.
+ */
+
+.clearfix {
+    *zoom: 1;
+}
+

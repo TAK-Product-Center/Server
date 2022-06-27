@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ifp
+	xmlns="http://www.bbn.com/roger/ifp"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.bbn.com/roger/ifp ifp.xsd">
+	
+	<node id="sendNode" nodeType="single_branch">
+		<action>
+			<request>
+				<task taskType="goal" value="SEND"/>
+			</request>
+		</action>
+	</node>
+	
+	<startNode nodeType="boolean">
+		 <expression>
+                        <![CDATA[
+                        	return msg.containsMetadata("roger.message.source.takserver") && msg.getMetadata("roger.message.source.takserver");
+                                        ]]>
+		</expression>
+			
+		<action value="false"><!-- This message orginated from a ROGER-side client or system. We're currently assuming the message is already
+			in CoT format, but it could be converted by adding another plug-in here. Right now, we convert to a string and send to TAK Server. -->
+			<nextNode nodeType="single_branch">
+				<action>
+					<request>
+						<task taskType="plugin name" value="ByteArrayToStringPayload"/>
+					</request>
+					<nextNode nodeType="single_branch">
+						<action>
+							<request>
+								<task taskType="goal" value="API_CALL"/>
+							</request>
+						</action>
+					</nextNode>
+				</action>
+			</nextNode>
+		</action>
+		<action value="true">
+			<request>
+			<!-- here, the message is a CoT coming from TAK Server. The current programmatic plugin from TAK Server creates a stringpayload,
+			which we convert to bytes and add a destination so the message can be sent out ROGER's network communication service-->
+				<task taskType="goal" value="ROUTING"/>
+				<task taskType="plugin name" value="StringToBytes"/>
+			</request>
+			<nextNodeRef>sendNode</nextNodeRef>
+		</action>
+	   <action value="*">
+		<request>
+			<task taskType="goal" value="MESSAGE_DISPOSAL"/>
+		</request>
+	   </action>
+		
+	</startNode>
+</ifp>
+

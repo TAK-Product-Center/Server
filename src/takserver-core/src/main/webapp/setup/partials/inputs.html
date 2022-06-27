@@ -1,0 +1,89 @@
+<link rel="stylesheet" href="../../Marti/tablesorter/style.css"/>
+<div id="inputView" data-ng-cloak>
+  <div id="inputList" class="content" class="listContainer" data-ng-cloak>
+
+    <h3>Input Definitions</h3>
+    <span>
+        <p>
+            This is where we define inputs for ATAK clients to connect. If you are setting up a secure configuration,
+            make sure to only use the <b><i>tls</i></b> or <b><i>cottls</i></b> protocol for your inputs.
+        </p>
+    </span>
+    <a id="createInputStep" data-ng-click="createInput()" href="#!/createInput">Create Input Definition</a>
+    <div data-ng-show="inputMetrics.length">
+      <!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+	   tablesorter js files, etc., results in a conflict with angular -->
+      <table id="inputMetricsList" class="tablesorter">
+    	<thead>
+    	  <tr>
+    	    <th>Auth Type</th>
+    	    <th>Name</th>
+    	    <th>Protocol</th>
+    	    <th>Port</th>
+    	    <th>Core Messaging Version</th>
+    	    <th>TLS</th>
+    	    <th>Group</th>
+    	    <th>Interface</th>
+    	    <th>Archive</th>
+    	    <th>Filter Group</th>
+    	    <th>Anonymous Group</th>
+    	    <th>Archive Only</th>
+    	    <th>Reads Received</th>
+    	    <th>Messages Received</th>
+    	    <th>Number Connected</th>
+    	    <th>&nbsp;</th>
+    	    <th id="tourModifyStep">&nbsp;</th>
+    	  </tr>
+    	</thead>
+    
+    	<tbody>
+    	  <tr data-ng-repeat="x in inputMetrics">
+    	    <td data-ng-bind="x.input.auth"></td>
+    	    <td data-ng-bind="x.input.name"></td>
+    	    <td data-ng-bind="x.input.protocol"></td>
+    	    <td data-ng-bind="x.input.port"></td>
+    	    <td data-ng-bind="x.input.coreVersion"></td>
+    	    <td>
+                <div ng-switch on="x.input.coreVersion">
+                    <span ng-switch-when="2">{{x.input.coreVersion2TlsVersions}}</span>
+                    <span ng-switch-default ng-show="x.input.protocol == 'tls' || x.input.protocol == 'cottls'">
+                        {{secConfig.tlsVersion}}
+                    </span>
+                </div>
+            </td>
+    	    <td data-ng-bind="x.input.group"></td>
+    	    <td data-ng-bind="x.input.iface"></td>
+    	    <td data-ng-bind="x.input.archive"></td>
+    	    <td data-ng-bind="x.input.filtergroup"></td>
+    	    <td data-ng-bind="x.input.anongroup"></td>
+    	    <td data-ng-bind="x.input.archiveOnly"></td>
+    	    <td data-ng-bind="x.readsReceived"></td>
+    	    <td data-ng-bind="x.messagesReceived"></td>
+    	    <td data-ng-bind="x.numClients"></td>
+    	    <td><a href="" data-ng-click="deleteObject(x.input.name)">Delete</a></td>
+    	    <td><a class="nav" href="#!/modifyInput/{{x.input.name | encodeURIComponent}}">Modify</a></td>
+    	  </tr>
+    	</tbody>
+      </table>
+    </div>
+
+    <div data-ng-show="showRmiError" data-ng-cloak>
+      <h2><font color="dc143c">Input List Unavailable</font></h2>
+      <p>The input list cannot be displayed because the Web application failed to connect to the TakServer broker.</p>
+      <p>Please ensure the broker is running and reload this page.</p>
+      <hr/>
+    </div>
+
+    <div id="messagingConfig">
+      <h3>Messaging Configuration</h3>
+      <strong>Latest SA:</strong> <input type="checkbox" data-ng-model="msgConfig.latestSA" disabled><br>
+      <h5>Repository Settings</h5>
+      <strong>Database Connections:</strong> {{msgConfig.numDbConnections}}<br>
+      <strong>Archive:</strong> {{msgConfig.archive}}<br>
+      <strong>Database URL:</strong> {{msgConfig.dbUrl}}<br>
+      <strong>Database Username:</strong> {{msgConfig.dbUsername}}<br>
+      <a class="nav" href="#!/modifyConfig">Edit Configuration</a>
+    </div>
+
+  </div>
+</div>

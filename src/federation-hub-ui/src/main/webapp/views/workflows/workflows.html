@@ -1,0 +1,59 @@
+
+
+<!-- Create our top tabbed pane navigation. -->
+<nav class="navbar navbar-default" ng-show="false">
+  <div class="container-fluid">
+    <ul class="nav navbar-nav">
+
+      <!-- File Menu -->
+      <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+        aria-expanded="false">File <span class="caret"></span></a>
+        <ul class="dropdown-menu">
+          <li><a ui-sref="workflows.editor.workflows-new({group: isGroup()})">New {{isGroup() ? "Group" : "Workflow"}}</a></li>
+          <li><a ui-sref="diagrams-load({group: isGroup()})">Open {{isGroup() ? "Group" : "Workflow"}}</a></li>
+          <li role="separator" class="divider"></li>
+          <li class="disabled"><a>Import...</a></li>
+          <li class="disabled"><a>Export...</a></li>
+          <li role="separator" class="divider"></li>
+          <li><a ui-sref="workflows.editor.instantiate">Instantiate</a></li>
+          <li role="separator" class="divider"></li>
+          <li class="disabled"><a>Delete</a></li>
+          <li class="disabled"><a>Properties</a></li>
+        </ul></li>
+
+      <!-- Edit Menu -->
+      <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+        aria-expanded="false">Edit <span class="caret"></span></a>
+        <ul class="dropdown-menu">
+          <li class="disabled"><a>Undo</a></li>
+          <li class="disabled"><a>Redo</a></li>
+          <li role="separator" class="divider"></li>
+          <li class="disabled"><a>Cut</a></li>
+          <li class="disabled"><a>Copy</a></li>
+          <li class="disabled"><a>Paste</a></li>
+          <li role="separator" class="divider"></li>
+          <li class="disabled"><a>Delete</a></li>
+        </ul></li>
+
+      <!-- Insert Menu -->
+      <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+        aria-expanded="false">Insert <span class="caret"></span></a>
+        <ul class="dropdown-menu">
+          <li class="disabled"><a ui-sref="workflows.editor.addGroup">Group</a></li>
+          <li><a ui-sref="workflows.editor.addSparqlQuery">Query</a></li>
+          <li class="disabled"><a>Filter</a></li>
+        </ul></li>
+
+      <!-- Help Menu -->
+      <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+        aria-expanded="false">Help <span class="caret"></span></a>
+        <ul class="dropdown-menu">
+          <li><a>User Manual</a></li>
+        </ul></li>
+    </ul>
+  </div>
+  <!-- /.navbar-collapse -->
+</nav>
+
+<!-- Now pull in the template for the currently selected sub state -->
+<div ui-view></div>

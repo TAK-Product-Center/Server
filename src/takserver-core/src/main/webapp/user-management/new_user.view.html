@@ -1,0 +1,69 @@
+
+<form name="form" ng-submit="create_user()" role="form">
+
+    <h2 style="text-align: center;">Add New User</h2>
+
+    <div class="col-md-6 col-md-offset-3">
+        <div class="form-group" ng-class="{ 'has-error': form.username.$dirty && form.username.$error.required }">
+            <label for="username">Username</label>
+            <input type="text" name="username" id="username" class="form-control" ng-model="new_user.username" required />
+            <span ng-show="form.username.$dirty && form.username.$error.required" class="help-block">Username is required</span>
+        </div>
+        <div class="form-group" ng-class="{ 'has-error': form.password.$dirty && form.password.$error.required }">
+            <label for="password">Password </label>
+            <i class="fa fa-question-circle" ng-click='showSimpleMessage("Password must have at least 15 characters and must include 1 lowercase, 1 uppercase, 1 number and 1 special character.")' style="cursor: pointer"></i>
+            <input type="text" name="password" id="password" class="form-control" ng-model="new_user.password" required />            
+            <span ng-show="form.password.$dirty && form.password.$error.required" class="help-block">Password is required</span>
+        </div>
+    </div>
+    <div class="form-actions" style="text-align: right;">
+        <button type="submit" ng-disabled="form.$invalid" class="btn btn-primary">Create New User</button>
+        <a href="#!/" class="btn btn-link">Cancel</a>
+    </div>
+</form>
+
+<div>
+Drag the groups on the right panel and drop to the boxes below.<br/>
+To remove a group from the boxes, drag it back to the right panel.<br/>
+If no groups are specified, user will be in group '_ ANON _'.<br/>
+</div>
+<div class="dropbox_group" id="dropbox_in_group" ng-drop="true" ng-drop-success="onDropCompleteToGroupIN($data,$event)">
+    <div style="text-align: center;"> <b>In Group</b></div>
+
+    <div ng-repeat="x in list_groups_for_user.groupListIN">
+
+        <button class="btn btn-info group_button" type="button" id="dropdownMenuButton_group_{{ x }}" ng-drag="true" ng-drag-data="{'groupname':x, 'from':'groupListIN'}" ng-drag-success="onDragComplete($data,$event)">
+            {{ x }}
+        </button>
+
+    </div>
+</div>
+
+
+<div class="dropbox_group" id="dropbox_out_group" ng-drop="true" ng-drop-success="onDropCompleteToGroupOUT($data,$event)">
+    <div style="text-align: center;"> <b>Out Group</b></div>
+
+    <div ng-repeat="x in list_groups_for_user.groupListOUT">
+
+        <button class="btn btn-info group_button" type="button" id="dropdownMenuButton_group_{{ x }}" ng-drag="true" ng-drag-data="{'groupname':x, 'from':'groupListOUT'}" ng-drag-success="onDragComplete($data,$event)">
+            {{ x }}
+        </button>
+
+    </div>
+
+</div>
+
+<div class="dropbox_group" id="dropbox_in_out_group" ng-drop="true" ng-drop-success="onDropCompleteToGroup($data,$event)">
+    <div style="text-align: center;"> <b>Both</b></div>
+
+    <div ng-repeat="x in list_groups_for_user.groupList">
+
+        <button class="btn btn-info group_button" type="button" id="dropdownMenuButton_group_{{ x }}" ng-drag="true" ng-drag-data="{'groupname':x, 'from':'groupList'}" ng-drag-success="onDragComplete($data,$event)">
+            {{ x }}
+        </button>
+
+    </div>
+
+</div>
+
+

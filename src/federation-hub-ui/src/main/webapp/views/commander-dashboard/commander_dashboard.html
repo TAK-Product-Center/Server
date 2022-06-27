@@ -1,0 +1,221 @@
+<div id="container" class="container-fluid" data-ng-init="initialize()" style="overflow:auto">
+  <div class="form-group">
+
+    <!-- <div class="col-sm-3 col-md-2 sidebar" style="width:200px">
+      <ul class="nav nav-sidebar">
+        <li class="active"><a href="#">Overview <span class="sr-only">(current)</span></a></li>
+        <li><a href="#">Reports</a></li>
+        <li><a href="#">Analytics</a></li>
+        <li><a href="#">Export</a></li>
+      </ul>
+      <ul class="nav nav-sidebar">
+        <li><a href="">Nav item</a></li>
+        <li><a href="">Nav item again</a></li>
+        <li><a href="">One more nav</a></li>
+        <li><a href="">Another nav item</a></li>
+        <li><a href="">More navigation</a></li>
+      </ul>
+      <ul class="nav nav-sidebar">
+        <li><a href="">Nav item again</a></li>
+        <li><a href="">One more nav</a></li>
+        <li><a href="">Another nav item</a></li>
+      </ul>
+    </div> -->
+
+    <!-- <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main"> -->
+    <div class="col-md-12 main">
+      <!-- <h1 class="page-header">Dashboard</h1>
+
+      <div class="row placeholders">
+        <div class="col-xs-6 col-sm-3 placeholder">
+          <img src="data:image/gif;base64,R0lGODlhAQABAIAAAHd3dwAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==" width="100" height="100" class="img-responsive" alt="Generic placeholder thumbnail">
+          <h4>Label</h4>
+          <span class="text-muted">Something else</span>
+        </div>
+        <div class="col-xs-6 col-sm-3 placeholder">
+          <img src="data:image/gif;base64,R0lGODlhAQABAIAAAHd3dwAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==" width="100" height="100" class="img-responsive" alt="Generic placeholder thumbnail">
+          <h4>Label</h4>
+          <span class="text-muted">Something else</span>
+        </div>
+        <div class="col-xs-6 col-sm-3 placeholder">
+          <img src="data:image/gif;base64,R0lGODlhAQABAIAAAHd3dwAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==" width="100" height="100" class="img-responsive" alt="Generic placeholder thumbnail">
+          <h4>Label</h4>
+          <span class="text-muted">Something else</span>
+        </div>
+        <div class="col-xs-6 col-sm-3 placeholder">
+          <img src="data:image/gif;base64,R0lGODlhAQABAIAAAHd3dwAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==" width="100" height="100" class="img-responsive" alt="Generic placeholder thumbnail">
+          <h4>Label</h4>
+          <span class="text-muted">Something else</span>
+        </div>
+      </div> -->
+      <div class="form-group">
+        <h2 class="sub-header">Instantiated Workflows</h2>
+        <table st-table="displayedInstanceCollection" class="table table-striped" st-safe-src="rowCollection">
+          <thead>
+            <tr>
+              <th>Creation Date</th>
+              <th st-sort="instance.name">Instance Name</th>
+              <th>Instance Description</th>
+              <th>Workflow Name</th>
+              <th>Workflow Description</th>
+            </tr>
+            <!-- <tr>
+              <th colspan="5">
+                <input st-search="" placeholder="global search..." class="input-sm form-control" type="text" />
+              </th>
+            </tr> -->
+          </thead>
+          <tbody>
+            <tr id="instanceRow" st-select-row="instanceRow" st-select-mode="single" ng-repeat="instanceRow in instanceList | orderBy: creationDate : true" value={{instanceRow.id}} ng-click="selectRow(instanceRow)">
+              <td>{{instanceRow.creationDate | date:'MM/dd/yyyy HH:mm:ss'}}</td>
+              <td>{{instanceRow.name}}</td>
+              <td>{{instanceRow.description}}</td>
+              <td>{{instanceRow.workflow.name}}</td>
+              <td>{{instanceRow.workflow.description}}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5" class="text-center">
+                <div st-pagination="" st-items-by-page="10" st-displayed-pages="7"></div>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div>
+        <button><i class="fa fa-search-plus" ng-click="gantt.zoomIn()"></i></button>
+        <button><i class="fa fa-search-minus" ng-click="gantt.zoomOut()"></i></button>
+        <span>{{gantt.options.zoom}}x</span>
+
+        <button><i class="fa fa-clock-o" title="scroll to current time" ng-click="gantt.api.scroll.toDate(gantt.options.currentDateValue);"></i></button>
+      </div>
+      <div gantt style="font-size: 12px;"
+        data="gantt.mockupdata2"
+        options="gantt.options"
+        view-scale="gantt.options.scale"
+        column-width="getColumnWidth(gantt.options.width, gantt.options.scale, gantt.options.zoom)"
+
+        api="registerApi">
+        <gantt-tree enabled="true" header-content="gantt.options.treeHeaderContent" keep-ancestor-on-filter-row="true"> </gantt-tree>
+        <!-- <gantt-table></gantt-table> -->
+        <!-- <div gantt current-date="getToday"></div> -->
+        <gantt-progress enabled="true"></gantt-progress>
+        <!-- <gantt-groups enabled="true" display="Blah" from="9/25/2013" to="10/30/2013"></gantt-groups> -->
+        <gantt-groups enabled="true"></gantt-groups>
+        <gantt-dependencies enabled="true" read-only="true" js-plumb-defaults="{
+                                          Endpoint: ['Dot', {radius: 7}],
+                                          Connector: 'Flowchart',
+                                          ConnectionOverlays: [['Arrow', {location: 1, length: 12, width: 12}]]}">
+        </gantt-dependencies>
+        <!-- <gantt-movable></gantt-movable> -->
+        <gantt-tooltips></gantt-tooltips>
+      </div>
+      <div ng-if="activeInstance !== undefined">
+        <div class="table-responsive">
+          <div class="col-md-12" style="padding:0; overflow:hidden">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <div class="row">
+                  <div class="col-md-12 text-left">
+                    <i class="fa fa-sitemap "></i>
+                    <div class="panel-title"><a href ng-click="navigateToWorkflow(activeInstance.workflow)">{{activeInstance.workflow.name}}</a> - {{activeInstance.creationDate| date:'MM/dd/yyyy HH:mm:ss'}}</div>
+                    <div class="pull-right">
+                      <input type="range" min="0" max="2" step="0.1" ng-model="graphLayout.zoomLevel" ng-change="changeGraphZoom()" />
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              <div gantt data=gantt.data api="registerApi">
+                <gantt-tree enabled="true" header-content="gantt.options.treeHeaderContent" keep-ancestor-on-filter-row="true"> </gantt-tree>
+                <!-- <gantt-table></gantt-table> -->
+                <gantt-progress enabled="true"></gantt-progress>
+                <gantt-groups enabled="true"></gantt-groups>
+                <gantt-dependencies enabled="true" read-only="true" js-plumb-defaults="{
+                                                  Endpoint: ['Dot', {radius: 7}],
+                                                  Connector: 'Flowchart',
+                                                  ConnectionOverlays: [['Arrow', {location: 1, length: 12, width: 12}]]}">
+                </gantt-dependencies>
+                <!-- <gantt-movable></gantt-movable> -->
+                <gantt-tooltips></gantt-tooltips>
+              </div>
+              <div id="pnlDiagram" class="panel-footer">
+                <joint-diagram id="joint-diagram" graph="workflow.graph" grid-size="1" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- <h2 class="sub-header">Instantiated Workflows</h2>
+      <div class="table-responsive">
+        <div class="col-md-12 " ng-repeat="instance in instanceList">
+          <div class="panel panel-primary">
+            <div class="panel-heading">
+              <div class="row">
+                <div class="col-xs-3">
+                  <i class="fa fa-sitemap "></i>
+                </div>
+                <div class="col-xs-9 text-right">
+                  <div class="panel-title"><a href ng-click="navigateToWorkflow(instance.workflow)">{{instance.workflow.name}}</a> - {{instance.creationDate}}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-footer">
+              <joint-diagram id="joint-diagram-{{instance.id}}" ng-init="initializeWorkflowDiagram(instance)" graph="workflow.graph" grid-size="1" />
+            </div>
+          </div>
+        </div>
+      </div> -->
+
+      <!-- <h2 class="sub-header">Instantiated Workflows</h2>
+      <div class="table-responsive">
+        <div class="col-md-12 " ng-repeat="wf in workflowList">
+          <div class="panel panel-primary">
+            <div class="panel-heading">
+              <div class="row">
+                <div class="col-xs-3">
+                  <i class="fa fa-sitemap "></i>
+                </div>
+                <div class="col-xs-9 text-right">
+                  <div class="panel-title"><a href ng-click="navigateToWorkflow(wf)">{{wf.name}}</a></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-footer">
+              <joint-diagram id="joint-diagram-{{wf.id}}" ng-init="initializeWorkflowDiagram(wf)" graph="workflow.graph" grid-size="1" />
+            </div>
+          </div>
+        </div>
+      </div> -->
+      <div id="tagRegion"></div>
+
+      <div ng-if="selectedInstanceTag !== undefined">
+        <h2 class="sub-header">Tags for {{getUriLabel(selectedInstanceTag.product)}}</h2>
+        <div class="table-responsive">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Tag</th>
+                <th>URI</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr ng-repeat="tag in selectedInstanceTag.tags">
+                <td>{{getUriLabel(tag)}}</td>
+                <td>{{tag}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+
+  </div>
+
+</div>

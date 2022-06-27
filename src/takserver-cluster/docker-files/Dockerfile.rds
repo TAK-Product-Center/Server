@@ -1,0 +1,19 @@
+FROM openjdk:11-stretch
+RUN apt-get update && \
+    apt-get install -y \
+        python \
+        python-dev \
+        python3-pip \
+        python-setuptools \
+        groff \
+        less \
+    && pip3 install --upgrade awscli \
+    && pip3 install --upgrade boto3 \
+    && apt-get clean
+COPY takserver-schemamanager/* ./
+COPY CoreConfig.xml /opt/tak/CoreConfig.xml
+
+# start postgres, and configure TAK server database
+ENTRYPOINT ["python3", "pollRDS.py"]
+
+

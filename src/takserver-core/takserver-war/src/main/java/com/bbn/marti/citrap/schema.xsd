@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema 
+    xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<!-- Simple Types -->
+	<xs:simpleType name="stringType">
+		<xs:restriction base="xs:string">
+			<xs:minLength value="0"/>
+			<xs:maxLength value="256"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<!-- End Simple Types -->
+	<!-- Generic complexTypes -->
+	<xs:complexType name="optionType">
+		<xs:attribute name="title"             type="stringType"/>
+		<xs:attribute name="required"          type="xs:boolean"/>
+		<xs:attribute name="type"              type="stringType"/>
+		<xs:attribute name="selected"          type="xs:boolean"/>
+		<xs:attribute name="value"             type="stringType"/>
+		<xs:attribute name="constraint"        type="stringType"/>
+		<xs:attribute name="unitOptions"       type="stringType"/>
+		<xs:attribute name="unitValue"         type="stringType"/>
+		<xs:attribute name="spinnerOptions"    type="stringType"/>
+		<xs:attribute name="spinnerValue"      type="stringType"/>
+		<xs:attribute name="prompt"            type="stringType"/>
+		<xs:attribute name="drawMapItem"       type="xs:boolean"/>
+		<xs:attribute name="useReportLocation" type="stringType"/>
+		<xs:attribute name="id"                type="stringType"/>
+		<xs:attribute name="source"            type="stringType"/>
+		<xs:attribute name="destination"       type="stringType"/>
+		<xs:attribute name="plugin"            type="stringType"/>
+		<xs:attribute name="uri"               type="stringType"/>
+		<xs:attribute name="format"            type="stringType"/>
+		<xs:attribute name="displayType"       type="stringType"/>
+	</xs:complexType>
+	<xs:complexType name="listType">
+		<xs:choice maxOccurs="unbounded">
+			<xs:element name="option"  type="optionType"/>
+			<xs:element name="section" type="sectionType"/>
+		</xs:choice>
+		<xs:attribute name="title"     type="stringType"/>
+		<xs:attribute name="multiple"  type="xs:boolean"/>
+		<xs:attribute name="type"      type="stringType"/>
+	</xs:complexType>
+	<!-- End Generic complexTypes -->
+	<xs:complexType name="sectionType">
+		<xs:choice maxOccurs="unbounded">
+			<xs:element name="option"  type="optionType"/>
+			<xs:element name="list"    type="listType"/>
+			<xs:element name="section" type="sectionType"/>
+		</xs:choice>
+		<xs:attribute   name="title"    type="stringType"/>
+		<xs:attribute   name="role"     type="stringType"/>
+		<xs:attribute   name="invert"   type="xs:boolean"/>
+		<xs:attribute   name="type"     type="stringType"/>
+		<xs:attribute   name="selected" type="xs:boolean"/>
+		<xs:attribute   name="id"       type="stringType"/>
+	</xs:complexType>
+	<xs:complexType name="reportType">
+		<xs:sequence>
+			<xs:element name="section" type="sectionType" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attribute name="type"                type="stringType"/>
+		<xs:attribute name="title"               type="stringType"/>
+		<xs:attribute name="userCallsign"        type="stringType"/>
+		<xs:attribute name="userDescription"     type="stringType"/>
+		<xs:attribute name="dateTime"            type="stringType"/>
+		<xs:attribute name="dateTimeDescription" type="stringType"/>
+		<xs:attribute name="location"            type="stringType"/>
+		<xs:attribute name="locationDescription" type="stringType"/>
+		<xs:attribute name="tags"             	 type="stringType"/>
+		<xs:attribute name="eventScale"          type="stringType"/>
+		<xs:attribute name="scaleDescription"    type="stringType"/>
+		<xs:attribute name="importance"          type="stringType"/>
+		<xs:attribute name="status"              type="stringType"/>
+		<xs:attribute name="id"                  type="stringType"/>
+		<xs:attribute name="warning"             type="stringType"/>
+		<xs:attribute name="tak"                 type="stringType"/>
+	</xs:complexType>
+	<xs:complexType name="reportsType">
+		<xs:sequence>
+			<xs:element name="report" type="reportType" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:element name="reports" type="reportsType"/>
+</xs:schema>

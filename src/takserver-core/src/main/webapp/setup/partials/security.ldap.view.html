@@ -1,0 +1,27 @@
+<div>
+    <h2>Authentication Configuration (LDAP)</h2>
+    <div id="noLdapDiv" data-ng-show="noLDAP">
+        <p>
+            LDAP is not currently defined in configuration.<br>To define LDAP edit the
+            configuration and restart the server
+        </p>
+    </div>
+    <strong>URL:</strong> {{authConfig.url}}<br>
+    <strong>User String:</strong> {{authConfig.userString}}<br>
+    <strong>Update Interval:</strong> {{authConfig.updateInterval}}<br>
+    <strong>Group Prefix:</strong> {{authConfig.groupPrefix}}<br>
+    <strong>Service Account DN:</strong> {{authConfig.serviceAccountDN}}<br>
+    <strong>Group Base RDN:</strong> {{authConfig.groupBaseRDN}}<br>
+    <div data-ng-show="showTest && testPassed">
+        <p style="background-color: #c4f5c3; width: fit-content;">
+            Your Authentication Configuration looks good!
+        </p>
+    </div>
+    <div data-ng-show="showTest && !testPassed">
+        <p style="background-color: #ecd2d1; width: fit-content;">
+            There was a problem with your Authentication Configuration.
+    </div>
+    <a class="btn btn-primary" ui-sref="security.ldap.modify">Edit Authentication</a>
+    <a class="btn btn-primary" data-ng-click="testAuthConfig()">Test Service Account</a>
+    <a class="btn btn-default" ui-sref="federation" data-ng-click="update_progress('security', 'ldap')">Next (Federation)</a>
+</div>

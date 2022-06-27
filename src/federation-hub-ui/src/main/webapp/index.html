@@ -1,0 +1,17 @@
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <script src="bowerDependencies/jquery/dist/jquery.js"></script>
+    <script type="text/javascript">
+
+      window.onload = function() {
+	  if (confirm("Distribution Statement A: Approved for public release; distribution is unlimited.")) {
+          window.location.replace("/home");
+	  }
+	  else {
+	      // we did not accept the consent banner, so we do nothing!
+	  }
+      }
+    </script>
+  </head>
+</html>

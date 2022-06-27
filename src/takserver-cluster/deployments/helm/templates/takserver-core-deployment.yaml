@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: takserver-messaging
+spec:
+  selector:
+      matchLabels:
+        app: takserver-messaging
+  replicas: {{ .Values.takserver.messaging.replicas }}
+  template:
+    metadata:
+      labels:
+        app: takserver-messaging
+    spec:
+      serviceAccountName: takserver-ignite
+      containers:
+        - name: takserver-messaging
+          image: "{{ .Values.takserver.messaging.image.repository }}:{{ .Values.takserver.messaging.image.tag }}"
+          env:
+            - name: "spring_profiles_active"
+              value: "k8cluster"
+          resources:
+            requests:
+              cpu: {{ .Values.takserver.messaging.resources.requests.cpu }}
+              memory: {{ .Values.takserver.messaging.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.takserver.api.resources.limits.cpu }}
+              memory: {{ .Values.takserver.api.resources.limits.memory }}
+          ports:
+            - containerPort: 8089
+              name: tls-8089
+            - containerPort: 9000
+              name: fedv1-9000
+            - containerPort: 9001
+              name: fedv2-9001
+          readinessProbe:
+            exec:
+              command:
+              - /messaging-readiness.sh
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+              - /messaging-readiness.sh
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 5
+          volumeMounts:
+            - name: config #The name(key) value must match pod volumes name(key) value
+              mountPath: /certs/files/
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Values.certConfigMapName}}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: takserver-api
+spec:
+  selector:
+      matchLabels:
+        app: takserver-api
+  replicas: {{ .Values.takserver.api.replicas }}
+  template:
+    metadata:
+      labels:
+        app: takserver-api
+    spec:
+      serviceAccountName: takserver-ignite
+      containers:
+        - name: takserver-api 
+          image: "{{ .Values.takserver.api.image.repository }}:{{ .Values.takserver.api.image.tag }}"
+          resources:
+            requests:
+              cpu: {{ .Values.takserver.api.resources.requests.cpu }}
+              memory: {{ .Values.takserver.api.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.takserver.api.resources.limits.cpu }}
+              memory: {{ .Values.takserver.api.resources.limits.memory }}
+          ports:
+            - containerPort: 8443
+              name: http-8443
+            - containerPort: 8444
+              name: fed-8444
+            - containerPort: 8446
+              name: certs-8446
+            - containerPort: 8080
+              name: unsecure-8446
+          readinessProbe:
+            exec:
+              command:
+              - /api-readiness.sh
+            initialDelaySeconds: 1
+            periodSeconds: 1
+          livenessProbe:
+            tcpSocket:
+              port: 8443
+            initialDelaySeconds: 180
+            periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: config #The name(key) value must match pod volumes name(key) value
+              mountPath: /certs/files/
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Values.certConfigMapName}}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}

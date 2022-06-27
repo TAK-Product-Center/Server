@@ -1,0 +1,24 @@
+<configuration scan="true" scanPeriod="30 seconds">
+        <appender name="retention_application_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/takserver-retention.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>logs/takserver-retention.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+                <maxHistory>90</maxHistory>
+            </rollingPolicy>
+            <encoder>
+                <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+    <root level="INFO">
+        <appender-ref ref="retention_application_log" />
+    </root>
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <root level="info">
+        <appender-ref ref="console" />
+    </root>
+    <logger name="org.apache.ignite" level="ERROR" />
+</configuration>

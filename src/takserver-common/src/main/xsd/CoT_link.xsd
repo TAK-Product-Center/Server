@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- $Id: CoT_link.xsd,v 1.7 2007/11/15 19:17:24 mel Exp $ 
+ Copyright (c) 2005-2006 The MITRE Corporation.  All rights reserved.
+ Approved for Public Release; Distribution Unlimited.
+ MITRE Case #11-3911  (CoT_link.xsd)
+ MITRE Case #07-1250 (superseded)
+
+- - - - - - - - - - - - -
+ Version History
+- - - - - - - - - - - - -
+  - 0.3: 14 Nov 2006
+    1. Updated comments to clarify that link can be used to reference arbitrary Internet resources.
+    2. Added the optional attribute, mime.
+    3. Deleted phrases that mention possiblity of embedding the linked object in the link element body.
+  - 0.2: 15 Dec 2005
+    1. version attribute definition modified
+      a) Changed data type to xs:decimal
+      b) Deleted 'fixed' facet 
+  - 0.1: Initial version
+-->
+<!-- edited with XMLSPY v5 rel. 3 U (http://www.xmlspy.com) -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<xs:element name="link">
+		<xs:annotation>
+			<xs:documentation>This is a Cursor On Target sub-schema for linking to either another CoT event or an arbitrary Internet resource. The objective of this schema is to provide an abstract way to express a relationship between a CoT object and other object.  This allows, for example, a sensor point of interest to be linked back to its source, or a PPLI from a wingman to be associated with his flight lead.  Linkages are always unidirectional.  One entity may have multiple links (i.e., it may be related to multipls other entities).  For processing simplicity, it is required that the relationship graphs will directed and acyclic (no cycles).  The link, itself, names the relationship (using a hierarchy similiar to the CoT type), the UID of the related object (whether CoT or not), possibly provides a URL for retrieving that object.</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+			</xs:sequence>
+			<xs:attribute name="relation" type="xs:string" use="required">
+				<xs:annotation>
+					<xs:documentation>The type of relationship (e.g, subject, object, indirect object) that this link describes.  This is a hierarchy much like the event type field.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="uid" type="xs:string" use="required">
+				<xs:annotation>
+					<xs:documentation>This is the CoT UID of the related object. If the linked object is not a CoT event, a CoT UID that represents that object is used.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="type" type="xs:string" use="required">
+				<xs:annotation>
+					<xs:documentation>The CoT type of the referenced object.  This is included because it is generally the key item needed in a tasking.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="url" type="xs:string" use="optional">
+				<xs:annotation>
+					<xs:documentation>If present, this is a URL through which the linked object can be retrieved.   If the URL is missing, then the object should be a periodic message (e.g., blue force track) that can be read from a CoT stream.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="remarks" type="xs:string" use="optional">
+				<xs:annotation>
+					<xs:documentation>Remarks associated with this link.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="mime" type="xs:string" use="optional">
+				<xs:annotation>
+					<xs:documentation>Internet Media type of the referenced object.  If the link is to a CoT event, the mime attribute is optional and its type may be application/xml or text/xml as described in RFC 3023, "XML Media Types", or the unregistered type, application/cot+xml.  If the link is to an arbitrary resource, the mime attribute is required and and appropriate Internet media type must be specified.  Registered media types are managed by the IANA and are listed at http://www.iana.org/assignments/media-types/.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="version" type="xs:decimal" use="optional">
+				<xs:annotation>
+					<xs:documentation>Version tag for this sub schema.  Neccessary to ensure upward compatibility with future revisions.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

@@ -1,0 +1,4 @@
+assign role "http://ontology.ihmc.us/Military/MilitaryActor.owl#RescueCombatAirPatrol"
+not match attribute identity : "CN=JP Jones,OU=Accounting,DC=Work,DC=COM" or
+not match attribute callsign : maverick 
+{uid : "xyz123"};

@@ -1,0 +1,507 @@
+<?xml version="1.0" encoding="UTF-8"?>
+    <beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:c="http://www.springframework.org/schema/c"
+	xmlns:sec="http://www.springframework.org/schema/security"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+    xmlns:jpa="http://www.springframework.org/schema/data/jpa"
+    xmlns:task="http://www.springframework.org/schema/task"
+    xmlns:cache="http://www.springframework.org/schema/cache"
+    xmlns:websocket="http://www.springframework.org/schema/websocket"
+    xmlns:util="http://www.springframework.org/schema/util"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:oauth="http://www.springframework.org/schema/security/oauth2"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans     
+        http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context-4.0.xsd
+        http://www.springframework.org/schema/mvc
+        http://www.springframework.org/schema/mvc/spring-mvc-4.0.xsd
+        http://www.springframework.org/schema/security
+        http://www.springframework.org/schema/security/spring-security.xsd
+        http://www.springframework.org/schema/websocket
+        http://www.springframework.org/schema/websocket/spring-websocket.xsd
+        http://www.springframework.org/schema/util
+        http://www.springframework.org/schema/util/spring-util-4.0.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop.xsd
+	    http://www.springframework.org/schema/security/oauth2
+        https://www.springframework.org/schema/security/spring-security-oauth2.xsd">
+        
+        
+
+        <!-- Enabled annotation-defined aspects -->           
+  	    <aop:aspectj-autoproxy />
+        
+        <bean id="springSecurityFilterChain" class="org.springframework.security.web.FilterChainProxy">
+		<sec:filter-chain-map request-matcher="ant">
+		  <sec:filter-chain pattern="/**" filters="
+				X509AuthenticationFilter,
+				BasicAuthenticationFilter,
+				BasicAuthenticationExceptionTranslationFilter,
+				takOauth2ProviderFilter,
+				takClientCredentialsTokenEndpointFilter,
+				martiPreAuthenticationFilter,
+				AnonymousAuthenticationFilter,
+				FilterSecurityInterceptor" />
+		  </sec:filter-chain-map>
+		</bean>
+
+        <!-- Add additional entries to this list to require both X509 and BASIC auth for all the specified subpaths (not the query string) -->
+        <!-- NB: be careful about specifying very short strings here that could match a lot of paths -->
+
+ 		<util:list id="httpsBasicPaths">
+			<value>/Marti/api/tls</value>
+			<value>/oauth/authorize</value>
+		</util:list>
+
+		<!-- Add additional entries to this list to require HTTPS for all the specified path prefixes -->
+        <!-- NB: be careful about specifying very short strings here that could match a lot of paths -->
+	    <util:list id="httpsOnlyPathPrefixes">
+    		<value>/Marti/cop</value>
+    		<value>/Marti/api/cop</value>
+		</util:list>
+	
+      <!--  Spring Security configuration -->
+      <bean id="FilterSecurityInterceptor" class="org.springframework.security.web.access.intercept.FilterSecurityInterceptor">
+		<property name="authenticationManager" ref="martiAuthenticationManager"/>
+		<property name="accessDecisionManager" ref="accessDecisionManager"/>
+		<property name="messageSource" ref="messageSource"/>
+		
+		<property name="securityMetadataSource">
+			<sec:filter-security-metadata-source request-matcher="ant" use-expressions="false">
+			
+			  <!-- require admin access for user manager -->
+	  	      <sec:intercept-url pattern="/users/**" access="ROLE_ADMIN" />
+	  	      
+	  	      <!--  set input manager security -->
+	  	      <sec:intercept-url pattern="/Marti/api/inputs/**" access="ROLE_ADMIN" />
+	  	      <sec:intercept-url pattern="/Marti/api/inputs/**" method="DELETE" access="ROLE_ADMIN" />
+	  	      
+	  	      <!-- data sync API -->
+	  	      <sec:intercept-url pattern="/Marti/api/missions/**" method="DELETE" access="ROLE_ANONYMOUS" />
+	  	      
+	  	      <!-- Map Layer API -->
+              <sec:intercept-url pattern="/Marti/api/maplayers/**" method="DELETE" access="ROLE_ANONYMOUS" />
+	  	      <sec:intercept-url pattern="/Marti/api/maplayers/**" access="ROLE_ANONYMOUS" />
+	  	      
+	  	      <!-- injector API -->
+	  	      <sec:intercept-url pattern="/Marti/api/injectors/cot/uid/**" method="DELETE" access="ROLE_ADMIN" />
+	  	      
+	  	      <!--  set federate groups security -->
+	  	      <sec:intercept-url pattern="/Marti/api/federategroups/**" access="ROLE_ADMIN" />
+	  	      <sec:intercept-url pattern="/Marti/api/federategroups/**" method="DELETE" access="ROLE_ADMIN" />
+
+	     	  <!--  set federate groups mapping security -->
+			  <sec:intercept-url pattern="/Marti/api/federategroupsmap/**" access="ROLE_ADMIN" />
+			  <sec:intercept-url pattern="/Marti/api/federategroupsmap/**" method="DELETE" access="ROLE_ADMIN" />
+
+			  <!--  set federate ca groups security -->
+	  	      <sec:intercept-url pattern="/Marti/api/federatecagroups/**" access="ROLE_ADMIN" />
+	  	      <sec:intercept-url pattern="/Marti/api/federatecagroups/**" method="DELETE" access="ROLE_ADMIN" />
+
+	  	      <!--  set federates security -->
+	  	      <sec:intercept-url pattern="/Marti/api/federates/**" access="ROLE_ADMIN" />
+	  	      <sec:intercept-url pattern="/Marti/api/federatedetails/**" access="ROLE_ADMIN" />
+	  	      
+	  	      <!--  set federate group config security -->
+	  	      <sec:intercept-url pattern="/Marti/api/federategroupconfig/**" access="ROLE_ADMIN" />
+	  	      
+	  	      <sec:intercept-url pattern="/Marti/api/groupprefix/**" access="ROLE_ADMIN" />
+
+	  	      <!--  set outgoing connections management security -->
+	  	      <sec:intercept-url pattern="/Marti/api/outgoingconnections/**" access="ROLE_ADMIN" />
+	  	      <sec:intercept-url pattern="/Marti/api/outgoingconnections/**" method="DELETE" access="ROLE_ADMIN" />
+	
+	  	      <sec:intercept-url pattern="/Marti/api/outgoingconnectionstatus/**" access="ROLE_ADMIN" />
+	
+	  	      <!--  set certificate management security -->
+	  	      <sec:intercept-url pattern="/Marti/api/federatecertificates/**" access="ROLE_ADMIN" />
+	  	      <sec:intercept-url pattern="/Marti/api/federatecertificates/**" method="DELETE" access="ROLE_ADMIN" />
+	
+	  	      <!--  set federate contacts config security -->
+	  	      <sec:intercept-url pattern="/Marti/api/federatecontacts/**" access="ROLE_ADMIN" />
+	
+	  	      <!--  set active connections config security -->
+	  	      <sec:intercept-url pattern="/Marti/api/activeconnections/**" access="ROLE_ADMIN" />
+
+			  <sec:intercept-url pattern="/Marti/api/device/profile/**" method="DELETE" access="ROLE_ADMIN" />
+
+			  <sec:intercept-url pattern="/Marti/api/config" method="GET" access="ROLE_ADMIN" />
+			  
+			  <sec:intercept-url pattern="/Marti/api/security/isSecure" method="GET" access="ROLE_ADMIN" />
+
+	  	      <!--  set video connection management security -->
+	  	      <sec:intercept-url pattern="/Marti/vcm/**" method="DELETE" access="ROLE_ADMIN" />     
+	  	
+			  <sec:intercept-url pattern="/Marti/api/xmpp/**" method="GET" access="ROLE_XMPP"/>
+			  <sec:intercept-url pattern="/Marti/api/xmpp/**" method="POST" access="ROLE_XMPP"/>
+			  <sec:intercept-url pattern="/Marti/api/xmpp/**" method="PUT" access="ROLE_XMPP"/>
+			  <sec:intercept-url pattern="/Marti/api/xmpp/**" method="DELETE" access="ROLE_XMPP"/>
+
+			  <sec:intercept-url pattern="/Marti/api/certadmin/cert/**" access="ROLE_ADMIN" />
+			  <sec:intercept-url pattern="/Marti/api/certadmin/cert/**" method="DELETE" access="ROLE_ADMIN" />
+		      <sec:intercept-url pattern="/Marti/api/retention/policy/**" access="ROLE_ADMIN" />
+			  <sec:intercept-url pattern="/Marti/api/retention/service/schedule/**" access="ROLE_ADMIN" />
+			  <sec:intercept-url pattern="/Marti/api/retention/**" access="ROLE_ADMIN" />
+
+			  <sec:intercept-url pattern="/Marti/api/token/**" access="ROLE_ADMIN" />
+			  <sec:intercept-url pattern="/Marti/api/token/**" method="DELETE" access="ROLE_ADMIN" />
+
+			  <sec:intercept-url pattern="/Marti/api/subscriptions/add/**" access="ROLE_ADMIN" />
+			  <sec:intercept-url pattern="/Marti/api/subscriptions/delete/**" method="DELETE" access="ROLE_ADMIN" />
+	
+			  <!-- Public interface is accessible to anyone, no authentication needed -->
+
+	          <!-- Mission packages can be queried and uploaded with either ROLE_ANONYMOUS or ROLE_FEDERATE.
+	               ROLE_FEDERATE will only be assigned when the "federate" port is used. See the
+	               RolePortUserServiceWrapper bean definition below. ROLE_ANONYMOUS will only be assigned
+	               when that port is NOT used. -->
+			  <sec:intercept-url pattern="/Marti/sync/missionquery" access="ROLE_ANONYMOUS, ROLE_FEDERATE"/>
+			  <sec:intercept-url pattern="/Marti/sync/missionupload" access="ROLE_ANONYMOUS, ROLE_FEDERATE"/>
+			  <sec:intercept-url pattern="/Marti/sync/search" access="ROLE_ANONYMOUS, ROLE_FEDERATE"/>
+	          
+			  <!-- CoT Query Servlet restricted to admin, since it doesn't do group filtering -->
+			  <sec:intercept-url pattern="/Marti/CotQueryServlet" access="ROLE_ADMIN"/> 
+			  <!-- api to provide status updates on CoT search query progress -->
+	  	      <sec:intercept-url pattern="/Marti/api/cot/search/**" access="ROLE_ADMIN"/>
+	  	      
+	  	      <!-- Require a special port-assigned role for creating client certs dynamically -->
+			  <sec:intercept-url pattern="/Marti/api/tls/makeClientKeyStore" access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/Marti/api/tls/config" access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/Marti/api/tls/signClient" access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/Marti/api/tls/profile/enrollment" method="GET" access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/Marti/api/tls/profile/tool/**" method="GET" access="ROLE_NO_CLIENT_CERT" />
+
+				<!-- ROLE_ADMIN only for export mission page, since it includes counts by hour for all events -->
+	  	      <sec:intercept-url pattern="/Marti/ExportMission.jsp" access="ROLE_ADMIN"/>
+	  	      
+	  	      <!-- default error path -->
+	  	      <sec:intercept-url pattern="/Marti/error/**" access="ROLE_ANONYMOUS, ROLE_NO_CLIENT_CERT, ROLE_FEDERATE"/>
+	  	      <sec:intercept-url pattern="/error" access="ROLE_ANONYMOUS, ROLE_NO_CLIENT_CERT, ROLE_FEDERATE"/>
+	  	      <sec:intercept-url pattern="/Marti/error.jsp" access="ROLE_NON_ADMIN_UI, ROLE_NO_CLIENT_CERT, ROLE_FEDERATE"/>
+	  	      <sec:intercept-url pattern="/Marti/CoreConnectionError.jsp" access="ROLE_NON_ADMIN_UI, ROLE_NO_CLIENT_CERT, ROLE_FEDERATE"/>
+	  	      <sec:intercept-url pattern="/CoreConnectionError.jsp" access="ROLE_NON_ADMIN_UI, ROLE_NO_CLIENT_CERT, ROLE_FEDERATE"/>
+			  <sec:intercept-url pattern="/error-401.html"  access="ROLE_NO_CLIENT_CERT" />
+
+			  <!-- properties API -->
+	  	      <sec:intercept-url pattern="/Marti/api/properties/**" method="DELETE" access="ROLE_ANONYMOUS" />
+
+			  <sec:intercept-url pattern="/Marti/menubar.html/**" method="GET" access="ROLE_NON_ADMIN_UI" />
+			  <sec:intercept-url pattern="/Marti/api/missions/**" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/api/sync/**" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/api/cot/**" access="ROLE_ANONYMOUS" />
+                     
+              <!--  properties API -->
+              <sec:intercept-url pattern="/Marti/api/properties/**" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/api/properties/**" method="DELETE" access="ROLE_ANONYMOUS" />
+              
+              <!--  Group API -->
+			  <sec:intercept-url pattern="/Marti/api/groups/update/**" access="ROLE_ADMIN" />
+              <sec:intercept-url pattern="/Marti/api/groups/**" access="ROLE_ANONYMOUS" />
+
+			  <sec:intercept-url pattern="/Marti/api/device/profile/tool/**" method="GET" access="ROLE_ANONYMOUS" />
+				<sec:intercept-url pattern="/Marti/api/device/profile/connection" method="GET" access="ROLE_ANONYMOUS" />
+				<sec:intercept-url pattern="/Marti/api/device/profile/enrollment" method="GET" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/api/device/profile/*/missionpackage" method="GET" access="ROLE_ANONYMOUS" />
+
+              <!--  set client endpoint query security -->
+              <sec:intercept-url pattern="/Marti/api/clientEndPoints/**" method="GET" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/api/contacts/**" method="GET" access="ROLE_ANONYMOUS" />
+              
+              <!--  client dashboard -->
+              <sec:intercept-url pattern="/Marti/clients/**" method="GET" access="ROLE_NON_ADMIN_UI" />
+              <sec:intercept-url pattern="/Marti/api/subscriptions/all/**" method="GET" access="ROLE_ANONYMOUS" />
+              
+              <sec:intercept-url pattern="/Marti/vcu/**" method="POST" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/vcm/**" method="GET" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/vcm/**" method="POST" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/vcm/**" method="DELETE" access="ROLE_ADMIN" />     
+              <sec:intercept-url pattern="/Marti/vcs/**" method="POST" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/VideoManager.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/VideoUpload.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/VideoSend.jsp" access="ROLE_NON_ADMIN_UI"/>
+     
+              <sec:intercept-url pattern="/Marti/TracksKML/**" method="POST" access="ROLE_ANONYMOUS"/>
+                         
+              <sec:intercept-url pattern="/Marti/ErrorLog/**" method="POST" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/ErrorLog/**" method="GET" access="ROLE_ADMIN"/>
+              <sec:intercept-url pattern="/Marti/ErrorLog/**" method="DELETE" access="ROLE_ADMIN"/>
+              <sec:intercept-url pattern="/Marti/ErrorLogManager.jsp" access="ROLE_ADMIN"/>
+
+              <sec:intercept-url pattern="/Marti/Missions.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/Missions.js" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/MissionEditor.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/MissionInvite.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/MissionSend.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/api/citrap/**" method="GET" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/citrap/**" method="POST" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/citrap/**" method="PUT" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/citrap/**" method="DELETE" access="ROLE_ANONYMOUS"/>
+
+              <sec:intercept-url pattern="/Marti/api/excheck/**" method="GET" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/excheck/**" method="POST" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/excheck/**" method="PUT" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/excheck/**" method="DELETE" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/ExCheck.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/api/subscriptions/*/filter" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/api/subscriptions/*/filter" method="DELETE" access="ROLE_ANONYMOUS" />
+              
+              <sec:intercept-url pattern="/Marti/api/version/**" access="ROLE_ANONYMOUS"/> 
+              <sec:intercept-url pattern="/Marti/api/node/id/**" access="ROLE_ANONYMOUS"/>
+              
+              
+              <sec:intercept-url pattern="/Marti/footer.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/images/*" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/jquery/**" access="ROLE_NON_ADMIN_UI, ROLE_NO_CLIENT_CERT"/>
+              <sec:intercept-url pattern="/Marti/lib/**" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/mil-std-2525b/*" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/icons/*" access="ROLE_NON_ADMIN_UI"/>
+
+              <sec:intercept-url pattern="/Marti/api/home/**" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/util/isAdmin/**" access="ROLE_ADMIN"/>
+              <sec:intercept-url pattern="/Marti/api/util/user/**" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/sync/content" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/sync/missioncreate" access="ROLE_ANONYMOUS"/>
+
+              <!-- allow anonymous access to GET icons from custom or default iconsets loaded into the webapps -->
+              <sec:intercept-url pattern="/Marti/api/icon/**" method="GET" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/iconset/**" method="GET" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/iconseturl/**" method="GET" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/cot/images/**" method="GET" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/authentication.jsp" access="ROLE_NON_ADMIN_UI"/>
+
+			  <!-- disallow OPTIONS and DELETE for all URLs. -->
+			  <sec:intercept-url pattern="/Marti/**" method="DELETE" access="ROLE_NONEXISTENT"/>
+			  <sec:intercept-url pattern="/Marti/**" method="OPTIONS" access="ROLE_NONEXISTENT"/>
+
+              <!-- These operations read either from the DB or runtime data from the CoT server -->       
+              <sec:intercept-url pattern="/Marti/ContactsJson.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/index.html" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/ListDataFerryFiles.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/ListContacts.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/ListContactsRefresh.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/sync" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/KmlMasterSA/**" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/LatestKML" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/EnterpriseSync.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/ExportMissionKML/**" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/trackExport.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/GetTime" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/iconurl" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/api/cop/**" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/webtak/**" access="ROLE_WEBTAK"/>
+              <sec:intercept-url pattern="/webtak-plugins/**" access="ROLE_WEBTAK"/>
+              <sec:intercept-url pattern="/takproto/**" access="ROLE_WEBTAK" />
+              <sec:intercept-url pattern="/Marti/GeoCache/**" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/async/chat" access="ROLE_ANONYMOUS"/>
+       
+              <!-- Upload interface allows user to write to the server -->
+              <sec:intercept-url pattern="/Marti/draw/**" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/sync/upload" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/sync/delete" access="ROLE_ANONYMOUS"/>
+              <sec:intercept-url pattern="/Marti/upload.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/sendMissionPackage.jsp" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/css/**" access="ROLE_NON_ADMIN_UI, ROLE_NO_CLIENT_CERT"/>
+                         
+              <sec:intercept-url pattern="/Marti/api/ver/**" access="ROLE_ANONYMOUS"/>
+
+			  <sec:intercept-url pattern="/actuator/**" access="ROLE_ADMIN" />
+			  
+			  <sec:intercept-url pattern="/Marti/metrics/**" access="ROLE_ADMIN" />
+			  
+			  <!--  Map Layer Admin tool -->
+			  <sec:intercept-url pattern="/Marti/mla/**" access="ROLE_ADMIN"/>
+
+			  <sec:intercept-url pattern="/oauth/token" access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/oauth/authorize"  access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/oauth/check_token"  access="ROLE_ANONYMOUS" />
+
+			  <!-- disallow direct access to login page - needs to pass through a Spring MVC view resolver -->
+				<sec:intercept-url pattern="/login/**" access="ROLE_NO_CLIENT_CERT"/>
+				<sec:intercept-url pattern="/Marti/login/**" access="ROLE_NO_CLIENT_CERT"/>
+
+			  <sec:intercept-url pattern="/register/admin/**" access="ROLE_ADMIN"/>
+			  <sec:intercept-url pattern="/register/**" access="#{@UserManagementAuthorizationProvider.role}" />
+			  <sec:intercept-url pattern="/locate/**"  access="#{@LocateAuthorizationProvider.role}" />
+			  <sec:intercept-url pattern="/schedule/**" access="ROLE_ADMIN"/>
+			  
+			  <sec:intercept-url pattern="/user-management/**" access="ROLE_ADMIN"/>
+
+			   <!-- static content -->
+			  <sec:intercept-url pattern="/Marti/favicon.ico" access="ROLE_NON_ADMIN_UI" />
+			  <sec:intercept-url pattern="/Marti/tablesorter/**" access="ROLE_NON_ADMIN_UI" />
+
+			  <!-- require admin for other /Marti paths -->
+			  <sec:intercept-url pattern="/Marti/**" access="ROLE_ADMIN" />
+
+			  <!-- require anonymous for everything else (namely extWebContentDir paths) -->
+			  <sec:intercept-url pattern="/**" access="ROLE_ANONYMOUS" />
+			  
+			  
+			  	 
+
+			</sec:filter-security-metadata-source>
+		</property>
+	</bean>
+
+	<bean id="LocateAuthorizationProvider" class="com.bbn.locate.LocateAuthorizationProvider"/>
+	<bean id="UserManagementAuthorizationProvider" class="com.bbn.user.registration.UserManagementAuthorizationProvider"/>
+
+	<bean id="SwaggerConfig" class="com.bbn.marti.swaggerconfig.SwaggerConfig"/>
+
+	<bean id="NullRequestCacheAwareFilter" class="org.springframework.security.web.savedrequest.NullRequestCache"/>
+
+	<bean id="SessionRegistry" class="org.springframework.security.core.session.SessionRegistryImpl"/>
+
+	<bean id="SwaggerAuthorizationFilter" class="com.bbn.marti.swaggerconfig.SwaggerAuthorizationFilter"/>
+	<bean id="swaggerFilterRegistrationBean" class="org.springframework.boot.web.servlet.FilterRegistrationBean">
+		<property name="filter" ref="SwaggerAuthorizationFilter"/>
+		<property name="urlPatterns" value="/swagger-resources/**, /swagger-ui.html, /v2/api-doc"/>
+	</bean>
+
+	<bean id="martiPreAuthenticationFilter" class="com.bbn.marti.util.spring.TakPreAuthenticatedProcessingFilter">
+		<property name="authenticationManager" ref="martiAuthenticationManager" />
+	</bean>
+
+	<bean id="AnonymousAuthenticationFilter" class="org.springframework.security.web.authentication.AnonymousAuthenticationFilter">
+	  <constructor-arg value="anonymous-key"/>
+	  <constructor-arg value="anonymous"/>
+	  <constructor-arg>
+	      <list>
+	        <bean class="org.springframework.security.core.authority.SimpleGrantedAuthority">
+			 <constructor-arg value="ROLE_ANONYMOUS"/>
+		    </bean>
+		  </list>
+	  </constructor-arg>
+	</bean>
+
+	<bean id="securityContextHolderAwareRequestFilter" class="org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter" />
+
+	<bean id="takTokenStore" class="com.bbn.marti.oauth.TAKTokenStore"/>
+	<bean id="takJwtAccessTokenConverter" class="com.bbn.marti.oauth.TAKJwtAccessTokenConverter"/>
+	<bean id="takClientDetailsService" class="com.bbn.marti.oauth.TAKClientDetailsService"/>
+	<bean id="takTokenServices" class="org.springframework.security.oauth2.provider.token.DefaultTokenServices">
+		<property name="tokenStore" ref="takTokenStore" />
+		<property name="tokenEnhancer" ref="takJwtAccessTokenConverter"/>
+		<property name="clientDetailsService" ref="takClientDetailsService"/>
+		<property name="supportRefreshToken" value="true" />
+	</bean>
+	<bean id ="takClientCredentialsTokenEndpointFilter" class="org.springframework.security.oauth2.provider.client.ClientCredentialsTokenEndpointFilter" >
+		<property name="authenticationManager" ref="martiOauthAuthenticationManager"/>
+	</bean>
+	<oauth:resource-server id="takOauth2ProviderFilter" token-services-ref="takTokenServices" stateless="false" authentication-manager-ref="martiOauthAuthenticationManager"/>
+	<oauth:authorization-server token-services-ref="takTokenServices"  client-details-service-ref="takClientDetailsService" check-token-enabled="true">
+		<oauth:authorization-code />
+		<oauth:refresh-token />
+		<oauth:client-credentials />
+		<oauth:password />
+	</oauth:authorization-server>
+
+	<bean id="X509AuthenticationFilter" class="org.springframework.security.web.authentication.preauth.x509.X509AuthenticationFilter">
+		<property name="authenticationManager" ref="martiAuthenticationManager" />
+		<property name="principalExtractor">
+			<bean class="com.bbn.marti.util.spring.DelegatingX509UsernameExtractor" />
+		</property>
+		<property name="authenticationFailureHandler" ref="unforgivingAuthFailureProvider" />
+	</bean>
+	
+	<bean id="unforgivingAuthFailureProvider" class="com.bbn.marti.util.spring.UnforgivingAuthenticationFailureHandler" />
+	
+	<bean id="BasicAuthenticationFilter" class="org.springframework.security.web.authentication.www.BasicAuthenticationFilter">
+		<constructor-arg ref="martiAuthenticationManager" />
+		<constructor-arg ref="authenticationEntryPoint"/>
+	</bean>
+	
+	<bean id="BasicAuthenticationExceptionTranslationFilter" class="org.springframework.security.web.access.ExceptionTranslationFilter">
+		<constructor-arg ref="authenticationEntryPoint" />
+		<property name="accessDeniedHandler">
+			<bean class="org.springframework.security.web.access.AccessDeniedHandlerImpl" />
+		</property>
+	</bean>
+	
+	<bean id="BasicAuthenticationProvider" class="org.springframework.security.authentication.dao.DaoAuthenticationProvider">
+		<property name="userDetailsService" ref="userService"/>
+		<property name="hideUserNotFoundExceptions" value="false"/>
+		<property name="passwordEncoder" ref="passwordEncoder"/>
+	</bean>
+	
+	<!-- use bcrypt for password hashes -->
+	<bean id="passwordEncoder" class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder"/>
+	
+	<bean id="Http403ExceptionTranslationFilter" class="org.springframework.security.web.access.ExceptionTranslationFilter">
+		<constructor-arg>
+			<bean class="org.springframework.security.web.authentication.Http403ForbiddenEntryPoint" />
+		</constructor-arg>
+	</bean>
+ 
+	<bean id="WebExpressionHandler" class="org.springframework.security.web.access.expression.DefaultWebSecurityExpressionHandler">
+		<property name="roleHierarchy" ref="roleHierarchy" />
+	</bean>
+
+	<sec:authentication-manager id="martiOauthAuthenticationManager">
+		<sec:authentication-provider ref="martiAuthenticationProvider"/>
+	</sec:authentication-manager>
+
+	<sec:authentication-manager id="martiAuthenticationManager">
+      <sec:authentication-provider ref="PreAuthenticatedAuthenticationProvider" />
+      <sec:authentication-provider ref="martiAuthenticationProvider"/>
+      <sec:authentication-provider ref="BasicAuthenticationProvider" />
+    </sec:authentication-manager>
+  
+    <!-- Custom spring security authentication provider that uses Marti auth layer to authenticate. -->
+    <bean id="martiAuthenticationProvider" class="com.bbn.marti.util.spring.TakAuthenticationProvider" />
+    
+	  <bean id="authenticationEntryPoint" class="org.springframework.security.web.authentication.www.BasicAuthenticationEntryPoint">
+  		<property name="realmName" value="Marti"/>
+	  </bean>
+
+      <bean id="accessDecisionManager" class="org.springframework.security.access.vote.AffirmativeBased">
+        <constructor-arg>
+            <list>
+                <bean id="roleVoter" class="org.springframework.security.access.vote.RoleHierarchyVoter">
+        		  <constructor-arg ref="roleHierarchy" />
+                </bean>
+            </list>
+        </constructor-arg>
+      </bean>
+	  
+      <bean id="roleHierarchy" class="org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl">
+        <property name="hierarchy">
+          <value>
+            ROLE_ADMIN > ROLE_READONLY
+            ROLE_READONLY > ROLE_ANONYMOUS
+            ROLE_ADMIN > ROLE_NON_ADMIN_UI
+            ROLE_WEBTAK > ROLE_NON_ADMIN_UI
+            ROLE_NON_ADMIN_UI > ROLE_ANONYMOUS
+          </value>
+        </property>
+      </bean>
+    
+      <bean class="com.bbn.marti.util.spring.RolePortUserServiceWrapper" id="rolePortUserServiceWrapper">
+	        <property name="userDetailsService" ref="userService"/>
+	        <property name="portRoleMap">
+	          <util:map id="portRoleMap">
+	            <entry key="8444" value="ROLE_FEDERATE" />
+	            <entry key="8445" value="ROLE_XMPP" />
+			    <entry key="8446" value="ROLE_NO_CLIENT_CERT" />
+	          </util:map>
+	        </property>
+	      </bean>
+      
+	  <!-- use a custom role mapper here based on the incoming port -->
+	  <bean id="PreAuthenticatedAuthenticationProvider" class="org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationProvider">
+	    <property name="preAuthenticatedUserDetailsService" ref="rolePortUserServiceWrapper"/>
+	  </bean>
+	  
+	  <!-- Spring security user service: intentionally empty. Users are manged by core. -->
+	  <sec:user-service id="userService">
+	    <sec:user name="usernonexistent" authorities="ROLE_NONEXISTENT" />
+      </sec:user-service>
+      
+</beans>

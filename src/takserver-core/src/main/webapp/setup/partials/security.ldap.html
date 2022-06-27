@@ -1,0 +1,9 @@
+<div>
+    <h2>Authentication Options</h2>
+    <h4>Do you want to use LDAP to Authenticate?</h4>
+    <a ui-sref="security.ldap.view" class="btn btn-primary btn-sm" ng-disabled="hideSkip" data-ng-click="hideSkipFunc()">
+        LDAP Authentication Options
+    </a>
+    <a ui-sref="federation" class="btn btn-default" data-ng-click="update_progress('security', 'ldap')" data-ng-hide="hideSkip">Skip</a>
+    <div ui-view></div>
+</div>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" data-ng-app="groupManager">
+<head>
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <meta charset="utf-8">
+    <title>Connected Users</title>
+    
+    <link rel="stylesheet" href="css/main.css">
+</head>
+
+<body>
+        <script type="text/javascript" src="../jquery/jquery-3.5.0.js"></script>
+	<div data-ng-include="'../menubar.html'"></div>
+	
+	<script type="text/javascript" src="../lib/angular/angular.min.js"></script>
+	<script type="text/javascript" src="../lib/angular/angular-route.min.js"></script>
+	
+	<script src="js/app.js"></script>
+	<script src="js/controllers.js"></script>
+	
+	<div id="content" class="content" >
+	    <header>
+	        <div id="users_heading">Connected Users</div>
+	    </header>
+	
+	    <div id="userList" class="content" class="listContainer" data-ng-controller="UserListCtrl" ng-cloak>
+	        <dl>
+	            <dd data-ng-repeat="user in users"><a class="cnt" href="#!/view/{{user.connectionId}}">{{user.displayName}}&nbsp;({{user.connectionType}})</a></dd>
+	        </dl>
+	    </div>
+		    <div class="content" id="rightViewContainer" >
+	        <div data-ng-view></div>
+	    </div>
+	</div>
+	<div data-ng-include="'../footer.jsp'"></div>
+</body>
+</html>

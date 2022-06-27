@@ -1,0 +1,42 @@
+{
+  "name": "jsPlumb",
+  "version": "2.1.8",
+  "ignore": [
+    "demo",
+    "dist/apidocs",
+    "dist/demo",
+    "dist/doc",
+    "dist/lib",
+    "dist/tests",
+    "dist/index.html",
+    "dist/css",
+    "demo-list.js",
+    "css",
+    "doc",
+    "img",
+    "lib",
+    "jekyll",
+    "node_modules",
+    "src",
+    "tests",
+    "Gruntfile.js",
+    "README.md",
+    "changelog.txt",
+    "index.html",
+    "build-support.js",
+    "package.json",
+    "todo.txt",
+     "**/.*",
+    "bower_components",
+    "test"
+  ],
+  "main": [
+    "dist/js/jsPlumb-2.1.8.js"
+  ],
+  "homepage": "https://jsplumbtoolkit.com",
+  "authors": [
+    "jsPlumb <hello@jsplumbtoolkit.com>"
+  ],
+  "description": "Visual connectivity for webapps",
+  "license": "/jsPlumb-LICENSE.txt"
+}

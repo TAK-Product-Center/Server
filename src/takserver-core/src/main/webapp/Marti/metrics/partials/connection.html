@@ -1,0 +1,220 @@
+<style>
+.blur-filter {
+    -webkit-filter: blur(2px);
+    -moz-filter: blur(2px);
+    -o-filter: blur(2px);
+    -ms-filter: blur(2px);
+    filter: blur(2px);
+}
+.selectedCon{
+   background-color: green;
+}
+   #metrics-container {
+   word-wrap: break-word; 
+   color: white;
+   padding-right: 2%;
+   padding-left: 2%;
+   padding-top: 10px;
+   background-color: #26282f;
+   height: 100%;
+   }
+   #header {
+   text-align: center
+   }
+   #row1 {
+   margin-bottom: 10px;
+   color: black;
+   width: calc(100%);
+   display: inline-block;
+   font-size: 0;
+   vertical-align: top;
+   display: flex
+   }
+   #r1c1 {
+   margin-bottom: 10px;
+   color: black;
+   width: calc(100%);
+   display: inline-block;
+   font-size: 0;
+   vertical-align: top;
+   display: flex
+   }
+   #r1c2 {
+   color: white;
+   width: calc(25% - 0.375%);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   margin-right: 0.5%;
+   }
+   #r1c3 {
+   color: white;
+   width: calc(25% - 0.375%);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   margin-right: 0.5%;
+   }
+   .aspect{
+   position: relative; 
+   padding-top: 50%;
+   }
+   #r1c4 {
+   color: white;
+   width: calc(25% - 0.375%);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   }
+   .t7 {
+   color: black;
+   width: calc(50% - 7.75px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   }
+   #row2 {
+   margin-bottom: 10px;
+   color: black;
+   width: calc(100%);
+   display: inline-block;
+   font-size: 0;
+   vertical-align: top;
+   display: flex
+   }
+   #row3 {
+   margin-bottom: 10px;
+   color: black;
+   width: calc(100%);
+   display: inline-block;
+   font-size: 0;
+   vertical-align: top;
+   display: flex
+   }
+   #r2c1 {
+   color: white;
+   width: calc(50% - 3px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   }
+   #r2c4 {
+   color: white;
+   width: calc(50% - 3px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   }
+   #r3c1 {
+   color: white;
+   width: calc(25% - 0.375% - 2px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   margin-right: 0.5%;
+   }
+   #r3c2 {
+   color: white;
+   width: calc(25% - 0.375% - 2px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   margin-right: 0.5%;
+   }
+   #r3c3 {
+   color: white;
+   width: calc(25% - 0.375% - 2px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   margin-right: 0.5%;
+   }
+   #r3c4 {
+   color: white;
+   width: calc(25% - 0.375% - 2px);
+   display: inline-block;
+   font-size: 15pt;
+   vertical-align: top;
+   }
+   #donut {
+   margin-bottom: 5%
+   }
+   #myline {
+   background-color: #393c47;
+   }
+   #mytime {
+   background-color: #393c47;
+   }
+   #cpuLabel{
+   padding-top: 2%;
+   padding-bottom: 2%
+   }
+   .rb {
+   border: 1px solid black;
+   border-radius: 15px;
+   background: #393c47;
+   color: white
+   }
+   .d3content {
+   position: absolute;
+   top: 0; bottom: 0; left: 0; right: 0; 
+   }
+   .legendRow {
+   color: black;
+   width: calc(100%);
+   display: inline-block;
+   font-size: 0;
+   vertical-align: top;
+   display: flex
+   }
+   .legendElem{
+      width: 50%; 
+      font-size: 15px;
+   }
+</style>
+<div id="metrics-container">
+   <!-- HEADER -->
+   <div id="header" class="rb">
+      <h2>Connection Metrics for {{uid}}</h2>
+   </div>
+   <h3 id="error" ng-show="error"> Connection {{uid}} is no longer active. </h3>
+   <div ng-hide="error">
+
+      <!-- ROW1 -->
+      <hr style="background-color: white">
+
+      <button ng-click="closeRow1()" style="font-size: 15px;"> {{ hideRow1 ? "+" : "-" }} </button>
+      <div id="row1" ng-hide="hideRow1">
+         <div id="r1c1" class="rb" style="flex-wrap: wrap; display: flex; flex-direction: row;">
+            <div ng-repeat="(key, value) in props" style="width: 20%">
+               <div style="margin: 10px; padding: 10px; border-style: solid; border-color: white; border-width: 0.5px; border-radius: 15px; font-size: 12px; color: white; text-align: center;"><u>{{key}}</u><br>{{value}}</div>
+            </div>
+            <!-- <div class="" style="flex-wrap: wrap;display: inline-block; text-align: center;" ng-repeat="att in attrs | orderBy: 'name'">
+               <div style="margin: 10px; padding: 10px; border-style: solid; border-color: white; border-width: 0.5px; border-radius: 15px;"><u>{{att.name}}</u><br>{{att.value}}</div>
+            </div> -->
+         </div>
+      </div>
+      <!-- ROW BREAK -->
+      <hr style="background-color: white">
+      <!-- ROW2 -->
+      <button ng-click="closeRow2()" style="font-size: 15px;"> {{ hideRow2 ? "+" : "-" }} </button>
+      <div id="row2" ng-hide="hideRow2">
+         <div id="r2c1" class="rb" style="text-align: center;">
+            <div class="aspect">
+               <div data-ng-include="'./partials/singleConnectionNetworkBytes.html'"></div>
+            </div>
+         </div><!--
+   -----><div id="r2c4" class="rb" style="text-align: center;">
+            <div class="aspect">
+               <div data-ng-include="'./partials/singleConnectionNetworkReadWrites.html'"></div>
+            </div>
+         </div>
+      </div>
+      <!-- ROW BREAK -->
+      <hr style="background-color: white">
+   </div>
+   <br>
+   <br>
+   <br>
+   <br>
+</div>

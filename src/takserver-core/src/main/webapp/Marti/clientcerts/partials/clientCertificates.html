@@ -1,0 +1,96 @@
+<style>
+	.nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+    
+    .nav:after {
+        content: none;
+    }
+
+    .nav:before {
+        content: none;
+    }
+
+	.sortorder:after {
+		content: '\25b2';   // BLACK UP-POINTING TRIANGLE
+	}
+	.sortorder.reverse:after {
+		content: '\25bc';   // BLACK DOWN-POINTING TRIANGLE
+	}
+</style>
+
+<div id="clientCertificatesView">
+	<div id="clientCertificatesListContainer" class="content" class="listContainer" >
+
+		<div data-ng-show="!showRmiError">
+			<h3>Client Certificates</h3>
+		</div>
+
+		<div data-ng-show="!showRmiError">
+		</div>
+
+		<div data-ng-show="!showRmiError">
+			<a class="nav" data-ng-click="getAll();" href>Show All</a>&nbsp;
+			<a class="nav" data-ng-click="getExpired();" href>Show Expired</a>&nbsp;
+			<a class="nav" data-ng-click="getRevoked();" href>Show Revoked</a>&nbsp;
+			<a class="nav" data-ng-click="getActive();" href>Show Active</a>&nbsp;
+			<a class="nav" data-ng-click="getReplaced();" href>Show Replaced</a>&nbsp;
+		</div><br/>
+		<div data-ng-show="!showRmiError">
+			<a class="nav" data-ng-click="download();" href>Download Selected</a>&nbsp;
+			<a class="nav" data-ng-click="delete();" href>Delete Selected</a>&nbsp;
+			<a class="nav" data-ng-click="revokeSelected();" href>Revoke Selected</a>&nbsp;
+			<a class="nav" data-ng-click="toggle();" href>Select All</a>&nbsp;
+		</div>
+
+		<div data-ng-show="!showRmiError && clientCertificates.length > 0">
+			<!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+            tablesorter js files, etc., results in a conflict with angular -->
+
+			<table id="clientCertificatesList" class="tablesorter">
+				<thead>
+				<tr>
+					<th>Select</th>
+					<th><a class="nav" data-ng-click="sortBy('creatorDn')" href>Creator</a><span class="sortorder" ng-show="sortPropertyName === 'creatorDn'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('subjectDn')" href>Subject</a><span class="sortorder" ng-show="sortPropertyName === 'subjectDn'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('userDn')" href>User</a><span class="sortorder" ng-show="sortPropertyName === 'userDn'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('clientUid')" href>Device UID</a><span class="sortorder" ng-show="sortPropertyName === 'clientUid'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('serialNumber')" href>Serial</a><span class="sortorder" ng-show="sortPropertyName === 'serialNumber'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('issuanceDate')" href>Issuance Date</a><span class="sortorder" ng-show="sortPropertyName === 'issuanceDate'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('expirationDate')" href>Expiration Date</a><span class="sortorder" ng-show="sortPropertyName === 'expirationDate'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('effectiveDate')" href>Effective Date</a><span class="sortorder" ng-show="sortPropertyName === 'effectiveDate'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('revocationDate')" href>Revocation Date</a><span class="sortorder" ng-show="sortPropertyName === 'revocationDate'" ng-class="{reverse: reverse}"></span></th>
+					<th>&nbsp;</th>
+				</tr>
+				</thead>
+
+				<tbody>
+				<tr data-ng-repeat="cc in clientCertificates | orderBy:sortPropertyName:reverse ">
+					<td align="center"><input type="checkbox" ng-model="cc.selected"></td>
+					<td data-ng-bind="cc.creatorDn"></td>
+					<td data-ng-bind="cc.subjectDn"></td>
+					<td data-ng-bind="cc.userDn"></td>
+					<td data-ng-bind="cc.clientUid"></td>
+					<td data-ng-bind="cc.serialNumber"></td>
+					<td data-ng-bind="cc.issuanceDate"></td>
+					<td data-ng-bind="cc.expirationDate"></td>
+					<td data-ng-bind="cc.effectiveDate"></td>
+					<td data-ng-bind="cc.revocationDate"></td>
+					<td><a class="nav" ng-href="#!/viewCertificate/{{cc.hash | encodeURIComponent}}">View</a>
+						<a class="nav" ng-href="/Marti/api/certadmin/cert/{{cc.hash | encodeURIComponent}}/download">Download</a>
+						<a class="nav" data-ng-click="revokeCertificate(cc)" href>Revoke</a>
+					</td>
+				</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div data-ng-show="!showRmiError && clientCertificates.length == 0">
+			<table class="tablesorter"><tr><td colspan="2">No Certificates Found</td></tr></table>
+		</div>
+
+		<div data-ng-show="showRmiError">
+			<h2><font color="dc143c">Certificates Unavailable</font></h2>
+			<p>Error retrieving client certificates.</p>
+			<hr/>
+		</div>
+	</div>
+</div>
