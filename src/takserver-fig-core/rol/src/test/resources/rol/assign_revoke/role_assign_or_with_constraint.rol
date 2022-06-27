@@ -1,0 +1,4 @@
+assign role "http://ontology.ihmc.us/Military/MilitaryActor.owl#RescueCombatAirPatrol"
+constraint max 1
+match attribute DN : "CN=JP Jones,OU=Accounting,DC=Work,DC=COM" or
+match attribute callsign : maverick;

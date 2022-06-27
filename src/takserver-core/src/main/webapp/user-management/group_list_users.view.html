@@ -1,0 +1,50 @@
+<h2>List Users in group</h2>
+
+<div> List users in group <b>{{ list_users_in_group.groupname }} </b> </div>
+
+<!-- list_users_in_group = {
+    "groupname": "Group Apple", 
+    "usersInGroupList": ["user_1", "user_2"], 
+    "usersInGroupListIN": [], 
+    "usersInGroupListOUT": ["user3"]
+}
+
+} -->
+
+<div class="dropbox_group" id="dropbox_in_group" >
+    <div style="text-align: center;"> <b>In Group</b></div>
+    
+    <div ng-repeat="x in list_users_in_group.usersInGroupListIN | orderBy:'username' ">
+
+        <button class="btn btn-secondary user_button" type="button" id="button_user_{{ x.username }}">
+            {{ x }}
+        </button>
+
+    </div>
+
+</div>
+
+<div class="dropbox_group" id="dropbox_out_group" >
+    <div style="text-align: center;"> <b>Out Group</b></div>
+
+    <div ng-repeat="x in list_users_in_group.usersInGroupListOUT | orderBy:'username' ">
+
+        <button class="btn btn-secondary user_button" type="button" id="button_user_{{ x.username }}">
+            {{ x }}
+        </button>
+
+    </div>
+
+</div>
+<div class="dropbox_group" id="dropbox_in_out_group" >
+    <div style="text-align: center;"> <b>Both</b></div>
+
+    <div ng-repeat="x in list_users_in_group.usersInGroupList | orderBy:'username' ">
+
+        <button class="btn btn-secondary user_button" type="button" id="button_user_{{ x.username }}">
+            {{ x }}
+        </button>
+
+    </div>
+
+</div>

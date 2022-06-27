@@ -1,0 +1,37 @@
+
+/* QoS config tables */
+table.qostable {
+	font-family:arial;
+	background-color: #CDCDCD;
+	margin:10px 0pt 15px;
+	font-size: 10pt;
+	text-align: left;
+	border-spacing: 2px;
+    border-collapse: separate;
+}
+table.qostable thead tr th, table.qostable tfoot tr th {
+	background-color: #e6EEEE;
+	border: 1px solid #FFF;
+	font-size: 12pt;
+	padding: 4px;
+}
+table.qostable thead tr .header {
+	/*background-image: url(bg.gif); */
+	background-repeat: no-repeat;
+	background-position: center right;
+	cursor: pointer;
+}
+table.qostable tbody td {
+	color: #3D3D3D;
+	padding: 4px;
+	background-color: #FFF;
+	vertical-align: top;
+}
+table.qostable tbody tr.odd td {
+	background-color:#F0F0F6;
+}
+
+table.qostable thead tr .headerSortDown, table.qostable thead tr .headerSortUp {
+background-color: #8dbdd8;
+}
+

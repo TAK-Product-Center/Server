@@ -1,0 +1,151 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "AWS CloudFormation Script to execute TAKCL integration tests",
+	"Parameters": {
+		"KeyName": {
+			"Description": "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+			"Type": "AWS::EC2::KeyPair::KeyName",
+			"ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+		}
+	},
+	"Metadata": {
+		"AWS::CloudFormation::Interface": {
+			"ParameterGroups": [
+				{
+					"Label": {
+						"default": "TakServer EC2 - Configuration"
+					},
+					"Parameters": ["KeyName"]
+				}
+			],
+			"ParameterLabels": {
+				"KeyName": {
+					"default": "KeyPair Name"
+				}
+			}
+		}
+	},
+	"Resources": {
+		"InstanceProfile": {
+			"Type": "AWS::IAM::InstanceProfile",
+			"Properties": {
+				"Path": "/",
+				"Roles": [
+					"tak-bbn-admin-role-ec2"
+				]
+			}
+		},
+		"IntegrationTestInstance": {
+			"DependsOn": ["InstanceProfile"],
+			"Type": "AWS::EC2::Instance",
+			"Metadata": {
+				"AWS::CloudFormation::Authentication": {
+					"S3IamCreds": {
+						"type": "S3",
+						"buckets": ["takserver-integrationtest"],
+						"roleName": "tak-bbn-admin-role-ec2"
+					}
+				},
+				"AWS::CloudFormation::Init": {
+					"configSets": {
+						"InstallAndRun": [
+							"Configure"
+						]
+					},
+					"Configure": {
+						"files": {
+							"/home/centos/takserver-archive.tar.gz": {
+								"source": null,
+								"owner": "centos",
+								"group": "centos",
+								"authentication": "S3IamCreds"
+							}
+						},
+						"commands": {
+							"01_extract_archive": {
+								"command": "su centos -c \"tar xzf takserver-archive.tar.gz\"",
+								"cwd": "/home/centos"
+							},
+							"02_build_project": {
+								"command": "su centos -c \"bash gradlew buildRpm\"",
+								"cwd": "/home/centos/takserver-archive/src"
+							},
+							"03_run_core_tests": {
+								"command": "su centos -c \"bash ../gradlew integrationTest\"",
+								"cwd": "/home/centos/takserver-archive/src/takserver-core",
+								"ignoreErrors": true
+							},
+							"04_run_usermanager_tests": {
+								"command": "su centos -c \"bash ../gradlew integrationTest\"",
+								"cwd": "/home/centos/takserver-archive/src/takserver-usermanager",
+								"ignoreErrors": true
+							},
+							"05_collect_results": {
+								"command": "su centos -c \"bash collect_results.sh\"",
+								"cwd": "/home/centos/takserver-archive/src/takserver-takcl-core/scripts"
+							},
+							"06_publish_results": {
+								"command": "aws s3 cp integration_test_results.tar.gz s3://takserver-integrationtest/label/",
+								"cwd": "/home/centos/takserver-archive/src/takserver-takcl-core/scripts"
+							}
+						}
+					}
+				}
+			},
+			"Properties": {
+				"IamInstanceProfile": {
+					"Ref": "InstanceProfile"
+				},
+				"ImageId": "ami-0a7fb611b62360fdd",
+				"InstanceType": "t2.xlarge",
+				"Monitoring": "true",
+				"SecurityGroupIds": ["sg-08e72a7413451b613"],
+				"KeyName": {
+					"Ref": "KeyName"
+				},
+				"Tags": [
+					{
+						"Key": "Name",
+						"Value": {
+							"Ref": "AWS::StackName"
+						}
+					}
+				],
+				"UserData": {
+					"Fn::Base64": {
+						"Fn::Join": [
+							"",
+							[
+								"#!/bin/bash -x\n",
+								"# Install the files and packages from the metadata\n",
+								"/opt/aws/bin/cfn-init -v ",
+								"         --stack ",
+								{
+									"Ref": "AWS::StackName"
+								},
+								"         --resource IntegrationTestInstance ",
+								"         --configsets InstallAndRun ",
+								"         --region us-east-1",
+								"\n",
+								"# Signal the status from cfn-init\n",
+								"/opt/aws/bin/cfn-signal -e $? ",
+								"         --stack ",
+								{
+									"Ref": "AWS::StackName"
+								},
+								"         --resource IntegrationTestInstance ",
+								"         --region us-east-1",
+								"\n"
+							]
+						]
+					}
+				}
+			},
+			"CreationPolicy": {
+				"ResourceSignal": {
+					"Timeout": "PT6H"
+				}
+			}
+		}
+	}
+}

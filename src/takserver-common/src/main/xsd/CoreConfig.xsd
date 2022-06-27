@@ -1,0 +1,1144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  Schema for TAK Server Configuration
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://bbn.com/marti/xml/config"
+           xmlns="http://bbn.com/marti/xml/config"
+           elementFormDefault="qualified">
+  <xs:element name="Configuration">
+    <xs:complexType>
+      <xs:all>
+        <xs:element ref="network" minOccurs="1"/>
+        <xs:element ref="auth" minOccurs="1"/>
+        <xs:element ref="submission" minOccurs="1"/>
+        <xs:element ref="subscription" minOccurs="1"/>
+        <xs:element ref="repository" minOccurs="1"/>
+        <xs:element ref="repeater" minOccurs="1"/>
+        <xs:element ref="filter" minOccurs="1"/>
+        <xs:element ref="buffer" minOccurs="1"/>
+        <xs:element ref="dissemination" minOccurs="1"/>
+        <xs:element ref="certificateSigning" minOccurs="0"/>
+        <xs:element ref="security" minOccurs="1"/>
+        <xs:element ref="ferry" minOccurs="0"/>
+        <xs:element ref="async" minOccurs="0"/>
+        <xs:element ref="federation" minOccurs="0"/>
+        <xs:element ref="geocache" minOccurs="0"/>
+        <xs:element ref="citrap" minOccurs="0"/>
+        <xs:element ref="xmpp" minOccurs="0"/>
+        <xs:element ref="plugins" minOccurs="0"/>
+        <xs:element ref="cluster" minOccurs="0"/>
+        <xs:element ref="docs" minOccurs="0"/>
+        <xs:element ref="email" minOccurs="0"/>
+        <xs:element ref="locate" minOccurs="0"/>
+      </xs:all>
+      <xs:attribute name="forceLowConcurrency" type="xs:boolean" default="true"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="network">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Networking</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element name="input" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>Network Input</xs:documentation>
+            </xs:annotation>
+            <xs:sequence>
+              <xs:element name="filtergroup" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+              <xs:element ref="filter" minOccurs="0" maxOccurs="1"/>
+            </xs:sequence>
+            <xs:attribute name="auth" type="authType" default="x509"/>
+            <xs:attribute name="authRequired" type="xs:boolean" default="false"/>
+            <xs:attribute name="_name" type="xs:string" use="required"/>
+            <xs:attribute name="protocol" type="xs:string" use="required"/>
+            <xs:attribute name="port" type="xs:int" use="required"/>
+            <xs:attribute name="group" type="xs:string" use="optional"/>
+            <xs:attribute name="iface" type="xs:string" use="optional"/>
+            <xs:attribute name="archive" type="xs:boolean" default="true"/>
+            <xs:attribute name="anongroup" type="xs:boolean" use="optional"/>
+            <xs:attribute name="archiveOnly" type="xs:boolean" default="false"/>
+            <xs:attribute name="coreVersion" type="xs:int" default="2"/>
+            <xs:attribute name="coreVersion2TlsVersions" type="xs:string" use="optional" default="TLSv1.2,TLSv1.3"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="connector" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>HTTP Connector</xs:documentation>
+            </xs:annotation>
+            <xs:attribute name="port" type="xs:int" use="required"/>
+            <xs:attribute name="tls" type="xs:boolean" default="true"/>
+            <xs:attribute name="useFederationTruststore" type="xs:boolean" default="false"/>
+            <xs:attribute name="clientAuth" type="xs:string" default="true"/>
+            <xs:attribute name="allowBasicAuth" type="xs:boolean" default="false"/>
+            <xs:attribute name="crlFile" type="xs:string" use="optional"/>
+            <xs:attribute name="_name" type="xs:string" use="optional"/>
+            <xs:attribute name="keystore" type="xs:string" use="optional"/>
+            <xs:attribute name="keystoreFile" type="xs:string" use="optional"/>
+            <xs:attribute name="keystorePass" type="xs:string" use="optional"/>
+            <xs:attribute name="truststore" type="xs:string" use="optional"/>
+            <xs:attribute name="truststoreFile" type="xs:string" use="optional"/>
+            <xs:attribute name="truststorePass" type="xs:string" use="optional"/>
+            <xs:attribute name="enableAdminUI" type="xs:boolean" default="true"/>			
+            <xs:attribute name="enableWebtak" type="xs:boolean" default="true"/>
+            <xs:attribute name="enableNonAdminUI" type="xs:boolean" default="true"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="announce" minOccurs="0" maxOccurs="1">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>Announce Mechanism</xs:documentation>
+            </xs:annotation>
+            <xs:attribute name="enable" type="xs:boolean" default="false"/>
+            <xs:attribute name="uid" type="xs:string"/>
+            <xs:attribute name="group" type="xs:string"/>
+            <xs:attribute name="port" type="xs:int"/>
+            <xs:attribute name="interval" type="xs:int"/>
+            <xs:attribute name="ip" type="xs:string"/>
+            <xs:attribute name="svctype" type="xs:string" default="a-f-A-M-F-F"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="multicastTTL" type="xs:int" default="1"/>
+      <xs:attribute name="serverId" type="xs:string" default=""/>
+      <xs:attribute name="enterpriseSyncSizeLimitMB" type="xs:int" default="200"/>
+      <xs:attribute name="missionPackageAutoExtractSizeLimitMB" type="xs:int" default="10"/>
+      <xs:attribute name="httpSessionTimeoutMinutes" type="xs:int" default="130"/>
+      <xs:attribute name="extWebContentDir" type="xs:string" default="webcontent"/>
+      <xs:attribute name="takServerHost" type="xs:string"/>
+      <xs:attribute name="useLinuxEpoll" type="xs:boolean" default="true"/>
+      <xs:attribute name="allowAllOrigins" type="xs:boolean" default="false"/>
+      <xs:attribute name="esyncEnableCache" type="xs:int" default="-1"/>
+      <xs:attribute name="esyncEnableCotFilter" type="xs:boolean" default="false"/>
+      <xs:attribute name="esyncCotFilter" type="xs:string" />
+      <xs:attribute name="version" type="xs:string" default=""/>
+      <xs:attribute name="webCiphers" type="xs:string" default=""/>
+      <xs:attribute name="tomcatMaxPool" type="xs:int" default="-1"/>
+      <xs:attribute name="cloudwatchNamespace" type="xs:string" default="takserver"/>
+      <xs:attribute name="cloudwatchMetricsBatchSize" type="xs:int" default="20"/>
+      <xs:attribute name="cloudwatchEnable" type="xs:boolean" default="false"/>
+      <xs:attribute name="cloudwatchName" type="xs:string" default=""/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:simpleType name="authType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ldap"/>
+      <xs:enumeration value="file"/>
+      <xs:enumeration value="anonymous"/>
+      <xs:enumeration value="x509"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ldapSecurityType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="simple"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:element name="auth">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Authentication</xs:documentation>
+      </xs:annotation>
+      <xs:choice minOccurs="0" maxOccurs="1">
+        <xs:element name="ldap" minOccurs="0" maxOccurs="1">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>LDAP Auth Type</xs:documentation>
+            </xs:annotation>
+            <xs:sequence>
+              <xs:element name="filtergroup" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+            <xs:attribute name="url" type="xs:string" use="required"/>
+            <xs:attribute name="userstring" type="xs:string" use="required"/>
+            <xs:attribute name="updateinterval" type="xs:int" use="optional"/>
+            <xs:attribute name="groupprefix" type="xs:string" default=""/>
+            <xs:attribute name="groupNameExtractorRegex" type="xs:string" default=""/>
+            <xs:attribute name="style" type="ldapStyle" use="required"/>
+            <xs:attribute name="ldapSecurityType" type="ldapSecurityType" default="simple"/>
+            <xs:attribute name="serviceAccountDN" type="xs:string" use="optional"/>
+            <xs:attribute name="serviceAccountCredential" type="xs:string" use="optional"/>
+            <xs:attribute name="groupObjectClass" type="xs:string" default="group"/>
+            <xs:attribute name="userObjectClass" type="xs:string" default="user"/>
+            <xs:attribute name="groupBaseRDN" type="xs:string" use="required"/>
+            <xs:attribute name="userBaseRDN" type="xs:string" use="optional"/>
+            <xs:attribute name="x509groups" type="xs:boolean" default="true"/>
+            <xs:attribute name="x509addAnonymous" type="xs:boolean" default="false"/>
+            <xs:attribute name="matchGroupInChain" type="xs:boolean" default="false"/>
+            <xs:attribute name="postMissionEventsAsPublic" type="xs:boolean" default="false"/>
+            <xs:attribute name="ldapsTruststore" type="xs:string" use="optional"/>
+            <xs:attribute name="ldapsTruststoreFile" type="xs:string" use="optional"/>
+            <xs:attribute name="ldapsTruststorePass" type="xs:string" use="optional"/>
+            <xs:attribute name="readOnlyGroup" type="xs:string" use="optional"/>
+            <xs:attribute name="readGroupSuffix" type="xs:string" default="_READ"/>
+            <xs:attribute name="writeGroupSuffix" type="xs:string" default="_WRITE"/>
+            <xs:attribute name="loginWithEmail" type="xs:boolean" default="false"/>
+            <xs:attribute name="callsignAttribute" type="xs:string" use="optional"/>
+            <xs:attribute name="colorAttribute" type="xs:string" use="optional"/>
+            <xs:attribute name="roleAttribute" type="xs:string" use="optional"/>
+            <xs:attribute name="enableConnectionPool" type="xs:boolean" default="false"/>
+            <xs:attribute name="connectionPoolTimeout" type="xs:string" default="30000" />
+            <xs:attribute name="dnAttributeName" type="xs:string" default="distinguishedName"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="File" minOccurs="0" maxOccurs="1">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>File Auth Type</xs:documentation>
+            </xs:annotation>
+            <xs:attribute name="location" type="xs:string" default="UserAuthenticationFile.xml"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element ref="oauth" minOccurs="0"/>
+      </xs:choice>
+      <xs:attribute name="default" type="xs:string" default="file"/>
+      <xs:attribute name="DNUsernameExtractorRegex" type="xs:string" default="CN=(.*?)(?:,|$)"/>
+      <xs:attribute name="x509groups" type="xs:boolean" default="true"/>
+      <xs:attribute name="x509groupsDefaultRDN" type="xs:boolean" default="false"/>
+      <xs:attribute name="x509addAnonymous" type="xs:boolean" default="false"/>
+      <xs:attribute name="x509useGroupCache" type="xs:boolean" default="false"/>
+      <xs:attribute name="x509checkRevocation" type="xs:boolean" default="false"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:simpleType name="ldapStyle">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="AD"/>
+      <xs:enumeration value="DS"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:element name="buffer">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Buffer and Cache Settings</xs:documentation>
+      </xs:annotation>
+      <xs:all>
+        <xs:element name="latestSA" minOccurs="1" maxOccurs="1">
+          <xs:complexType>
+            <xs:attribute name="enable" type="xs:boolean" default="false"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="queue" minOccurs="1" maxOccurs="1">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>Queue</xs:documentation>
+            </xs:annotation>
+            <xs:sequence>
+              <xs:element name="priority" minOccurs="0" maxOccurs="1">
+                <xs:complexType>
+                  <xs:annotation>
+                    <xs:documentation>Priority</xs:documentation>
+                  </xs:annotation>
+                  <xs:attribute name="levels" type="xs:int" default="3"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute name="monitor" type="xs:boolean" default="true"/>
+            <xs:attribute name="capacity" type="xs:int" default="2048"/>
+            <xs:attribute name="pubSubCapacity" type="xs:int" default="512"/>
+            <xs:attribute name="outboundCapacity" type="xs:int" default="4"/>
+            <xs:attribute name="inboundCapacity" type="xs:int" default="4096"/>
+            <xs:attribute name="codecWrapperCapacity" type="xs:int" default="2048"/>
+            <xs:attribute name="tcpWriteQueueCapacity" type="xs:int" default="32768"/>
+            <xs:attribute name="disconnectOnFull" type="xs:boolean" default="false"/>
+            <xs:attribute name="maxWriteQueueSize" type="xs:int" default="2048"/>
+            <xs:attribute name="defaultExecQueueSize" type="xs:int" default="1024"/>
+            <xs:attribute name="defaultMaxPoolSize" type="xs:int" default="8"/>
+            <xs:attribute name="defaultMaxPoolFactor" type="xs:int" default="2"/>
+            <xs:attribute name="messageWriteQueueSize" type="xs:int" default="32"/>
+            <xs:attribute name="messageWriteExecutorQueueSize" type="xs:int" default="16384"/>
+            <xs:attribute name="codecViewPendingCapacity" type="xs:int" default="2048"/>
+            <xs:attribute name="queueSizeInitial" type="xs:int" default="1"/>
+            <xs:attribute name="queueSizeIncrement" type="xs:int" default="2"/>
+            <xs:attribute name="coreExecutorCapacity" type="xs:int" default="32768"/>
+            <xs:attribute name="throwOnAssertionFail" type="xs:boolean" default="false"/>
+            <xs:attribute name="disconnectOnPendingExceeded" type="xs:boolean" default="true"/>
+            <xs:attribute name="flushInterval" type="xs:int" default="1000"/>
+            <xs:attribute name="websocketSendBufferSizeLimit" type="xs:int" default="4096"/>
+            <xs:attribute name="websocketMaxBinaryMessageBufferSize" type="xs:int" default="2048"/>
+            <xs:attribute name="websocketMaxSessionIdleTimeout" type="xs:long" default="-1"/>
+            <xs:attribute name="websocketSendTimeoutMs" type="xs:int" default="5000"/>
+            <xs:attribute name="missionUidLimit" type="xs:int" default="512"/>
+            <xs:attribute name="missionContentLimit" type="xs:int" default="512"/>
+            <xs:attribute name="nearCacheMaxSize" type="xs:int" default="0"/>
+            <xs:attribute name="cotCacheMaxSize" type="xs:int" default="0"/>
+            <xs:attribute name="cotCacheBatchSize" type="xs:int" default="-1"/>
+            <xs:attribute name="cotCacheMaxMemorySize" type="xs:int" default="-1"/>
+            <xs:attribute name="springCacheMaxSize" type="xs:int" default="-1"/>
+            <xs:attribute name="springCacheBatchSize" type="xs:int" default="-1"/>
+            <xs:attribute name="springCacheMaxMemorySize" type="xs:int" default="-1"/>
+            <xs:attribute name="springCacheSizeScalingFactor" type="xs:int" default="8"/>
+            <xs:attribute name="onHeapEnabled" type="xs:boolean" default="true"/>
+            <xs:attribute name="cacheOffHeapMaxSizeBytes" type="xs:long" default="-1"/>
+            <xs:attribute name="cacheOffHeapInitialSizeBytes" type="xs:long" default="-1"/>
+            <xs:attribute name="cacheOffHeapDefaultPercentage" type="xs:float" default="0.44"/>
+            <xs:attribute name="enableCacheWarmer" type="xs:boolean" default="false"/>
+            <xs:attribute name="ignitePoolSize" type="xs:int" default="-1"/>
+            <xs:attribute name="cacheCotInRepository" type="xs:boolean" default="false"/> 
+            <xs:attribute name="enableCachePersistence" type="xs:boolean" default="false"/> 
+            <xs:attribute name="messageTimestampCacheSizeItems" type="xs:long" default="-1"/> 
+            <xs:attribute name="enableStoreForwardChat" type="xs:boolean" default="false"/>
+            <xs:attribute name="storeForwardQueryBufferMs" type="xs:long" default="1000"/>
+            <xs:attribute name="storeForwardSendBufferMs" type="xs:long" default="200"/>
+            <xs:attribute name="enableClientEndpointCache" type="xs:boolean" default="true"/>
+            <xs:attribute name="contactCacheUpdateRateLimitSeconds" type="xs:long" default="5"/>
+            <xs:attribute name="contactCacheRecencyLimitSeconds" type="xs:long" default="86400"/>
+           </xs:complexType>
+        </xs:element>
+      </xs:all>
+      <xs:attribute name="embeddedIgnite" type="xs:boolean" default="false"/>
+      <xs:attribute name="igniteMulticast" type="xs:boolean" default="false"/>
+      <xs:attribute name="igniteNonMulticastDiscoveryPort" default="47500" type="xs:int"/>
+      <xs:attribute name="igniteNonMulticastDiscoveryPortCount" default="100" type="xs:int"/>
+      <xs:attribute name="igniteCommunicationPort" default="47100" type="xs:int"/>
+      <xs:attribute name="igniteCommunicationPortCount" default="100" type="xs:int"/>
+      <xs:attribute name="igniteHost" default="127.0.0.1" type="xs:string"/>
+      <xs:attribute name="igniteWorkerTimeoutMilliseconds" default="2600000" type="xs:int"/>
+    </xs:complexType>
+
+  </xs:element>
+
+  <xs:element name="submission">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Submission Service</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="ignoreStaleMessages" type="xs:boolean"/>
+      <xs:attribute name="validateXml" type="xs:boolean" default="false"/>
+      <xs:attribute name="dropMesssagesIfAnyServiceIsFull" type="xs:boolean" default="false"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="subscription">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Subscriptions</xs:documentation>
+      </xs:annotation>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="static">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>Static Subscriptions</xs:documentation>
+            </xs:annotation>
+            <xs:sequence>
+              <xs:element name="filtergroup" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+              <xs:element ref="filter" minOccurs="0" maxOccurs="1"/>
+            </xs:sequence>
+            <xs:attribute name="_name" type="xs:string" use="required"/>
+            <xs:attribute name="protocol" type="xs:string" use="required"/>
+            <xs:attribute name="address" type="xs:string" use="required"/>
+            <xs:attribute name="port" type="xs:int" use="required"/>
+            <xs:attribute name="xpath" type="xs:string" default="*"/>
+            <xs:attribute name="federated" type="xs:boolean" default="false"/>
+            <xs:attribute name="iface" type="xs:string" use="optional"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
+      <xs:attribute name="reloadPersistent" type="xs:boolean" default="false"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="repository">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Repository Service</xs:documentation>
+      </xs:annotation>
+      <xs:all>
+        <xs:element ref="connection" minOccurs="1" maxOccurs="1"/>
+      </xs:all>
+      <xs:attribute name="enable" type="xs:boolean" default="true"/>
+      <xs:attribute name="numDbConnections" type="xs:int" default="200"/>
+      <xs:attribute name="connectionPoolAutoSize" type="xs:boolean" default="true"/>
+      <xs:attribute name="primaryKeyBatchSize" type="xs:int" default="500"/>
+      <xs:attribute name="insertionBatchSize" type="xs:int" default="500"/>
+      <xs:attribute name="archive" type="xs:boolean" default="false"/>
+      <xs:attribute name="iconsetDir" type="xs:string" default="iconsets"/>
+      <xs:attribute name="enableCallsignAudit" type="xs:boolean" default="true"/>
+      <xs:attribute name="contactCacheMaxClearRateSeconds" type="xs:int" default="1"/>
+      <xs:attribute name="dbTimeoutMs" type="xs:long" default="60000"/>
+      <xs:attribute name="dbConnectionMaxLifetimeMs" type="xs:int" default="600000"/>
+      <xs:attribute name="dbConnectionMaxIdleMs" type="xs:int" default="10000"/>
+      <xs:attribute name="poolScaleFactor" type="xs:int" default="200"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dissemination">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Dissemination Service</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="smartRetry" type="xs:boolean" default="false"/>
+      <xs:attribute name="boundedSubscriptionWrite" type="xs:boolean" default="false"/>
+      <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="ferry">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Data Ferry Mechanism</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="endpoint">
+            <xs:complexType>
+              <xs:annotation>
+                <xs:documentation>Data Ferry Endpoint</xs:documentation>
+              </xs:annotation>
+              <xs:attribute name="_name" type="xs:string" use="required"/>
+              <xs:attribute name="callsign" type="xs:string"/>
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:sequence>
+      <xs:attribute name="enable" type="xs:boolean" default="false"/>
+      <xs:attribute name="stale" type="xs:int" default="60"/>
+      <xs:attribute name="webserver" type="xs:string" use="required"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="nameEntry">
+    <xs:annotation>
+      <xs:documentation>nameEntry</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="name" type="xs:string"/>
+    <xs:attribute name="value" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:complexType name="nameEntries">
+    <xs:sequence>
+      <xs:element name="nameEntry" type="nameEntry" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="certificateConfig" >
+    <xs:annotation>
+      <xs:documentation>Certificate configuration data</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="nameEntries" type="nameEntries" minOccurs="0" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TAKServerCAConfig">
+    <xs:annotation>
+      <xs:documentation>Configuration for Certificate Signing servlets</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="keystore" type="xs:string" use="required"/>
+    <xs:attribute name="keystoreFile" type="xs:string" use="required"/>
+    <xs:attribute name="keystorePass" type="xs:string" use="required"/>
+    <xs:attribute name="validityDays" type="xs:int" default="365"/>
+    <xs:attribute name="validityNotBeforeOffsetMinutes" type="xs:int" default="720"/>
+    <xs:attribute name="signatureAlg" type="xs:string" use="required"/>
+    <xs:attribute name="CAkey" type="xs:string" use="optional"/>
+    <xs:attribute name="CAcertificate" type="xs:string" use="optional"/>
+
+  </xs:complexType>
+
+  <xs:complexType name="MicrosoftCAConfig">
+    <xs:annotation>
+      <xs:documentation>Configuration for Microsoft CA Certificate Enrollment Services</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="username" type="xs:string" use="required"/>
+    <xs:attribute name="password" type="xs:string" use="required"/>
+    <xs:attribute name="truststore" type="xs:string" use="required"/>
+    <xs:attribute name="truststorePass" type="xs:string" use="required"/>
+    <xs:attribute name="svcUrl" type="xs:string" use="required"/>
+    <xs:attribute name="templateName" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:simpleType name="CAType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="MicrosoftCA"/>
+      <xs:enumeration value="TAKServer"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:element name="certificateSigning">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Configuration for Certificate Signing</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element name="certificateConfig" type="certificateConfig" minOccurs="1" maxOccurs="1" />
+        <xs:element name="TAKServerCAConfig" type="TAKServerCAConfig" minOccurs="0" maxOccurs="1" />
+        <xs:element name="MicrosoftCAConfig" type="MicrosoftCAConfig" minOccurs="0" maxOccurs="1" />
+      </xs:sequence>
+      <xs:attribute name="CA" type="CAType" use="required"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="security">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Security Configuration</xs:documentation>
+      </xs:annotation>
+      <xs:all>
+        <xs:element ref="tls" minOccurs="0"/>
+      </xs:all>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="tls">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+      <xs:sequence minOccurs="0" maxOccurs="unbounded">
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="crl">
+            <xs:complexType>
+              <xs:annotation>
+                <xs:documentation>Certificate Revocation Lists</xs:documentation>
+              </xs:annotation>
+              <xs:attribute name="_name" type="xs:string" use="required"/>
+              <xs:attribute name="crlFile" type="xs:string" use="required"/>
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:sequence>
+      <xs:attribute name="keystore" type="xs:string" use="required"/>
+      <xs:attribute name="keystoreFile" type="xs:string" use="required"/>
+      <xs:attribute name="keystorePass" type="xs:string" use="required"/>
+      <xs:attribute name="truststore" type="xs:string" use="required"/>
+      <xs:attribute name="truststoreFile" type="xs:string" use="required"/>
+      <xs:attribute name="truststorePass" type="xs:string" use="required"/>
+      <xs:attribute name="context" type="xs:string" default="TLSv1.2"/>
+      <xs:attribute name="keymanager" type="xs:string" use="required"/>
+      <xs:attribute name="allow128cipher" type="xs:boolean" default="true"/>
+      <xs:attribute name="allowNonSuiteB" type="xs:boolean" default="true"/>
+      <xs:attribute name="enableOCSP" type="xs:boolean" default="false"/>
+      <xs:attribute name="responderUrl" type="xs:string" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="oauth">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>OAuth configuration</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element name="client" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>OAuth client</xs:documentation>
+            </xs:annotation>
+            <xs:attribute name="clientId" type="xs:string" use="required"/>
+            <xs:attribute name="secret" type="xs:string"/>
+            <xs:attribute name="redirectUri" type="xs:string"/>
+            <xs:attribute name="resourceIds" type="xs:string"/>
+            <xs:attribute name="scope" type="xs:string"/>
+            <xs:attribute name="authorizedGrantTypes" type="xs:string"/>
+            <xs:attribute name="authorities" type="xs:string" default="ROLE_ANONYMOUS"/>
+            <xs:attribute name="autoapprove" type="xs:string"/>
+            <xs:attribute name="refreshTokenValidity" type="xs:int"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="filter">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Filter Configuration</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element ref="thumbnail" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="urladd" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="flowtag" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="streamingbroker" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="dropfilter" minOccurs="0" maxOccurs="1" />
+        <xs:element ref="injectionfilter" minOccurs="0" maxOccurs="1" />
+        <xs:element ref="scrubber" minOccurs="0" maxOccurs="1" />
+        <xs:element ref="geospatialFilter" minOccurs="0" maxOccurs="1" />
+        <xs:element ref="qos" minOccurs="0" maxOccurs="1" />
+        <xs:element ref="contact-api" minOccurs="0" maxOccurs="4096" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="thumbnail">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+      <xs:attribute name="enable" type="xs:boolean" default="false"/>
+      <xs:attribute name="pixels" type="xs:int" default="10"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="urladd">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+      <xs:attribute name="thumburl" type="xs:boolean" default="false"/>
+      <xs:attribute name="fullurl" type="xs:boolean" default="true"/>
+      <xs:attribute name="script" type="xs:string" default="/Marti/loadImage.jsp"/>
+      <xs:attribute name="vidscript" type="xs:string" default="/Marti/videoclip.jsp"/>
+      <xs:attribute name="host" type="xs:string"/>
+      <xs:attribute name="overwriteurl" type="xs:boolean" default="false"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="flowtag">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+      <xs:attribute name="enable" type="xs:boolean" default="true"/>
+      <xs:attribute name="text" type="xs:string" default=""/>
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="contact-api">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+      <xs:attribute name="groupName" type="xs:string" default=""/>
+      <xs:attribute name="writeOnly" type="xs:boolean" default="true"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="streamingbroker">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+      <xs:attribute name="enable" type="xs:boolean" default="false"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dropfilter">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+      <xs:sequence minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="typefilter">
+          <xs:complexType>
+            <xs:attribute name="type" type="xs:string" />
+            <xs:attribute name="detail" type="xs:string" />
+            <xs:attribute name="threshold" type="xs:int" default="30" />
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="uidInject">
+    <xs:annotation>
+      <xs:documentation>nameEntry</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="uid" type="xs:string"/>
+    <xs:attribute name="toInject" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:element name="injectionfilter">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element name="uidInject" type="uidInject" minOccurs="0" maxOccurs="unbounded"/>
+      </xs:sequence>
+      <xs:attribute name="enable" type="xs:boolean" default="true"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="scrubber">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>A filter to scrub invalid values.  Can either 'drop' or 'overwrite' as action </xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="enable" type="xs:boolean" default="true"/>
+      <xs:attribute name="action" type="xs:string" default="drop"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="geospatialFilter">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Bounding box coordinates</xs:documentation>
+      </xs:annotation>
+      <xs:sequence minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="boundingBox">
+          <xs:complexType>
+            <xs:attribute name="minLongitude" type="xs:double"/>
+            <xs:attribute name="minLatitude" type="xs:double"/>
+            <xs:attribute name="maxLongitude" type="xs:double"/>
+            <xs:attribute name="maxLatitude" type="xs:double"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="qos">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Quality of Service</xs:documentation>
+      </xs:annotation>
+        <xs:all>
+          <xs:element ref="deliveryRateLimiter" minOccurs="0" maxOccurs="1"/>
+          <xs:element ref="readRateLimiter" minOccurs="0" maxOccurs="1"/>
+          <xs:element ref="dosRateLimiter" minOccurs="0" maxOccurs="1"/>
+        </xs:all>
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="deliveryRateLimiter">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+        <xs:sequence minOccurs="0" maxOccurs="unbounded">
+			<xs:element ref="rateLimitRule" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+      <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    </xs:complexType>
+  </xs:element>
+
+ <xs:element name="readRateLimiter">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+        <xs:sequence minOccurs="0" maxOccurs="unbounded">
+         <xs:element ref="rateLimitRule" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+      <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+    </xs:complexType>
+  </xs:element>
+
+ <xs:element name="dosRateLimiter">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+        <xs:sequence minOccurs="0" maxOccurs="unbounded">
+         <xs:element ref="dosLimitRule" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+      <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+      <xs:attribute name="intervalSeconds" type="xs:int" default="60"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="rateLimitRule">
+  	<xs:complexType>
+    	<xs:attribute name="clientThresholdCount" type="xs:int"/>
+        <xs:attribute name="reportingRateLimitSeconds" type="xs:int"/>
+  	</xs:complexType>
+  </xs:element>
+
+  <xs:element name="dosLimitRule">
+  	<xs:complexType>
+    	<xs:attribute name="clientThresholdCount" type="xs:int"/>
+        <xs:attribute name="messageLimitPerInterval" type="xs:int"/>
+  	</xs:complexType>
+  </xs:element>
+  
+  <xs:element name="connection">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Connection</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="url" type="xs:string" default="jdbc:postgresql://127.0.0.1:5432/cot"/>
+      <xs:attribute name="username" type="xs:string" default="martiuser"/>
+      <xs:attribute name="password" type="xs:string" default=""/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="repeater">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Repeater</xs:documentation>
+      </xs:annotation>
+      <xs:sequence minOccurs="0" maxOccurs="unbounded">
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="repeatableType">
+            <xs:complexType>
+              <xs:annotation>
+                <xs:documentation>Repeatable Type</xs:documentation>
+              </xs:annotation>
+              <xs:attribute name="initiate-test" type="xs:string"/>
+              <xs:attribute name="cancel-test" type="xs:string"/>
+              <xs:attribute name="_name" type="xs:string"/>
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:sequence>
+      <xs:attribute name="enable" type="xs:boolean" default="false"/>
+      <xs:attribute name="periodMillis" type="xs:int" default="10000"/>
+      <xs:attribute name="staleDelayMillis" type="xs:int" default="15000"/>
+      <xs:attribute name="maxAllowedRepeatables" type="xs:int" default="2147483647"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="async">
+    <xs:complexType>
+      <xs:attribute name="enable" type="xs:boolean" default="true"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="geocache">
+    <xs:complexType>
+      <xs:attribute name="enable" type="xs:boolean" default="false" />
+      <xs:attribute name="connectId" type="xs:string" />
+      <xs:attribute name="maxTilesPerGoal" type="xs:int" default="1000" />
+      <xs:attribute name="maxSizeOfCacheInMb" type="xs:int" default="1000" />
+      <xs:attribute name="cacheDir" type="xs:string" default="/tmp/geocache" />
+      <xs:attribute name="numThreads" type="xs:int" default="10" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="federation">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="federation-server" minOccurs="0" maxOccurs="1">
+          <xs:annotation>
+            <xs:documentation>Configuration for accepting incoming federation requests</xs:documentation>
+          </xs:annotation>
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element ref="tls" minOccurs="1" maxOccurs="1"/>
+              <xs:element name="federation-port" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="port" type="xs:int"/>
+                  <xs:attribute name="tlsVersion" type="xs:string" default="TLSv1.2"/>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="v1Tls" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="tlsVersion" type="xs:string" default="TLSv1.2"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute name="port" type="xs:int" default="9000"/>
+            <xs:attribute name="coreVersion" type="xs:int" default="2"/>
+            <xs:attribute name="v1enabled" type="xs:boolean" default="true"/>
+            <xs:attribute name="v2port" type="xs:int" default="9001"/>
+            <xs:attribute name="v2enabled" type="xs:boolean" default="true"/>
+            <xs:attribute name="webBaseUrl" type="xs:string" default=""/>
+            <xs:attribute name="httpsPort" type="xs:int" default="8444"/>
+            <xs:attribute name="healthCheckIntervalSeconds" type="xs:int" default="3">
+              <xs:annotation>
+                <xs:documentation>Control how often a health check message will be sent</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="initializationDelaySeconds" type="xs:int" default="30"/>
+          </xs:complexType>
+        </xs:element>
+
+        <xs:element name="federation-outgoing" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Configuration for federation requests</xs:documentation>
+          </xs:annotation>
+          <xs:complexType>
+            <xs:attribute name="displayName" type="xs:string" />
+            <xs:attribute name="address" type="xs:string" />
+            <xs:attribute name="port" type="xs:int" />
+            <xs:attribute name="enabled" type="xs:boolean" default="true" />
+            <xs:attribute name="protocolVersion" type="xs:int" default="1" />
+            <xs:attribute name="reconnectInterval" type="xs:int" default="30" use="optional"/>
+            <xs:attribute name="filter" type="xs:string" />
+            <xs:attribute name="maxFrameSize" type="xs:int" default = "268435456"/>
+            <xs:attribute name="fallback" type="xs:string"/>
+            <xs:attribute name="maxRetries" type="xs:int" default = "0" use="optional"/>
+            <xs:attribute name="unlimitedRetries" type="xs:boolean" default="true"/>
+          </xs:complexType>
+        </xs:element>
+        
+        <xs:element name="mission-disruption-tolerance" minOccurs="0" maxOccurs="1">
+          <xs:annotation>
+            <xs:documentation>Set mission disruption tolerance interval on a per-mission basis</xs:documentation>
+          </xs:annotation>
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="mission" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="name" type="xs:string"/>
+                  <xs:attribute name="recencySeconds" type="xs:long" default="43200"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+
+        <xs:sequence>
+          <xs:element name="federate" minOccurs="0" maxOccurs="unbounded">
+            <xs:complexType>
+              <xs:annotation>
+                <xs:documentation>Federate</xs:documentation>
+              </xs:annotation>
+              <xs:sequence>
+                <xs:element name="inboundGroupMapping" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+                  <xs:annotation>
+                    <xs:documentation>Mapping of the local groups to which federated traffic from the specified federate will be assigned.</xs:documentation>
+                  </xs:annotation>
+                </xs:element>
+                <xs:element name="inboundGroup" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+                  <xs:annotation>
+                    <xs:documentation>Name of the local group to which federated traffic from the specified federate will be assigned.</xs:documentation>
+                  </xs:annotation>
+                </xs:element>
+                <xs:element name="outboundGroup" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+                  <xs:annotation>
+                    <xs:documentation>Name of a local group whose traffic will be shared with the specified federate.</xs:documentation>
+                  </xs:annotation>
+                </xs:element>
+              </xs:sequence>
+              <xs:attribute name="id" type="xs:string" use="required">
+                <xs:annotation>
+                  <xs:documentation>Unique identifier for federate; hash of cert and that cert's CA</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="name" type="xs:string" use="required">
+                <xs:annotation>
+                  <xs:documentation>Human-readable name for the remote federate; CN from cert</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="notes" type="xs:string" use="optional">
+                <xs:annotation>
+                  <xs:documentation>User provided description of federate</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="shareAlerts" type="xs:boolean" use="optional" default="true">
+                <xs:annotation>
+                  <xs:documentation>If true, shares local alerts with this federate.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="archive" type="xs:boolean" use="optional" default="true">
+                <xs:annotation>
+                  <xs:documentation>If true, enable archival of data from this federate.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="federatedGroupMapping" type="xs:boolean" use="optional" default="true">
+                <xs:annotation>
+                  <xs:documentation>If true, allow group mapping for this federate.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="automaticGroupMapping" type="xs:boolean" use="optional" default="false">
+                <xs:annotation>
+                  <xs:documentation>If true, remote groups are automatically mapped to local groups for this federate.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+        <xs:element name="fileFilter">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="fileExtension" block="extension" minOccurs="0" maxOccurs="unbounded" type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:sequence>
+          <xs:element name="federateCA" minOccurs="0" maxOccurs="unbounded">
+            <xs:complexType>
+              <xs:annotation>
+                <xs:documentation>Federate-CA</xs:documentation>
+              </xs:annotation>
+              <xs:sequence>
+                <xs:element name="inboundGroup" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+                  <xs:annotation>
+                    <xs:documentation>Name of the local group to which federated traffic from a federate with this CA will be assigned</xs:documentation>
+                  </xs:annotation>
+                </xs:element>
+                <xs:element name="outboundGroup" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+                  <xs:annotation>
+                    <xs:documentation>Name of the local group which traffic from a federate with this CA will be shared</xs:documentation>
+                  </xs:annotation>
+                </xs:element>
+              </xs:sequence>
+              <xs:attribute name="fingerprint" type="xs:string" use="required">
+                <xs:annotation>
+                  <xs:documentation>The fingerprint of the issuing authority for the Federate CA</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+      </xs:sequence>
+      <xs:attribute name="allowDuplicate" type="xs:boolean" default="false">
+        <xs:annotation>
+          <xs:documentation>Allows users who are very careful to turn off a safety feature that prevents misconfiguration.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="iVoidMyWarrantyAndWantToForwardFederationTraffic" type="xs:boolean" default="false" />
+      <xs:attribute name="allowFederatedDelete" type="xs:boolean" default="false" />
+      <xs:attribute name="allowMissionFederation" type="xs:boolean" default="true" />
+      <xs:attribute name="enableMissionFederationDisruptionTolerance" type="xs:boolean" default="true" />
+      <xs:attribute name="missionFederationDisruptionToleranceRecencySeconds" type="xs:long" default="43200" />
+      <xs:attribute name="federateOnlyPublicMissions" type="xs:boolean" default="true" />
+      <xs:attribute name="enableFederation" type="xs:boolean" default="false"/>
+      <xs:attribute name="federatedGroupMapping" type="xs:boolean" default="true"/>
+      <xs:attribute name="automaticGroupMapping" type="xs:boolean" default="false"/>
+      <xs:attribute name="enableDataPackageAndMissionFileFilter" type="xs:boolean" default="false" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="citrap">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>CI TRAP Configuration</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="enableNotifications" type="xs:boolean" default="false">
+        <xs:annotation>
+          <xs:documentation>Enables sending of report notifications to users that are not subscribed to the report mission.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="notificationCot" type="xs:string" default="a-h-G-U-C-R">
+        <xs:annotation>
+          <xs:documentation>Cot type for sending report notifications to TAK clients.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="nonsubscriberCotFilter" type="xs:string" default="a-f%">
+        <xs:annotation>
+          <xs:documentation>Send report notifications to all entities matching this filter.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="searchRadius" type="xs:int" default="100000">
+        <xs:annotation>
+          <xs:documentation>Send report notifications to all entities within the specified distance from the report.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="searchSecago" type="xs:int" default="300">
+        <xs:annotation>
+          <xs:documentation>Send report notifications only to entities who have reported their location within the specified timeframe.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="xmpp">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>XMPP Configuration</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="xmppHost" type="xs:string" default="127.0.0.1">
+        <xs:annotation>
+          <xs:documentation>XMPP host</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="xmppPort" type="xs:int" default="5222">
+        <xs:annotation>
+          <xs:documentation>XMPP port</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="takServerHost" type="xs:string" default="127.0.0.1">
+        <xs:annotation>
+          <xs:documentation>TAK server host</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="takServerPort" type="xs:int" default="8443">
+        <xs:annotation>
+          <xs:documentation>TAK server port</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="xmppSharedSecret" type="xs:string" default="">
+        <xs:annotation>
+          <xs:documentation>XMPP shared secret</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+
+      <xs:attribute name="xmppComponentRetryCount" type="xs:int" default="5">
+        <xs:annotation>
+          <xs:documentation>Retry component registration count</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+
+      <xs:attribute name="xmppComponentRetryDelay" type="xs:int" default="5">
+        <xs:annotation>
+          <xs:documentation>Retry component registration delay (seconds)</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="plugins">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Plugin Configuration</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="enabled" type="xs:boolean" default="false" />
+      <xs:attribute name="rogerConfigFile" type="xs:string" default="plugins/roger.json" />
+      <xs:attribute name="usePluginMessageQueue" type="xs:boolean" default="true" />
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="cluster">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Cluster Configuration</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="enabled" type="xs:boolean" default="false" />
+      <xs:attribute name="natsURL" type="xs:string" default="" />
+      <xs:attribute name="natsClusterID" type="xs:string" default="takserver-nats-streaming" />
+      <xs:attribute name="kubernetes" type="xs:boolean" default="false" />
+      <xs:attribute name="cacheConfig" type="xs:boolean" default="true" />
+      <xs:attribute name="metricsIntervalSeconds" type="xs:int" default="5" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="docs">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>API Documentation Configuration</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="adminOnly" type="xs:boolean" default="true" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="whitelist">
+    <xs:annotation>
+      <xs:documentation>Registration Whitelist</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="domain" type="xs:string" default="" />
+    <xs:attribute name="token" type="xs:string" default="" />
+    <xs:attribute name="privateGroup" type="xs:boolean" default="false" />
+    <xs:attribute name="group" type="xs:string" default="" />
+  </xs:complexType>
+
+  <xs:element name="email">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Email Configuration</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element name="whitelist" type="whitelist" minOccurs="0" maxOccurs="unbounded"/>
+      </xs:sequence>
+      <xs:attribute name="host" type="xs:string" use="required" />
+      <xs:attribute name="port" type="xs:int" use="required" />
+      <xs:attribute name="username" type="xs:string" use="required" />
+      <xs:attribute name="password" type="xs:string" use="required" />
+      <xs:attribute name="from" type="xs:string" use="required" />
+      <xs:attribute name="supportName" type="xs:string" use="required" />
+      <xs:attribute name="supportEmail" type="xs:string" use="required" />
+      <xs:attribute name="registrationPort" type="xs:int" default="8446" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="locate">
+    <xs:complexType>
+      <xs:attribute name="enabled" type="xs:boolean" default="false" />
+      <xs:attribute name="requireLogin" type="xs:boolean" default="true" />
+      <xs:attribute name="cot-type" type="xs:string" default="a-f-G" />
+      <xs:attribute name="group" type="xs:string" use="required" />
+      <xs:attribute name="broadcast" type="xs:boolean" default="true" />
+      <xs:attribute name="addToMission" type="xs:boolean" default="true" />
+      <xs:attribute name="mission" type="xs:string" />
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

@@ -1,0 +1,26 @@
+<configuration scan="true" scanPeriod="30 seconds" debug="false">
+
+  <!-- Simple logback configuration file that logs everything to the console. -->
+  <!-- To use, rename this file to logback-test.xml or logback.xml and put it on your classpath -->
+  
+   <!-- Very simple ConsoleAppender for people who just want to dump log messages to stdout -->
+   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>     
+   </appender>
+
+  <root level="info">
+    <appender-ref ref="STDOUT" />
+  </root>
+
+  <logger name="org.flywaydb.core" level="warn" additivity="false">
+    <appender-ref ref="STDOUT" />
+  </logger>
+
+  <logger name="com.bbn.tak.schema" level="info" additivity="false">
+    <appender-ref ref="STDOUT" />
+  </logger>
+
+
+</configuration>

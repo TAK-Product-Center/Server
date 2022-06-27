@@ -1,0 +1,3 @@
+assign role "http://ontology.ihmc.us/Military/MilitaryActor.owl#RescueCombatAirPatrol"
+constraint min 10 and max 53 
+not match attribute brand : "Kleenex";

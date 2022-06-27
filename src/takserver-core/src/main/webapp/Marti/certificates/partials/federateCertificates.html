@@ -1,0 +1,51 @@
+<style>
+  .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+</style>
+
+<div id="federateCertificatesView">
+    <div id="federateCertificatesListContainer" class="content" class="listContainer" >
+
+	    <div data-ng-show="!showRmiError">
+		    <h3>Federation Certificate Authorities</h3>
+		    <a class="nav" href="#!/uploadCertificate">Upload Federate Certificate Authority</a>
+		</div>
+		
+	    <div data-ng-show="!showRmiError && federateCertificates.length > 0">
+		    <!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+		    tablesorter js files, etc., results in a conflict with angular -->
+
+		    <table id="federateCertificatesList" class="tablesorter">
+		    	<thead>
+				  	<tr>
+					  	<th>Issuer</th>
+					  	<th>Subject</th>
+					  	<th>Serial Number</th>
+					  	<th>&nbsp;</th>
+						<th>&nbsp;</th>
+					</tr>
+				</thead>
+				
+				<tbody>
+					<tr data-ng-repeat="fc in federateCertificates">
+					    <td data-ng-bind="fc.issuerDN"></td>
+					    <td data-ng-bind="fc.subjectDN"></td>
+					    <td data-ng-bind="fc.serialNumber"></td>
+					    <td><a class="nav" data-ng-click="deleteCertificate(fc.fingerPrint, fc.serialNumber)">Delete</a></td>
+						<td><a class="nav" href="#!/editFederateCAGroups/{{fc.fingerPrint | encodeURIComponent}}">Manage CA Groups</a> </td>
+					</tr>
+				</tbody>
+			</table>
+</div>
+
+		<div data-ng-show="!showRmiError && federateCertificates.length == 0">
+			<table class="tablesorter"><tr><td colspan="2">No Certificates Found</td></tr></table>
+	    </div>
+
+		<div data-ng-show="showRmiError">
+			<h2><font color="dc143c">Certificates Unavailable</font></h2>
+			<p>The certificates manager cannot be displayed because the Web application failed to connect to the Federation Manager.</p>
+			<p>Please ensure the broker is running and reload this page.</p>
+			<hr/>
+	    </div>		
+    </div>
+</div>

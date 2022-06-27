@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# /etc/rc.d/init.d/takserver-api
+#
+# (c)2015-2018 Raytheon BBN Technologies. Licensed to US Government with unlimited rights.
+#
+# The Team Awareness Kit (TAK) server is a network server supporting the
+# family of TAK situation-awareness applications, such as the Android
+# Team Awareness Kit (ATAK) and Windows Team Awareness Kit (WinTAK). TAK
+# server provides brokering, filtering, and archiving of Cursor-on-Target
+# (CoT) information and provides interconnectivity to client devices on
+# non-multicast networks.
+#
+# This script starts the takserver-api service
+
+
+# chkconfig: 345 20 40
+# description: Team Awareness Kit (TAK) API service.
+
+# Source function library
+. /etc/rc.d/init.d/functions
+
+SERVICE="TAK server API"
+TAK_HOME=/opt/tak
+
+case "$1" in
+     start)
+        echo -n "Starting $SERVICE: "
+          su tak -c "cd ${TAK_HOME} && ./takserver-api.sh &> /opt/tak/logs/takserver-api-console.log &"
+          if [ $? -eq 0 ]; then
+	      echo "OK"
+	      else
+		  pkill -9 -f "spring.profiles.active=api"
+		  echo "FAILED"
+		  exit 1
+	      fi
+          touch "/var/lock/subsys/$SERVICE"
+    ;;
+    stop)
+          echo -n "Shutting down $SERVICE: "
+		  pkill -9 -f "spring.profiles.active=api"
+	  rm -f "/var/lock/subsys/$SERVICE"
+	  echo "done."
+    ;;
+    status)
+	RETVAL=0
+	TAK_PID=`pgrep -f "spring.profiles.active=api"`
+        if [ $? -eq 0 ] ; then
+            echo "$SERVICE is running with pid ${TAK_PID}"
+        else
+            echo "$SERVICE is not running."
+            RETVAL=1
+        fi
+	exit $RETVAL
+    ;;
+    restart)
+          $0 stop;
+          $0 start;
+    ;;
+    reload)
+          $0 stop;
+          $0 start;
+    ;;
+    *)
+       echo "Usage: $0 {start|stop|status|restart}"
+       exit 1
+    ;;
+esac
+
+exit 0

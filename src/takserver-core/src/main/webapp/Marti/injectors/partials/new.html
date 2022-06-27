@@ -1,0 +1,105 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+  
+  .rowHeader {
+  	text-align:right;
+  	padding-right:5px;
+  	width:200px;
+  	vertical-align:top;
+  }
+  
+  .rowValue {
+  	width:400px;
+  	text-align:right;
+  	vertical-align:top;
+  }
+  
+  .rowValue select {
+  	width:100%;
+  }
+
+  .rowValue input {
+  	width:400px;
+  }
+  
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+
+  table {
+  	border-collapse: separate;
+  	border-spacing:10px
+  }
+
+  .inlineHelp {
+  	font:13px arial, sans-serif;
+  	font-style:italic;
+  	text-align:right;
+  	color:green;
+  }  
+</style>
+
+<div>
+  <h3>Create Injector</h3>
+
+  <div data-ng-show="serviceReportedMessages">
+  	<ul>
+  		<li class="error" data-ng-repeat="message in messages">{{message}}</li>
+  	</ul>
+  </div>
+  
+  <form name="injectorForm" novalidate data-ng-submit="injectorForm.$valid && saveInjector(injector)">
+  	<table>
+  		<tr>
+  			<td class="rowHeader"><label for="name">*UID</label></td>
+  			<td class="rowValue">
+  				<input type="text" data-ng-model="injector.uid" name="uid" required  maxlength="50" data-ng-pattern="/^[A-Za-z0-9_-\.\s]+$/"/>
+  				<br/><span class="inlineHelp">UID may contain upper and lower case letters, numbers, spaces and underscores up to 50 characters.</span>
+  			</td>
+  			<td style="vertical-align:top;">
+	  			<button type="button" class="btn btn-default" data-ng-click="searchUid()">Search UID</button>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="injectorForm.$submitted || injectorForm.uid.$touched">
+  					<span data-ng-show="injectorForm.uid.$error.required">UID is required.</span>
+  					<span data-ng-show="injectorForm.uid.$error.maxLength">UID must be between 1 and 30 characters.</span>  					
+  					<span data-ng-show="injectorForm.uid.$error.pattern">The UID may contain only upper and lower case letters, numbers, spaces and underscores.</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="injection">*Injection</label></td>
+  			<td class="rowValue">
+  				<input type="text" data-ng-model="injector.toInject" name="toInject" required data-ng-maxlength="255" data-ng-minlength="1" data-ng-pattern='/^\w+\s((\w|\s|\-)+\=\"(\w|\s|\-|\:|\/|\.)+\"\s?)+$/'/>
+  				<br/><span class="inlineHelp">Provide a name (e.g., __video) follow by one or more name=value pairs, each pair separated by a space<br/>
+  				Example: __video url="udp://224.10.10.1:1234" test="value"</span>
+  			</td>
+  			<td>&nbsp;</td>
+  			<td class="error">
+  				<span data-ng-show="injectorForm.$submitted || injectorForm.toInject.$touched">
+   					<span data-ng-show="injectorForm.toInject.$error.required">Injection string is required.</span>
+  					<span data-ng-show="injectorForm.toInject.$error.pattern">The injection string contains invalid characters.</span>
+  				</span>
+  			</td>
+  		</tr>
+
+		<tr>
+			<td style="text-align:right;">*Required</td>
+			<td style="padding:10px;" align="right">
+				<input type="button" data-ng-click="cancelInjector()" value="Cancel" />&nbsp;
+				<input type="submit" value="Save" data-ng-disabled="submitInProgress" />
+			</td>
+			<td>&nbsp;</td>
+		</tr>
+
+  	</table>
+  </form>
+</div>

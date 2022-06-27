@@ -1,0 +1,82 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+  
+  .rowHeader {
+  	text-align:right;
+  	padding-right:5px;
+  	width:200px;
+  	vertical-align:top;
+  }
+  
+  .rowValue {
+  	width:400px;
+  	text-align:right;
+  	vertical-align:top;
+  }
+  
+  .rowValue select {
+  	width:100%;
+  }
+
+  .rowValue input {
+  	width:400px;
+  }
+  
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+
+  table {
+  	border-collapse: separate;
+  	border-spacing:10px
+  }
+
+  .inlineHelp {
+  	font:13px arial, sans-serif;
+  	font-style:italic;
+  	text-align:right;
+  	color:green;
+  }  
+</style>
+
+<div>
+  <h3>Upload Certificate Authority</h3>
+
+  <div data-ng-show="serviceReportedMessages">
+  	<ul>
+  		<li class="error" data-ng-repeat="message in messages">{{message}}</li>
+  	</ul>
+  </div>
+  
+  <form enctype="multipart/form-data" name="uploadCertificateForm" novalidate data-ng-submit="uploadCertificateForm.$valid && uploadFile()">
+  	<div>
+  		To make connections with a federate, you must add its certificate authority to your
+  		federate certificate keystore.  Upload a ".pem" file (e.g., ca.pem if using the cert-generation scripts)
+  	</div>
+  	<div style="margin-top:10px; border: 1px solid gray;width:60%;">
+	  	<table>
+	  		<tr>
+	  			<td class="rowHeader"><label for="name">Certificate File:</label></td>
+	  			<td class="rowValue">
+	  				<input type="file" data-file-model="certificateFile" name="file" required/>
+	  			</td>
+	  		</tr>
+	
+			<tr>
+				<td>&nbsp;</td>
+				<td style="padding:10px;" align="right">
+					<input type="button" data-ng-click="cancel()" value="Cancel" />&nbsp;
+					<input type="submit" value="Save" data-ng-disabled="submitInProgress" />
+				</td>
+			</tr>
+	  	</table>
+	</div>
+  </form>
+</div>

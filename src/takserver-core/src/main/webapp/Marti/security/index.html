@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-ng-app="securityConfigManager">
+<head>
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <meta charset="utf-8">
+    <title>Security and Authentication Configuration Manager</title>
+    
+    <!-- <link rel="stylesheet" href="css/main.css">-->
+	<link rel="stylesheet" href="../tablesorter/style.css" type="text/css" media="print, projection, screen" />
+	<link rel="stylesheet" href="../jquery/jquery-ui.css" type="text/css" media="print, projection, screen" />
+    <link rel="stylesheet" href="../css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+
+	<script type="text/javascript" src="../jquery/jquery-3.5.0.js"></script> 
+	<script type="text/javascript" src="../jquery/jquery-ui.min.js"></script> 
+	
+	<script type="text/javascript" src="../lib/angular/angular.min.js"></script>
+	<script type="text/javascript" src="../lib/angular/angular-route.min.js"></script>
+	<script type="text/javascript" src="../lib/angular/angular-resource.min.js"></script>
+	<script type="text/javascript" src="../lib/angular/angular-messages.min.js"></script>
+
+	<script src="js/app.js"></script>
+	<script src="js/controllers.js"></script>
+	<script src="js/services.js"></script>
+</head>
+
+<body style="font:18px arial, sans-serif;">
+	<div data-ng-include="'../menubar.html'"></div>
+	<div class="content" id="rightViewContainer" >
+		<div data-ng-view></div>
+	</div>
+	<div data-ng-include="'../footer.jsp'"></div>
+</body>
+
+</html>

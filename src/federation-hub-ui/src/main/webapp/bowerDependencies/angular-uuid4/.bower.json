@@ -1,0 +1,32 @@
+{
+  "name": "angular-uuid4",
+  "version": "0.3.0",
+  "dependencies": {
+    "angular": ">0.9.0"
+  },
+  "main": "angular-uuid4.js",
+  "ignore": [
+    ".*",
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "src",
+    "test",
+    "Gruntfile",
+    "karma.conf.js",
+    "package.json"
+  ],
+  "devDependencies": {
+    "angular-mocks": ">0.9.0"
+  },
+  "homepage": "https://github.com/monicao/angular-uuid4",
+  "_release": "0.3.0",
+  "_resolution": {
+    "type": "version",
+    "tag": "v0.3.0",
+    "commit": "37a13f5b2e6c4762e5934864f0ae658c23c1ce05"
+  },
+  "_source": "https://github.com/monicao/angular-uuid4.git",
+  "_target": "0.3.0",
+  "_originalSource": "angular-uuid4"
+}

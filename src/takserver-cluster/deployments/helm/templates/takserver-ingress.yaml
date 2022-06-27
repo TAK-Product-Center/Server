@@ -1,0 +1,136 @@
+{{ if .Values.takserver.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tak-api-cert-https-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+{{- if .Values.takserver.ingress.api.cert.annotations }}
+{{ toYaml .Values.takserver.ingress.api.cert.annotations | indent 4 }}
+{{- end }}
+spec:
+  rules:
+    - host: {{ .Values.takserver.ingress.api.cert.host }}
+      http:
+        paths:
+          - backend:
+              service:
+                name: takserver-api-service
+                port:
+                  number: 8443
+            path: /
+            pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tak-api-federation-truststore-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+{{- if .Values.takserver.ingress.api.federationTruststore.annotations }}
+{{ toYaml .Values.takserver.ingress.api.federationTruststore.annotations | indent 4 }}
+{{- end }}
+spec:
+  rules:
+    - host: {{ .Values.takserver.ingress.api.federationTruststore.host }}
+      http:
+        paths:
+          - backend:
+              service:
+                name: takserver-api-service
+                port:
+                  number: 8444
+            path: /
+            pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tak-api-https-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: https
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+{{- if .Values.takserver.ingress.api.https.annotations }}
+{{ toYaml .Values.takserver.ingress.api.https.annotations | indent 4 }}
+{{- end }}
+spec:
+  rules:
+    - host: {{ .Values.takserver.ingress.api.https.host }}
+      http:
+        paths:
+          - backend:
+              service:
+                name: takserver-api-service
+                port:
+                  number: 8446
+            path: /
+            pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tak-messaging-tls-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+{{- if .Values.takserver.ingress.messaging.streaming.annotations }}
+{{ toYaml .Values.takserver.ingress.messaging.streaming.annotations | indent 4 }}
+{{- end }}
+spec:
+  rules:
+    - host: {{ .Values.takserver.ingress.messaging.streaming.host }}
+      http:
+        paths:
+          - backend:
+              service:
+                name: takserver-messaging-service
+                port:
+                  number: 8089
+            path: /
+            pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tak-messaging-fedv1-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+{{- if .Values.takserver.ingress.messaging.fedv1.annotations }}
+{{ toYaml .Values.takserver.ingress.messaging.fedv1.annotations | indent 4 }}
+{{- end }}
+spec:
+  rules:
+    - host: {{ .Values.takserver.ingress.messaging.fedv1.host }}
+      http:
+        paths:
+          - backend:
+              service:
+                name: takserver-messaging-service
+                port:
+                  number: 9000
+            path: /
+            pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tak-messaging-fedv2-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+{{- if .Values.takserver.ingress.messaging.fedv2.annotations }}
+{{ toYaml .Values.takserver.ingress.messaging.fedv2.annotations | indent 4 }}
+{{- end }}
+spec:
+  rules:
+    - host: {{ .Values.takserver.ingress.messaging.fedv2.host }}
+      http:
+        paths:
+          - backend:
+              service:
+                name: takserver-messaging-service
+                port:
+                  number: 9001
+            path: /
+            pathType: Prefix
+{{- end }}

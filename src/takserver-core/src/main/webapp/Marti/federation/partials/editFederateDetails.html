@@ -1,0 +1,137 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+  
+  .rowHeader {
+  	text-align:right;
+  	padding-right:5px;
+  	width:200px;
+  	vertical-align:top;
+  }
+  
+  .rowValue {
+  	width:400px;
+  	text-align:right;
+  	vertical-align:top;
+  }
+  
+  .rowValue select {
+  	width:100%;
+  }
+
+  .rowValue input {
+  	width:400px;
+  }
+  
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+
+  table {
+  	border-collapse: separate;
+  	border-spacing:10px
+  }
+
+  .inlineHelp {
+  	font:13px arial, sans-serif;
+  	font-style:italic;
+  	text-align:right;
+  	color:green;
+  }  
+</style>
+
+<div>
+  <h3>Federate Details</h3>
+
+  <p>You are configuring details for federate: <b>{{federateName}}</b></p>
+
+  <div data-ng-show="serviceReportedMessages">
+  	<ul>
+  		<li class="error" data-ng-repeat="message in messages">{{message}}</li>
+  	</ul>
+  </div>
+  
+  <form name="federateDetailsForm" novalidate data-ng-submit="federateDetailsForm.$valid && saveFederateDetails(federateDetails)">
+  	<table>
+  		<tr>
+  			<td class="rowHeader"><label for="shareAlerts">*Share Alerts</label></td>
+  			<td class="rowValue">
+				<select name="shareAlerts" data-ng-model="federateDetails.shareAlerts" required data-ng-options="boolToStr(item) for item in [true, false]">
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="federateDetailsForm.$submitted || federateDetailsForm.shareAlerts.$touched">
+  					<span data-ng-show="federateDetailsForm.shareAlerts.$error.required">The Share Alerts flag must be set.</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="archive">*Archive</label></td>
+  			<td class="rowValue">
+				<select name="archive" data-ng-model="federateDetails.archive" required data-ng-options="boolToStr(item) for item in [true, false]">
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="federateDetailsForm.$submitted || federateDetailsForm.archive.$touched">
+  					<span data-ng-show="federateDetailsForm.archive.$error.required">The Archive flag must be set.</span>
+  				</span>
+  			</td>
+  		</tr>
+
+		<tr>
+			<td class="rowHeader"><label for="federatedGroupMapping">*Federated Group Mapping</label></td>
+			<td class="rowValue">
+				<select name="federatedGroupMapping" data-ng-model="federateDetails.federatedGroupMapping" required data-ng-options="boolToStr(item) for item in [true, false]">
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="federateDetailsForm.$submitted || federateDetailsForm.federatedGroupMapping.$touched">
+  					<span data-ng-show="federateDetailsForm.federatedGroupMapping.$error.required">The Federated Group Mapping flag must be set.</span>
+  				</span>
+			</td>
+		</tr>
+		<tr>
+			<td class="rowHeader"><label for="automaticGroupMapping">*Automatic Group Mapping</label></td>
+			<td class="rowValue">
+				<select name="automaticGroupMapping" data-ng-model="federateDetails.automaticGroupMapping" required data-ng-options="boolToStr(item) for item in [true, false]">
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="federateDetailsForm.$submitted || federateDetailsForm.automaticGroupMapping.$touched">
+  					<span data-ng-show="federateDetailsForm.automaticGroupMapping.$error.required">The Automatic Group Mapping flag must be set.</span>
+  				</span>
+			</td>
+		</tr>
+  		<tr>
+  			<td class="rowHeader"><label for="name">Notes</label></td>
+  			<td class="rowValue">
+  				<input type="text" data-ng-model="federateDetails.notes" name="notes" maxlength="30" data-ng-pattern="/^[A-Za-z0-9_\s]+$/"/>
+  				<br/><span class="inlineHelp">Notes may contain upper and lower case letters, numbers, spaces and underscores up to 30 characters.</span>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="federateDetailsForm.$submitted || federateDetailsForm.notes.$touched">
+  					<span data-ng-show="federateDetailsForm.notes.$error.maxLength">If provided, Notes must be between 1 and 30 characters</span>  					
+  					<span data-ng-show="federateDetailsForm.notes.$error.pattern">Notes may contain only upper and lower case letters, numbers, spaces and underscores</span>
+  				</span>
+  			</td>
+  		</tr>
+
+		<tr>
+			<td style="text-align:right;">*Required</td>
+			<td style="padding:10px;" align="right">
+				<input type="button" data-ng-click="cancel()" value="Cancel" />&nbsp;
+				<input type="submit" value="Save" data-ng-disabled="submitInProgress" />
+			</td>
+			<td>&nbsp;</td>
+		</tr>
+
+  	</table>
+  </form>
+</div>

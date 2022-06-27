@@ -1,0 +1,58 @@
+<div>
+<h2>User-Group Management</h2>
+
+<div class="rowFF">
+    <div class="columnFF">Edit groups for user <b>{{ list_groups_for_user.username  }} </b></div>
+    <div class="columnFF" style="text-align: right;">
+        <div style="text-align: right;">
+            <button class="btn btn-primary" ng-click="saveGroupsForUser()"><i class="fa fa-floppy-o" style="font-size:24px;" aria-hidden="true"></i>&nbsp;Update</button>
+            <button class="btn btn-primary" ng-click="getAssignedGroupsForUser()"><i class="fa fa-eraser" style="font-size:24px;" aria-hidden="true"></i>&nbsp;Reset</button>
+
+        </div>
+        <!-- <span style="cursor: pointer;" ng-click="saveGroupsForUser()"><i class="fa fa-floppy-o" style="font-size:24px;" aria-hidden="true"></i>&nbsp;Update </span>
+        &nbsp;&nbsp;
+        <span style="cursor: pointer;" ng-click="getAssignedGroupsForUser()"><i class="fa fa-eraser" style="font-size:24px;" aria-hidden="true"></i>&nbsp;Reset</span> -->
+    </div>
+</div>
+
+<div>Drag the groups on the right panel and drop to the boxes below. <br/>(To remove a group from the boxes, drag it back to the right panel)</div>
+<div class="dropbox_group" id="dropbox_in_group" ng-drop="true" ng-drop-success="onDropCompleteToGroupIN($data,$event)">
+    <div style="text-align: center;"> <b>In Group</b></div>
+
+    <div ng-repeat="x in list_groups_for_user.groupListIN">
+
+        <button class="btn btn-info group_button" type="button" id="dropdownMenuButton_group_{{ x }}" ng-drag="true" ng-drag-data="{'groupname':x, 'from':'groupListIN'}" ng-drag-success="onDragComplete($data,$event)">
+            {{ x }}
+        </button>
+
+    </div>
+</div>
+
+
+<div class="dropbox_group" id="dropbox_out_group" ng-drop="true" ng-drop-success="onDropCompleteToGroupOUT($data,$event)">
+    <div style="text-align: center;"> <b>Out Group</b></div>
+
+    <div ng-repeat="x in list_groups_for_user.groupListOUT">
+
+        <button class="btn btn-info group_button" type="button" id="dropdownMenuButton_group_{{ x }}" ng-drag="true" ng-drag-data="{'groupname':x, 'from':'groupListOUT'}" ng-drag-success="onDragComplete($data,$event)">
+            {{ x }}
+        </button>
+
+    </div>
+
+</div>
+
+<div class="dropbox_group" id="dropbox_in_out_group" ng-drop="true" ng-drop-success="onDropCompleteToGroup($data,$event)">
+    <div style="text-align: center;"> <b>Both</b></div>
+
+    <div ng-repeat="x in list_groups_for_user.groupList">
+
+        <button class="btn btn-info group_button" type="button" id="dropdownMenuButton_group_{{ x }}" ng-drag="true" ng-drag-data="{'groupname':x, 'from':'groupList'}" ng-drag-success="onDragComplete($data,$event)">
+            {{ x }}
+        </button>
+
+    </div>
+
+</div>
+
+</div>

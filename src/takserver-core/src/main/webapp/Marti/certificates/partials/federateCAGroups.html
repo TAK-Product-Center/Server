@@ -1,0 +1,139 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+
+  .rowHeader {
+  	text-align:right;
+  	padding-right:5px;
+  	width:200px;
+  	vertical-align:top;
+  }
+
+  .rowValue {
+  	width:400px;
+  	text-align:right;
+  	vertical-align:top;
+  }
+
+  .rowValue select {
+  	width:100%;
+  }
+
+  .rowValue input {
+  	width:400px;
+  }
+
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+
+  .formTable {
+  	border-collapse: separate;
+  	border-spacing:10px
+  }
+
+  .inlineHelp {
+  	font:13px arial, sans-serif;
+  	font-style:italic;
+  	text-align:right;
+  	color:green;
+  }
+
+  .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+</style>
+
+<div id="federateCAGroupsView">
+	<div id="federateCAGroupsViewContainer" class="content">
+
+    <h3>Federate Certificate Authority Groups</h3>
+
+    <p>You are configuring groups for federate certificate authority: <b>{{caId}}</b></p>
+
+
+
+		<div data-ng-show="serviceReportedMessages">
+			<ul>
+				<li class="error" data-ng-repeat="message in messages">{{message}}</li>
+			</ul>
+		</div>
+
+	    <form name="federateCAGroupsForm" novalidate data-ng-submit="save()">
+
+		    <div style="border: 1px solid gray; padding:5px;">
+			  	<table class="formTable">
+			  		<tr>
+			  			<td class="rowHeader"><label style="font-weight:normal;" for="group">Group</label></td>
+			  			<td class="rowValue">
+			  				<input type="text" data-ng-model="group" name="group" maxlength="255" data-ng-pattern="/^[\w\d\s\.\(\)@#$_\=\-\+\[\]\{\}:,\|\\]*$/"/>
+			  			</td>
+			  			<td class="error">
+			  				<span data-ng-show="federateCAGroupsForm.group.$touched">
+			  					<span data-ng-show="federateCAGroupsForm.group.$error.maxLength">Group Name must be between 1 and 255 characters.</span>
+  								<span data-ng-show="federateCAGroupsForm.group.$error.pattern">The group name contains invalid characters.</span>
+			  				</span>
+			  			</td>
+			  		</tr>
+			  		<tr>
+			  			<td style="text-align:right;"colspan="2">
+			  				<button type="button" class="btn btn-default" data-ng-click="searchGroups()">Search LDAP</button>
+			  			</td>
+			  			<td></td>
+			  		</tr>
+			  		<tr>
+			  			<td class="rowHeader"><label style="font-weight:normal;" for="direction">Direction</label></td>
+			  			<td class="rowValue">
+					    	<select name="direction" data-ng-model="direction" required>
+							<option value="BOTH">Both (Inbound/Outbound)</option>
+				      			<option value="INBOUND">Inbound</option>
+							<option value="OUTBOUND">Outbound</option>
+							</select>
+			  			</td>
+			  			<td></td>
+			  		</tr>
+
+			  		<tr>
+			  			<td style="text-align:right;"colspan="2">
+			  				<button type="button" class="btn btn-default" data-ng-click="addGroup(group, direction)">Add Group</button>
+			  			</td>
+			  			<td></td>
+			  		</tr>
+				</table>
+	    	</div>
+		</br>
+			Groups configured for this federate:
+		    <br/>
+		    <table data-ng-show="federateCAGroups.length > 0" id="groupList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+		    	<thead>
+				  	<tr>
+					  	<th>Group</th>
+					  	<th>Direction</th>
+					  	<th>&nbsp;</th>
+					</tr>
+				</thead>
+
+				<tbody>
+					<tr data-ng-repeat="fg in federateCAGroups">
+					    <td data-ng-bind="fg.group"></td>
+					    <td data-ng-bind="fg.direction"></td>
+					    <td><a class="nav" data-ng-click="deleteObject(fg.group, fg.direction)">Remove</a></td>
+					</tr>
+				</tbody>
+			</table>
+
+			<div data-ng-show="federateCAGroups.length == 0">
+				<table class="tablesorter"><tr><td colspan="2">No Groups Configured</td></tr></table>
+		    </div>
+
+			<br/>
+
+			<input type="button"  onclick="window.history.back()" value="Back To Federate Certificate Authorities" />&nbsp;
+			<br/><br/>
+		</form>
+	</div>
+</div>

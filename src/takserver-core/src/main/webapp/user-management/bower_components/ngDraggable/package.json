@@ -1,0 +1,19 @@
+{
+  "name": "ngdraggable",
+  "version": "0.1.11",
+  "description": "Drag and drop module for Angular JS with support for touch devices",
+  "main": "ngDraggable.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fatlinesofcode/ngDraggable.git"
+  },
+  "author": "philip andrews",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/fatlinesofcode/ngDraggable/issues"
+  },
+  "homepage": "https://github.com/fatlinesofcode/ngDraggable#readme"
+}

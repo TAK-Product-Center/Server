@@ -1,0 +1,8 @@
+create subscription
+matchrole JTAC
+{type : XPATH,
+ filter : "*",
+ name : "mySubscription",
+ topics : [CAS_REQUEST, BLUE_FORCE_TRACKING]};
+
+  

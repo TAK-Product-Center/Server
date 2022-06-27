@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# /etc/rc.d/init.d/federation-hub-policy
+#
+# (c)2015-2021 Raytheon BBN. Licensed to US Government with unlimited rights.
+#
+# The Federation Hub is an optional companion to the Team Awareness Kit (TAK) server.
+# It allows for the federation of TAK data across the administrative and trust
+# boundaries of different networks participating in a TAK deployment. It can be run
+# with or without a co-located TAK server.
+#
+# This script starts the federation-hub-policy service, which provides the
+# policy management logic to determine how federated data is shared.
+
+# chkconfig: 345 20 40
+# description: Federation Hub policy manager service.
+
+# Source function library
+. /etc/rc.d/init.d/functions
+
+SERVICE="Federation Hub Policy Manager"
+FEDERATION_HUB_HOME=/opt/tak/federation-hub
+
+case "$1" in
+     start)
+        echo -n "Starting $SERVICE: "
+          su tak -c "cd ${FEDERATION_HUB_HOME}/scripts && ./federation-hub-policy.sh &> /opt/tak/federation-hub/logs/federation-hub-policy-console.log &"
+          if [ $? -eq 0 ]; then
+	      echo "OK"
+	      else
+		  pkill -9 -f "federation-hub-policy"
+		  echo "FAILED"
+		  exit 1
+	      fi
+          touch "/var/lock/subsys/$SERVICE"
+    ;;
+    stop)
+          echo -n "Shutting down $SERVICE: "
+		    pkill -9 -f "federation-hub-policy"
+	  rm -f "/var/lock/subsys/$SERVICE"
+	  echo "done."
+    ;;
+    status)
+	RETVAL=0
+	PID=`pgrep -f "federation-hub-policy"`
+        if [ $? -eq 0 ] ; then
+            echo "$SERVICE is running with pid ${PID}"
+        else
+            echo "$SERVICE is not running."
+            RETVAL=1
+        fi
+	exit $RETVAL
+    ;;
+    restart)
+          $0 stop;
+          $0 start;
+    ;;
+    reload)
+          $0 stop;
+          $0 start;
+    ;;
+    *)
+       echo "Usage: $0 {start|stop|status|restart}"
+       exit 1
+    ;;
+esac
+
+exit 0

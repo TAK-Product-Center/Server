@@ -1,0 +1,28 @@
+{
+  "name": "angular-ui-layout",
+  "main": [
+    "src/ui-layout.js",
+    "src/ui-layout.css"
+  ],
+  "homepage": "https://angular-ui.github.io/ui-layout/",
+  "authors": [
+    "https://github.com/angular-ui/ui-layout/contributors"
+  ],
+  "description": "This directive allows you to split !",
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "angular": "^1"
+  },
+  "devDependencies": {
+    "angular-mocks": "^1",
+    "jquery": "^2",
+    "requestAnimationFrame": "~0.0.22"
+  }
+}

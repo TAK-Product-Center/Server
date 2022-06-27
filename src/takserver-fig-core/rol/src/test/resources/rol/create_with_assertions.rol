@@ -1,0 +1,7 @@
+create subscription
+matchrole JTAC or (matchrole RESCUEESCORT and matchrole PLANE)
+{"type" : "XPATH",
+ "filter" : "*",
+ "name" : "mySubscription"};
+
+  

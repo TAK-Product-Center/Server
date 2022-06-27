@@ -1,0 +1,32 @@
+<div style="text-align: center; background-color: #FF4000;" data-ng-if="hasAdminRole && !dbIsConnected">Database Unavailable: Check Connectivity </div>
+<div style="text-align: center; background-color: #FF4000;" data-ng-if="hasAdminRole && actualNum > maxConnections">
+  PostgreSQL database configuration suggestion <a href="/Marti/database/index.html"> available.</a>
+</div>
+
+<div class="container-fluid">
+  <div id="DatabaseConfig">
+    <h3>Database Configuration</h3>
+      <div>PostgreSQL Version: <strong>{{dbVersion}}</strong></div><br>
+      <div>Latest SA (share location of other users at connection time):
+       <strong data-ng-show="dbConfig.latestSA">enabled</strong>
+       <strong data-ng-hide="dbConfig.latestSA">disabled</strong></div><br>
+      <div data-ng-show="dbConfig.connectionPoolAutoSize">Database Connection Pool size is auto-detected at startup (edit configuration below to change this setting). </div><br>
+      <div data-ng-hide="dbConfig.connectionPoolAutoSize">Connection Pool auto-detection is disabled, default value will be used.</div>
+      <div data-ng-if="hasAdminRole && actualNum > maxConnections">
+      Increasing the <strong>max_connections</strong> property in the PostgreSQL database configuration to at least <strong>{{(actualNum * 2) + 10}}</strong> is suggested.<br>Increasing the <strong>max_buffers</strong> 
+      property is also suggested.<br>On a RHEL 7 or CentOS 7 system this configuration file is normally located at <strong>/var/lib/pgsql/10/data/postgresql.conf</strong><br>
+      See PostgreSQL <a href="https://www.postgresql.org/docs/10/runtime-config-connection.html">documentation</a> for further information.</div>
+      <br> 
+	   Database URL:<strong> {{dbConfig.dbUrl}}</strong><br>
+       Database Username:<strong> {{dbConfig.dbUsername}}</strong><br>
+    <br>	
+    <div>
+        <div>Stored Message Count (estimated) <b>{{numCotEvents}}</b></div>
+        Vacuuming or re-indexing database periodically may improve database performance.<br>
+        <button type="button" data-ng-click="vacuumDB()" class="btn btn-primary btn-sm">Vacuum Database</button>
+        <button type="button" data-ng-click="reindexDB()" class="btn btn-primary btn-sm">Re-index Database</button>
+        <br>
+        </div><br>
+    <a class="nav" href="#!/modifyConfig">Edit Configuration</a>
+  </div>
+</div>

@@ -1,0 +1,16 @@
+.group-conditions{
+    margin-left: 20px;
+}
+
+.alert-group{
+    margin-top: 10px;
+    margin-bottom: 10px;
+    border-color: rgb(192, 152, 83);
+    border-color: rgb(251, 238, 213);
+    border-color: rgb(220, 200, 150);
+}
+
+.condition {
+    margin-top: 15px;
+    margin-bottom: 15px;
+}

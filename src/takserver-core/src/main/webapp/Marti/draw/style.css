@@ -1,0 +1,165 @@
+
+html {
+    overflow-y: scroll;
+}
+
+*{
+	margin:0;
+	font-family: Georgia, sans-serif;
+}
+
+body{
+	width:65%;
+	margin:0 auto;
+	background:#FFF6DF;
+	}
+canvas{
+	cursor: crosshair;
+	border:#CCC solid 1px;
+	float:left;
+	margin-bottom:10px;
+ }
+
+ hr {
+margin: 20px 0 19px;
+border: 0;
+border-bottom: 1px solid #EEE;
+}
+
+
+#clr{
+	margin:0 auto;
+	float:left;
+}
+
+#clr div{
+	cursor:pointer;
+	cursor:hand;
+	width:20px;
+	height:20px;
+}
+img{
+	 height: 100px;
+	 width: 100px;
+	 box-shadow: 0px 0.9px 2px #333333;
+	 margin-bottom: 14px;
+	 background: none;
+	 
+}
+
+img:hover {
+   box-shadow: 0px 1px 10px #333333;
+}
+
+
+body{
+text-align:center;
+}
+
+a.minimal:active {
+    background: none repeat scroll 0 0 #D0D0D0;
+    box-shadow: 0 0 1px 1px #E3E3E3 inset;
+    color: #000000;
+}
+
+a.minimal {
+    background: none repeat scroll 0 0 #E3E3E3;
+    border: 1px solid #BBBBBB;
+    border-radius: 3px 3px 3px 3px;
+    box-shadow: 0 0 1px 1px #F6F6F6 inset;
+    color: #333333;
+    font: bold 12px/1 "helvetica neue",helvetica,arial,sans-serif;
+    padding: 8px 10px 9px;
+    text-align: center;
+    text-shadow: 0 1px 0 #FFFFFF;
+    width: 150px;
+	text-decoration:none;
+}
+
+
+a.download:active {
+    -moz-border-bottom-colors: none;
+    -moz-border-image: none;
+    -moz-border-left-colors: none;
+    -moz-border-right-colors: none;
+    -moz-border-top-colors: none;
+    background: none repeat scroll 0 0 #3282D3;
+    border-color: #154C8C #154C8C #0E408E;
+    border-style: solid;
+    border-width: 1px;
+    box-shadow: 0 0 6px 3px #1657B5 inset, 0 1px 0 0 white;
+    text-shadow: 0 -1px 1px #2361A4;
+}
+
+a.download {
+   cursor:pointer;
+}
+
+a.download {
+    background-color: #52A8E8;
+    background-image: -moz-linear-gradient(center top , #52A8E8, #377AD0);
+    border-color: #4081AF #2E69A3 #20559A;
+    border-radius: 16px 16px 16px 16px;
+    border-style: solid;
+    border-width: 1px;
+    box-shadow: 0 1px 0 0 #72B9EB inset, 0 1px 2px 0 #B3B3B3;
+    color: #FFFFFF;
+    font: 25px/1 "lucida grande",sans-serif;
+    padding: 3px 5px;
+    text-align: center;
+    text-shadow: 0 -1px 1px #3275BC;
+    width: 112px;
+	display: block;
+	margin: 10px auto;
+	padding: 10px;
+	width: 230px;
+}
+h1{
+	font-family: 'Droid Serif', serif;
+	font-weight: normal;
+	font-size: 220%;
+	color: black;
+	margin-top: 0.4em;
+	margin-bottom: 0.3em;
+}
+
+h2{
+	font-family: 'Droid Sans', sans-serif;
+	font-weight: normal;
+	font-size: 120%;
+	color: black;
+	margin-top:1.2em;
+
+}
+
+h3{
+
+    font-family: 'Droid Sans', sans-serif;
+	font-weight: normal;
+	font-size: 120%;
+	color: gray;
+	margin-top:1.2em;
+	margin-bottom: 0.3em;
+
+}
+
+#footer{
+border-top:1px #ccc solid;
+margin-top:20px;
+padding:10px;
+}
+
+#themain{
+	border: 1px solid #ccc;
+	/*
+	-webkit-box-shadow: 2px 2px 2px #aaa;
+	-moz-box-shadow: 2px 2px 2px #aaa;
+	-webkit-border-radius: 10px;
+	-moz-border-radius: 10px;
+	*/
+	padding: 20px;
+}
+
+#btns{
+margin:20px auto;
+}

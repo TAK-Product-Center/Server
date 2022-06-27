@@ -1,0 +1,10 @@
+create subscription
+matchrole JTAC
+{type : SPARQL,
+ filter : "SELECT  ?io
+ 	   WHERE { ?producer <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://ontology.ihmc.us/IMS/IMSActor.owl#IMSClient> .
+	           ?io <http://ontology.ihmc.us/IMS/IMSEntity.owl#hasPublisher>
+	           ?producer ;
+		   <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>  <http://ontology.ihmc.us/IMS/IMSEntity.owl#InformationObject> .}",
+ name : "jtac_semantic_sub"};
+

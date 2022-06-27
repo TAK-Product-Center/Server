@@ -1,0 +1,58 @@
+
+<div class="row top-buffer">
+    <div class="col-md-12">
+        <button class="btn btn-primary" type="file" data-ngf-select="importWorkflow($files)" ngf-multiple="true" accept="*">Import</button>
+    </div>
+</div>
+
+<div class="row top-buffer">
+    <div class="col-md-12">
+        <table st-table="displayedCollection" class="table table-striped" st-safe-src="rowCollection">
+            <thead>
+                <tr>
+                    <th st-sort="name">Federation Name</th>
+                    <th st-sort="creatorName">Creator</th>
+                    <th st-sort="creationDate">Creation Date</th>
+                    <th st-sort="modifiedDate">Modified Date</th>
+                    <th>Description</th>
+                    <th>Export</th>
+                    <th>Delete</th>
+                </tr>
+                <tr>
+                    <th colspan="5"><input st-search=""
+                        placeholder="global search..." class="input-sm form-control"
+                        type="text" /></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="row in displayedCollection | filter: {diagramType : 'Federation'} track by row.id">
+                    <td>{{row.name}}</td>
+                    <td>{{row.creatorName}}</td>
+                    <td>{{row.creationDate | date}}</td>
+                    <td>{{row.modifiedDate | date}}</td>
+                    <td>{{row.description}}</td>
+                    <td>
+                        <button type="button" ng-click="exportWorkflow(row)"
+                            class="btn btn-xs">
+                            <i class="glyphicon glyphicon-share-alt"> </i>
+                        </button>
+                    </td>
+                    <td>
+                        <button type="button" ng-click="removeWorkflowRow(row)"
+                            class="btn btn-xs btn-danger">
+                            <i class="glyphicon glyphicon-remove"> </i>
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="5" class="text-center">
+                        <div st-pagination="" st-items-by-page="itemsByPage"
+                            st-displayed-pages="7"></div>
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>

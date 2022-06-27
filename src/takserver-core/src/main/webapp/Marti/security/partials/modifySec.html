@@ -1,0 +1,30 @@
+<div>
+    <h2>Security Configuration</h2>
+    <strong>Keystore File:</strong><input type="text" data-ng-model="secConfig.keystoreFile"><br>
+    <strong>Keystore Password:</strong><input type="password" data-ng-model="secConfig.keystorePass"><br>
+    <strong>Truststore File:</strong><input type="text" data-ng-model="secConfig.truststoreFile"><br>
+    <strong>Truststore Password:</strong><input type="password" data-ng-model="secConfig.truststorePass"><br>
+    <strong>TLS Version:</strong><input type="text" data-ng-model="secConfig.tlsVersion"><br>
+    <strong>x509 Groups:</strong><input type="checkbox" data-ng-model="secConfig.x509Groups"><br>
+    <strong>x509 Add Anonymous:</strong><input type="checkbox" data-ng-model="secConfig.x509addAnon"><br>
+
+    <strong>Enable Certificate Enrollment:</strong><input type="checkbox" data-ng-model="secConfig.enableEnrollment"><br>
+
+    <div ng-hide="!secConfig.enableEnrollment">
+        <strong>TAK Server CA</strong><input type="radio" data-ng-model="secConfig.caType" value="TAKServer"><br>
+        <strong>Signing Keystore File:</strong><input type="text" data-ng-model="secConfig.signingKeystoreFile" ng-disabled="!secConfig.enableEnrollment || secConfig.caType != 'TAKServer'"><br>
+        <strong>Signing Keystore Password:</strong><input type="password" data-ng-model="secConfig.signingKeystorePass" ng-disabled="!secConfig.enableEnrollment || secConfig.caType != 'TAKServer'"><br>
+        <strong>Validity Days:</strong><input type="text" data-ng-model="secConfig.validityDays" ng-disabled="!secConfig.enableEnrollment || secConfig.caType != 'TAKServer'"><br>
+
+        <strong>Microsoft CA</strong><input type="radio" data-ng-model="secConfig.caType" value="MicrosoftCA"><br>
+        <strong>Username:</strong><input type="text" data-ng-model="secConfig.mscaUserName" ng-disabled="!secConfig.enableEnrollment || secConfig.caType != 'MicrosoftCA'"><br>
+        <strong>Password:</strong><input type="password" data-ng-model="secConfig.mscaPassword" ng-disabled="!secConfig.enableEnrollment || secConfig.caType != 'MicrosoftCA'"><br>
+        <strong>Truststore File:</strong><input type="text" data-ng-model="secConfig.mscaTruststore" ng-disabled="!secConfig.enableEnrollment || secConfig.caType != 'MicrosoftCA'"><br>
+        <strong>Truststore Password:</strong><input type="password" data-ng-model="secConfig.mscaTruststorePass" ng-disabled="!secConfig.enableEnrollment || secConfig.caType != 'MicrosoftCA'"><br>
+        <strong>Template Name:</strong><input type="text" data-ng-model="secConfig.mscaTemplateName" ng-disabled="!secConfig.enableEnrollment || secConfig.caType != 'MicrosoftCA'"><br>
+    </div>
+
+ 	<button class="btn btn-primary" type="button" data-ng-click="saveSecConfig(secConfig)">Submit</button><br>
+    <a class="nav" href="#!/">Back to view Configuration</a><br>
+	<p><strong>Note:</strong>Any changes to configuration will not take full effect until server restart. </p>
+</div>

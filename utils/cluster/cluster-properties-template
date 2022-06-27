@@ -1,0 +1,25 @@
+# === PROPERTIES TO EDIT ===
+
+# absolute path to takserver source root directory. (eg. /Users/user/takserver)
+TAK_HOME_DIR=<tak dir path>
+
+# Create a unique name for your cluster, preferably the one used to name this file. this will keep naming conventions consistent accross all resources
+TAK_CLUSTER_NAME=<cluster name>
+
+# Set the AWS region the cluster will be running in. (us-east-1 for virginia region)
+TAK_CLUSTER_REGION=<cluster region>
+
+# Set the AWS zones for cluster region. (eg. us-east-1a,us-east-1b,us-east-1c)
+TAK_CLUSTER_ZONES=${ZONES:-"<zone1>,<zone2>"}
+
+# Set the Domain Name of the hosted zone you registered with Route53 (eg. yourorg.tak.net)
+TAK_CLUSTER_DOMAIN_NAME=<route53 domain>
+
+
+
+# === DO NOT EDIT PROPERTIES ===
+
+AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id)
+AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key)
+AWS_S3_KOPS_STORE_NAME=tak.server-$TAK_CLUSTER_NAME
+KOPS_STATE_STORE=s3://$AWS_S3_KOPS_STORE_NAME

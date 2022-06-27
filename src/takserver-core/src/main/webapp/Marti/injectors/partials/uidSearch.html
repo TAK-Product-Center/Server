@@ -1,0 +1,137 @@
+<style>
+  .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+  
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+
+
+  .rowHeader {
+  	text-align:right;
+  	padding-right:5px;
+  	width:200px;
+  	vertical-align:top;
+  }
+  
+  .rowValue {
+  	width:400px;
+  	text-align:right;
+  	vertical-align:top;
+  }
+  
+  .rowValue select {
+  	width:100%;
+  }
+
+  .rowValue input {
+  	width:400px;
+  }
+  
+</style>
+
+<div id="uidSearchView">
+    <div style="padding:10px;" id="uidSearchContainer" style="padding:15px;" class="content" >
+
+	    <div data-ng-show="!showRmiError">
+		    <h3>UID Search</h3>
+		</div>
+
+	    <div data-ng-show="!showRmiError">
+	    	<p>
+	    		To search for a UID, provide the filter values below and click the Search button.
+	    	</p>
+	    	<br/>
+	    	<div>
+			  <form name="uidSearchForm" novalidate data-ng-submit="uidSearchForm.$valid && searchUIDs(criteria.startDate, criteria.endDate)">
+			  	<table>
+			  		<tr>
+			  			<td class="rowHeader">
+					    	Start Date:
+						</td>
+						<td class="rowValue">
+							<input type="text" data-ng-model="criteria.startDate" name="startDate" required data-ng-pattern="/^\d{4}-\d{2}-\d{2}$/" />
+			  				<br/><span class="inlineHelp">Example: 2014-12-04 (yyyy-mm-dd)</span>
+						</td>
+						<td class="error">
+			  				<span data-ng-show="uidSearchForm.$submitted || uidSearchForm.startDate.$touched">
+			  					<span data-ng-show="uidSearchForm.startDate.$error.pattern">The provided date is invalid.</span>
+								<span data-ng-show="uidSearchForm.startDate.$error.required">Start Date is required.</span>
+			  				</span>
+			  			</td>
+			  		</tr>
+
+			  		<tr>
+			  			<td class="rowHeader">
+					    	End Date:
+						</td>
+						<td class="rowValue">
+							<input type="text" data-ng-model="criteria.endDate" name="endDate" required data-ng-pattern="/^\d{4}-\d{2}-\d{2}$/"/>
+			  				<br/><span class="inlineHelp">Example: 2014-12-04 (yyyy-mm-dd)</span>
+						</td>
+						<td class="error">
+			  				<span data-ng-show="uidSearchForm.$submitted || uidSearchForm.endDate.$touched">
+			  					<span data-ng-show="uidSearchForm.endDate.$error.pattern">The provided date is invalid.</span>
+								<span data-ng-show="uidSearchForm.endDate.$error.required">Start Date is required.</span>
+			  				</span>
+			  			</td>
+			  		</tr>
+			  		
+			  		<tr>
+			  			<td>&nbsp;</td>
+			  			<td style="text-align:right;">
+						    <input type="submit" value="Search" />
+			  			</td>
+			  			<td>&nbsp;</td>
+			  		</tr>
+			  	</table>
+			  </form>
+		    </div>
+			&nbsp;	
+
+		    <div data-ng-show="!showRmiError && uidResults.length > 0" style="overflow-y:scroll;height:300px;">
+			    <table id="uidResultsList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+			    	<thead>
+					  	<tr>
+						  	<th>Callsign</th>
+						  	<th>UID</th>
+						  	<th style="text-align:center;">Select</th>
+						</tr>
+					</thead>
+					
+					<tbody>
+						<tr data-ng-repeat="u in uidResults">
+							<td data-ng-bind="u.callSign"></td>
+						    <td data-ng-bind="u.uid"></td>
+							<td style="text-align:center;"><input type="radio" name="selectedUID" data-ng-model="uidSelection.uid" value="{{u.uid}}" /></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<div style="margin-top:10px;" data-ng-show="!showRmiError && uidResults.length > 0">
+				<input type="button" value="Cancel" data-ng-click="cancel()" />&nbsp;
+				<input type="button" value="Select UID" data-ng-click="selectUID()" />			
+			</div>
+			
+			<div data-ng-show="!showRmiError && (uidResults == null || uidResults.length == 0)">
+				<table class="tablesorter" style="border-collapse:separate;border-spacing:2px;"><tr><td colspan="2">No Matching UIDs</td></tr></table>
+		    </div>
+		</div>
+
+		<div data-ng-show="showRmiError">
+			<h2><font color="dc143c">UID Search Unavailable</font></h2>
+			<p>The UID search screen cannot be displayed.</p>
+			<p>Please ensure the broker is running and reload this page.</p>
+			<hr/>
+	    </div>		
+    </div>
+</div>

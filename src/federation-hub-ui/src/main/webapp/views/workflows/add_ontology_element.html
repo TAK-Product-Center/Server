@@ -1,0 +1,165 @@
+<div class="modal-header">
+  <h3 class="modal-title">{{editorTitle}} {{roger_federation.type}}</h3>
+  <h4 class="modal-title">{{roger_federation.name}}</h4>
+</div>
+
+<div class="modal-body" data-ng-init="initialize()" style="height: 830px; width:100%;">
+
+  <form name="myForm">
+ <div style="height: 600px; overflow: hidden;">
+    <div ui-layout>
+        <div ui-layout="{flow : 'column' }">
+          <div ui-layout-container min-size="300px" id="vizContainer">
+            <div style="height: 100%; overflow: hidden;">
+              <div class="panel panel-primary" style="height: 100%;">
+                <div class="panel-heading">
+                  <div class="pull-right">
+                    <!-- <button class="btn btn-sm btn-success" ng-disabled="checkClassSelection()" ng-click="addClassToRoles()">Add Class to Roles</button>
+                    <button class="btn btn-sm btn-success" ng-disabled="checkClassSelection()" ng-click="addClassToProducts()">Add Class to Products</button> -->
+                    <button class="btn btn-sm btn-success" type="button" ng-click="submit()">OK</button>
+                    <button class="btn btn-sm btn-success" type="button" ng-click="cancel()">Cancel</button>
+                  </div>
+                  <div style="display:inline-flex;">
+                    <select class="form-control input-sm" name="roleProductSets.dataset" id="dataset" ng-model="selectedDataset" ng-change="getDatasetData(selectedDataset)" required autofocus>
+                      <option value="">-- Select Dataset --</option>
+                      <option ng-repeat="dataset in datasetOptions" value={{dataset}}>
+                        {{dataset}}
+                      </option>
+                    </select>
+                    <!-- <button ng-disabled="showRPSetLoadSpinner" ng-show="selectedDataset !== undefined && selectedDataset !== ''" class="btn btn-sm btn-success" ng-click="!showRPSetLoadSpinner && reloadDataset(selectedDataset)" title="Reload dataset from Fuseki. (this may take a while for large ontologies)" style="margin-left:8px;">
+                      <span class="glyphicon glyphicon-refresh"></span>
+                    </button> -->
+                  </div>
+                </div>
+                <div>
+                </div>
+                <div class="panel-body" id="vizPanelBody" style="height: 100%; padding:0;">
+                  <span us-spinner spinner-on="showRPSetLoadSpinner"></span>
+                  <iframe id="viz" src="/viz/deploy/index.html" style="width:100%; height:100%;" onLoad="vizLoadComplete();"></iframe>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div ui-layout-container min-size="350px" size="30%">
+            <div ui-layout="{flow : 'row' }">
+              <div ui-layout-container min-size="300px" id="pnlPrimary">
+                <div class="panel panel-primary" style="height: 100%; margin: 0; overflow:hidden" >
+                  <div class="panel-heading">
+                    <h3 class="panel-title" style="padding:7px;">
+                     <span>Class Hierarchy</span>
+                    </h3>
+                  </div>
+                  <div style="margin:8px; white-space: nowrap;">
+                    <!-- <input placeholder="Search..." type="text" ng-model="search.input.text" ng-keyup="$event.keyCode == 13 && search.doSearch()"> -->
+                    <input type="text"  ng-model="search.input.text" ng-keyup="$event.keyCode === 13 && search.doSearch()" placeholder="Search..." uib-typeahead="item for item in queryClasses($viewValue)" typeahead-loading="loadingLocations" typeahead-no-results="noResults" class="form-control">
+                    <!-- /.dropdown -->
+                    <ul class="" style="list-style-type: none; padding:4px; display: inline-block;">
+                      <li class="dropdown">
+                        <a class="dropdown-toggle" data-toggle="dropdown" title="Search Settings">
+                          <i class="glyphicon glyphicon-search" ng-click="search.doSearch()"></i>
+                          <i class="fa fa-caret-down"></i>
+                        </a>
+                        <ul role="menu" class="dropdown-menu">
+                          <li style="padding: 3px 20px;">
+                            <input type="checkbox" ng-model="search.options.wholeWordMatch"><span> Find whole words only</span>
+                          </li>
+                          <!-- <li class="divider"></li> -->
+                          <!-- <li>
+                            <li style="padding: 3px 20px;">
+                              <input type="checkbox" ng-model="search.options.includeClassInstances" disabled><span> Include Instances</span>
+                            </li>
+                          </li> -->
+                        </ul>
+                      </li>
+                    </ul>
+                    <!-- /.dropdown -->
+                    <span ng-if="search.result.hits.length > 0">
+                      {{search.result.currentIndex + 1}} of {{search.result.hits.length}}
+                      <button class="glyphicon glyphicon-menu-down" ng-click="search.findNext()"></button>
+                      <button class="glyphicon glyphicon-menu-up" ng-click="search.findPrevious()"></button>
+                    </span>
+                    <span id="spanNoMatches" ng-if="search.result.alertNoMatches">
+                      No Matches
+                    </span>
+                  </div>
+                  <div id="pnlClassHierarchy" class="panel-body" style="padding:0; overflow: auto; white-space: nowrap;">
+                    <treecontrol id="treeClassHierarchy" class="tree-light" tree-model="datasetData" ng-model-options="{ debounce: 500 }" selected-node="selectedClass" options="treeOptions" expanded-nodes="expandedClassNodes" on-selection="showSelectedClass(node, true)">
+                      <span style="background-color: {{search.getNodeBGColor(node)}}">
+                          {{node.name}}
+                        </span>
+                    </treecontrol>
+                  </div>
+                </div>
+              </div>
+              <div ui-layout-container size="200px">
+                <tabset style="overflow: auto;">
+                  <tab heading="Class Attributes">
+                    <div class="panel panel-success">
+                      <!-- <div class="panel-heading">Selected Class Attributes</div> -->
+                      <div class="panel-body">
+                        <div id="classAttributesDiv">
+                          <b>Label: <span ng-bind="selectedClass.name"></span></b>
+                          <br>
+                          <b>Name: <span ng-bind="selectedClass.label['IRI-based']"></span></b>
+                          <br>
+                          <b style="white-space:nowrap;">IRI: </b>
+                          <a ng-bind="selectedClass.iri" href="{{selectedClass.iri}}" target="iriTarget" style="word-wrap:break-word;"></a>
+                          <br>
+                          <b>Comment: </b><span ng-bind="selectedClass.comment.undefined"></span>
+                          <br>
+                        </div>
+                      </div>
+                    </div>
+                  </tab>
+                  <tab heading="Class Instances ({{selectedClass.individuals.length === undefined ? 0 :selectedClass.individuals.length}})">
+                    <div class="panel-body">
+                      <b>Instances: </b><span ng-bind="selectedClass.individuals.length"></span>
+                      <br>
+                      <div style="white-space: nowrap; overflow: auto;">
+                        <div ng-repeat="intances in selectedClass.individuals | orderBy:'iri'">
+                          {{intances.labels['IRI-based']}}
+                        </div>
+                      </div>
+                    </div>
+                  </tab>
+                </tabset>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+  </div>
+
+
+
+
+
+
+
+    <div style="max-height: 400px;overflow: auto;">
+      <treecontrol class="tree-light" tree-model="treeData" selected-node="selectedNode" options="treeOptions" expanded-nodes="expandedNodes" on-selection="showSelected(node, selected)">
+        <span style="color: {{nodeColor(node)}}" ng-mouseenter="showPopover(node, $event)">
+          {{node.name}} ({{node.datasetName}})
+      </span>
+      </treecontrol>
+    </div>
+    <hr>
+    <div style="margin: 10px">
+      <div ng-show="roger_federation.type === 'Pool'">
+        <label>Number of pool swim lanes:
+          <input type="number" name="input" ng-model="pool.numberOfSwimLanes" min="1" max="4" required>
+        </label>
+      </div>
+      <div ng-if="roger_federation.priority !== undefined">
+        <label>Priority
+          <input type="number" name="input" ng-model="roger_federation.priority" ng-model-options="{ allowInvalid: true }" min="0" max="999" required>
+        </label>
+      </div>
+    </div>
+    <!-- <div class="modal-footer">
+      <button class="btn btn-primary" type="button" ng-click="submit()" >OK</button>
+      <button class="btn btn-primary" type="button" ng-click="cancel()">Cancel</button>
+    </div> -->
+  </form>
+</div>

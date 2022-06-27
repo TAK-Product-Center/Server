@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration xmlns="http://bbn.com/marti/xml/config"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="CoreConfig.xsd">
+	<network tomcatMaxPool="300" esyncEnableCache="1" multicastTTL="5">
+		<input _name="stdssl" protocol="tls" port="8089" coreVersion="2"/>
+		<!-- web connectors -->
+		<connector port="8443" _name="https"/>
+		<connector port="8444" useFederationTruststore="true" _name="fed_https"/>
+		<connector port="8446" clientAuth="false" _name="cert_https"/>
+	</network>
+	<auth>
+	        <File location="UserAuthenticationFile.xml"/>
+	</auth>
+	<submission ignoreStaleMessages="false" validateXml="false"/>
+
+	<subscription reloadPersistent="false">
+	
+	</subscription>
+
+	<repository enable="true" numDbConnections="100" primaryKeyBatchSize="500" insertionBatchSize="500">
+		<connection url="DB_URL_PLACEHOLDER" username="DB_USERNAME_PLACEHOLDER" password="DB_PASSWORD_PLACEHOLDER" />
+	</repository>
+
+	<repeater connectionPoolAutoSize="false" enable="true" numDbConnections="400" periodMillis="3000" staleDelayMillis="15000">
+	    <!-- Examples -->
+		<repeatableType initiate-test="/event/detail/emergency[@type='911 Alert']" cancel-test="/event/detail/emergency[@cancel='true']" _name="911"/> 
+		<repeatableType initiate-test="/event/detail/emergency[@type='Ring The Bell']" cancel-test="/event/detail/emergency[@cancel='true']" _name="RingTheBell"/>
+		<repeatableType initiate-test="/event/detail/emergency[@type='Geo-fence Breached']" cancel-test="/event/detail/emergency[@cancel='true']" _name="GeoFenceBreach"/>
+		<repeatableType initiate-test="/event/detail/emergency[@type='Troops In Contact']" cancel-test="/event/detail/emergency[@cancel='true']" _name="TroopsInContact"/>
+	</repeater>
+
+	<dissemination smartRetry="false" enabled="true"/>
+
+	<filter>
+		<flowtag enable="false" text="" />
+		<streamingbroker enable="true" />
+	
+		<scrubber enable="false" action="overwrite" />
+
+		<qos enabled="false">
+            <reportingRateLimiter>
+                <rateLimitRule clientThresholdCount="1000" reportingRateLimitSeconds="120" />
+                <rateLimitRule clientThresholdCount="5000" reportingRateLimitSeconds="180" />
+                <rateLimitRule clientThresholdCount="10000" reportingRateLimitSeconds="240" />
+                <rateLimitRule clientThresholdCount="25000" reportingRateLimitSeconds="480" />
+                <rateLimitRule clientThresholdCount="50000" reportingRateLimitSeconds="960" />
+            </reportingRateLimiter>
+        </qos>
+	</filter>
+
+	<buffer>
+		<latestSA enable="true" />
+		<queue enableCachePersistence="false" missionUidLimit="2048" missionContentLimit="2048" />
+	</buffer>
+
+	<security>
+		<tls context="TLSv1.2" 
+			keymanager="SunX509"
+			keystore="JKS" keystoreFile="certs/files/takserver.jks" keystorePass="atakatak" 
+			truststore="JKS" truststoreFile="certs/files/truststore-root.jks" truststorePass="atakatak">
+		</tls>
+		
+	</security>
+
+	<federation allowFederatedDelete="false" allowMissionFederation="true" enableFederation="true">
+	  <federation-server port="9000" v1enabled="true" v2port="9001" v2enabled="true">
+	    <tls context="TLSv1.2" 
+		 keymanager="SunX509"
+		 keystore="JKS" keystoreFile="certs/files/takserver.jks" keystorePass="atakatak" 
+		 truststore="JKS" truststoreFile="certs/files/fed-truststore.jks" truststorePass="atakatak"/>
+	  </federation-server>
+	</federation>
+
+	<cluster enabled="true" kubernetes="true" natsClusterID="takserver" natsURL="nats://nats-cluster:4222"/>
+ 
+</Configuration>

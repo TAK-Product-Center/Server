@@ -1,0 +1,100 @@
+imagePullSecret: reg-cred
+certConfigMapName: cert-migration
+
+takserver:
+  ingress:
+    # Note, ingress resources require an ingress controller in the Kubernetes cluster.
+    # Note, ingress resources will require ssl passthrough enabled on the ingress controller.
+    enabled: false
+    api:
+      cert:
+        annotations: {}
+        host: ""
+      federationTruststore:
+        annotations: {}
+        host: ""
+      https:
+        annotations: {}
+        host: ""
+    messaging:
+      streaming:
+        annotations: {}
+        host: ""
+      fedv1:
+        annotations: {}
+        host: ""
+      fedv2:
+        annotations: {}
+        host: ""
+  messaging:
+    image:
+      repository: docker-devtest-local.artifacts.tak.gov/takserver-cluster/takserver-messaging
+      tag: messaging-provisioned
+    replicas: 1
+    resources:
+      requests:
+        cpu: 1
+        memory: 8Gi
+      limits:
+        cpu: 1
+        memory: 8Gi
+  api:
+    image:
+      repository: docker-devtest-local.artifacts.tak.gov/takserver-cluster/takserver-api
+      tag: api-provisioned
+    replicas: 1
+    resources:
+      requests:
+        cpu: 1
+        memory: 8Gi
+      limits:
+        cpu: 1
+        memory: 8Gi
+  plugins:
+    enabled: true
+    image:
+      repository: docker-devtest-local.artifacts.tak.gov/takserver-cluster/takserver-plugins
+      tag: plugins-provisioned
+    replicas: 1
+    resources:
+      requests:
+        cpu: 1
+      limits:
+        cpu: 1
+  takserverDatabaseSetup:
+    image:
+      repository: docker-devtest-local.artifacts.tak.gov/takserver-cluster/takserver-database-setup
+      tag: takserver-database-setup-provisioned
+  limits:
+    persistentVolumeClaims: '5'
+    requests:
+      storage: 100Gi
+    storage:
+      max: 50Gi
+      min: 1Gi
+postgresql:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: postgis/postgis
+    tag: 10-3.1
+  configurationConfigMap: postgres-configuration
+  postgresqlDatabase: cot
+
+global:
+  postgresql:
+    postgresqlUsername: postgres
+    postgresqlPassword: postgres
+
+ignite:
+  image:
+    tag: 2.11.0
+  serviceAccount:
+    name: takserver-ignite
+
+nats-operator:
+  image:
+    tag: 0.7.2
+  cluster:
+    auth:
+      enabled: false

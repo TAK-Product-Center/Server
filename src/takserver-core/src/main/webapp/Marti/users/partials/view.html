@@ -1,0 +1,12 @@
+<div id="userView"  ng-cloak>
+	<h2>{{user.displayName}}</h2>
+	<dl>
+	<dd ng-show="user.address"><span style="font-weight: bold">address</span> {{user.address}}</dd>
+	<dd><span style="font-weight: bold">connection</span> {{user.connectionType}} {{user.connectionId}}</dd>
+	<dd ng-show="user.cotSaUid"><span style="font-weight: bold">sa uid (auth message)</span> {{user.cotSaUid}}</dd>
+	<dd><span style="font-weight: bold">created</span> {{user.created | date:'yyyy-MM-dd HH:mm:ss'}}</dd>
+	<dd ng-repeat="group in groups"><span style="font-weight: bold">group</span> {{group.name}}&nbsp;<span ng-show="group.direction === 'IN'">&larr;</span><span ng-show="group.direction === 'OUT'">&rarr;</span> (<span style="font-weight: bold">bit </span>{{group.bitpos}})</dd>
+	<dd ng-repeat="authority in user.authorities"><span style="font-weight: bold">authority</span> {{authority}}&nbsp;</dd>
+	</dl>
+	<a class="btn btn-left back" href="#!/">Go Back</a>
+</div>

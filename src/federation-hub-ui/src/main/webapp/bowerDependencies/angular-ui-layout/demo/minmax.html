@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html ng-app="x">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width">
+
+
+    <base href="../"/>
+    <title>UI.Layout : Min/Max Demo</title>
+
+    <!-- Le css -->
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="src/ui-layout.css"/>
+
+    <style type="text/css">
+    .testColumn:first-child {
+      background: green;
+    }
+    .testColumn:last-child {
+      background-color: red;
+    }
+    </style>
+  </head>
+  <body style="height: 50vh;">
+
+
+    <div ui-layout="{ flow:'column' }">
+      <div class="testColumn" min-size="5%" max-size="10%"></div>
+      <div class="testColumn"></div>
+      <div class="testColumn" min-size="10%" max-size="50%"></div>
+      <div class="testColumn"></div>
+    </div>
+
+    <!-- Le javascript -->
+    <script type="application/javascript" src="../bower_components/angular/angular.min.js"></script>
+    <script type="application/javascript" src="src/ui-layout.js"></script>
+    <script type="application/javascript">
+
+angular.module('x', ['ui.layout']);
+
+    </script>
+
+
+  </body>
+</html>

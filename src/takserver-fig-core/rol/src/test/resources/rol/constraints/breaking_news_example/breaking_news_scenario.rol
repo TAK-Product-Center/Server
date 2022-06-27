@@ -1,0 +1,3 @@
+assign role Reporter
+constraint max 2
+match attribute DN : "CN=Sam" or (match attribute company : "xyz" and match attribute state : "CA");

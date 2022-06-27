@@ -1,0 +1,80 @@
+<style>
+	.nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+</style>
+
+<div id="deviceProfilesView">
+	<div id="deviceProfilesListContainer" class="content" class="listContainer" >
+
+		<div data-ng-show="!showRmiError">
+			<h3><a href="/Marti/profiles/index.html">Device Profile Manager</a>&nbsp;/&nbsp;{{profile.name}}</h3>
+
+		</div>
+
+		<div data-ng-show="!showRmiError">
+			<h4>Type</h4>
+			<input type="radio" name="type" value="Enrollment" ng-model="profile.type" ng-change="updateProfile(profile)"> Apply on Enrollment<br>
+			<input type="radio" name="type" value="Connection" ng-model="profile.type" ng-change="updateProfile(profile)"> Apply on Connection<br>
+			<input type="radio" name="type" value="Tool" ng-model="profile.type" ng-change="updateProfile(profile)"> Tool
+		</div>
+
+		<div>
+			<h4>Tool (optional)</h4>
+			<input type="text" ng-disabled="profile.type != 'Tool'" ng-model="profile.tool" ng-click="profile.tool = profile.tool === setToolNameLabel ? '' : profile.tool;" ng-change="updateProfile(profile)">
+		</div>
+
+		<div>
+			<h4>Groups</h4>
+			<a class="nav" data-ng-click="toggle();" href>Select All</a>&nbsp;
+			<ul style="list-style-type:none;padding-left: 0;">
+				<li ng-repeat="group in groups">
+					<input type="checkbox"
+						   ng-model="groupStatus[group.name]"
+						   ng-change="updateGroups();"> {{group.name}}
+				</li>
+			</ul>
+
+		</div>
+
+		<h4>Files</h4>
+		<div data-ng-show="!showRmiError">
+			<table id="fileList" class="tablesorter">
+				<thead>
+				<tr>
+					<th>Name</th>
+					<th>&nbsp;</th>
+				</tr>
+				</thead>
+
+				<tbody>
+				<tr data-ng-repeat="file in files">
+					<td width=50%>
+						<a class="nav" ng-href="/Marti/api/device/profile/{{profile.name}}/file/{{file.id}}">{{file.name}}</a>
+					</td>
+					<td width=10% align=center>
+						<a class="nav" ng-href="/Marti/api/device/profile/{{profile.name}}/file/{{file.id}}">Download</a>
+						<a class="nav" data-ng-click="deleteFile(file.id)" href>Delete</a>
+					</td>
+				</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<input type="file" id="file" name="file"/><br>
+		<button ng-click="uploadFile()">Upload file</button>
+		<br><br>
+
+
+		<div data-ng-show="profile.type == 'Tool'">
+			<h4>Directories</h4>
+			<ul style="list-style-type:none;padding-left: 0;">
+				<li ng-repeat="validDirectory in validDirectories">
+					<input type="checkbox"
+						   ng-model="directoryStatus[validDirectory]"
+						   ng-change="updateSelectedDirectories();"> {{validDirectory}}
+				</li>
+			</ul>
+
+		</div>
+
+	</div>
+</div>

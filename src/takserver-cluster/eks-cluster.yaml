@@ -1,0 +1,18 @@
+# DO NOT EDIT 
+apiVersion: eksctl.io/v1alpha5
+availabilityZones:
+- us-east-1a
+- us-east-1b
+- us-east-1c
+kind: ClusterConfig
+managedNodeGroups:
+- desiredCapacity: 20
+  iam:
+    withAddonPolicies:
+      cloudWatch: true
+  instanceType: c5.4xlarge
+  name: cluster-node-group
+  volumeSize: 100
+metadata:
+  name: cluster
+  region: us-east-1

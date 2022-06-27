@@ -1,0 +1,1 @@
+assign priority for MSG match attribute topic : "TestTopic" { "precedence" : "1", "importance" : "2", "policyName" : "MessageAttributeOpsTest" };

@@ -1,0 +1,66 @@
+<style>
+	.nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+
+	.sortorder:after {
+		content: '\25b2';   // BLACK UP-POINTING TRIANGLE
+	}
+	.sortorder.reverse:after {
+		content: '\25bc';   // BLACK DOWN-POINTING TRIANGLE
+	}
+</style>
+
+<div id="deviceProfilesView">
+	<div id="deviceProfilesListContainer" class="content" class="listContainer" >
+
+		<div data-ng-show="!showRmiError">
+			<h3>Device Profile Manager</h3>
+		</div>
+
+		<div data-ng-show="!showRmiError">
+			<table id="deviceProfilesList" class="tablesorter">
+				<thead>
+				<tr>
+					<th><a class="nav" data-ng-click="sortBy('name')" href>Name</a><span class="sortorder" ng-show="sortPropertyName === 'name'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('type')" href>Type</a><span class="sortorder" ng-show="sortPropertyName === 'type'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('tool')" href>Tool</a><span class="sortorder" ng-show="sortPropertyName === 'tool'" ng-class="{reverse: reverse}"></span></th>
+					<th><a class="nav" data-ng-click="sortBy('groups')" href>Groups</a><span class="sortorder" ng-show="sortPropertyName === 'groups'" ng-class="{reverse: reverse}"></span></th>
+					<th align="center"><a class="nav" data-ng-click="sortBy('active')" href>Active</a><span class="sortorder" ng-show="sortPropertyName === 'active'" ng-class="{reverse: reverse}"></span></th>
+					<th>&nbsp;</th>
+				</tr>
+				</thead>
+
+				<tbody>
+				<tr data-ng-repeat="profile in deviceProfiles | orderBy:sortPropertyName:reverse">
+					<td width=50%>
+						<a class="nav" ng-href="#!/editProfile/{{profile.name | encodeURIComponent}}">{{profile.name}}</a>
+					</td>
+
+					<td align=left data-ng-bind="profile.type"></td>
+					<td align=left data-ng-bind="profile.tool"></td>
+					<td align=left data-ng-bind="profile.groups"></td>
+					<td  align=center>
+						<a class="nav" data-ng-click="profile.active = !profile.active; updateProfile(profile);" href>{{profile.active}}</a>
+					</td>
+					
+					<td width=10% align=center>
+						<a class="nav" ng-href="#!/editProfile/{{profile.name | encodeURIComponent}}">Edit</a>
+						<a class="nav" ng-href="#!/sendProfile/{{profile.name | encodeURIComponent}}">Send</a>
+						<a class="nav" ng-href="/Marti/api/device/profile/{{profile.name}}/missionpackage">Download</a>
+						<a class="nav" data-ng-click="deleteProfile(profile.id)" href>Delete</a>
+					</td>
+				</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div data-ng-show="showRmiError">
+			<h2><font color="dc143c">Profiles Unavailable</font></h2>
+			<p>Error retrieving device profiles.</p>
+			<hr/>
+		</div>
+
+		<input type="text" ng-model="profileName" data-ng-click="profileName = '' ">
+		<a class="nav" data-ng-click="addProfile()" href>Create</a>
+
+	</div>
+</div>

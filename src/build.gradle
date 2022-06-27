@@ -1,0 +1,106 @@
+buildscript {
+
+  repositories {
+    mavenCentral()
+    maven {
+      url 'https://plugins.gradle.org/m2'
+    }
+  }
+
+  dependencies {
+    classpath 'org.ajoberstar:grgit:1.7.2'
+  }
+}
+
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+
+apply from: 'gradle/license.gradle', to: project
+
+ext {
+  // access local git repo
+  git = org.ajoberstar.grgit.Grgit.open(file('..'))
+  gitrev = git.head().id
+  gitdescribe = git.describe()
+  gitbranch = git.branch.getCurrent().name
+
+  def (tv, takrel1, takrel2) = gitdescribe.trim().tokenize('-')
+
+  if (takrel2 == null) {
+    takrel2 = '0'
+  }
+
+  takversion = tv
+  takrelease = takrel1 + '-' + takrel2
+  takreleaserpm = takrel1 + takrel2
+
+  def (tvmaj, tvmin) = tv.tokenize('.')
+  
+  verMajor = tvmaj
+  verMinor = tvmin
+  verPatch = takrel2
+
+  // only show the branch name if it's not master or a maintenance branch
+  branch = (gitbranch == "master" || gitbranch.toLowerCase().contains("maintenance") ? "" : ("-" + gitbranch))
+}
+
+allprojects {
+
+  apply plugin: 'java'
+  apply plugin: 'eclipse'
+  apply plugin: 'idea'
+
+  sourceCompatibility = 1.8
+  targetCompatibility = 1.8
+
+// alternate way to set target
+// https://github.com/gradle/gradle/issues/2510
+//  compileJava {
+//    options.compilerArgs.addAll(['--release', '8'])
+//  }
+
+  group = 'com.bbn.marti'
+  version = takversion + '-' + takrelease
+
+  defaultTasks 'build'
+
+  test {
+    testLogging.showStandardStreams = true
+  }
+
+  repositories {
+    mavenCentral()
+    maven {
+      url 'https://plugins.gradle.org/m2'
+    }
+    flatDir {
+      dirs project.rootDir.toString() + '/lib'
+    }
+  }
+}
+
+subprojects {
+  buildscript {
+    repositories {
+      mavenCentral()
+      maven {
+        url 'https://plugins.gradle.org/m2'
+      }
+      flatDir {
+        dirs project.rootDir.toString() + '/lib'
+      }
+    }
+
+    dependencies {
+      classpath 'com.github.jengelman.gradle.plugins:shadow:' + gradle_shadow_version
+	  classpath 'gradle.plugin.org.openrepose:gradle-jaxb-plugin:2.5.0'
+    }
+  }
+
+  clean {
+    delete 'bin/'
+  }
+}
+
+
+

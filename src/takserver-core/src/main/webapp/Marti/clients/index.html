@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en" data-ng-app="clientDashboard" xmlns="http://www.w3.org/1999/html">
+<head>
+	<link rel="icon" type="image/x-icon" href="../favicon.ico" />
+	<meta charset="utf-8">
+	<title>Client Dashboard</title>
+	
+	<link rel="stylesheet" href="../css/bootstrap-theme.min.css" />
+	<link rel="stylesheet" href="../css/bootstrap.min.css" >
+	<link rel="stylesheet" href="css/clients.css" /> 
+	
+</head>
+
+<body data-ng-controller="ClientDashboardController">
+	<script type="text/javascript" src="../jquery/jquery-3.5.0.js"></script>
+	<div data-ng-include="'../menubar.html'"></div>
+	
+	<script type="text/javascript" src="../lib/angular/angular.min.js"></script>
+	<script type="text/javascript" src="../lib/angular/angular-animate.min.js"></script>
+	<script type="text/javascript" src="../lib/angular/angular-sanitize.min.js"></script>
+	<script type="text/javascript" src="../lib/angular/smart-table.min.js"></script>
+	<script type="text/javascript" src="../lib/angular/ng-infinite-scroll.min.js"></script>
+	<script type="text/javascript" src="js/ui-bootstrap-tpls-2.5.0.min.js"></script>
+
+	<script src="js/app.js"></script>
+	<script src="js/controllers.js"></script>
+
+	<div style="text-align: center; background-color: #FF4000;" data-ng-show="hasAdminRole && !dbIsConnected">Database Unavailable: Check Connectivity </div>
+    <div style="text-align: center; background-color: #FF4000;" data-ng-if="hasAdminRole && actualNum > maxConnections">
+PostgreSQL database configuration suggestion <a href="/Marti/database/index.html"> available.</a>
+    </div>
+	
+	<header>
+		<div style="font-size: 20px;" id="users_heading">Client Dashboard</div>
+	</header>
+
+
+	<div id="button_div">
+		<div id="add_sub_button" data-ng-controller="AddStaticSubscriptionCtrl" style="float:left;padding-right:2px" ng-show="hasAdminRole">
+			<button data-ng-click="open()" type="button" class="btn btn-primary btn-sm">Add Static Subscription</button>
+		</div>
+		<div id="change_columns_button" style="float:left">
+			<button data-ng-click="open()" type="button" class="btn btn-primary btn-sm">Column Preferences</button>
+		</div>
+	</div>
+	<div style="display: flex;">
+		<div style="margin-left: 2%">
+			Total Clients: {{numClients}}
+		</div>
+		<div style="margin-left: 2%">Clients Per Page:</div> 
+		<input style="margin-left: 0.5%" ng-model="clientsPerPage" type="number" min="1" max="200">
+		<div style="margin-left: 2%">
+			Total Pages: {{maxPage}}
+		</div>
+		<div style="margin-left: 2%">Current Page:</div> 
+		<input style="margin-left: 0.5%" ng-model="selectedPage" type="number" min="1" max="{{maxPage}}">
+	</div>
+	<div id="add_sub" data-ng-controller="AddStaticSubscriptionCtrl">
+		<script type="text/ng-template" id="subFormModal.html">
+			<div class="modal-header">
+				<h3 class="modal-title" id="form_modal-title">Add Static Subscription</h3>
+			</div>
+			<form name="addForm">
+				<div class="modal-body" id="form_modal-body">
+					UID: <input type="text" name="uid" data-ng-model="staticSub.uid" required>
+					<span style="color:red" data-ng-show="addForm.uid.$touched && addForm.uid.$invalid">
+						<span data-ng-show="addForm.uid.$error.required">UID is required</span>
+					</span>
+					<br>
+					Protocol: <input type="text" name="protocol" data-ng-model="staticSub.protocol" required>
+					<span style="color:red" data-ng-show="addForm.protocol.$touched && addForm.protocol.$invalid">
+						<span data-ng-show="addForm.protocol.$error.required">Protocol is required</span>
+					</span>
+					<br>
+					Subscriber Address: <input type="text" name="addr" data-ng-model="staticSub.subaddr" required>
+					<span style="color:red" data-ng-show="addForm.addr.$touched && addForm.addr.$invalid">
+						<span data-ng-show="addForm.addr.$error.required">Address is required</span>
+					</span>
+					<br>
+					Subscriber Port: <input type="number" name="port" data-ng-model="staticSub.subport" min="1" max="65535" required>
+					<span style="color:red" data-ng-show="addForm.port.$touched && addForm.port.$invalid">
+						<span data-ng-show="addForm.port.$error.required">Port is required</span>
+						<span data-ng-show="addForm.port.$error.min || addForm.port.$error.max">Port must be between 1 and 65535</span>
+					</span>
+					<br>
+					XPath: <input type="text" name="xpath" data-ng-model="staticSub.xpath"><br>
+					Example XPath: /event[starts-with(@uid, 'Rascal.PPLI')] <br>
+					Groups: <input type="text" name="groups" data-ng-model="staticSub.filterGroups"> <br>
+					Groups must be a comma separated list.<br>
+					Interface: <input type="text" name="iface" data-ng-model="staticSub.iface"> <br>
+					Optionally set the outbound interface for udp multicast subscriptions
+				</div>
+				<div class="modal-footer">
+					<button class="btn btn-primary" type="button" ng-click="$ctrl.submit()" data-ng-disabled="addForm.$invalid">Submit</button>
+				</div>
+			</form>
+		</script>
+	</div>
+	<div id="main">
+		<script type="text/ng-template" id="alert.html">
+			<div ng-transclude></div>
+		</script>
+		<script type="text/ng-template" id="checkboxModal.html">
+			<div class="modal-header">
+				<h3 class="modal-title" id="modal-title">Column Preferences</h3>
+			</div>
+			<div class="modal-body" id="modal-body">
+				Health: <input type="checkbox" data-ng-model="columnChecks.health"><br>
+				Callsign: <input type="checkbox" data-ng-model="columnChecks.callsign"><br>
+				Username: <input type="checkbox" data-ng-model="columnChecks.username"><br>
+				DN: <input type="checkbox" data-ng-model="columnChecks.dn"><br>
+				Groups: <input type="checkbox" data-ng-model="columnChecks.groups"><br>
+				Last Report: <input type="checkbox" data-ng-model="columnChecks.lastReportMS"><br>
+				TAK Client: <input type="checkbox" data-ng-model="columnChecks.takClient"><br>
+				Version: <input type="checkbox" data-ng-model="columnChecks.takVersion"><br>
+				Role: <input type="checkbox" data-ng-model="columnChecks.role"><br>
+				Team: <input type="checkbox" data-ng-model="columnChecks.team"><br>
+				IP Address: <input type="checkbox" data-ng-model="columnChecks.ip"><br>
+				Pending Writes: <input type="checkbox" data-ng-model="columnChecks.pendingWrites"><br>
+				Processed: <input type="checkbox" data-ng-model="columnChecks.numProcessed"><br>
+				Protocol: <input type="checkbox" data-ng-model="columnChecks.protocol"><br>
+				XPath: <input type="checkbox" data-ng-model="columnChecks.xpath"><br>
+				UID: <input type="checkbox" data-ng-model="columnChecks.uid"><br>
+				Subscription: <input type="checkbox" data-ng-model="columnChecks.subscription"><br>
+				Framerate: <input type="checkbox" data-ng-model="columnChecks.appFramerate"><br>
+				Battery: <input type="checkbox" data-ng-model="columnChecks.battery"><br>
+				Battery Status: <input type="checkbox" data-ng-model="columnChecks.batteryStatus"><br>
+				Battery Temp: <input type="checkbox" data-ng-model="columnChecks.batteryTemp"><br>
+				Rx: <input type="checkbox" data-ng-model="columnChecks.deviceDataRx"><br>
+				Tx: <input type="checkbox" data-ng-model="columnChecks.deviceDataTx"><br>
+				Heap Current: <input type="checkbox" data-ng-model="columnChecks.heapCurrentSize"><br>
+				Heap Free: <input type="checkbox" data-ng-model="columnChecks.heapFreeSize"><br>
+				Heap Max: <input type="checkbox" data-ng-model="columnChecks.heapMaxSize"><br>
+				Device IP: <input type="checkbox" data-ng-model="columnChecks.deviceIPAddress"><br>
+				Storage Available: <input type="checkbox" data-ng-model="columnChecks.storageAvailable"><br>
+				Storage Total: <input type="checkbox" data-ng-model="columnChecks.storageTotal"><br>
+				Handler Type: <input type="checkbox" data-ng-model="columnChecks.handlerType"><br>
+			</div>
+			<div class="modal-footer">
+				<button class="btn btn-primary" type="button" ng-click="$ctrl.ok()">OK</button>
+			</div>
+		</script>
+		<div uib-alert ng-repeat="alert in alerts"
+		ng-class="'alert-' + (alert.type || 'success')"
+		close="closeAlert($index)" dismiss-on-timeout="4000">{{alert.msg}}
+	</div>
+
+	<div id="content" class="content">
+		<div id="clientTable" class="content" class="listContainer" ng-cloak>
+			<table st-table="viewSubs" st-safe-src="subs" class="table table-striped">
+				<thead>
+					<tr>
+						<th data-ng-show="columnChecks.health" st-sort="lastReportMilliseconds">Health</th>
+						<th data-ng-show="columnChecks.callsign" st-sort="callsign" st-sort-default="true">Callsign</th>
+						<th data-ng-show="columnChecks.username" st-sort="username">Username</th>
+						<th data-ng-show="columnChecks.dn" st-sort="dn">DN</th>
+						<th data-ng-show="columnChecks.groups">Groups</th>
+						<th data-ng-show="columnChecks.lastReportMS" st-sort="lastReportMilliseconds">Last Report</th>
+						<th data-ng-show="columnChecks.takClient" st-sort="takClient">TAK client</th>
+						<th data-ng-show="columnChecks.takVersion" st-sort="takVersion">Version</th>
+						<!-- special getter for this to sort on client and version, not just version? -->
+						<th data-ng-show="columnChecks.role" st-sort="role">Role</th>
+						<th data-ng-show="columnChecks.team" st-sort="team">Team</th>
+						<th data-ng-show="columnChecks.ip">IP address</th>
+						<th data-ng-show="columnChecks.pendingWrites" st-sort="pendingWrites">Pending writes</th>
+						<th data-ng-show="columnChecks.numProcessed" st-sort="numProcessed">Processed</th>
+						<th data-ng-show="columnChecks.protocol" st-sort="protocol">Protocol</th>
+						<th data-ng-show="columnChecks.xpath">XPath</th>
+						<th data-ng-show="columnChecks.uid">UID</th>
+						<th data-ng-show="columnChecks.subscription">Subscription</th>
+						<th data-ng-show="columnChecks.appFramerate" st-sort="appFramerate">Framerate</th>
+						<th data-ng-show="columnChecks.battery" st-sort="battery">Battery</th>
+						<th data-ng-show="columnChecks.batteryStatus" st-sort="batteryStatus">Battery Status</th>
+						<th data-ng-show="columnChecks.batteryTemp" st-sort="batteryTemp">Battery Temp</th>
+						<th data-ng-show="columnChecks.deviceDataRx" st-sort="deviceDataRx">Rx</th>
+						<th data-ng-show="columnChecks.deviceDataTx" st-sort="deviceDataTx">Tx</th>
+						<th data-ng-show="columnChecks.heapCurrentSize" st-sort="heapCurrentSize">Heap Current</th>
+						<th data-ng-show="columnChecks.heapFreeSize" st-sort="heapFreeSize">Heap Free</th>
+						<th data-ng-show="columnChecks.heapMaxSize" st-sort="heapMaxSize">Heap Max</th>
+						<th data-ng-show="columnChecks.deviceIPAddress" st-sort="deviceIPAddress">Device IP</th>
+						<th data-ng-show="columnChecks.storageAvailable" st-sort="storageAvailable">Storage Available</th>
+						<th data-ng-show="columnChecks.storageTotal" st-sort="storageTotal">Storage Total</th>
+						<th data-ng-show="columnChecks.handlerType" st-sort="handlerType">Handler Type</th>
+					</tr>
+				</thead>
+
+				<tbody>
+					<tr ng-repeat="sub in viewSubs | limitTo:totalSubsDisplayed track by sub.subscriptionUid" ng-class="{'danger': sub.incognito} " data-ng-click="visualizeConnection(sub.subscriptionUid)">
+						<td data-ng-show="columnChecks.health"><img ng-src='{{getHealthIcon(sub.lastReportDiffMilliseconds)}}'/></td>
+						<td data-ng-show="columnChecks.callsign">{{sub.callsign}}</td>
+						<td data-ng-show="columnChecks.username">{{sub.username}}</td>
+						<td data-ng-show="columnChecks.dn">{{sub.dn}}</td>
+						<td data-ng-show="columnChecks.groups"><span ng-repeat="group in sub.groups">{{group.name}}<span
+							ng-show="group.direction === 'IN'">&larr;</span><span
+							ng-show="group.direction === 'OUT'">&rarr;</span><span
+							ng-show="!$last">,</span></span></td>
+							<td data-ng-show="columnChecks.lastReportMS">{{sub.lastReportMilliseconds | date:'yyyy-MM-dd HH:mm:ss Z'}}</td>
+							<td data-ng-show="columnChecks.takClient">{{sub.takClient}}</td>
+							<td data-ng-show="columnChecks.takVersion">{{sub.takVersion}}</td>
+							<td data-ng-show="columnChecks.role">{{sub.role}}</td>
+							<td data-ng-show="columnChecks.team">{{sub.team}}</td>
+							<td data-ng-show="columnChecks.ip">{{sub.ipAddress}}</td>
+							<td data-ng-show="columnChecks.pendingWrites">{{sub.pendingWrites}}</td>
+							<td data-ng-show="columnChecks.numProcessed">{{sub.numProcessed}}</td>
+							<td data-ng-show="columnChecks.protocol">{{sub.protocol}}</td>
+							<td data-ng-show="columnChecks.xpath">{{sub.xpath}}</td>
+							<td data-ng-show="columnChecks.uid">{{sub.clientUid}}</td>
+							<td data-ng-show="columnChecks.subscription">{{sub.subscriptionUid}}</td>
+							<td data-ng-show="columnChecks.appFramerate">{{sub.appFramerate}}</td>
+							<td data-ng-show="columnChecks.battery">{{sub.battery}}</td>
+							<td data-ng-show="columnChecks.batteryStatus">{{sub.batteryStatus}}</td>
+							<td data-ng-show="columnChecks.batteryTemp">{{sub.batteryTemp}}</td>
+							<td data-ng-show="columnChecks.deviceDataRx">{{sub.deviceDataRx}}</td>
+							<td data-ng-show="columnChecks.deviceDataTx">{{sub.deviceDataTx}}</td>
+							<td data-ng-show="columnChecks.heapCurrentSize">{{sub.heapCurrentSize}}</td>
+							<td data-ng-show="columnChecks.heapFreeSize">{{sub.heapFreeSize}}</td>
+							<td data-ng-show="columnChecks.heapMaxSize">{{sub.heapMaxSize}}</td>
+							<td data-ng-show="columnChecks.deviceIPAddress">{{sub.deviceIPAddress}}</td>
+							<td data-ng-show="columnChecks.storageAvailable">{{sub.storageAvailable}}</td>
+							<td data-ng-show="columnChecks.storageTotal">{{sub.storageTotal}}</td>
+							<td data-ng-show="columnChecks.handlerType">{{sub.handlerType}}</td>
+							<td ng-click="$event.stopPropagation();" data-ng-show="hasAdminRole" valign="center">
+								<div class="dropdown">
+									<button data-ng-show="{{sub.subscriptionUid != ''}}" ng-click="toggleMenu(sub);" class="dropbtn">&#9776</button>
+									<div class="dropdown-content" ng-attr-id="{{ sub.subscriptionUid }}">
+										<a data-ng-click="deleteSubscription(sub)">Delete</a>
+										<a data-ng-click="sub.incognito = !sub.incognito; toggleIncognito(sub)">Incognito</a>
+									</div>
+								</div>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+	<div data-ng-include="'../footer.jsp'"></div>
+</body>
+</html>

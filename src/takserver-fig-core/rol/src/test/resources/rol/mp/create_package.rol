@@ -1,0 +1,8 @@
+create package
+{ "sha256" : "7cd075a026fa2a21af8b11306abe329c9bfaf6c08b17405388bdce415f182518",
+   "senderUid" : "7cd075a026fa2a21af8b11306abe329c9bfaf6c08b17405388bdce415f182518",
+   "name" : "2014-07-28T02-00-00.0Z.kmz.zip",
+   "filename" : "2014-07-28T02-00-00.0Z.kmz.zip",
+   "senderUrl" : "https://marti:8443/Marti/sync/content?hash=7cd075a026fa2a21af8b11306abe329c9bfaf6c08b17405388bdce415f182518",
+   "sizeInBytes" : 28144,
+   "senderCallsign" : "test1" };

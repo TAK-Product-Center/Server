@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RulePack xmlns="xmlns://www.fortifysoftware.com/schema/rules">
+    <RulePackID>E7B08C26-36B4-4A36-88B3-C48BDB35208D</RulePackID>
+    <SKU>SKU-/home/user/Projects/marti/trunk/newmarti/TAKServer-rules</SKU>
+    <Name><![CDATA[/home/user/Projects/marti/trunk/newmarti/TAKServer-rules]]></Name>
+    <Version>1.0</Version>
+    <Description><![CDATA[]]></Description>
+    <Rules version="6.30">
+        <RuleDefinitions>
+            <DataflowCleanseRule formatVersion="6.30" language="java">
+                <RuleID>4ABD529C-C1EC-499C-AB75-EBBD8E564F42</RuleID>
+                <FunctionIdentifier>
+                    <NamespaceName>
+                        <Pattern>com.bbn.security.web</Pattern>
+                    </NamespaceName>
+                    <ClassName>
+                        <Pattern>MartiValidator</Pattern>
+                    </ClassName>
+                    <FunctionName>
+                        <Pattern>getValidInput</Pattern>
+                    </FunctionName>
+                    <ApplyTo implements="true" overrides="true" extends="true"/>
+                </FunctionIdentifier>
+                <OutArguments>return</OutArguments>
+            </DataflowCleanseRule>
+            <DataflowCleanseRule formatVersion="6.30" language="java">
+                <RuleID>AAE5E884-CDA3-4D10-83E7-52A99BBC8B50</RuleID>
+                <FunctionIdentifier>
+                    <NamespaceName>
+                        <Pattern>org.owasp.esapi</Pattern>
+                    </NamespaceName>
+                    <ClassName>
+                        <Pattern>Validator</Pattern>
+                    </ClassName>
+                    <FunctionName>
+                        <Pattern>isValidInput</Pattern>
+                    </FunctionName>
+                    <ApplyTo implements="true" overrides="true" extends="true"/>
+                </FunctionIdentifier>
+                <OutArguments>1</OutArguments>
+            </DataflowCleanseRule>
+            <DataflowCleanseRule formatVersion="17.10" language="java">
+                <RuleID>B67520AE-FB90-4D51-AEBE-62B82F21B48C</RuleID>
+                <TaintFlags>+VALIDATED_SQL_INJECTION</TaintFlags>
+                <FunctionIdentifier>
+                    <NamespaceName>
+                        <Pattern>com.bbn.marti</Pattern>
+                    </NamespaceName>
+                    <ClassName>
+                        <Pattern>EsapiServlet</Pattern>
+                    </ClassName>
+                    <FunctionName>
+                        <Pattern>validateParams</Pattern>
+                    </FunctionName>
+                    <ApplyTo implements="true" overrides="true" extends="true"/>
+                </FunctionIdentifier>
+                <OutArguments>return</OutArguments>
+            </DataflowCleanseRule>
+        </RuleDefinitions>
+    </Rules>
+</RulePack>

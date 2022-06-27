@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html ng-app="x">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width">
+
+
+    <base href="../"/>
+    <title>UI.Layout : Messy Demo</title>
+
+    <!-- Le css -->
+    <link href="http://getbootstrap.com/dist/css/bootstrap.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="src/ui-layout.css"/>
+    <link rel="stylesheet" type="text/css" href="demo/demo-design.css"/>
+
+
+  </head>
+  <body style="height: 100vh;">
+
+    <div ui-layout="{ flow : 'row' }">
+      <div class="jumbotron text-center" style="overflow: hidden;">
+        <h1>UI.Layout : Messy Demo</h1>
+      </div>
+      <div class="aSpace" >
+        <h1 class="text-center">UI.Layout is born !</h1>
+
+        <div class="container">
+          <div class="row">
+            <p>And your layout goes <em>Elastic</em> ! Lorem ipsum dolor sit amet, consectetur adipisicing elit. Voluptatibus cumque temporibus tempora nihil distinctio ipsum repudiandae sed voluptates fugiat pariatur consectetur possimus corporis aperiam omnis expedita nostrum soluta minus a!</p>
+
+            <h2>Bootstrap it.</h2>
+            <p>I'm putting bootstrap stuff just to try... <br> Here comes the <code>bs-docs-grid</code></p>
+            <div class="bs-docs-grid">
+              <div class="row show-grid">
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+                <div class="col-md-1">.col-md-1</div>
+              </div>
+              <div class="row show-grid">
+                <div class="col-md-8">.col-md-8</div>
+                <div class="col-md-4">.col-md-4</div>
+              </div>
+              <div class="row show-grid">
+                <div class="col-md-4">.col-md-4</div>
+                <div class="col-md-4">.col-md-4</div>
+                <div class="col-md-4">.col-md-4</div>
+              </div>
+              <div class="row show-grid">
+                <div class="col-md-6">.col-md-6</div>
+                <div class="col-md-6">.col-md-6</div>
+              </div>
+            </div>
+
+
+
+            <h2>Angular it</h2>
+            <p>I'm putting angular stuff just to try...</p>
+            <div class="row" ng-init="edit=!0">
+              <div class="col-xs-2">
+                <button type="button" class="btn pull-right btn-info" ng-click="edit=!edit">Click to edit</button></div>
+              <div class="col-xs-10">
+                <input type="text" class="form-control" ng-model="yourName" ng-hide="edit">
+              </div>
+            </div>
+            <h4 class="text-center">Hello {{yourName}}</h4>
+          </div>
+        </div>
+      </div>
+
+      <div ui-layout="{ flow : 'column' }">
+        <div class=" html-back" ></div>
+        <div ui-layout="{ flow : 'row' }">
+          <div class=" html-back" ></div>
+          <div class=" css-back" ></div>
+        </div>
+        <div class=" js-back" ></div>
+      </div>
+    </div>
+
+    <!-- Le javascript -->
+    <script type="application/javascript" src="https://ajax.googleapis.com/ajax/libs/angularjs/1.0.8/angular.min.js"></script>
+    <script type="application/javascript" src="src/ui-layout.js"></script>
+    <script type="application/javascript">
+
+angular.module('x', ['ui.layout']);
+
+    </script>
+
+
+  </body>
+</html>

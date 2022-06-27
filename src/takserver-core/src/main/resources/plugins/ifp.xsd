@@ -1,0 +1,114 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	targetNamespace="http://www.bbn.com/roger/ifp"
+	xmlns="http://www.bbn.com/roger/ifp"
+	elementFormDefault="qualified">
+	
+	<xs:annotation>
+
+  		<xs:documentation xml:lang="en">
+  			This Schema defines a ROGER Information Flow Policy. More information is contained in the corresponding Java classes: 
+  			InformationFlowPolicy, BranchAction, IFPDecisionNode, InfoFlowPolicyTask, and ServiceRequest. 
+  			An IFP has one "root" IFPDecisionNode, the startNode. The start node is the top of what can be thought of as a "decision tree". 
+  			Each IFPDecisionNode may have an expression that can be evaluated. The result of this expression should match the value of a 
+  			BranchAction that is the child of that decision node. In addition to a value, BranchActions have "pluginRequests" that 
+  			are requests for plugins to take action on the message as it traverses the branch. A BranchAction may have another node at 
+  			the end of it, continuing the tree. 
+  			
+  			For more information, please see the user's/developer's guide.
+  		</xs:documentation>
+	</xs:annotation>
+	
+	<xs:complexType name="ifptask">
+		<xs:attribute name="taskType" use="required">
+				<xs:simpleType>
+					<xs:restriction base="xs:string">
+						<xs:pattern value="goal|plugin name"/>
+					</xs:restriction>
+				</xs:simpleType>
+		</xs:attribute>
+		<xs:attribute name="value" type="xs:token" use="required"/>
+	</xs:complexType>
+	
+	<xs:complexType name="pluginRequest">
+		<xs:sequence>
+			<xs:element name="task" type="ifptask" minOccurs="1" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attribute name="operation">
+			<xs:simpleType>
+				<xs:restriction base="xs:string">
+						<xs:pattern value="and_ordered|and_unordered|or|parallel|transaction"/>
+				</xs:restriction>
+			</xs:simpleType>
+		</xs:attribute>
+	</xs:complexType>
+	
+	<xs:complexType name="branchAction">
+		<xs:sequence>
+			<xs:element name="request" type="pluginRequest" minOccurs="0" maxOccurs="unbounded"/>	
+			<xs:choice minOccurs="0">
+				<xs:element name="nextNode" type="decisionNode"/>
+				<xs:element name="nextNodeRef"  type="xs:IDREF"/>
+				<xs:element name="return">
+					<xs:complexType>
+					</xs:complexType>
+				</xs:element>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attribute name="value">
+			<xs:simpleType>
+					<xs:union memberTypes="xs:boolean xs:token xs:integer"/>
+			</xs:simpleType>
+		</xs:attribute>
+	</xs:complexType>
+	
+	<xs:complexType name="function">
+		<xs:sequence>
+			<xs:element name="request" type="pluginRequest" minOccurs="0" maxOccurs="unbounded"/>	
+			<xs:element minOccurs="0" maxOccurs="1" name="return"/>
+		</xs:sequence>
+		<xs:attribute name="value">
+			<xs:simpleType>
+					<xs:union memberTypes="xs:boolean xs:token xs:integer"/>
+			</xs:simpleType>
+		</xs:attribute>
+		<xs:attribute name="id" type="xs:ID" use="required"/>
+	</xs:complexType>
+
+	<xs:complexType name="decisionNode">
+		<xs:sequence>
+			<xs:element name="expression" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="actionRef" minOccurs="0" maxOccurs="unbounded">
+				<xs:complexType>
+					<xs:attribute name="function" type="xs:IDREF" use="required"/>
+					<xs:attribute name="value">
+						<xs:simpleType>
+							<xs:union memberTypes="xs:boolean xs:token xs:integer"/>
+						</xs:simpleType>
+					</xs:attribute>
+					<xs:attribute name="nextNodeRef" type="xs:IDREF" use="required"/>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="action" type="branchAction" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attribute name="id" type="xs:ID"/>
+		<xs:attribute name="delayExpressionEvaluation" type="xs:boolean"/>
+		<xs:attribute name="nodeType" use="required">
+				<xs:simpleType>
+					<xs:restriction base="xs:string">
+						<xs:pattern value="single_branch|boolean|string|integer"/>
+					</xs:restriction>
+				</xs:simpleType>
+		</xs:attribute>
+	</xs:complexType>
+
+	<xs:element name="ifp">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="node" type="decisionNode" minOccurs="0" maxOccurs="unbounded"/>
+				<xs:element name="function" type="function" minOccurs="0" maxOccurs="unbounded"/>
+				<xs:element name="startNode" type="decisionNode" minOccurs="1" maxOccurs="1"/>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+</xs:schema>

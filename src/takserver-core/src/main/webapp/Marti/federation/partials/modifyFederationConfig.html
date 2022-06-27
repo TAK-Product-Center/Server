@@ -1,0 +1,237 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+      background-color: #FA787E;
+  }
+  input.ng-valid.ng-touched {
+      background-color: white;
+  }
+  .rowHeader {
+      text-align:right;
+      padding-right:5px;
+      width:200px;
+      vertical-align:top;
+  }
+  .rowValue {
+      width:400px;
+      text-align:right;
+      vertical-align:top;
+  }
+  .rowValue select {
+      width:100%;
+  }
+  .rowValue input {
+      width:400px;
+  }
+  .error {
+      color:red;
+      vertical-align:top;
+  }
+  table {
+      border-collapse: separate;
+      border-spacing:10px
+  }
+  .inlineHelp {
+      font:13px arial, sans-serif;
+      font-style:italic;
+      text-align:right;
+      color:green;
+  }
+</style>
+<div>
+  <h3>Federation Configuration</h3>
+  <form name="modifyFederationConfigForm" data-ng-submit="modifyFederationConfigForm.$valid && saveFederationConfig(fedConfig)">
+    <strong>Federation Enabled:</strong>
+    <input id="isEnabled" type="checkbox" data-ng-model="fedConfig.enabled">
+    <table border="1">
+      <tr>
+        <td>
+          <table>
+            <tr>
+              <th>V1 Federation <span style="font-weight: lighter;"> Enabled: <input type="checkbox" data-ng-model="fedConfig.serverPortEnabled" data-ng-disabled="!fedConfig.enabled"></span></th>
+            </tr>
+            <tr>
+              <td>
+                <strong>
+                  Core Messaging Version 1 <input type="radio" name="coreVersion" data-ng-model="fedConfig.coreVersion" data-ng-value="'1'" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled">
+                </strong>
+                <table>
+                  <tr data-ng-repeat="v1Port in fedConfig.v1Ports">
+                    <td>Port: <input type="number" required min="1" max="65535" data-ng-model="v1Port.port" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || fedConfig.coreVersion != 1"></td>
+                    <td>TLS Version:</td>
+                    <td>
+                      <select data-ng-model="v1Port.tlsVersion" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || fedConfig.coreVersion != 1">
+                        <option value="TLSv1">TLSv1</option>
+                        <option value="TLSv1.1">TLSv1.1</option>
+                        <option value="TLSv1.2">TLSv1.2</option>
+                      </select>
+                    </td>
+                    <td data-ng-if="!($last && $first)"><button data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || fedConfig.coreVersion != 1" type="button" data-ng-click="removePort($index)">-</button></td>
+                    <td data-ng-if="$last"><button data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || fedConfig.coreVersion != 1" type="button" data-ng-click="addPort()">+</button></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <strong>
+                  Core Messaging Version 2 <br> (performance increase) <input type="radio" name="coreVersion" data-ng-model="fedConfig.coreVersion" data-ng-value="'2'" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled">
+                </strong>
+                <table>
+                  <tr>
+                    <td>Port: <input type="number" required min="1" max="65535" data-ng-model="fedConfig.serverPortv1" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || fedConfig.coreVersion != 2"></td>
+                    <td>TLS Version(s):</td>
+                    <td>TLSv1: <input data-ng-model="tls['TLSv1']" data-ng-click="handleTlsCheckbox('TLSv1')" type="checkbox" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || fedConfig.coreVersion != 2"></td>
+                    <td>TLSv1.1: <input data-ng-model="tls['TLSv1.1']" data-ng-click="handleTlsCheckbox('TLSv1.1')" type="checkbox" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || fedConfig.coreVersion != 2"></td>
+                    <td>TLSv1.2: <input data-ng-model="tls['TLSv1.2']" data-ng-click="handleTlsCheckbox('TLSv1.2')" type="checkbox" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || fedConfig.coreVersion != 2"></td>
+                    <td>TLSv1.3: <input data-ng-model="tls['TLSv1.3']" data-ng-click="handleTlsCheckbox('TLSv1.3')" type="checkbox" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || fedConfig.coreVersion != 2"></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <table>
+            <tr>
+              <td>
+                <table>
+                  <tr>
+                    <th>V2 Federation <span style="font-weight: lighter;"> Enabled: <input type="checkbox" data-ng-model="fedConfig.serverPortEnabledv2" data-ng-disabled="!fedConfig.enabled"></span></th>
+                  </tr>
+                  <tr>
+                    <td>Port:</td>
+                    <td><input type="number" required  min="1" max="65535" data-ng-model="fedConfig.serverPortv2" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
+                  </tr>
+                  <tr>
+                    <td>Allow Mission Federation:</td>
+                    <td><input type="checkbox" data-ng-model="fedConfig.allowMissionFederation" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
+                  </tr>
+                  <tr>
+                    <td>Allow Federated Delete:</td>
+                    <td><input type="checkbox" data-ng-model="fedConfig.allowFederatedDelete" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
+                  </tr>
+                  <tr>
+                    <td>Federated Group Mapping:</td>
+                    <td><input type="checkbox" data-ng-model="fedConfig.federatedGroupMapping" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
+                  </tr>
+                  <tr>
+                    <td>Automatic Group Mapping:</td>
+                    <td><input type="checkbox" data-ng-model="fedConfig.automaticGroupMapping" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
+                  </tr>
+                  <tr>
+                    <td>Enable Mission Federation Disruption Tolerance:</td>
+                    <td><input type="checkbox" data-ng-model="fedConfig.enableMissionFederationDisruptionTolerance" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled"></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr data-ng-show="fedConfig.enableMissionFederationDisruptionTolerance">
+              <td>
+                <table>
+                  <tr>
+                    <td>
+                      Unlimited:
+                    </td>
+                    <td class="tooltip2">
+                      <span class="tooltiptext">This may use a lot of bandwidth</span>
+                      <input type="checkbox" data-ng-model="unlimited">
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Send Changes Newer Than:</td>
+                    <td>
+                      <input type="number" required min="0" data-ng-model="cache_length_num" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || unlimited">
+                    </td>
+                    <td>
+                      <select data-ng-model="cache_length_type" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || unlimited">
+                        <option value="seconds">Seconds</option>
+                        <option value="hours">Hours</option>
+                        <option value="days">Days</option>
+                      </select>
+                    </td>
+                  </tr>
+                  <tr data-ng-show="mission_list.length > 0">
+                    <td colspan="3">
+                      <table>
+                        <tr><td><i>Mission Specific Settings</i></td></tr>
+                        <tr data-ng-repeat="mission_cache in mission_caches">
+                          <td>Mission: </td>
+                          <td>
+                            <select data-ng-model="mission_cache.name" data-ng-change="determineUsedMissions()" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled">
+                              <option data-ng-repeat="mission in mission_list" data-ng-disabled="used_missions[mission] && mission != mission_cache.name" data-ng-value="mission">{{mission}}</option>
+                            </select>
+                          </td>
+                          <td><input type="number" data-ng-model="mission_cache.time" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || mission_cache.unlimited"></td>
+                          <td>
+                            <select data-ng-model="mission_cache.time_type" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || mission_cache.unlimited">
+                              <option value="seconds">Seconds</option>
+                              <option value="hours">Hours</option>
+                              <option value="days">Days</option>
+                            </select>
+                          </td>
+                          <td class="tooltip2">
+                            Unlimited: <input type="checkbox" data-ng-model="mission_cache.unlimited" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled">
+                            <span class="tooltiptext">This may use a lot of bandwidth</span>
+                          </td>
+                          <td><button data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled" type="button" data-ng-click="removeMissionCache($index)">-</button></td>
+                          <td data-ng-if="$last && mission_caches.length != mission_list.length"><button data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled" type="button" data-ng-click="addMissionCache()">+</button></td>
+                        </tr>
+                      </table>
+                </table>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <table>
+            <th>Data Package and Mission File Filter</th>
+            </tr>
+            <td>Enable Data Package and Mission File Filter:  <input type="checkbox" data-ng-model="fedConfig.enableDataPackageAndMissionFileFilter" data-ng-disabled="!fedConfig.enabled"></td>
+            </tr>
+            <tr data-ng-show="fedConfig.enableDataPackageAndMissionFileFilter">
+              <td>
+                <table>
+                  <tr>
+                  <tr data-ng-show="fedConfig.enableDataPackageAndMissionFileFilter && fedConfig.fileExtension != 0 ">
+                    <td>File Extension: {{fedConfig.fileExtension[0]}}</td>
+                  </tr>
+                  <td><span>Add File Extension:&nbsp&nbsp</span><input type="text" data-ng-model="fileExtension" data-ng-disabled="!fedConfig.enabled">
+                      <button type="button" class="btn btn-secondary" data-ng-click="addFileExtension(fileExtension)" >Add</button>
+                      <span class="inlineHelp">&ensp;The default extension is .pref.</span></td>
+                  </tr>
+                </table>
+                <p><i>Enter the extension of the file type to block in federated data packages and missions. </i></p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <table>
+            <tr>
+              <th>Federation Security Config</th>
+            </tr>
+            <tr>
+              <td>Federation Truststore Path:</td>
+              <td><input id="truststorePath" type="text" data-ng-model="fedConfig.truststorePath" data-ng-disabled="!fedConfig.enabled"></td>
+            </tr>
+            <tr>
+              <td>Federation Truststore Password:</td>
+              <td><input id="truststorePass" type="password" data-ng-model="fedConfig.truststorePass" data-ng-disabled="!fedConfig.enabled" autocomplete="off"></td>
+            </tr>
+            <tr>
+              <td>Web Base URL:</td>
+              <td><input id="webBaseUrl" type="text" data-ng-model="fedConfig.webBaseURL" data-ng-disabled="!fedConfig.enabled"><br/><span class="inlineHelp">*Required for sending mission packages over V2. (https://&lt;host&gt;:&lt;port&gt;/Marti) </span></td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    <input type="submit" class="btn btn-primary" value="Save"/>
+    <p><strong>Note:</strong>Any changes to configuration v1 will not take effect until server restart.</p>
+  </form>
+</div>

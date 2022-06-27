@@ -1,0 +1,112 @@
+<div class="container-fluid">
+  <div>
+    <button ng-click="viewRetentionPolicies()" class="btn btn-secondary">View Retention Configuration</button>
+  </div>
+
+  <h2>Mission Archive Configuration</h2>
+
+  <div class="container-fluid">
+    <div>
+        <input type="checkbox" data-ng-model="archiveMissionByNoContentActivity"> Archive Missions By Content Activity
+        <br><br>
+        <input type="checkbox" data-ng-model="archiveMissionByNoSubscriptionActivity"> Archive Missions By Subscription Activity
+        <br><br>
+        <input type="number" data-ng-model="archiveAfterNoActivityDays" min="0.001"> Number of days to archive the mission after no activity
+        <br><br>
+        <input type="number" data-ng-model="removeFromArchiveAfterDays" min="0.001"> Number of days to remove an archived mission from the archive
+        <br><br>
+        <button type="button" class="btn btn-primary" data-ng-click=saveArchiveSettings()>Save Archive Settings</button>
+        <br><br>
+    </div>
+
+    <small>How often do we run the policy?</small>
+    <div>
+      <span>{{cron_english}}</span>
+    </div>
+    <div>
+      <span>
+        Every:
+        <select data-ng-model="freq">
+          <option value="hour">Hour</option>
+          <option value="day">Day</option>
+          <option value="week">Week</option>
+          <option value="month">Month</option>
+          <option value="disabled">Never</option>
+        </select>
+      </span>
+      <span data-ng-show="freq === 'month'">
+        on day:
+        <select data-ng-model="split_cron.day">
+          <option data-ng-repeat="x in [].constructor(31) track by $index" data-ng-value='$index + 1'>{{$index + 1}}</option>
+        </select>
+      </span>
+      <span data-ng-show="freq === 'week'">
+        on:
+        <select data-ng-model="split_cron.day_of_week">
+          <option data-ng-repeat="dow in days_of_week" data-ng-value='$index'>{{dow}}</option>
+        </select>
+      </span>
+      <span data-ng-show="['month', 'week', 'day'].indexOf(freq) >= 0">
+        at:
+        <select data-ng-model="split_cron.hour">
+          <option data-ng-repeat="x in [].constructor(24) track by $index" data-ng-value='$index'>{{$index}}</option>
+        </select>
+        :
+        <select data-ng-model="split_cron.minute">
+          <option data-ng-repeat="x in [].constructor(60) track by $index" data-ng-value='$index'>{{("0" + $index).slice(-2)}}</option>
+        </select>
+      </span>
+      <span data-ng-show="freq === 'hour'">
+        at:
+        <select data-ng-model="split_cron.minute">
+          <option data-ng-repeat="x in [].constructor(60) track by $index" data-ng-value='$index'>{{("0" + $index).slice(-2)}}</option>
+        </select>
+        past the hour.
+      </span>
+      <br><br>
+      <button type="button" class="btn btn-primary" data-ng-click=saveCron()>Save Cron and Archive Settings</button>
+    </div>
+  </div>
+
+  <br><hr>
+
+  <h2>Mission Archive Entry</h2>
+
+  <div id="content" class="content">
+    <div id="clientTable" class="content" class="listContainer" ng-cloak>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <td> <input ng-model="missions.queryMissionName" type="text" class="form-control" placeholder="Filter by Name">
+            </td>
+            <td><input ng-model="missions.queryArchiveTime" type="text" class="form-control" placeholder="Filter by Archive Time">
+            </td>
+            <td><input ng-model="missions.queryCreateTime" type="text" class="form-control" placeholder="Filter by Create Time">
+            </td>
+          </tr>
+          <tr>
+            <td>Mission Name
+            </td>
+            <td>Archive Time
+            </td>
+            <td>Creation Time
+            </td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="missonArchiveStoreEntry in missions.missonArchiveStoreEntries | filter:missionFilter">
+            <td>{{missonArchiveStoreEntry.missionName}}
+            </td>
+            <td>{{missonArchiveStoreEntry.archiveTime}}
+            </td>
+            <td>{{missonArchiveStoreEntry.createTime}}
+            </td>
+            <td>
+              <button class="btn-danger" data-ng-click="restoreMission(missonArchiveStoreEntry)">Restore</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

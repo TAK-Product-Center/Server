@@ -1,0 +1,32 @@
+<div>
+    <div>
+        <h4>Do you want to set up a secure configuration?</h4>
+        <button data-ng-click="showSecureConfig()" type="button" class="btn btn-success btn-sm">
+            Yes (recommended)
+        </button>
+        <a ui-sref="security.viewSec" class="btn btn-danger btn-sm" ng-disabled="showSecureInput">No</a>
+    </div>
+    <div data-ng-show="showSecureInput">
+        <h5>To set up a secure configuration, you should only have inputs and connectors that require tls.</h5>
+        <div>
+            <strong>Set up a secure input for TAK clients to connect:</strong><br>
+            <strong>Name:</strong> stdssl &nbsp;
+            <strong>Port:</strong> 8089 &nbsp;
+            <strong>Protocol:</strong> tls <br>
+        </div>
+        <button data-ng-click="setSecureInput()" class="btn btn-primary btn-sm" onclick="this.disabled=true">
+            Configure Secure Input
+        </button>
+        <div data-ng-show="unsafeHttpConnectors">
+            <p style="background-color: #ecd2d1; width: fit-content;">
+                You have unsafe http connectors on the following ports: {{unsafeHttpConnectors}}. <br>
+                In order to remove these, you will have to delete them from the CoreConfig.xml and restart the server.
+            </p>
+        </div>
+        <br>
+        <a ui-sref="security.viewSec" class="btn btn-primary btn-sm" onclick="this.style.display='none'">Next</a>
+    </div>
+    <div ui-view="security_config"></div>
+    <div ui-view="security_auth"></div>
+    <br>
+</div>

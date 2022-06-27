@@ -1,0 +1,1 @@
+alter table client_endpoint_event add column groups bit varying;

@@ -1,0 +1,15 @@
+
+.martiHeading {
+     font-variant: small-caps;
+     font-size: 30px;
+     font-family:Arial;
+     text-align:center;
+}
+
+.martiHeading hr {
+	display: block;
+  	border-style: inset;
+  	border-width: 1px;
+}
+
+

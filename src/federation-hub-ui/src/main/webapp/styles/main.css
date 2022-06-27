@@ -1,0 +1,281 @@
+.panel-title {
+	word-wrap: break-word;
+	display: inline-block;
+	word-break: break-all;
+    white-space: normal;
+}
+
+
+.load-workflow-modal-window {
+  width: 600px;
+}
+
+.new-workflow-modal-window {
+  width: 600px;
+}
+
+/* smart table row selection color */
+table.table tbody tr.st-selected {
+  /*border-left:4px solid black;*/
+  background-color: #73D3E3;
+}
+
+.element .element-tools {
+/*	display: none; */
+	cursor: pointer
+}
+
+.element:hover .element-tools {
+	display: inline;
+}
+
+.browsehappy {
+  margin: 0.2em 0;
+  background: #ccc;
+  color: #000;
+  padding: 0.2em 0;
+}
+
+body {
+  padding: 0;
+}
+
+/* Everything but the jumbotron gets side spacing for mobile first views */
+.header,
+.marketing,
+.footer {
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+/* Custom page header */
+.header {
+  border-bottom: 1px solid #e5e5e5;
+  margin-bottom: 10px;
+}
+/* Make the masthead heading the same height as the navigation */
+.header h3 {
+  margin-top: 0;
+  margin-bottom: 0;
+  line-height: 40px;
+  padding-bottom: 19px;
+}
+
+/* Custom page footer */
+.footer {
+  padding-top: 19px;
+  color: #777;
+  border-top: 1px solid #e5e5e5;
+}
+
+.container-narrow > hr {
+  margin: 30px 0;
+}
+
+/* Main marketing message and sign up button */
+.jumbotron {
+  text-align: center;
+  border-bottom: 1px solid #e5e5e5;
+}
+.jumbotron .btn {
+  font-size: 21px;
+  padding: 14px 24px;
+}
+
+/* Supporting marketing content */
+.marketing {
+  margin: 40px 0;
+}
+.marketing p + h4 {
+  margin-top: 28px;
+}
+
+/* Responsive: Portrait tablets and up */
+@media screen and (min-width: 768px) {
+  .container {
+    max-width: 730px;
+  }
+
+  /* Remove the padding we set earlier */
+  .header,
+  .marketing,
+  .footer {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  /* Space out the masthead */
+  .header {
+    margin-bottom: 30px;
+  }
+  /* Remove the bottom border on the jumbotron for visual effect */
+  .jumbotron {
+    border-bottom: 0;
+  }
+}
+
+.top-buffer { margin-top:20px; }
+
+/*Lifecycle Events*/
+.rounded-corners-block {
+	border-radius: 12px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  font-size: 22px;
+  padding: 8px;
+  color: white;
+}
+
+.command-row  {
+	display: flex;
+	white-space: nowrap;
+	margin-top: 20px;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+ .gantt-task-content {
+	 color: white;
+ }
+
+/* bootstrap tree */
+
+/* .btn {
+    margin-right: 8px;
+} */
+
+.angular-ui-tree-handle {
+    background: #f8faff;
+    border: 1px solid #dae2ea;
+    color: #7c9eb2;
+    padding: 10px 10px;
+}
+
+.angular-ui-tree-handle:hover {
+    color: #438eb9;
+    background: #f4f6f7;
+    border-color: #dce2e8;
+}
+
+.angular-ui-tree-placeholder {
+    background: #f0f9ff;
+    border: 2px dashed #bed2db;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+tr.angular-ui-tree-empty {
+    height:100px
+}
+
+.group-title {
+    background-color: #687074 !important;
+    color: #FFF !important;
+}
+
+.silver {
+    color: #C0C0C0;
+}
+
+.smallheading {
+	font-size: 18px;
+}
+
+
+/* --- Tree --- */
+.tree-node {
+    border: 1px solid #dae2ea;
+    background: #f8faff;
+    color: #7c9eb2;
+}
+
+.nodrop {
+    background-color: #f2dede;
+}
+
+.tree-node-content {
+    margin: 10px;
+}
+
+.tree-handle {
+    padding: 10px;
+    background: #428bca;
+    color: #FFF;
+    margin-right: 10px;
+}
+
+.angular-ui-tree-handle:hover {
+}
+
+.angular-ui-tree-placeholder {
+    background: #f0f9ff;
+    border: 2px dashed #bed2db;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+.blue {
+	color: #0000A0;
+}
+
+.darkgreen {
+	color: #347235;
+}
+
+.left {
+	float: left;
+}
+
+.right {
+	float: right;
+}
+
+/* glyphicon size */
+.gi-1_5x {
+	font-size: 1.5em;
+}
+
+.gi-2x {
+	font-size: 2em;
+}
+
+.gi-3x {
+	font-size: 3em;
+}
+
+.gi-4x{
+	font-size: 4em;
+}
+
+.gi-5x{
+	font-size: 5em;
+}
+
+.server-status {
+	position: absolute;
+  top: 36px;
+  left: 28px;
+	color: #23527c;
+  background: #e6e6e6;
+  border-radius: 5px;
+  padding: 3px;
+}
+.gantt-current-date-line{
+	border-width: 2px;
+	border-style: solid;
+	border-color: green;
+}
+
+.modal-xl {
+    width: 80%;
+}
+.modal-xxl {
+    width: 95%;
+}
+
+.angular-ui-tree-empty {
+    background-color: white;
+    color: white;
+}

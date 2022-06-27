@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="tomcat-bin"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/WebApps"/>
+	<classpathentry kind="con" path="org.eclipse.jst.server.core.container/org.eclipse.jst.server.tomcat.runtimeTarget/Apache Tomcat v7.0"/>
+	<classpathentry kind="lib" path="lib/junit-4.12.jar"/>
+	<classpathentry kind="lib" path="lib/httpclient-4.3.3.jar"/>
+	<classpathentry kind="lib" path="lib/httpclient-cache-4.3.3.jar"/>
+	<classpathentry kind="lib" path="lib/httpcore-4.3.2.jar"/>
+	<classpathentry kind="lib" path="lib/jcot-event-1.0.3.jar"/>
+	<classpathentry kind="lib" path="/martiRouter/lib/dom4j-1.6.1.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/martiRouter"/>
+	<classpathentry kind="lib" path="lib/jcommander-1.48-SNAPSHOT.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

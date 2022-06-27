@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# /etc/rc.d/init.d/federation-hub-init
+#
+# (c)2015-2021 Raytheon BBN. Licensed to US Government with unlimited rights.
+#
+# The Federation Hub is an optional companion to the Team Awareness Kit (TAK) server.
+# It allows for the federation of TAK data across the administrative and trust
+# boundaries of different networks participating in a TAK deployment. It can be run
+# with or without a co-located TAK server.
+#
+# This script starts the federation-hub-broker, federation-hub-policy, and
+# federation-hub-ui services.
+
+
+# chkconfig: 345 20 40
+# description: Federation Hub for Team Awareness Kit (TAK)
+
+# Source function library
+. /etc/rc.d/init.d/functions
+
+SERVICE="Federation Hub"
+FEDERATION_HUB_HOME=/opt/tak/federation-hub
+
+case "$1" in
+     start)
+        echo -n "Starting $SERVICE: "
+		    service federation-hub-policy start
+		    service federation-hub-broker start
+		    service federation-hub-ui start
+        touch "/var/lock/subsys/$SERVICE"
+    ;;
+    stop)
+        echo -n "Shutting down $SERVICE: "
+		    service federation-hub-ui stop
+		    service federation-hub-broker stop
+		    service federation-hub-policy stop
+	      rm -f "/var/lock/subsys/$SERVICE"
+	      echo "done."
+    ;;
+    status)
+        RETVAL=0
+        PID=`pgrep -f "federation-hub-broker"`
+        if [ $? -eq 0 ] ; then
+            echo "federation-hub-broker is running with pid ${PID}"
+        else
+            echo "federation-hub-broker is not running."
+            RETVAL=1
+        fi
+
+        PID=`pgrep -f "federation-hub-policy"`
+        if [ $? -eq 0 ] ; then
+            echo "federation-hub-policy is running with pid ${PID}"
+        else
+            echo "federation-hub-policy is not running."
+            RETVAL=1
+        fi
+
+        PID=`pgrep -f "federation-hub-ui"`
+        if [ $? -eq 0 ] ; then
+            echo "federation-hub-ui is running with pid ${PID}"
+        else
+            echo "federation-hub-ui is not running."
+            RETVAL=1
+        fi
+
+        exit $RETVAL
+    ;;
+    restart)
+          $0 stop;
+          $0 start;
+    ;;
+    reload)
+          $0 stop;
+          $0 start;
+    ;;
+    *)
+       echo "Usage: $0 {start|stop|status|restart}"
+       exit 1
+    ;;
+esac
+
+exit 0

@@ -1,0 +1,269 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Federation Editor</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width">
+
+
+    <!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
+    <!-- build:css(.tmp,..) styles/vendor.css -->
+    <!-- bower:css -->
+    <link rel="stylesheet" href="bowerDependencies/bootstrap/dist/css/bootstrap.css" />
+    <link rel="stylesheet" href="bowerDependencies/ag-grid/dist/ag-grid.css" />
+    <link rel="stylesheet" href="bowerDependencies/ag-grid/dist/theme-fresh.css" />
+    <link rel="stylesheet" href="bowerDependencies/ag-grid/dist/theme-blue.css" />
+    <link rel="stylesheet" href="bowerDependencies/ag-grid/dist/theme-dark.css" />
+    <link rel="stylesheet" href="bowerDependencies/angular-ui-layout/src/ui-layout.css" />
+    <link rel="stylesheet" href="bowerDependencies/angular-ui-select/dist/select.css" />
+    <link rel="stylesheet" href="bowerDependencies/json-formatter/dist/json-formatter.css" />
+    <link rel="stylesheet" href="bowerDependencies/datatables/media/css/jquery.dataTables.css" />
+    <link rel="stylesheet" href="bowerDependencies/metisMenu/dist/metisMenu.css" />
+    <link rel="stylesheet" href="bowerDependencies/morrisjs/morris.css" />
+    <link rel="stylesheet" href="bowerDependencies/datatables-responsive/css/dataTables.responsive.css" />
+    <link rel="stylesheet" href="bowerDependencies/bootstrap-social/bootstrap-social.css" />
+    <link rel="stylesheet" href="bowerDependencies/startbootstrap-sb-admin-2/dist/css/sb-admin-2.css" />
+    <link rel="stylesheet" href="bowerDependencies/startbootstrap-sb-admin-2/dist/css/sb-admin-2.min.css" />
+    <link rel="stylesheet" href="bowerDependencies/angular-growl-v2/angular-growl.css" />
+    <link rel="stylesheet" href="bowerDependencies/angular-tree-control/css/tree-control.css" />
+    <link rel="stylesheet" href="bowerDependencies/angular-ui-tree/dist/angular-ui-tree.css" />
+    <link rel="stylesheet" href="bowerDependencies/angular-gantt/assets/angular-gantt.css" />
+    <link rel="stylesheet" href="bowerDependencies/angular-gantt/assets/angular-gantt-plugins.css" />
+    <link rel="stylesheet" href="bowerDependencies/components-font-awesome/css/font-awesome.css" />
+    <!-- endbower -->
+    <!-- endbuild -->
+    <!-- build:css(.tmp) styles/main.css -->
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/dashboard.css">
+    <link rel="stylesheet" href="styles/rappid.css" />
+    <link rel="stylesheet" href="styles/bpmn.css" />
+    <link rel="stylesheet" href="styles/queryBuilder.css">
+    <!-- endbuild -->
+
+</head>
+<body ng-app="fed" data-ng-controller="ApplicationController" >
+
+<nav class="navbar navbar-default navbar-fixed-top">
+    <div class="container-fluid">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <div ncy-breadcrumb></div>
+        </div>
+        <ul class="nav navbar-top-links navbar-right">
+            <!--<li class="dropdown">-->
+                <!--<a class="dropdown-toggle" data-toggle="dropdown" title="Commander Dashboard" ui-sref="commander-dashboard.editor">-->
+                    <!--<i class="fa fa-tachometer fa-fw"></i>-->
+                <!--</a>-->
+            <!--</li>-->
+            <!-- /.dropdown -->
+            <!--<li class="dropdown">-->
+            <!--<a class="dropdown-toggle" data-toggle="dropdown" title="Diagrams">-->
+            <!--<i class="fa fa-file-o fa-fw"></i>-->
+            <!--<i class="fa fa-caret-down"></i>-->
+            <!--</a>-->
+            <!--<ul class="dropdown-menu dropdown-user">-->
+            <!--<li class="dropdown-header">Diagrams</li>-->
+            <!--<li><a ui-sref="diagrams-new">New</a></li>-->
+            <!--<li><a ui-sref="diagrams-load">Load</a></li>-->
+            <!--<li><a ui-sref="manage.diagrams">Manage</a></li>-->
+            <!--</ul> &lt;!&ndash; /.dropdown-template &ndash;&gt;-->
+            <!--</li>-->
+            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
+
+            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
+            <!--<li class="dropdown">-->
+            <!--<a class="dropdown-toggle" data-toggle="dropdown" title="Instances">-->
+            <!--<i class="fa fa-line-chart fa-fw"></i>-->
+            <!--<i class="fa fa-caret-down"></i>-->
+            <!--</a>-->
+            <!--<ul class="dropdown-menu dropdown-user">-->
+            <!--<li class="dropdown-header">Instances</li>-->
+            <!--<li><a ui-sref="instances-new">New</a></li>-->
+            <!--<li><a ui-sref="instances-load">Load</a></li>-->
+            <!--<li><a ui-sref="manage.instances">Manage</a></li>-->
+            <!--</ul> &lt;!&ndash; /.dropdown-instances &ndash;&gt;-->
+            <!--</li>-->
+            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
+
+            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
+            <!--<li class="dropdown">-->
+            <!--<a class="dropdown-toggle" data-toggle="dropdown" title="Role/Product Sets">-->
+            <!--<i class="fa fa-tree fa-fw"></i>-->
+            <!--<i class="fa fa-caret-down"></i>-->
+            <!--</a>-->
+            <!--<ul class="dropdown-menu dropdown-user">-->
+            <!--<li class="dropdown-header">Role/Product Sets</li>-->
+            <!--<li><a ui-sref="role-product-set-new">New</a>-->
+            <!--<li><a ui-sref="role-product-set-load">Load</a>-->
+            <!--<li><a ui-sref="manage.role-sets">Manage</a>-->
+            <!--</ul> &lt;!&ndash; /.dropdown-instances &ndash;&gt;-->
+            <!--</li>-->
+            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
+
+
+            <!-- /.dropdown -->
+            <!--
+                            <li class="dropdown">
+                                <a class="dropdown-toggle" data-toggle="dropdown" title="Monitor">
+                                    <i class="fa fa-line-chart fa-fw"></i>
+                                    <i class="fa fa-caret-down"></i>
+                                </a>
+                                <ul class="dropdown-menu dropdown-user">
+                                    <li class="dropdown-header">Monitor</li>
+                                    <li><a ui-sref="monitor">Coming Soon</a></li>
+                                </ul>
+                            </li>
+            -->
+            <!-- /.dropdown -->
+
+            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
+            <!--<li class="dropdown">-->
+            <!--<a class="dropdown-toggle" data-toggle="dropdown" title="Manage">-->
+            <!--<i class="fa fa-cogs fa-fw"></i>-->
+            <!--<i class="fa fa-caret-down"></i>-->
+            <!--</a>-->
+            <!--<ul class="dropdown-menu dropdown-user">-->
+            <!--<li class="dropdown-header">Manage</li>-->
+            <!--<li><a ui-sref="manage.assets">Assets</a></li>-->
+            <!--<li><a ui-sref="manage.defaults">Defaults</a></li>-->
+            <!--</ul> &lt;!&ndash; /.dropdown-instance &ndash;&gt;-->
+            <!--</li>-->
+            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
+
+            <!-- /.dropdown -->
+            <li class="dropdown">
+                <a class="dropdown-toggle" data-toggle="dropdown" title="Information">
+                    <i class="fa fa-info fa-fw"></i>
+                    <i class="fa fa-caret-down"></i>
+                </a>
+                <ul class="dropdown-menu dropdown-user">
+                    <!--<li><a ui-sref="config">Config</a></li>-->
+                    <!--<li><a ui-sref="about">About</a></li>-->
+                    <li><a ui-sref="help">Help</a></li>
+                </ul> <!-- /.dropdown-info -->
+            </li>
+            <!-- /.dropdown -->
+
+        </ul>
+    </div>
+</nav>
+
+<!-- The main page content is populated here from the state router defined in app.js -->
+<div class="row container-fluid">
+    <div class="col-md-12">
+        <div growl></div>
+        <div ui-view></div>
+    </div>
+</div>
+
+<!-- build:js(.tmp,..) scripts/vendor.js -->
+<!-- bower:js -->
+<script src="bowerDependencies/jquery/dist/jquery.js"></script>
+<script src="bowerDependencies/angular/angular.js"></script>
+<script src="bowerDependencies/bootstrap/dist/js/bootstrap.js"></script>
+<script src="bowerDependencies/angular-animate/angular-animate.js"></script>
+<script src="bowerDependencies/angular-cookies/angular-cookies.js"></script>
+<script src="bowerDependencies/angular-resource/angular-resource.js"></script>
+<script src="bowerDependencies/angular-route/angular-route.js"></script>
+<script src="bowerDependencies/angular-sanitize/angular-sanitize.js"></script>
+<script src="bowerDependencies/angular-touch/angular-touch.js"></script>
+<script src="bowerDependencies/angular-ui-router/release/angular-ui-router.js"></script>
+<script src="bowerDependencies/ag-grid/dist/ag-grid.js"></script>
+<script src="bowerDependencies/angular-bootstrap/ui-bootstrap-tpls.js"></script>
+<script src="bowerDependencies/angular-smart-table/dist/smart-table.js"></script>
+<script src="bowerDependencies/angular-messages/angular-messages.js"></script>
+<script src="bowerDependencies/angular-ui-layout/src/ui-layout.js"></script>
+<script src="bowerDependencies/angular-ui-select/dist/select.js"></script>
+<script src="bowerDependencies/blob-polyfill/Blob.js"></script>
+<script src="bowerDependencies/file-saver.js/FileSaver.js"></script>
+<script src="bowerDependencies/angular-file-saver/dist/angular-file-saver.bundle.js"></script>
+<script src="bowerDependencies/json-formatter/dist/json-formatter.js"></script>
+<script src="bowerDependencies/datatables/media/js/jquery.dataTables.js"></script>
+<script src="bowerDependencies/flot/jquery.flot.js"></script>
+<script src="bowerDependencies/holderjs/holder.js"></script>
+<script src="bowerDependencies/metisMenu/dist/metisMenu.js"></script>
+<script src="bowerDependencies/eve-raphael/eve.js"></script>
+<script src="bowerDependencies/raphael/raphael.min.js"></script>
+<script src="bowerDependencies/mocha/mocha.js"></script>
+<script src="bowerDependencies/morrisjs/morris.js"></script>
+<script src="bowerDependencies/datatables-responsive/js/dataTables.responsive.js"></script>
+<script src="bowerDependencies/flot.tooltip/js/jquery.flot.tooltip.js"></script>
+<script src="bowerDependencies/startbootstrap-sb-admin-2/dist/js/sb-admin-2.js"></script>
+<script src="bowerDependencies/startbootstrap-sb-admin-2/dist/js/sb-admin-2.min.js"></script>
+<script src="bowerDependencies/angular-breadcrumb/release/angular-breadcrumb.js"></script>
+<script src="bowerDependencies/angular-growl-v2/angular-growl.js"></script>
+<script src="bowerDependencies/ng-file-upload/ng-file-upload.js"></script>
+<script src="bowerDependencies/underscore/underscore.js"></script>
+<script src="bowerDependencies/backbone/backbone.js"></script>
+<script src="bowerDependencies/lodash/lodash.js"></script>
+<script src="bowerDependencies/angular-uuid4/angular-uuid4.js"></script>
+<script src="bowerDependencies/angular-tree-control/angular-tree-control.js"></script>
+<script src="bowerDependencies/ngstorage/ngStorage.js"></script>
+<script src="bowerDependencies/bootstrap-ui-datetime-picker/dist/datetime-picker.min.js"></script>
+<script src="bowerDependencies/moment/moment.js"></script>
+<script src="bowerDependencies/angular-ui-tree/dist/angular-ui-tree.js"></script>
+<script src="bowerDependencies/spin.js/spin.js"></script>
+<script src="bowerDependencies/angular-spinner/angular-spinner.js"></script>
+<script src="bowerDependencies/bootbox.js/bootbox.js"></script>
+<script src="bowerDependencies/angular-moment/angular-moment.js"></script>
+<script src="bowerDependencies/angular-gantt/assets/angular-gantt.js"></script>
+<script src="bowerDependencies/angular-gantt/assets/angular-gantt-plugins.js"></script>
+<script src="bowerDependencies/jsPlumb/dist/js/jsPlumb-2.1.8.js"></script>
+<!-- endbower -->
+<!-- endbuild -->
+
+<!-- build:js({.tmp,src/webapp}) scripts/scripts.js -->
+<script src="scripts/app.js"></script>
+<script src="modules/core/core_module.js"></script>
+<script src="modules/core/application_controller.js"></script>
+<script src="modules/config/config_module.js"></script>
+<script src="modules/config/config_service.js"></script>
+<script src="modules/config/config_controller.js"></script>
+<script src="modules/authentication/auth_module.js"></script>
+<script src="modules/authentication/auth_controller.js"></script>
+<script src="modules/authentication/auth_services.js"></script>
+<script src="modules/authentication/session_services.js"></script>
+<script src="modules/manage/manage_module.js"></script>
+<script src="modules/manage/manage_controller.js"></script>
+<script src="modules/logout/logout_module.js"></script>
+<script src="modules/logout/logout_controller.js"></script>
+<script src="modules/workflows/workflows_module.js"></script>
+<script src="modules/workflows/workflow_services.js"></script>
+<script src="modules/workflows/asset_services.js"></script>
+<script src="modules/workflows/defaults_services.js"></script>
+<script src="modules/workflows/semantics_service.js"></script>
+<script src="modules/workflows/workflow_critic.js"></script>
+<script src="modules/workflows/workflows_controller.js"></script>
+<script src="modules/workflows/workflows_factory.js"></script>
+<script src="modules/workflows/joint_paper_factory.js"></script>
+<script src="modules/workflows/display_tc_controller.js"></script>
+<script src="modules/workflows/add_bpmn_federate_controller.js"></script>
+<script src="modules/workflows/add_federate_group_controller.js"></script>
+<script src="modules/workflows/add_bpmn_federate_policy_controller.js"></script>
+<script src="modules/workflows/add_ontology_element_controller.js"></script>
+<script src="modules/workflows/new_workflow_controller.js"></script>
+<script src="modules/workflows/load_workflow_controller.js"></script>
+<script src="modules/workflows/add_bpmn_subprocess_controller.js"></script>
+<script src="modules/workflows/add_bpmn_transition_controller.js"></script>
+<script src="modules/workflows/edit_attributes_controller.js"></script>
+<script src="modules/workflows/select_asset_controller.js"></script>
+<script src="modules/workflows/lifecycle_command_controller.js"></script>
+<script src="modules/workflows/attribute_expression_editor_controller.js"></script>
+<script src="modules/workflows/add_policy_filter_controller.js"></script>
+<script src="modules/ontology/ontology_service.js"></script>
+<script src="modules/commander-dashboard/commander_dashboard_module.js"></script>
+<script src="modules/commander-dashboard/commander_dashboard_controller.js"></script>
+<script src="lib/queryBuilder/querybuilder.js"></script>
+<!-- endbuild -->
+<script src="lib/require.js"></script>
+<script src="lib/rappid/inspector.js"></script>
+<script src="lib/rappid/rappid.min.js"></script>
+
+</body>
+</html>

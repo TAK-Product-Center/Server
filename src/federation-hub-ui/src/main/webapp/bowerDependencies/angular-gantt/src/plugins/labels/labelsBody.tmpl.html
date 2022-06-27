@@ -1,0 +1,12 @@
+<div class="gantt-labels-body" ng-style="getLabelsCss()">
+    <div gantt-vertical-scroll-receiver>
+        <div ng-repeat="row in gantt.rowsManager.visibleRows track by row.model.id">
+            <div gantt-row-label
+                 class="gantt-row-label gantt-row-height"
+                 ng-class="row.model.classes"
+                 ng-style="{'height': row.model.height}">
+                <span class="gantt-label-text">{{row.model.name}}</span>
+            </div>
+        </div>
+    </div>
+</div>

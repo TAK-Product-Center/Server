@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ngDraggable</title>
+    <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootswatch/2.3.1/spruce/bootstrap.min.css">
+    <style>
+
+        * {
+            -moz-box-sizing: border-box;
+            -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+        }
+
+        [ng-drag] {
+            -moz-user-select: -moz-none;
+            -khtml-user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        [ng-drag] {
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 0, 0, 0.5);
+            color: white;
+            text-align: center;
+            padding-top: 40px;
+            display: block;
+            cursor: move;
+        }
+
+        [ng-drag].one {
+            background: rgba(255, 0, 0, 0.5);
+        }
+
+        [ng-drag].two {
+            background: rgba(0, 255, 0, 0.5);
+        }
+
+        [ng-drag].three {
+            background: rgba(0, 0, 255, 0.5);
+        }
+
+        [ng-drag].drag-over {
+            border: solid 1px red;
+        }
+
+        [ng-drag].dragging {
+            opacity: 0.5;
+        }
+
+        [ng-drop] {
+            background: rgba(0, 0, 0, 0.25);
+            text-align: center;
+            display: block;
+            position: relative;
+            padding: 20px;
+            width: 140px;
+            height: 140px;
+            float: left;
+        }
+
+        [ng-drop].drag-enter {
+            border: solid 5px red;
+        }
+
+        [ng-drop] span.title {
+            display: block;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 200px;
+            height: 20px;
+            margin-left: -100px;
+            margin-top: -10px;
+        }
+
+        [ng-drop] div {
+            position: relative;
+            z-index: 2;
+        }
+
+        .draglist {
+            display: inline-block;
+            margin: 0 auto;
+        }
+
+
+    </style>
+</head>
+<body ng-app="ExampleApp">
+
+
+<div class="row  text-center">
+    <h1>ngDraggable Ordering Example</h1>
+</div>
+<hr/>
+
+<div class="row text-center" ng-controller="MainCtrl">
+    <ul class="draglist">
+        <li ng-repeat="obj in draggableObjects" ng-drop="true" ng-drop-success="onDropComplete($index, $data,$event)">
+            <div ng-drag="true" ng-drag-data="obj" ng-class="obj.name">
+                {{obj.name}}
+            </div>
+        </li>
+    </ul>
+</div>
+
+<hr/>
+
+<script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.8/angular.min.js"></script>
+<script src="ngDraggable.js"></script>
+<script>
+    angular.module('ExampleApp', ['ngDraggable']).
+            controller('MainCtrl', function ($scope) {
+                $scope.draggableObjects = [
+                    {name: 'one'},
+                    {name: 'two'},
+                    {name: 'three'}
+                ];
+                $scope.onDropComplete = function (index, obj, evt) {
+                    var otherObj = $scope.draggableObjects[index];
+                    var otherIndex = $scope.draggableObjects.indexOf(obj);
+                    $scope.draggableObjects[index] = obj;
+                    $scope.draggableObjects[otherIndex] = otherObj;
+                }
+            });
+</script>
+</body>
+</html>

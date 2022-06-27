@@ -1,0 +1,173 @@
+TAK Server Cluster Quickstart
+
+---- Requirements ----
+AWS:
+AWS access
+Elastic container repository
+Route 53 DNS with hosted zone
+KOPS S3 state store
+
+Software installed on workstation:
+kubernetes
+kops
+docker
+java 11
+
+
+---- Create kubernetes cluster using KOPS ----
+** set up environment and refresh docker repository token
+export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id) && export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key) && export NAME=tyr.takdata.net && export KOPS_STATE_STORE=s3://tyr-takdata-net && export EDITOR=emacs && $(aws ecr get-login --no-include-email)
+
+** create cluster configuration
+kops create cluster --zones us-east-1e --node-size=m4.xlarge ${NAME} --node-count=24
+
+** optional: edit to change number of nodes or other options
+kops edit ig --name=${NAME} nodes
+
+** provision the cluster in AWS - will take a while
+kops update cluster --name ${NAME} --yes
+
+** Keep an eye on Route53 in console, make sure placeholder IP 203.0.113.123 is no longer present for cluster machines
+
+** build takserver-ca docker container image (is this the right directory to source the docker files?)
+cd docker/build && docker build -f ../../Dockerfile.takserver-ca -t 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:ca .
+
+** <build and run local takserver-core-provisioned image, using docker> - only do once
+<steps TBD>
+
+** Check cluster status
+kops validate cluster
+
+** Check node status
+kubectl get nodes --show-labels
+
+
+----- Create or update TAK server cluster -----
+** set up environment and refresh docker repository token (using AWS ECS)
+export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id) && export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key) && export NAME=tyr.takdata.net && export KOPS_STATE_STORE=s3://tyr-takdata-net && export EDITOR=emacs && $(aws ecr get-login --no-include-email)
+
+** build CA image (do once, or if there are code changes)
+cd ~/takserver/repo/takserver/src/takserver-core && ../gradlew buildDockerCA
+
+** build postgres / postgis base image and takserver-db container image (do once, or if there are code changes)
+cd ~/takserver/repo/takserver/src/takserver-schemamanager && docker build -f Dockerfile.postgres10_postgis24 -t tak/postgres10_postgis24:latest . && ../gradlew clean shadowJar buildDocker && cd build/docker && docker build -t 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:database . && docker push 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server
+
+** Set up namesapce and service account for Apache ignite (distributed cache cluster) (do once)
+cd ~/takserver/repo/takserver/utils/cluster
+kubectl create -f ignite-namespace.yaml
+kubectl create -f ignite-service-account.yaml
+kubectl create -f ignite-account-role.yaml
+kubectl create -f ignite-role-binding.yaml
+
+** Install NATS Operator and NATS Streaming Operator (distributed message queue) (do once)
+kubectl apply -f nats_ignite/00-prereqs.yaml 
+kubectl apply -f nats_ignite/10-deployment.yaml
+kubectl apply -f nats_ignite/default-rbac.yaml
+kubectl apply -f nats_ignite/deployment.yaml
+
+** delete database (if needed)
+kubectl delete service takserver-database && kubectl delete deployment takserver-database
+
+** deploy database (if not already deployed)
+kubectl run takserver-database --image=317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:database --port=5432 --image-pull-policy Always && kubectl expose deployment takserver-database --type=NodePort
+
+** delete service and deployment (will fail if the deployment does not exist yet)
+kubectl delete service takserver-core && kubectl delete deployment takserver-core
+
+** delete ignite deployments (if exists)
+cd ~/takserver/repo/takserver/utils/cluster
+kubectl config set-context $(kubectl config current-context) --namespace=ignite && kubectl delete service ignite && kubectl delete deployment ignite-cluster
+
+** delete NATS deployment (if exists)
+kubectl delete natsstreamingcluster takserver-nats-streaming && kubectl delete natscluster takserver-nats
+
+** Deploy ignite 
+kubectl create -f ignite-service.yaml && kubectl create -f ignite-deployment.yaml
+
+** Deploy NATS 
+echo '
+---
+apiVersion: "nats.io/v1alpha2"
+kind: "NatsCluster"
+metadata:
+  name: "takserver-nats"
+spec:
+  size: 3
+' | kubectl apply -f - 
+
+* wait for NATS pods to start *
+kubectl get pods
+
+echo '
+---
+apiVersion: "streaming.nats.io/v1alpha1"
+kind: "NatsStreamingCluster"
+metadata:
+  name: "takserver-nats-streaming"
+spec:
+  size: 3
+  natsSvc: "takserver-nats"
+' | kubectl apply -f - 
+
+** check if NATS and ignite are up
+kubectl get pods
+
+or
+
+kubectl get natsclusters
+kubectl get natsstreamingclusters
+kubectl get services
+kubectl get deployments
+etc.
+
+** build tak server, build takserver-core docker container image, build provisioned core takserver image (including certs and truststore), deploy takserver-core
+cd ~/takserver/repo/takserver/src/takserver-core && ../gradlew clean bootWar buildDocker && cd build/docker && docker build -t 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:core-base . && cd ~/takserver/repo/takserver/utils/cluster && docker build -f Dockerfile.takserver-core-provisioned -t 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:core-provisioned . && docker push 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server && kubectl create -f takserver-core-service-and-deployment.yml
+
+** optional: create DNS entry for network load balancer, manual step in console
+service.tyr.takdata.net
+
+** wait for load balancer to be ready. This is usually the slowest step in the process. Watch EC2 console, load balancer section for this.
+
+** optional: tail logs
+kubectl get pods
+kubectl logs -f <pod_id>
+
+
+--- Useful Commands ---
+** Get server logs
+kubectl get pods
+kubectl logs <pod_name>
+
+** Tail server logs
+kubectl logs -f <pod_name>
+
+** Get service details
+kubectl describe service takserver-core
+
+** Get shell in running container
+kubectl get pods
+kubectl exec -it <pod-name> -- /bin/bash
+
+** Send test traffic (1000 test clients)
+for i in {1..1000}; do while true; do cat ~/sa_anon1; sleep 5; done | openssl s_client -host service.tyr.takdata.net -port 8089 -cert user_no_pass.pem > /dev/null & sleep 0.1; done
+
+** Set current kubernetes namespace to default
+kubectl config set-context $(kubectl config current-context) --namespace=default
+
+** get all NATS instances
+kubectl get natsclusters
+kubectl get natsstreamingclusters
+
+** delete cluster
+kops delete cluster --name ${NAME} --yes
+
+** Scale number of pods up or down
+kubectl scale --replicas=<num_pods> deployment.apps/takserver-core
+
+** Destroy all pods (scale to 0) but keep everything else running (load balancer, etc)
+kubectl scale --replicas=0 deployment.apps/takserver-core
+
+** clean up docker images and containers 
+docker system prune
+
+

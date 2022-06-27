@@ -1,0 +1,4 @@
+create subscription {"type" : "SPARQL",
+       		     "filter" : "SELECT  ?io WHERE { ?producer <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ...",
+		     "name" : "mySemanticSubcription"};
+remove subscription {"name" : "mySemanticSubscription"};

@@ -1,0 +1,79 @@
+
+
+connection:
+  host: "3.236.246.198"
+  tls: 8089
+  https: 8443
+  udp: 8087
+
+authentication:
+  cert: "./certs/my_cert.p12"
+  password: "atakatak" # if no password, use empty string
+
+
+PyTAK:
+  self_sa_delta: 1 # seconds
+  offset: 1.0 # time between starting clients
+  clients: 800
+
+  websocket_path: "takproto/1"
+
+  missions:
+    random: False
+    subscribe:
+      - mission_1
+      - mission_3
+    send_mission_cot: True
+    send_mission_cot_probability: 0.5
+    send_only_new_tracks: False
+    mission_write_interval: 20 # seconds
+    react_to_change_message: True
+    download_mission_content: 0.2 # percent of clients that download file (from 0 -> 1)
+    download_existing_content: False
+    uploads:
+      probability: 0.15
+      size: 1000000 # 1mb
+      interval: 1200 # in seconds (20 min)
+
+  # missions:
+  #   random: True
+  #   subscribe: 2
+  #   send_mission_cot: True
+  #   mission_write_interval: 2 # seconds
+  #   react_to_change_message: True
+
+
+UDPTest:
+  interval: 0.1 # seconds
+  clients: 100
+
+
+
+Missions:
+  creatorUid: PyTAK-0
+  group: __ANON__
+
+  size_files:
+     - 1mb.txt:
+         1000000
+     - 5mb.txt:
+         5000000
+
+  missions:
+    - mission_1:
+        files:
+          - 1mb.txt
+          - 5mb.txt
+
+    - mission_2:
+        keywords:
+          - cool
+
+        description: "A cool mission!"
+
+    - mission_3:
+        files:
+          - 1mb.txt
+
+    - mission_4:
+

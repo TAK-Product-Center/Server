@@ -1,0 +1,26 @@
+<style>
+    .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+</style>
+
+<div id="deviceProfilesView">
+    <div id="deviceProfilesListContainer" class="content" class="listContainer" >
+
+        <div data-ng-show="!showRmiError">
+            <h3><a href="/Marti/profiles/index.html">Device Profile Manager</a>&nbsp;/&nbsp;{{profileName}}</h3>
+        </div>
+
+        <div>
+            <a class="nav" data-ng-click="toggle();" href>Select All</a>&nbsp;
+            <h4>Send to</h4>
+            <ul style="list-style-type:none;padding-left: 0;">
+                <li ng-repeat="clientEndPoint in clientEndPoints">
+                    <input type="checkbox"
+                           ng-model="clientEndPoint.checked"> {{clientEndPoint.callsign}}
+                </li>
+            </ul>
+        </div>
+
+        <button ng-click="sendProfile()">Send</button>
+
+    </div>
+</div>

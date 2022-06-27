@@ -1,0 +1,20 @@
+module takserver-policy 1.0;
+
+require {
+        type lastlog_t;
+        type init_t;
+        type su_exec_t;
+        class file { execute execute_no_trans getattr lock map open read write };
+        class passwd rootok;
+}
+
+#============= init_t ==============
+allow init_t lastlog_t:file lock;
+allow init_t lastlog_t:file { open read write };
+allow init_t self:passwd rootok;
+allow init_t su_exec_t:file open;
+allow init_t su_exec_t:file map;
+allow init_t su_exec_t:file execute_no_trans;
+allow init_t su_exec_t:file read;
+allow init_t su_exec_t:file execute;
+

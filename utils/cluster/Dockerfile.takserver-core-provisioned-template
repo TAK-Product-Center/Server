@@ -1,0 +1,9 @@
+#FROM tak/server-core-base:latest
+FROM <AWS_ECR_URI>:core-base
+COPY target/truststore-root.jks certs/files/
+COPY target/fed-truststore.jks certs/files/
+COPY target/takserver.jks certs/files/
+COPY target/ca.crl certs/files/
+COPY target/admin.pem .
+CMD ["sh", "start.sh"]
+

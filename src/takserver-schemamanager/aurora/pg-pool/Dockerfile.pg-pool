@@ -1,0 +1,19 @@
+FROM openjdk:11-jdk-stretch
+ARG URL_WRITER
+ARG URL_READER
+ARG DB_USER
+ARG DB_PASS
+RUN mkdir -p /var/run/pgpool
+RUN apt update && \
+	apt-get install -y emacs-nox net-tools netcat vim pgpool2
+COPY pgpool.conf /etc/pgpool2/pgpool.conf
+COPY pool_hba.conf /etc/pgpool2/pool_hba.conf
+RUN pg_md5 -m -u $DB_USER $DB_PASS
+RUN sed -i "/backend_hostname0/c\backend_hostname0 = $URL_WRITER" /etc/pgpool2/pgpool.conf
+RUN sed -i "/backend_hostname1/c\backend_hostname1 = $URL_READER" /etc/pgpool2/pgpool.conf
+RUN sed -i "/health_check_user/c\health_check_user = $DB_USER" /etc/pgpool2/pgpool.conf
+RUN sed -i "/health_check_password/c\health_check_password = $DB_PASS" /etc/pgpool2/pgpool.conf
+RUN sed -i "/sr_check_user/c\sr_check_user = $DB_USER" /etc/pgpool2/pgpool.conf
+RUN sed -i "/sr_check_password/c\sr_check_password = $DB_PASS" /etc/pgpool2/pgpool.conf
+ENTRYPOINT ["/bin/bash", "-c", "pgpool -n -f /etc/pgpool2/pgpool.conf"]
+

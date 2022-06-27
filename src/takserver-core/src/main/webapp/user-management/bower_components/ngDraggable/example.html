@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ngDraggable</title>
+  <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootswatch/2.3.1/spruce/bootstrap.min.css">
+  <style>
+
+    *{
+        -moz-box-sizing: border-box; -webkit-box-sizing: border-box; box-sizing: border-box;
+    }
+    [ng-drag]{
+        -moz-user-select: -moz-none;
+        -khtml-user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+    [ng-drag]{
+        width: 100px;
+        height: 100px;
+        background: rgba(255,0,0, 0.5);
+        color:white;
+        text-align: center;
+        padding-top:40px;
+        display: inline-block;
+        margin:0 10px;
+        cursor: move;
+    }
+    ul.draggable-objects:after{
+        display: block;
+        content:"";
+        clear:both;
+    }
+    .draggable-objects li{
+        float:left;
+        display: block;
+        width: 120px;
+        height:100px;
+    }
+    [ng-drag].drag-over{
+        border:solid 1px red;
+    }
+    [ng-drag].dragging{
+        opacity: 0.5;
+    }
+    [ng-drop]{
+        background: rgba(0,255,0, 0.5);
+        text-align: center;
+        width: 600px;
+        height: 200px;
+        padding-top:90px;
+        display: block;
+        margin:20px auto;
+        position: relative;
+    }
+    [ng-drop].drag-enter{
+        border:solid 5px red;
+    }
+    [ng-drop] span.title{
+        display: block;
+        position: absolute;
+        top:50%;
+        left:50%;
+        width: 200px;
+        height: 20px;
+        margin-left: -100px;
+        margin-top: -10px;
+    }
+    [ng-drop] div{
+        position: relative;
+        z-index: 2;
+    }
+
+  </style>
+</head>
+<body ng-app="ExampleApp">
+
+  <div class="container" ng-controller="MainCtrl">
+
+    <div class="row">
+      <h1>ngDraggable Example</h1>
+    </div>
+
+        <ul class="draggable-objects">
+            <li  ng-repeat="obj in draggableObjects" >
+                <div ng-drag="true" ng-drag-data="obj" data-allow-transform="true"> {{obj.name}} </div>
+            </li>
+        </ul>
+
+      <hr/>
+      <div ng-drop="true" ng-drop-success="onDropComplete1($data,$event)">
+          <span class="title">Drop area #1</span>
+
+          <div ng-repeat="obj in droppedObjects1" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess1($data,$event)" ng-center-anchor="{{centerAnchor}}">
+              {{obj.name}}
+          </div>
+
+      </div>
+
+      <div ng-drop="true" ng-drop-success="onDropComplete2($data,$event)">
+          <span class="title">Drop area #2</span>
+
+          <div ng-repeat="obj in droppedObjects2" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess2($data,$event)" ng-center-anchor="{{centerAnchor}}">
+              {{obj.name}}
+          </div>
+
+      </div>
+
+    <hr>
+
+
+
+  </div>
+  <footer style="margin-top:2000px;">footer</footer>
+
+  <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.8/angular.min.js"></script>
+  <script src="ngDraggable.js"></script>
+  <script>
+    angular.module('ExampleApp', ['ngDraggable']).
+      controller('MainCtrl', function ($scope) {
+        $scope.centerAnchor = true;
+        $scope.toggleCenterAnchor = function () {$scope.centerAnchor = !$scope.centerAnchor}
+        $scope.draggableObjects = [{name:'one'}, {name:'two'}, {name:'three'}];
+        $scope.droppedObjects1 = [];
+        $scope.droppedObjects2= [];
+        $scope.onDropComplete1=function(data,evt){
+            var index = $scope.droppedObjects1.indexOf(data);
+            if (index == -1)
+            $scope.droppedObjects1.push(data);
+        }
+        $scope.onDragSuccess1=function(data,evt){
+            console.log("133","$scope","onDragSuccess1", "", evt);
+            var index = $scope.droppedObjects1.indexOf(data);
+            if (index > -1) {
+                $scope.droppedObjects1.splice(index, 1);
+            }
+        }
+        $scope.onDragSuccess2=function(data,evt){
+            var index = $scope.droppedObjects2.indexOf(data);
+            if (index > -1) {
+                $scope.droppedObjects2.splice(index, 1);
+            }
+        }
+        $scope.onDropComplete2=function(data,evt){
+            var index = $scope.droppedObjects2.indexOf(data);
+            if (index == -1) {
+                $scope.droppedObjects2.push(data);
+            }
+        }
+        var inArray = function(array, obj) {
+            var index = array.indexOf(obj);
+        }
+      });
+  </script>
+</body>
+</html>

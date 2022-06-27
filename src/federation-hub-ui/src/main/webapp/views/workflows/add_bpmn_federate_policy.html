@@ -1,0 +1,82 @@
+<div class="modal-header">
+  <div style="clear: both">
+    <h3 class="modal-title" style="float: left">{{editorTitle}} Federate Policy</h3>
+    <h4 ng-if="editExisting" style="float: right">{{roger_federation.name}}</h4>
+  </div>
+</div>
+
+<div class="modal-body" data-ng-init="initialize()">
+
+  <script type="text/ng-template" id="nodes_renderer.html">
+    <div style="display:inline-block" ui-tree-handle class="tree-node tree-node-content">
+      <a class="btn btn-success btn-xs" ng-if="node.nodes && node.nodes.length > 0" data-nodrag ng-click="toggle(this)"><span
+              class="glyphicon"
+              ng-class="{
+              'glyphicon-chevron-right': collapsed,
+              'glyphicon-chevron-down': !collapsed
+            }"></span></a>
+      <a class="btn btn-danger btn-xs" data-nodrag ng-click="remove(this)"><span class="glyphicon glyphicon-remove"></span></a>
+      <span ng-show="node.type === 'filter'"><a class="btn btn-primary btn-xs" data-nodrag style="margin-right: 8px;"><span class="glyphicon glyphicon-plus text-muted"></span></a></span>
+      <span ng-show="node.type === 'and'"><a class="btn btn-primary btn-xs" data-nodrag ng-click="newSubItem(this)" style="margin-right: 8px;"><large><span class="glyphicon glyphicon-plus"></span></large></a></span>
+      <span ng-show="node.type === 'or'"><a class="btn btn-primary btn-xs" data-nodrag ng-click="newSubItem(this)" style="margin-right: 8px;"><large><span class="glyphicon glyphicon-plus"></span></large></a></span>
+
+
+      <div class="btn-group" uib-tooltip="select type: boolean operation or attribute">
+        <label data-nodrag class="btn btn-primary" ng-model="node.type" uib-btn-radio="'filter'">Filter</label>
+        <label data-nodrag class="btn btn-success" ng-model="node.type" uib-btn-radio="'and'">AND</label>
+        <label data-nodrag class="btn btn-success" ng-model="node.type" uib-btn-radio="'or'">OR</label>
+      </div>
+
+
+
+      <div ng-show="node.type === 'filter'" style="margin-top:10px">
+        <select class="form-control" ng-model="node.filter" ng-options="o.name for o in filters track by o.name"></select>
+
+        <label>Filter Name: {{ node.filter.name }}</label>
+        <li ng-repeat="arg in node.filter.args">
+          <label style="width:70px">Type: {{arg.name}} ({{ arg.type }})</label>
+          <input ng-show="isArgumentEditable(arg)" style="width:190px" type="text" ng-model="arg.value"
+                 placeholder="Value"
+                 tooltip-placement="top"
+                 tooltip-trigger="mouseenter"
+                 tooltip-enable="!node.value"
+                 data-nodrag />
+        </li>
+
+        <p>Filter Description:  {{ node.filter.description }}</p>
+      </div>
+
+      <ol ng-show="node.type !== 'filter'" ui-tree-nodes="" ng-model="node.nodes" ng-class="{hidden: collapsed}">
+        <div ng-repeat="node in node.nodes"><li ui-tree-node ng-include="'nodes_renderer.html'"></div></li>
+      </ol>
+    </div>
+  </script>
+
+
+  <form name="federatePolicyForm">
+    <div class="form-group">
+      <label for="name">Name</label>
+      <input type="text" name="name" class="form-control" ng-model="roger_federation.name" ng-class="{ 'has-error': roger_federation.name.$touched && roger_federation.name.$invalid }" required/>
+      <p ng-show="roger_federation.name.$error.required">A Policy name is required.</p>
+    </div>
+
+    <div class="row form-group">
+      <label class="col-sm-3">Filters</label>
+      <div>
+        <div ui-tree data-drag-enabled="false" id="tree-root">
+          <ol ui-tree-nodes ng-model="roger_federation.edgeFilters">
+            <!--<a class="btn btn-primary btn-xs" data-nodrag style="margin-right: 8px;"><span class="glyphicon glyphicon-plus text-muted"></span></a>-->
+            <a class="btn btn-primary btn-xs" data-nodrag ng-click="newTopNode()" style="margin-right: 8px;"><large><span class="glyphicon glyphicon-plus"></span></large></a>
+            <li ng-repeat="node in roger_federation.edgeFilters" ui-tree-node ng-include="'nodes_renderer.html'"></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-primary" type="button" ng-click="submit()" ng-disabled="!federatePolicyForm.$valid">OK</button>
+      <!-- Commenting out until we support this. <button class="btn btn-primary" type="button" ng-click="newFilter()">New Filter</button> -->
+      <button class="btn btn-primary" type="button" ng-click="cancel()">Cancel</button>
+    </div>
+  </form>
+</div>

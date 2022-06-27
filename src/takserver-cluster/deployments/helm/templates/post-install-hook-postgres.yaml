@@ -1,0 +1,58 @@
+{{ if .Values.postgresql.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ .Release.Name }}"
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/version: 0.0.1
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+  annotations:
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+
+spec:
+  template:
+    metadata:
+      name: "{{ .Release.Name }}"
+      labels:
+        app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+      annotations:
+        "proxy.istio.io/config": '{ "holdApplicationUntilProxyStarts": true }'
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: check-db-ready
+          image: postgres:11.12-alpine
+          command: ['sh', '-c',
+              'until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT;
+                do echo waiting for database; sleep 5; done;']
+          env:
+          - name: POSTGRES_DB
+            value: {{ .Values.postgresql.postgresqlDatabase }}
+          - name: POSTGRES_USER
+            value: {{ .Values.global.postgresql.postgresqlUsername }}
+          - name: POSTGRES_PASSWORD
+            value: {{ .Values.global.postgresql.postgresqlPassword }}
+          - name: POSTGRES_HOST
+            value: takserver-postgresql
+          - name: POSTGRES_PORT
+            value: "5432"
+      containers:
+      - name: post-install-job
+        image: "{{ .Values.takserver.takserverDatabaseSetup.image.repository }}:{{ .Values.takserver.takserverDatabaseSetup.image.tag }}"
+        env:
+          - name: 'region'
+            value: 'placeholder'
+          - name: 'identifier'
+            value: 'identifier'
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+{{- end }}

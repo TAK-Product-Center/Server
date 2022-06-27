@@ -1,0 +1,24 @@
+<style>
+    .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+
+    pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+</style>
+
+
+<div id="viewTokenView">
+    <div id="TokenContainer" class="content" >
+
+        <div data-ng-show="!showRmiError">
+            <pre style="font-family:courier;">{{ parsedToken }}</pre>
+        </div>
+
+        <div data-ng-show="!showRmiError">
+            <pre style="font-family:courier;">{{ token }}</pre>
+        </div>
+
+        <input type="button" data-ng-click="backToTokens()" value="Back To Tokens" />&nbsp;
+    </div>
+</div>

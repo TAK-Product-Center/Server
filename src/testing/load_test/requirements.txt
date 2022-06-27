@@ -1,0 +1,8 @@
+lxml==4.2.5
+protobuf==3.11.3
+pyOpenSSL==19.1.0
+PyYAML==5.1
+requests==2.19.1
+urllib3==1.23
+websockets
+pyzmq~=19.0.2

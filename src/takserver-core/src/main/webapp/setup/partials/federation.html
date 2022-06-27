@@ -1,0 +1,55 @@
+<div>
+    <h2>Federation</h2>
+    <p>Federation lets TAK clients from different TAK servers communicate more easily<p>
+    <h4>Do you want to enable Federation for this server? The server will start automatically on saving these settings if enabled.</h4>
+    <button data-ng-click="enableFederation(true)" id="enableFed" class="btn btn-primary btn-sm">
+        Yes
+    </button>
+    <button data-ng-click="enableFederation(false)" id="disableFed" class="btn btn-danger btn-sm">
+        No
+    </button>
+    <br>
+
+    <div ng-show="fedConfig.enabled">
+        <h4>Do you want to enable Federation for connecting with legacy TAK servers (v1.3.10 and earlier)?</h4>
+        <span>Enabling federation v1 will require a restart to take effect.</span>
+        <button data-ng-click="enableV1Federation()" id="enableV1" class="btn btn-primary btn-sm">Yes</button>
+        <button data-ng-click="skipV1Federation()" id="skipV1" class="btn btn-default btn-sm">No</button>
+    </div>
+
+    <div ng-show="showTrust && fedConfig.enabled">
+        <strong>Fed Truststore:</strong>
+        <input type="text" data-ng-model="fedConfig.truststorePath" ng-disabled="configVerified" style="width: 500px"/><br>
+        <p style="background-color: #ecd2d1; width: fit-content;" ng-hide="configVerified">
+            This truststore is not valid.<br>
+            If you have not yet set up a truststore, please follow the instructions in Appendix B of the Configuration Guide.<br>
+            If you have already done this, make sure that the path is pointing at the correct federation truststore.
+        </p>
+        <p style="background-color: #c4f5c3; width: fit-content;">
+            This truststore is valid. It is not necessary to change the path.
+        </p>
+        <button class="btn btn-warning btn-sm" data-ng-click="configVerified=false">Edit Trustore Path</button>
+        <button class="btn btn-default btn-sm" data-ng-click="skipTrust()">Next</button>
+    </div>
+
+    <div ng-show="showAdvanced && fedConfig.enabled">
+        <h4>Make sure the Web Base url is correct</h4>
+        <span>The address needs to be an ip or hostname for this TAK server, and the port must the https port used for the web interface.</span>
+        <br>
+        <strong>Address:</strong><input type="text" data-ng-model="webUrlAddress"/><br>
+        <strong>Port:</strong><input type="number" min="1" max="65535" data-ng-model="webUrlPort"/><br>
+    </div>
+
+    <div ng-show="showSave && fedConfig.enabled">
+        <button data-ng-click="saveFederationConfig()" class="btn btn-primary btn-sm" ng-disabled="configFinished">Save Federation Config</button>
+        <span>Federation will automatically start when you save these settings if you have it enabled.</span>
+        </br>
+        <span ng-show="fedConfig.serverPortEnabled">Federation v1 will still require you to restart the server in order to operate.</span>
+    </div>
+
+    <br>
+    <div ng-show="configFinished">
+        <h6>Finished Configuration!</h6>
+        <a href="/Marti/index.html" class="btn btn-default btn-lg">TAK Home</a>
+    </div>
+</div>

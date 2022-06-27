@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://bbn.com/marti/takcl/config/common"
+           xmlns="http://bbn.com/marti/takcl/config/common"
+           elementFormDefault="qualified">
+
+  <xs:element name="TemporaryDirectory" type="xs:string"/>
+  <xs:element name="FallbackTemporaryDirectory" type="xs:string"/>
+
+  <xs:element name="RunnableTAKServerConfig">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>TAKCL TAK server configuration</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="modelServerDir" type="xs:string" use="required"/>
+      <xs:attribute name="jarName" type="xs:string" use="required"/>
+      <xs:attribute name="configFile" type="xs:string" default="CoreConfig.xml"/>
+      <xs:attribute name="userFile" type="xs:string" default="UserAuthenticationFile.xml"/>
+      <xs:attribute name="cleanConfigFile" type="xs:string" default="CoreConfig.example.xml"/>
+      <xs:attribute name="serverFarmDir" type="xs:string" use="required"/>
+      <xs:attribute name="certificateDirectory" type="xs:string" use="required"/>
+      <xs:attribute name="certToolDirectory" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:simpleType name="TakclRunMode">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="REMOTE_SERVER_INTERACTION"/>
+      <xs:enumeration value="LOCAL_SERVER_INTERACTION"/>
+      <xs:enumeration value="LOCAL_SOURCE_INTERACTION"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="authType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="file"/>
+      <xs:enumeration value="anonymous"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="Protocol">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="tcp"/>
+      <xs:enumeration value="stcp"/>
+      <xs:enumeration value="udp"/>
+      <xs:enumeration value="ssl"/>
+      <xs:enumeration value="tls"/>
+      <xs:enumeration value="mcast"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:element name="input">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Network Input Mechanisms</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element name="filtergroup" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+      </xs:sequence>
+      <xs:attribute name="auth" type="authType" default="anonymous"/>
+      <xs:attribute name="_name" type="xs:string" use="required"/>
+      <xs:attribute name="protocol" type="Protocol" use="required"/>
+      <xs:attribute name="port" type="xs:int" use="required"/>
+      <xs:attribute name="group" type="xs:string" use="optional"/>
+      <xs:attribute name="iface" type="xs:string" use="optional"/>
+      <xs:attribute name="anongroup" type="xs:boolean" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="ConnectableTAKServerConfig">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>A TAKServer managed by the user and not the TAKA instance</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element ref="input" minOccurs="0" maxOccurs="unbounded"/>
+      </xs:sequence>
+      <xs:attribute name="url" type="xs:string" use="required"/>
+      <xs:attribute name="truststoreJKSFilepath" type="xs:string" use="optional"/>
+      <xs:attribute name="truststorePass" type="xs:string" use="optional"/>
+      <xs:attribute name="clientKeystoreP12Filepath" type="xs:string" use="optional"/>
+      <xs:attribute name="clientKeystorePass" type="xs:string" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="TAKCLTestSourceGenerationConfig">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Configuration options for generating test data templates</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="javaSrcDir" type="xs:string" use="required"/>
+      <xs:attribute name="javaTemplatePackage" type="xs:string" use="required"/>
+      <xs:attribute name="javaGenerationPackage" type="xs:string" use="required"/>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

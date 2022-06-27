@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+import "takmessage.proto";
+
+package atakmap.commoncommo.protobuf.v1;
+
+// Container for TakMessage and metadata, such as groups
+message Message {
+    TakMessage payload = 1;
+
+    string source = 2;    
+
+    repeated string groups = 3;
+
+    string clientId = 4;
+}
+

@@ -1,0 +1,3 @@
+assign role "SafetyInspector" for CONSUMER
+constraint max 1
+(match attribute dn : "CN=HomerJay, OU=DEV, O=AFRL, ST=NY, C=US") or (match attribute planet : "earth");

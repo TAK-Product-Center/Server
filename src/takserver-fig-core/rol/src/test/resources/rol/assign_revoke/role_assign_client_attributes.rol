@@ -1,0 +1,1 @@
+assign role "http://ontology.ihmc.us/Military/MilitaryActor.owl#JTAC" constraint max 1 match attribute prime.idm.client.ipaddress : "il";

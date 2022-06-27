@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- $Id: CoT_shape.xsd,v 1.10 2009/03/27 18:25:28 jmathews Exp $ 
+ Copyright (c) 2005-2007. The MITRE Corporation.  All rights reserved.
+ Approved for Public Release; Distribution Unlimited.
+ MITRE Case #11-3904 (CoT_shape.xsd)
+ MITRE Case #06-0357 (superseded)
+ 
+- - - - - - - - - - - - -
+ Version History
+- - - - - - - - - - - - -
+  - 0.5: 27 Jan 2009
+    1. Deleted xs:any from sequence under polyline element because it had violated XML Schema
+       Unique Particle Attribution clause.
+  - 0.4: 16 Jan 2007
+    1. Deleted xs:any from sequence under shape element because it had violated XML Schema
+       Unique Particle Attribution clause. See http://en.wikipedia.org/wiki/Unique_Particle_Attribution
+  - 0.3: 14 Mar 2006
+    1. The extrude attribute was changed to optional.
+  - 0.2: 15 Dec 2005
+    1. version attribute definition modified
+      a) Changed data type to xs:decimal
+      b) Deleted 'fixed' facet
+  - 0.1: Initial version
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:kml="http://earth.google.com/kml/2.1" elementFormDefault="qualified" attributeFormDefault="unqualified" xsi:schemaLocation="http://www.w3.org/2001/XMLSchema http://www.w3.org/2001/XMLSchema.xsd">
+  <xs:import namespace="http://earth.google.com/kml/2.1" schemaLocation="kml21.xsd"/>
+ 
+	<xs:simpleType name="nonNegativeDecimal">
+		<xs:restriction base="xs:decimal">
+			<xs:minInclusive value="0"/>
+		</xs:restriction>
+		<!-- Defined as global type for DoD XML Gallery manifest reference than any other reason -->
+	</xs:simpleType>
+	<xs:element name="shape">
+		<xs:annotation>
+			<xs:documentation>This is a Cursor On Target sub-schema for a generic shape description.  Many objects are not adequately represented by the simple "point" object in the CoT base schema.  However, it is counterproductive to burden all CoT applications to understand arbitrary shapes, so "shape" is an optional attribute that can be used to communicate between shape-aware apprications.  The "point" object in the base schema must still be populated and the CE and LE fields in the point entity must be set such that the point completely encloses the area described in any shape entity in the detail section.  (This is needed so that CoT applications can quickly filter out objects that are clearly outside an area of interest.</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="link">
+					<xs:annotation>
+					<xs:documentation>This is a Cursor On Target sub-schema for linking to either another CoT event or an arbitrary Internet resource. The objective of this schema is to provide an abstract way to express a relationship between a CoT object and other object.  This allows, for example, a sensor point of interest to be linked back to its source, or a PPLI from a wingman to be associated with his flight lead.  Linkages are always unidirectional.  One entity may have multiple links (i.e., it may be related to multipls other entities).  For processing simplicity, it is required that the relationship graphs will directed and acyclic (no cycles).  The link, itself, names the relationship (using a hierarchy similiar to the CoT type), the UID of the related object (whether CoT or not), possibly provides a URL for retrieving that object.</xs:documentation>
+					</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+			  			<xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+						<!-- <xs:element name="style" type="kml:StyleType" minOccurs="0" maxOccurs="unbounded" />-->
+					</xs:sequence>
+					<xs:attribute name="relation" type="xs:string" use="required">
+					<xs:annotation>
+						<xs:documentation>The type of relationship (e.g, subject, object, indirect object) that this link describes.  This is a hierarchy much like the event type field.</xs:documentation>
+					</xs:annotation>
+					</xs:attribute>
+				<xs:attribute name="uid" type="xs:string" use="required">
+					<xs:annotation>
+					<xs:documentation>This is the CoT UID of the related object. If the linked object is not a CoT event, a CoT UID that represents that object is used.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="type" type="xs:string" use="required">
+				<xs:annotation>
+					<xs:documentation>The CoT type of the referenced object.  This is included because it is generally the key item needed in a tasking.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="url" type="xs:string" use="optional">
+				<xs:annotation>
+					<xs:documentation>If present, this is a URL through which the linked object can be retrieved.   If the URL is missing, then the object should be a periodic message (e.g., blue force track) that can be read from a CoT stream.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="remarks" type="xs:string" use="optional">
+				<xs:annotation>
+					<xs:documentation>Remarks associated with this link.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="mime" type="xs:string" use="optional">
+				<xs:annotation>
+					<xs:documentation>Internet Media type of the referenced object.  If the link is to a CoT event, the mime attribute is optional and its type may be application/xml or text/xml as described in RFC 3023, "XML Media Types", or the unregistered type, application/cot+xml.  If the link is to an arbitrary resource, the mime attribute is required and and appropriate Internet media type must be specified.  Registered media types are managed by the IANA and are listed at http://www.iana.org/assignments/media-types/.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+			<xs:attribute name="version" type="xs:decimal" use="optional">
+				<xs:annotation>
+					<xs:documentation>Version tag for this sub schema.  Neccessary to ensure upward compatibility with future revisions.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+		</xs:complexType>
+				</xs:element>
+				<xs:element name="ellipse" minOccurs="0" maxOccurs="2">
+					<xs:annotation>
+						<xs:documentation>The "ellipse" is a common shape abstraction used by many geomanipulation applications; it is supported natively.</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+						</xs:sequence>
+						<xs:attribute name="major" type="nonNegativeDecimal" use="required">
+							<xs:annotation>
+								<xs:documentation>Ellipse major axis (meters)</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="minor" type="nonNegativeDecimal" use="required">
+							<xs:annotation>
+								<xs:documentation>Ellipse minor axis (meters)</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="angle" type="xs:decimal" use="required">
+							<xs:annotation>
+								<xs:documentation>Orientation of major axis with respect to true north. </xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="level" type="xs:integer" use="optional">
+							<xs:annotation>
+								<xs:documentation>"level" is used to indicate the preferred ordering of multiple shape sub-schemas.  
+                For instance, if a polyline and ellipse are both present on the shape attribute, the one with the higher 
+                level value will be the "more desirable" representation of the object.  This allows producers to provide 
+                alternative representation of an objects shape while ensuring that consumers will know which of the available
+                representation is the best.  (Note that not all consumers will implement all shape variations, hence the need 
+                for the allowing multiple shape objects.)
+                
+                Since the level attribute is optional, it is necesary for precedence rules to exist to ensure all consumers
+                process the shape definition the same way.
+                  1. The shape definition with the highest value level attribute is considered the most accurate interpretation.
+                  2. If all shape definitions specify the same level, the order from least to most accurate interpretation
+                     is presumed to be ellipse, polyline, dxf.
+                  3. A shape that specifies the level attribute has precedence over any that do not specify it.
+                  4. If the level attribute is absent from all shape definitions, the order from least to most accurate 
+                     interpretation is presumed to be ellipse, polyline, dxf.
+                </xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="extrude" type="xs:nonNegativeInteger" use="optional">
+							<xs:annotation>
+								<xs:documentation>A "Height" of the ellipse used to make the flat object encompas a volume.</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="polyline" minOccurs="0" maxOccurs="unbounded">
+					<xs:annotation>
+						<xs:documentation>The poly line provides a mechanism to express arbitrarily complex two-dimenstional shapes.  This is used for representing oddly shaped objects such as exclusion zones, etc.  Though generally closed, it is not necessarily a closed line, thus allowing polyline to represent objects such as phasing lines, etc.</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="vertex" minOccurs="2" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:attribute name="lat" use="required">
+										<xs:annotation>
+											<xs:documentation>Latitude based on WGS-84 ellipsoid in signed degree-decimal format (e.g. -33.350000). Range -90 -> +90. Positive values denote north.</xs:documentation>
+										</xs:annotation>
+										<xs:simpleType>
+											<xs:restriction base="xs:decimal">
+												<xs:minInclusive value="-90"/>
+												<xs:maxInclusive value="90"/>
+											</xs:restriction>
+										</xs:simpleType>
+									</xs:attribute>
+									<xs:attribute name="lon" use="required">
+										<xs:annotation>
+											<xs:documentation>Longitude based on WGS-84 ellipsoid in signed degree-decimal format (e.g. 44.383333). Range -180 -> +180. Positive values denote east.</xs:documentation>
+										</xs:annotation>
+										<xs:simpleType>
+											<xs:restriction base="xs:decimal">
+												<xs:minInclusive value="-180"/>
+												<xs:maxInclusive value="180"/>
+											</xs:restriction>
+										</xs:simpleType>
+									</xs:attribute>
+									<xs:attribute name="hae" type="xs:decimal" use="optional">
+										<xs:annotation>
+											<xs:documentation>Height Above Ellipsoid (HAE) in Meters.  If absent, the value of the point/@hae in the CoT event base schema is used.</xs:documentation>
+										</xs:annotation>
+									</xs:attribute>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+						<xs:attribute name="level" type="xs:integer">
+							<xs:annotation>
+								<xs:documentation>"level" is used to indicate the preferred ordering of multiple shape sub-schemas.  For instance, if a polyline and ellipse are both present on the shape attribute, the one with the higher level value will be the "more desirable" representation of the object.  This allows producers to provide alternative representation of an objects shape while ensuring that consumers will know which of the available representation is the best.  (Note that not all consumers will implement all shape variations, hence the need for the allowing multiple shape objects.)
+                
+                See the documentation for shape/ellipse/@level for remarks on determining the precedence order when level values are equal or are missing. 
+                </xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="closed" type="xs:boolean" default="true">
+							<xs:annotation>
+								<xs:documentation>True if the list of verticies should be considered a closed polygon (an implicit line will be added from vertex N to vertex 0).</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="dxf" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>This is a hook for an arbitrary 3D DXF description of a volume of space.</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+						</xs:sequence>
+						<xs:attribute name="level" type="xs:integer">
+							<xs:annotation>
+								<xs:documentation>"level" is used to indicate the preferred ordering of multiple shape sub-schemas.  For instance, if a polyline and ellipse are both present on the shape attribute, the one with the higher level value will be the "more desirable" representation of the object.  This allows producers to provide alternative representation of an objects shape while ensuring that consumers will know which of the available representation is the best.  (Note that not all consumers will implement all shape variations, hence the need for the allowing multiple shape objects.)
+                                                                See the documentation for shape/ellipse/@level for remarks on determining the precedence order when level values are equal or are missing. 
+                                                                </xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+					</xs:complexType>
+				</xs:element>
+			</xs:sequence>
+			<xs:attribute name="version" type="xs:decimal" use="optional">
+				<xs:annotation>
+					<xs:documentation>Version tag for this sub schema.  Can be used to ensure upward compatibility with future revisions.</xs:documentation>
+				</xs:annotation>
+			</xs:attribute>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

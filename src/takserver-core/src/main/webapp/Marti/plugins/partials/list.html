@@ -1,0 +1,56 @@
+<div class="container-fluid" data-ng-cloak>
+  <div data-ng-cloak>
+    <h2>Plugins</h2>
+    <div data-ng-show="pluginMetadata.length">
+    	<button id="startButton" ng-click="handleAllStatus(true)">Start All Plugins</button>
+    	<button id="stopButton" ng-click="handleAllStatus(false)">Stop All Plugins</button>
+      <div class="row">
+	<div class="col-lg-4 col-lg-offset-4">
+	  <ul data-ng-show="pluginMetadata.length" class="list-group list-group-horizontal">
+	    <li class="list-group-item"><u>Plugin Types</u></li>
+	    <li class="list-group-item">Sender: <span class="glyphicon glyphicon-log-out" style="float: right;"></span></li>
+	    <li class="list-group-item">Receiver: <span class="glyphicon glyphicon-log-in" style="float: right;"></span></li>
+	    <li class="list-group-item">Interceptor: <span class="glyphicon glyphicon-flash" style="float: right;"></span></li>
+	  </ul>
+	</div>
+      </div>
+      <div class="row">
+	<div class="col-md-12">
+	  <table class="table table-bordered">
+	    <thead>
+	      <tr>
+		<th scope="col">Name
+		  <small><span class="{{sort_class['name']}}" style="float:right; cursor:pointer" data-ng-click="toggle_sort('name')"></span></small>
+		</th>
+		<th scope="col">Description</th>
+		<th scope="col">Plugin Type</th>
+		<th scope="col">Class Name</th>
+		<th scope="col">Startup Status</th>
+		<th scope="col">Enabled</th>
+	      </tr>
+	    </thead>
+
+	    <tbody>
+	      <tr scope="row" data-ng-repeat="x in pluginMetadata" data-ng-class="status_class(x.exceptionMessage)">
+			<td>{{x.name}}</td>
+			<td>{{x.description}}</td>
+			<td class="text-center" data-ng-bind-html="x.direction" data-ng-attr-title="{{sender_receiver_title(x)}}"></td>
+			<td>{{x.className}}</td>
+			<td>{{x.status}}</td>
+			<td>
+				<input ng-model="x.name" ng-click="handleStatus(x,$event)" ng-checked="x.enabled" type="checkbox">
+			</td>
+	      </tr>
+	    </tbody>
+	  </table>
+	</div>
+      </div>
+    </div>
+  </div>
+  <div data-ng-show="pluginMetadata.length === 0 && !showPluginError">
+    <h2 class="text-warning">There are currently no plugins installed</h2>
+  </div>
+  <div data-ng-show="showPluginError" data-ng-cloak>
+    <h2 class="text-danger">TAK Server Plugin Manager not running or inaccessible</h2>
+  </div>
+</div>

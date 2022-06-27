@@ -1,0 +1,9 @@
+FROM openjdk:11-jdk-stretch
+COPY takserver-schemamanager/SchemaManager.jar ./
+COPY takserver-schemamanager/generic-cluster-database-configuration.sh ./
+COPY CoreConfig.xml opt/tak/CoreConfig.xml
+COPY takserver-schemamanager/db-connection-configuration.sh .
+RUN chmod +x generic-cluster-database-configuration.sh
+RUN chmod +x db-connection-configuration.sh
+RUN ./db-connection-configuration.sh
+CMD ["./generic-cluster-database-configuration.sh"]

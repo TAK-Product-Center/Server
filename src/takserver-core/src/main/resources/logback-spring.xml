@@ -1,0 +1,124 @@
+<configuration scan="true" scanPeriod="30 seconds">
+    <include resource="org/springframework/boot/logging/logback/defaults.xml" />
+    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator" />
+    
+    <springProfile name="!duplicatelogs">
+    	<turboFilter class="ch.qos.logback.classic.turbo.DuplicateMessageFilter">
+        	<AllowedRepetitions>1</AllowedRepetitions>
+    	</turboFilter>
+    </springProfile>
+    
+    <springProfile name="api">
+        <appender name="application_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/takserver-api.log</file>
+            <filter class="com.bbn.marti.logging.AuditLogMarkerExcludingRootLoggerThresholdFilter" />
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>logs/takserver-api.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+                <maxHistory>90</maxHistory>
+            </rollingPolicy>
+            <encoder>
+                <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+    <springProfile name="messaging">
+        <appender name="application_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/takserver-messaging.log</file>
+            <filter class="com.bbn.marti.logging.AuditLogMarkerExcludingRootLoggerThresholdFilter" />
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>logs/takserver-messaging.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+                <maxHistory>90</maxHistory>
+            </rollingPolicy>
+            <encoder>
+                <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+    <springProfile name="monolith">
+        <appender name="application_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/takserver.log</file>
+            <filter class="com.bbn.marti.logging.AuditLogMarkerExcludingRootLoggerThresholdFilter" />
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>logs/takserver.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+                <maxHistory>90</maxHistory>
+            </rollingPolicy>
+            <encoder>
+                <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+    <!-- TAK Server database access / change audit log. The default level is "off" - only audit log markers will appear in this log -->
+    <appender name="audit_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/takserver-db-audit.log</file>
+        <filter class="com.bbn.marti.logging.AuditLogMarkerThresholdFilter">
+            <level>off</level>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/takserver-db-audit.%d{yyyy-MM-dd-HH}.log.gz</fileNamePattern>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} %msg%n</pattern>
+        </encoder>
+    </appender>
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <springProfile name="consolelog">
+        <root level="INFO">
+            <appender-ref ref="console" />
+        </root>
+    </springProfile>
+    <!-- This custom appender and these loggers intercept the logging output from hibernate, and send it to the marti audit log, along with information about the current user -->
+    <appender name="hibernate_audit_log" class="com.bbn.marti.logging.DelegatingAuditLogAppender" />
+    <logger name="org.hibernate.SQL" additivity="false" >
+        <level value="INFO" />
+        <appender-ref ref="hibernate_audit_log" />
+    </logger>
+    <logger name="org.hibernate.type" additivity="false" >
+        <level value="INFO" />
+        <appender-ref ref="hibernate_audit_log" />
+    </logger>
+    <logger name="org.hibernate.engine.jdbc.spi.SqlExceptionHelper" level="OFF"/>
+    <logger name="org.springframework.web.socket.config.WebSocketMessageBrokerStats" level="OFF"/>
+    <logger name="tak.server.ServerConfiguration" level="WARN"/>
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.apache" level="WARN"/>
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="com.zaxxer" level="WARN"/>
+    <logger name="org.springframework.boot.web.embedded.tomcat.TomcatWebServer" level="INFO"/>
+    <logger name="org.springframework.security.config.http.FilterInvocationSecurityMetadataSourceParser" level="OFF"/>
+    <logger name="org.springframework.boot.autoconfigure.orm.jpa" level="OFF"/>
+    <logger name="org.springframework.boot.actuate.endpoint.EndpointId" level="OFF"/>
+    <logger name="springfox" level="OFF"/>
+    <logger name="com.bbn.marti.sync.MissionPackageUploadServlet" level="WARN"/>
+    <logger name="org.apache.tomcat.util.net.NioEndpoint" level="OFF"/>
+    <logger name="io.grpc.internal.SerializingExecutor" level="OFF" />
+    <logger name="org.apache.ignite" level="ERROR" />
+    <logger name="org.springframework.http" level="OFF" />
+    <logger name="org.springframework.web" level="OFF" />
+    <logger name="org.springframework.core" level="OFF" />
+    <logger name="org.apache.tomcat.util.net" level="OFF" />
+    <logger name="metrics-logger" level="INFO" />
+    <!--  the audit log logs at debug level, so filter at that level just for the audit log logger -->
+    <logger name="data-access-log" level="OFF" />
+    <appender name="esapi_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/takserver-esapi.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/takserver-esapi.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="Marti Web Applications:IntrusionDetector" additivity="false" >
+        <appender-ref ref="esapi_log" />
+    </logger>
+    <root level="INFO">
+        <appender-ref ref="application_log" />
+        <appender-ref ref="audit_log" />
+    </root>
+</configuration>

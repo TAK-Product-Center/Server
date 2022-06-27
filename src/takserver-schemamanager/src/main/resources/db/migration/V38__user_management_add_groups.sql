@@ -1,0 +1,1 @@
+alter table tak_user add column groups bit varying;

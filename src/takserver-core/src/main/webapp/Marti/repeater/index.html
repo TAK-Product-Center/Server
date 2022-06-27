@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" data-ng-app="repeaterUI">
+<head>
+   <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <meta charset="utf-8">
+    <title>Alarm Service</title>
+    
+    <link rel="stylesheet" href="css/main.css">
+    <link href="css/prettify.css" type="text/css" rel="stylesheet" />
+    <link type="text/css" href="../jquery/jquery.jnotify.css" rel="stylesheet" media="all" />
+    <link rel="stylesheet" href="../css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+
+    <script type="text/javascript" src="../jquery/jquery-3.5.0.js"></script>
+    <script type="text/javascript" src="../lib/angular/angular.min.js"></script>
+    <script type="text/javascript" src="js/app.js"></script>
+    <script type="text/javascript" src="js/prettify.js"></script>
+    <script type="text/javascript" src="js/vkbeautify.0.99.00.beta.js"></script>
+	<script type="text/javascript" src="../jquery/jquery.jnotify.min.js"></script>
+</head>
+<body data-ng-controller="repeatablesList as repList">
+	<div data-ng-include="'../menubar.html'"></div>
+	
+	<label for="period">Dissemination Period:</label><input type="text" id="period" data-ng-model="period"/><button data-ng-click="updatePeriod()">Update Period</button>
+	
+	<h1>Alarm Messages</h1>
+
+	<div id="errMessage" data-ng-hide="repList.message">
+		<span style='font-weight: bold; color: {{messageColor}};'>{{message}}</span>
+	</div>
+	Show Message Content: <input type="checkbox" data-ng-model="repList.showCoT"/>
+	<div id="repeatablesList" class="listContainer" data-ng-show="repList.repeatables.length">
+		<table class="styledTable">
+			<tr>
+				<th>Select</th>
+				<th>Callsign</th>
+				<th>Alarm Type</th>
+				<th>Date/Time Activated</th>
+				<th data-ng-show="repList.showCoT">Message Content</th>
+			</tr>
+			<tr data-ng-repeat="repeatable in repList.repeatables" on-finish-render="ngRepeatFinished">
+				<td><input id="repeatable_{{$index}}" type="checkbox" data-uid="{{repeatable.uid}}" data-ng-model="repeatable.checked"/>
+				<td>{{repeatable.callsign}}</td>
+				<td>{{repeatable.repeatType}}</td>
+				<td>{{repeatable.formattedDate}}</td>
+				<td data-ng-show="repList.showCoT"><pre class='prettyprint' id='xml' style='text-align: left;'>{{repeatable.xml}}</pre></td>
+			</tr>
+		</table>
+		<button data-ng-click="deleteSelectedRepeatables()">Delete</button>
+	</div>
+	<div data-ng-include="'../footer.jsp'"></div>
+</body>
+</html>

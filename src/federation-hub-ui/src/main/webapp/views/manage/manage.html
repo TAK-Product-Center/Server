@@ -1,0 +1,19 @@
+<div data-ng-init="initialize()">
+  <!-- Create our top tabbed pane navigation. -->
+  <div class="row">
+    <div class="col-lg-12">
+      <ul class="nav nav-tabs">
+        <li role="presentation" ng-class="{active : $state.includes('manage.role-sets')}"><a ui-sref="manage.role-sets">Role/Product Sets</a></li>
+        <li role="presentation" ng-class="{active : $state.includes('manage.diagrams')}"><a ui-sref="manage.diagrams">Diagrams</a></li>
+        <li role="presentation" ng-class="{active : $state.includes('manage.federations')}"><a ui-sref="manage.federations">Federations</a></li>        
+        <li role="presentation" ng-class="{active : $state.includes('manage.instances')}"><a ui-sref="manage.instances">Instances</a></li>
+        <li role="presentation" ng-class="{active : $state.includes('manage.assets')}"><a ui-sref="manage.assets">Assets</a></li>
+        <li role="presentation" ng-class="{active : $state.includes('manage.defaults')}"><a ui-sref="manage.defaults">Defaults</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Now pull in the template for the currently selected sub state -->
+  <div ui-view></div>
+
+</div>

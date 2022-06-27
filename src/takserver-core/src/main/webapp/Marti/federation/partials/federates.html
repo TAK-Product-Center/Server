@@ -1,0 +1,271 @@
+<style>
+  .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+</style>
+<div style="text-align: center; background-color: #FF4000;" data-ng-show="hasAdminRole && !dbIsConnected">Database Unavailable: Check Connectivity </div>
+<div style="text-align: center; background-color: #FF4000;" data-ng-if="hasAdminRole && actualNum > maxConnections">
+  PostgreSQL database configuration suggestion <a href="/Marti/database/index.html"> available.</a>
+</div>
+<div id="federatesView" data-ng-show="fedConfig.enabled">
+  <div id="federatesListContainer" class="content" class="listContainer" >
+
+    <div data-ng-show="!showRmiError">
+      <h3>Active Connections</h3>
+    </div>
+
+    <div data-ng-show="!showRmiError && activeConnections.length > 0">
+      <!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+	   tablesorter js files, etc., results in a conflict with angular -->
+
+      <table id="activeConnectionsList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+	<thead>
+	  <tr>
+	    <th>Federate Configuration</th>
+	    <th>Remote Address</th>
+	    <th>Port</th>
+	    <th>Initiator</th>
+	    <th>Read Count</th>
+	    <th>Processed Count</th>
+	    <th>Groups (not for group mapping)</th>
+	    <th>Manage</th>
+	  </tr>
+	</thead>
+
+	<tbody>
+	  <tr data-ng-repeat="ac in activeConnections">
+	    <td data-ng-bind="ac.federateName"></td>
+	    <td data-ng-bind="ac.remoteAddress"></td>
+	    <td data-ng-bind="ac.remotePort"></td>
+	    <td> {{ac.client | incomingOutgoing}} </td>
+	    <td data-ng-bind="ac.readCount"></td>
+	    <td data-ng-bind="ac.processedCount"></td>
+	    <td><div data-ng-repeat="group in ac.groups">{{group.name}}<span data-ng-show="group.direction === 'IN'">&larr;</span><span data-ng-show="group.direction === 'OUT'">&rarr;</span></div></td>
+	    <td>
+	      <a class="nav" href="#!/listFederateContacts/{{ac.federateId | encodeURIComponent}}?name={{ac.federateName | encodeURIComponent}}">View Contacts</a>
+	      <a class="nav" data-ng-click="deleteFederate(ac.federateId)">Delete</a>
+    	  <a class="nav" href="#!/editFederateDetails/{{ac.federateId | encodeURIComponent}}?name={{ac.federateName | encodeURIComponent}}">Edit Config</a>
+	      <a class="nav" href="#!/editFederateGroups/{{ac.federateId | encodeURIComponent}}?name={{ac.federateName | encodeURIComponent}}">Edit Groups</a>
+	    </td>
+
+	  </tr>
+	</tbody>
+      </table>
+    </div>
+
+    <div data-ng-show="!showRmiError && activeConnections.length == 0">
+      <table class="tablesorter" style="border-collapse:separate;border-spacing:2px;"><tr><td colspan="2">No Active Connections</td></tr></table>
+    </div>
+
+
+    <div data-ng-show="!showRmiError">
+      <h3>Outgoing Connection Configuration</h3>
+      <a class="nav" href="#!/createOutgoingConnection">Create Outgoing Connection</a>
+    </div>
+
+    <div data-ng-show="!showRmiError && outgoingConnections.length > 0">
+      <!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+	   tablesorter js files, etc., results in a conflict with angular -->
+
+      <table id="outgoingConnectionsList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+	<thead>
+	  <tr>
+	    <th>Name</th>
+	    <th>Address</th>
+	    <th>Port</th>
+	    <th>Fallback Connection</th>
+	    <th>Status</th>
+	    <th>Reconnect Interval</th>
+	    <th>Max Retries</th>
+	    <th>Federate</th>
+	    <th>Protocol Version</th>
+	    <th>Connection Status</th>
+	    <th>Last Error</th>
+	    <th>&nbsp;</th>
+	  </tr>
+	</thead>
+
+	<tbody>
+	  <tr data-ng-repeat="og in outgoingConnections">
+	    <td data-ng-bind="og.displayName"></td>
+	    <td data-ng-bind="og.address"></td>
+	    <td data-ng-bind="og.port"></td>
+	    <td data-ng-bind="og.fallback"></td>
+	    <td> {{og.enabled | formatEnabled}}
+	      <span data-ng-show="og.enabled">
+		<a class="nav" data-ng-click="changeConnectionStatus(og.displayName, !og.enabled)">&nbsp; (Disable Connection)</a>
+	      </span>
+
+	      <span data-ng-show="!og.enabled">
+		<a class="nav" data-ng-click="changeConnectionStatus(og.displayName, !og.enabled)">&nbsp; (Enable Connection)</a>
+	      </span>
+	    </td>
+	    <td data-ng-bind="og.reconnectInterval"></td>
+
+	    <td>
+	      <span data-ng-show="og.unlimitedRetries">Unlimited</span>
+	      <span data-ng-show="!og.unlimitedRetries">{{ og.maxRetries }}</span>
+	    </td>
+
+	    <td data-ng-bind="og.connectionInfoSummary.federateName"></td>
+	    <td data-ng-bind="og.protocolVersion"></td>
+	    <td data-ng-bind="og.connectionInfoSummary.connectionStatusValue"></td>
+	    <td data-ng-bind="og.connectionInfoSummary.lastError"></td>
+	    <td><a class="nav" data-ng-click="deleteOutgoingConnection(og.displayName)">Delete</a></td>
+	  </tr>
+	</tbody>
+      </table>
+    </div>
+
+    <div data-ng-show="!showRmiError && outgoingConnections.length == 0">
+      <table class="tablesorter" style="border-collapse:separate;border-spacing:2px;"><tr><td colspan="2">No Outgoing Connections</td></tr></table>
+    </div>
+
+    <div data-ng-show="!showRmiError">
+      <h3>Federate Configuration</h3>
+    </div>
+
+    <div data-ng-show="!showRmiError && federates.length > 0">
+      <!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+	   tablesorter js files, etc., results in a conflict with angular -->
+
+      <table id="federatesList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+	<thead>
+	  <tr>
+	    <th>Name</th>
+	    <th>Share Alerts</th>
+	    <th>Archive</th>
+	    <th>Notes</th>
+	    <th>&nbsp;</th>
+	  </tr>
+	</thead>
+
+	<tbody>
+	  <tr data-ng-repeat="f in federates">
+	    <td data-ng-bind="f.name"></td>
+	    <td>{{f.shareAlerts | formatEnabled}}</td>
+	    <td>{{f.archive | formatEnabled}}</td>
+	    <td data-ng-bind="f.notes"></td>
+	    <td>
+	      <a class="nav" data-ng-click="deleteFederate(f.id)">Delete</a>
+    	      <a class="nav" href="#!/editFederateDetails/{{f.id | encodeURIComponent}}?name={{f.name | encodeURIComponent}}">Edit Config</a>
+	      <a class="nav" href="#!/editFederateGroups/{{f.id | encodeURIComponent}}?name={{f.name | encodeURIComponent}}">Edit Groups</a>
+	    </td>
+	  </tr>
+	</tbody>
+      </table>
+    </div>
+
+    <div data-ng-show="!showRmiError && federates.length == 0">
+      <table class="tablesorter" style="border-collapse:separate;border-spacing:2px;"><tr><td colspan="2">No Federates Configured</td></tr></table>
+    </div>
+
+    <div data-ng-show="showRmiError">
+      <h2><font color="dc143c">Federate List Unavailable</font></h2>
+      <p>The federation manager cannot be displayed because the Web application failed to connect to the Federation Manager.</p>
+      <p>Please check that the federation server configuration is valid and restart.</p>
+      <hr/>
+    </div>
+  </div>
+
+</div>
+<div data-ng-show="!fedConfig.enabled">
+  <br>
+  <p><strong>The federation server is currently disabled.</strong></p>
+  <p><strong>Please edit configuration below and enable federation server to see the federation manager.</strong></p>
+</div>
+<div id="federationConfig">
+  <h3>Federation Configuration</h3>
+  <table border="1" style="border-spacing:2px;border-collapse:separate">
+    <tr>
+      <td><strong>Federation Enabled:</strong><input type="checkbox" data-ng-model="fedConfig.enabled" disabled><br></td>
+    </tr>
+    <tr>
+      <td><table>
+	  <tr>
+	    <td><strong>Federation V1 Enabled:</strong><input type="checkbox" data-ng-model="fedConfig.serverPortEnabled" disabled></td>
+	  </tr>
+	  <tr>
+	    <td>Core Messaging Version: {{fedConfig.coreVersion}}</td>
+	  </tr>
+	  <tr data-ng-repeat="v1Port in fedConfig.v1Ports" data-ng-show="fedConfig.coreVersion == 1">
+	    <td>Port: {{v1Port.port}}, TLSVersion: {{v1Port.tlsVersion}}</td>
+	  </tr>
+	  <tr data-ng-show="fedConfig.coreVersion == 2">
+	    <td>Port: {{fedConfig.serverPortv1}}, TLS Version(s):
+	      <span data-ng-repeat="v1Tls in fedConfig.v1Tls">{{v1Tls.tlsVersion}}<font data-ng-show="!$last">, </font></span>
+	    </td>
+	  </tr>
+      </table></td>
+    </tr>
+    <tr>
+      <td>
+	<table>
+	  <tr>
+	    <td><strong>Federation V2 Enabled:</strong><input type="checkbox" data-ng-model="fedConfig.serverPortEnabledv2" disabled></td>
+	  </tr>
+	  <tr>
+	    <td>Port: {{fedConfig.serverPortv2}}</td>
+	  </tr>
+	  <tr>
+	    <td><strong>Allow Mission Federation:</strong> {{fedConfig.allowMissionFederation}}</td>
+	  </tr>
+	  <tr>
+	    <td><strong>Allow Federated Delete:</strong> {{fedConfig.allowFederatedDelete}}</td>
+	  </tr>
+	  <tr>
+	    <td><strong>Federated Group Mapping:</strong> {{fedConfig.federatedGroupMapping}}</td>
+	  </tr>
+	  <tr>
+	    <td><strong>Automatic Group Mapping:</strong> {{fedConfig.automaticGroupMapping}}</td>
+	  </tr>
+	  <tr>
+	    <td>
+	      <strong>Enable Mission Federation Disruption Tolerance:</strong> {{fedConfig.enableMissionFederationDisruptionTolerance}}
+	    </td>
+	  </tr>
+	  <tr>
+	    <td>
+	      <strong>Mission Federation Disruption Tolerance Interval:</strong> {{fedConfig.missionFederationDisruptionToleranceRecencySeconds}}
+	    </td>
+	  </tr>
+	  <tr data-ng-show="fedConfig.missionInterval.length > 0">
+	    <td><strong>Mission Specific Settings</strong></td>
+	  </tr>
+	  <tr data-ng-repeat="missionInterval in fedConfig.missionInterval">
+	    <td>Mission: {{missionInterval.name}}</td>
+	    <td>{{missionInterval.recencySeconds}}</td>
+	  </tr>
+	  <tr data-ng-show="fedConfig.enableMissionFederationDisruptionTolerance">
+	    <td>
+	      <button type="button" class="btn btn-warning" data-ng-click="clearFederationEvents()">
+		Clear Federation Events
+	      </button></br>
+	      <span><small>Will resync federated missions on reconnect</small></span>
+	    </td>
+	  </tr>
+	</table>
+      </td>
+    </tr>
+	  <tr>
+		  <td>
+			  <table>
+				  <tr>
+					  <td>
+						  <strong>Enable Data Package And Mission File Filter:</strong> {{fedConfig.enableDataPackageAndMissionFileFilter}}
+					  </td>
+				  </tr>
+				  <tr data-ng-show="fedConfig.enableDataPackageAndMissionFileFilter && fedConfig.fileExtension !=0 ">
+					  <td>File Extension: {{fedConfig.fileExtension[0]}}</td>
+				  </tr>
+			  </table>
+		  </td>
+	  </tr>
+	  <tr>
+	  <td><strong>Federation Truststore File Path:</strong> {{fedConfig.truststorePath}}</td>
+  </tr>
+    <tr>
+      <td><strong>Web Base URL:</strong> {{fedConfig.webBaseURL}}</td>
+    </tr>
+  </table>
+
+  <a class="nav" href="#!/modifyConfig">Edit Configuration</a><br>
+</div>

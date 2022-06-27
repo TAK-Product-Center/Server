@@ -1,0 +1,37 @@
+<div class="row top-buffer">
+    <div class="col-md-12">
+        <table st-table="rowCollection" class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Delete</th>
+                    <th>IO Type</th>
+                    <th>Publishers</th>
+                    <th>Subscribers</th>
+                    <th>Priority</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="row in rowCollection">
+                    <td>
+                        <button type="button" ng-click="removeRow(row)"
+                            class="btn btn-xs btn-danger">
+                            <i class="glyphicon glyphicon-remove"> </i>
+                        </button>
+                    </td>
+                    <td>{{row.ioType}}</td>
+                    <td>{{row.Publishers}}</td>
+                    <td>{{row.Subscribers}}</td>
+                    <td>{{row.Priority}}</td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="5" class="text-center">
+                        <div st-pagination="" st-items-by-page="itemsByPage"
+                            st-displayed-pages="7"></div>
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>

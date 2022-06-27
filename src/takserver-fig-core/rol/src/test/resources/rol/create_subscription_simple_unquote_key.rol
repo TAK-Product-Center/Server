@@ -1,0 +1,3 @@
+create subscription
+matchrole JTAC
+{type : "XPATH"};
