@@ -1,0 +1,56 @@
+import proguard.gradle.ProGuardTask
+
+apply plugin: 'application'
+
+// must be specified here due to plugin ordering
+mainClassName = 'com.bbn.tak.schema.SchemaManager'
+
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'maven-publish'
+
+buildscript {
+    dependencies {
+      classpath 'net.sf.proguard:proguard-gradle:5.2.1'
+    }
+}
+
+dependencies {
+  compile project(':takserver-common')
+
+  compile group: 'org.flywaydb', name: 'flyway-core', version: flyway_version
+  compile group: 'com.beust', name: 'jcommander', version: jcommander_version
+  compile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  compile group: 'org.postgresql', name: 'postgresql', version: postgres_version
+  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  compile group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
+  compile group: 'xerces', name: 'xercesImpl', version: xerces_version
+}
+
+shadowJar {
+    mainClassName = 'com.bbn.tak.schema.SchemaManager'
+    baseName = 'schemamanager'
+    classifier = 'uber'
+    version = version
+}
+
+task copyJar (type: Copy, dependsOn: shadowJar) {
+  from file('build/libs')
+  include 'schemamanager-' + version + '-uber.jar'
+  into "$buildDir/cluster"
+  rename('schemamanager-' + version + '-uber.jar', 'SchemaManager.jar')
+}
+
+task copyScripts (type: Copy, dependsOn: copyJar) {
+  from file('scripts')
+  include 'setupRDS.sh'
+  include 'pollRDS.py'
+  into "$buildDir/cluster"
+}
+
+task setupCluster (type: Copy, dependsOn: copyScripts) {}
+
+clean {
+  delete '$buildDir/cluster'
+}
+
+group = 'tak'

@@ -1,0 +1,303 @@
+buildscript {
+    dependencies {
+      classpath('org.springframework.boot:spring-boot-gradle-plugin:' + spring_boot_version)
+    }
+}
+
+import java.nio.file.Files
+import java.nio.file.Paths
+
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'war'
+
+
+task unpack(type: Copy) {
+    dependsOn bootWar
+    from(zipTree(tasks.bootWar.outputs.files.singleFile))
+    into("build/dependency")
+}
+
+group = 'tak'
+
+task copyCoreExample(type: Copy, dependsOn: build) {
+    from file('example/')
+    include 'CoreConfig.example.cluster.xml', 'UserAuthenticationFile.cluster.xml', 'logging-restrictsize.xml'
+    into "$buildDir/cluster/"
+    rename('CoreConfig.example.cluster.xml', 'CoreConfig.xml')
+    rename('UserAuthenticationFile.cluster.xml', 'UserAuthenticationFile.xml')
+}
+
+task copyScripts(type: Copy, dependsOn: copyCoreExample) {
+    from file('scripts/')
+    into "$buildDir/cluster"
+}
+
+task setupCluster() {
+  doFirst {
+    copy {
+      from war
+      into "$buildDir/cluster"
+    }
+  }
+  def lib = new File("$buildDir/cluster/lib")
+  doLast {
+      lib.mkdirs()
+  }
+}
+
+setupCluster.dependsOn bootWar
+setupCluster.dependsOn copyScripts
+
+sourceSets {
+    main {
+        java {
+            srcDir 'build/src-generated'
+        }
+    }
+    integrationTest {
+        java {
+            'src/integrationTest/java'
+        }
+        resources {
+            srcDir 'src/integrationTest/resources'
+        }
+    }
+}
+
+test {
+
+    testLogging.showStandardStreams = true
+
+    File logging_target_path = buildDir.toPath().resolve('tmp/test/logs').toAbsolutePath().toFile()
+    doFirst {
+        logging_target_path.mkdirs()
+    }
+    systemProperty "tak.server.test.logging.targetPath", logging_target_path.toString()
+
+    // display logging output
+    onOutput { descriptor, event -> logger.lifecycle(event.message) }
+}
+
+import java.text.SimpleDateFormat
+
+task writeVerFile() {
+    doFirst {
+      new File("$projectDir/src/main/resources/shortver.txt").text = "$takversion-$takrelease$branch"
+      new File("$projectDir/src/main/resources/ver.json").text = """
+{
+  "major" : $verMajor,
+  "minor" : $verMinor,
+  "patch" : $verPatch,
+  "branch" : "$gitbranch"
+}
+      """
+   }
+}
+
+task copyVerFile(type: Copy) {
+    from file("${projectDir}/src/main/resources/shortver.txt")
+    into file("${buildDir}/resources")
+}
+
+bootWar.dependsOn test
+bootWar.dependsOn compileIntegrationTestJava
+compileJava.finalizedBy writeVerFile
+writeVerFile.finalizedBy copyVerFile
+
+bootWar {
+    enabled = true
+    
+    manifest {
+      attributes 'Main-Class': 'org.springframework.boot.loader.PropertiesLauncher'
+    }    
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+dependencies {
+
+  compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+  compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
+  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+
+
+
+
+  // required to fix version conflict for h2 between ignite and spring boot
+  compile group: 'com.h2database', name: 'h2', version: h2_version
+
+  compile group: 'javax.cache', name: 'cache-api', version: '1.1.1'
+  
+  compile project(':takserver-common')
+  compile project(':federation-common')
+
+  compile group: 'org.dom4j', name: 'dom4j', version: dom4j_version
+  compile group: 'com.google.code.gson', name: 'gson', version: gson_version
+
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: spring_boot_version 
+
+
+
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: spring_boot_version
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-cache', version: spring_boot_version
+  
+  compile group: 'io.micrometer', name: 'micrometer-core'
+  
+  
+    // apache ignite (cache)
+  compile group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_spring_version
+    
+  // cloudwatch metrics
+  compile group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_cloudwatch_version
+  
+  compile(project(':takserver-core:takserver-war')) {
+    exclude group: 'ch.qos.logback', module: 'logback-classic'
+    exclude group: 'org.slf4j'
+    exclude group: 'log4j', module: 'log4j'
+  }
+  compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
+  compile group: 'org.slf4j', name: 'jul-to-slf4j', version: slf4j_version
+  
+  // tomcat
+  compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-jasper', version: tomcat_version
+  compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-el', version: tomcat_version
+  compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-websocket', version: tomcat_version
+  compile group: 'org.apache.tomcat', name: 'tomcat-jsp-api', version: tomcat_version
+  compile group: 'org.apache.tomcat', name: 'tomcat-el-api', version: tomcat_version
+  compile group: 'org.apache.tomcat', name: 'tomcat-annotations-api', version: tomcat_version
+  
+  
+  compile group: 'javax.servlet', name: 'jstl'
+  compile group: 'javax.mail', name: 'javax.mail-api'
+  compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-core', version: tomcat_version
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-tomcat', version: spring_boot_version
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-data-jpa', version: spring_boot_version
+  compile group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-mail', version: spring_boot_version
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-websocket', version: spring_boot_version
+  compile group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
+  compile group: 'org.springframework.security', name: 'spring-security-config', version: spring_security_version
+  compile group: 'org.springframework.security', name: 'spring-security-messaging', version: spring_security_version
+  compile group: 'org.springframework.security', name: 'spring-security-web', version: spring_security_version
+  compile group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
+  compile group: 'org.hibernate', name: 'hibernate-entitymanager', version: hibernate_version
+  
+  compile group: 'xerces', name: 'xercesImpl', version: xerces_version
+  
+  
+  // core deps
+  
+  compile group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
+  compile group: 'org.apache.httpcomponents', name: 'fluent-hc', version: httpcomponents_version
+  compile group: 'org.apache.httpcomponents', name: 'httpclient', version: httpcomponents_version
+  compile group: 'org.apache.httpcomponents', name: 'httpmime', version: httpcomponents_version
+  
+ compile group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_epoll_version, classifier: 'linux-x86_64'
+
+  // nats message queue
+  compile group: 'io.nats', name: 'jnats', version: nats_version
+  
+    // apache ignite (cache and distributed service grid)
+  testCompile group: 'org.apache.ignite', name: 'ignite-indexing', version: ignite_version
+  testCompile group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
+  testCompile group: 'org.apache.ignite', name: 'ignite-log4j', version: ignite_version
+
+   
+  testCompile group: 'junit', name: 'junit', version: junit_version
+  testCompile group: 'org.mockito', name: 'mockito-core', version: mockito_version
+  testCompile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+  testCompile("org.springframework.boot:spring-boot-starter-test") {
+    exclude group: "com.vaadin.external.google", module:"android-json"
+  }
+  
+  testCompile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+
+  integrationTestCompile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+  integrationTestCompile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
+  integrationTestCompile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  
+  integrationTestCompile project(':takserver-takcl-core')
+
+  // required to fix version conflict for h2 between ignite and spring boot
+  integrationTestCompile group: 'com.h2database', name: 'h2', version: h2_version
+  integrationTestCompile group: 'xerces', name: 'xercesImpl', version: xerces_version
+
+ 
+}
+
+clean {
+  delete 'src/main/resources/ver.txt'
+  delete '$buildDir/cluster'
+}
+
+task integrationTest(type: Test) {
+    group = "Verification"
+    description = "Executes integration test using the takcl framework"
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    testLogging.showStandardStreams = true
+
+    def tmpDir = "$buildDir/tmp/integrationTest/"
+    def fallbackTmpDir = tmpDir
+    def modelServerDir = project.parent.project(':takserver-package').buildDir.toPath().resolve('takArtifacts')
+    def certToolDir = project.parent.project(':takserver-package').buildDir.toPath().resolve('takArtifacts/certs')
+    def jarName = 'takserver.war'
+    def configFilepath = Paths.get(tmpDir).resolve("TAKCLConfig.xml").toAbsolutePath()
+
+    def certificateDirectory = tmpDir + 'TEST_CERTS/'
+
+    def configurationString =
+            """<?xml version="1.0" encoding="UTF-8"?>
+<TAKCLConfiguration xmlns="http://bbn.com/marti/takcl/config"
+  xmlns:common="http://bbn.com/marti/takcl/config/common">
+  <common:TemporaryDirectory>"${tmpDir}</common:TemporaryDirectory>"
+  <common:FallbackTemporaryDirectory>${fallbackTmpDir}/</common:FallbackTemporaryDirectory>
+  <common:RunnableTAKServerConfig
+    modelServerDir="${modelServerDir}"
+    jarName="${jarName}"
+    serverFarmDir="${tmpDir}TEST_FARM"
+    certificateDirectory="${certificateDirectory}"
+    certToolDirectory="${certToolDir}"
+    />
+  <common:ConnectableTAKServerConfig
+    url="127.0.0.1"
+    truststoreJKSFilepath="${certificateDirectory}/truststore-root.jks"
+    truststorePass="atakatak"
+    clientKeystoreP12Filepath="${certificateDirectory}TAKCL.p12"
+    clientKeystorePass="atakatak"
+    />
+  <common:TAKCLTestSourceGenerationConfig
+    javaSrcDir="src/"
+    javaTemplatePackage="com.bbn.marti.test.shared.data.templates"
+    javaGenerationPackage="com.bbn.marti.test.shared.data.generated"
+    />
+</TAKCLConfiguration>"""
+
+    doFirst {
+        new File(tmpDir).mkdirs()
+        Files.write(configFilepath, configurationString.getBytes())
+    }
+
+    systemProperty 'com.bbn.marti.takcl.config.filepath', configFilepath.toString()
+	systemProperty 'com.bbn.marti.takcl.takclIgniteConfig', 'true'
+	systemProperty 'java.net.preferIPv4Stack', 'true'
+	systemProperty 'logging.level.com.bbn', 'TRACE'
+	systemProperty 'logging.level.tak', 'TRACE'
+	systemProperty 'logging.level.org.apache.ignite', 'INFO'
+	//systemProperty '-DIGNITE_QUIET', 'true'
+
+    Object testProperties = System.properties
+    for (String key : testProperties.keySet()) {
+        if (key.startsWith("com.bbn.marti.takcl")) {
+            systemProperty key, testProperties.get(key)
+        }
+    }
+
+    dependsOn(':takserver-package:prePackage')
+    dependsOn('build')
+}
+

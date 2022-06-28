@@ -1,0 +1,75 @@
+// Resource Operation Language (ROL)
+// Build File. Use antlr to generate a parser, lexer and parse tree walker. Then run units tests using the antlr runtime, along with the generated code.
+
+apply plugin: 'antlr'
+apply plugin: 'java'
+apply plugin: 'maven-publish'
+
+group = 'com.bbn.roger'
+version = '0.0.1-SNAPSHOT'
+
+jar {
+    from sourceSets.main.allSource
+}
+
+test {
+
+    testLogging.showStandardStreams = true
+
+    // display logging output
+    onOutput { descriptor, event -> logger.lifecycle(event.message) }
+}
+
+apply plugin: 'maven'
+
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+
+//apply plugin: 'com.github.johnrengelman.shadow'
+
+dependencies {
+    compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
+
+    // antlr dependencies
+    antlr 'org.antlr:antlr4:' + antlr_version
+
+    // test dependencies
+    testCompile 'junit:junit:' + junit_version
+    testCompile('ch.qos.logback:logback-classic:' + logback_version)
+    testCompile 'com.google.guava:guava:' +  guava_version
+
+    // main dependencies
+    compile 'com.google.code.gson:gson:' + gson_version
+    compile 'com.google.guava:guava:' +  guava_version
+    compile group: 'com.google.code.gson', name: 'gson', version:gson_version
+    compileOnly 'org.slf4j:slf4j-api:' + slf4j_version
+
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jackson_version
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jackson_version
+}
+
+def od = new File("${project.buildDir}/generated-src/antlr/main".toString());
+
+def args = ["-visitor", "-long-messages", "-package", "mil.af.rl.rol"];
+
+generateGrammarSource {
+  outputDirectory = od;
+  arguments += args;
+}
+
+generateTestGrammarSource {
+  outputDirectory = od;
+  arguments += args;
+}
+
+def static uberManifest() { }
+
+clean {}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}

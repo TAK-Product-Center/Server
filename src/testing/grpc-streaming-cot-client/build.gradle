@@ -1,0 +1,115 @@
+apply plugin: 'java'
+apply plugin: 'com.google.protobuf'
+apply plugin: 'maven-publish'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+apply plugin: 'application'
+
+mainClassName = 'grpc.GrpcClientInputTest'
+
+apply plugin: 'com.github.johnrengelman.shadow'
+
+
+buildscript {
+  repositories {
+    mavenCentral()
+    maven {
+      url 'https://plugins.gradle.org/m2'
+    }
+  }
+  dependencies {
+    classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.8'
+    classpath 'com.github.jengelman.gradle.plugins:shadow:6.1.0'
+  }
+}
+
+//apply plugin: 'com.github.johnrengelman.shadow'
+
+repositories {
+  mavenCentral()
+  mavenLocal()
+  jcenter()
+}
+dependencies {
+
+  compile group: 'org.eclipse.jetty', name: 'jetty-util', version: '9.4.10.RC0'
+
+  // gRPC
+  compile group: 'io.grpc', name: 'grpc-netty', version: grpc_version
+  compile group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
+  compile group: 'io.grpc', name: 'grpc-stub', version: grpc_version
+
+  // Google's OpenSSL variant
+  // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
+  compile 'io.netty:netty-tcnative-boringssl-static:' + boringssl_static_version
+
+  //compile 'javax.activation:activation:' + javax_activation_version
+
+  compile 'javax.annotation:javax.annotation-api:1.3.2'
+
+  // for netty performance, put javassist on the classpath
+  compile group: 'org.javassist', name: 'javassist', version: javassist_version
+}
+
+// protobuf code generation step
+protobuf {
+  protoc {
+    artifact = 'com.google.protobuf:protoc:3.0.0'
+  }
+  plugins {
+    grpc {
+      artifact = 'io.grpc:protoc-gen-grpc-java:1.0.2'
+    }
+  }
+  generateProtoTasks {
+    all()*.plugins {
+      grpc {
+        // To generate deprecated interfaces and static bindService method,
+        // turn the enable_deprecated option to true below:
+        option 'enable_deprecated=false'
+      }
+    }
+  }
+}
+
+idea {
+  module {
+    // Not using generatedSourceDirs because of
+    // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
+    sourceDirs += file("${projectDir}/build/generated/source/proto/main/java");
+    sourceDirs += file("${projectDir}/build/generated/source/proto/main/grpc");
+  }
+}
+
+sourceSets {
+  main {
+    java {
+      srcDir 'build/generated/source/proto/main/grpc'
+      srcDir 'build/generated/source/proto/main/java'
+    }
+  }
+}
+
+shadowJar {
+    baseName = 'grpctestclient'
+    classifier = 'uber'
+    version = '1.0'
+}
+
+clean {
+  delete 'bin'
+}
+
+//Generates protobuf code, applies the patch
+task applyGrpcPatch{
+  dependsOn 'generateProto'
+  description 'Patches the generated protobuf to make it compatible with both versions 2 and 3'
+  doLast{
+  //Ant used to apply the patch file
+  //(Need to specify the specific file that is getting patched because ant can't figure out which file to patch from the diff file)
+  ant.patch(patchfile: 'proto2compatFix.patch', originalfile: 'build/generated/source/proto/main/java/com/atakmap/Tak/GeoEvent.java')
+}
+println 'APPLYING PROTO PATCH'
+}
+
+compileJava.finalizedBy(tasks.applyGrpcPatch)
