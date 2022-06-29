@@ -1,0 +1,105 @@
+import groovy.json.JsonSlurper
+
+/**
+ * Generates the license for the software
+ */
+
+abstract class GenerateLicense extends DefaultTask {
+    /** @return the thirdparty definitions file */
+    @InputFile
+    abstract Property<File> getThirdpartyDefinitions()
+    /** @return the license template file */
+    @InputFile
+    abstract Property<File> getLicenseTemplate()
+    /** @return the exception substitutions configuration file */
+    @InputFile
+    abstract Property<File> getExceptionSubstitutions()
+    /** @return the file containing any explicit exceptions beyond THIRDPARTY.md */
+    @InputFile
+    abstract Property<File> getExplicitExceptions()
+
+    /** @return the output license file location */
+    @OutputFile
+    abstract Property<File> getLicenseFile()
+
+    /** Generates the license file. */
+    @TaskAction
+    void generate() {
+        licenseTemplate.get().withReader { template ->
+            licenseFile.get().withWriter {license ->
+                while(true) {
+                    def line = template.readLine()
+                    if(line == null)
+                        break
+                    // inject the exceptions at the end of section 7
+                    if(line.equals('8.  Termination.')) {
+                        // slurp the exception substitutions
+                        def substitutions = new JsonSlurper().parse(exceptionSubstitutions.get())
+
+                        thirdpartyDefinitions.get().withReader { thirdparty ->
+                            String lastTpProject = null
+                            while(true) {
+                                def tpDef = thirdparty.readLine()
+                                if(tpDef == null)
+                                    break;
+                                def tpFields = tpDef.split('\t')
+                                if(tpFields == null || tpFields.length < 5)
+                                    continue
+                                def tpProject = tpFields[1]
+                                def tpLicense = tpFields[4]
+
+                                // skip invalid rows
+                                if(tpProject.equals('Project') || tpProject.isEmpty())
+                                    continue;
+
+                                // skip duplicates
+                                if(tpProject.equals(lastTpProject))
+                                    continue
+                                lastTpProject = tpProject
+
+                                // perform substitution
+                                if(substitutions.projects.find { it.in == "${tpProject}" } != null)
+                                    tpProject = substitutions.projects.find { it.in == "${tpProject}" }.out
+                                if(substitutions.licenses.find { it.in == "${tpLicense}" } != null)
+                                    tpLicense = substitutions.licenses.find { it.in == "${tpLicense}" }.out
+
+                                // write the exceptions block
+                                license.writeLine('If you modify this Program, or any covered work, by linking or combining')
+                                license.writeLine("it with ${tpProject} (or a modified version of that library), containing")
+                                license.writeLine("parts covered by the terms of the ${tpLicense},")
+                                license.writeLine('the licensors of this Program grant you additional permission')
+                                license.writeLine('to convey the resulting work.')
+                                license.writeLine('')
+                            }
+                        }
+                        explicitExceptions.get().withReader { exceptions ->
+                            while (true) {
+                                def exception = exceptions.readLine()
+                                if (exception == null)
+                                    break;
+                                license.writeLine(exception)
+                            }
+                        }
+                    }
+                    license.writeLine(line)
+                }
+            }
+        }
+    }
+}
+
+// Inject the `generateLicense` task
+project.afterEvaluate {
+    project.tasks.register('generateLicense', GenerateLicense) {
+        group = 'Build'
+        description = 'Generates the license file.'
+
+        thirdpartyDefinitions = rootProject.file('../THIRDPARTY.md')
+        licenseTemplate = rootProject.file('.license/gpl-template.txt')
+        exceptionSubstitutions = rootProject.file('.license/exception-substitutions.json')
+        explicitExceptions = rootProject.file('.license/explicit-exceptions.txt')
+        licenseFile = rootProject.file('../LICENSE.md')
+    }
+
+    assemble.dependsOn generateLicense
+}

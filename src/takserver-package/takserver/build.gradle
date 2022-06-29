@@ -1,0 +1,238 @@
+buildscript {
+    dependencies {
+        classpath 'com.netflix.nebula:gradle-ospackage-plugin:' + gradle_ospackage_version
+    }
+}
+
+apply plugin: 'nebula.ospackage'
+apply from: "../utils/utils.gradle"
+
+// Copy scripts
+task copyLauncherScripts(type: Copy) {
+    from project(':takserver-core').file('scripts')
+    into "$buildDir/takArtifacts"
+    exclude 'utils*', 'messaging*', 'API*', 'plugins*', 'retention*', 'takserver.sh'
+}
+
+// rpm postinstall script
+def postinstall_script_takserver = '''\
+
+export tak_full_version=''' + takversion + '''-''' + takrelease + '''
+
+chmod 644 /opt/tak/logging-restrictsize.xml
+chmod 544 /opt/tak/*.bat
+chmod 544 /opt/tak/*.sh
+
+chmod 544 /opt/tak/messaging/*.sh
+chmod u+w /opt/tak/messaging/takserver-messaging.sh
+cp /opt/tak/messaging/takserver-messaging.sh /opt/tak
+chown -f tak:tak /opt/tak/takserver-messaging.sh 2>/dev/null
+
+chmod 544 /opt/tak/API/*.sh
+chmod u+w /opt/tak/API/takserver-api.sh
+cp /opt/tak/API/takserver-api.sh /opt/tak
+chown -f tak:tak /opt/tak/takserver-api.sh 2>/dev/null
+
+chmod 544 /opt/tak/takserver-plugins.sh
+chmod u+w /opt/tak/takserver-plugins.sh
+chown -f tak:tak /opt/tak/takserver-plugins.sh 2>/dev/null
+
+chmod 544 /opt/tak/retention/*.sh
+chmod u+w /opt/tak/retention/takserver-retention.sh
+cp /opt/tak/retention/takserver-retention.sh /opt/tak
+chown -f tak:tak /opt/tak/takserver-retention.sh 2>/dev/null
+
+chmod 500 /opt/tak/certs/*.sh
+chmod 600 /opt/tak/certs/cert-metadata.sh
+
+chown root:root /opt/tak/messaging/takserver-messaging
+chmod 755 /opt/tak/messaging/takserver-messaging
+cp /opt/tak/messaging/takserver-messaging /etc/init.d
+rm -rf /opt/tak/messaging
+
+chown root:root /opt/tak/API/takserver-api
+chmod 755 /opt/tak/API/takserver-api
+cp /opt/tak/API/takserver-api /etc/init.d
+rm -rf /opt/tak/API
+
+chown root:root /opt/tak/launcher/takserver
+chown root:root /opt/tak/launcher/takserver-noplugins
+chown root:root /opt/tak/takserver-plugins
+
+chown root:root  /opt/tak/retention/takserver-retention
+chmod 755 /opt/tak/retention/takserver-retention
+cp /opt/tak/retention/takserver-retention /etc/init.d
+
+mkdir -p /opt/tak/conf/retention
+
+if [ ! -e /opt/tak/conf/retention/retention-policy.yml ]; then
+    cp /opt/tak/retention/retention-policy.yml /opt/tak/conf/retention/
+fi
+
+if [ ! -e /opt/tak/conf/retention/retention-service.yml ]; then
+    cp /opt/tak/retention/retention-service.yml /opt/tak/conf/retention/
+fi
+
+if [ ! -e /opt/tak/conf/retention/misison-archiving-config.yml ]; then
+    cp /opt/tak/retention/misison-archiving-config.yml /opt/tak/conf/retention/
+fi
+
+if [ ! -d "/opt/tak/mission-archive" ]; then
+    mkdir -p /opt/tak/mission-archive
+    cp /opt/tak/retention/mission-store.yml /opt/tak/mission-archive/
+fi
+
+chown -fR tak:tak /opt/tak/conf
+chown -fR tak:tak /opt/tak/mission-archive
+rm -rf /opt/tak/retention
+
+chmod 755 /opt/tak/launcher/takserver
+chmod 755 /opt/tak/launcher/takserver-noplugins
+chmod 755 /opt/tak/takserver-plugins
+
+cp /opt/tak/launcher/takserver /etc/init.d
+cp /opt/tak/launcher/takserver-noplugins /etc/init.d
+cp /opt/tak/takserver-plugins /etc/init.d
+rm -rf /opt/tak/launcher
+rm -rf /opt/tak/takserver-plugins
+
+
+chmod 755 /opt/tak/utils
+mkdir -p /opt/tak/logs
+chown tak:tak /opt/tak/logs
+chmod 755 /opt/tak/logs
+chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
+mkdir -p /opt/tak/iconsets
+chown -fR tak:tak /opt/tak/iconsets
+mkdir -p /opt/tak/webcontent/webtak-plugins/plugins
+if [ ! -f /opt/tak/webcontent/webtak-plugins/webtak-manifest.json ]; then 
+\techo -e "{\\n\\t\\"plugins\\": [], \\n\\t\\"iconSets\\": []\\n}" > /opt/tak/webcontent/webtak-plugins/webtak-manifest.json
+fi
+chown -fR tak:tak /opt/tak/webcontent
+mkdir -p /opt/tak/logs
+chown tak:tak /opt/tak/logs
+mkdir -p /opt/tak/lib
+chown tak:tak /opt/tak/lib
+
+cp /opt/tak/certs-tmp/cert-metadata.sh /opt/tak/certs/. 2>/dev/null || :
+cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
+rm -rf /opt/tak/certs-tmp
+
+# rename old tomcat if it exists
+mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED &>/dev/null
+
+cat <<- "EOF"
+
+TAK SERVER SOFTWARE LICENSE AGREEMENT
+
+Distribution Statement A: Approved for public release; distribution is unlimited.
+
+----
+
+Create login credentials for local adminstrative access to the configuration interface:
+
+sudo java -jar /opt/tak/utils/UserManager.jar usermod -A -p <password> <username>
+
+For secure operation, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates.
+
+Using Firefox or Chrome on this computer, browse to this address to verify keystore and truststore configuration:
+ 
+http://localhost:8080 
+
+Login with the administrative credentials specified above.
+
+Follow the instructions in the Installation section of the configuration guide to complete the setup process. 
+
+EOF
+
+
+chown root:root /opt/tak/db-utils/pg_hba.conf
+chmod 600 /opt/tak/db-utils/pg_hba.conf
+
+chmod 544 /opt/tak/db-utils/*.sh
+chmod 500 /opt/tak/db-utils/clear-old-data.sh
+chmod 500 /opt/tak/db-utils/clear-old-data.sql
+chown postgres:postgres /opt/tak/db-utils/clear-old-data.sh
+chown postgres:postgres /opt/tak/db-utils/clear-old-data.sql
+
+# setup a default DB password
+sh /opt/tak/db-utils/setupDefaultPassword.sh
+
+if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
+    mv /opt/tak/db-utils/clear-old-data.sql /opt/tak/db-utils/clear-old-data.sql.dist.$tak_full_version
+    mv /opt/tak/db-utils/clear-old-data.sql.bak /opt/tak/db-utils/clear-old-data.sql
+fi
+
+
+echo "Configure or upgrade your TAK Server database:" 
+echo "To configure for the first time: sudo /opt/tak/db-utils/takserver-setup-db.sh" 
+echo "To upgrade an existing db: sudo java -jar /opt/tak/db-utils/SchemaManager.jar upgrade"
+'''
+
+ospackage {
+    packageName = 'takserver'
+    version = takversion
+    release = takreleaserpm
+    os = LINUX
+    arch = _arch
+    user = _user
+    permissionGroup = _permission_group
+    packageGroup = _package_group
+    packageDescription = _package_description
+    license = _license
+    url = _url
+    summary = _summary
+
+    preInstall _preinstall_script
+    postInstall postinstall_script_takserver
+    postUninstall _postuninstall_script
+
+    from ("$buildDir/takArtifacts") {
+        into 'opt/tak'
+        fileMode = 444
+        dirMode = 755
+    }
+}
+
+task prePackage { }
+prePackage.dependsOn ':takserver-core:bootWar'
+prePackage.dependsOn ':takserver-schemamanager:shadowJar'
+prePackage.dependsOn ':takserver-usermanager:shadowJar'
+prePackage.dependsOn ':takserver-takcl-core:publicJar'
+prePackage.dependsOn copyJars
+prePackage.dependsOn copyWars
+prePackage.dependsOn copyCoreConfigXSD
+prePackage.dependsOn copyCoreConfigExample
+prePackage.dependsOn copyMessagingScripts
+prePackage.dependsOn copyAPIScripts
+prePackage.dependsOn copyPluginsJar
+prePackage.dependsOn copyPluginsScripts
+prePackage.dependsOn copyRetentionJar
+prePackage.dependsOn copyRetentionConfigs
+prePackage.dependsOn copyRetentionMissionStoreDir
+prePackage.dependsOn copyRetentionScripts
+prePackage.dependsOn copyLauncherScripts
+prePackage.dependsOn copyDbScripts
+prePackage.dependsOn copyDocs
+prePackage.dependsOn copyPolicy
+prePackage.dependsOn copyLicense
+
+
+
+buildRpm.dependsOn prePackage
+
+buildDeb.dependsOn prePackage
+
+buildRpm {
+    requires('java-11-openjdk-devel')
+    requires('postgis30_10')
+    requires('postgis30_10-utils')
+    requires('postgresql10-server')
+    requires('postgresql10-contrib')
+    requires('openssl')
+}
+
+// can add deb package dependencies here
+buildDeb { }
+
+

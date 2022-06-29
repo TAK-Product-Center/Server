@@ -1,0 +1,140 @@
+apply plugin: 'java'
+apply plugin: 'com.google.protobuf'
+apply plugin: 'maven-publish'
+
+buildscript {
+  dependencies {
+    classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.8'
+  }
+}
+
+//apply plugin: 'com.github.johnrengelman.shadow'
+
+group = 'com.bbn.roger'
+version = '0.0.1-SNAPSHOT'
+
+dependencies {
+
+  compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+  compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
+  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
+
+  compile 'javax.xml.bind:jaxb-api:2.3.0'
+
+  // gRPC
+  compile group: 'io.grpc', name: 'grpc-netty', version: grpc_version
+  compile group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
+  compile group: 'io.grpc', name: 'grpc-stub', version: grpc_version
+
+  // Google's OpenSSL variant
+  // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
+  compile 'io.netty:netty-tcnative-boringssl-static:' + boringssl_static_version
+
+  //compile 'javax.activation:activation:' + javax_activation_version
+
+  compile 'javax.annotation:javax.annotation-api:1.3.2'
+
+  // for netty performance, put javassist on the classpath
+  compile group: 'org.javassist', name: 'javassist', version: javassist_version
+  
+  // guava
+  compile group: 'com.google.guava', name: 'guava', version: guava_version
+
+  // jackson
+  compile group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: jackson_version
+  compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jackson_version
+  compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jackson_version
+
+  // opencsv
+  compile group: 'com.opencsv', name: 'opencsv', version: opencsv_version
+
+  compile 'org.dom4j:dom4j:2.0.0'
+  compile group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
+
+  // ROL
+  compile project(':takserver-fig-core:rol')
+
+}
+
+// protobuf code generation step
+protobuf {
+  protoc {
+    artifact = 'com.google.protobuf:protoc:3.0.0'
+  }
+  plugins {
+    grpc {
+      artifact = 'io.grpc:protoc-gen-grpc-java:1.0.2'
+    }
+  }
+  generateProtoTasks {
+    all()*.plugins {
+      grpc {
+        // To generate deprecated interfaces and static bindService method,
+        // turn the enable_deprecated option to true below:
+        option 'enable_deprecated=false'
+      }
+    }
+  }
+}
+
+
+
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+
+idea {
+  module {
+    // Not using generatedSourceDirs because of
+    // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
+    sourceDirs += file("${projectDir}/build/generated/source/proto/main/java");
+    sourceDirs += file("${projectDir}/build/generated/source/proto/main/grpc");
+  }
+}
+
+sourceSets {
+  main {
+    java {
+      srcDir 'build/generated/source/proto/main/grpc'
+      srcDir 'build/generated/source/proto/main/java'
+    }
+  }
+}
+
+clean {
+  delete 'bin'
+}
+
+/**
+shadowJar {
+  baseName = 'fig'
+  classifier = 'core'
+  version = version
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}
+**/
+
+//Generates protobuf code, applies the patch
+task applyGrpcPatch{
+  dependsOn 'generateProto'
+  description 'Patches the generated protobuf to make it compatible with both versions 2 and 3'
+  doLast{
+  //Ant used to apply the patch file
+  //(Need to specify the specific file that is getting patched because ant can't figure out which file to patch from the diff file)
+  ant.patch(patchfile: 'proto2compatFix.patch', originalfile: 'build/generated/source/proto/main/java/com/atakmap/Tak/GeoEvent.java')
+}
+println 'APPLYING PROTO PATCH'
+}
+
+compileJava.finalizedBy(tasks.applyGrpcPatch)
+
+task wrapper(type: Wrapper) {
+  gradleVersion = '2.13'
+}

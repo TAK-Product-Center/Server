@@ -1,0 +1,136 @@
+buildscript {
+    dependencies {
+        classpath 'com.netflix.nebula:gradle-ospackage-plugin:' + gradle_ospackage_version
+    }
+}
+
+apply plugin: 'nebula.ospackage'
+apply from: "../utils/utils.gradle"
+
+// Get CoreConfig.example.xml
+task copyCoreConfigExampleOnly(type: Copy) {
+    from project(':takserver-core').file('example/')
+    include 'CoreConfig.example.xml'
+    into "$buildDir/takArtifacts"
+}
+
+def modified_preinstall_script = _preinstall_script + '\n' + """
+
+if [ -f "/opt/tak/CoreConfig.example.xml" ]; then
+  echo '/opt/tak/CoreConfig.example.xml exists!'
+  cp /opt/tak/CoreConfig.example.xml /opt/tak/CoreConfig_temp_backup.example.xml
+else 
+  echo '/opt/tak/CoreConfig.example.xml does not exist'
+fi
+
+"""
+
+//println "modified_preinstall_script:"
+//println modified_preinstall_script
+
+// rpm postinstall script
+def postinstall_script_db = '''\
+
+export tak_full_version=''' + takversion + '''-''' + takrelease + '''
+
+chown root:root /opt/tak/db-utils/pg_hba.conf
+chmod 600 /opt/tak/db-utils/pg_hba.conf
+
+chmod 544 /opt/tak/db-utils/*.sh
+chmod 500 /opt/tak/db-utils/clear-old-data.sh
+chmod 500 /opt/tak/db-utils/clear-old-data.sql
+chown postgres:postgres /opt/tak/db-utils/clear-old-data.sh
+chown postgres:postgres /opt/tak/db-utils/clear-old-data.sql
+
+cp /opt/tak/certs-tmp/cert-metadata.sh /opt/tak/certs/. 2>/dev/null || :
+cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
+rm -rf /opt/tak/certs-tmp
+
+# rename old tomcat if it exists
+mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED &>/dev/null
+
+# setup a default DB password
+sh /opt/tak/db-utils/setupDefaultPassword.sh
+
+cat <<- "EOF"
+
+TAK SERVER SOFTWARE LICENSE AGREEMENT
+
+Distribution Statement A: Approved for public release; distribution is unlimited.
+
+----
+
+Configure or upgrade your TAK Server database:
+ 
+To configure for the first time: sudo /opt/tak/db-utils/takserver-setup-db.sh
+ 
+To upgrade an existing db: sudo java -jar /opt/tak/db-utils/SchemaManager.jar upgrade
+
+EOF
+''' + '''
+
+if [ -f "/opt/tak/CoreConfig_temp_backup.example.xml" ]; then
+  echo 'Reinstate the previous CoreConfig.example.xml from CoreConfig_temp_backup.example.xml...'
+  mv /opt/tak/CoreConfig_temp_backup.example.xml /opt/tak/CoreConfig.example.xml
+  chown tak:tak /opt/tak/CoreConfig.example.xml
+fi
+
+if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
+    mv /opt/tak/db-utils/clear-old-data.sql /opt/tak/db-utils/clear-old-data.sql.dist.$tak_full_version
+    mv /opt/tak/db-utils/clear-old-data.sql.bak /opt/tak/db-utils/clear-old-data.sql
+fi
+
+'''
+
+ospackage {
+    packageName = 'takserver-database'
+    version = takversion
+    release = takreleaserpm
+    os = LINUX
+    arch = _arch
+    user = _user
+    permissionGroup = _permission_group
+    packageGroup = _package_group
+    packageDescription = _package_description
+    license = _license
+    url = _url
+    summary = _summary
+
+    preInstall modified_preinstall_script
+    postInstall postinstall_script_db
+    postUninstall _postuninstall_script
+
+    from ("$buildDir/takArtifacts") {
+        into 'opt/tak'
+        fileMode = 444
+        dirMode = 755
+    }
+}
+
+task prePackageDbOnlyScripts { }
+prePackageDbOnlyScripts.dependsOn copyDbOnlyScripts
+
+
+task prePackage { }
+prePackage.dependsOn prePackageDbOnlyScripts
+prePackage.dependsOn ':takserver-schemamanager:shadowJar'
+prePackage.dependsOn copySchemaManagerJar
+prePackage.dependsOn copyCoreConfigExampleOnly
+prePackage.dependsOn copyDbScripts
+prePackage.dependsOn copyDocs
+prePackage.dependsOn copyLicense
+
+
+
+buildRpm.dependsOn prePackage
+
+buildRpm {
+    requires('java-11-openjdk-devel')
+    requires('postgis30_10')
+    requires('postgis30_10-utils')
+    requires('postgresql10-server')
+    requires('postgresql10-contrib')
+}
+
+// TODO: add deb package dependencies here
+buildDeb { }

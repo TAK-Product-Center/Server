@@ -1,0 +1,113 @@
+buildscript {
+    dependencies {
+        classpath 'com.netflix.nebula:gradle-ospackage-plugin:' + gradle_ospackage_version
+    }
+}
+
+apply plugin: 'nebula.ospackage'
+apply from: "../utils/utils.gradle"
+
+// rpm postinstall script
+def postinstall_script_messaging = '''\
+
+chmod 644 /opt/tak/logging-restrictsize.xml
+chmod 544 /opt/tak/*.bat
+chmod 544 /opt/tak/*.sh
+
+chmod 544 /opt/tak/messaging/*.sh
+chmod u+w /opt/tak/messaging/takserver-messaging.sh
+cp /opt/tak/messaging/takserver-messaging.sh /opt/tak
+chown -f tak:tak /opt/tak/takserver-messaging.sh 2>/dev/null
+
+chmod 500 /opt/tak/certs/*.sh
+chmod 600 /opt/tak/certs/cert-metadata.sh
+
+chown root:root /opt/tak/messaging/takserver-messaging
+chmod 755 /opt/tak/messaging/takserver-messaging
+cp /opt/tak/messaging/takserver-messaging /etc/init.d
+
+rm -rf /opt/tak/messaging
+
+chmod 755 /opt/tak/utils
+mkdir -p /opt/tak/logs
+chown tak:tak /opt/tak/logs
+chmod 755 /opt/tak/logs
+chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
+mkdir -p /opt/tak/iconsets
+chown -fR tak:tak /opt/tak/iconsets
+mkdir -p /opt/tak/webcontent
+chown -fR tak:tak /opt/tak/webcontent
+mkdir -p /opt/tak/logs
+chown tak:tak /opt/tak/logs
+mkdir -p /opt/tak/lib
+chown tak:tak /opt/tak/lib
+
+cp /opt/tak/certs-tmp/cert-metadata.sh /opt/tak/certs/. 2>/dev/null || :
+cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
+rm -rf /opt/tak/certs-tmp
+
+# rename old tomcat if it exists
+mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED &>/dev/null
+
+echo "IMPORTANT: If you are going to use a database, make sure you copy the generated database password from /opt/tak/CoreConfig.example.xml on the database machine to your CoreConfig on this machine"
+echo "Create login credentials for local adminstrative access to the configuration interface:"
+echo "sudo java -jar /opt/tak/utils/UserManager.jar usermod -A -p <password> <username>"
+echo "For secure operation, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates."
+echo "Using Firefox or Chrome on this computer, browse to this address to verify keystore and truststore configuration:"
+echo "http://localhost:8080" 
+echo "Login with the administrative credentials specified above."
+echo "Follow the instructions in the Installation section of the configuration guide to complete the setup process." 
+'''
+
+
+ospackage {
+    packageName = 'takserver-messaging'
+    version = takversion
+    release = takreleaserpm
+    os = LINUX
+    arch = _arch
+    user = _user
+    permissionGroup = _permission_group
+    packageGroup = _package_group
+    packageDescription = _package_description
+    license = _license
+    url = _url
+    summary = _summary
+
+    preInstall _preinstall_script
+    postInstall postinstall_script_messaging
+    postUninstall _postuninstall_script
+
+    from ("$buildDir/takArtifacts") {
+        into 'opt/tak'
+        fileMode = 444
+        dirMode = 755
+    }
+}
+
+task prePackage { }
+prePackage.dependsOn ':takserver-core:bootWar'
+prePackage.dependsOn ':takserver-usermanager:shadowJar'
+prePackage.dependsOn ':takserver-takcl-core:publicJar'
+prePackage.dependsOn copyJarsNoDb
+prePackage.dependsOn copyWars
+prePackage.dependsOn copyCoreConfigXSD
+prePackage.dependsOn copyCoreConfigExample
+prePackage.dependsOn copyMessagingScripts
+prePackage.dependsOn copyDocs
+prePackage.dependsOn copyPolicy
+prePackage.dependsOn copyLicense
+
+buildRpm.dependsOn prePackage
+
+buildDeb.dependsOn prePackage
+
+buildRpm {
+    requires('java-11-openjdk-devel')
+    requires('openssl')
+}
+
+// TODO: add deb package dependencies here
+buildDeb { }
+
+
