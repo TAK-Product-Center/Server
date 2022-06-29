@@ -1,0 +1,251 @@
+buildscript {
+  dependencies {
+   classpath 'com.netflix.nebula:gradle-ospackage-plugin:' + gradle_ospackage_version
+  }
+}
+
+apply plugin: 'nebula.ospackage'
+apply from: "utils/utils.gradle"
+
+ext {
+    // rpm preinstall script
+    _preinstall_script = '''\
+# stop TAK Server if it is running (including older versions)
+pkill -9 -f takserver.jar &>/dev/null
+pkill -9 -f takserver.war &>/dev/null
+pkill -9 -f takserver-web.war &>/dev/null
+pkill -9 -f TAKServer.jar &>/dev/null
+pkill -9 -f takserver-pm.jar &>/dev/null
+pkill -9 -f takserver-retention.jar &>/dev/null 
+pkill -9 -f apache-tomcat &>/dev/null
+systemctl stop takserver &>/dev/null
+
+mkdir -p /opt/tak
+id -u tak &> /dev/null
+if [ $? -ne 0 ] ; then
+# User id 1491 is arbitrary
+useradd tak -r -u 1491 --no-create-home -d /opt/tak
+fi
+
+if [ -f /opt/tak/db-utils/clear-old-data.sql ] ; then
+    mv /opt/tak/db-utils/clear-old-data.sql /opt/tak/db-utils/clear-old-data.sql.bak
+fi
+
+mkdir -p /opt/tak/certs-tmp
+cp /opt/tak/certs/cert-metadata.sh /opt/tak/certs-tmp/. 2>/dev/null || :
+cp /opt/tak/certs/config.cfg /opt/tak/certs-tmp/. 2>/dev/null || :
+'''
+    // rpm post uninstall script
+    _postuninstall_script = '''\
+case "$1" in
+ 0)
+        # uninstall
+        userdel tak
+        ;;
+ 1)
+        # this is an upgrade, do nothing
+        :
+        ;;
+esac
+'''
+    _arch = 'noarch'
+    _user = 'tak'
+    _permission_group = 'tak'
+    _package_group = 'Applications/Internet'
+    _package_description = '''\
+The Team Awareness Kit (TAK) server is a network server supporting the family of TAK
+situation-awareness applications, such as the Android Team Awareness Kit (ATAK) and 
+Windows Team Awareness Kit (WinTAK). TAK server provides brokering, filtering, and
+archiving of Cursor-on-Target (CoT) information and provides interconnectivity to
+TAK devices on non-multicast networks.
+'''
+    _license = 'Distribution Statement A: Approved for public release; distribution is unlimited.'
+    _url = 'https://atakmap.com'
+    _summary = 'Team Awareness Kit (TAK) Tactical Information Management System'
+}
+
+
+// rpm postinstall script
+def postinstall_script = '''\
+
+export tak_full_version=''' + takversion + '''-''' + takrelease + '''
+
+chmod 644 /opt/tak/logging-restrictsize.xml
+chmod 544 /opt/tak/*.bat
+chmod 544 /opt/tak/*.sh
+chmod u+w /opt/tak/takserver.sh
+chown root:root /opt/tak/db-utils/pg_hba.conf
+chmod 600 /opt/tak/db-utils/pg_hba.conf
+chmod 500 /opt/tak/certs/*.sh
+chmod 600 /opt/tak/certs/cert-metadata.sh
+
+chmod 544 /opt/tak/db-utils/*.sh
+chmod 500 /opt/tak/db-utils/clear-old-data.sh
+chmod 500 /opt/tak/db-utils/clear-old-data.sql
+chown postgres:postgres /opt/tak/db-utils/clear-old-data.sh
+chown postgres:postgres /opt/tak/db-utils/clear-old-data.sql
+
+chown root:root /opt/tak/utils/takserver-combined
+chmod 755 /opt/tak/utils/takserver-combined
+cp /opt/tak/utils/takserver-combined /etc/init.d
+chmod 755 /opt/tak/utils
+mkdir -p /opt/tak/logs
+chown tak:tak /opt/tak/logs
+chmod 755 /opt/tak/logs
+chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
+mkdir -p /opt/tak/iconsets
+chown -fR tak:tak /opt/tak/iconsets
+mkdir -p /opt/tak/webcontent/webtak-plugins/plugins
+if [ ! -f /opt/tak/webcontent/webtak-plugins/webtak-manifest.json ]; then 
+\techo -e "{\\n\\t\\"plugins\\": [], \\n\\t\\"iconSets\\": []\\n}" > /opt/tak/webcontent/webtak-plugins/webtak-manifest.json
+fi
+chown -fR tak:tak /opt/tak/webcontent
+mkdir -p /opt/tak/logs
+chown tak:tak /opt/tak/logs
+mkdir -p /opt/tak/lib
+chown tak:tak /opt/tak/lib
+
+cp /opt/tak/certs-tmp/cert-metadata.sh /opt/tak/certs/. 2>/dev/null || :
+cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
+rm -rf /opt/tak/certs-tmp
+
+# rename old tomcat if it exists
+mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED &>/dev/null
+
+# setup a default DB password
+sh /opt/tak/db-utils/setupDefaultPassword.sh
+
+if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
+    mv /opt/tak/db-utils/clear-old-data.sql /opt/tak/db-utils/clear-old-data.sql.dist.$tak_full_version
+    mv /opt/tak/db-utils/clear-old-data.sql.bak /opt/tak/db-utils/clear-old-data.sql
+fi
+
+echo "Configure or upgrade your TAK Server database:" 
+echo "To configure for the first time: sudo /opt/tak/db-utils/takserver-setup-db.sh" 
+echo "To upgrade an existing db: sudo java -jar /opt/tak/db-utils/SchemaManager.jar upgrade"
+echo "Create login credentials for local adminstrative access to the configuration interface:"
+echo "sudo java -jar /opt/tak/utils/UserManager.jar usermod -A -p <password> <username>"
+echo "For secure operation, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates."
+echo "Using Firefox or Chrome on this computer, browse to this address to verify keystore and truststore configuration:"
+echo "http://localhost:8080" 
+echo "Login with the administrative credentials specified above."
+echo "Follow the instructions in the Installation section of the configuration guide to complete the setup process." 
+'''
+
+ospackage {
+ packageName = 'takserver-combined'
+ version = takversion
+ release = takreleaserpm
+ os = LINUX
+ arch = _arch
+ user = _user
+ permissionGroup = _permission_group
+ packageGroup = _package_group
+ packageDescription = _package_description
+ license = _license
+ url = _url
+ summary = _summary
+
+ preInstall _preinstall_script
+ postInstall postinstall_script
+ postUninstall _postuninstall_script
+
+ from ("$buildDir/takArtifacts") {
+   into 'opt/tak'
+   fileMode = 444
+   dirMode = 755
+ }
+}
+
+
+
+task prePackage { }
+prePackage.dependsOn ':takserver-core:bootWar'
+prePackage.dependsOn ':takserver-schemamanager:shadowJar'
+prePackage.dependsOn ':takserver-usermanager:shadowJar'
+prePackage.dependsOn ':takserver-takcl-core:publicJar'
+prePackage.dependsOn copyJars
+prePackage.dependsOn copyWars
+prePackage.dependsOn copyCoreConfigXSD
+prePackage.dependsOn copyCoreConfigExample
+prePackage.dependsOn copyCoreScripts
+prePackage.dependsOn copyDbScripts
+prePackage.dependsOn copyDocs
+prePackage.dependsOn copyPolicy
+prePackage.dependsOn copyLicense
+
+
+buildRpm.dependsOn prePackage
+
+buildDeb.dependsOn prePackage
+
+buildRpm {
+  requires('java-11-openjdk-devel')
+  requires('postgis30_10')
+  requires('postgis30_10-utils')
+  requires('postgresql10-server')
+  requires('postgresql10-contrib')
+}
+
+// NB can configure deb package generation here
+buildDeb { }
+
+task bundleRpm(type: Zip) {
+    archiveName 'takserver-bundle-' + takversion + '-' + takrelease + branch + '.zip'
+    destinationDir(file('build/'))
+    from('takserver/build/distributions/') {}
+    from ('takserver/build/takArtifacts/docs/') {
+        include 'TAK_Server_Configuration_Guide.pdf'
+    }
+    into ('multiprocess')  {
+        from('database/build/distributions/', 'launcher/build/distributions/')
+    }
+}
+
+task bundleRpmCoreDb(type: Zip) {
+    archiveName 'takserver-rpm-core-db-' + takversion + '-' + takrelease + branch + '.zip'
+    from('database/build/distributions/', 'launcher/build/distributions/')
+    from ('takserver/build/takArtifacts/docs/') {
+        include 'TAK_Server_Configuration_Guide.pdf'
+    }
+}
+
+task bundlePublishArtifacts(type: Copy) {
+   dependsOn('database:buildRpm', 'federation-hub:buildRpm', 'takserver:buildRpm', 'launcher:buildRpm', 'buildDocker', 'createCIVersionArtifacts', ':takserver-cluster:buildCluster')
+
+    def rpmv = "${takversion}-${takreleaserpm}"
+    def zipv = "${takversion}-${takrelease}"
+    from("resources/takserver-public-gpg.key",
+            "takserver/build/takArtifacts/docs/TAK_Server_Configuration_Guide.pdf",
+            "takserver/build/distributions/takserver-${rpmv}.noarch.rpm",
+            "takserver/build/distributions/takserver-docker-${zipv}.zip",
+            "launcher/build/distributions/takserver-core-${rpmv}.noarch.rpm",
+            "database/build/distributions/takserver-database-${rpmv}.noarch.rpm",
+            "${rootDir}/takserver-cluster/build/distributions/takserver-cluster-${zipv}.zip",
+            "federation-hub/build/distributions/takserver-fed-hub-${rpmv}.noarch.rpm"
+//            "API/build/distributions/takserver-api-${tail}",
+//            "build/distributions/takserver-combined-${tail}",
+//            "messaging/build/distributions/takserver-messaging-${tail}",
+    )
+    into "${rootDir}/UNSIGNED/${version}/"
+}
+
+
+task buildDocker(type: GradleBuild) { 
+  buildName = 'buildDocker'
+  tasks = [
+    'prePackage',
+    'copyTakserverDockerFiles',
+    'copySchemaManagerFiles',
+    'copyPluginsScripts',
+    'copyPluginsJar',
+    'copyRetentionConfigs',
+    'copyRetentionMissionStoreDir',
+    'copyRetentionScripts',
+    'copyRetentionJar',
+    'createVersionFile',
+    'createLogDir',
+    'createPluginsLibDir',
+    'zipTakserverDocker'
+  ]
+}

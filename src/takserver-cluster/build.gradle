@@ -1,0 +1,163 @@
+buildscript {
+  dependencies {
+      classpath 'com.netflix.nebula:gradle-ospackage-plugin:' + gradle_ospackage_version
+      classpath 'net.sf.proguard:proguard-gradle:5.2.1'
+  }
+}
+apply plugin: 'nebula.ospackage'
+
+task pullPluginManager(type: Copy, dependsOn: ':takserver-plugin-manager:bootJar') {
+    from project(':takserver-plugin-manager').file('build/libs/')
+    into "$buildDir/takserver-core"
+    include 'takserver-plugin-manager-*.jar'
+    rename { String fileName -> "takserver-pm.jar" }
+}
+
+task pullSchemaManager(type: Copy, dependsOn: ':takserver-schemamanager:setupCluster') {
+    from project(':takserver-schemamanager').file('build/cluster')
+    into "$buildDir/takserver-schemamanager"
+}
+
+task pullUserManager(type: Copy, dependsOn: ':takserver-usermanager:setupCluster') {
+    from project(':takserver-usermanager').file('build/cluster')
+    into "$buildDir/takserver-usermanager"
+}
+
+task pullTakserverCore(type: Copy, dependsOn: ':takserver-core:setupCluster') {
+    from project(':takserver-core').file('build/cluster')
+    into "$buildDir/takserver-core"
+}
+
+task moveCoreConfig(type: Copy) {
+    from project(':takserver-cluster').file('build/takserver-core/CoreConfig.xml')
+    into "$buildDir"
+}
+
+task deleteCoreConfig(type: Delete) {
+    delete project(':takserver-cluster').file('build/takserver-core/CoreConfig.xml')
+}
+
+task copyClusterProperties(type: Copy) {
+    from project(':takserver-cluster').file('cluster-properties-template')
+    into "$buildDir"
+    rename('cluster-properties-template', 'cluster-properties')
+}
+
+task copyClusterConfig(type: Copy) {
+    from project(':takserver-cluster').file('eks-cluster.yaml')
+    into "$buildDir"
+}
+
+task copyDockerFiles(type: Copy) {
+    from project(':takserver-cluster').file('docker-files')
+    into "$buildDir/docker-files"
+}
+
+task copyDeployments(type: Copy) {
+    from project(':takserver-cluster').file('deployments')
+    into "$buildDir/deployments"
+    rename('takserver-core-service-and-deployment-template.yml', 'takserver-core-service-and-deployment.yaml')
+}
+
+task copyScripts(type: Copy) {
+    from project(':takserver-schemamanager').file('scripts/generic-cluster-database-configuration.sh')
+    into "$buildDir/takserver-schemamanager"
+    from project(':takserver-cluster').file('utilities/db-connection-configuration.sh')
+    into "$buildDir/takserver-schemamanager"
+}
+
+task copyClusterScripts(type: Copy) {
+    from project(':takserver-cluster').file('scripts')
+    into "$buildDir/scripts"
+}
+
+task copyDbConfigurations(type: Copy) {
+    from project(':takserver-schemamanager').file('scripts/postgresql.conf')
+    into project.getProjectDir().getPath() + '/deployments/helm/extras'
+    from project(':takserver-schemamanager').file('scripts/pg_hba.conf')
+    into project.getProjectDir().getPath() + '/deployments/helm/extras'
+}
+
+task zipCluster(type: Zip) {
+    from('build') {
+        into('cluster/')
+    }
+    from('.') {
+        include 'README.md'
+    }
+    archiveName 'takserver-cluster-' + version + '.zip'
+    destinationDir(file('.'))
+}
+
+task moveZip(type: Copy) {
+    from project(':takserver-cluster').file('takserver-cluster-' + version + '.zip')
+    into "$buildDir/distributions/"
+}
+
+task deleteZip(type: Delete) {
+    delete project(':takserver-cluster').file('takserver-cluster-' + version + '.zip')
+}
+
+task generateCertsConfigMap(type: Exec) {
+    workingDir "$buildDir/takserver-core/certs"
+    commandLine 'sh', 'generateClusterCertsConfigMap.sh'
+}
+
+task copyCertsConfigMap(type: Copy) {
+    from "$buildDir/takserver-core/certs/cert-migration.yaml"
+    into project(':takserver-cluster').file('deployments/helm/templates')
+}
+
+clean {
+  delete '$buildDir'
+}
+
+// Keeps kubernetes dependencies out of the package process by not creating default cert configs used for helm
+task buildCluster(type: GradleBuild) {
+  buildName = 'buildCluster'
+  tasks = [
+    'pullTakserverCore',
+    'pullSchemaManager', 
+    'pullUserManager',
+    'pullPluginManager',
+    'moveCoreConfig',
+    'deleteCoreConfig',
+    'copyClusterProperties',
+    'copyClusterConfig',
+    'copyScripts',
+    'copyClusterScripts',
+    'copyDockerFiles',
+    'copyDeployments',
+    'copyDbConfigurations',
+    'zipCluster',
+    'moveZip',
+    'deleteZip'
+  ]
+}
+
+task buildHelmCluster(type: GradleBuild) { 
+  buildName = 'buildHelmCluster'
+  tasks = [
+    'pullTakserverCore',
+    'pullSchemaManager', 
+    'pullUserManager',
+    'pullPluginManager',
+    'moveCoreConfig',
+    'deleteCoreConfig',
+    'copyClusterProperties',
+    'copyClusterConfig',
+    'copyScripts',
+    'copyClusterScripts',
+    'copyDockerFiles',
+    'copyDeployments',
+    'copyDbConfigurations',
+    'zipCluster',
+    'moveZip',
+    'deleteZip',
+    'generateCertsConfigMap',
+    'copyCertsConfigMap'
+  ]
+}
+
+
+

@@ -1,0 +1,87 @@
+buildscript {
+  dependencies {
+    classpath('org.springframework.boot:spring-boot-gradle-plugin:' + spring_boot_version)
+  }
+}
+
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+
+apply plugin: 'war'
+
+bootWar {
+  mainClass = "tak.server.federation.hub.ui.FederationHubUIService"
+}
+
+apply plugin: 'application'
+mainClassName = 'tak.server.federation.hub.ui.manage.AuthManager'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+shadowJar {
+  baseName = 'federation-hub-manager'
+  classifier = 'all'
+  version = version
+  dependencies {
+    exclude(dependency('org.apache.*:.*'))
+    exclude(dependency('org.springframework.*:.*'))
+  }
+  archiveFileName = "${baseName}-${version}.${extension}"
+}
+
+test {
+  testLogging.showStandardStreams = true
+
+  // Display logging output.
+  onOutput { descriptor, event -> logger.lifecycle(event.message) }
+}
+
+sourceSets {
+  main {
+    java {
+      srcDir 'build/src-generated'
+    }
+  }
+}
+
+configurations {
+    compile.exclude module: "spring-boot-starter-tomcat"
+}
+
+dependencies {
+  compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+  compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
+  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
+
+  compile project(':federation-common')
+
+  compile group: 'com.h2database', name: 'h2', version: h2_version
+
+  // Apache Ignite (cache and distributed service grid).
+  compile group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_version
+  compile group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
+  compile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
+  compile group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: spring_boot_version
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-jetty', version: spring_boot_version
+  compile group: 'org.springframework.boot', name: 'spring-boot-starter-security', version: spring_boot_version
+  compile group: 'org.springframework', name: 'spring-web', version: spring_version
+
+  testCompile group: 'junit', name: 'junit', version: junit_version
+  testCompile group: 'org.mockito', name: 'mockito-core', version: mockito_version
+  testCompile("org.springframework.boot:spring-boot-starter-test") {
+    exclude group: "com.vaadin.external.google", module:"android-json"
+  }
+
+  compile group: 'commons-fileupload', name: 'commons-fileupload', version: commons_fileupload_version
+
+  testCompile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+}
+
+compileJava {
+    options.compilerArgs += ["-Xlint:unchecked", "-Xlint:deprecation", "-Xlint:serial"]
+}

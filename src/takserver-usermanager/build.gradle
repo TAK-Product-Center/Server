@@ -1,0 +1,130 @@
+import groovy.xml.MarkupBuilder
+
+import java.nio.file.Files
+import java.nio.file.Paths
+
+apply plugin: 'application'
+
+mainClassName = 'com.bbn.marti.UserManager'
+
+apply plugin: 'com.github.johnrengelman.shadow'
+
+shadowJar {
+    baseName = 'UserManager'
+    classifier = 'all'
+    version = version
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java']
+        }
+        resources {
+            srcDirs = ['src/main/resources']
+        }
+    }
+    integrationTest {
+        java {
+            srcDir 'src/integrationTest/java'
+        }
+        resources {
+            srcDir 'src/integrationTest/resources'
+        }
+    }
+}
+
+task integrationTest(type: Test) {
+    group = "Verification"
+    description = "Executes integration test using the takcl framework"
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    
+    def tmpDir = "$buildDir/tmp/integrationTest/"
+    def fallbackTmpDir = tmpDir
+    def modelServerDir = project.parent.project(':takserver-package').buildDir.toPath().resolve('takArtifacts')
+    def certToolDir = project.parent.project(':takserver-package').buildDir.toPath().resolve('takArtifacts/certs')
+    def jarName = 'takserver.war'
+    def configFilepath = Paths.get(tmpDir).resolve("TAKCLConfig.xml").toAbsolutePath()
+
+    def certificateDirectory = tmpDir + 'TEST_CERTS/'
+
+    def configurationString = 
+            """<?xml version="1.0" encoding="UTF-8"?>
+<TAKCLConfiguration xmlns="http://bbn.com/marti/takcl/config"
+  xmlns:common="http://bbn.com/marti/takcl/config/common">
+  <common:TemporaryDirectory>"${tmpDir}</common:TemporaryDirectory>"
+  <common:FallbackTemporaryDirectory>${fallbackTmpDir}/</common:FallbackTemporaryDirectory>
+  <common:RunnableTAKServerConfig
+    modelServerDir="${modelServerDir}"
+    jarName="${jarName}"
+    serverFarmDir="${tmpDir}TEST_FARM"
+    certificateDirectory="${certificateDirectory}"
+    certToolDirectory="${certToolDir}"
+    />
+  <common:ConnectableTAKServerConfig
+    url="127.0.0.1"
+    truststoreJKSFilepath="${certificateDirectory}/truststore-root.jks"
+    truststorePass="atakatak"
+    clientKeystoreP12Filepath="${certificateDirectory}TAKCL.p12"
+    clientKeystorePass="atakatak"
+    />
+  <common:TAKCLTestSourceGenerationConfig
+    javaSrcDir="src/"
+    javaTemplatePackage="com.bbn.marti.test.shared.data.templates"
+    javaGenerationPackage="com.bbn.marti.test.shared.data.generated"
+    />
+</TAKCLConfiguration>"""
+
+    doFirst {
+        new File(tmpDir).mkdirs()
+        Files.write(configFilepath, configurationString.getBytes())
+    }
+
+    systemProperty 'com.bbn.marti.takcl.config.filepath', configFilepath.toString()
+    systemProperty 'java.net.preferIPv4Stack', 'true'
+    systemProperty 'logging.level.com.bbn', 'TRACE'
+    systemProperty 'logging.level.tak', 'TRACE'
+    systemProperty 'logging.level.org.apache.ignite', 'INFO'
+    systemProperty 'com.bbn.marti.takcl.dbEnabled', 'false'
+
+    Object testProperties = System.properties
+    for (String key : testProperties.keySet()) {
+        if (key.startsWith("com.bbn.marti.takcl")) {
+            systemProperty key, testProperties.get(key)
+        }
+    }
+
+    dependsOn(':takserver-package:prePackage')
+    dependsOn('build')
+}
+
+dependencies {
+    compile project(':takserver-takcl-core')
+	compile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+    compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+    compile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+    compile group: 'xerces', name: 'xercesImpl', version: xerces_version
+
+    // required to fix version conflict for h2 between ignite and spring boot
+    compile group: 'com.h2database', name: 'h2', version: h2_version
+
+    integrationTestCompile project(':takserver-takcl-core')
+    integrationTestCompile group: 'xerces', name: 'xercesImpl', version: xerces_version
+
+    // required to fix version conflict for h2 between ignite and spring boot
+    integrationTestCompile group: 'com.h2database', name: 'h2', version: h2_version
+}
+
+task copyJar (type: Copy, dependsOn: shadowJar) {
+  from file('build/libs')
+  include 'UserManager-' + version + '-all.jar'
+  into "$buildDir/cluster"
+  rename('UserManager-' + version + '-all.jar', 'UserManager.jar')
+}
+
+task setupCluster (type: Copy, dependsOn: copyJar) {}
+
+clean {
+  delete '$buildDir/cluster'
+}
