@@ -1,11 +1,10 @@
 name: Run Gradle on PUSH or PR
 on: [push,pull_request]
 jobs:
-  gradle:
-    strategy:
-      matrix:
-        os: [ macos-latest, windows-latest, ubuntu-latest ]
-    runs-on: ${{ matrix.os }}
+  job-name: Build on CentOS 7
+    runs-on: ubuntu-latest
+    container:
+      image: centos:7
     steps:
     - uses: actions/checkout@v3
       with:
