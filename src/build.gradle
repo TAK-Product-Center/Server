@@ -21,7 +21,7 @@ ext {
   // access local git repo
   git = org.ajoberstar.grgit.Grgit.open(file('..'))
   gitrev = git.head().id
-  gitdescribe = git.describe(tags: true)
+  gitdescribe = git.describe(longDescr: true)
   gitbranch = git.branch.getCurrent().name
 
   def (tv, takrel1, takrel2) = gitdescribe.trim().tokenize('-')
