@@ -22,6 +22,10 @@ ext {
   git = org.ajoberstar.grgit.Grgit.open(file('..'))
   gitrev = git.head().id
   gitdescribe = git.describe()
+  if (gitdescribe == null)
+    {
+    gitdescribe = 0.0.0
+    }
   project.logger.lifecycle('gitdescribe = {}', gitdescribe.toString())
   gitbranch = git.branch.getCurrent().name
   project.logger.lifecycle('gitbranch = {}', gitbranch.toString())
