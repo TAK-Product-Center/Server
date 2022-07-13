@@ -21,4 +21,4 @@ jobs:
     - name: Execute Gradle build
       run: |
        cd src
-       ./gradlew clean test
+       ./gradlew clean test --scan
