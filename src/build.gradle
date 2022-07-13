@@ -22,9 +22,9 @@ ext {
   git = org.ajoberstar.grgit.Grgit.open(file('..'))
   gitrev = git.head().id
   gitdescribe = git.describe()
-  project.logger.lifecycle(gitdescribe)
+  project.logger.lifecycle("gitdescribe =" gitdescribe)
   gitbranch = git.branch.getCurrent().name
-  project.logger.lifecycle(gitbranch)
+  project.logger.lifecycle("gitbranch =" gitbranch)
 
   def (tv, takrel1, takrel2) = gitdescribe.trim().tokenize('-')
 
