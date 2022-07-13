@@ -21,10 +21,10 @@ ext {
   // access local git repo
   git = org.ajoberstar.grgit.Grgit.open(file('..'))
   gitrev = git.head().id
-  //temp fix by hard coding version
-  gitdescribe = "TakServer-4.5-Release72"
-  //gitdescribe = git.describe()
+  gitdescribe = git.describe()
+  printf(gitdescribe)
   gitbranch = git.branch.getCurrent().name
+  printf(gitbranch)
 
   def (tv, takrel1, takrel2) = gitdescribe.trim().tokenize('-')
 
