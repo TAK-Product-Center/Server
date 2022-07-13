@@ -18,7 +18,7 @@ jobs:
     - name: Setup Gradle
       uses: gradle/gradle-build-action@v2
 
-    - name: Execute Gradle build
+    - name: Execute Gradle tests
       run: |
        cd src
-       ./gradlew clean test --scan
+       ./gradlew clean test
