@@ -1,23 +1,9 @@
-name: Run Gradle on PUSH or PR
-on: [push,pull_request]
+name: container
+on: push
+
 jobs:
-  job-name: Build on CentOS 7
+  node-docker:
     runs-on: ubuntu-latest
     container:
       image: centos:7
-    steps:
-    - uses: actions/checkout@v3
-      with:
-       fetch-depth: 0
-    - uses: actions/setup-java@v3
-      with:
-        distribution: temurin
-        java-version: 11
-        
-    - name: Setup Gradle
-      uses: gradle/gradle-build-action@v2
-    
-    - name: Execute Gradle build
-      run: |
-       cd src
-       ./gradlew build clean bootWar bootJar
+
