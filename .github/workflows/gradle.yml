@@ -1,5 +1,5 @@
 name: Run Gradle on PRs
-on: [ push, pull_request ]
+on: [push,pull_request]
 jobs:
   gradle:
     strategy:
@@ -12,11 +12,11 @@ jobs:
       with:
         distribution: temurin
         java-version: 11
-        
+
     - name: Setup Gradle
       uses: gradle/gradle-build-action@v2
-    
+
     - name: Execute Gradle build
       run: |
-      cd src
-      ./gradlew clean bootWar bootJar
+       cd src
+       ./gradlew clean test
