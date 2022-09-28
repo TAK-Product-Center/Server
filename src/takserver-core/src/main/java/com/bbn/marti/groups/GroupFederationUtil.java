@@ -36,7 +36,7 @@ import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
 import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
 import com.bbn.marti.config.Federation;
-import com.bbn.marti.config.Network;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.remote.groups.AuthenticatedUser;
 import com.bbn.marti.remote.groups.ConnectionInfo;
@@ -289,7 +289,7 @@ public class GroupFederationUtil {
     	return reachableUsers;
     }
     
-    public void updateInputGroups(@NotNull Network.Input input) {
+    public void updateInputGroups(@NotNull Input input) {
         // Get the connectionId
         String connectionId = MessageConversionUtil.getConnectionId(input);
 

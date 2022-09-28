@@ -39,5 +39,9 @@ message CotEvent {
     // This is optional - if omitted, then the cot message
     // had no data under <detail>
     Detail detail = 15;
+
+    uint64 submissionTime = 16;
+    uint64 creationTime = 17;
+
 }
 

@@ -10,7 +10,11 @@ import org.dom4j.Document;
 import org.dom4j.DocumentException;
 
 import com.bbn.cot.CotParserCreator;
+import com.bbn.cot.filter.DataFeedFilter;
+import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.channel.ChannelHandler;
+import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.nio.protocol.ProtocolInstantiator;
 import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
@@ -42,38 +46,15 @@ public class SingleCotProtocol extends AbstractBroadcastingProtocol<CotEventCont
 
     @Override
 	public void onDataReceived(ByteBuffer buffer, ChannelHandler handler) {
-        int binaryLength = buffer.remaining();
-		String strData = charset.decode(buffer).toString();
-
-        log.trace(String.format(
-            "%s received network data -- handler: %s binary_data_length: %d char_data_length: %d", 
-            this,
-            handler,
-            binaryLength,
-            strData.length()
-        ));
-        
-        
-		Document doc = null;
-		try {
-			
-			if (cotParser.get() == null) {
-				cotParser.set(CotParserCreator.newInstance());
-			}
-			
-			doc = cotParser.get().parse(strData);
-		} catch (DocumentException e) {
-			// TODO: notify somebody... may want to filter out messages from a given party if we get too many
-		    if (log.isTraceEnabled()) {
-		        log.trace("received single message packet data: " + strData);
-		    }
-			log.debug("Error attempting to parse single message packet from " + handler.toString());
+    	if (cotParser.get() == null) {
+			cotParser.set(CotParserCreator.newInstance());
 		}
-		
-		if (doc != null) {
-			CotEventContainer cot = new CotEventContainer(doc);
-			broadcastDataReceived(cot, handler);
-		}
+    	
+    	CotEventContainer cot = byteBufToCot(buffer, handler, cotParser.get());
+			
+    	if (cot != null) {
+    		broadcastDataReceived(cot, handler);
+    	}
 	}
 
     @Override
@@ -118,4 +99,40 @@ public class SingleCotProtocol extends AbstractBroadcastingProtocol<CotEventCont
 	public String toString() {
         return "server_packet_CoT";
 	}
+    
+    public static CotEventContainer byteBufToCot(ByteBuffer buffer, ChannelHandler handler, CotParser cotParser) {
+        int binaryLength = buffer.remaining();
+		String strData = charset.decode(buffer).toString();
+
+		if (log.isTraceEnabled()) {
+			log.trace(
+					String.format("%s received network data -- handler: %s binary_data_length: %d char_data_length: %d",
+							SingleCotProtocol.class, handler, binaryLength, strData.length()));
+		}
+        
+		Document doc = null;
+		try {			
+			doc = cotParser.parse(strData);
+		} catch (DocumentException e) {
+			// TODO: notify somebody... may want to filter out messages from a given party if we get too many
+		    if (log.isTraceEnabled()) {
+		        log.trace("received single message packet data: " + strData);
+		    }
+			log.debug("Error attempting to parse single message packet from " + handler.toString());
+		}
+		
+		if (doc != null) {
+			CotEventContainer cot = new CotEventContainer(doc);
+			
+			if (handler instanceof AbstractBroadcastingChannelHandler) {
+            	Input input = ((AbstractBroadcastingChannelHandler) handler).getInput();
+            	if (input != null && input instanceof DataFeed) {
+            		DataFeedFilter.getInstance().filter(cot, (DataFeed) input);
+            	}
+            }
+			return cot;
+		}
+
+		return null;
+    }
 }

@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
@@ -139,7 +140,7 @@ public abstract class EsapiServlet extends HttpServlet {
 					safeKey = "(unsafe parameter name)";
 				}
 				if (values.length > 1) {
-					log.warning("Multiple values detected for HTTP parameter " + safeKey + "; ignoring extras." );
+					log.warning("Multiple values detected for HTTP parameter " + StringUtils.normalizeSpace(safeKey) + "; ignoring extras." );
 				} 
 				if (!values[0].isEmpty()) {
 					result = values[0];

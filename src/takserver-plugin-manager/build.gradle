@@ -40,6 +40,8 @@ bootJar {
 
 dependencies {
 
+  compile group: 'xerces', name: 'xercesImpl', version: xerces_version
+
   compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
   compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
   compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version

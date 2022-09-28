@@ -36,7 +36,7 @@ public class DistributedSubmissionService implements SubmissionInterface {
 	
 	@Autowired
 	Messenger<CotEventContainer> cotMessenger;
-	
+
 	public DistributedSubmissionService() { }
 
 	@Override
@@ -154,7 +154,7 @@ public class DistributedSubmissionService implements SubmissionInterface {
 	}
 
 	@Override
-	public boolean submitCot(String cotMessage, List<String> uids, List<String> callsigns, NavigableSet<Group> groups, boolean federate) {
+	public boolean submitCot(String cotMessage, List<String> uids, List<String> callsigns, NavigableSet<Group> groups, boolean federate, boolean resubmission) {
 		requireNonNull(uids, "submitCot uids");
         requireNonNull(callsigns, "submitCot callsigns");
         requireNonNull(groups, "submitCot groups");
@@ -182,7 +182,18 @@ public class DistributedSubmissionService implements SubmissionInterface {
                 // only set groups, not the user
                 cot.setContext(Constants.NOFEDV2_KEY, "true");
             }
-            
+
+            if (resubmission) {
+            	// trim off existing flow tags so we can resend the message
+				Node flowTags = cot.getDocument().selectSingleNode("/event/detail/_flow-tags_");
+				if (flowTags != null) {
+					flowTags.detach();
+				}
+
+				// turn off message archiving so we dont save the message again
+				cot.setContext(Constants.ARCHIVE_EVENT_KEY, Boolean.FALSE);
+			}
+
     		// send message
     		cotMessenger.send(cot);
             
@@ -196,7 +207,7 @@ public class DistributedSubmissionService implements SubmissionInterface {
         
         return false;
 	}
-	
+
 	private CotParser getCotParser() {
 		if (parser.get() == null) {
 			

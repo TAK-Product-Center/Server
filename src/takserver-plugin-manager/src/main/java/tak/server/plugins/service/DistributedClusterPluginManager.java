@@ -25,7 +25,7 @@ public class DistributedClusterPluginManager extends DistributedPluginManager {
 	private static final long serialVersionUID = 753070297094974770L;
 	private static final Logger logger = LoggerFactory.getLogger(DistributedClusterPluginManager.class);
 		
-	private IgniteCache<String, Boolean> pluginCache;
+	private IgniteCache<String, Boolean> pluginStartedCache;
     private ContinuousQuery<String, Boolean> continuousPluginQuery = new ContinuousQuery<>();
 
     @EventListener({ PluginsStartedEvent.class })
@@ -33,19 +33,19 @@ public class DistributedClusterPluginManager extends DistributedPluginManager {
     	// initialize plugins only if they arent in the cache    		
     	getAllPlugins()
     		.stream()
-    		.forEach(plugin -> getPluginCache().putIfAbsent(plugin.getPluginInfo().getName(), new Boolean(true)));
+    		.forEach(plugin -> getPluginStartedCache().putIfAbsent(plugin.getPluginInfo().getName(), new Boolean(plugin.getPluginInfo().isStarted())));
     	
     	// pull the most up to date plugin status from cache and set them
     	getAllPlugins()
 			.stream()
 			.forEach(plugin -> {
-				Boolean status = getPluginCache().get(plugin.getPluginInfo().getName());
-				plugin.getPluginInfo().setEnabled(status.booleanValue());
+				Boolean statusInCache = getPluginStartedCache().get(plugin.getPluginInfo().getName());
+				plugin.getPluginInfo().setStarted(statusInCache.booleanValue());
 				
-				if (!status.booleanValue()) {
+				if (!statusInCache.booleanValue()) {
 					plugin.internalStop();
 					// the stop failed (likely due to incompatibility - so re-cache as running)
-					if (plugin.getPluginInfo().isEnabled()) {
+					if (plugin.getPluginInfo().isStarted()) {
 						updateCache(plugin.getPluginInfo().getName(), true);
 					}
 				}
@@ -59,14 +59,14 @@ public class DistributedClusterPluginManager extends DistributedPluginManager {
    	     			// plugin matches   	     			
    	     			.filter(plugin -> plugin.getPluginInfo().getName().equals(e.getKey()))
    	     			// make sure we are only setting a new status if its not already set
-   	     			.filter(plugin -> plugin.getPluginInfo().isEnabled() != e.getValue().booleanValue())
+   	     			.filter(plugin -> plugin.getPluginInfo().isStarted() != e.getValue().booleanValue())
    	     			.forEach(plugin -> {
    	     				if (e.getValue().booleanValue()) {
    	     					plugin.internalStart();
    	     				} else {
    	     					plugin.internalStop();
    	     					// the stop failed (likely due to incompatibility - so re-cache as running)
-   	     					if (plugin.getPluginInfo().isEnabled()) {
+   	     					if (plugin.getPluginInfo().isStarted()) {
    								updateCache(plugin.getPluginInfo().getName(), true);
    							}
    	     				}	
@@ -74,7 +74,7 @@ public class DistributedClusterPluginManager extends DistributedPluginManager {
    	     	}
      	 });
    	
-		getPluginCache().query(continuousPluginQuery);
+		getPluginStartedCache().query(continuousPluginQuery);
     }
     
 	@Override
@@ -127,20 +127,20 @@ public class DistributedClusterPluginManager extends DistributedPluginManager {
 		updateCache(name, false);
 	}
 	
-	private IgniteCache<String, Boolean> getPluginCache() {
+	private IgniteCache<String, Boolean> getPluginStartedCache() {
 
-		if (pluginCache == null) {
+		if (pluginStartedCache == null) {
 			CacheConfiguration<String, Boolean> cfg = new CacheConfiguration<String, Boolean>();
 			
 			cfg.setName(CommonConstants.PLUGIN_CACHE);
 			cfg.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);				
-			pluginCache = PluginManagerDependencyInjectionProxy.getInstance().ignite().getOrCreateCache(cfg);
+			pluginStartedCache = PluginManagerDependencyInjectionProxy.getInstance().ignite().getOrCreateCache(cfg);
 		}
 		
-		return pluginCache;
+		return pluginStartedCache;
 	}
 	
 	private void updateCache(String name, boolean status) {
-		getPluginCache().put(name, status);
+		getPluginStartedCache().put(name, status);
 	}
 }

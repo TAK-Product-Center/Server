@@ -1,5 +1,3 @@
-
-
 package com.bbn.marti.sync;
 
 import java.io.ByteArrayInputStream;
@@ -30,11 +28,13 @@ import java.util.SimpleTimeZone;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
 import javax.sql.DataSource;
 
+import org.apache.commons.lang.StringUtils;
 import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
@@ -57,7 +57,6 @@ import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.service.RetentionPolicyConfig;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.Metadata.Field;
-import com.bbn.marti.util.RestrictedInputStream;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
@@ -258,7 +257,9 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 				+ RemoteUtil.getInstance().getGroupAndClause();  // only allow delete where there is common group membership
 
 		try (Connection connection = ds.getConnection(); PreparedStatement statement = wrapper.prepareStatement(sql, connection)) {
-			log.fine("Deleting resource hash =" + hash);
+			if (log.isLoggable(Level.FINE)) {
+				log.fine("Deleting resource hash =" + StringUtils.normalizeSpace(hash));
+			}
 			statement.setString(1, hash);
 			statement.setString(2, groupVector);
 			statement.execute();
@@ -302,12 +303,21 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 			statement.executeBatch();
 		}
 	}
+	
+	
+	public Metadata insertResource(Metadata metadata, byte[] content, String groupVector)
+			throws SQLException, NamingException, IllegalArgumentException,
+			ValidationException, IntrusionException, IllegalStateException, IOException {
+		
+		return insertResource(metadata, content, groupVector, false);
+	}
+
 
 	/**
 	 * Inserts the given byte array into the database, with the given metadata mapped to columns.
 	 *
 	 */
-	public Metadata insertResource(Metadata metadata, byte[] content, String groupVector)
+	public Metadata insertResource(Metadata metadata, byte[] content, String groupVector, boolean validate)
 			throws SQLException, NamingException, IllegalArgumentException,
 			ValidationException, IntrusionException, IllegalStateException, IOException {
 
@@ -315,7 +325,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 			throw new IllegalArgumentException("empty group vector");
 		}
 
-		if (validator != null) {
+		if (validate && validator != null) {
 			content = validator.getValidFileContent("Storing resource content to DB", content, content.length, false);
 		}
 
@@ -467,7 +477,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 				// bind input stream to database
 				log.fine("binding binary stream with content length " + contentLen + " to the database query");
-				statement.setBinaryStream(1, new RestrictedInputStream(contentStream, contentLen), contentLen);
+				statement.setBinaryStream(1, contentStream, contentLen);
 
 				int columnIndex = 2;
 				for (TypeValuePair toStore : metadataColumns) {

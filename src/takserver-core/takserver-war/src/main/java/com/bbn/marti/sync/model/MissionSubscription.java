@@ -20,14 +20,16 @@ public class MissionSubscription {
     protected String token;
     protected Mission mission;
     protected String clientUid;
+    protected String username;
     protected Date createTime;
     protected MissionRole role;
 
-    public MissionSubscription(String uid, String token, Mission mission, String clientUid, Date createTime, MissionRole role) {
+    public MissionSubscription(String uid, String token, Mission mission, String clientUid, String username, Date createTime, MissionRole role) {
         this.uid = uid;
         this.token = token;
         this.mission = mission;
         this.clientUid = clientUid;
+        this.username = username;
         this.createTime = createTime;
         this.role = role;
     }
@@ -63,6 +65,14 @@ public class MissionSubscription {
     }
     public void setClientUid(String clientUid) {
         this.clientUid = clientUid;
+    }
+
+    @Column(name = "username", nullable = false, columnDefinition = "TEXT")
+    public String getUsername() {
+        return username;
+    }
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = Constants.COT_DATE_FORMAT)

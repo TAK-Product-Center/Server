@@ -4,28 +4,29 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 
-import com.bbn.marti.config.Network;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.remote.groups.ConnectionModifyResult;
 import com.bbn.marti.remote.groups.NetworkInputAddResult;
 
 public interface MessagingConfigurator {
 
-    NetworkInputAddResult addInputAndSave(Network.Input input);
+    NetworkInputAddResult addInputAndSave(Input input);
 
     void removeInputAndSave(String name);
 
-    Collection<InputMetric> getInputMetrics();
+    Collection<InputMetric> getInputMetrics(boolean excludeDataFeeds);
 
-    ConnectionModifyResult modifyInputAndSave(String inputName, Network.Input input);
+    ConnectionModifyResult modifyInputAndSave(String inputName, Input input);
 
     MessagingConfigInfo getMessagingConfig();
 
     void modifyMessagingConfig(MessagingConfigInfo info);
 
-    void addMetric(Network.Input input, InputMetric metric);
+    void addMetric(Input input, InputMetric metric);
 
-	InputMetric getMetric(Network.Input input);
+    void updateMetric(Input input);
+
+	InputMetric getMetric(Input input);
 
 	AuthenticationConfigInfo getAuthenticationConfig();
 
@@ -40,4 +41,6 @@ public interface MessagingConfigurator {
 	HashMap<String, Boolean> verifyConfiguration();
 	
 	void addInput(Input newInput, boolean cluster) throws IOException;
+
+	void removeDataFeedAndSave(String name);
 }

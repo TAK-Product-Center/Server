@@ -5,7 +5,7 @@
 
 Links:
  * [CI Test Execution](src/takserver-takcl-core/docs/ci_testing.md)
- * [Publishing](docs/publishing.md)
+ * [Publishing](src/docs/publishing.md)
 
 ---
 Clean and Build TAK Server
@@ -141,7 +141,7 @@ https://localhost:8443/swagger-ui.html
 ### Integration Tests
 
 Integration tests are executed against master nightly. In addition to this, they can be executed on any branch as follows:  
-1.  Navigate to the [TAKServer Dashboard](https://git.tak.gov/core/takserver).  
+1.  Navigate to the [TAKServer Dashboard](https://git.takmaps.com/core/takserver).  
 2.  On the sidebar, hover over 'CI/CD' and select 'Pipelines'.  
 3.  Find your commit from the list and tap the Play button to the right, and select the test suite you would like to execute.  The Main suites are what is executed nightly and execute all the tests.  
 

@@ -1,6 +1,5 @@
 package tak.server.messaging;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.ignite.Ignite;
 import org.slf4j.Logger;
@@ -8,7 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.ServerInfo;
-import com.bbn.marti.remote.util.RemoteUtil;
+import com.bbn.marti.service.PluginStore;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
@@ -23,7 +22,7 @@ public class DistributedCotMessenger implements Messenger<CotEventContainer> {
 	private boolean isPlugins = false;
 	private boolean isCluster = false;
 	
-	public DistributedCotMessenger(Ignite ignite, SubscriptionStore subscriptionStore, ServerInfo serverInfo, MessageConverter messageConverter, SubmissionService submissionService, CoreConfig config, RemoteUtil remoteUtil) {
+	public DistributedCotMessenger(Ignite ignite, SubscriptionStore subscriptionStore, ServerInfo serverInfo, MessageConverter messageConverter, SubmissionService submissionService, CoreConfig config) {
 		this.ignite = ignite;
 		this.subscriptionStore = subscriptionStore;
 		this.serverInfo = serverInfo;
@@ -33,7 +32,6 @@ public class DistributedCotMessenger implements Messenger<CotEventContainer> {
 		
 		this.isCluster = config.getRemoteConfiguration().getCluster() != null && config.getRemoteConfiguration().getCluster().isEnabled();
 		this.isPlugins = config.getRemoteConfiguration().getPlugins().isUsePluginMessageQueue();
-		this.remoteUtil = remoteUtil;
 	}
 	
 	private final Ignite ignite;
@@ -53,25 +51,24 @@ public class DistributedCotMessenger implements Messenger<CotEventContainer> {
 	
 	private static final Logger logger = LoggerFactory.getLogger(DistributedCotMessenger.class);
 	
-	private AtomicBoolean isIntercept = null;
-	
-	private final RemoteUtil remoteUtil;
-
-	
 	@Override
 	public void send(CotEventContainer message) {
-		
 		if (logger.isTraceEnabled()) {
 			logger.trace("sending message " + message);
 		}
-	
-		if (!remoteUtil.getIsIntercept(isIntercept).get()) {
+		
+		boolean isControlMessage = submissionService.isControlMessage(message.getType());
+		if (isControlMessage) {
+			submissionService.addToInputQueue(message);
+			return;
+		}
+		
+		if (PluginStore.getInstance().getInterceptorPluginsActive() == 0 || !isPlugins) {
 			submissionService.addToInputQueue(message);
 		}
 
 		// push the message to the plugin queue, if plugins and plugin message queue are enabled
 		if (isPlugins) {
-
 			try {
 				byte[] rawMessage = messageConverter.cotToDataMessage(new CotEventContainer(message, true, ImmutableSet.of(Constants.SOURCE_TRANSPORT_KEY, Constants.SOURCE_PROTOCOL_KEY, Constants.USER_KEY)), true);
 

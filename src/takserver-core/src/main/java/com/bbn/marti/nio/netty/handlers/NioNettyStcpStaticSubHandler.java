@@ -6,12 +6,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.log4j.Logger;
 
 import com.bbn.marti.config.Filter;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.groups.GroupFederationUtil;
-
-import tak.server.Constants;
-import tak.server.ignite.IgniteHolder;
-
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.nio.channel.connections.TcpChannelHandler;
 import com.bbn.marti.nio.netty.NioNettyBuilder;
@@ -25,6 +21,8 @@ import com.bbn.marti.util.MessageConversionUtil;
 import io.micrometer.core.instrument.Metrics;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
+import tak.server.Constants;
+import tak.server.ignite.IgniteHolder;
 
 
 /*

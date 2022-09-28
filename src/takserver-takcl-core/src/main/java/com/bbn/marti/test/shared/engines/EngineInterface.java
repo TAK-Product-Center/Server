@@ -27,6 +27,8 @@ public interface EngineInterface {
 	void disconnectClientAndVerify(@NotNull AbstractUser disconnectingUser);
 
 	void onlineRemoveInputAndVerify(@NotNull AbstractConnection input);
+	
+	void onlineRemoveDataFeedAndVerify(@NotNull AbstractConnection dataFeed);
 
 	void attemptSendFromUserAndVerify(@NotNull AbstractUser sendingUser, @NotNull AbstractUser... targetUsers);
 
@@ -41,6 +43,8 @@ public interface EngineInterface {
 	void authenticateAndVerifyClient(@NotNull AbstractUser users);
 
 	void onlineAddInput(@NotNull AbstractConnection input);
+	
+	void onlineAddDataFeed(@NotNull AbstractConnection dataFeed);
 
 	void startServer(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier);
 
@@ -56,6 +60,8 @@ public interface EngineInterface {
 
 	void offlineAddSubscriptionFromInputToServer(@NotNull AbstractConnection targetInput, @NotNull AbstractServerProfile serverProvidingSubscription);
 
+	void offlineAddSubscriptionFromDataFeedToServer(AbstractConnection targetDataFeed, AbstractServerProfile serverProvidingSubscription);
+	
 	void offlineFederateServers(boolean useV1Federation, boolean useV2Federation, @NotNull AbstractServerProfile... serversToFederate);
 
 	void offlineAddOutboundFederateConnection(boolean useV2Federation, @NotNull AbstractServerProfile sourceServer, @NotNull AbstractServerProfile targetServer);

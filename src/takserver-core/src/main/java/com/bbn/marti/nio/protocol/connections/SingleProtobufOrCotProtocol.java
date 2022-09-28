@@ -7,7 +7,11 @@ import org.apache.log4j.Logger;
 import org.dom4j.Document;
 
 import com.bbn.cot.CotParserCreator;
+import com.bbn.cot.filter.DataFeedFilter;
+import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.channel.ChannelHandler;
+import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.nio.protocol.ProtocolInstantiator;
 import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
 import com.bbn.marti.util.Assertion;
@@ -36,59 +40,18 @@ public class SingleProtobufOrCotProtocol extends AbstractBroadcastingProtocol<Co
     public void onDataReceived(ByteBuffer buffer, ChannelHandler handler) {
         Assertion.areNotNull(buffer, handler);
         Assertion.condition(buffer.hasRemaining(), "Received trivial data container from network");
+        
+        if (cotParser.get() == null) {
+        	cotParser.set(CotParserCreator.newInstance());
+        }
 
         try {
-
-            Byte firstByte = buffer.get();
-            CotEventContainer cotEventContainer;
-
-            if (firstByte == StreamingProtoBufHelper.MAGIC) {
-
-                int version = StreamingProtoBufHelper.getInstance().readVarint(buffer);
-                if (Integer.toString(version).compareTo(StreamingProtoBufHelper.TAK_PROTO_VERSION) != 0) {
-                    log.error("Failed to find supported protocol version ! : " + version);
-                    return;
-                }
-
-                if (buffer.get() != StreamingProtoBufHelper.MAGIC) {
-                    log.error("Failed to find magic byte!");
-                    return;
-                }
-
-                byte[] eventBytes = new byte[buffer.remaining()];
-                buffer.get(eventBytes);
-
-                // parse the protobuf
-                Takmessage.TakMessage takMessage = Takmessage.TakMessage.parseFrom(eventBytes);
-                cotEventContainer = StreamingProtoBufHelper.getInstance().proto2cot(takMessage);
-
-            } else if (firstByte == 0x3C) {
-
-                StringBuilder cotBuilder = new StringBuilder("<");
-                cotBuilder.append(charset.decode(buffer).toString());
-                
-                if (cotParser.get() == null) {
-                	cotParser.set(CotParserCreator.newInstance());
-                }
-
-                // parse the cot
-                Document doc = cotParser.get().parse(cotBuilder.toString());
-                cotEventContainer = new CotEventContainer(doc);
-
-            } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("Found invalid first byte! : 0x" + String.format("%02X ", firstByte));
-                }
-
-                if (log.isTraceEnabled()) {
-                    log.trace("Found invalid content! : " + charset.decode(buffer).toString());
-                }
-                return;
-            }
-
-            // broadcast the message
-            broadcastDataReceived(cotEventContainer, handler);
-
+        	CotEventContainer cotEventContainer = byteBufToCot(buffer, handler, cotParser.get());
+        	
+        	if (cotEventContainer != null) {
+        		 // broadcast the message
+                broadcastDataReceived(cotEventContainer, handler);
+        	}
         } catch (Exception e) {
             log.error("exception in onDataReceived!", e);
         }
@@ -135,5 +98,63 @@ public class SingleProtobufOrCotProtocol extends AbstractBroadcastingProtocol<Co
     @Override
     public String toString() {
         return "SingleProtobufOrCotProtocol";
+    }
+    
+    public static CotEventContainer byteBufToCot(ByteBuffer buffer, ChannelHandler handler, CotParser cotParser) {
+    	CotEventContainer cotEventContainer = null;
+        try {
+            Byte firstByte = buffer.get();
+
+            if (firstByte == StreamingProtoBufHelper.MAGIC) {
+
+                int version = StreamingProtoBufHelper.getInstance().readVarint(buffer);
+                if (Integer.toString(version).compareTo(StreamingProtoBufHelper.TAK_PROTO_VERSION) != 0) {
+                    log.error("Failed to find supported protocol version ! : " + version);
+                    return null;
+                }
+
+                if (buffer.get() != StreamingProtoBufHelper.MAGIC) {
+                    log.error("Failed to find magic byte!");
+                    return null;
+                }
+
+                byte[] eventBytes = new byte[buffer.remaining()];
+                buffer.get(eventBytes);
+
+                // parse the protobuf
+                Takmessage.TakMessage takMessage = Takmessage.TakMessage.parseFrom(eventBytes);
+                cotEventContainer = StreamingProtoBufHelper.getInstance().proto2cot(takMessage);
+
+            } else if (firstByte == 0x3C) {
+
+                StringBuilder cotBuilder = new StringBuilder("<");
+                cotBuilder.append(charset.decode(buffer).toString());
+
+                // parse the cot
+                Document doc = cotParser.parse(cotBuilder.toString());
+                cotEventContainer = new CotEventContainer(doc);
+                
+                if (handler instanceof AbstractBroadcastingChannelHandler) {
+                	Input input = ((AbstractBroadcastingChannelHandler) handler).getInput();
+                	if (input != null && input instanceof DataFeed) {
+                		DataFeedFilter.getInstance().filter(cotEventContainer, (DataFeed) input);
+                	}
+                }
+
+            } else {
+                if (log.isDebugEnabled()) {
+                    log.debug("Found invalid first byte! : 0x" + String.format("%02X ", firstByte));
+                }
+
+                if (log.isTraceEnabled()) {
+                    log.trace("Found invalid content! : " + charset.decode(buffer).toString());
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("exception in byteBufToCot!", e);
+        }
+        
+        return cotEventContainer;
     }
 }

@@ -32,6 +32,8 @@
         <xs:element ref="docs" minOccurs="0"/>
         <xs:element ref="email" minOccurs="0"/>
         <xs:element ref="locate" minOccurs="0"/>
+        <xs:element ref="vbm" minOccurs="0"/>
+        <xs:element ref="profile" minOccurs="0"/>
       </xs:all>
       <xs:attribute name="forceLowConcurrency" type="xs:boolean" default="true"/>
     </xs:complexType>
@@ -41,31 +43,12 @@
       <xs:annotation>
         <xs:documentation>Networking</xs:documentation>
       </xs:annotation>
-      <xs:sequence>
-        <xs:element name="input" minOccurs="0" maxOccurs="unbounded">
-          <xs:complexType>
-            <xs:annotation>
-              <xs:documentation>Network Input</xs:documentation>
-            </xs:annotation>
-            <xs:sequence>
-              <xs:element name="filtergroup" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
-              <xs:element ref="filter" minOccurs="0" maxOccurs="1"/>
-            </xs:sequence>
-            <xs:attribute name="auth" type="authType" default="x509"/>
-            <xs:attribute name="authRequired" type="xs:boolean" default="false"/>
-            <xs:attribute name="_name" type="xs:string" use="required"/>
-            <xs:attribute name="protocol" type="xs:string" use="required"/>
-            <xs:attribute name="port" type="xs:int" use="required"/>
-            <xs:attribute name="group" type="xs:string" use="optional"/>
-            <xs:attribute name="iface" type="xs:string" use="optional"/>
-            <xs:attribute name="archive" type="xs:boolean" default="true"/>
-            <xs:attribute name="anongroup" type="xs:boolean" use="optional"/>
-            <xs:attribute name="archiveOnly" type="xs:boolean" default="false"/>
-            <xs:attribute name="coreVersion" type="xs:int" default="2"/>
-            <xs:attribute name="coreVersion2TlsVersions" type="xs:string" use="optional" default="TLSv1.2,TLSv1.3"/>
-          </xs:complexType>
-        </xs:element>
-        <xs:element name="connector" minOccurs="0" maxOccurs="unbounded">
+      <xs:sequence> 
+      	<xs:element ref="filter" minOccurs="0" maxOccurs="1" />
+      	<xs:element type="input" name="input" minOccurs="0" maxOccurs="unbounded" />
+      	<xs:element type="dataFeed" name="datafeed" minOccurs="0" maxOccurs="unbounded" />
+      	
+      	<xs:element name="connector" minOccurs="0" maxOccurs="unbounded">
           <xs:complexType>
             <xs:annotation>
               <xs:documentation>HTTP Connector</xs:documentation>
@@ -122,6 +105,7 @@
       <xs:attribute name="cloudwatchMetricsBatchSize" type="xs:int" default="20"/>
       <xs:attribute name="cloudwatchEnable" type="xs:boolean" default="false"/>
       <xs:attribute name="cloudwatchName" type="xs:string" default=""/>
+      <xs:attribute name="missionCopTool" type="xs:string" default="vbm"/>
     </xs:complexType>
   </xs:element>
 
@@ -204,6 +188,7 @@
       <xs:attribute name="x509addAnonymous" type="xs:boolean" default="false"/>
       <xs:attribute name="x509useGroupCache" type="xs:boolean" default="false"/>
       <xs:attribute name="x509checkRevocation" type="xs:boolean" default="false"/>
+      <xs:attribute name="x509tokenAuth" type="xs:boolean" default="false"/>
     </xs:complexType>
   </xs:element>
 
@@ -261,8 +246,8 @@
             <xs:attribute name="throwOnAssertionFail" type="xs:boolean" default="false"/>
             <xs:attribute name="disconnectOnPendingExceeded" type="xs:boolean" default="true"/>
             <xs:attribute name="flushInterval" type="xs:int" default="1000"/>
-            <xs:attribute name="websocketSendBufferSizeLimit" type="xs:int" default="4096"/>
-            <xs:attribute name="websocketMaxBinaryMessageBufferSize" type="xs:int" default="2048"/>
+            <xs:attribute name="websocketSendBufferSizeLimit" type="xs:int" default="65536"/>
+            <xs:attribute name="websocketMaxBinaryMessageBufferSize" type="xs:int" default="65536"/>
             <xs:attribute name="websocketMaxSessionIdleTimeout" type="xs:long" default="-1"/>
             <xs:attribute name="websocketSendTimeoutMs" type="xs:int" default="5000"/>
             <xs:attribute name="missionUidLimit" type="xs:int" default="512"/>
@@ -290,6 +275,7 @@
             <xs:attribute name="enableClientEndpointCache" type="xs:boolean" default="true"/>
             <xs:attribute name="contactCacheUpdateRateLimitSeconds" type="xs:long" default="5"/>
             <xs:attribute name="contactCacheRecencyLimitSeconds" type="xs:long" default="86400"/>
+            <xs:attribute name="pluginDatafeedCacheSeconds" type="xs:int" default="300"/>
            </xs:complexType>
         </xs:element>
       </xs:all>
@@ -541,7 +527,20 @@
             <xs:attribute name="refreshTokenValidity" type="xs:int"/>
           </xs:complexType>
         </xs:element>
+        <xs:element name="authServer" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>Authorization server public key used to validated tokens</xs:documentation>
+            </xs:annotation>
+            <xs:attribute name="issuer" type="xs:string"/>
+          </xs:complexType>
+        </xs:element>
       </xs:sequence>
+      <xs:attribute name="oauthAddAnonymous" type="xs:boolean" default="false"/>
+      <xs:attribute name="readOnlyGroup" type="xs:string" use="optional"/>
+      <xs:attribute name="readGroupSuffix" type="xs:string" default="_READ"/>
+      <xs:attribute name="writeGroupSuffix" type="xs:string" default="_WRITE"/>
+      <xs:attribute name="groupprefix" type="xs:string" default=""/>
     </xs:complexType>
   </xs:element>
 
@@ -836,6 +835,8 @@
               </xs:annotation>
             </xs:attribute>
             <xs:attribute name="initializationDelaySeconds" type="xs:int" default="30"/>
+            <xs:attribute name="maxMessageSizeBytes" type="xs:int" default="1073741824"/>
+            
           </xs:complexType>
         </xs:element>
 
@@ -1104,12 +1105,82 @@
     <xs:annotation>
       <xs:documentation>Registration Whitelist</xs:documentation>
     </xs:annotation>
+    <xs:sequence>
+      <xs:element name="groups" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
     <xs:attribute name="domain" type="xs:string" default="" />
     <xs:attribute name="token" type="xs:string" default="" />
     <xs:attribute name="privateGroup" type="xs:boolean" default="false" />
     <xs:attribute name="group" type="xs:string" default="" />
   </xs:complexType>
-
+  
+<!--   <xs:element name="filter">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Filter Configuration</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element ref="thumbnail" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="urladd" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="flowtag" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="streamingbroker" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="dropfilter" minOccurs="0" maxOccurs="1" />
+        <xs:element ref="injectionfilter" minOccurs="0" maxOccurs="1" />
+        <xs:element ref="scrubber" minOccurs="0" maxOccurs="1" />
+        <xs:element ref="geospatialFilter" minOccurs="0" maxOccurs="1" />
+        <xs:element ref="qos" minOccurs="0" maxOccurs="1" />
+        <xs:element ref="contact-api" minOccurs="0" maxOccurs="4096" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element> -->
+<!--   <xs:element name="filter"> -->
+  
+	<xs:complexType name="input">
+		<xs:annotation>
+			<xs:documentation>Network Input</xs:documentation>
+		</xs:annotation>
+		<xs:sequence>
+			<xs:element name="filtergroup" type="xs:string"
+				minOccurs="0" maxOccurs="unbounded" />
+			<xs:element ref="filter" minOccurs="0" maxOccurs="1" />
+		</xs:sequence>
+		<xs:attribute name="auth" type="authType" default="x509" />
+		<xs:attribute name="authRequired" type="xs:boolean"
+			default="false" />
+		<xs:attribute name="_name" type="xs:string"
+			use="required" />
+		<xs:attribute name="protocol" type="xs:string"
+			use="required" />
+		<xs:attribute name="port" type="xs:int" use="required" />
+		<xs:attribute name="group" type="xs:string"
+			use="optional" />
+		<xs:attribute name="iface" type="xs:string"
+			use="optional" />
+		<xs:attribute name="archive" type="xs:boolean"
+			default="true" />
+		<xs:attribute name="anongroup" type="xs:boolean"
+			use="optional" />
+		<xs:attribute name="archiveOnly" type="xs:boolean"
+			default="false" />
+		<xs:attribute name="coreVersion" type="xs:int"
+			default="2" />
+		<xs:attribute name="coreVersion2TlsVersions"
+			type="xs:string" use="optional" default="TLSv1.2,TLSv1.3" />
+	</xs:complexType>
+	
+	<xs:complexType name="dataFeed">
+      <xs:complexContent>
+        <xs:extension base="input">
+            <xs:sequence>
+                <xs:element name="uuid" type="xs:string" />
+                <xs:element name="type" type="xs:string" />
+                <xs:element name="tag" block="extension" minOccurs="0" maxOccurs="unbounded" type="xs:string"/>
+                <xs:element name="sync" type="xs:boolean" />
+            </xs:sequence>
+        </xs:extension>
+       </xs:complexContent>
+    </xs:complexType>
+          
   <xs:element name="email">
     <xs:complexType>
       <xs:annotation>
@@ -1138,6 +1209,20 @@
       <xs:attribute name="broadcast" type="xs:boolean" default="true" />
       <xs:attribute name="addToMission" type="xs:boolean" default="true" />
       <xs:attribute name="mission" type="xs:string" />
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="vbm">
+    <xs:complexType>
+      <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+      <xs:attribute name="disableSASharing" type="xs:boolean" default="true"/>
+      <xs:attribute name="disableChatSharing" type="xs:boolean" default="false"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="profile">
+    <xs:complexType>
+      <xs:attribute name="useStreamingGroup" type="xs:boolean" default="false"/>
     </xs:complexType>
   </xs:element>
 

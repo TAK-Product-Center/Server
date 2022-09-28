@@ -91,12 +91,12 @@ def print_data_dict(connection_data):
     total_clients = len(connection_data)
     connected_clients = 0
     num_writes = 0
-    #num_reads = 0
+    num_reads = 0
     #num_bytes = 0
     for client_data in connection_data.values():
         if client_data['connected']:
             connected_clients += 1
-        #num_reads += client_data['read']
+        num_reads += client_data['read']
         num_writes += client_data['write']
         #num_bytes += client_data['bytes']
     # try:
@@ -115,13 +115,16 @@ def print_data_dict(connection_data):
 
     # prev_data['bytes'] = num_bytes
 
+    diff_reads = num_reads - prev_data['read']
+    prev_data['read'] = num_reads 
+    
     diff_writes = num_writes - prev_data['write']
-    prev_data['write'] = num_writes
+    prev_data['write'] = num_writes 
 
     # ; num_reads/client: {reads:>10}; num_bytes: {bytes:>10}" \
-    return "clients connected: {conn:>3} / {tot:>3}; num_writes: {writes:>10}" \
+    return "clients connected: {conn:>3} / {tot:>3}; num_writes: {writes:>10}; num_reads: {reads:>10} " \
         .format(conn=connected_clients,
                 tot=total_clients,
-                writes=diff_writes)#,
-                #reads=diff_reads,
+                writes=diff_writes,
+                reads=diff_reads) #,
                 #bytes=diff_bytes)

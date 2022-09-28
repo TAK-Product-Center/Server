@@ -4,10 +4,18 @@ services.factory('AllPluginsInfoService', function($resource) {
     return $resource('/Marti/api/plugins/info/all');
 });
 
-services.factory('PluginStatusService', function($resource) {
-  return $resource('/Marti/api/plugins/info/status', {name:'@name', status: '@status'}, {});
+services.factory('PluginEnabledService', function($resource) {
+  return $resource('/Marti/api/plugins/info/enabled', {name:'@name', status: '@status'}, {});
 });
 
-services.factory('AllPluginStatusService', function($resource) {
-  return $resource('/Marti/api/plugins/info/all/status', {status: '@status'}, {});
+services.factory('PluginStartedService', function($resource) {
+  return $resource('/Marti/api/plugins/info/started', {name:'@name', status: '@status'}, {});
+});
+
+services.factory('AllPluginStartedService', function($resource) {
+  return $resource('/Marti/api/plugins/info/all/started', {status: '@status'}, {});
+});
+
+services.factory('PluginArchiveService', function($resource) {
+  return $resource('/Marti/api/plugins/info/archive', {name:'@name', archiveEnabled: '@archiveEnabled'}, {});
 });

@@ -12,11 +12,8 @@ import org.slf4j.LoggerFactory;
 
 import com.bbn.cot.CotParserCreator;
 import com.bbn.marti.nio.channel.ChannelHandler;
-import com.bbn.marti.nio.channel.connections.TcpChannelHandler;
 import com.bbn.marti.nio.protocol.ProtocolInstantiator;
 import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
-import com.bbn.marti.nio.util.ConnectionState;
-import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.util.Assertion;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.google.common.base.Charsets;
@@ -53,7 +50,7 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 	private final static String END_OF_COT_MSG_STR = "</event>";      // string that we search for, marks a message end
 	private final static int BUFFER_TRIM_SIZE = 1000000; 			  // 1MB of characters -- point at which we trim the string builder
 
-	private volatile StringBuilder builder; // string builder for aggregating a message received over multiple reads
+	private volatile StringBuffer messageStringBuffer; // string builder for aggregating a message received over multiple reads
 	private volatile CotParser parser;      // parser for converting string to cot
 	private volatile boolean outboundClosed = false;
 
@@ -74,7 +71,7 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 					));
 		}
 
-		this.builder = new StringBuilder();
+		this.messageStringBuffer = new StringBuffer();
 		this.parser = CotParserCreator.newInstance();
 
 		// notify our listeners
@@ -98,10 +95,10 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 		CharSequence newData = charset.decode(buffer);
 
 
-		StringBuilder builder = (this.builder == null ? new StringBuilder() : this.builder);
+		StringBuffer messageStringBuilder = (this.messageStringBuffer == null ? new StringBuffer() : this.messageStringBuffer);
 		CotParser parser = (this.parser == null ? CotParserCreator.newInstance() : this.parser);
 
-		List<CotEventContainer> msgs = add(builder, newData, parser, handler);
+		List<CotEventContainer> msgs = add(messageStringBuilder, newData, parser, handler);
 
 
 
@@ -156,12 +153,12 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 	@Override
 	public void onInboundClose(ChannelHandler handler) {
 
-		if (this.builder != null && this.builder.length() > 0) {
-			log.warn("Received EOS notification with partial message (" + builder.length() + " bytes) in decode buffer for " + handler + ". Dumping data mercilessly.");
+		if (this.messageStringBuffer != null && this.messageStringBuffer.length() > 0) {
+			log.warn("Received EOS notification with partial message (" + messageStringBuffer.length() + " bytes) in decode buffer for " + handler + ". Dumping data mercilessly.");
 		}
 
 		// void out parser and builder
-		this.builder = null;
+		this.messageStringBuffer = null;
 		this.parser = null;
 		
 		if (log.isTraceEnabled()) {
@@ -196,7 +193,7 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 		// notify listeners
 		super.broadcastOutboundClose(handler);
 	}
-
+	
 	/**
 	 * A static function that appends the given data to an existing
 	 * buffer, and checks to see if any new messages can be parsed with
@@ -204,7 +201,7 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 	 *
 	 * Parses as many complete messages as possible out of the buffer.
 	 */
-	public static List<CotEventContainer> add(StringBuilder builder, CharSequence newData, CotParser parser, ChannelHandler handler) {
+	public static List<CotEventContainer> add(StringBuffer messageStringBuffer, CharSequence newData, CotParser parser, ChannelHandler handler) {
 
 		List<CotEventContainer> results = new LinkedList<CotEventContainer>();
 
@@ -214,18 +211,18 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 
 		// init search pointer (0 for all other iterations, but we start searching after the end of the message)
 		// note: subtract the end-tag length to cover end tag spanning multiple frames
-		int prevLen = Math.max(0, builder.length() - END_OF_COT_MSG_STR.length());
-		builder.append(newData);
+		int prevLen = Math.max(0, messageStringBuffer.length() - END_OF_COT_MSG_STR.length());
+		messageStringBuffer.append(newData);
 
 		int indexOfEnd = -1;
-		while ((indexOfEnd = builder.indexOf(END_OF_COT_MSG_STR, prevLen)) >= 0) {
+		while ((indexOfEnd = messageStringBuffer.indexOf(END_OF_COT_MSG_STR, prevLen)) >= 0) {
 
 			// skip anything received ahead of the first cot event (such as <auth> messages sent to anonymous ports)
-			int openIndex = builder.indexOf(START_OF_COT_MSG_STR, 0);
+			int openIndex = messageStringBuffer.indexOf(START_OF_COT_MSG_STR, 0);
 
 			// have some end tag to seek to
 			int closeIndex = indexOfEnd + END_OF_COT_MSG_STR.length();
-			final String msg = builder.substring(openIndex, closeIndex);
+			final String msg = messageStringBuffer.substring(openIndex, closeIndex);
 
 			if (msg.length() <= INDIVIDUAL_COT_MSG_SIZE_LIMIT) {
 				// have a message window to parse, within size limits
@@ -246,25 +243,25 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 			} else {
 				// message closure is too long, even if we could parse it -- chuck out
 				if (log.isTraceEnabled()) {
-					log.trace("Error parsing CoT message: message too long to parse: " + builder.substring(0, closeIndex));
+					log.trace("Error parsing CoT message: message too long to parse: " + messageStringBuffer.substring(0, closeIndex));
 				}
 			}
 
 			// TODO: change so that we don't delete parsed data until the end of our parse attempt...
 			// string builder implementation will move all of the contained data to the zero index
-			builder.delete(0, closeIndex);
+			messageStringBuffer.delete(0, closeIndex);
 
 			// END OF WHILE -- have cleared or parsed past the end tag that we found
 			prevLen = 0; // reset search finger
 		}
 
-		if (builder.length() > INDIVIDUAL_COT_MSG_SIZE_LIMIT) {
-			builder.delete(0, builder.length());
+		if (messageStringBuffer.length() > INDIVIDUAL_COT_MSG_SIZE_LIMIT) {
+			messageStringBuffer.delete(0, messageStringBuffer.length());
 		}
 
-		if (builder.capacity() > BUFFER_TRIM_SIZE) {
+		if (messageStringBuffer.capacity() > BUFFER_TRIM_SIZE) {
 			// trim buffer size down if we've grown beyond a meg -- don't want to hold on to a giant buffer if we only occasionally get a large message
-			builder.trimToSize();
+			messageStringBuffer.trimToSize();
 		}
 
 		return results;

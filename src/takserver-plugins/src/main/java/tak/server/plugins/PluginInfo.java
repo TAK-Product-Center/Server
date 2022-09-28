@@ -12,12 +12,16 @@ public class PluginInfo {
 	private String name;
 	private String description;
 	private String className;
+	private String version;
+	private String tag;
 	private UUID id;
 	boolean isSender;
 	boolean isReceiver;
 	boolean isInterceptor;
 	private boolean isEnabled;
+	private boolean isStarted;
 	private String exceptionMessage;
+	private boolean archiveEnabled;
 
 	public String getName() {
 		return name;
@@ -67,12 +71,37 @@ public class PluginInfo {
 	public void setEnabled(boolean isEnabled) {
 		this.isEnabled = isEnabled;
 	}
+	public boolean isStarted() {
+		return isStarted;
+	}
+	public void setStarted(boolean isStarted) {
+		this.isStarted = isStarted;
+	}
 	public boolean isInterceptor() {
 		return isInterceptor;
 	}
 	public void setInterceptor(boolean isInterceptor) {
 		this.isInterceptor = isInterceptor;
 	}
+	public boolean isArchiveEnabled() {
+		return archiveEnabled;
+	}
+	public void setArchiveEnabled(boolean archiveEnabled) {
+		this.archiveEnabled = archiveEnabled;
+	}
+	public String getVersion() {
+		return version;
+	}
+	public void setVersion(String version) {
+		this.version = version;
+	}
+	public String getTag() {
+		return tag;
+	}
+	public void setTag(String tag) {
+		this.tag = tag;
+	}
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;

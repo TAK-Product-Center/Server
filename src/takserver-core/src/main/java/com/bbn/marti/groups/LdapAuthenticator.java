@@ -191,6 +191,28 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         }
     }
 
+    public static Set<String> applyGroupPrefixFilter(Set<String> groupNames, String prefix) {
+
+        Set<String> filtered = new ConcurrentSkipListSet<>();
+
+        //
+        // apply the groupPrefix filter
+        //
+        for (String groupName : groupNames) {
+            // move the group name on for further processing if it matches. an empty string prefix matches everything.
+            if (groupName.toLowerCase(Locale.ENGLISH).startsWith(prefix)) {
+                filtered.add(groupName);
+            } else {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("skipping non prefix-matching group " + groupName);
+                }
+            }
+        }
+
+        return filtered;
+    }
+
+
     public Set<String> getGroupNamesFromSearchResults(Map<String, String> groupInfo) {
         Set<String> groupNames = new ConcurrentSkipListSet<>();
 
@@ -231,21 +253,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             groupNames.add(groupName);
         }
 
-        Set<String> filtered = new ConcurrentSkipListSet<>();
-
-        //
-        // apply the groupPrefix filter
-        //
-        for (String groupName : groupNames) {
-            // move the group name on for further processing if it matches. an empty string prefix matches everything.
-            if (groupName.toLowerCase(Locale.ENGLISH).startsWith(groupPrefix)) {
-                filtered.add(groupName);
-            } else {
-                if (logger.isDebugEnabled()) {
-                    logger.debug("skipping non prefix-matching group " + groupName);
-                }
-            }
-        }
+        Set<String> filtered = applyGroupPrefixFilter(groupNames, groupPrefix);
 
         //
         // apply the groupNameExtractorRegex to the results of the groupPrefix filter
@@ -289,14 +297,6 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
 
         if (logger.isTraceEnabled()) {
         	logger.trace("processing group updates for " + user + " for these groups " + groupNames);
-        }
-
-        if (getConf().getFiltergroup() != null && getConf().getFiltergroup().size() > 0) {
-            Set<String> filterGroups = new ConcurrentSkipListSet<>(getConf().getFiltergroup());
-            Set<String> intersection = Sets.intersection(groupNames, filterGroups);
-            if (intersection.size() == 0) {
-                throw new UnauthorizedException();
-            }
         }
 
         return processGroupUpdates(user, groupNames);
@@ -628,14 +628,19 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
     }
 
     public boolean groupNamesToGroups(Set<String> groupNames, Set<Group> groups) {
+        return groupNamesToGroups(groupManager, groupNames, groups, readOnlyGroup, readGroupSuffix, writeGroupSuffix);
+    }
+
+    public static boolean groupNamesToGroups(GroupManager groupManager, Set<String> groupNames, Set<Group> groups,
+                                      String readOnlyGroupName, String readSuffix, String writeSuffix) {
 
         //
         // check to see if the user belongs to the readOnlyGroup
         //
         boolean readOnly = false;
-        if (readOnlyGroup != null && readOnlyGroup.length() > 0) {
+        if (readOnlyGroupName != null && readOnlyGroupName.length() > 0) {
             for (String groupName : groupNames) {
-                if (groupName.compareTo(readOnlyGroup) == 0) {
+                if (groupName.compareTo(readOnlyGroupName) == 0) {
                     groupNames.remove(groupName);
                     readOnly = true;
                     break;
@@ -651,12 +656,12 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             //
             boolean grantReadAccess = true;
             boolean grantWriteAccess = true;
-            if (groupName.endsWith(readGroupSuffix)) {
+            if (groupName.endsWith(readSuffix)) {
                 grantWriteAccess = false;
-                groupName = groupName.substring(0, groupName.indexOf(readGroupSuffix));
-            } else if (groupName.endsWith(writeGroupSuffix)) {
+                groupName = groupName.substring(0, groupName.indexOf(readSuffix));
+            } else if (groupName.endsWith(writeSuffix)) {
                 grantReadAccess = false;
-                groupName = groupName.substring(0, groupName.indexOf(writeGroupSuffix));
+                groupName = groupName.substring(0, groupName.indexOf(writeSuffix));
             }
 
             if (grantWriteAccess && !readOnly) {
@@ -671,10 +676,18 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         return readOnly;
     }
 
-    private boolean processGroupUpdates(User user, Set<String> groupNames) {
+    public boolean processGroupUpdates(User user, Set<String> groupNames) {
 
         if (user == null || groupNames == null) {
             throw new IllegalArgumentException("null user or groupNames list");
+        }
+
+        if (getConf().getFiltergroup() != null && getConf().getFiltergroup().size() > 0) {
+            Set<String> filterGroups = new ConcurrentSkipListSet<>(getConf().getFiltergroup());
+            Set<String> intersection = Sets.intersection(groupNames, filterGroups);
+            if (intersection.size() == 0) {
+                throw new UnauthorizedException();
+            }
         }
 
         Set<Group> groups = new ConcurrentSkipListSet<>();

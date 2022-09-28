@@ -11,7 +11,7 @@
         <br><br>
         <input type="checkbox" data-ng-model="archiveMissionByNoSubscriptionActivity"> Archive Missions By Subscription Activity
         <br><br>
-        <input type="number" data-ng-model="archiveAfterNoActivityDays" min="0.001"> Number of days to archive the mission after no activity
+        <input type="number" data-ng-model="timeToArchiveAfterNoActivityDays" min="0.001"> Number of days to archive the mission after no activity
         <br><br>
         <input type="number" data-ng-model="removeFromArchiveAfterDays" min="0.001"> Number of days to remove an archived mission from the archive
         <br><br>
@@ -94,15 +94,15 @@
           </tr>
         </thead>
         <tbody>
-          <tr ng-repeat="missonArchiveStoreEntry in missions.missonArchiveStoreEntries | filter:missionFilter">
-            <td>{{missonArchiveStoreEntry.missionName}}
+          <tr ng-repeat="missionArchiveStoreEntry in missions.missionArchiveStoreEntries | filter:missionFilter">
+            <td>{{missionArchiveStoreEntry.missionName}}
             </td>
-            <td>{{missonArchiveStoreEntry.archiveTime}}
+            <td>{{missionArchiveStoreEntry.archiveTime}}
             </td>
-            <td>{{missonArchiveStoreEntry.createTime}}
+            <td>{{missionArchiveStoreEntry.createTime}}
             </td>
             <td>
-              <button class="btn-danger" data-ng-click="restoreMission(missonArchiveStoreEntry)">Restore</button>
+              <button class="btn-danger" data-ng-click="restoreMission(missionArchiveStoreEntry)">Restore</button>
             </td>
           </tr>
         </tbody>

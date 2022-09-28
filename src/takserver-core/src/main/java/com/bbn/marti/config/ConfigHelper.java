@@ -34,8 +34,8 @@ public class ConfigHelper {
 
             HashSet<String> inputNameSet = new HashSet<>();
 
-            List<Network.Input> inputList = configuration.getNetwork().getInput();
-            for (Network.Input input : inputList) {
+            List<Input> inputList = configuration.getNetwork().getInput();
+            for (Input input : inputList) {
                 // Using switch since the compiler will complain if another auth is added but not checked for here
 
                 if (inputNameSet.contains(input.getName())) {

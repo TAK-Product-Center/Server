@@ -13,7 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.groups.DummyAuthenticator;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.groups.PeriodicUpdateCancellationException;

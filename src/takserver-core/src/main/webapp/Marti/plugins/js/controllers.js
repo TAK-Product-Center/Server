@@ -6,9 +6,11 @@ pluginManagerControllers.controller('PluginListCtrl', [
     '$scope',
     '$timeout',
     'AllPluginsInfoService',
-    'PluginStatusService',
-    'AllPluginStatusService',
-    function($scope, $timeout, AllPluginsInfoService, PluginStatusService, AllPluginStatusService) {
+    'PluginEnabledService',
+    'PluginStartedService',
+    'AllPluginStartedService',
+    'PluginArchiveService',
+    function($scope, $timeout, AllPluginsInfoService, PluginEnabledService, PluginStartedService, AllPluginStartedService, PluginArchiveService) {
 
 	var unsorted_class = "glyphicon glyphicon-sort";
 	var ascend_class = "glyphicon glyphicon-arrow-up";
@@ -38,9 +40,16 @@ pluginManagerControllers.controller('PluginListCtrl', [
 				    plugin['status'] = "Startup Error: " + plugin.exceptionMessage;
 				    plugin['status-class'] = "bg-danger";
 				} else {
-				    plugin['status'] = "Started";
-				    plugin['status-class'] = "";
-				}
+				    if (plugin['started']){
+    				    plugin['status'] = "Started";
+                        plugin['status-class'] = "";
+                        plugin['start_stop_command'] = "Stop";                
+				    }else{
+				        plugin['status'] = "Stopped";
+                        plugin['status-class'] = "";
+                        plugin['start_stop_command'] = "Start";     
+				    }
+				}				
 		    }
 		    $scope.pluginMetadata = res.data;
 		    sort();
@@ -88,16 +97,42 @@ pluginManagerControllers.controller('PluginListCtrl', [
 	    sort();
 	}
 
-	$scope.handleStatus = function (plugin, input) {
+	$scope.handlePluginEnabledUpdate = function (plugin, input) {
         input.currentTarget.disabled = true
 
-   		PluginStatusService.save({
+   		PluginEnabledService.save({
             name: plugin.name,
             status: !plugin.enabled
         },
         function (apiResponse) {},
         function () {
-            alert('An unexpected error occurred changing the plugin status.');
+            alert('An unexpected error occurred changing the plugin enabled status.');
+        });
+	}
+	
+    $scope.handlePluginStartedUpdate = function (plugin, input) {
+        input.currentTarget.disabled = true
+
+        PluginStartedService.save({
+            name: plugin.name,
+            status: !plugin.started
+        },
+        function (apiResponse) {},
+        function () {
+            alert('An unexpected error occurred changing the plugin started status.');
+        });
+    }
+
+	$scope.handleArchiveUpdate = function (plugin, input) {
+        input.currentTarget.disabled = true 
+
+   		PluginArchiveService.save({
+            name: plugin.name,
+            archiveEnabled: !plugin.archiveEnabled
+        },
+        function (apiResponse) {},
+        function () {
+            alert('An unexpected error occurred changing the plugin archive setting.');
         });
 	}
 
@@ -105,7 +140,7 @@ pluginManagerControllers.controller('PluginListCtrl', [
 		document.getElementById('startButton').disabled = true
 		document.getElementById('stopButton').disabled = true
    		
-   		AllPluginStatusService.save({
+   		AllPluginStartedService.save({
             status: status
         },
         function (apiResponse) {},

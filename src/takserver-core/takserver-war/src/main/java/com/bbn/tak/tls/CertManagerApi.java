@@ -2,6 +2,9 @@
 
 package com.bbn.tak.tls;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.io.ByteArrayOutputStream;
 import java.io.StringWriter;
 import java.security.KeyStore;
@@ -24,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -314,6 +318,46 @@ public class CertManagerApi extends BaseRestController {
 
         } catch (Exception e) {
             logger.error("Exception in signClient!", e);
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            return null;
+        }
+    }
+
+    @RequestMapping(value = "/tls/signClient/v2", method = RequestMethod.POST)
+    ResponseEntity<String> signClientCertV2(
+            @RequestParam(value = "clientUid", defaultValue = "") String clientUid,
+            @RequestParam(value = "version", required = false) String version,
+            @RequestBody String base64CSR)
+            throws Exception {
+
+        try {
+            TakCert cert = certManagerService.signClient(clientUid, version != null, base64CSR);
+            if (cert == null) {
+                throw new TakException("signClient returned null!");
+            }
+
+            takCertRepository.save(cert);
+
+            ObjectMapper mapper = new ObjectMapper();
+            ObjectNode rootNode = mapper.createObjectNode();
+
+            String clientCertPem = Util.certToPEM(cert.getX509Certificate(), false);
+            rootNode.put("signedCert", clientCertPem);
+
+            int ndx = 0;
+            for (X509Certificate ca : cert.getX509CertificateChain()) {
+                String caPem = Util.certToPEM(ca, false);
+                rootNode.put("ca" + ndx++, caPem);
+            }
+
+            String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(rootNode);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            return new ResponseEntity<String>(json, HttpStatus.OK);
+
+        } catch (Exception e) {
+            logger.error("Exception in signClientCertV2!", e);
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return null;
         }

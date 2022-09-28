@@ -326,6 +326,7 @@ public class SSLHelper {
 				File cwd = makeCertPath.getParent().toFile();
 				ProcessBuilder pb = new ProcessBuilder(cmd);
 				pb.directory(cwd);
+				pb.inheritIO();
 				pb.environment().put("COUNTRY", "US");
 				pb.environment().put("STATE", "MA");
 				pb.environment().put("CITY", "Cambridge");

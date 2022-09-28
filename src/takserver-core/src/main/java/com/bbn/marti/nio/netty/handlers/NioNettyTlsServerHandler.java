@@ -11,8 +11,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.log4j.Logger;
 import org.dom4j.DocumentException;
 
+import com.bbn.cot.filter.DataFeedFilter;
 import com.bbn.marti.config.AuthType;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.nio.channel.connections.TcpChannelHandler;
@@ -112,9 +114,7 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 							setNegotiator();
 							buildCallbacks();
 							setupFlushHandler();
-							createSubscription();
-							
-													
+							createSubscription();				
 						} else {
 							ctx.close();
 						}
@@ -280,20 +280,32 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 	}
 
 	protected void convertAndSubmitBytesAsCot(ByteBuffer msg) {
-		StreamingCotProtocol.add(builder, Charsets.UTF_8.decode(msg), parser, channelHandler).forEach(c -> {
-			if (isNotDOSLimited(c) && isNotReadLimited(c)) {
-				protocolListeners.forEach(listener -> {
-					try {
-						listener.onDataReceived(c, channelHandler, protocol);
-					} catch (RejectedExecutionException ree) {
-						// count how often full queue has blocked message send
-						
-						queueFullCounter.increment();
 
+		try {
+			
+			StreamingCotProtocol.add(builder, Charsets.UTF_8.decode(msg), cotParser(), channelHandler).forEach(c -> {
+				if (isNotDOSLimited(c) && isNotReadLimited(c)) {
+					if (isDataFeedInput()) {
+						DataFeedFilter.getInstance().filter(c, (DataFeed) input);
 					}
-				});
+
+					protocolListeners.forEach(listener -> {
+						try {
+							listener.onDataReceived(c, channelHandler, protocol);
+						} catch (RejectedExecutionException ree) {
+							// count how often full queue has blocked message send
+
+							queueFullCounter.increment();
+
+						}
+					});
+				}
+			});
+		} catch (Exception e) {
+			if (log.isWarnEnabled()) {
+				log.warn("Exception receiving message", e);
 			}
-		});
+		}
 	}
 
 	protected void convertAndSubmitProtoBufBytesAsCot(byte[] msg) {
@@ -360,6 +372,11 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 				CotEventContainer cotEventContainer = StreamingProtoBufHelper.getInstance().proto2cot(takMessage);
 				
 				if (isNotDOSLimited(cotEventContainer)  && isNotReadLimited(cotEventContainer)) {
+					
+					if (isDataFeedInput()) {
+						DataFeedFilter.getInstance().filter(cotEventContainer, (DataFeed) input);
+					}
+					
 					for (ProtocolListener<CotEventContainer> listener :  protocolListeners) {
 						listener.onDataReceived(cotEventContainer, channelHandler, protocol);
 					}

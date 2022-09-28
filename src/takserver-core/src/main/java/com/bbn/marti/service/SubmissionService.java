@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import javax.xml.XMLConstants;
 import javax.xml.bind.JAXBContext;
@@ -39,6 +40,7 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.ignite.Ignite;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
@@ -49,10 +51,12 @@ import org.dom4j.io.SAXReader;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.xml.sax.SAXException;
 
+import com.bbn.cot.filter.DataFeedFilter;
 import com.bbn.cot.filter.DropEventFilter;
 import com.bbn.cot.filter.FlowTagFilter;
 import com.bbn.cot.filter.GeospatialEventFilter;
@@ -66,15 +70,15 @@ import com.bbn.marti.config.CAType;
 import com.bbn.marti.config.CertificateConfig;
 import com.bbn.marti.config.CertificateSigning;
 import com.bbn.marti.config.Configuration;
+import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Dropfilter;
 import com.bbn.marti.config.Federation.FederationServer;
 import com.bbn.marti.config.Filter;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.config.MicrosoftCAConfig;
 import com.bbn.marti.config.NameEntries;
 import com.bbn.marti.config.NameEntry;
-import com.bbn.marti.config.Network;
 import com.bbn.marti.config.Network.Connector;
-import com.bbn.marti.config.Network.Input;
 import com.bbn.marti.config.Repository;
 import com.bbn.marti.config.TAKServerCAConfig;
 import com.bbn.marti.config.Tls;
@@ -121,6 +125,8 @@ import com.bbn.marti.remote.groups.NetworkInputAddResult;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.remote.util.RemoteUtil;
+import com.bbn.marti.sync.model.DataFeedDao;
+import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.util.FixedSizeBlockingQueue;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
@@ -134,11 +140,14 @@ import io.micrometer.core.instrument.Metrics;
 import tak.server.CommonConstants;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
+import tak.server.cache.PluginDatafeedCacheHelper;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotElement;
 import tak.server.cot.CotEventContainer;
 import tak.server.cot.CotParser;
 import tak.server.federation.DistributedFederationManager;
+import tak.server.feeds.DataFeed.DataFeedType;
+import tak.server.feeds.PluginDataFeed;
 import tak.server.ignite.IgniteHolder;
 import tak.server.messaging.MessageConverter;
 
@@ -206,6 +215,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     private AtomicBoolean isIntercept = null;
     
+    private DataFeedRepository dataFeedRepository;
+    
+	@Autowired
+	private PluginDatafeedCacheHelper pluginDatafeedCacheHelper;
+    
 	public static SubmissionService getInstance() {
 		if (instance == null) {
 			synchronized (SubmissionService.class) {
@@ -244,7 +258,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                              GroupManager gm, ScrubInvalidValues siv, MessageConversionUtil mcu,
                              GroupFederationUtil gfu, InjectionManager im, RepositoryService rs,
                              Ignite i, SubscriptionManager sm, SubscriptionStore store, FlowTagFilter flowTag, ContactManager contactManager, ServerInfo serverInfo, CoreConfig coreConfig,
-                             MessageConverter messageConverter, ActiveGroupCacheHelper agch, RemoteUtil remoteUtil) {
+                             MessageConverter messageConverter, ActiveGroupCacheHelper agch, RemoteUtil remoteUtil, DataFeedRepository dfr) {
     	this.federationManager = dfm;
         this.nettyBuilder = nb;
         this.messagingUtil = mui;
@@ -265,6 +279,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         this.messageConverter = messageConverter;
         this.activeGroupCacheHelper = agch;
         this.remoteUtil = remoteUtil;
+        this.dataFeedRepository = dfr;
 
         DistributedConfiguration dc = DistributedConfiguration.getInstance();
         Auth.Ldap ldapConfig = dc.getAuth().getLdap();
@@ -305,7 +320,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         postMissionEventsAsPublic = config.getAuth() != null && config.getAuth().getLdap() != null &&
                 config.getAuth().getLdap().isPostMissionEventsAsPublic();
 
-        List<Network.Input> inputs = config.getNetwork().getInput();
+        List<Input> inputs = config.getNetwork().getInput();
 
 
         if (logger.isDebugEnabled()) {
@@ -317,7 +332,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         }
 
         try {
-            for (Network.Input input : inputs) {
+            for (Input input : inputs) {
                 if (CollectionUtils.isNotEmpty(input.getFiltergroup()) && input.getAuth().equals(AuthType.X_509)) {
                     if (logger.isErrorEnabled()) {
                         logger.error("You have configured an input with both x509 auth and filter groups, the filter groups will be ignored. " + input.getFiltergroup());
@@ -329,6 +344,113 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             logger.error("Configuration or setup of network inputs failed: " + e.getMessage(), e);
             System.exit(-1);
         }
+        
+        List<DataFeed> feeds = config.getNetwork().getDatafeed();
+
+        if (!feeds.isEmpty()) {
+        	logger.info("listening for " + feeds.size() + " data feed(s)");
+        }
+        
+        try {
+        	Set<String> feedUids = new HashSet<>();
+
+            for (DataFeed feed : feeds) {
+            	if (CollectionUtils.isNotEmpty(feed.getFiltergroup()) && feed.getAuth().equals(AuthType.X_509)) {
+                    if (logger.isErrorEnabled()) {
+                        logger.error("You have configured a datafeed with both x509 auth and filter groups, the filter groups will be ignored. " + feed.getFiltergroup());
+                    }
+                }
+                if (Strings.isNullOrEmpty(feed.getUuid())) {
+                  logger.info("Failed to initialize Data Feed: " + feed.getName() 
+                  +  " because no uuid tag was specified. Here is an auto-generated uuid you can use: <uuid>" 
+                      + UUID.randomUUID().toString() + "</uuid>");
+                  continue;
+                }
+                
+                if (feedUids.contains(feed.getUuid())) {
+                  logger.info("Failed to initialize Data Feed: " + feed.getName() + " because a data feed with that uuid already exists.");
+                  continue;
+                }
+                
+                feedUids.add(feed.getUuid());
+                
+                DataFeedType feedType = EnumUtils.getEnumIgnoreCase(DataFeedType.class, feed.getType());
+        		
+        		if (feedType == null) {
+        			feedType = DataFeedType.Streaming;
+        		}
+        		
+        		feed.setType(feedType.toString());
+
+				AuthType feedAuthType = feed.getAuth();
+
+				if (feedAuthType == null) {
+					feedAuthType = AuthType.X_509;
+				}
+
+				feed.setAuth(feedAuthType);
+
+				// Determine the anongroup value
+				boolean anonGroup;
+
+				if (feed.isAnongroup() == null) {
+					List<String> groupList = feed.getFiltergroup();
+					boolean hasGroups = (groupList != null && !groupList.isEmpty());
+					anonGroup = !hasGroups;
+				} else {
+					anonGroup = feed.isAnongroup();
+				}
+
+				feed.setAnongroup(anonGroup);
+
+				Long dataFeedId = null;
+
+				if (dataFeedRepository.getDataFeedByUUID(feed.getUuid()).size() > 0) {
+					dataFeedId = dataFeedRepository.updateDataFeed(feed.getUuid(), feed.getName(), feedType.ordinal(),
+							feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
+							feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
+							feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
+							feed.isSync());
+					if (feed.getTag().size() > 0) {
+						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
+						for (String tag : feed.getTag()) {
+							dataFeedRepository.addDataFeedTag(dataFeedId, tag);
+						}
+					}
+					if (feed.getFiltergroup().size() > 0) {
+						dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
+						for (String filterGroup : feed.getFiltergroup()) {
+							dataFeedRepository.addDataFeedFilterGroup(dataFeedId, filterGroup);
+						}
+					}
+				} else {
+
+					if (dataFeedRepository.getDataFeedByName(feed.getName()).size() != 1) {
+						dataFeedId = dataFeedRepository.addDataFeed(feed.getUuid(), feed.getName(), feedType.ordinal(),
+								feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
+								feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
+								feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(), feed.isSync());
+						if (feed.getTag().size() > 0) {
+							dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
+							for (String tag : feed.getTag()) {
+								dataFeedRepository.addDataFeedTag(dataFeedId, tag);
+							}
+						}
+						if (feed.getFiltergroup().size() > 0) {
+							dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
+							for (String filterGroup : feed.getFiltergroup()) {
+								dataFeedRepository.addDataFeedFilterGroup(dataFeedId, filterGroup);
+							}
+						}
+					}
+				}
+
+                addInput(feed);
+            }
+        } catch (Exception e) {
+            logger.error("Configuration or setup of network feeds failed: " + e.getMessage(), e);
+        }
+
 
         if (config.getFilter().getDropfilter() != null) {
             for (Dropfilter.Typefilter t : config.getFilter().getDropfilter().getTypefilter()) {
@@ -458,29 +580,95 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         			try {
 
         				Message m = Message.parseFrom((byte[]) message);
-
-        				if (m != null && m.getProvenanceCount() > 0) {
-        					// do not republish the message if it is marked with provenance        			
-
-        					if (logger.isDebugEnabled()) {
-        						logger.debug("has provenance - processing in service queue");
-        					}
-
-        					// this is only necessary if interception is enabled
-        					if (remoteUtil.getIsIntercept(isIntercept).get()) {
+        				
+        				if (m != null) {
+        					boolean isInterceptorMessage = false;
+           					List<String> provenance = m.getProvenanceList();
+            				if (provenance != null && provenance.contains(Constants.PLUGIN_INTERCEPTOR_PROVENANCE)) {
+            					isInterceptorMessage = true;
+            				}
+            				
+        					if (isInterceptorMessage) {
+            					// do not republish the message if it is marked as intercepted, submit it directly
         						SubmissionService.this.addToInputQueue(messageConverter.dataMessageToCot(m, false));
-        					}
+            				} else {
+            					if (logger.isDebugEnabled()) {
+            						logger.debug("processing through plugin pipeline");
+            					}
 
-        				} else {
+            					// Check if the message is a datafeed
+            					boolean isDataFeedMessage = false;
+            					if (m.getFeedUuid() != null && !m.getFeedUuid().isEmpty()) {
+            						isDataFeedMessage = true;
+            					}
+            					
+            					CotEventContainer pluginCotEvent = messageConverter.dataMessageToCot(m, false);
+            					
+            					if (isDataFeedMessage) {
+            						
+            						List<tak.server.plugins.PluginDataFeed> cacheResult = pluginDatafeedCacheHelper.getPluginDatafeed(m.getFeedUuid());
+            						
+            						if (cacheResult == null) { // Does not have in cache
+            							
+            							List<DataFeedDao> dataFeedInfo = dataFeedRepository.getDataFeedByUUID(m.getFeedUuid());
+                    					if (dataFeedInfo.size() == 0) {
+                    						
+                    						// update cache with empty result
+                        					pluginDatafeedCacheHelper.cachePluginDatafeed(m.getFeedUuid(), new ArrayList<>());
 
-        					if (logger.isDebugEnabled()) {
-        						logger.debug("no provenance - processing through plugin pipeline");
-        					}
+                        					logger.warn("Datafeed with UUID {} does not exist. Ignore the message.", m.getFeedUuid());
+                        					
+                    					} else {
+                    						
+                    						List<String> tags = dataFeedRepository.getDataFeedTagsById(dataFeedInfo.get(0).getId());
+                    						
+                    						// update cache
+                    						List<tak.server.plugins.PluginDataFeed> pluginDatafeeds = new ArrayList<>();
+                    						tak.server.plugins.PluginDataFeed pluginDataFeed = new tak.server.plugins.PluginDataFeed(m.getFeedUuid(), dataFeedInfo.get(0).getName(), tags, dataFeedInfo.get(0).getArchive(), dataFeedInfo.get(0).isSync());
+                    						pluginDatafeeds.add(pluginDataFeed);
+                        					pluginDatafeedCacheHelper.cachePluginDatafeed(m.getFeedUuid(), pluginDatafeeds);
+                    						
+                    						com.bbn.marti.config.DataFeed dataFeed = new com.bbn.marti.config.DataFeed();
+                        					dataFeed.setUuid(m.getFeedUuid());
+                        					dataFeed.setName(dataFeedInfo.get(0).getName());
+                        					dataFeed.getTag().addAll(tags); 
+                        					dataFeed.setArchive(dataFeedInfo.get(0).getArchive());
+                        					dataFeed.setSync(dataFeedInfo.get(0).isSync());
+                        					logger.debug("Retrieve Datafeed info from dataFeedRepository: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync());
+                        				
+                        					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
 
-        					CotEventContainer pluginCotEvent = messageConverter.dataMessageToCot(m, false);
+                        					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+                    					}
+            							
+            						} else { // exist in cache
+            							
+            							if (cacheResult.size() == 0) { // datafeed with this uuid does not exist
+            								
+                        					logger.warn("-Datafeed with UUID {} does not exist. Ignore the message.", m.getFeedUuid());
+                        					
+            							} else {
+            								com.bbn.marti.config.DataFeed dataFeed = new com.bbn.marti.config.DataFeed();
+                        					dataFeed.setUuid(m.getFeedUuid());
+                        					dataFeed.setName(cacheResult.get(0).getName());
+                        					dataFeed.getTag().addAll(cacheResult.get(0).getTags());
+                        					dataFeed.setArchive(cacheResult.get(0).isArchive());
+                        					dataFeed.setSync(cacheResult.get(0).isSync());
+                        					logger.debug("Retrieve Datafeed info from cache: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync());
+                        				
+                        					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
 
-        					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+                        					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+            							}
+            						}
+
+            					} else {
+                					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+            					}
+            					
+            				}
         				}
+        			
         			} catch (Exception e) {
 
         				if (logger.isDebugEnabled()) {
@@ -601,7 +789,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     	if (logger.isTraceEnabled()) {
     		logger.trace("createSubscriptionFromConnection " + handler + " " + protocol);
     	}
-
+    	
 		// Add to subscribers
         try {
             long uid = config.getRemoteConfiguration().getCluster().isEnabled() ?
@@ -620,10 +808,20 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                 String connectionId = tcpHandler.getConnectionId();
                 User user = (connectionId == null ? null : groupManager.getUserByConnectionId(connectionId));
                 if (user != null) {
-
+                	// make data feed users read only                	
+                	if (tcpHandler.getInput() instanceof DataFeed) {
+                		Set<Group> readOnlyGroups = groupManager
+            					.getGroups(user)
+            					.stream()
+            					.filter(g->g.getDirection() == Direction.IN).collect(Collectors.toSet());
+                		
+                		groupManager.updateGroups(user, readOnlyGroups);
+                	}
+                	
                 	Subscription subscription = subMgr.getSubscription(handler.netProtocolName() + ":" + uid);
                 	subscription.isWebsocket.set(websocketApiNode != null);
                 	subscription.websocketApiNode = websocketApiNode;
+                	
                 	if (logger.isDebugEnabled()) {
                 		logger.debug("subscription in subscriptionLifecycleCallback " + subscription);
                 	}
@@ -654,7 +852,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             NavigableSet<Group> groups = groupManager.getGroups(user);
             return RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
         } catch (Exception e) {
-            logger.error("exception in getGroupVectorFromHandler!");
+            logger.error("exception in getGroupVectorFromHandler!", e);
             return RemoteUtil.getInstance().getBitStringNoGroups();
         }
     }
@@ -685,8 +883,10 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
                 if (config.getRepository().isEnable()) {
 
+                    String username = subscription.getUser() != null ? subscription.getUser().getName() : "";
+
                     //Audit disconnected event for callsign/uid pair
-                    repositoryService.auditCallsignUIDEventAsync(subscription.callsign, subscription.clientUid, ConnectionEventTypeValue.DISCONNECTED,
+                    repositoryService.auditCallsignUIDEventAsync(subscription.callsign, subscription.clientUid, username, ConnectionEventTypeValue.DISCONNECTED,
                             getGroupVectorFromHandler(handler));
                 }
             }
@@ -839,7 +1039,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 			}
 
             // process per-input filters
-            Network.Input input = ((AbstractBroadcastingChannelHandler) handler).getInput();
+            Input input = ((AbstractBroadcastingChannelHandler) handler).getInput();
             Filter filter = input.getFilter();
             if (filter != null) {
 
@@ -1069,8 +1269,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 						}
 
 						try {
+                            String username = sub.getUser() != null ? sub.getUser().getName() : "";
 							repositoryService.auditCallsignUIDEventAsync(
-									callsign, data.getUid(), ConnectionEventTypeValue.CONNECTED, groupVector);
+                                callsign, data.getUid(), username, ConnectionEventTypeValue.CONNECTED, groupVector);
 						} catch (Exception e) {
 							if (logger.isDebugEnabled()) {
 								logger.debug("error recording connection event", e);
@@ -1093,8 +1294,27 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     // add input business logic, optional clustering of the input add
     public void addInput(Input input, boolean cluster) throws IOException {
+    	
+    	logger.info("input class type: " + input.getClass().getSimpleName());
+    	
         String name = input.getName();
-        logger.info("Configuring " + (cluster ? "clustered " : "") + "network input " + name + ": ");
+        logger.info("Configuring " + (cluster ? "clustered " : "") + "network input " + input.getClass().getName() + " " + name + ": ");
+        
+        if (input instanceof DataFeed) {
+			DataFeed feed = (DataFeed) input;
+
+			if (Strings.isNullOrEmpty(feed.getUuid())) {
+				feed.setUuid(UUID.randomUUID().toString());
+			}
+			if (feed.getType() == null) {
+				feed.setType("Streaming");
+			}
+			if (feed.getProtocol() == null || feed.getType().equals("Plugin")) {
+		        addMetric(input, new InputMetric(input));
+		        config.addInputAndSave(input);
+		        return;
+			}
+        }
 
         TransportCotEvent transport = TransportCotEvent.findByID(input.getProtocol());
         boolean isTls = (transport == TransportCotEvent.TLS || transport == TransportCotEvent.SSL
@@ -1119,41 +1339,44 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             if (config.getRemoteConfiguration().getSecurity() == null) {
                 throw new IllegalArgumentException("Security section of CoreConfig is required");
             }
+            
+			int localPort = input.getPort();
 
-            int localPort = input.getPort();
+			// Multicast options
+			InetAddress group = null;
+			List<NetworkInterface> interfs = new LinkedList<NetworkInterface>();
 
-            // Multicast options
-            InetAddress group = null;
-            List<NetworkInterface> interfs = new LinkedList<NetworkInterface>();
+			if (input.getGroup() != null) {
+				group = InetAddress.getByName(input.getGroup());
+				// only set the interface if we're using multicast
+				if (input.getIface() != null) {
+					interfs.add(NetworkInterface.getByName(input.getIface()));
+				}
+			}
+            
+			if (input.getCoreVersion() == 2) {
+				if (transport == TransportCotEvent.UDP)
+					nettyBuilder.buildUdpServer(input);
+				if (transport == TransportCotEvent.MUDP || transport == TransportCotEvent.COTPROTOMUDP)
+					nettyBuilder.buildMulticastServer(input, group, interfs);
+			} else {
 
-            if (input.getGroup() != null) {
-                group = InetAddress.getByName(input.getGroup());
-                // only set the interface if we're using multicast
-                if (input.getIface() != null) {
-                    interfs.add(NetworkInterface.getByName(input.getIface()));
-                }
-            }
+				// Get codec sources, such as SSL and LDAPAUTH
+				List<CodecSource> codecSources = getCodecSources(input);
+				LinkedBlockingQueue<ProtocolListenerInstantiator<CotEventContainer>> protocolListenerInstantiators = new LinkedBlockingQueue<ProtocolListenerInstantiator<CotEventContainer>>();
+				addProtocolListeners(protocolListenerInstantiators, input);
 
-            // Get codec sources, such as SSL and LDAPAUTH
-            List<CodecSource> codecSources = getCodecSources(input);
-            LinkedBlockingQueue<ProtocolListenerInstantiator<CotEventContainer>> protocolListenerInstantiators = new LinkedBlockingQueue<ProtocolListenerInstantiator<CotEventContainer>>();
-            addProtocolListeners(protocolListenerInstantiators, input);
+				ServerBinder binder = transport.binder(localPort, protocolListenerInstantiators, codecSources, interfs,
+						group);
 
-            ServerBinder binder = transport.binder(
-                    localPort,
-                    protocolListenerInstantiators,
-                    codecSources,
-                    interfs,
-                    group
-            );
+				server.bind(binder, input);
+			}
 
-            server.bind(binder, input);
+			if (!TransportCotEvent.isStreaming(input.getProtocol())) {
+				groupFederationUtil.updateInputGroups(input);
+			}
 
-            if (!TransportCotEvent.isStreaming(input.getProtocol())) {
-                groupFederationUtil.updateInputGroups(input);
-            }
-
-        }
+		}
         addMetric(input, new InputMetric(input));
 
         config.addInputAndSave(input);
@@ -1652,7 +1875,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     }
 
     // keep track of metrics based on the Network.Input object
-    private Map<Network.Input, InputMetric> inputMetrics = new ConcurrentHashMap<>();
+    private Map<String, InputMetric> inputMetrics = new ConcurrentHashMap<>();
 
     @Override
     public NetworkInputAddResult addInputAndSave(Input newInput) {
@@ -1680,6 +1903,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     			} else {
 
     				List<Input> currentInputList = config.getNetworkInputs();
+					List<DataFeed> currentDataFeedList = config.getNetworkDataFeeds();
     				String protocol = newInput.getProtocol();
 
     				boolean isUdp = protocol.equals(TransportCotEvent.UDP.configID);
@@ -1707,6 +1931,38 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     						break;
     					}
     				}
+
+					for (DataFeed loopfeed : currentDataFeedList) {
+						if (newInput.getName().equals(loopfeed.getName())) {
+							returnResult = NetworkInputAddResult.FAIL_INPUT_NAME_EXISTS;
+						} else {
+							boolean isPlugin = false;
+							if (newInput instanceof DataFeed) {
+								DataFeed newDataFeed = (DataFeed) newInput;
+								if (newDataFeed.getType().equals("Plugin")) {
+									isPlugin = true;
+								}
+							}
+
+							if (!isPlugin && newInput.getPort() == loopfeed.getPort()) {
+								String loopProtocol = loopfeed.getProtocol();
+								boolean loopIsUdp = loopProtocol.equals(TransportCotEvent.UDP.configID);
+								boolean loopIsMcast = loopProtocol.equals(TransportCotEvent.MUDP.configID);
+	
+								if (loopIsUdp && isUdp) {
+									returnResult = NetworkInputAddResult.FAIL_UDP_PORT_ALREADY_IN_USE;
+								} else if (loopIsMcast && isMcast) {
+									returnResult = NetworkInputAddResult.FAIL_MCAST_PORT_ALREADY_IN_USE;
+								} else if (!loopIsUdp && !loopIsMcast && !isUdp && !isMcast) {
+									returnResult = NetworkInputAddResult.FAIL_TCP_PORT_ALREADY_IN_USE;
+								}
+							}
+						}
+
+						if (returnResult != NetworkInputAddResult.SUCCESS) {
+							break;
+						}
+					}
     			}
 
     			if (logger.isDebugEnabled()) {
@@ -1742,20 +1998,19 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     	}
 
         // untrack metrics
-        Input input = null;
+        InputMetric inputMetric = inputMetrics.get(name);
 
-        for (Input inp : inputMetrics.keySet()) {
-            if (inp.getName().equalsIgnoreCase(name)) {
-                input = inp;
-                break;
-            }
-        }
+		if (inputMetric == null) {
+			throw new IllegalStateException("input named " + name + " not found in input metric map for deletion");
+		}
 
-        if (input == null) {
-            throw new IllegalStateException("input named " + name + " not found in input -> metric map for deletion");
-        }
+		Input input = inputMetric.getInput();
 
-        inputMetrics.remove(input);
+		if (input == null) {
+			throw new IllegalStateException("input metric contained null input");
+		}
+
+        inputMetrics.remove(input.getName());
         logger.info("Stopping server for input: "  + input.getName());
         
 		TransportCotEvent transport = TransportCotEvent.findByID(input.getProtocol());
@@ -1775,11 +2030,18 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     }
 
     @Override
-    public Collection<InputMetric> getInputMetrics() {
+    public Collection<InputMetric> getInputMetrics(boolean excludeDataFeeds) {
 
         if (logger.isDebugEnabled()) {
             logger.debug("getInputMetrics: " + inputMetrics.values());
         }
+
+		if (excludeDataFeeds) {
+			Collection<InputMetric> onlyInputsMetrics = inputMetrics.values().stream()
+					.filter(input -> !(input.getInput() instanceof DataFeed))
+					.collect(Collectors.toList());
+			return onlyInputsMetrics;
+		}
 
         return inputMetrics.values();
     }
@@ -1805,7 +2067,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     			} else if (currentState.getAuth() != modifiedInput.getAuth()) {
     				return ConnectionModifyResult.FAIL_NOMOD_AUTH_TYPE;
 
-    			} else if (!currentState.getProtocol().toLowerCase(Locale.ENGLISH).equals(modifiedInput.getProtocol().toLowerCase(Locale.ENGLISH))) {
+    			} else if (currentState.getProtocol() != null && modifiedInput.getProtocol() != null &&
+    					!currentState.getProtocol().toLowerCase(Locale.ENGLISH).equals(modifiedInput.getProtocol().toLowerCase(Locale.ENGLISH))) {
     				return ConnectionModifyResult.FAIL_NOMOD_PROTOCOL;
 
     			} else if (currentState.getPort() != modifiedInput.getPort()) {
@@ -1855,11 +2118,30 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         }
     				}
 
-    				// Save the flag changes
+					// Save the flag changes;
     				updateProtocolListeners(config.getInputByName(inputName));
     				nettyBuilder.modifyServerInput(modifiedInput);
     				config.saveChangesAndUpdateCache();
     			}
+
+    			// Modify data feed attributes
+				if (modifiedInput instanceof DataFeed && currentState instanceof DataFeed) {
+					DataFeed modifiedDataFeed = (DataFeed) modifiedInput;
+					DataFeed currentDataFeed = (DataFeed) currentState;
+
+					config.updateTagsNoSave(inputName, modifiedDataFeed.getTag());
+					
+					if (modifiedDataFeed.isSync() != currentDataFeed.isSync()) {
+						result = config.setSyncFlagNoSave(inputName, modifiedDataFeed.isSync());
+						if (result != ConnectionModifyResult.SUCCESS) {
+							return result;
+						}
+					}
+					config.saveChangesAndUpdateCache();
+				}
+				
+				// Update input in inputMetric
+				updateMetric(config.getInputByName(inputName));
     		}
     		catch (RemoteException e) {
     			throw new TakException(e); // will not happen
@@ -1870,18 +2152,78 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     }
 
+	@Override
+	public void removeDataFeedAndSave(String name) {
+		if (logger.isDebugEnabled()) {
+			logger.debug("Removing datafeed '" + name + "' if it exists.");
+		}
+
+		try {
+			config.removeDataFeedAndSave(name);
+		} catch (RemoteException e) {
+			throw new TakException(e);
+		}
+
+        // untrack metrics
+        InputMetric inputMetric = inputMetrics.get(name);
+
+        if (inputMetric == null) {
+            throw new IllegalStateException("input named " + name + " not found in input metric map for deletion");
+        }
+
+        Input input = inputMetric.getInput();
+        
+        if (input == null) {
+            throw new IllegalStateException("input metric contained null input");
+        }
+
+        inputMetrics.remove(input.getName());
+        logger.info("Stopping server for input: "  + input.getName());
+        
+        if (input.getProtocol() != null) {
+			TransportCotEvent transport = TransportCotEvent.findByID(input.getProtocol());
+	
+			boolean isUdp = transport == TransportCotEvent.MUDP || transport == TransportCotEvent.UDP
+					|| transport == TransportCotEvent.COTPROTOMUDP;
+	
+			try {
+				if (input.getProtocol().equals("grpc") || !isUdp) {
+					nettyBuilder.stopServer(input.getPort());
+				} else {
+					server.unbind(name);
+				}
+			} catch (Exception e) {
+				logger.warn("exception unbinding server port for input " + name);
+			}
+        }
+	}
+
     @Override
-    public void addMetric(Network.Input input, InputMetric metric) {
+    public void addMetric(Input input, InputMetric metric) {
         if (input == null || metric == null) {
             throw new IllegalArgumentException("null input or metric");
         }
 
-        inputMetrics.put(input, metric);
+        inputMetrics.put(input.getName(), metric);
     }
 
+	@Override
+	public void updateMetric(Input input) {
+		if (input == null) {
+			throw new IllegalArgumentException("null input");
+		}
+		if (!inputMetrics.containsKey(input.getName())) {
+			throw new IllegalArgumentException("input to update not found");
+		}
+
+		InputMetric inputMetric = inputMetrics.get(input.getName());
+		inputMetric.setInput(input);
+		inputMetrics.put(input.getName(), inputMetric);
+	}
+
     @Override
-    public InputMetric getMetric(Network.Input input) {
-        return inputMetrics.get(input);
+    public InputMetric getMetric(Input input) {
+        return inputMetrics.get(input.getName());
     }
 
     @Override
@@ -2139,5 +2481,5 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         ret.put("truststoreFile", truststoreFile.exists());
         return ret;
     }
-
+	  
 }

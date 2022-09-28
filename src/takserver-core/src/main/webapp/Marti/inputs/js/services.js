@@ -1,9 +1,17 @@
 var services = angular.module('inputManagerServices', []).factory('InputManagerService', function($resource) {
   return $resource('/Marti/api/inputs/:id', { id: '@_id' }, {
-	  		'query': {method: "GET", isArray: false},
+	  		'query': {method: "GET", isArray: false, params: {excludeDataFeeds: false}},
 	  		'update': {method: "PUT", params: {id: '@id'}, isArray: false, cache: false}
   		}
   );
+});
+
+services.factory('DataFeedManagerService', function($resource){
+	return $resource('/Marti/api/datafeeds/:name', {name: '@_name'}, {
+			'query': {method: "GET", isArray: false},
+			'update': {method: "PUT", params: {name: '@name'}, isArray: false, cache: false}
+		}
+	);
 });
 
 services.factory('MessagingConfigService', function($resource){

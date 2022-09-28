@@ -68,7 +68,7 @@ import com.atakmap.Tak.TakServerVersion;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
 import com.bbn.marti.config.Federation.FederationOutgoing;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.groups.CommonGroupDirectedReachability;
 import com.bbn.marti.groups.GroupFederationUtil;
@@ -103,8 +103,8 @@ import com.bbn.marti.util.VersionBean;
 import com.bbn.marti.util.concurrent.future.AsyncCallback;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
-import com.bbn.roger.fig.FigProtocolNegotiator;
 import com.bbn.roger.fig.FederationUtils;
+import com.bbn.roger.fig.FigProtocolNegotiator;
 import com.bbn.roger.fig.Propagator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
@@ -246,8 +246,6 @@ public class TakFigClient implements Serializable {
 
 	// track last server health check message
 	private final AtomicReference<DateTime> serverLastHealth = new AtomicReference<>(null);
-
-	private static final int SERVER_HEALTH_OFFSET_SEC = 5;
 
 	private final AtomicBoolean running = new AtomicBoolean(true);
 
@@ -1400,7 +1398,7 @@ public class TakFigClient implements Serializable {
 						logger.debug("submitting federated mission package announcement: " + announceCotResult + " groups " + groups + " to submission service.");
 					}
 
-					submission.submitCot(announceCotResult.getAnnoucement(), announceCotResult.getUids(), announceCotResult.getCallsigns(), groups, false);
+					submission.submitCot(announceCotResult.getAnnoucement(), announceCotResult.getUids(), announceCotResult.getCallsigns(), groups, false, false);
 
 				} catch (Exception e) {
 					logger.warn("exception processing federated mission package announcement.", e);

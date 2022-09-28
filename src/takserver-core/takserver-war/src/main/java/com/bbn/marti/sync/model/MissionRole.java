@@ -48,6 +48,11 @@ public class MissionRole implements Serializable, Comparable<MissionRole> {
 		this.role = role;
 	}
 
+	public MissionRole(String role) {
+		this();
+		this.role = Role.valueOf(role);
+	}
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "id", unique = true, nullable = false)

@@ -71,9 +71,13 @@ public interface FederationManager {
 
 	List<Federate> getConfiguredFederates();
 
-	// Send ROL to core, to be federated subject to group filtering.
+	// Send ROL to messaging process, to be federated subject to group filtering.
 	// Attach outbound groups to the ROL for federates using group mapping
 	void submitFederateROL(ROL rol, NavigableSet<Group> groups);
+	
+	// Send ROL to messaging process, to be federated subject to group filtering.
+		// Attach outbound groups to the ROL for federates using group mapping
+	void submitFederateROL(ROL rol, NavigableSet<Group> groups, String fileHash);
 
 	void reconfigureFederation();
 

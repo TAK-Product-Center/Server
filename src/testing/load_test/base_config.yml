@@ -7,7 +7,7 @@ connection:
   udp: 8087
 
 authentication:
-  cert: "./certs/my_cert.p12"
+  cert: "./certs/ser_cert.p12"
   password: "atakatak" # if no password, use empty string
 
 

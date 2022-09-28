@@ -22,6 +22,7 @@ public interface SubmissionInterface {
 
     public boolean submitMissionPackageCotAtTime(String cotMessage, String missionName, Date timestamp, NavigableSet<Group> groups, String clientUid);
 
-    // Submit explicitly addressed CoT message to intersection of specified groups, callsigns and uids
-    public boolean submitCot(String cotMessage, List<String> uids, List<String> callsigns, NavigableSet<Group> groups, boolean federate);
+    // Submit explicitly addressed CoT message to intersection of specified groups, callsigns and uids.
+    // resbumission indicates the event is being resent from this server, trims flow tags and turns off archiving
+    public boolean submitCot(String cotMessage, List<String> uids, List<String> callsigns, NavigableSet<Group> groups, boolean federate, boolean resubmission);
 }

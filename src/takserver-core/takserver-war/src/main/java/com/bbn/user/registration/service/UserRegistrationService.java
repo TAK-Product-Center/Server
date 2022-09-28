@@ -1,12 +1,6 @@
 package com.bbn.user.registration.service;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
-import java.util.Random;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import javax.mail.internet.MimeMessage;
@@ -209,7 +203,16 @@ public class UserRegistrationService {
             } else if  (privateGroup != null) {
                 String privateGroupName = !Strings.isNullOrEmpty(privateGroup.getGroup()) ? privateGroup.getGroup()
                         : privateGroup.getDomain();
-                groupNames = new String[] { privateGroupName };
+
+                List<String> groups = new ArrayList<>();
+                groups.add(privateGroupName);
+                if (privateGroup.getGroups() != null) {
+                    for (String groupz : privateGroup.getGroups()) {
+                        groups.add(groupz);
+                    }
+                }
+                groupNames = groups.toArray(new String[0]);
+
             } else {
                 groupNames = new String[] { "__ANON__" };
             }

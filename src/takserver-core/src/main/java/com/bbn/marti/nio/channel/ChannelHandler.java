@@ -6,7 +6,7 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
 
-import com.bbn.marti.config.Network;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.protocol.ChannelListener;
 import com.bbn.marti.nio.server.Server;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
@@ -103,7 +103,7 @@ public interface ChannelHandler {
 	// property queries
 	public ChannelListener listener();
 
-	public boolean isMatchingInput(Network.Input input);
+	public boolean isMatchingInput(Input input);
 	
 	public String identityHash();
 }

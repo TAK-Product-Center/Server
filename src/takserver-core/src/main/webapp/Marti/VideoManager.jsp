@@ -6,6 +6,7 @@
 <%@ page import="com.bbn.marti.video.VideoManagerService" %>
 <%@ page import="com.bbn.marti.video.VideoConnections" %>
 <%@ page import="org.owasp.esapi.ESAPI" %>
+<%@ page import="com.bbn.marti.util.CommonUtil" %>
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -176,7 +177,9 @@
 </tr>
 
 <%
-	VideoConnections videoConnections = videoService.getVideoConnections(false);
+    CommonUtil martiUtil = SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class);
+    String groupVector = martiUtil.getGroupBitVector(request);
+	VideoConnections videoConnections = videoService.getVideoConnections(false, true, groupVector);
 	for (Feed feed : videoConnections.getFeeds()) {
 %>
     <tr>

@@ -16,7 +16,7 @@ import com.bbn.marti.remote.socket.SituationAwarenessMessage;
 
 public interface SubscriptionManagerLite {
 
-    enum ChangeType { CONTENT, LOG, KEYWORD, METADATA, EXTERNAL_DATA, UID_KEYWORD, RESOURCE_KEYWORD, MISSION_DELETE, MISSION_CREATE }
+    enum ChangeType { CONTENT, LOG, KEYWORD, METADATA, EXTERNAL_DATA, UID_KEYWORD, RESOURCE_KEYWORD, MISSION_DELETE, MISSION_CREATE, DATA_FEED, MAP_LAYER }
 
 	RemoteSubscription getRemoteSubscriptionByClientUid(String cUid);
     RemoteSubscription getSubscriptionByClientUid(String cUid);
@@ -39,11 +39,12 @@ public interface SubscriptionManagerLite {
     
     // Mission subscription management
     void missionSubscribe(String missionName, String uid);
-    void missionUnsubscribe(String missionName, String uid);
+    void missionUnsubscribe(String missionName, String uid, String username, boolean disconnectOnly);
     void missionDisconnect(String missionName, String uid);
     void removeAllMissionSubscriptions(String missionName);
 
     List<String> getMissionSubscriptions(String missionName, boolean connectedOnly);
+    void announceMissionChange(String missionName, ChangeType changeType, String creatorUid, String tool, String changes, String xmlContentForNotification);
     void announceMissionChange(String missionName, ChangeType changeType, String creatorUid, String tool, String changes);
     void announceMissionChange(String missionName, String creatorUid, String tool, String changes);
     void broadcastMissionAnnouncement(String missionName, String groupVector, String creatorUid, ChangeType changeType, String tool);

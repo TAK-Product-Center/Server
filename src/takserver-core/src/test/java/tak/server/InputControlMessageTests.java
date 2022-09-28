@@ -22,7 +22,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.atakmap.Tak.ROL;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.exception.TakException;
 import com.google.common.base.Charsets;

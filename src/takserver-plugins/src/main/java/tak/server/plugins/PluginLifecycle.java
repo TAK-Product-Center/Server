@@ -1,6 +1,6 @@
 package tak.server.plugins;
 
-public interface PluginLifecycle {
+public interface PluginLifecycle extends PluginDataApi {
 	
 	void start();
 	void stop();
@@ -10,4 +10,7 @@ public interface PluginLifecycle {
 	
 	PluginInfo getPluginInfo();
 	void setPluginInfo(PluginInfo pluginInfo);
+	
+	void selfStop();
+
 }

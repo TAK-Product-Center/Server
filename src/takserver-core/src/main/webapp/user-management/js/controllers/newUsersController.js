@@ -1,4 +1,4 @@
-app.controller('newUsersController', function($scope, $http) {
+app.controller('newUsersController', function($scope, $http, ngDialog) {
 
     $scope.reset_form = function(){
         // Reset the form model.
@@ -32,36 +32,52 @@ app.controller('newUsersController', function($scope, $http) {
       
     $scope.create_users = function(){
 
-        data = {
-            usernameExpression: $scope.new_users.username_expression,
-            startN: $scope.new_users.startN,
-            endN: $scope.new_users.endN,
-            groupListIN: $scope.list_groups_for_user.groupListIN,
-            groupListOUT: $scope.list_groups_for_user.groupListOUT,
-            groupList: $scope.list_groups_for_user.groupList
-        };
+        var confirmDialog = ngDialog.openConfirm({
+            template:'\
+                <p>After new users are created, you will only have one chance to save the password file. Do you want to proceed?</p>\
+                <div class="ngdialog-buttons">\
+                    <button type="button" class="ngdialog-button ngdialog-button-secondary" ng-click="closeThisDialog()">Cancel</button>\
+                    <button type="button" class="ngdialog-button ngdialog-button-primary" ng-click="confirm(1)">OK</button>\
+                </div>',
+            plain: true
+        }).then(function (confirm) {
+            
+            data = {
+                usernameExpression: $scope.new_users.username_expression,
+                startN: $scope.new_users.startN,
+                endN: $scope.new_users.endN,
+                groupListIN: $scope.list_groups_for_user.groupListIN,
+                groupListOUT: $scope.list_groups_for_user.groupListOUT,
+                groupList: $scope.list_groups_for_user.groupList
+            };
 
-        $http({
-            method : "POST",
-            url : "api/new-users",
-            data: JSON.stringify(data)
-        }).then(function mySuccess(response) {
-            // Start file download.
-            download("tak_users.txt", JSON.stringify(response.data));
+            $http({
+                method : "POST",
+                url : "api/new-users",
+                data: JSON.stringify(data)
+            }).then(function mySuccess(response) {
+                // Start file download.
+                download("tak_users.txt", JSON.stringify(response.data));
 
-            // alert("Created new users successfully");
-            $scope.reset_form();     
-            $scope.list_users();
+                // alert("Created new users successfully");
+                $scope.reset_form();     
+                $scope.list_users();
 
-        }, function myError(response) {
-            if (response.data != null){
-                alert("Error creating users. " + response.data.message);
-            } else {
-                alert("Error creating users.");
-            }
-            console.error("response status: "+response.status);
-            console.error("response text: "+response.statusText);
+            }, function myError(response) {
+                if (response.data != null){
+                    alert("Error creating users. " + response.data.message);
+                } else {
+                    alert("Error creating users.");
+                }
+                console.error("response status: "+response.status);
+                console.error("response text: "+response.statusText);
+            });
+
         });
+
+
+
+        
     
     }
 

@@ -75,6 +75,14 @@ public class StateEngine implements EngineInterface {
 //        data.clearTestIterationData();
 		data.updateState();
 	}
+	
+	@Override
+	public void onlineRemoveDataFeedAndVerify(@NotNull AbstractConnection dataFeed) {
+		// TODO: Validate validate validate!! Check. Maybe add a thread for delayed checking?
+		data.getState(dataFeed).setInactiveInDeployment();
+//        data.clearTestIterationData();
+		data.updateState();
+	}
 
 	@Override
 	public void attemptSendFromUserAndVerify(@NotNull AbstractUser sendingUser, @NotNull AbstractUser... targetUsers) {
@@ -127,6 +135,13 @@ public class StateEngine implements EngineInterface {
 		data.getState(input).setActiveInDeployment();
 		data.updateState();
 	}
+	
+	@Override
+	public void onlineAddDataFeed(@NotNull AbstractConnection dataFeed) {
+		// TODO: Validate validate validate!! Check
+		data.getState(dataFeed).setActiveInDeployment();
+		data.updateState();
+	}
 
 	@Override
 	public void startServer(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier) {
@@ -173,6 +188,12 @@ public class StateEngine implements EngineInterface {
 
 	@Override
 	public void offlineAddSubscriptionFromInputToServer(@NotNull AbstractConnection targetInput, @NotNull AbstractServerProfile serverProvidingSubscription) {
+		data.getState(serverProvidingSubscription).addConnectionSubscriptionTarget(targetInput);
+		data.updateState();
+	}
+	
+	@Override
+	public void offlineAddSubscriptionFromDataFeedToServer(@NotNull AbstractConnection targetInput, @NotNull AbstractServerProfile serverProvidingSubscription) {
 		data.getState(serverProvidingSubscription).addConnectionSubscriptionTarget(targetInput);
 		data.updateState();
 	}

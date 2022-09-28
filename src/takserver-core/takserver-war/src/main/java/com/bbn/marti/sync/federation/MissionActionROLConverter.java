@@ -95,7 +95,10 @@ public class MissionActionROLConverter {
 		
 	}
 	
-	public ROL getInsertResourceROL(Metadata metadata, byte[] content) throws IOException {
+	/*
+	 * generate save file ROL with content attached
+	 */
+		public ROL getInsertResourceROL(Metadata metadata, byte[] content) throws IOException {
 		
 		Resource res = new Resource(metadata);
 		String metadataJson = mapper.writeValueAsString(res);
@@ -115,6 +118,25 @@ public class MissionActionROLConverter {
         
         return rol.build();
 		
+	}	
+	
+	/*
+	 * generate save file ROL with only metadata attached
+	 */
+	public ROL getInsertResourceROLNoContent(Metadata metadata) throws IOException {
+		
+		Resource res = new Resource(metadata);
+		String metadataJson = mapper.writeValueAsString(res);
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("intercepted enterprise sync insert resource (without content)" + metadataJson);
+		}
+
+		Objects.requireNonNull(metadataJson, "resource metadata");
+		
+		Builder rol = ROL.newBuilder().setProgram("create resource\n" + metadataJson + ";");
+		        
+        return rol.build();		
 	}	
 
 	public ROL getUpdateMetadataROL(String hash, String key, String value) throws IOException {

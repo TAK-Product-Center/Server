@@ -9,7 +9,17 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.NavigableSet;
+import java.util.SimpleTimeZone;
+import java.util.TimeZone;
+import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 
 import javax.annotation.PostConstruct;
@@ -29,6 +39,7 @@ import org.w3c.dom.NodeList;
 
 import com.bbn.cot.filter.Filter;
 import com.bbn.cot.filter.ImageFormattingFilter;
+import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Repository;
 import com.bbn.marti.remote.ConnectionEventTypeValue;
 import com.bbn.marti.remote.ImagePref;
@@ -128,9 +139,15 @@ public class RepositoryService extends BaseService {
 	    		}
 	    	}
 
+	    	// This is the case where c is a message from a plugin and the plugin archive is disabled
 	        if (c.getContextValue(Constants.ARCHIVE_EVENT_KEY) != null && !((Boolean) c.getContextValue(Constants.ARCHIVE_EVENT_KEY)).booleanValue()) {
 	            return false;
 	        }
+	        
+	        // This is the case where c is a datafeed message, and the datafeed archive is disabled 
+			if (c.getContextValue(Constants.DATA_FEED_KEY) != null && ((DataFeed) c.getContextValue(Constants.DATA_FEED_KEY)).isArchive() == false) { 
+				return false;
+			}
 	    } catch (Exception e) {
 	        log.debug("exception checking archive flag in message", e);
 	    }
@@ -233,7 +250,7 @@ public class RepositoryService extends BaseService {
 	public void insertBatchCotData(List<CotEventContainer> events) {
 
 		try (Connection connection = dataSource.getConnection()) {
-
+			LinkedList<CotEventContainer> dataFeedEvents = new LinkedList<>();
 			try (PreparedStatement cotRouterInsert = connection.prepareStatement("INSERT INTO "
 							+ cotRouterTableName
 							+ " (uid, event_pt, cot_type, "
@@ -242,13 +259,12 @@ public class RepositoryService extends BaseService {
 							+ "how, point_hae, point_ce, point_le, groups, "
 							+ "id, servertime) VALUES "
 							+ "(?,ST_GeometryFromText(?, 4326),?,?,?,?,?,?,?,?,?,?,?,?,(?)::bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + "), nextval('cot_router_seq'),?) ")) {
-
+				
 				// formats each cot message as we iterate over it
 				Iterable<CotEventContainer> imageFormattedEvents = Iterables.filter(events, imageFilter);
 				LinkedList<CotEventContainer> toRemove = new LinkedList<>();
 				for (CotEventContainer event : imageFormattedEvents) {
 					try {
-
 						boolean[] groupsBitVector = new boolean[RemoteUtil.GROUPS_BIT_VECTOR_LEN];
 
 						if (event.getContextValue(Constants.GROUPS_KEY) != null) {
@@ -288,42 +304,16 @@ public class RepositoryService extends BaseService {
 							}
 							continue;
 						}
-
-
-						cotRouterInsert.setString(1, event.getUid());
-						cotRouterInsert.setString(2, "POINT(" + event.getLon() + " "
-								+ event.getLat() + ")");
-						cotRouterInsert.setString(3, event.getType());
-
-						cotRouterInsert.setTimestamp(4, new Timestamp(DatatypeConverter
-								.parseDateTime(event.getStart()).getTimeInMillis()), utcCalendar);
-						cotRouterInsert.setTimestamp(5, new Timestamp(DatatypeConverter
-								.parseDateTime(event.getTime()).getTimeInMillis()), utcCalendar);
-						cotRouterInsert.setTimestamp(6, new Timestamp(DatatypeConverter
-								.parseDateTime(event.getStale()).getTimeInMillis()), utcCalendar);
-
-						cotRouterInsert.setString(7, event.getDetailXml());
-						cotRouterInsert.setString(8, event.getAccess());
-						cotRouterInsert.setString(9, event.getQos());
-						cotRouterInsert.setString(10, event.getOpex());
-						cotRouterInsert.setString(11, event.getHow());
-						cotRouterInsert.setDouble(12, event.getHae());
-						cotRouterInsert.setDouble(13, event.getCe());
-						cotRouterInsert.setDouble(14, event.getLe());
-
-						cotRouterInsert.setString(15, RemoteUtil.getInstance().bitVectorToString(groupsBitVector));
-
-						//
-						// check to see if this event has serverTime (set by SubmissionService.processNextEvent)
-						//
-						String serverTime;
-						if (event.hasServerTime()) {
-							serverTime = event.getTime();
-						} else {
-							serverTime = DateUtil.toCotTime(new Date().getTime());
+						
+						event.setContext(Constants.GROUPS_BIT_VECTOR_KEY, groupsBitVector);
+						
+						// CoT is valid, but came from a data feed. add it to the list and let {#archiveBatchDataFeedCot()}	handle it					
+						if (event.getContextValue(Constants.DATA_FEED_KEY) != null) {
+							dataFeedEvents.add(event);
+							continue;
 						}
-						cotRouterInsert.setTimestamp(16, new Timestamp(DatatypeConverter
-								.parseDateTime(serverTime).getTimeInMillis()), utcCalendar);
+						
+						setCotQueryParams(cotRouterInsert, event);
 
 						cotRouterInsert.addBatch();
 					} catch (Exception e) {
@@ -343,10 +333,86 @@ public class RepositoryService extends BaseService {
 					log.debug("exception executing CoT insert batch ", e);
 				}
 			}
+			
+			archiveBatchDataFeedCot(dataFeedEvents, connection);
 
 		} catch (SQLException eee) {
 			if (log.isWarnEnabled()) {
 				log.warn("unable to obtain database connection");
+			}
+		}
+	}
+	
+	private void setCotQueryParams(PreparedStatement dataFeedInsert, CotEventContainer event) throws SQLException {
+		dataFeedInsert.setString(1, event.getUid());
+		dataFeedInsert.setString(2, "POINT(" + event.getLon() + " "
+				+ event.getLat() + ")");
+		dataFeedInsert.setString(3, event.getType());
+
+		dataFeedInsert.setTimestamp(4, new Timestamp(DatatypeConverter
+				.parseDateTime(event.getStart()).getTimeInMillis()), utcCalendar);
+		dataFeedInsert.setTimestamp(5, new Timestamp(DatatypeConverter
+				.parseDateTime(event.getTime()).getTimeInMillis()), utcCalendar);
+		dataFeedInsert.setTimestamp(6, new Timestamp(DatatypeConverter
+				.parseDateTime(event.getStale()).getTimeInMillis()), utcCalendar);
+
+		dataFeedInsert.setString(7, event.getDetailXml());
+		dataFeedInsert.setString(8, event.getAccess());
+		dataFeedInsert.setString(9, event.getQos());
+		dataFeedInsert.setString(10, event.getOpex());
+		dataFeedInsert.setString(11, event.getHow());
+		dataFeedInsert.setDouble(12, event.getHae());
+		dataFeedInsert.setDouble(13, event.getCe());
+		dataFeedInsert.setDouble(14, event.getLe());
+
+		dataFeedInsert.setString(15, RemoteUtil.getInstance().bitVectorToString((boolean[]) event.getContext(Constants.GROUPS_BIT_VECTOR_KEY)));
+		
+		//
+		// check to see if this event has serverTime (set by SubmissionService.processNextEvent)
+		//
+		String serverTime;
+		if (event.hasServerTime()) {
+			serverTime = event.getTime();
+		} else {
+			serverTime = DateUtil.toCotTime(new Date().getTime());
+		}
+		dataFeedInsert.setTimestamp(16, new Timestamp(DatatypeConverter
+				.parseDateTime(serverTime).getTimeInMillis()), utcCalendar);
+	}
+	
+	// link the Cot UID to the data feed it came from	
+	private void archiveBatchDataFeedCot(List<CotEventContainer> events, Connection connection) {
+
+		if (events.size() != 0) {
+			try (PreparedStatement dataFeedInsert = connection.prepareStatement(""
+					+ "WITH inserted_row as (INSERT INTO "
+					+ cotRouterTableName
+					+ " (uid, event_pt, cot_type, "
+					+ "start, time, stale, detail, "
+					+ "access, qos, opex, "
+					+ "how, point_hae, point_ce, point_le, groups, "
+					+ "id, servertime) VALUES "
+					+ "(?,ST_GeometryFromText(?, 4326),?,?,?,?,?,?,?,?,?,?,?,?,(?)::bit(" 
+					+ RemoteUtil.GROUPS_BIT_VECTOR_LEN + "), nextval('cot_router_seq'),?) returning id)" 
+					+ " INSERT INTO data_feed_cot (cot_router_id, data_feed_id) VALUES ((SELECT id FROM inserted_row), (SELECT id FROM data_feed WHERE uuid = ?))")) {
+	
+				for (CotEventContainer event : events) {
+					try {
+						setCotQueryParams(dataFeedInsert, event);
+						
+						dataFeedInsert.setString(17, ((DataFeed) event.getContext(Constants.DATA_FEED_KEY)).getUuid());
+
+						dataFeedInsert.execute();
+					} catch (Exception e) {
+						log.error("Error with datafeed batch insert: " + e.toString(), e);
+						dataFeedInsert.clearBatch();
+					}
+				}
+			} catch (SQLException e) {
+				log.error("exception executing datafeed insert batch ", e);
+				if (log.isDebugEnabled()) {
+					log.debug("exception executing datafeed insert batch ", e);
+				}
 			}
 		}
 	}
@@ -697,7 +763,7 @@ public class RepositoryService extends BaseService {
 	 * @param eventType ConnectionEventTypeValue (required)
 	 * @return boolean indicating success
 	 */
-	public void auditCallsignUIDEventAsync(String callsign, String uid, ConnectionEventTypeValue eventType, String groupVector) {
+	public void auditCallsignUIDEventAsync(String callsign, String uid, String username, ConnectionEventTypeValue eventType, String groupVector) {
 
 		if (!config.getRepository().isEnable()) {
 			return;
@@ -714,22 +780,28 @@ public class RepositoryService extends BaseService {
 				if (uid != null && uid.trim().length() > 0 &&
 						callsign != null && callsign.trim().length() > 0 && eventType != null) {
 
-					String ep_sql = new String("insert into client_endpoint (callsign, uid) " +
-							"select ?, ? where not exists " +
-							"(select * from client_endpoint ce where ce.callsign = ? and ce.uid = ?)");
+					String ep_sql = new String("insert into client_endpoint (callsign, uid, username) " +
+							"select ?, ?, ? where not exists " +
+							"(select * from client_endpoint ce where ce.callsign = ? and ce.uid = ? and username = ?)");
 
 					String epe_sql = new String("insert into client_endpoint_event (client_endpoint_id, connection_event_type_id, created_ts, groups) " +
 							"select ce.id, cet.id, current_timestamp, (?)::bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + ") " +
 							"from client_endpoint ce join connection_event_type cet on cet.event_name = ? " +
-							"where ce.callsign = ? and ce.uid = ?");
+							"where ce.callsign = ? and ce.uid = ? and username = ?");
+					
+					if (log.isDebugEnabled()) {
+						log.debug("Insert client endpoint callsign: " + callsign + " uid: " + uid);
+					}
 
 					try (Connection conn = dataSource.getConnection()) {
 
 						try (PreparedStatement ps_ep = conn.prepareStatement(ep_sql)) {
 							ps_ep.setString(1, callsign);
 							ps_ep.setString(2, uid);
-							ps_ep.setString(3, callsign);
-							ps_ep.setString(4, uid);
+							ps_ep.setString(3, username);
+							ps_ep.setString(4, callsign);
+							ps_ep.setString(5, uid);
+							ps_ep.setString(6, username);
 							ps_ep.executeUpdate();
 
 							// Insert a client endpoint row
@@ -738,6 +810,7 @@ public class RepositoryService extends BaseService {
 								ps_epe.setString(2, eventType.value());
 								ps_epe.setString(3, callsign);
 								ps_epe.setString(4, uid);
+								ps_epe.setString(5, username);
 								ps_epe.executeUpdate();
 							}
 						}

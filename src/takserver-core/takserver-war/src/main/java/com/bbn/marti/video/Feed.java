@@ -13,6 +13,8 @@ import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.bbn.security.web.MartiValidator;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 
 @XmlRootElement(name = "feed")
@@ -25,36 +27,68 @@ public class Feed {
         SENSOR_POINT
     }
 	
-    private int id;
-    private String uuid;
-    private Type type;
-    
-    private boolean active;
-    private String alias;
-    
-    private String address;
-    private String macAddress;
-    private String port;
-    private String roverPort;
-    private String ignoreEmbeddedKLV;
-    private String path;
-    private String protocol;
-    private String source;
-    private String networkTimeout;
-    private String bufferTime;
-    private String rtspReliable;
-    private String thumbnail;
-    private String classification;
+    protected int id;
+    protected String uuid;
+    protected Type type;
 
-    private String latitude;
-    private String longitude;
-    private String fov;
-    private String heading;
-    private String range;
+    protected boolean active;
+    protected String alias;
+
+    protected String address;
+    protected String macAddress;
+    protected String port;
+    protected String roverPort;
+    protected String ignoreEmbeddedKLV;
+    protected String path;
+    protected String protocol;
+    protected String source;
+    protected String networkTimeout;
+    protected String bufferTime;
+    protected String rtspReliable;
+    protected String thumbnail;
+    protected String classification;
+
+    protected String latitude;
+    protected String longitude;
+    protected String fov;
+    protected String heading;
+    protected String range;
     
 
     public Feed() { }
-    
+
+    public Feed(FeedV2 feedV2) {
+        this.uuid = feedV2.uuid;
+        this.active = feedV2.active;
+        this.alias = feedV2.alias;
+
+        try {
+            URL url = new URL(feedV2.getUrl());
+            this.protocol = url.getProtocol();
+            this.address = url.getHost();
+            this.port = String.valueOf(url.getPort());
+            this.path = url.getPath();
+        } catch (MalformedURLException e) {
+            logger.error("exception parsing feedv2 url!!", e);
+        }
+
+        this.macAddress = feedV2.macAddress;
+        this.roverPort = feedV2.roverPort;
+        this.ignoreEmbeddedKLV = feedV2.ignoreEmbeddedKLV;
+        this.source = feedV2.source;
+        this.networkTimeout = feedV2.networkTimeout;
+        this.bufferTime = feedV2.bufferTime;
+        this.rtspReliable = feedV2.rtspReliable;
+        this.thumbnail = feedV2.thumbnail;
+        this.classification = feedV2.classification;
+        this.latitude = feedV2.latitude;
+        this.longitude = feedV2.longitude;
+        this.fov = feedV2.fov;
+        this.heading = feedV2.heading;
+        this.range = feedV2.range;
+    }
+
+
     public boolean validate(Validator validator) {
     	
     	try {

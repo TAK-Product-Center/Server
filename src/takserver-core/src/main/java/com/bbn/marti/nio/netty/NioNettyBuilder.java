@@ -3,7 +3,10 @@ package com.bbn.marti.nio.netty;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.UnknownHostException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,12 +15,13 @@ import javax.annotation.PreDestroy;
 
 import org.apache.log4j.Logger;
 
-import com.bbn.marti.config.Filter;
 import com.bbn.marti.config.Federation.FederationOutgoing;
 import com.bbn.marti.config.Federation.FederationServer;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Filter;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.grpc.GrpcStreamingServer;
 import com.bbn.marti.nio.netty.handlers.NioNettyTcpStaticSubHandler;
+import com.bbn.marti.nio.netty.handlers.NioNettyUdpHandler;
 import com.bbn.marti.nio.netty.initializers.NioNettyInitializer;
 import com.bbn.marti.remote.ConnectionStatus;
 import com.bbn.marti.remote.ConnectionStatusValue;
@@ -28,6 +32,7 @@ import com.bbn.marti.util.spring.SpringContextBeanForApi;
 
 import io.micrometer.core.lang.NonNull;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.ChannelFactory;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.ChannelFuture;
@@ -39,9 +44,13 @@ import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.DatagramChannel;
+import io.netty.channel.socket.InternetProtocolFamily;
+import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.ssl.SslContext;
+import io.netty.util.internal.SocketUtils;
 import tak.server.cot.CotEventContainer;
 import tak.server.federation.DistributedFederationManager;
 
@@ -56,6 +65,7 @@ public class NioNettyBuilder implements Serializable {
 	public static int flushThreshold;
 	public static int maxOptimalMessagesPerMinute;
 	private final boolean isEpoll;
+	private EventLoopGroup udpBossGroup;
 	private EventLoopGroup workerGroup;
 	private EventLoopGroup bossGroup;
 	private final DistributedConfiguration config = DistributedConfiguration.getInstance();
@@ -90,6 +100,88 @@ public class NioNettyBuilder implements Serializable {
 		maxOptimalMessagesPerMinute = baselineMaxOptimalMessagesPerMinute * NUM_AVAIL_CORES;
 	}
 
+	public void buildUdpServer(@NonNull Input input) {
+		checkAndCreateEventLoopGroups();
+		
+		new Thread(() -> {
+			try {
+				Bootstrap bootstrap = new Bootstrap();
+				bootstrap.group(udpBossGroup)
+						.channelFactory(new ChannelFactory<NioDatagramChannel>() {
+							@Override
+							public NioDatagramChannel newChannel() {
+								return new NioDatagramChannel(InternetProtocolFamily.IPv4);
+							}
+						})
+						.handler(new NioNettyUdpHandler(input))
+						.option(ChannelOption.AUTO_CLOSE, true)
+				        .option(ChannelOption.SO_BROADCAST, true);
+
+				portToNettyServer.put(input.getPort(), bootstrap.bind(input.getPort()).sync().channel().closeFuture());
+
+				portToInput.put(input.getPort(), input);
+				
+				log.info("Successfully Started Netty UDP Server for " + input.getName() + " on Port " + input.getPort());
+
+			} catch (Exception e) {
+				log.error("Error initializing Netty UDP Server ", e);
+			}
+		}).start();
+	}
+	
+	public void buildMulticastServer(@NonNull Input input, InetAddress group, List<NetworkInterface> interfs) {
+		checkAndCreateEventLoopGroups();
+		
+		if (group == null) {
+			log.info("Not starting Multicast Server " + input.getName() + " on " + input.getPort() + " because not group was defined");
+			return;
+		}
+		
+		if (!group.isMulticastAddress()) {
+			log.info("Not starting Multicast Server " + input.getName() + " on " + input.getPort() + " because the group is not a multicast address");
+			return;
+		}
+		
+		List<NetworkInterface> validInterfs = NioNettyUtils.validateMulticastInterfaces(interfs);
+		
+		if (validInterfs.size() == 0) {
+			log.info("Could Not Initialize Multicast Server for " + input + " on Port " + input.getPort() + ". No multicast interfaces found.");
+			return;
+		}
+		
+		
+		new Thread(() -> {
+			try {
+				Bootstrap bootstrap = new Bootstrap();
+				bootstrap.group(udpBossGroup)
+						.channelFactory(new ChannelFactory<NioDatagramChannel>() {
+							@Override
+							public NioDatagramChannel newChannel() {
+								return new NioDatagramChannel(InternetProtocolFamily.IPv4);
+							}
+						})
+						.handler(new NioNettyUdpHandler(input))
+						.option(ChannelOption.AUTO_CLOSE, true);
+				
+				InetSocketAddress groupAddress = SocketUtils.socketAddress(group.getHostAddress(), input.getPort());
+				
+				DatagramChannel dc = (DatagramChannel) bootstrap.bind(groupAddress).sync().channel();
+				
+				validInterfs.forEach(interf -> {
+					dc.joinGroup(groupAddress, interf);
+				});
+				
+				portToNettyServer.put(input.getPort(), dc.closeFuture());
+				portToInput.put(input.getPort(), input);
+				
+				log.info("Successfully Started Netty Multicast Server for " + input.getName() + " on Port " + input.getPort());
+
+			} catch (Exception e) {
+				log.error("Error initializing Netty Multicast Server ", e);
+			}
+		}).start();
+	}
+	
 	public void buildFederationServer() {
 		startServer(NioNettyInitializer.Pipeline.initializer.federationServer(federationServer), federationServer.getPort());
 	}
@@ -225,6 +317,9 @@ public class NioNettyBuilder implements Serializable {
 	private void checkAndCreateEventLoopGroups() {
 		if (bossGroup == null) {
             bossGroup = isEpoll ? new EpollEventLoopGroup(1) : new NioEventLoopGroup(1);
+        }
+		if (udpBossGroup == null) {
+			udpBossGroup = new NioEventLoopGroup(1);
         }
 		if (workerGroup == null) {
             workerGroup = isEpoll ? new EpollEventLoopGroup() : new NioEventLoopGroup();

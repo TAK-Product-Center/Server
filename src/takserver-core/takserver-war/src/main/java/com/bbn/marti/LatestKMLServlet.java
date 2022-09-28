@@ -157,9 +157,17 @@ public class LatestKMLServlet extends EsapiServlet {
 		}
 
 		OutputStream servletReponseOutputStream = null;
+		String contentDisposition = "filename=" + DEFAULT_FILENAME_BASE + "-" + cotType + ".kml";
+		try {
+			contentDisposition = validator.getValidInput("Content Disposition", contentDisposition, "Filename", MartiValidator.DEFAULT_STRING_CHARS, false);
+		} catch (ValidationException ex) {
+			log.severe(ex.getMessage());
+			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Unsafe filename value detected.");
+			return;
+		}
 
 		response.setContentType("application/vnd.google-earth.kml+xml");
-		response.setHeader("Content-Disposition", "filename=" + DEFAULT_FILENAME_BASE + "-" + cotType + ".kml");
+		response.setHeader("Content-Disposition", contentDisposition);
 
 		try {
 

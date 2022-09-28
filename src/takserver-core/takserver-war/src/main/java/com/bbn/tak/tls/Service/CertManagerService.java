@@ -9,6 +9,8 @@ import java.util.List;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.SignatureAlgorithm;
 import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +18,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationDetails;
 
 import com.bbn.marti.config.*;
+import com.bbn.marti.jwt.JwtUtils;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.exception.TakException;
@@ -27,6 +31,7 @@ import com.bbn.tak.tls.TakCert;
 import com.bbn.tak.tls.WSTEP.WSTEPClient;
 
 import sun.security.pkcs10.PKCS10;
+
 
 /**
  * Created on 5/14/2018.
@@ -141,6 +146,16 @@ public class CertManagerService {
             X509Certificate[] caChain;
             X509Certificate signedCert = null;
 
+            // is the user authenticating to the enrollment endpoint via OAuth?
+            String token = null;
+            if (SecurityContextHolder.getContext().getAuthentication().getDetails()
+                    instanceof OAuth2AuthenticationDetails) {
+
+                // save the token with the certificate
+                token = ((OAuth2AuthenticationDetails)SecurityContextHolder.getContext().
+                        getAuthentication().getDetails()).getTokenValue();
+            }
+
             if (certificateSigning.getCA() == CAType.TAK_SERVER) {
 
                 TAKServerCAConfig takServerCAConfig = certificateSigning.getTAKServerCAConfig();
@@ -159,8 +174,24 @@ public class CertManagerService {
                     responderUrl = tls.getResponderUrl();
                 }
 
+                long now = new Date().getTime();
+                long validMs = validityDays * 1000 * 60 * 60 * 24;
+                long validityNotBeforeOffsetMS = validityNotBeforeOffsetMinutes * 60 * 1000;
+                Date notBefore = new Date(now - validityNotBeforeOffsetMS);
+                Date notAfter = new Date(now + validMs);
+
+                // is the user authenticating to the enrollment endpoint via OAuth?
+                if (token != null) {
+                    // set the certificate expiration to match the token expiration
+                    Claims claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256);
+                    Integer exp = (Integer)claims.get("exp");
+                    if (exp != null) {
+                        notAfter = new Date(exp.longValue() * 1000);
+                    }
+                }
+
                 signedCert = certManager.signCertificate(
-                        csr, signingCert, CertManager.CERTTYPE.CLIENT, validityNotBeforeOffsetMinutes, validityDays,
+                        csr, signingCert, CertManager.CERTTYPE.CLIENT, notBefore, notAfter,
                         takServerCAConfig.getSignatureAlg(), addChannelsExtUsage, responderUrl);
 
             } else if (certificateSigning.getCA() == CAType.MICROSOFT_CA) {
@@ -202,7 +233,7 @@ public class CertManagerService {
             String username = usernameExtractor.extractUsername(signedCert);
 
             return new TakCert(signedCert, caChain,
-                    getHttpUser(), username, new Date(), clientUid);
+                    getHttpUser(), username, new Date(), clientUid, token);
 
         } catch (Exception e) {
             logger.error("exception in signClient!", e);

@@ -36,7 +36,7 @@ public class DropEventFilter implements CotFilter {
 
 		if(detail != null && !c.getDetailXml().contains(detail)) {
 			if (log.isDebugEnabled()) {
-				log.debug("cot event type : " + c.getDetailXml() + " didnt match filter detail: " + detail);
+				log.debug("cot detail : " + c.getDetailXml() + " didnt match filter detail: " + detail);
 			}
 			return c;
 		}

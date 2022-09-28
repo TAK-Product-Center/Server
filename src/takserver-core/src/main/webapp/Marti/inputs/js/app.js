@@ -21,6 +21,22 @@ app.config(['$routeProvider',
 		templateUrl: 'partials/modify.html',
 		controller: 'InputModificationCtrl'
 	}).
+	when('/createStreamingDataFeed', {
+		templateUrl: 'partials/newStreamingDataFeed.html',
+		controller: 'DataFeedCreationCtrl'
+	}).
+	when('/modifyStreamingDataFeed/:name', {
+		templateUrl: 'partials/modifyStreamingDataFeed.html',
+		controller: 'DataFeedModificationCtrl'
+	}).
+	when('/createPluginDataFeed', {
+		templateUrl: 'partials/newPluginDataFeed.html',
+		controller: 'DataFeedCreationCtrl'
+	}).
+	when('/modifyPluginDataFeed/:name', {
+		templateUrl: 'partials/modifyPluginDataFeed.html',
+		controller: 'DataFeedModificationCtrl'
+	}).
 	otherwise({
 		redirectTo: '/'
 	});

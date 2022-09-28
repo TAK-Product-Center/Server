@@ -23,7 +23,8 @@ import javax.net.ssl.SSLPeerUnverifiedException;
 import org.apache.log4j.Logger;
 
 import com.bbn.cot.CotParserCreator;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.groups.MessagingUtilImpl;
 import com.bbn.marti.nio.channel.ChannelHandler;
@@ -73,12 +74,12 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 	protected DistributedConfiguration config;
 	protected final GroupManager groupManager;
 	protected Input input;
+	private AtomicBoolean isDataFeedInput = null;
 	protected String negotiationUuid;
 	protected final static String TAK_PROTO_VERSION = "1";
 	protected final static String TAK_REQUEST_TYPE = "t-x-takp-q";
 	protected AtomicBoolean protobufSupported = new AtomicBoolean();
-	protected volatile StringBuilder builder = new StringBuilder("");
-	protected volatile CotParser parser;
+	protected volatile StringBuffer builder = new StringBuffer("");
 	protected ChannelHandler channelHandler;
 	protected Protocol<CotEventContainer> protocol;
 	protected ConnectionInfo connectionInfo;
@@ -99,14 +100,22 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 
 	public NioNettyHandlerBase()  {
 		groupManager = getGroupManager();
-
 		submissionService = SubmissionService.getInstance();
 		subscriptionManager = DistributedSubscriptionManager.getInstance();
 		federationManager = DistributedFederationManager.getInstance();
 		groupFederationUtil = GroupFederationUtil.getInstance();
 		messagingUtil = MessagingUtilImpl.getInstance();
 		config = DistributedConfiguration.getInstance();
-		parser = CotParserCreator.newInstance();
+	}
+	
+	private ThreadLocal<CotParser> cotParser = new ThreadLocal<>();
+	
+	protected CotParser cotParser() {
+		if (cotParser.get() == null) {
+			cotParser.set(new CotParser(false));
+		}
+		
+		return cotParser.get();
 	}
 
 	@FunctionalInterface
@@ -415,6 +424,8 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 	}
 
 	protected void createSubscription() {
+		if (input == null) return;
+		
 		submissionService.createSubscriptionFromConnection(channelHandler, protocol);
 	}
 
@@ -563,6 +574,20 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 			log.error("error recording channel activation", e);
 		}
 
+	}
+	
+	protected boolean isDataFeedInput() {
+		if (input == null) return false;
+		
+		if (isDataFeedInput == null) {
+			if (input instanceof DataFeed) {
+				isDataFeedInput = new AtomicBoolean(true);
+			} else {
+				isDataFeedInput = new AtomicBoolean(false);
+			}
+		}
+		
+		return isDataFeedInput.get();
 	}
 
 }

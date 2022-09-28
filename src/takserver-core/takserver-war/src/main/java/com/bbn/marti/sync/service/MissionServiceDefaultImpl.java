@@ -1,16 +1,12 @@
 package com.bbn.marti.sync.service;
 
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.security.PrivateKey;
 import java.sql.Array;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
@@ -18,9 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 import javax.persistence.EntityNotFoundException;
 import javax.servlet.http.HttpServletRequest;
@@ -28,8 +21,10 @@ import javax.sql.DataSource;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.dom4j.DocumentException;
 import org.jetbrains.annotations.NotNull;
+import org.locationtech.jts.geom.Polygon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,6 +53,8 @@ import com.bbn.marti.config.GeospatialFilter;
 import com.bbn.marti.dao.kml.JDBCCachingKMLDao;
 import com.bbn.marti.jwt.JwtUtils;
 import com.bbn.marti.logging.AuditLogUtil;
+import com.bbn.marti.maplayer.MapLayerService;
+import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.SubmissionInterface;
@@ -83,7 +80,7 @@ import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.model.*;
 import com.bbn.marti.sync.model.Mission.MissionAdd;
 import com.bbn.marti.sync.model.Mission.MissionAddDetails;
-import com.bbn.marti.sync.model.MissionPermission.Permission;
+import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.sync.repository.ExternalMissionDataRepository;
 import com.bbn.marti.sync.repository.LogEntryRepository;
 import com.bbn.marti.sync.repository.MissionChangeRepository;
@@ -92,7 +89,9 @@ import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.repository.MissionRoleRepository;
 import com.bbn.marti.sync.repository.MissionSubscriptionRepository;
 import com.bbn.marti.sync.repository.ResourceRepository;
+import com.bbn.marti.sync.repository.MissionFeedRepository;
 import com.bbn.marti.util.CommonUtil;
+import com.bbn.marti.util.GeomUtils;
 import com.bbn.marti.util.TimeUtils;
 import com.bbn.marti.util.missionpackage.ContentType;
 import com.bbn.marti.util.missionpackage.MissionPackage;
@@ -159,6 +158,12 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	private final MissionSubscriptionRepository missionSubscriptionRepository;
 
+	private final MissionFeedRepository missionFeedRepository;
+
+	private final MapLayerService mapLayerService;
+
+	private final DataFeedRepository dataFeedRepository;
+
 	private final GroupManager groupManager;
 
 	private final CommonUtil commonUtil;
@@ -196,6 +201,9 @@ public class MissionServiceDefaultImpl implements MissionService {
 			ExternalMissionDataRepository externalMissionDataRepository,
 			MissionInvitationRepository missionInvitationRepository,
 			MissionSubscriptionRepository missionSubscriptionRepository,
+			MissionFeedRepository missionFeedRepository,
+			DataFeedRepository dataFeedRepository,
+			MapLayerService mapLayerService,
 			GroupManager groupManager,
 			CacheManager cacheManager,
 			CommonUtil commonUtil,
@@ -218,6 +226,9 @@ public class MissionServiceDefaultImpl implements MissionService {
 		this.externalMissionDataRepository = externalMissionDataRepository;
 		this.missionInvitationRepository = missionInvitationRepository;
 		this.missionSubscriptionRepository = missionSubscriptionRepository;
+		this.missionFeedRepository = missionFeedRepository;
+		this.dataFeedRepository = dataFeedRepository;
+		this.mapLayerService = mapLayerService;
 		this.groupManager = groupManager;
 		this.commonUtil = commonUtil;
 		this.missionRoleRepository = missionRoleRepository;
@@ -676,7 +687,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 				resourceAdds.add(resourceAdd);
 			}
 		}
-		
+
 		Metrics.timer("method-exec-timer-hydrateMission-processChanges", "takserver", "MissionService").record(Duration.ofMillis(System.currentTimeMillis() - startProcessChanges));
 
 
@@ -1011,7 +1022,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 					}
 					break;
 				}
-				case user: {
+				case username: {
 					RemoteSubscription subscription = subscriptionManager
 							.getSubscriptionByUsersDisplayName(missionInvitation.getInvitee());
 					if (subscription != null) {
@@ -1040,7 +1051,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 			if (contactUids == null || contactUids.length == 0) {
 				logger.error("Unable to determine contactUids for invite! "
-						+ missionInvitation.getType() + ", " + missionInvitation.getInvitee());
+						+ StringUtils.normalizeSpace(missionInvitation.getType()) + ", " + StringUtils.normalizeSpace(missionInvitation.getInvitee()));
 			} else {
 				subscriptionManager.sendMissionInvite(mission.getName(), contactUids,
 						missionInvitation.getCreatorUid(), mission.getTool(), missionInvitation.getToken(), roleXml);
@@ -1097,7 +1108,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 				User user = subscription.getUser();
 				if (user.getConnectionType() == ConnectionType.CORE) {
 					missionInvitations.addAll(missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
-							user.getDisplayName(), MissionInvitation.Type.user.name(), groupVector));
+							user.getDisplayName(), MissionInvitation.Type.username.name(), groupVector));
 				}
 
 				// add invitations for user's groups
@@ -1120,11 +1131,21 @@ public class MissionServiceDefaultImpl implements MissionService {
 	public MissionSubscription missionSubscribe(String missionName, String clientUid, String groupVector) {
 		Mission mission = getMissionService().getMission(missionName, groupVector);
 		MissionRole defaultRole = getDefaultRole(mission);
-		return missionSubscribe(missionName, mission.getId(), clientUid, defaultRole, groupVector);
+
+		String username = "";
+		try {
+			username = SecurityContextHolder.getContext().getAuthentication().getName();
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception getting username", e);
+			}
+		}
+
+		return missionSubscribe(missionName, mission.getId(), clientUid, username, defaultRole, groupVector);
 	}
 
 	@Override
-	public MissionSubscription missionSubscribe(String missionName, Long missionId, String clientUid, MissionRole role, String groupVector) {
+	public MissionSubscription missionSubscribe(String missionName, Long missionId, String clientUid, String username, MissionRole role, String groupVector) {
 		try {
 			missionName = trimName(missionName);
 
@@ -1132,8 +1153,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 			MissionSubscription missionSubscription = null;
 
-			missionSubscription = missionSubscriptionRepository.findByMissionNameAndClientUidNoMission(
-					missionName, clientUid);
+			missionSubscription = missionSubscriptionRepository.findByMissionNameAndClientUidAndUsernameNoMission(
+					missionName, clientUid, username);
 
 			if (missionSubscription == null) {
 
@@ -1145,16 +1166,19 @@ public class MissionServiceDefaultImpl implements MissionService {
 					logger.debug("creating subscription with uid : " + subscriptionUid);
 				}
 
-				missionSubscription = new MissionSubscription(subscriptionUid, token, null, clientUid, new Date(), role);
+				missionSubscription = new MissionSubscription(subscriptionUid, token, null, clientUid, username, new Date(), role);
 
-				missionSubscriptionRepository.subscribe(missionId, clientUid, new Date(), subscriptionUid, token, role.getId());
+				missionSubscriptionRepository.subscribe(missionId, clientUid, new Date(), subscriptionUid, token, role.getId(), username);
 
-			} else if (missionSubscription.getRole() != null && missionSubscription.getRole().compareTo(role) != 0) {
+			} else {
+				if (missionSubscription.getRole() != null && missionSubscription.getRole().compareTo(role) != 0) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("updating subscription role");
+					}
+					missionSubscription.setRole(role);
 
-				logger.error("updating subscription role");
-				missionSubscription.setRole(role);
-
-				getMissionService().setRole(missionId, clientUid, role.getId());
+					getMissionService().setRoleByClientUidOrUsername(missionId, clientUid, null, role.getId());
+				}
 			}
 
 			return missionSubscription;
@@ -1172,9 +1196,9 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	@Override
 	@Transactional
-	public void missionUnsubscribe(String missionName, String uid, String groupVector) {
+	public void missionUnsubscribe(String missionName, String uid, String username, String groupVector, boolean disconnectOnly) {
 		try {
-			subscriptionManagerProxy.getSubscriptionManagerForClientUid(uid).missionUnsubscribe(missionName, uid);
+			subscriptionManagerProxy.getSubscriptionManagerForClientUid(uid).missionUnsubscribe(missionName, uid, username, disconnectOnly);
 		} catch (Exception e) {
 			throw new TakException(e);
 		}
@@ -1192,7 +1216,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 	private AtomicInteger addCount = new AtomicInteger();
 
 	@Override
-	public Mission addMissionContentAtTime(String missionName, MissionContent content, String creatorUid, String groupVector, Date date) {
+	public Mission addMissionContentAtTime(String missionName, MissionContent content, String creatorUid, String groupVector, Date date, String xmlContentForNotification) {
 
 		if (logger.isDebugEnabled()) {
 			logger.debug("addMissionContent " + content + " missionName: " + missionName + " creatorUid: " + creatorUid);
@@ -1322,7 +1346,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 					changeLogger.trace(" annoucing change " +  changeXml);
 				}
 				
-				subscriptionManager.announceMissionChange(missionName, ChangeType.CONTENT, creatorUid, mission.getTool(), changeXml);
+				subscriptionManager.announceMissionChange(missionName, ChangeType.CONTENT, creatorUid, mission.getTool(), changeXml, xmlContentForNotification);
 				
 				if (logger.isDebugEnabled()) {
 					logger.debug("mission change announced");
@@ -1348,7 +1372,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	@Override
 	public Mission addMissionContent(String missionName, MissionContent content,  String creatorUid, String groupVector) {
-		return addMissionContentAtTime(missionName, content, creatorUid, groupVector, new Date());
+		return addMissionContentAtTime(missionName, content, creatorUid, groupVector, new Date(), null);
 	}
 
 	public Metadata addToEnterpriseSync(byte[] contents, String name, String mimeType, List<String> keywords,
@@ -1733,7 +1757,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 							MissionContent content = new MissionContent();
 							content.getHashes().add(hash);
 							addMissionContentAtTime(
-									missionName, content, creatorUid, groupVector, pendingChange.getTimestamp());
+									missionName, content, creatorUid, groupVector, pendingChange.getTimestamp(), null);
 						} else {
 							String hash = pendingChange.getTempResource().getHash();
 							deleteMissionContentAtTime(missionName, hash, null,
@@ -1790,7 +1814,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 						// add the new checklist to the checklist mission
 						MissionContent content = new MissionContent();
 						content.getHashes().add(metadata.getHash());
-						addMissionContentAtTime(missionName, content, creatorUid, groupVector, now);
+						addMissionContentAtTime(missionName, content, creatorUid, groupVector, now, null);
 					}
 				}
 			}
@@ -2107,7 +2131,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 	@Override
 	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
 	public Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom,
-								 String tool, String passwordHash, MissionRole defaultRole, Long expiration) {
+								 String baseLayer, String bbox, String path, String classification, String tool, String passwordHash,
+								 MissionRole defaultRole, Long expiration, String boundingPolygon) {
 
 		if (logger.isDebugEnabled()) {
 			logger.debug("create mission " + name + " " + tool + " " + creatorUid);
@@ -2148,9 +2173,9 @@ public class MissionServiceDefaultImpl implements MissionService {
 				expirationValue = expiration;
 			}
 			if (defaultRole == null) {
-				id = missionRepository.create(new Date(), trimName(name), creatorUid, groupVector, description, chatRoom, tool, passwordHash, expirationValue);
+				id = missionRepository.create(new Date(), trimName(name), creatorUid, groupVector, description, chatRoom, baseLayer, bbox, path, classification, tool, passwordHash, expirationValue, boundingPolygon);
 			} else {
-				id = missionRepository.create(new Date(), trimName(name), creatorUid, groupVector, description, chatRoom, tool, passwordHash, defaultRole.getId(), expirationValue);
+				id = missionRepository.create(new Date(), trimName(name), creatorUid, groupVector, description, chatRoom, baseLayer, bbox, path, classification, tool, passwordHash, defaultRole.getId(), expirationValue, boundingPolygon);
 			}
 
 			mission.setId(id);
@@ -2356,6 +2381,45 @@ public class MissionServiceDefaultImpl implements MissionService {
 		}
 
 		return missions;
+	}
+
+	@Override
+	@Cacheable(value = Constants.ALL_COPS_MISSION_CACHE, keyGenerator = "allCopsMissionsCacheKeyGenerator", sync = true)
+	public List<Mission> getAllCopsMissions(String tool, NavigableSet<Group> groups, String path, Integer offset, Integer size)  {
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("mission service getAllMissions cache miss");
+		}
+
+		String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
+
+		List<Mission> missions;
+
+		if (offset != null && size != null) {
+			missions = missionRepository.getAllCopMissionsWithPaging(groupVector, path, tool, offset, size);
+		} else {
+			missions = missionRepository.getAllCopMissions(groupVector, path, tool);
+		}
+
+		for (Mission mission : missions) {
+			if (mission.isPasswordProtected()) {
+				mission.clear();
+			}
+
+			mission.setGroups(RemoteUtil.getInstance().getGroupNamesForBitVectorString(
+					mission.getGroupVector(), groups));
+		}
+
+		return missions;
+	}
+
+	public Long getMissionCount(String tool) {
+
+		if (tool == null) {
+			return 0L;
+		}
+
+		return missionRepository.getMissionCountByTool(tool);
 	}
 
 	@Override
@@ -2672,100 +2736,100 @@ public class MissionServiceDefaultImpl implements MissionService {
 			//
 			String authorization = request.getHeader("MissionAuthorization") != null ?
 					request.getHeader("MissionAuthorization") : request.getHeader("Authorization");
-					if (authorization == null) {
-						return null;
-					}
+			if (authorization == null) {
+				return null;
+			}
 
-					// see if the request is using bearer/token authentication
-					if (!authorization.startsWith("Bearer ")) {
-						logger.error("Bearer not found : " + authorization + " : " + request.getServletPath());
-						return null;
-					}
+			// see if the request is using bearer/token authentication
+			if (!authorization.startsWith("Bearer ")) {
+				logger.error("Bearer not found : " + StringUtils.normalizeSpace(authorization) + " : " + StringUtils.normalizeSpace(request.getServletPath()));
+				return null;
+			}
 
-					// parse the token's claims
-					Claims claims = null;
-					String token = authorization.substring(7);
-					try {
+			// parse the token's claims
+			Claims claims = null;
+			String token = authorization.substring(7);
+			try {
 
-						if (coreConfig.getRemoteConfiguration().getSecurity().getTls() == null) {
-							logger.error("unable to find tls configuration!");
-						}
+				if (coreConfig.getRemoteConfiguration().getSecurity().getTls() == null) {
+					logger.error("unable to find tls configuration!");
+				}
 
-						claims = MissionTokenUtils.getInstance(JwtUtils.getInstance().getPrivateKey()).decodeMissionToken(token);
+				claims = MissionTokenUtils.getInstance(JwtUtils.getInstance().getPrivateKey()).decodeMissionToken(token);
 
-					} catch (Exception e) {
-						logger.error("decodeMissionToken failed! : " + authorization + " : " + request.getServletPath());
-						return null;
-					}
+			} catch (Exception e) {
+				logger.error("decodeMissionToken failed! : " + authorization + " : " + request.getServletPath());
+				return null;
+			}
 
-					MissionTokenUtils.TokenType tokenType = MissionTokenUtils.TokenType.valueOf(claims.getSubject());
+			MissionTokenUtils.TokenType tokenType = MissionTokenUtils.TokenType.valueOf(claims.getSubject());
 
-					//
-					// make sure we have the correct token type
-					//
-					if (!ArrayUtils.contains(validTokenTypes, tokenType)) {
-						String expected = "";
-						for (MissionTokenUtils.TokenType type : validTokenTypes) {
-							expected += type.name() + " ";
-						}
-						logger.error("found unexpected token type, expected " + expected
-								+ ", found " + tokenType.name() + ", " + request.getServletPath());
-						return null;
-					}
+			//
+			// make sure we have the correct token type
+			//
+			if (!ArrayUtils.contains(validTokenTypes, tokenType)) {
+				String expected = "";
+				for (MissionTokenUtils.TokenType type : validTokenTypes) {
+					expected += type.name() + " ";
+				}
+				logger.error("found unexpected token type, expected " + expected
+						+ ", found " + tokenType.name() + ", " + request.getServletPath());
+				return null;
+			}
 
-					String missionName = (String) claims.get(MissionTokenUtils.MISSION_NAME_CLAIM);
-					if (missionName == null) {
-						logger.error("found token without MISSION_NAME_CLAIM!");
-						return null;
-					}
+			String missionName = (String) claims.get(MissionTokenUtils.MISSION_NAME_CLAIM);
+			if (missionName == null) {
+				logger.error("found token without MISSION_NAME_CLAIM!");
+				return null;
+			}
 
-					if (missionName.compareTo(mission.getName()) != 0) {
-						logger.error("illegal attempt to re-use token for different mission! : " + request.getServletPath());
-						return null;
-					}
+			if (missionName.compareTo(mission.getName()) != 0) {
+				logger.error("illegal attempt to re-use token for different mission! : " + request.getServletPath());
+				return null;
+			}
 
-					if (tokenType == MissionTokenUtils.TokenType.SUBSCRIPTION) {
+			if (tokenType == MissionTokenUtils.TokenType.SUBSCRIPTION) {
 
-						String subscriptionUid = claims.get(tokenType.name(), String.class);
-						if (subscriptionUid == null) {
-							logger.error("missing subscription uid for subscription token! : " + request.getServletPath());
-							return null;
-						}
+				String subscriptionUid = claims.get(tokenType.name(), String.class);
+				if (subscriptionUid == null) {
+					logger.error("missing subscription uid for subscription token! : " + request.getServletPath());
+					return null;
+				}
 
-						MissionSubscription missionSubscription = missionSubscriptionRepository.
-								findByUidAndMissionNameNoMission(subscriptionUid, mission.getName());
-						if (missionSubscription == null) {
-							logger.error("can't find subscription for token! : " + subscriptionUid
-									+ ", " + request.getServletPath());
-							return null;
-						}
+				MissionSubscription missionSubscription = missionSubscriptionRepository.
+						findByUidAndMissionNameNoMission(subscriptionUid, mission.getName());
+				if (missionSubscription == null) {
+					logger.error("can't find subscription for token! : " + subscriptionUid
+							+ ", " + request.getServletPath());
+					return null;
+				}
 
-						return missionSubscription.getRole();
+				return missionSubscription.getRole();
 
-					} else if (tokenType == MissionTokenUtils.TokenType.INVITATION) {
+			} else if (tokenType == MissionTokenUtils.TokenType.INVITATION) {
 
-						MissionInvitation invitation = missionInvitationRepository.findByToken(token);
-						if (invitation == null) {
-							logger.error("can't find invitation for token! : " + request.getServletPath());
-							return null;
-						}
+				MissionInvitation invitation = missionInvitationRepository.findByToken(token);
+				if (invitation == null) {
+					logger.error("can't find invitation for token! : " + request.getServletPath());
+					return null;
+				}
 
-						if (invitation.getMissionName().compareToIgnoreCase(mission.getName()) != 0) {
-							logger.error("illegal attempt to re-use invitation token for different mission! : "
-									+ request.getServletPath());
-							return null;
-						}
+				if (invitation.getMissionName().compareToIgnoreCase(mission.getName()) != 0) {
+					logger.error("illegal attempt to re-use invitation token for different mission! : "
+							+ request.getServletPath());
+					return null;
+				}
 
-						return invitation.getRole();
+				return invitation.getRole();
 
-					} else if (tokenType == MissionTokenUtils.TokenType.ACCESS) {
+			} else if (tokenType == MissionTokenUtils.TokenType.ACCESS) {
 
-						return getDefaultRole(mission);
+				return getDefaultRole(mission);
 
-					} else {
-						logger.error("unknown token type : " + tokenType.name() + ", " + request.getServletPath());
-						return null;
-					}
+			} else {
+				logger.error("unknown token type : " + tokenType.name() + ", " + request.getServletPath());
+				return null;
+			}
 
 		} catch (Exception e) {
 			logger.error("exception in getRoleFromToken!", e);
@@ -2855,7 +2919,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	@Override
 	@CacheEvict(value = Constants.MISSION_SUBSCRIPTION_CACHE, allEntries = true)
-	public void setRole(Long missionId, String clientUid, Long roleId) {
+	public void setRoleByClientUid(Long missionId, String clientUid, Long roleId) {
 		MapSqlParameterSource namedParameters = new MapSqlParameterSource();
 		namedParameters.addValue("roleId", roleId);
 		namedParameters.addValue("clientUid", clientUid);
@@ -2865,9 +2929,31 @@ public class MissionServiceDefaultImpl implements MissionService {
 	}
 
 	@Override
-	public boolean setRole(Mission mission, String clientUid, MissionRole role) {
+	@CacheEvict(value = Constants.MISSION_SUBSCRIPTION_CACHE, allEntries = true)
+	public void setRoleByUsername(Long missionId, String username, Long roleId) {
+		MapSqlParameterSource namedParameters = new MapSqlParameterSource();
+		namedParameters.addValue("roleId", roleId);
+		namedParameters.addValue("username", username);
+		namedParameters.addValue("missionId", missionId);
+		String sql = "update mission_subscription set role_id = :roleId where username = :username and mission_id = :missionId";
+		new NamedParameterJdbcTemplate(dataSource).update(sql, namedParameters);
+	}
+
+	@Override
+	@CacheEvict(value = Constants.MISSION_SUBSCRIPTION_CACHE, allEntries = true)
+	public void setRoleByClientUidOrUsername(Long missionId, String clientUid, String username, Long roleId) {
+		if (!Strings.isNullOrEmpty(username)) {
+			getMissionService().setRoleByUsername(missionId, username, roleId);
+		} else {
+			getMissionService().setRoleByClientUid(missionId, clientUid, roleId);
+		}
+	}
+
+	@Override
+	public boolean setRole(Mission mission, String clientUid, String username, MissionRole role) {
 		try {
-			getMissionService().setRole(mission.getId(), clientUid, role.getId());
+
+			getMissionService().setRoleByClientUidOrUsername(mission.getId(), clientUid, username, role.getId());
 
 			String roleXml = commonUtil.toXml(role);
 
@@ -2879,6 +2965,17 @@ public class MissionServiceDefaultImpl implements MissionService {
 			logger.error("exception in setRole!", e);
 			return false;
 		}
+	}
+
+	@Override
+	@CacheEvict(value = Constants.MISSION_SUBSCRIPTION_CACHE, allEntries = true)
+	public void setSubscriptionUsername(Long missionId, String clientUid, String username) {
+		MapSqlParameterSource namedParameters = new MapSqlParameterSource();
+		namedParameters.addValue("missionId", missionId);
+		namedParameters.addValue("clientUid", clientUid);
+		namedParameters.addValue("username", username);
+		String sql = "update mission_subscription set username = :username where client_uid = :clientUid and mission_id = :missionId";
+		new NamedParameterJdbcTemplate(dataSource).update(sql, namedParameters);
 	}
 
 	@Override
@@ -2939,17 +3036,28 @@ public class MissionServiceDefaultImpl implements MissionService {
 		try {
 			for (MissionSubscription next : subscriptions) {
 
-				MissionSubscription existing = missionSubscriptionRepository.
-						findByMissionNameAndClientUidNoMission(mission.getName(), next.getClientUid());
+				MissionSubscription existing = null;
+
+				if (!Strings.isNullOrEmpty(next.getUsername())) {
+					existing = missionSubscriptionRepository.
+							findByMissionNameAndUsernameNoMission(mission.getName(), next.getUsername());
+				} else if (!Strings.isNullOrEmpty(next.getClientUid())) {
+					existing = missionSubscriptionRepository.
+							findByMissionNameAndClientUidNoMission(mission.getName(), next.getClientUid());
+				}
 
 				MissionRole role = missionRoleRepository.findFirstByRole(next.getRole().getRole());
 
 				if (existing != null) {
-					setRole(mission, next.getClientUid(), role);
-
+					setRole(mission, next.getClientUid(), next.getUsername(), role);
 				} else {
-					missionInvite(mission.getName(), next.getClientUid(),
-							MissionInvitation.Type.clientUid, role, creatorUid, groupVector);
+					if (!Strings.isNullOrEmpty(next.getUsername())) {
+						missionInvite(mission.getName(), next.getUsername(),
+								MissionInvitation.Type.username, role, creatorUid, groupVector);
+					} else if (!Strings.isNullOrEmpty(next.getClientUid())) {
+						missionInvite(mission.getName(), next.getClientUid(),
+								MissionInvitation.Type.clientUid, role, creatorUid, groupVector);
+					}
 				}
 			}
 
@@ -3087,5 +3195,205 @@ public class MissionServiceDefaultImpl implements MissionService {
 	public List<Resource> getCachedResourcesByHash(String missionName, String hash) {
 		return resourceRepository.findByHash(hash);
 	}
-}
 
+	private MissionChanges saveFeedChangeAtTime(String missionFeedUid, String creatorUid, MissionChangeType missionChangeType,
+														Mission mission, Date date) {
+
+		MissionChanges changes = new MissionChanges();
+		MissionChange change = new MissionChange(missionChangeType, mission);
+		change.setMissionFeedUid(missionFeedUid);
+		changes.add(change);
+
+		change.setTimestamp(date);
+		change.setCreatorUid(creatorUid);
+
+		missionChangeRepository.saveAndFlush(change);
+
+		return changes;
+	}
+
+	@Override
+	public MissionFeed getMissionFeed(String missionFeedUid) {
+		return missionFeedRepository.getByUidNoMission(missionFeedUid);
+	}
+
+	@Override
+	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
+	public MissionFeed addFeedToMission(String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterBbox, String filterType, String filterCallsign) {
+		MissionFeed missionFeed = new MissionFeed();
+		missionFeed.setUid(UUID.randomUUID().toString());
+		missionFeed.setDataFeedUid(dataFeedUid);
+		missionFeed.setFilterBbox(filterBbox);
+		missionFeed.setFilterType(filterType);
+		missionFeed.setFilterCallsign(filterCallsign);
+		missionFeed.setMission(mission);
+		missionFeed = missionFeedRepository.save(missionFeed);
+
+		// record the change
+		MissionChanges changes = saveFeedChangeAtTime(
+				missionFeed.getUid(), creatorUid, MissionChangeType.ADD_CONTENT, mission, new Date());
+
+		// notify users of the change
+		subscriptionManager.announceMissionChange(mission.getName(),
+				ChangeType.DATA_FEED, creatorUid, mission.getTool(), commonUtil.toXml(changes));
+
+		return missionFeed;
+	}
+
+	@Override
+	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
+	public void removeFeedFromMission(String missionName, String creatorUid, Mission mission, String missionFeedUid) {
+
+		missionFeedRepository.deleteByUid(missionFeedUid);
+
+		// record the change
+		MissionChanges changes = saveFeedChangeAtTime(
+				missionFeedUid, creatorUid, MissionChangeType.REMOVE_CONTENT, mission, new Date());
+
+		// notify users of the change
+		subscriptionManager.announceMissionChange(mission.getName(),
+				ChangeType.DATA_FEED, creatorUid, mission.getTool(), commonUtil.toXml(changes));
+
+	}
+
+	private MissionChanges saveMapLayerChangeAtTime(String mapLayerUid, String creatorUid, MissionChangeType missionChangeType,
+												Mission mission, Date date) {
+
+		MissionChanges changes = new MissionChanges();
+		MissionChange change = new MissionChange(missionChangeType, mission);
+		change.setMapLayerUid(mapLayerUid);
+		changes.add(change);
+
+		change.setTimestamp(date);
+		change.setCreatorUid(creatorUid);
+
+		missionChangeRepository.saveAndFlush(change);
+
+		return changes;
+	}
+
+	@Override
+	public MapLayer getMapLayer(String mapLayerUid) {
+		MapLayer mapLayer = null;
+		try {
+			mapLayer = mapLayerService.getMapLayerForUid(mapLayerUid);
+		} catch (Exception e) {
+			logger.error("exception in getMapLayer", e);
+		}
+		return mapLayer;
+	}
+
+	@Override
+	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
+	public MapLayer addMapLayerToMission(String missionName, String creatorUid, Mission mission, MapLayer mapLayer) {
+		MapLayer newMapLayer = mapLayerService.createMapLayer(mapLayer);
+
+		// record the change
+		MissionChanges changes = saveMapLayerChangeAtTime(
+				mapLayer.getUid(), creatorUid, MissionChangeType.ADD_CONTENT, mission, new Date());
+
+		// notify users of the change
+		subscriptionManager.announceMissionChange(mission.getName(),
+				ChangeType.MAP_LAYER, creatorUid, mission.getTool(), commonUtil.toXml(changes));
+
+		return newMapLayer;
+	}
+
+	@Override
+	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
+	public MapLayer updateMapLayer(String missionName, String creatorUid, Mission mission, MapLayer mapLayer) {
+		return mapLayerService.updateMapLayer(mapLayer);
+	}
+
+	@Override
+	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
+	public void removeMapLayerFromMission(String missionName, String creatorUid, Mission mission, String mapLayerUid) {
+
+		// record the change
+		MissionChanges changes = saveMapLayerChangeAtTime(
+				mapLayerUid, creatorUid, MissionChangeType.REMOVE_CONTENT, mission, new Date());
+
+		// notify users of the change
+		subscriptionManager.announceMissionChange(mission.getName(),
+				ChangeType.MAP_LAYER, creatorUid, mission.getTool(), commonUtil.toXml(changes));
+
+		mapLayerService.deleteMapLayer(mapLayerUid);
+	}
+
+	@Override
+	@Cacheable(value = Constants.ALL_MISSION_CACHE, key="{#root.methodName, #root.args[0]}", sync = true)
+	public List<Mission> getMissionsForDataFeed(String feed_uid) {
+		return missionRepository.getMissionsForDataFeed(feed_uid);
+	}
+
+	@Override
+	public void sendLatestFeedEvents(Mission mission, MissionFeed missionFeed, String clientUid, String groupVector) {
+		try {
+			List<String> clientUidList = Collections.singletonList(clientUid);
+			NavigableSet<Group> groups = groupManager.groupVectorToGroupSet(mission.getGroupVector());
+
+			Polygon polygon = null;
+			GeospatialFilter.BoundingBox boundingBox = null;
+			// use polygon over bbox
+			if (!Strings.isNullOrEmpty(mission.getBoundingPolygon())) {
+				polygon = GeomUtils.postgisBoundingPolygonToPolygon(mission.getBoundingPolygon());
+			}
+			// fallback to bbox
+			else {
+				boundingBox = GeomUtils.getBoundingBoxFromBboxString(mission.getBbox());
+			}
+
+			int sent = 0;
+			for (DataFeedDao datafeed : dataFeedRepository.getDataFeedByUUID(missionFeed.getDataFeedUid())) {
+
+				if (!datafeed.isSync()) {
+					continue;
+				}
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("found datafeed to sync " + datafeed.getUUID());
+				}
+
+				// list of unique event ids contained in the feed
+				List<String> feedEventUids = dataFeedRepository.getFeedEventUids(missionFeed.getDataFeedUid());
+
+				Collection<CotCacheWrapper> feedEvents = cotCacheHelper.getLatestCotWrappersForUids(
+						new HashSet<>(feedEventUids), groupVector, false);
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("found events to sync : " + feedEvents.size());
+				}
+
+				// iterate over the events
+				for (CotCacheWrapper feedEvent : feedEvents) {
+
+					if (polygon != null && !GeomUtils.polygonContainsCoordinate(polygon,
+							feedEvent.getCotElement().lat, feedEvent.getCotElement().lon)) {
+						continue;
+					} else if (boundingBox != null && !GeomUtils.bboxContainsCoordinate(
+							boundingBox, feedEvent.getCotElement().lat, feedEvent.getCotElement().lon)) {
+						continue;
+					}
+
+					long now = new Date().getTime();
+					long staleSeconds = 365 * 24 * 60 * 60;
+					feedEvent.getCotElement().setServertime(now);
+					feedEvent.getCotElement().setStaletime(now + (staleSeconds * 1000));
+
+					// send the event to the COP subscriber
+					submission.submitCot(
+							feedEvent.getCotElement().toCotXml(), clientUidList,
+							new ArrayList<String>(), groups, false, true);
+
+					sent++;
+				}
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("filtered events sent : " + sent);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("exception in sendLatestFeedEvents", e);
+		}
+	}
+}
