@@ -217,7 +217,11 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                         Set<Group> groups = FileAuthenticator.getGroups(fileUser);
 
                         if (useGroupCache) {
-                            assignGroupsCheckCache(groups, user, username);
+                            Set<Group> hydrated = new ConcurrentSkipListSet<>();
+                            for (Group group : groups) {
+                                hydrated.add(groupManager.hydrateGroup(group));
+                            }
+                            assignGroupsCheckCache(hydrated, user, username);
                         } else {
                             groupManager.updateGroups(user, groups);
                         }

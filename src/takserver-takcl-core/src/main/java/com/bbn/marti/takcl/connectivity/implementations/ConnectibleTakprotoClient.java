@@ -92,9 +92,7 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 	private void setConnectivityState(TestConnectivityState newState) {
 		if (_connectivityState != newState) {
 			_connectivityState = newState;
-//			dl.begin("stateChangeListener.onConnectivityStateChange");
 			stateChangeListener.onConnectivityStateChange(newState);
-//			dl.end("stateChangeListener.onConnectivityStateChange");
 		}
 	}
 
@@ -126,9 +124,7 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 	}
 
 	private synchronized boolean sendMessage(@NotNull Document doc, boolean omitXmlDeclaration) {
-//		dl.begin("Document to String");
 		String xmlString = omitXmlDeclaration ? CotGenerator.stripXmlDeclaration(doc) : doc.asXML();
-//		dl.end("Document to String");
 
 		if (!isConnected()) {
 			System.err.println("Cannot send message from client '" + user.getConsistentUniqueReadableIdentifier() + "' because it is not connected!");
@@ -137,17 +133,13 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 		dl.begin(LogActivity.sendWss);
 		client.send(xmlString);
 		dl.end(LogActivity.sendWss);
-//		dl.begin("stateChangeListener.onMessageSent");
 		stateChangeListener.onMessageSent(xmlString);
-//		dl.end("stateChangeListener.onMessageSent");
 		return true;
 	}
 
 	@Override
 	public synchronized boolean sendMessage(Document doc) {
-//		dl.begin("Send Document");
 		boolean result = sendMessage(doc, false);
-//		dl.end("Send Document");
 		return result;
 	}
 
@@ -165,8 +157,8 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 
 
 	@Override
-	public synchronized void disconnect() {
-		if (!this.isConnected()) {
+	public synchronized void disconnect(boolean logInconsistentState) {
+		if (!this.isConnected() && logInconsistentState) {
 			System.err.println("Cannot disconnect client '" + user.getConsistentUniqueReadableIdentifier() + "' because it is not connected!");
 		}
 		try {
@@ -181,10 +173,10 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 	@Override
 	public boolean isConnected() {
 		if (client != null) {
-			System.err.println("client.isOpen=" + client.isOpen());
-			System.err.println("client.isClosed=" + client.isClosed());
+			log.trace(user.getConsistentUniqueReadableIdentifier() +  "-client.isOpen=" + client.isOpen());
+			log.trace(user.getConsistentUniqueReadableIdentifier() + "-client.isClosed=" + client.isClosed());
 		}
-		System.err.println("ConnectivityState=" + _connectivityState);
+		log.trace(user.getConsistentUniqueReadableIdentifier() + "ConnectivityState=" + _connectivityState);
 		boolean actuallyConnected = client != null && client.isOpen() && !client.isClosed();
 		boolean shouldBeConnected = _connectivityState == TestConnectivityState.ConnectedAuthenticatedIfNecessary ||
 				_connectivityState == TestConnectivityState.ConnectedCannotAuthenticate ||
@@ -267,18 +259,14 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 	private synchronized void responseReceived(String response) {
 		if (secondaryOutputTarget != OutputTarget.DEV_NULL) {
 			try {
-//				dl.begin("Write Response to Secondary Stream");
 				secondaryOutputStream.write(response.getBytes());
 				secondaryOutputStream.flush();
-//				dl.end("Write Response to Secondary Stream");
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			}
 		}
 
-//		dl.begin("stateChangeListener.onMessageReceived");
 		stateChangeListener.onMessageReceived(response);
-//		dl.end("stateChangeListener.onMessageReceived");
 	}
 
 	public interface TakWebsocketClientInterface {
@@ -359,7 +347,6 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 		private ByteBuffer convertStringToProtoBufBuffer(String xml) {
 			ByteBuffer buffer;
 			try {
-//				dl.begin("String to ByteBuffer");
 				CotEventContainer data = new CotEventContainer(DocumentHelper.parseText(xml));
 
 				//
@@ -390,7 +377,6 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 				codedOutputStream.writeUInt32NoTag(takMessageSize);
 				takMessage.writeTo(codedOutputStream);
 				((Buffer) buffer).rewind();
-//				dl.end("String to ByteBuffer");
 
 			} catch (DocumentException | IOException e) {
 				throw new RuntimeException(e);
@@ -439,9 +425,7 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 
 		@Override
 		public void send(ByteBuffer buffer) {
-//			dl.begin("Send ByteBuffer");
 			super.send(buffer);
-//			dl.end("Send ByteBuffer");
 		}
 
 		@Override
@@ -536,11 +520,9 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 							fullBuf.get(eventBytes);
 
 							// parse and broadcast the message
-//							dl.begin("ByteBuffer to String");
 							Takmessage.TakMessage takMessage = Takmessage.TakMessage.parseFrom(eventBytes);
 							CotEventContainer cotEventContainer = StreamingProtoBufHelper.getInstance().proto2cot(takMessage);
 							String result = cotEventContainer.asXml();
-//							dl.end("ByteBuffer to String");
 							responseListener.accept(result);
 
 							// reset parser state

@@ -12,7 +12,8 @@
         <div class="form-group" ng-class="{ 'has-error': form.password.$dirty && form.password.$error.required }">
             <label for="password">Password </label>
             <i class="fa fa-question-circle" ng-click='showSimpleMessage("Password must have at least 15 characters and must include 1 lowercase, 1 uppercase, 1 number and 1 special character.")' style="cursor: pointer"></i>
-            <input type="text" name="password" id="password" class="form-control" ng-model="new_user.password" required />            
+            <div ng-click="toggleShowPassword()" ng-class="{'fa fa-eye': showPassword,'fa fa-eye-slash': !showPassword}" style="cursor: pointer;"></div>
+            <input type="password" ng-attr-type="{{ showPassword ? 'text':'password'}}" name="password" id="password" class="form-control" ng-model="new_user.password" required />   
             <span ng-show="form.password.$dirty && form.password.$error.required" class="help-block">Password is required</span>
         </div>
     </div>

@@ -1,16 +1,13 @@
 package com.bbn.marti.tests;
 
 import com.bbn.marti.takcl.SSLHelper;
-import com.bbn.marti.takcl.TestLogger;
-import com.bbn.marti.takcl.connectivity.AbstractRunnableServer;
+import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
 import com.bbn.marti.test.shared.AbstractTestClass;
 import com.bbn.marti.test.shared.data.generated.ImmutableUsers;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import com.bbn.marti.test.shared.engines.TestEngine;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-
-import java.io.IOException;
 
 /**
  * Created on 11/24/15.

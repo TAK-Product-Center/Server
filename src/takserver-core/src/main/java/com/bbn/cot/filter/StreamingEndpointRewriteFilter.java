@@ -287,9 +287,19 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 											return;
 										}
 
-										if (mission.getTool() != null && !mission.getTool().equals("public")) {
-											logger.debug("not federating non-public mission action for mission " + missionName);
-											return;
+										
+										if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions()) {
+											if ("public".equals(mission.getTool())) {
+												// allow public. no action needed as of now
+											} else if (config.getNetwork().getMissionCopTool().equals(mission.getTool())) {
+												if (!DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
+													logger.debug("not federating vbm mission action for mission " + missionName + " since vbm is disabled");
+													return;
+												}
+											} else {
+												logger.debug("not federating non-public mission action for mission " + missionName);
+												return;
+											}
 										}
 
 										ROL rol = RemoteUtil.getInstance().getROLforMissionChange(content, missionName, fclientUid, mission.getCreatorUid(), mission.getChatRoom(), mission.getTool(), mission.getDescription());

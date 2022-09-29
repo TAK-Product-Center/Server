@@ -1,0 +1,2 @@
+create data_feed
+{"type":"DataFeedMetadata","missionName":"rolMission","data_feed_uid":"feed-uid111","filter_bbox":"","filter_type":"","filter_callsign":""};

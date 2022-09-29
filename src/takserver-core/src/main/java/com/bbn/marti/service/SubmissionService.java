@@ -147,7 +147,6 @@ import tak.server.cot.CotEventContainer;
 import tak.server.cot.CotParser;
 import tak.server.federation.DistributedFederationManager;
 import tak.server.feeds.DataFeed.DataFeedType;
-import tak.server.feeds.PluginDataFeed;
 import tak.server.ignite.IgniteHolder;
 import tak.server.messaging.MessageConverter;
 
@@ -205,7 +204,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     private final MessageConverter messageConverter;
 
-    private final ActiveGroupCacheHelper activeGroupCacheHelper;
+//    private final ActiveGroupCacheHelper activeGroupCacheHelper;
     
     private final RemoteUtil remoteUtil;
 
@@ -277,7 +276,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         this.serverInfo = serverInfo;
         this.coreConfig = coreConfig;
         this.messageConverter = messageConverter;
-        this.activeGroupCacheHelper = agch;
+//        this.activeGroupCacheHelper = agch;
         this.remoteUtil = remoteUtil;
         this.dataFeedRepository = dfr;
 
@@ -405,48 +404,55 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 				Long dataFeedId = null;
 
+				if (feed.getFiltergroup().isEmpty()) {
+					feed.getFiltergroup().add(Constants.ANON_GROUP);
+				}
+
+				Set<Group> groups = groupManager.findGroups(feed.getFiltergroup());
+				String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
+				
 				if (dataFeedRepository.getDataFeedByUUID(feed.getUuid()).size() > 0) {
 					dataFeedId = dataFeedRepository.updateDataFeed(feed.getUuid(), feed.getName(), feedType.ordinal(),
 							feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
 							feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
 							feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
-							feed.isSync());
+							feed.isSync(), feed.getSyncCacheRetentionSeconds());
+
 					if (feed.getTag().size() > 0) {
 						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
-						for (String tag : feed.getTag()) {
-							dataFeedRepository.addDataFeedTag(dataFeedId, tag);
-						}
+						dataFeedRepository.addDataFeedTags(dataFeedId, feed.getTag());
 					}
 					if (feed.getFiltergroup().size() > 0) {
 						dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
-						for (String filterGroup : feed.getFiltergroup()) {
-							dataFeedRepository.addDataFeedFilterGroup(dataFeedId, filterGroup);
-						}
+						dataFeedRepository.addDataFeedFilterGroups(dataFeedId, feed.getFiltergroup());
 					}
 				} else {
-
 					if (dataFeedRepository.getDataFeedByName(feed.getName()).size() != 1) {
 						dataFeedId = dataFeedRepository.addDataFeed(feed.getUuid(), feed.getName(), feedType.ordinal(),
 								feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
 								feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
-								feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(), feed.isSync());
+								feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
+								feed.isSync(), feed.getSyncCacheRetentionSeconds(), groupVector);
+
 						if (feed.getTag().size() > 0) {
 							dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
-							for (String tag : feed.getTag()) {
-								dataFeedRepository.addDataFeedTag(dataFeedId, tag);
-							}
+							dataFeedRepository.addDataFeedTags(dataFeedId, feed.getTag());
 						}
 						if (feed.getFiltergroup().size() > 0) {
 							dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
-							for (String filterGroup : feed.getFiltergroup()) {
-								dataFeedRepository.addDataFeedFilterGroup(dataFeedId, filterGroup);
-							}
+							dataFeedRepository.addDataFeedFilterGroups(dataFeedId, feed.getFiltergroup());
 						}
 					}
 				}
 
                 addInput(feed);
             }
+            
+            // add input metrics for federation data feeds from DB         
+            dataFeedRepository.getFederationDataFeeds().forEach(fedFeed -> {
+            	DataFeed datafeed = fedFeed.toInput();
+            	addMetric(datafeed, new InputMetric(datafeed));
+            });
         } catch (Exception e) {
             logger.error("Configuration or setup of network feeds failed: " + e.getMessage(), e);
         }
@@ -469,7 +475,6 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         // listen for messages on this node's submission topic
         ignite.message().localListen(serverInfo.getSubmissionTopic(), (nodeId, message) -> {
-
         	if (!(message instanceof byte[])) {
 
         		if (dlogger.isDebugEnabled()) {
@@ -580,7 +585,6 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         			try {
 
         				Message m = Message.parseFrom((byte[]) message);
-        				
         				if (m != null) {
         					boolean isInterceptorMessage = false;
            					List<String> provenance = m.getProvenanceList();
@@ -616,10 +620,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     						// update cache with empty result
                         					pluginDatafeedCacheHelper.cachePluginDatafeed(m.getFeedUuid(), new ArrayList<>());
 
-                        					logger.warn("Datafeed with UUID {} does not exist. Ignore the message.", m.getFeedUuid());
+                        					if (logger.isWarnEnabled()) {
+                        						logger.warn("Datafeed with UUID {} does not exist. Ignore the message.", m.getFeedUuid());
+                        					}
                         					
                     					} else {
-                    						
                     						List<String> tags = dataFeedRepository.getDataFeedTagsById(dataFeedInfo.get(0).getId());
                     						
                     						// update cache
@@ -634,18 +639,27 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         					dataFeed.getTag().addAll(tags); 
                         					dataFeed.setArchive(dataFeedInfo.get(0).getArchive());
                         					dataFeed.setSync(dataFeedInfo.get(0).isSync());
-                        					logger.debug("Retrieve Datafeed info from dataFeedRepository: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync());
+                        					if (logger.isDebugEnabled()) {
+                        						logger.debug("Retrieve Datafeed info from dataFeedRepository: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync());
+                        					}
                         				
                         					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
 
                         					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+											InputMetric inputMetric = getInputMetric(dataFeed.getName());
+											if (inputMetric != null) {
+												inputMetric.getMessagesReceived().incrementAndGet();
+												inputMetric.getBytesRecieved().addAndGet(((byte[]) message).length);
+											}
                     					}
             							
             						} else { // exist in cache
             							
             							if (cacheResult.size() == 0) { // datafeed with this uuid does not exist
             								
-                        					logger.warn("-Datafeed with UUID {} does not exist. Ignore the message.", m.getFeedUuid());
+            								if (logger.isWarnEnabled()) {
+            									logger.warn("-Datafeed with UUID {} does not exist. Ignore the message.", m.getFeedUuid());
+            								}
                         					
             							} else {
             								com.bbn.marti.config.DataFeed dataFeed = new com.bbn.marti.config.DataFeed();
@@ -654,11 +668,19 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         					dataFeed.getTag().addAll(cacheResult.get(0).getTags());
                         					dataFeed.setArchive(cacheResult.get(0).isArchive());
                         					dataFeed.setSync(cacheResult.get(0).isSync());
-                        					logger.debug("Retrieve Datafeed info from cache: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync());
+                        					
+                        					if (logger.isDebugEnabled()) {
+                        						logger.debug("Retrieve Datafeed info from cache: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync());
+                        					}
                         				
                         					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
 
                         					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+											InputMetric inputMetric = getInputMetric(dataFeed.getName());
+											if (inputMetric != null) {
+												inputMetric.getMessagesReceived().incrementAndGet();
+												inputMetric.getBytesRecieved().addAndGet(((byte[])message).length);
+											}
             							}
             						}
 
@@ -718,7 +740,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         }
 
         public static final ProtocolListenerInstantiator<CotEventContainer> onArchiveOnlyDataReceivedCallback = new AbstractAutoProtocolListener<CotEventContainer>() {
-            @Override
+            private static final long serialVersionUID = -2338348114005512168L;
+
+			@Override
             public void onDataReceived(CotEventContainer data, final ChannelHandler handler, final Protocol<CotEventContainer> protocol) {
                 data.setContextValue(Constants.DO_NOT_BROKER_KEY, Boolean.TRUE);
             }
@@ -730,7 +754,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         };
 
         public static final ProtocolListenerInstantiator<CotEventContainer> onNoArchiveDataReceivedCallback = new AbstractAutoProtocolListener<CotEventContainer>() {
-            @Override
+            private static final long serialVersionUID = 6936588138193322737L;
+
+			@Override
             public void onDataReceived(CotEventContainer data, final ChannelHandler handler, final Protocol<CotEventContainer> protocol) {
                 data.setContextValue(Constants.ARCHIVE_EVENT_KEY, Boolean.FALSE);
             }
@@ -743,14 +769,16 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     }
 
     public final ProtocolListenerInstantiator<CotEventContainer> subscriptionLifecycleCallback = new AbstractAutoProtocolListener<CotEventContainer>() {
-        @Override
+        private static final long serialVersionUID = 8948907635338980454L;
+
+		@Override
         public void onConnect(ChannelHandler handler, Protocol<CotEventContainer> protocol) {
 
         	if (logger.isDebugEnabled()) {
         		logger.debug("subscriptionLifecycleCallback onConnect " + handler + " " + protocol);
         	}
 
-            createSubscriptionFromConnection(handler, protocol);
+            createSubscriptionFromConnection(handler, protocol, null);
         }
 
         @Override
@@ -779,12 +807,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         }
     };
 
-    public void createSubscriptionFromConnection(ChannelHandler handler, Protocol<CotEventContainer> protocol) {
-    	createSubscriptionFromConnection(handler, protocol, null);
-    }
-
-
-    public void createSubscriptionFromConnection(ChannelHandler handler, Protocol<CotEventContainer> protocol, UUID websocketApiNode) {
+    public Subscription createSubscriptionFromConnection(ChannelHandler handler, Protocol<CotEventContainer> protocol,
+														 UUID websocketApiNode) {
 
     	if (logger.isTraceEnabled()) {
     		logger.trace("createSubscriptionFromConnection " + handler + " " + protocol);
@@ -819,9 +843,12 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                 	}
                 	
                 	Subscription subscription = subMgr.getSubscription(handler.netProtocolName() + ":" + uid);
-                	subscription.isWebsocket.set(websocketApiNode != null);
-                	subscription.websocketApiNode = websocketApiNode;
-                	
+
+                	if (websocketApiNode != null) {
+						subscription.isWebsocket.set(true);
+						subscription.websocketApiNode = websocketApiNode;
+					}
+
                 	if (logger.isDebugEnabled()) {
                 		logger.debug("subscription in subscriptionLifecycleCallback " + subscription);
                 	}
@@ -837,12 +864,16 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     }
 
                     subMgr.startProtocolNegotiation(subscription);
+                    
+                    return subscription;
                 }
             }
 
         } catch (Exception e) {
             logger.warn("Remote exception adding subscription: " + handler, e);
         }
+        
+        return null;
   	}
 
   	private String getGroupVectorFromHandler(ChannelHandler handler) {
@@ -908,7 +939,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 	}
 
     public final ProtocolListenerInstantiator<CotEventContainer> staticSubscriptionRemovingCallback = (new AbstractAutoProtocolListener<CotEventContainer>() {
-        @Override
+        private static final long serialVersionUID = -7142427436573649795L;
+
+		@Override
         public void onOutboundClose(ChannelHandler handler, Protocol<CotEventContainer> protocol) {
             try {
                 subMgr.removeSubscription(handler);
@@ -924,7 +957,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     });
 
     public ProtocolListenerInstantiator<CotEventContainer> onDataReceivedCallback = new AbstractAutoProtocolListener<CotEventContainer>() {
-        @Override
+        private static final long serialVersionUID = 8609977739208495040L;
+
+		@Override
         public void onDataReceived(final CotEventContainer data, ChannelHandler handler, Protocol<CotEventContainer> protocol) {
         	if (config.getRemoteConfiguration().getSubmission().isIgnoreStaleMessages()) {
                 if (MessageConversionUtil.isStale(data)) {
@@ -945,6 +980,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                 InputMetric metric = util.getInputMetric(((AbstractBroadcastingChannelHandler) handler).getInput());
                 metric.getMessagesReceived().incrementAndGet();
 
+                metric.getBytesRecieved().addAndGet(data.toString().length());
             } catch (Exception e) {
             	if (logger.isDebugEnabled()) {
             		logger.debug("exception writing metric", e);
@@ -1283,6 +1319,10 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 			} catch (RejectedExecutionException ree) {
 				// count how often full queue has blocked message send
 				Metrics.counter(Constants.METRIC_MESSAGE_QUEUE_FULL_SKIP).increment();
+			} catch (Exception e) {
+				if (logger.isErrorEnabled()) {
+					logger.error("exception in callsignAssignmentExecutor", e);
+				}
 			}
 		}
     };
@@ -1711,7 +1751,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         	if (logger.isDebugEnabled()) {
         		logger.debug("adding subscription for uid: " + msg.getUid());
         	}
-            User user = groupFederationUtil.getAnonymousUser(msg.getUid());
+            User user = groupFederationUtil.getUser(msg.getUid(), true);
 
             groupManager.addUser(user);
 
@@ -2045,6 +2085,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         return inputMetrics.values();
     }
+    
+    @Override
+    public InputMetric getInputMetric(String name) {
+        return inputMetrics.get(name);
+    }
 
     @Override
     public ConnectionModifyResult modifyInputAndSave(String inputName, Input modifiedInput) {
@@ -2225,6 +2270,15 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     public InputMetric getMetric(Input input) {
         return inputMetrics.get(input.getName());
     }
+
+	public InputMetric getMetricByPort(int port) {
+		for (InputMetric inputMetric : inputMetrics.values()) {
+			if (inputMetric.getInput().getPort() == port) {
+				return inputMetric;
+			}
+		}
+		return null;
+	}
 
     @Override
     public MessagingConfigInfo getMessagingConfig() {

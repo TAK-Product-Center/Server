@@ -61,7 +61,7 @@ public class ContentServlet extends EnterpriseSyncServlet {
 
 	  initAuditLog(request);
 	  // Get group vector for the user associated with this session
-	  String groupVector = martiUtil.getGroupBitVector(request);
+	  String groupVector = commonUtil.getGroupBitVector(request);
 
 	  if (Strings.isNullOrEmpty(groupVector)) {
 	  	throw new IllegalStateException("empty group vector");

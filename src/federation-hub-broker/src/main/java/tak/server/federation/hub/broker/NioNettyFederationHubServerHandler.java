@@ -136,7 +136,7 @@ public class NioNettyFederationHubServerHandler extends SimpleChannelInboundHand
     }
 
     private void createConnectionInfo() {
-        connectionInfo = new ConnectionInfo();
+        connectionInfo = new ConnectionInfo(ConnectionInfo.ConnectionType.INCOMING, null);
         X509Certificate cert = (X509Certificate)certArray[0];
         connectionInfo.setCert(cert);
         connectionInfo.setConnectionId(getConnectionId((SocketChannel)nettyContext.channel()));

@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 
+import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
 import com.bbn.marti.config.Federation.Federate;
@@ -32,6 +33,7 @@ import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.remote.ConnectionStatus;
 import com.bbn.marti.remote.ConnectionStatusValue;
+import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.RemoteCachedSubscription;
 import com.bbn.marti.remote.RemoteContact;
 import com.bbn.marti.remote.RemoteFile;
@@ -45,6 +47,7 @@ import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.google.common.collect.Multimap;
 
+import io.grpc.stub.StreamObserver;
 import tak.server.Constants;
 import tak.server.federation.FederateSubscription;
 import tak.server.federation.FederationSubscriptionCacheDAO;
@@ -82,6 +85,7 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	private final Map<ChannelHandler, ConcurrentHashMap<String, RemoteContactWithSA>> contactList = new ConcurrentHashMap<>();
 	private final Map<String, GuardedStreamHolder<FederatedEvent>> sessionClientStreamMap = new ConcurrentHashMap<>();
 	private final Map<String, GuardedStreamHolder<ROL>> sessionROLClientStreamMap = new ConcurrentHashMap<>();
+	private final Map<String, StreamObserver<FederateGroups>> sessionGroupServerStreamMap = new ConcurrentHashMap<>();
 	private final Map<String, RemoteContact> contactMap = new ConcurrentHashMap<>();
 	private final Map<ConnectionInfo, Subscription> connectionSubMap = new ConcurrentHashMap<>();
 	private final Map<User, Subscription> userSubscriptionMap = new ConcurrentHashMap<>();
@@ -193,6 +197,15 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	}
 	
 	public void put(String uid, Subscription subscription) {
+		
+		// only update count if new subscription
+		if (!uidSubscriptionMap.contains(uid) && subscription.handler != null) {
+			InputMetric inputMetric = SubmissionService.getInstance().getMetricByPort(subscription.handler.localPort());
+			if (inputMetric != null) {
+				inputMetric.getNumClients().incrementAndGet();
+			}
+		}
+		
 		uidSubscriptionMap.put(uid, subscription);
 		updateSubscriptionCaches(subscription);
 		if (logger.isTraceEnabled()) {
@@ -221,6 +234,10 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 		IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().remove(uid);
 		if (subscription != null) {
 			channelHandlerSubscriptionMap.remove(subscription.handler);
+            InputMetric inputMetric = SubmissionService.getInstance().getMetricByPort(subscription.handler.localPort());
+            if (inputMetric != null) {
+				inputMetric.getNumClients().decrementAndGet();
+            }
 		}
 		
 		return subscription;
@@ -563,33 +580,48 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	}
 
 	@Override
-	public void putClientSteamToSession(String sessionId, GuardedStreamHolder<FederatedEvent> guardedStreamHolder) {
+	public void putClientStreamToSession(String sessionId, GuardedStreamHolder<FederatedEvent> guardedStreamHolder) {
 		sessionClientStreamMap.put(sessionId, guardedStreamHolder);
 	}
 
 	@Override
-	public GuardedStreamHolder<FederatedEvent> removeClientSteamBySession(String sessionId) {
+	public GuardedStreamHolder<FederatedEvent> removeClientStreamHolderBySession(String sessionId) {
 		return sessionClientStreamMap.remove(sessionId);
 	}
 
 	@Override
-	public GuardedStreamHolder<FederatedEvent> getClientSteamBySession(String sessionId) {
+	public GuardedStreamHolder<FederatedEvent> getClientStreamBySession(String sessionId) {
 		return sessionClientStreamMap.get(sessionId);
 	}
 
 	@Override
-	public void putClientROLSteamToSession(String sessionId, GuardedStreamHolder<ROL> guardedStreamHolder) {
+	public void putClientROLStreamToSession(String sessionId, GuardedStreamHolder<ROL> guardedStreamHolder) {
 		sessionROLClientStreamMap.put(sessionId, guardedStreamHolder);
 	}
 
 	@Override
-	public GuardedStreamHolder<ROL> removeClientROLSteamBySession(String sessionId) {
+	public GuardedStreamHolder<ROL> removeClientROLStreamBySession(String sessionId) {
 		return sessionROLClientStreamMap.remove(sessionId);
 	}
 
 	@Override
-	public GuardedStreamHolder<ROL> getClientROLSteamBySession(String sessionId) {
+	public GuardedStreamHolder<ROL> getClientROLStreamBySession(String sessionId) {
 		return sessionROLClientStreamMap.get(sessionId);
+	}
+
+	@Override
+	public void putServerGroupStreamToSession(String sessionId, StreamObserver<FederateGroups> groupStream) {
+		sessionGroupServerStreamMap.put(sessionId, groupStream);	
+	}
+
+	@Override
+	public StreamObserver<FederateGroups> removeServerGroupStreamBySession(String sessionId) {
+		return sessionGroupServerStreamMap.remove(sessionId);
+	}
+
+	@Override
+	public StreamObserver<FederateGroups> getServerGroupStreamBySession(String sessionId) {
+		return sessionGroupServerStreamMap.get(sessionId);
 	}
 
 	@Override

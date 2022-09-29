@@ -31,6 +31,7 @@ import com.bbn.marti.excheck.checklist.ChecklistTask;
 import com.bbn.marti.excheck.checklist.ChecklistTaskStatus;
 import com.bbn.marti.network.BaseRestController;
 import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.sync.model.MissionRole;
 import com.bbn.marti.sync.UploadServlet;
 import com.bbn.marti.sync.model.MissionChange;
 import com.bbn.marti.sync.service.MissionService;
@@ -163,11 +164,12 @@ public class ExCheckAPI extends BaseRestController {
             @RequestParam(value = "name", required = true) String name,
             @RequestParam(value = "description", required = true) String description,
             @RequestParam(value = "startTime", required = true) String startTime,
+            @RequestParam(value = "defaultRole", required = false) MissionRole.Role defaultRole,
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
 
         String checklistXml = exCheckService.startChecklist(
-                templateUid, clientUid, callsign, name, description, startTime, martiUtil.getGroupBitVector(request));
+                templateUid, clientUid, callsign, name, description, startTime, defaultRole, martiUtil.getGroupBitVector(request));
         response.setContentType("application/xml");
         response.getOutputStream().write(checklistXml.getBytes());
         return new ResponseEntity(HttpStatus.OK);
@@ -180,6 +182,7 @@ public class ExCheckAPI extends BaseRestController {
     ResponseEntity createChecklist(
             @RequestParam(value = "clientUid", required = true) String clientUid,
             @RequestBody Checklist checklist,
+            @RequestParam(value = "defaultRole", required = false) MissionRole.Role defaultRole,
             HttpServletRequest request,
             HttpServletResponse response) throws RemoteException, IOException {
 
@@ -187,7 +190,7 @@ public class ExCheckAPI extends BaseRestController {
             checklist.getChecklistDetails().setUid(UUID.randomUUID().toString());
         }
 
-        exCheckService.createOrUpdateChecklistMission(checklist, clientUid, martiUtil.getGroupBitVector(request));
+        exCheckService.createOrUpdateChecklistMission(checklist, clientUid, defaultRole, martiUtil.getGroupBitVector(request));
 
         response.getOutputStream().write(checklist.getChecklistDetails().getUid().getBytes());
 

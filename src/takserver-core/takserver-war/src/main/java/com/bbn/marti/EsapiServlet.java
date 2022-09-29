@@ -22,6 +22,7 @@ import org.springframework.web.context.support.SpringBeanAutowiringSupport;
 
 import com.bbn.marti.logging.AuditLogUtil;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.bbn.security.web.SecurityUtils;
 
 /**
@@ -90,7 +91,7 @@ public abstract class EsapiServlet extends HttpServlet {
 		} catch (ValidationException ex) {
 			String message = "Bad value for HTTP request parameter ";
 			if (validator.isValidInput(context, parameterName, "MartiSafeString",
-					MartiValidator.SHORT_STRING_CHARS, false)) {
+					MartiValidatorConstants.SHORT_STRING_CHARS, false)) {
 				message = message + "\"" + parameterName + "\"";
 			}
 			log.warning(message);
@@ -99,7 +100,7 @@ public abstract class EsapiServlet extends HttpServlet {
 		} catch (IntrusionException ex) {
 			String message = "Bad value for HTTP request parameter ";
 			if (validator.isValidInput(context, parameterName, "MartiSafeString",
-					MartiValidator.SHORT_STRING_CHARS, false)) {
+					MartiValidatorConstants.SHORT_STRING_CHARS, false)) {
 				message = message + "\"" + parameterName + "\"";
 			}
 			log.severe("Intrusion attempt detected! " + message);
@@ -108,7 +109,7 @@ public abstract class EsapiServlet extends HttpServlet {
 		} catch (IllegalArgumentException ex) {
 			String message = "Unrecognized HTTP request parameter ";
 			if (validator.isValidInput(context, parameterName, "MartiSafeString",
-					MartiValidator.SHORT_STRING_CHARS, false)) {
+					MartiValidatorConstants.SHORT_STRING_CHARS, false)) {
 				message = message + "\"" + parameterName + "\"";
 			}
 			log.warning(message);
@@ -136,7 +137,7 @@ public abstract class EsapiServlet extends HttpServlet {
 				String[] values = httpParameters.get(key);
 				String safeKey = key;
 				if (!validator.isValidInput("getParameterValue", key, "MartiSafeString", 
-						MartiValidator.DEFAULT_STRING_CHARS, true)) {
+						MartiValidatorConstants.DEFAULT_STRING_CHARS, true)) {
 					safeKey = "(unsafe parameter name)";
 				}
 				if (values.length > 1) {

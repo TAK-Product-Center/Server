@@ -1,92 +1,53 @@
 package tak.server.federation.hub.ui;
 
-import java.util.ArrayList;
+import java.io.IOException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
-import javax.servlet.annotation.MultipartConfig;
-
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.ignite.Ignite;
-import org.apache.ignite.Ignition;
-import org.springframework.boot.SpringApplication;
-import org.springframework.context.annotation.Bean;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.ImportResource;
-import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.boot.web.embedded.jetty.JettyServletWebServerFactory;
-import org.springframework.boot.web.server.ErrorPage;
-import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
-import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import tak.server.federation.FederateGroup;
 import tak.server.federation.FederationException;
 import tak.server.federation.FederationPolicyGraph;
-
-import tak.server.federation.hub.FederationHubConstants;
-import tak.server.federation.hub.FederationHubUtils;
 import tak.server.federation.hub.broker.FederationHubBroker;
-import tak.server.federation.hub.broker.FederationHubBrokerProxyFactory;
+import tak.server.federation.hub.broker.HubConnectionInfo;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
-import tak.server.federation.hub.policy.FederationHubPolicyManagerProxyFactory;
 import tak.server.federation.hub.policy.FederationPolicy;
 import tak.server.federation.hub.ui.graph.EdgeFilter;
 import tak.server.federation.hub.ui.graph.FederationPolicyModel;
 import tak.server.federation.hub.ui.graph.FilterUtils;
-import tak.server.federation.hub.ui.manage.AuthorizationFileWatcher;
 
-@SpringBootApplication
-@Controller
-@MultipartConfig
-public class FederationHubUIService extends SpringBootServletInitializer {
-
-    private static final String DEFAULT_CONFIG_FILE = "/opt/tak/federation-hub/configs/federation-hub-ui.yml";
-
-    private static final int CERT_FILE_UPLOAD_SIZE = 1048576;
+@RequestMapping("/")
+public class FederationHubUIService {
 
     private static final Logger logger = LoggerFactory.getLogger(FederationHubUIService.class);
+    
+    private static final int CERT_FILE_UPLOAD_SIZE = 1048576;
 
-    private static Ignite ignite = null;
-
-    private static String configFile;
-
-    private static String activePolicyName = null;
-    private static Map<String, FederationPolicyModel> cachedPolicies;
-
-    @Autowired
-    private FederationHubUIConfig fedHubConfig;
+    private String activePolicyName = null;
+    private Map<String, FederationPolicyModel> cachedPolicies = new HashMap<>();
 
     @Autowired
     private FederationHubPolicyManager fedHubPolicyManager;
@@ -94,103 +55,6 @@ public class FederationHubUIService extends SpringBootServletInitializer {
     @Autowired
     private FederationHubBroker fedHubBroker;
 
-    @Autowired
-    private AuthorizationFileWatcher authFileWatcher;
-
-    public static void main(String[] args) {
-        if (args.length > 1) {
-            System.err.println("Usage: java -jar federation-hub-ui.jar [CONFIG_FILE_PATH]");
-            return;
-        } else if (args.length == 1) {
-            configFile = args[0];
-        } else {
-            configFile = DEFAULT_CONFIG_FILE;
-        }
-
-        SpringApplication application = new SpringApplication(FederationHubUIService.class);
-
-        ignite = Ignition.getOrStart(FederationHubUtils.getIgniteConfiguration(
-            FederationHubConstants.FEDERATION_HUB_UI_IGNITE_PROFILE,
-            true));
-        if (ignite == null) {
-            System.exit(1);
-        }
-
-        setupInitialConfig(application);
-        cachedPolicies = new HashMap<>();
-
-        ApplicationContext context = application.run(args);
-    }
-
-    private static void setupInitialConfig(SpringApplication application) {
-        List<String> profiles = new ArrayList<String>();
-        application.setAdditionalProfiles(profiles.toArray(new String[0]));
-        Properties properties = new Properties();
-        properties.put("cloud.aws.region.auto", false);
-        properties.put("cloud.aws.region.static", "us-east-1");
-        properties.put("cloud.aws.stack.auto", false);
-        application.setDefaultProperties(properties);
-    }
-
-    @Bean
-    public Ignite getIgnite() {
-        return ignite;
-    }
-
-    @Bean
-    public FederationHubBrokerProxyFactory fedHubBrokerProxyFactory() {
-        return new FederationHubBrokerProxyFactory();
-    }
-
-    public FederationHubBroker fedHubBroker() throws Exception {
-        return fedHubBrokerProxyFactory().getObject();
-    }
-
-    @Bean
-    public FederationHubPolicyManagerProxyFactory fedHubPolicyManagerProxyFactory() {
-        return new FederationHubPolicyManagerProxyFactory();
-    }
-
-    public FederationHubPolicyManager fedHubPolicyManager() throws Exception {
-        return fedHubPolicyManagerProxyFactory().getObject();
-    }
-
-    @Bean
-    public ConfigurableServletWebServerFactory jettyServletFactory() {
-        return new JettyServletWebServerFactory(fedHubConfig.getPort());
-    }
-
-    private FederationHubUIConfig loadConfig(String configFile)
-            throws JsonParseException, JsonMappingException, FileNotFoundException, IOException {
-        if (getClass().getResource(configFile) != null) {
-            // It's a resource.
-            return new ObjectMapper(new YAMLFactory()).readValue(getClass().getResourceAsStream(configFile),
-                FederationHubUIConfig.class);
-        }
-
-        // It's a file.
-        return new ObjectMapper(new YAMLFactory()).readValue(new FileInputStream(configFile),
-            FederationHubUIConfig.class);
-    }
-
-    @Bean
-    public FederationHubUIConfig getFedHubConfig()
-            throws JsonParseException, JsonMappingException, IOException {
-        return loadConfig(configFile);
-    }
-
-    @Bean
-    public AuthorizationFileWatcher authFileWatcher() {
-        AuthorizationFileWatcher authFileWatcher = new AuthorizationFileWatcher(fedHubConfig);
-        try {
-            authFileWatcher.start();
-        } catch (IOException e) {
-            logger.error("Could not start watch service on authorization file: " + e);
-            return null;
-        }
-        Runtime.getRuntime().addShutdownHook(new Thread(authFileWatcher::stop));
-        return authFileWatcher;
-    }
 
     @RequestMapping(value = "/home", method = RequestMethod.GET)
     public String getHome() {
@@ -201,7 +65,10 @@ public class FederationHubUIService extends SpringBootServletInitializer {
     @ResponseBody
     public FederationPolicyModel saveFederation(RequestEntity<FederationPolicyModel> requestEntity) {
         FederationPolicyModel policy = requestEntity.getBody();
-        this.cachedPolicies.put(policy.getName(), policy);
+        if (policy != null) {
+        	this.cachedPolicies.put(policy.getName(), policy);
+        }
+        
         return policy;
     }
 
@@ -279,6 +146,8 @@ public class FederationHubUIService extends SpringBootServletInitializer {
                         fedHubPolicyManager.setPolicyGraph(policyModel, null);
                         activePolicyName = policyModel.getName();
                     }
+                    
+                    fedHubBroker.updatePolicy(policyModel);
 
                     return new ResponseEntity<>(new HttpHeaders(), HttpStatus.OK);
                 } catch (FederationException e) {
@@ -306,6 +175,9 @@ public class FederationHubUIService extends SpringBootServletInitializer {
                             policyModel.getFederationPolicyObjectFromModel());
                         activePolicyName = policyModel.getName();
                     }
+                    
+                    fedHubBroker.updatePolicy(policyModel);
+                    
                     return new ResponseEntity<>(new HttpHeaders(), HttpStatus.OK);
                 } catch (FederationException e) {
                     logger.error("Could not save the policy graph to the federation manager", e);
@@ -326,6 +198,11 @@ public class FederationHubUIService extends SpringBootServletInitializer {
                 HttpStatus.OK);
         }
         return new ResponseEntity<>(new HttpHeaders(), HttpStatus.FORBIDDEN);
+    }
+    
+    @RequestMapping(value = "/fig/getActiveConnections", method = RequestMethod.GET)
+    public ResponseEntity<List<HubConnectionInfo>> getActiveConnections() {
+    	return new ResponseEntity<List<HubConnectionInfo>>(fedHubBroker.getActiveConnections(), new HttpHeaders(), HttpStatus.OK);
     }
 
     @RequestMapping(value = "/fig/addNewGroupCa", method = RequestMethod.POST)
@@ -352,7 +229,7 @@ public class FederationHubUIService extends SpringBootServletInitializer {
         }
         return new ResponseEntity<>(new HttpHeaders(), HttpStatus.FORBIDDEN);
     }
-
+    
     private boolean isUpdateActiveFederation() {
         /* TODO do we really need to configure this? */
         return true;
@@ -366,7 +243,8 @@ public class FederationHubUIService extends SpringBootServletInitializer {
         // Production code.
         FederationPolicyGraph activePolicy = fedHubPolicyManager.getPolicyGraph();
         Map<String, Object> additionalData = activePolicy.getAdditionalData();
-
+        
+   
         // UI Test code.
         //FederationPolicyGraph testActualPolicy = cachedPolicys.values().iterator().next().getPolicyGraphFromModel();
         //Map<String, Object> additionalData =  testActualPolicy.getAdditionalData();

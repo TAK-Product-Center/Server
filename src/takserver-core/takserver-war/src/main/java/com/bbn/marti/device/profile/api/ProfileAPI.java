@@ -15,6 +15,7 @@ import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 import java.io.IOException;
 import java.net.URI;
@@ -191,8 +192,8 @@ public class ProfileAPI extends BaseRestController {
 
         for (String relativePath : relativePaths) {
             validator.getValidInput(ProfileAPI.class.getName(), relativePath,
-                    MartiValidator.Regex.PreventDirectoryTraversal.name(),
-                    MartiValidator.DEFAULT_STRING_CHARS, false);
+                    MartiValidatorConstants.Regex.PreventDirectoryTraversal.name(),
+                    MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
         }
 
         byte[] content = profileService.getProfileDirectoryContent(toolName, relativePaths, syncSecago, clientUid);
@@ -211,8 +212,8 @@ public class ProfileAPI extends BaseRestController {
 
         for (String relativePath : relativePaths) {
             validator.getValidInput(ProfileAPI.class.getName(), relativePath,
-                    MartiValidator.Regex.PreventDirectoryTraversal.name(),
-                    MartiValidator.DEFAULT_STRING_CHARS, false);
+            		MartiValidatorConstants.Regex.PreventDirectoryTraversal.name(),
+            		MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
         }
 
         byte[] content = profileService.getProfileDirectoryContent(toolName, relativePaths, syncSecago, clientUid);

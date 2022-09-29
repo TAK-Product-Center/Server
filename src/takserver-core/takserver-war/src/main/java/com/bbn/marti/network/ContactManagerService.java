@@ -21,6 +21,7 @@ import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 import tak.server.cache.ContactCacheHelper;
 
@@ -191,14 +192,14 @@ public class ContactManagerService {
 				try {
 
 					String uid = resultSet.getString("uid");
-					validator.isValidInput("Client Endpoint uid", uid, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+					validator.isValidInput("Client Endpoint uid", uid, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 					String callsign = resultSet.getString("callsign");
-					validator.isValidInput("Client Endpoint callsign", callsign, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+					validator.isValidInput("Client Endpoint callsign", callsign, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 					String username = resultSet.getString("username");
-					validator.isValidInput("Client Endpoint username", username, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+					validator.isValidInput("Client Endpoint username", username, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 					java.sql.Timestamp ts = resultSet.getTimestamp("created_ts");
 					String lastEventName = resultSet.getString("event_name");
-					validator.isValidInput("Client Endpoint event name", lastEventName, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+					validator.isValidInput("Client Endpoint event name", lastEventName, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 					String groups = resultSet.getString("groups");
 					list.add(new ClientEndpoint(callsign, uid, username, new Date(ts.getTime()), lastEventName, groups));
 				} catch (Throwable t) {

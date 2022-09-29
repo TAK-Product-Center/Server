@@ -53,6 +53,7 @@ import tak.server.cache.ActiveGroupCacheHelper;
 import tak.server.cot.CotEventContainer;
 import tak.server.grid.ContactManagerProxyFactory;
 import tak.server.grid.CoreConfigProxyFactoryForAPI;
+import tak.server.grid.DistributedDatafeedCotServiceProxyFactory;
 import tak.server.grid.FederationManagerProxyFactory;
 import tak.server.grid.GroupManagerProxyFactory;
 import tak.server.grid.InjectionServiceProxyFactory;
@@ -193,6 +194,11 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 	@Bean
 	public SecurityManagerProxyFactory securityManagerProxyFactory() {
 		return new SecurityManagerProxyFactory();
+	}
+	
+	@Bean
+	public DistributedDatafeedCotServiceProxyFactory distributedDatafeedCotServiceProxyFactory() {
+		return new DistributedDatafeedCotServiceProxyFactory();
 	}
 
 	@Bean

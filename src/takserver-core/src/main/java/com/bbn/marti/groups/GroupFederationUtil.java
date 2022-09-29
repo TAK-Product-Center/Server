@@ -129,21 +129,23 @@ public class GroupFederationUtil {
     }
     
     public User getAnonymousUser() {
-        return getAnonymousUser(ANONYMOUS_USERNAME_DEFAULT_SUFFIX);
+        return getUser(ANONYMOUS_USERNAME_DEFAULT_SUFFIX, true);
     }
     
-    public User getAnonymousUser(String suffix) {
+    public User getUser(String suffix, boolean anonymous) {
 
         String username = GroupFederationUtil.ANONYMOUS_USERNAME_BASE + "_" + suffix;
 
         User user = new AuthenticatedUser(username, username, "", null, username, "", "");
 
-        Set<Group> groups = new ConcurrentSkipListSet<>();
+        if (anonymous) {
+			Set<Group> groups = new ConcurrentSkipListSet<>();
 
-        groups.add(new Group(GroupFederationUtil.ANONYMOUS_DEFAULT_GROUP, Direction.IN));
-        groups.add(new Group(GroupFederationUtil.ANONYMOUS_DEFAULT_GROUP, Direction.OUT));
+			groups.add(new Group(GroupFederationUtil.ANONYMOUS_DEFAULT_GROUP, Direction.IN));
+			groups.add(new Group(GroupFederationUtil.ANONYMOUS_DEFAULT_GROUP, Direction.OUT));
 
-        groupManager.updateGroups(user, groups);
+			groupManager.updateGroups(user, groups);
+		}
         
         Subscription sub = new Subscription();
 
@@ -684,7 +686,7 @@ public class GroupFederationUtil {
     	federatedSubscriptionManager.removeFederateSubcription(connection);
     }
 
-	public NavigableSet<Group> addFederateGroupMapping(Multimap inboundMap, List<String> federateGroups) {
+	public NavigableSet<Group> addFederateGroupMapping(Multimap<String, String> inboundMap, List<String> federateGroups) {
 		NavigableSet<Group> mappedGroups = new ConcurrentSkipListSet<>();
 
 		if (!inboundMap.isEmpty()) {
@@ -707,20 +709,9 @@ public class GroupFederationUtil {
 		return mappedGroups;
 	}
 
-	public void collectRemoteGroups(Set<String> groups, Federation.Federate federate) {
-		if (subscriptionStore.getFederateRemoteGroups().containsKey(federate.getId())) {
-			subscriptionStore.getFederateRemoteGroups().get(federate.getId()).addAll(groups);
-			if (logger.isTraceEnabled()) {
-				logger.trace("key is present for the remote group store: " +
-						subscriptionStore.getFederateRemoteGroups());
-			}
-		} else {
-			subscriptionStore.getFederateRemoteGroups().putIfAbsent(federate.getId(), groups);
-			if (logger.isTraceEnabled()) {
-				logger.trace("put if absent in the remote group store: " +
-						subscriptionStore.getFederateRemoteGroups());
-			}
-		}
+	// 
+	public void collectRemoteFederateGroups(Set<String> groups, Federation.Federate federate) {
+		subscriptionStore.getFederateRemoteGroups().put(federate.getId(), groups);
 	}
 	
 	// check if the remote CA matches the self CA we have in takserver.jks

@@ -7,7 +7,6 @@ insert into data_feed_type_pl (feed_type) values ('Streaming');
 insert into data_feed_type_pl (feed_type) values ('API');
 insert into data_feed_type_pl (feed_type) values ('Plugin');
 
-DROP TABLE IF EXISTS data_feed;
 CREATE TABLE data_feed (
     id bigint NOT NULL,
     uuid character varying(255) UNIQUE NOT NULL,

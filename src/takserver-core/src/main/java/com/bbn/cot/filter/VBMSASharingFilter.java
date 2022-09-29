@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.google.common.base.Strings;
 
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
@@ -37,7 +38,8 @@ public class VBMSASharingFilter {
 		if (SubmissionService.getInstance().isControlMessage(cot.getType())) return cot;
 				
 		// came from a data feed				
-		if (cot.getContext(Constants.DATA_FEED_KEY) != null) {
+		String dataFeedUid = (String) cot.getContextValue(Constants.DATA_FEED_UUID_KEY);
+		if (!Strings.isNullOrEmpty(dataFeedUid)) {
 			return cot;
 		}
 		

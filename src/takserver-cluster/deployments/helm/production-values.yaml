@@ -1,5 +1,6 @@
 imagePullSecret: reg-cred
 certConfigMapName: cert-migration
+coreConfigMapName: core-config
 
 takserver:
   ingress:
@@ -88,7 +89,7 @@ global:
 
 ignite:
   image:
-    tag: 2.11.0
+    tag: 2.13.0
   serviceAccount:
     name: takserver-ignite
 

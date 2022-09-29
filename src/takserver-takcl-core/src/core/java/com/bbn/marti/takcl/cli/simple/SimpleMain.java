@@ -1,6 +1,8 @@
 package com.bbn.marti.takcl.cli.simple;
 
 import com.bbn.marti.takcl.AppModules.generic.BaseAppModuleInterface;
+import com.bbn.marti.takcl.SystemMonitor;
+import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.takcl.cli.CommandCommon;
 import com.bbn.marti.takcl.cli.EndUserReadableException;
 
@@ -19,6 +21,8 @@ public class SimpleMain {
 	public final Map<String, BaseAppModuleInterface> moduleMap = new HashMap<>();
 
 	public boolean showDevCommands = false;
+
+	private SystemMonitor systemMonitor;
 
 	public final void addModule(String identifier, BaseAppModuleInterface module) {
 		moduleMap.put(identifier, module);
@@ -75,6 +79,11 @@ public class SimpleMain {
 	 * @param args                   The arguments to pass in from the main method
 	 */
 	public final void run(boolean alwaysShowCommandNames, String[] args) {
+
+		if (TAKCLCore.systemMonitorPeriodSeconds != null) {
+			systemMonitor = new SystemMonitor(TAKCLCore.systemMonitorPeriodSeconds * 1000);
+			systemMonitor.start();
+		}
 ;
 		try {
 			boolean singleModuleMode = moduleMap.size() == 1 && !alwaysShowCommandNames;

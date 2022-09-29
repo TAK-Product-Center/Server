@@ -28,10 +28,16 @@ spec:
           volumeMounts:
             - name: config #The name(key) value must match pod volumes name(key) value
               mountPath: /certs/files/
+            - name: core-config
+              mountPath: /CoreConfig.xml
+              subPath: CoreConfig.xml
       volumes:
         - name: config
           configMap:
             name: {{ .Values.certConfigMapName }}
+        - name: core-config
+          configMap:
+            name: {{ .Values.coreConfigMapName}}
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
 {{- end }}

@@ -31,6 +31,7 @@ import com.bbn.marti.cot.search.model.query.ImageOption;
 import com.bbn.marti.cot.search.service.CotQueryParameter;
 import com.bbn.marti.cot.search.service.CotSearchService;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 import tak.server.Constants;
 
@@ -329,29 +330,29 @@ public class CotQueryServlet extends EsapiServlet {
     protected void initalizeEsapiServlet() {
         log = Logger.getLogger(CotQueryServlet.class.getCanonicalName());
         requiredHttpParameters = new HashMap<String, HttpParameterConstraints>();
-        requiredHttpParameters.put(CotQueryParameter.hostName.name(), new HttpParameterConstraints("MartiSafeString", MartiValidator.DEFAULT_STRING_CHARS));
-        requiredHttpParameters.put(CotQueryParameter.port.name(), new HttpParameterConstraints("NonNegativeInteger", MartiValidator.SHORT_STRING_CHARS));
+        requiredHttpParameters.put(CotQueryParameter.hostName.name(), new HttpParameterConstraints("MartiSafeString", MartiValidatorConstants.DEFAULT_STRING_CHARS));
+        requiredHttpParameters.put(CotQueryParameter.port.name(), new HttpParameterConstraints("NonNegativeInteger", MartiValidatorConstants.SHORT_STRING_CHARS));
 
         optionalHttpParameters = new HashMap<String, HttpParameterConstraints>();
 
-        optionalHttpParameters.put(CotQueryParameter.cotType.name(), new HttpParameterConstraints("RestrictedRegex", MartiValidator.SHORT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.centerLatitude.name(), new HttpParameterConstraints("Double", MartiValidator.DEFAULT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.centerLongitude.name(), new HttpParameterConstraints("Double", MartiValidator.DEFAULT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.image.name(), new HttpParameterConstraints("MartiSafeString", MartiValidator.SHORT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.latestByUid.name(), new HttpParameterConstraints("MartiSafeString", MartiValidator.SHORT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.maximumResults.name(), new HttpParameterConstraints("NonNegativeInteger", MartiValidator.SHORT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.maximumStartTime.name(), new HttpParameterConstraints("Timestamp", MartiValidator.DEFAULT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.minimumStartTime.name(), new HttpParameterConstraints("Timestamp", MartiValidator.DEFAULT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.cotType.name(), new HttpParameterConstraints("RestrictedRegex", MartiValidatorConstants.SHORT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.centerLatitude.name(), new HttpParameterConstraints("Double", MartiValidatorConstants.DEFAULT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.centerLongitude.name(), new HttpParameterConstraints("Double", MartiValidatorConstants.DEFAULT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.image.name(), new HttpParameterConstraints("MartiSafeString", MartiValidatorConstants.SHORT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.latestByUid.name(), new HttpParameterConstraints("MartiSafeString", MartiValidatorConstants.SHORT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.maximumResults.name(), new HttpParameterConstraints("NonNegativeInteger", MartiValidatorConstants.SHORT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.maximumStartTime.name(), new HttpParameterConstraints("Timestamp", MartiValidatorConstants.DEFAULT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.minimumStartTime.name(), new HttpParameterConstraints("Timestamp", MartiValidatorConstants.DEFAULT_STRING_CHARS));
 
-        optionalHttpParameters.put(CotQueryParameter.protocol.name(), new HttpParameterConstraints("MartiSafeString", MartiValidator.SHORT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.searchArea.name(), new HttpParameterConstraints("MartiSafeString", MartiValidator.DEFAULT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.radius.name(), new HttpParameterConstraints("Double", MartiValidator.DEFAULT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.rectangleBottom.name(), new HttpParameterConstraints("Double", MartiValidator.DEFAULT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.rectangleLeft.name(), new HttpParameterConstraints("Double", MartiValidator.DEFAULT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.rectangleRight.name(), new HttpParameterConstraints("Double", MartiValidator.DEFAULT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.rectangleTop.name(), new HttpParameterConstraints("Double", MartiValidator.DEFAULT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.replayMode.name(), new HttpParameterConstraints("MartiSafeString", MartiValidator.SHORT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.replaySpeed.name(), new HttpParameterConstraints("Double", MartiValidator.SHORT_STRING_CHARS));
-        optionalHttpParameters.put(CotQueryParameter.uid.name(), new HttpParameterConstraints("RestrictedRegex", MartiValidator.SHORT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.protocol.name(), new HttpParameterConstraints("MartiSafeString", MartiValidatorConstants.SHORT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.searchArea.name(), new HttpParameterConstraints("MartiSafeString", MartiValidatorConstants.DEFAULT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.radius.name(), new HttpParameterConstraints("Double", MartiValidatorConstants.DEFAULT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.rectangleBottom.name(), new HttpParameterConstraints("Double", MartiValidatorConstants.DEFAULT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.rectangleLeft.name(), new HttpParameterConstraints("Double", MartiValidatorConstants.DEFAULT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.rectangleRight.name(), new HttpParameterConstraints("Double", MartiValidatorConstants.DEFAULT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.rectangleTop.name(), new HttpParameterConstraints("Double", MartiValidatorConstants.DEFAULT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.replayMode.name(), new HttpParameterConstraints("MartiSafeString", MartiValidatorConstants.SHORT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.replaySpeed.name(), new HttpParameterConstraints("Double", MartiValidatorConstants.SHORT_STRING_CHARS));
+        optionalHttpParameters.put(CotQueryParameter.uid.name(), new HttpParameterConstraints("RestrictedRegex", MartiValidatorConstants.SHORT_STRING_CHARS));
     }
 }

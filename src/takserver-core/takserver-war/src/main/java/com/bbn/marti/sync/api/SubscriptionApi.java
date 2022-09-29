@@ -36,6 +36,7 @@ import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 import com.google.common.collect.ComparisonChain;
 
@@ -181,7 +182,7 @@ public class SubscriptionApi extends BaseRestController {
         try {
             RemoteSubscription remoteSubscription = new RemoteSubscription();
             //Validate uid
-            validator.getValidInput(CONTEXT, tmpSub.uid, "MartiSafeString", MartiValidator.DEFAULT_STRING_CHARS, false);
+            validator.getValidInput(CONTEXT, tmpSub.uid, "MartiSafeString", MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
             remoteSubscription.uid = tmpSub.uid.trim();
             remoteSubscription.clientUid = tmpSub.uid.trim();
 
@@ -214,7 +215,7 @@ public class SubscriptionApi extends BaseRestController {
                 filterGroupsList.replaceAll(String::trim);
                 //Validate each group name entered
                 for(String groupName : filterGroupsList){
-                    validator.getValidInput(CONTEXT + "validate sub filter groups", groupName, "MartiSafeString", MartiValidator.DEFAULT_STRING_CHARS, false);
+                    validator.getValidInput(CONTEXT + "validate sub filter groups", groupName, "MartiSafeString", MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
                 }
             }
             else{

@@ -17,7 +17,7 @@ public interface ConnectingInterface extends ReceivingInterface, SendingInterfac
 	TestConnectivityState getConnectivityState();
 	TestConnectivityState getActualConnectivityState();
 
-	void disconnect();
+	void disconnect(boolean logInconsistentState);
 
 	boolean isConnected();
 

@@ -40,11 +40,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Handler;
 
 import org.apache.ignite.events.DiscoveryEvent;
 import org.apache.ignite.events.EventType;
 import org.apache.ignite.lang.IgnitePredicate;
 import org.apache.ignite.services.ServiceContext;
+import org.apache.naming.HandlerRef;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.DocumentHelper;
@@ -78,6 +80,7 @@ import com.bbn.marti.nio.protocol.Protocol;
 import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
 import com.bbn.marti.nio.server.NioServer;
 import com.bbn.marti.nio.websockets.NioWebSocketHandler;
+import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.RemoteSubscriptionMetrics;
 import com.bbn.marti.remote.SubscriptionManagerLite;
@@ -105,6 +108,7 @@ import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.bbn.metrics.dto.MetricSubscription;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -310,14 +314,18 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	public void initializeStaticSubscription(String uid, String protocolStr, String host, String iface,
 			int port, String xpath, String name, List<String> groups, Filter filter) throws IOException {
 
-		User user = groupFederationUtil().getAnonymousUser(name);
+		User user = groupFederationUtil().getUser(name, groups.isEmpty());
 		groupManager().addUser(user);
 
-		for (String s : groups) {
-			groupManager().addUserToGroup(user, new Group(s, Direction.IN));
-			groupManager().addUserToGroup(user, new Group(s, Direction.OUT));
+		if (!groups.isEmpty()) {
+			Set<Group> groupList = new ConcurrentSkipListSet<>();
+			for (String s : groups) {
+				groupList.add(new Group(s, Direction.IN));
+				groupList.add(new Group(s, Direction.OUT));
+			}
+			groupManager().updateGroups(user, groupList);
 		}
-		
+
 		if (xpath == null) {
 			xpath = "*";
 		}
@@ -1308,7 +1316,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 				try {
 					if (!Strings.isNullOrEmpty(subscription.callsign)) {
 						getValidator().getValidInput("getSubscriptionList", subscription.callsign,
-								MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+								MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 					}
 					RemoteSubscription remote = new RemoteSubscription(subscription);
 					remote.prepareForSerialization();
@@ -1335,7 +1343,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			try {
 				if (!Strings.isNullOrEmpty(subscription.callsign)) {
 					getValidator().getValidInput("getCachedSubscriptionList", subscription.callsign,
-							MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+							MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 				}
 			} catch (ValidationException validationException) {
 				logger.error("invalid callsign found in getCachedSubscriptionList!");
@@ -1378,7 +1386,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			try {
 				if (!Strings.isNullOrEmpty(subscription.callsign)) {
 					getValidator().getValidInput("getSubscriptionsWithGroupAccess", subscription.callsign,
-							MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+							MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 				}
 
 				User user = subscription.getUser();

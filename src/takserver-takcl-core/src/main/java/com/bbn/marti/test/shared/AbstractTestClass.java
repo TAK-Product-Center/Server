@@ -3,14 +3,13 @@ package com.bbn.marti.test.shared;
 import ch.qos.logback.classic.Level;
 import com.bbn.marti.takcl.AppModules.TAKCLConfigModule;
 import com.bbn.marti.takcl.*;
-import com.bbn.marti.takcl.connectivity.AbstractRunnableServer;
+import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import com.bbn.marti.test.shared.engines.TestEngine;
 import org.junit.BeforeClass;
 import org.slf4j.LoggerFactory;
 
-import java.io.InvalidClassException;
 import java.lang.reflect.Method;
 import java.util.*;
 

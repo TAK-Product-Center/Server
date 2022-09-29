@@ -5,8 +5,13 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 
 import com.bbn.marti.remote.ServerInfo;
+import com.bbn.marti.remote.SubscriptionManagerLite;
+import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.sync.EnterpriseSyncService;
+import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.repository.MissionRoleRepository;
+import com.bbn.marti.sync.service.MissionService;
+import com.bbn.marti.util.CommonUtil;
 
 import tak.server.PluginManager;
 import tak.server.cache.CoTCacheHelper;
@@ -96,4 +101,87 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		return cotCacheHelper;
 	}
 	
+	private MissionRepository missionRepository = null;
+	
+	public MissionRepository missionRepository() {
+		if (missionRepository == null) {
+			synchronized (this) {
+				if (missionRepository == null) {
+					missionRepository = springContext.getBean(MissionRepository.class);
+				}
+			}
+		}
+
+		return missionRepository;
+	}
+	
+	private SubscriptionManagerLite subscriptionManagerLite = null;
+	
+	public SubscriptionManagerLite subscriptionManagerLite() {
+		if (subscriptionManagerLite == null) {
+			synchronized (this) {
+				if (subscriptionManagerLite == null) {
+					subscriptionManagerLite = springContext.getBean(SubscriptionManagerLite.class);
+				}
+			}
+		}
+
+		return subscriptionManagerLite;
+	}
+	
+	private MissionService missionService = null;
+
+	public MissionService missionService() {
+		if (missionService == null) {
+			synchronized (this) {
+				if (missionService == null) {
+					missionService = springContext.getBean(MissionService.class);
+				}
+			}
+		}
+
+		return missionService;
+	}
+	
+	private GroupManager groupManager = null;
+
+	public GroupManager groupManager() {
+		if (groupManager == null) {
+			synchronized (this) {
+				if (groupManager == null) {
+					groupManager = springContext.getBean(GroupManager.class);
+				}
+			}
+		}
+
+		return groupManager;
+	}
+	
+	private PluginManager pluginManager = null;
+
+	public PluginManager pluginManager() {
+		if (pluginManager == null) {
+			synchronized (this) {
+				if (pluginManager == null) {
+					pluginManager = springContext.getBean(PluginManager.class);
+				}
+			}
+		}
+
+		return pluginManager;
+	}
+	
+	private CommonUtil commonUtil = null;
+
+	public CommonUtil commonUtil() {
+		if (commonUtil == null) {
+			synchronized (this) {
+				if (commonUtil == null) {
+					commonUtil = springContext.getBean(CommonUtil.class);
+				}
+			}
+		}
+
+		return commonUtil;
+	}
 }

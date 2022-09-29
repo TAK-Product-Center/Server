@@ -152,39 +152,50 @@ public class DistributedSubmissionService implements SubmissionInterface {
 		
 		return false;
 	}
-
+	
 	@Override
 	public boolean submitCot(String cotMessage, List<String> uids, List<String> callsigns, NavigableSet<Group> groups, boolean federate, boolean resubmission) {
-		requireNonNull(uids, "submitCot uids");
-        requireNonNull(callsigns, "submitCot callsigns");
-        requireNonNull(groups, "submitCot groups");
-
         try {
-        	
-            CotEventContainer cot = new CotEventContainer(getCotParser().parse(cotMessage));
+            return submitCot(new CotEventContainer(getCotParser().parse(cotMessage)), uids, callsigns, groups, federate, resubmission);
+        } catch (Exception e) {
+        	if (logger.isDebugEnabled()) {
+        		logger.debug("exception submitting message", e);
+        	}
+        }
+        
+        return false;
+	}
+	
+	@Override
+	public boolean submitCot(CotEventContainer cot, List<String> uids, List<String> callsigns, NavigableSet<Group> groups, boolean federate, boolean resubmission) {
+		requireNonNull(uids, "submitCot uids");
+		requireNonNull(callsigns, "submitCot callsigns");
+		requireNonNull(groups, "submitCot groups");
 
-            if (logger.isDebugEnabled()) {
-                logger.debug("CoT message submitted: " + cot + " for uids: " + uids + " - callsigns: " + callsigns + " - groups: " + groups);
-            }
+		try {
+			if (logger.isDebugEnabled()) {
+				logger.debug("CoT message submitted: " + cot + " for uids: " + uids + " - callsigns: " + callsigns
+						+ " - groups: " + groups);
+			}
 
-            if (!callsigns.isEmpty() && !callsigns.contains("All Streaming")) {
-                cot.setContext(StreamingEndpointRewriteFilter.EXPLICIT_CALLSIGN_KEY, callsigns);
-            }
+			if (!callsigns.isEmpty() && !callsigns.contains("All Streaming")) {
+				cot.setContext(StreamingEndpointRewriteFilter.EXPLICIT_CALLSIGN_KEY, callsigns);
+			}
 
-            if (!uids.isEmpty()) {
-                cot.setContext(StreamingEndpointRewriteFilter.EXPLICIT_UID_KEY, uids);
-            }
+			if (!uids.isEmpty()) {
+				cot.setContext(StreamingEndpointRewriteFilter.EXPLICIT_UID_KEY, uids);
+			}
 
-            // only set groups, not the user
-            cot.setContext(Constants.GROUPS_KEY, groups);
+			// only set groups, not the user
+			cot.setContext(Constants.GROUPS_KEY, groups);
 
-            if (!federate) {
-                // only set groups, not the user
-                cot.setContext(Constants.NOFEDV2_KEY, "true");
-            }
+			if (!federate) {
+				// only set groups, not the user
+				cot.setContext(Constants.NOFEDV2_KEY, "true");
+			}
 
-            if (resubmission) {
-            	// trim off existing flow tags so we can resend the message
+			if (resubmission) {
+				// trim off existing flow tags so we can resend the message
 				Node flowTags = cot.getDocument().selectSingleNode("/event/detail/_flow-tags_");
 				if (flowTags != null) {
 					flowTags.detach();
@@ -194,18 +205,17 @@ public class DistributedSubmissionService implements SubmissionInterface {
 				cot.setContext(Constants.ARCHIVE_EVENT_KEY, Boolean.FALSE);
 			}
 
-    		// send message
-    		cotMessenger.send(cot);
-            
-            return true;
+			// send message
+			cotMessenger.send(cot);
 
-        } catch (Exception e) {
-        	if (logger.isDebugEnabled()) {
-        		logger.debug("exception submitting message", e);
-        	}
-        }
-        
-        return false;
+			return true;
+
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception submitting message", e);
+			}
+		}
+		return false;
 	}
 
 	private CotParser getCotParser() {
@@ -219,6 +229,5 @@ public class DistributedSubmissionService implements SubmissionInterface {
 		}
 		
 		return parser.get();
-	}
-	
+	}	
 }

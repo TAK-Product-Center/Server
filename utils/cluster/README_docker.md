@@ -29,6 +29,11 @@ docker build --no-cache -f Dockerfile.postgres10_postgis24 -t tak/postgres10_pos
 cd ../../src
 ./gradlew clean buildDocker buildDockerCA
 ```
+to build the hardened docker images from source
+```
+cd ../../src
+./gradlew clean buildHardenedDocker
+```
 
 ## run ca container, generate certs and copy all files to current directory (on docker host)
 ```

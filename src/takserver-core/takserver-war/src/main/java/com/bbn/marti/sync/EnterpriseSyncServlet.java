@@ -24,13 +24,11 @@ public abstract class EnterpriseSyncServlet extends EsapiServlet {
 	protected EnterpriseSyncService enterpriseSyncService;
 	
 	@Autowired
-	protected CommonUtil martiUtil;
+	protected CommonUtil commonUtil;
 	
 	@Override
     public void init(final ServletConfig config) throws ServletException {
 		super.init(config);
-
-		log.finer("getting MartiUtil bean from spring context");
 	}
 	
 	@Override

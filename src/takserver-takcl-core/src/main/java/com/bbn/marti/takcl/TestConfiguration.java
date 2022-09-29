@@ -6,6 +6,7 @@ import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import com.bbn.marti.test.shared.data.servers.MutableServerProfile;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -206,19 +207,13 @@ public class TestConfiguration {
 		return toFormalTaggedName(method.getDeclaringClass()) + "." + method.getName();
 	}
 
-	public void configureDatabase(AbstractServerProfile profile, Repository repository) {
-		if (!hasBeenVerified) {
-			throw new RuntimeException("The test configuration must be verified before it can be used!");
-		}
-		// Set the enabled state
-		repository.setEnable(dbEnabled);
-
+	@Nullable
+	public String getDbHost(AbstractServerProfile profile) {
 		AbstractServerProfile baseProfile = null;
 		if (profile instanceof MutableServerProfile) {
 			baseProfile = ((MutableServerProfile)profile).baseProfile;
 		}
 
-		// Determine the host
 		String dbHost = null;
 		if (profile == ImmutableServerProfiles.SERVER_0 ||
 				baseProfile != null && baseProfile == ImmutableServerProfiles.SERVER_0) {
@@ -238,13 +233,17 @@ public class TestConfiguration {
 		} else {
 			throw new RuntimeException("Could not find a database for server profile '" + profile + "'!");
 		}
+		return dbHost;
+	}
+
+	public void configureDatabase(AbstractServerProfile profile) {
+		if (!hasBeenVerified) {
+			throw new RuntimeException("The test configuration must be verified before it can be used!");
+		}
+		String dbHost = getDbHost(profile);
 
 		// If the DB Host is set add the credentials
 		if (dbHost != null) {
-			repository.getConnection().setUrl("jdbc:postgresql://" + dbHost + ":5432/cot");
-			repository.getConnection().setUsername("martiuser");
-			repository.getConnection().setPassword(profile.getDbPassword());
-
 			try {
 				Path dbToolPath = Paths.get(profile.getServerPath()).resolve("db-utils").toAbsolutePath();
 				ProcessBuilder smProcessBuilder =

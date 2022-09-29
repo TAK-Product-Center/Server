@@ -14,7 +14,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-@WebFilter(urlPatterns = {"/swagger-resources/**", "/swagger-ui.html", "/v2/api-doc"})
 public class SwaggerAuthorizationFilter extends OncePerRequestFilter {
 
     CoreConfig coreConfig;

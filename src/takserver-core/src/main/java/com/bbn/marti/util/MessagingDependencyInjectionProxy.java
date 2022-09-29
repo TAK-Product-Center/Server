@@ -2,6 +2,8 @@
 
 package com.bbn.marti.util;
 
+import com.bbn.marti.network.PluginDataFeedJdbc;
+import com.bbn.marti.remote.util.RemoteUtil;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -14,6 +16,7 @@ import com.bbn.marti.groups.GroupStore;
 import com.bbn.marti.remote.ContactManager;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.ServerInfo;
+import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.repeater.RepeaterStore;
 import com.bbn.marti.service.DistributedConfiguration;
@@ -22,10 +25,13 @@ import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.sync.repository.FederationEventRepository;
+import com.bbn.marti.sync.repository.MissionRepository;
+import com.bbn.marti.sync.repository.MissionRoleRepository;
 import com.bbn.marti.sync.repository.MissionSubscriptionRepository;
 import com.bbn.marti.sync.service.MissionService;
 
 import tak.server.Constants;
+import tak.server.cache.PluginDatafeedCacheHelper;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotEventContainer;
 import tak.server.messaging.Messenger;
@@ -404,7 +410,86 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 				}
 			}
 		}
-
 		return esyncService;
+	}
+					
+	private MissionRepository missionRepository = null;
+	
+	public MissionRepository missionRepository() {
+		if (missionRepository == null) {
+			synchronized (this) {
+				if (missionRepository == null) {
+					missionRepository = springContext.getBean(MissionRepository.class);
+				}
+			}
+		}
+
+		return missionRepository;
+	}
+	
+	private SubscriptionManagerLite subscriptionManagerLite = null;
+	
+	public SubscriptionManagerLite subscriptionManagerLite() {
+		if (subscriptionManagerLite == null) {
+			synchronized (this) {
+				if (subscriptionManagerLite == null) {
+					subscriptionManagerLite = springContext.getBean(SubscriptionManagerLite.class);
+				}
+			}
+		}
+
+		return subscriptionManagerLite;
+	}
+	
+	private MissionRoleRepository missionRoleRepository = null;
+	
+	public MissionRoleRepository missionRoleRepository() {
+		if (missionRoleRepository == null) {
+			synchronized (this) {
+				if (missionRoleRepository == null) {
+					missionRoleRepository = springContext.getBean(MissionRoleRepository.class);
+				}
+			}
+		}
+		return missionRoleRepository;
+	}
+
+	private PluginDatafeedCacheHelper pluginDatafeedCacheHelper = null;
+
+	public PluginDatafeedCacheHelper pluginDatafeedCacheHelper() {
+		if (pluginDatafeedCacheHelper == null) {
+			synchronized (this) {
+				if (pluginDatafeedCacheHelper == null) {
+					pluginDatafeedCacheHelper = springContext.getBean(PluginDatafeedCacheHelper.class);
+				}
+			}
+		}
+		return pluginDatafeedCacheHelper;
+	}
+
+	private PluginDataFeedJdbc pluginDataFeedJdbc = null;
+
+	public PluginDataFeedJdbc pluginDataFeedJdbc() {
+		if (pluginDataFeedJdbc == null) {
+			synchronized (this) {
+				if (pluginDataFeedJdbc == null) {
+					pluginDataFeedJdbc = springContext.getBean(PluginDataFeedJdbc.class);
+				}
+			}
+		}
+		return pluginDataFeedJdbc;
+	}
+
+	private RemoteUtil remoteUtil = null;
+
+	public RemoteUtil remoteUtil() {
+		if (remoteUtil == null) {
+			synchronized (this) {
+				if (remoteUtil == null) {
+					remoteUtil = springContext.getBean(RemoteUtil.class);
+				}
+			}
+		}
+		return remoteUtil;
 	}
 }

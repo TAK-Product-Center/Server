@@ -17,6 +17,7 @@ import java.util.Map;
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include= JsonTypeInfo.As.PROPERTY, property="graphType")
 @JsonSubTypes({ @JsonSubTypes.Type(value = FederateCell.class, name = "FederateCell"),
                 @JsonSubTypes.Type(value = GroupCell.class, name= "GroupCell"),
+                @JsonSubTypes.Type(value = FederationOutgoingCell.class, name= "FederationOutgoingCell"),
                 @JsonSubTypes.Type(value = EdgeCell.class, name = "EdgeCell")})
 public abstract class PolicyObjectCell {
 

@@ -349,8 +349,8 @@ public class ConnectibleClient implements ConnectingInterface {
 
 
 	@Override
-	public synchronized void disconnect() {
-		if (!this.isConnected()) {
+	public synchronized void disconnect(boolean logInconsistentState) {
+		if (!this.isConnected() && logInconsistentState) {
 			System.err.println("Cannot disconnect client '" + user.getConsistentUniqueReadableIdentifier() + "' because it is not connected!");
 		}
 		try {

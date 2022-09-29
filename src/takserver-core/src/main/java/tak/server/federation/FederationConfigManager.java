@@ -51,6 +51,7 @@ public class FederationConfigManager implements FederationConfigInterface {
                                         fedConfig.getFederationServer().getTls().getContext(),
                                         fedConfig.getFederationServer().getWebBaseUrl(),
                                         fedConfig.isAllowMissionFederation(),
+                                        fedConfig.isAllowDataFeedFederation(),
                                         fedConfig.isAllowFederatedDelete(),
                                         fedConfig.isEnableMissionFederationDisruptionTolerance(),
                                         fedConfig.getMissionFederationDisruptionToleranceRecencySeconds(),
@@ -80,6 +81,7 @@ public class FederationConfigManager implements FederationConfigInterface {
         fedConfig.getFederationServer().getTls().setContext(info.getTlsVersion());
         fedConfig.getFederationServer().setWebBaseUrl(info.getWebBaseURL());
         fedConfig.setAllowMissionFederation(info.isAllowMissionFederation());
+        fedConfig.setAllowDataFeedFederation(info.isAllowDataFeedFederation());
         fedConfig.setAllowFederatedDelete(info.isAllowFederatedDelete());
         fedConfig.setEnableMissionFederationDisruptionTolerance(info.isEnableMissionFederationDisruptionTolerance());
         fedConfig.setMissionFederationDisruptionToleranceRecencySeconds(info.getMissionFederationDisruptionToleranceRecencySeconds());

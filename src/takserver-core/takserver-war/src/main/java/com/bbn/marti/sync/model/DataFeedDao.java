@@ -1,20 +1,13 @@
 package com.bbn.marti.sync.model;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 
-import javax.persistence.Cacheable;
 import javax.persistence.Column;
 import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
-import javax.persistence.Transient;
-import javax.xml.bind.annotation.XmlRootElement;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
@@ -45,6 +38,30 @@ public class DataFeedDao implements Serializable, Comparable<DataFeedDao> {
 	protected Integer coreVersion;
 	protected String coreVersion2TlsVersions;
 	protected int type;
+	protected int syncCacheRetentionSeconds = 3600;
+	
+	public com.bbn.marti.config.DataFeed toInput() {
+		com.bbn.marti.config.DataFeed datafeed = new com.bbn.marti.config.DataFeed();
+    	datafeed.setAnongroup(anongroup);
+    	datafeed.setArchive(archive);
+    	datafeed.setArchiveOnly(archiveOnly);
+    	datafeed.setAuth(null);
+    	datafeed.setAuthRequired(false);
+    	datafeed.setCoreVersion(null);
+    	datafeed.setCoreVersion2TlsVersions(null);
+    	datafeed.setFilter(null);
+    	datafeed.setGroup(feedGroup);
+    	datafeed.setIface(iface);
+    	datafeed.setName(name);
+    	datafeed.setPort(-1);
+    	datafeed.setProtocol(null);
+    	datafeed.setSync(sync);
+    	datafeed.setType(DataFeedType.values()[type].toString());
+    	datafeed.setUuid(uuid);
+    	datafeed.setSyncCacheRetentionSeconds(syncCacheRetentionSeconds);
+		
+		return datafeed;
+	}
 	
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -191,7 +208,15 @@ public class DataFeedDao implements Serializable, Comparable<DataFeedDao> {
     public void setCoreVersion2TlsVersions(String coreVersion2TlsVersions) {
     	this.coreVersion2TlsVersions = coreVersion2TlsVersions;
     }
+	
+	@Column(name = "sync_cache_retention_seconds", unique = false, nullable = true, columnDefinition="integer")
+	public int getSyncCacheRetentionSeconds() {
+		return syncCacheRetentionSeconds;
+	}
 
+	public void setSyncCacheRetentionSeconds(int syncCacheRetentionSeconds) {
+		this.syncCacheRetentionSeconds = syncCacheRetentionSeconds;
+	}
 
 	@Override
 	public int compareTo(DataFeedDao that) {

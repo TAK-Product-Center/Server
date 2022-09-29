@@ -28,6 +28,7 @@
 						<th>Reads Received</th>
 						<th>Messages Received</th>
 						<th>Number Connected</th>
+						<th>Bytes Received</th>
 						<th>&nbsp;</th>
 						<th>&nbsp;</th>
 					</tr>
@@ -51,6 +52,7 @@
 						<td data-ng-bind="x.readsReceived"></td>
 						<td data-ng-bind="x.messagesReceived"></td>
 						<td data-ng-bind="x.numClients"></td>
+						<td data-ng-bind="x.bytesRecieved"></td>
 						<td><a href="" data-ng-click="deleteObject(x.input.name)">Delete</a></td>
 						<td><a class="nav"
 							href="#!/modifyInput/{{x.input.name | encodeURIComponent}}">Modify</a></td>
@@ -79,12 +81,13 @@
 						<th>Group</th>
 						<th>Interface</th>
 						<th>Archive</th>
-						<th>Filter Group</th>
+						<th>Filter Groups</th>
 						<th>Anonymous Group</th>
 						<th>Archive Only</th>
 						<th>Reads Received</th>
 						<th>Messages Received</th>
 						<th>Number Connected</th>
+						<th>Bytes Received</th>
 						<th>&nbsp;</th>
 						<th>&nbsp;</th>
 					</tr>
@@ -111,6 +114,7 @@
 						<td data-ng-bind="x.readsReceived"></td>
 						<td data-ng-bind="x.messagesReceived"></td>
 						<td data-ng-bind="x.numClients"></td>
+						<td data-ng-bind="x.bytesRecieved"></td>
 						<td><a href="" data-ng-click="deleteDataFeed(x.input.name)">Delete</a></td>
 						<td><a class="nav"
 							href="#!/modifyStreamingDataFeed/{{x.input.name | encodeURIComponent}}">Modify</a></td>
@@ -127,6 +131,41 @@
 			<table id="pluginDataFeedsList" class="tablesorter">
 				<thead>
 					<tr>
+						<th>Name</th>
+						<th>Type</th>
+						<th>Sync</th>
+						<th>Tags</th>
+						<th>Archive</th>
+						<th>Filter Groups</th>
+						<th>Messages Received</th>
+						<th>Bytes Received</th>
+						<th>&nbsp;</th>
+						<th>&nbsp;</th>
+					</tr>
+				</thead>
+
+				<tbody>
+					<tr data-ng-repeat="x in pluginDataFeeds">
+						<td data-ng-bind="x.input.name"></td>
+						<td data-ng-bind="x.input.type"></td>
+						<td data-ng-bind="x.input.sync"></td>
+						<td data-ng-bind="x.input.tag"></td>
+						<td data-ng-bind="x.input.archive"></td>
+						<td data-ng-bind="x.input.filtergroup"></td>
+						<td data-ng-bind="x.messagesReceived"></td>
+						<td data-ng-bind="x.bytesRecieved"></td>
+						<td><a href="" data-ng-click="deleteDataFeed(x.input.name)">Delete</a></td>
+						<td><a class="nav"
+							href="#!/modifyPluginDataFeed/{{x.input.name | encodeURIComponent}}">Modify</a></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<h3>Federation Data Feeds</h3>
+		<div data-ng-show="federationDataFeeds.length">
+			<table id="federationDataFeedsList" class="tablesorter">
+				<thead>
+					<tr>
 						<th>Auth Type</th>
 						<th>Name</th>
 						<th>Type</th>
@@ -136,13 +175,14 @@
 						<th>Reads Received</th>
 						<th>Messages Received</th>
 						<th>Number Connected</th>
+						<th>Bytes Received</th>
 						<th>&nbsp;</th>
 						<th>&nbsp;</th>
 					</tr>
 				</thead>
 
 				<tbody>
-					<tr data-ng-repeat="x in pluginDataFeeds">
+					<tr data-ng-repeat="x in federationDataFeeds">
 						<td data-ng-bind="x.input.auth"></td>
 						<td data-ng-bind="x.input.name"></td>
 						<td data-ng-bind="x.input.type"></td>
@@ -152,9 +192,10 @@
 						<td data-ng-bind="x.readsReceived"></td>
 						<td data-ng-bind="x.messagesReceived"></td>
 						<td data-ng-bind="x.numClients"></td>
+						<td data-ng-bind="x.bytesRecieved"></td>
 						<td><a href="" data-ng-click="deleteDataFeed(x.input.name)">Delete</a></td>
 						<td><a class="nav"
-							href="#!/modifyPluginDataFeed/{{x.input.name | encodeURIComponent}}">Modify</a></td>
+							href="#!/modifyFederationDataFeed/{{x.input.name | encodeURIComponent}}">Modify</a></td>
 					</tr>
 				</tbody>
 			</table>

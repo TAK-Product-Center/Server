@@ -79,6 +79,9 @@ public class Constants {
 	public static final int NETTY_NIO = 2;
 	public static final int GRPC_INPUT_CHANNEL_VERSION = 1;
 
+	// Grouping
+	public static final String ANON_GROUP = "__ANON__";
+	
     // WebSocket Topic Reaper
     public static final int TOPIC_REAPER_SCHEDULE = 1200; // run reaper every 20 minutes
     public static final int TOPIC_LIFETIME_SECONDS = 7200; // topic lifetime: 2 hours
@@ -116,6 +119,8 @@ public class Constants {
 	public static final String CLIENT_MSG_TS_CACHE = "client-msg-ts-cache";
 	public static final String CERTIFICATE_CACHE = "certificate-cache";
 	public static final String VIDEO_CACHE = "video-cache";
+	public static final String DATA_FEED_CACHE = "data-feed-cache";
+
 
 	// distributed message topics (ignite)
 	public static final String SUBMISSION_TOPIC_BASE = "submission-topic-";
@@ -164,6 +169,7 @@ public class Constants {
 	public static final String PLUGIN_PROVENANCE = "plugin.provenance";
 	public static final String STORE_FORWARD_KEY = "storeforward";
 	public static final String DATA_FEED_KEY = "data.feed";
+	public static final String DATA_FEED_UUID_KEY = "data.feed.uuid";
 
 	// Grid Service Names
 	public static final String DISTRIBUTED_FEDERATION_MANAGER = "distributed-federation-manager";
@@ -189,6 +195,9 @@ public class Constants {
     public static final String DISTRIBUTED_PLUGIN_DATA_FEED_API = "distributed-plugin-data-feed-api";
     public static final String DISTRIBUTED_PLUGIN_API = "plugin-api";
     public static final String DISTRIBUTED_PLUGIN_SELF_STOP_API = "distributed-plugin-self-stop-api";
+    public static final String DISTRIBUTED_PLUGIN_MISSION_API = "distributed-plugin-mission-api";
+    public static final String DISTRIBUTED_DATAFEED_COT_SERVICE = "distributed-datafeed-cot-service";
+    public static final String DISTRIBUTED_PLUGIN_FILE_API = "distributed-plugin-file-api";
 
     // Bean Names
     public static final String DISTRIBUTED_COT_MESSENGER = "cotMessenger";

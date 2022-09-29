@@ -1,0 +1,6 @@
+FROM openjdk:11-jdk-stretch
+RUN apt update && apt-get install -y emacs-nox net-tools netcat vim nmon python-lxml
+
+COPY tak /opt/tak
+
+ENTRYPOINT ["/bin/bash", "/opt/tak/docker_entrypoint.sh"]

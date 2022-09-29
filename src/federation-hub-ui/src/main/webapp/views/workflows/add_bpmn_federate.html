@@ -122,18 +122,17 @@
       </div>
     </div>
 
-    <div class="row form-group">
+   <!--  <div class="row form-group">
       <label class="col-sm-3">Attributes</label>
       <div>
         <div ui-tree id="tree-root">
           <ol ui-tree-nodes ng-model="roger_federation.attributes">
-            <!--<a class="btn btn-primary btn-xs" data-nodrag style="margin-right: 8px;"><span class="glyphicon glyphicon-plus text-muted"></span></a>-->
             <a class="btn btn-primary btn-xs" data-nodrag ng-click="newTopNode()" style="margin-right: 8px;"><large><span class="glyphicon glyphicon-plus"></span></large></a>
             <li ng-repeat="node in roger_federation.attributes" ui-tree-node ng-include="'nodes_renderer.html'"></li>
           </ol>
         </div>
       </div>
-    </div>
+    </div> -->
 
     <div class="modal-footer">
       <button class="btn btn-primary" type="button" ng-click="submit()" ng-disabled="!federateForm.$valid">OK</button>

@@ -3,12 +3,11 @@ package com.bbn.marti.test.shared;
 import ch.qos.logback.classic.Level;
 import com.bbn.marti.takcl.*;
 import com.bbn.marti.takcl.AppModules.TAKCLConfigModule;
-import com.bbn.marti.takcl.connectivity.AbstractRunnableServer;
+import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import com.bbn.marti.test.shared.engines.TestEngine;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Test;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
@@ -87,9 +86,7 @@ public abstract class AbstractSingleServerTestClass {
 
 	public static String initEnvironment(@NotNull Class<?> testClass) {
 		try {
-			if (!TAKCLCore.useRunningServer) {
-				SSLHelper.genCertsIfNecessary();
-			}
+			SSLHelper.genCertsIfNecessary();
 			if (engine != null) {
 				engine.engineFactoryReset();
 			}
@@ -97,10 +94,8 @@ public abstract class AbstractSingleServerTestClass {
 			TestLogger.setFileLogging(TEST_ARTIFACT_DIRECTORY);
 			engine = new TestEngine(defaultServerProfile);
 
-			if (!TAKCLCore.useRunningServer) {
-				engine.engineFactoryReset();
-				SSLHelper.genCertsIfNecessary();
-			}
+			engine.engineFactoryReset();
+			SSLHelper.genCertsIfNecessary();
 
 			String sessionIdentifier = TestConfiguration.getInstance().toFormalTaggedName(testClass);
 			LoggerFactory.getLogger(testClass).info(String.format(LOG_START_FORMATTER, sessionIdentifier));

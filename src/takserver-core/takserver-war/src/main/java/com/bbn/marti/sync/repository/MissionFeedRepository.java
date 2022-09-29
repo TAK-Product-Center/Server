@@ -11,6 +11,9 @@ public interface MissionFeedRepository extends JpaRepository<MissionFeed, String
     MissionFeed save(MissionFeed missionFeed);
 
     MissionFeed getByUid(String uid);
+    
+    @Query(value = "select * from mission_feed where data_feed_uid = :dataFeedUid and mission_id = :missionId", nativeQuery = true)
+    MissionFeed getMissionFeedByDataFeedUid(@Param("dataFeedUid") String dataFeedUid, @Param("missionId") long missionId);
 
     @Query(value = "select uid, data_feed_uid, filter_bbox, filter_type, filter_callsign, null as mission_id " +
             "from mission_feed where uid = :uid ", nativeQuery = true)

@@ -1,7 +1,9 @@
 package tak.server.federation;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -16,12 +18,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.atakmap.Tak.ROL;
+import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
 import com.bbn.marti.remote.FederationManager;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
+import com.bbn.marti.remote.sync.MissionChangeType;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.service.DistributedConfiguration;
@@ -29,9 +33,14 @@ import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.federation.MissionActionROLConverter;
 import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionChange;
+import com.bbn.marti.sync.model.MissionFeed;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Strings;
+
+import mil.af.rl.rol.value.DataFeedMetadata;
+import mil.af.rl.rol.value.MissionMetadata;
 
 /*
  */
@@ -56,8 +65,10 @@ public class MissionDisruptionManager {
 
 
 	public List<ROL> getMissionChangesAndTrackConnectEvent(Federate federate, String fedName, FederateSubscription fedSubscription) {
-
+		
 		List<ROL> rols = new CopyOnWriteArrayList<>();
+		
+		if (!DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowMissionFederation()) return rols;
 
 		try {
 			
@@ -142,8 +153,6 @@ public class MissionDisruptionManager {
 				logger.debug("outbound groups for fed mission exchange" + outboundGroups);
 			}
 
-			List<Mission> fedMissions = missionService.getAllMissions(true, true, null, outboundGroups);
-
 			if (logger.isDebugEnabled() ) {
 				logger.debug("start: " + lastEventTime + " end: " + now);
 			}
@@ -151,8 +160,19 @@ public class MissionDisruptionManager {
 			String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(outboundGroups));
 
 			// get enterprise sync changes as ROL
-			List<String> fileUids = MessagingDependencyInjectionProxy.getInstance().fedEventRepo().getResourceHashesForTimeInterval(new Date(bestRecencyMillis), now);
-
+			List<String> fileUids = new ArrayList<>();
+			
+			if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions()) {
+				fileUids.addAll(MessagingDependencyInjectionProxy.getInstance().fedEventRepo().getMissionResourceHashesForToolForTimeInterval("public", new Date(bestRecencyMillis), now));
+				// only federating public, but make an exception for cops if vbm is enabled
+				if (DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
+					String tool = DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool();
+					fileUids.addAll(MessagingDependencyInjectionProxy.getInstance().fedEventRepo().getMissionResourceHashesForToolForTimeInterval(tool, new Date(bestRecencyMillis), now));
+				}
+			} else {
+				fileUids.addAll(MessagingDependencyInjectionProxy.getInstance().fedEventRepo().getMissionResourceHashesForTimeInterval(new Date(bestRecencyMillis), now));
+			}
+				
 			if (logger.isDebugEnabled()) {
 				logger.debug("file uids: " + fileUids);
 			}
@@ -189,6 +209,20 @@ public class MissionDisruptionManager {
 			        missionRecencySeconds.put(missionInterval.getName(), missionInterval.getRecencySeconds());
 			    }
 			}
+			
+			List<Mission> fedMissions = new ArrayList<>();
+			
+			if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions()) {
+				missionService.getAllMissions(true, true, null, outboundGroups);
+				fedMissions.addAll(missionService.getAllMissions(true, true, "public", outboundGroups));
+				// only federating public, but make an exception for cops if vbm is enabled
+				if (DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
+					String tool = DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool();
+					fedMissions.addAll(missionService.getAllMissions(true, true, tool, outboundGroups));
+				}
+			} else {
+				fedMissions.addAll(missionService.getAllMissions(true, true, null, outboundGroups));
+			}
 
 			// get mission changes as ROL
 			for (Mission fedMission : fedMissions) {
@@ -212,13 +246,15 @@ public class MissionDisruptionManager {
 				}
 
 				ROL changeROL = null;
-
+				
 				for (MissionChange change : missionChanges) {
 					switch (change.getType()) {
-					case CREATE_MISSION:
-
-						changeROL = malrc.createMissionToROL(change.getMissionName(), change.getCreatorUid(), fedMission.getDescription(), fedMission.getChatRoom(), fedMission.getTool());
-
+					case CREATE_MISSION: 
+						MissionMetadata meta = malrc.missionToROLMissionMetadata(fedMission);
+						meta.setName(change.getMissionName());
+						meta.setCreatorUid(change.getCreatorUid());
+						
+						changeROL = malrc.createMissionToROL(meta);
 						break;
 					case ADD_CONTENT:
 
@@ -264,6 +300,53 @@ public class MissionDisruptionManager {
 						changeROL = malrc.deleteMissionContentToROL(fedMission.getName(), change.getContentHash(), change.getContentUid(), change.getCreatorUid(), fedMission);
 
 						break;
+					case CREATE_DATA_FEED: {
+						if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+							MissionFeed createdMissionFeed = missionService.getMissionFeed(change.getMissionFeedUid());
+							if (createdMissionFeed != null) {
+								DataFeed dataFeed = DistributedConfiguration.getInstance()
+										.getRemoteConfiguration()
+				    					.getNetwork()
+				    					.getDatafeed()
+				    					.stream()
+				    					.filter(df -> df.getUuid().equals(createdMissionFeed.getDataFeedUid()))
+				    					.findFirst().orElse(null);
+								
+								DataFeedMetadata createFeedMeta = new DataFeedMetadata();
+
+								createFeedMeta.setDataFeedUid(createdMissionFeed.getDataFeedUid());
+								createFeedMeta.setFilterBbox(createdMissionFeed.getFilterBbox());
+								createFeedMeta.setFilterCallsign(createdMissionFeed.getFilterCallsign());
+								createFeedMeta.setFilterType(createdMissionFeed.getFilterType());
+
+								createFeedMeta.setMissionFeedUid(change.getMissionFeedUid());
+								createFeedMeta.setMissionName(change.getMissionName());
+								
+								createFeedMeta.setArchive(dataFeed.isArchive());
+								createFeedMeta.setArchiveOnly(dataFeed.isArchiveOnly());
+								createFeedMeta.setSync(dataFeed.isSync());
+								createFeedMeta.setFeedName(dataFeed.getName());
+								createFeedMeta.setAuthType(dataFeed.getAuth().toString());
+								createFeedMeta.setTags(dataFeed.getTag());
+
+								changeROL = malrc.createDataFeedToROL(createFeedMeta);
+							}
+						}
+						break;
+					}
+					case DELETE_DATA_FEED: {
+						if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+							MissionFeed deleteMissionFeed = missionService.getMissionFeed(change.getMissionFeedUid());
+							if (deleteMissionFeed != null) {
+								DataFeedMetadata deleteFeedMeta = new DataFeedMetadata();
+								deleteFeedMeta.setMissionFeedUid(change.getMissionFeedUid());
+								deleteFeedMeta.setMissionName(change.getMissionName());
+								deleteFeedMeta.setDataFeedUid(deleteMissionFeed.getDataFeedUid());
+								changeROL = malrc.deleteDataFeedToROL(deleteFeedMeta);
+							}
+						}
+						break;
+					}
 					default:
 						// no-op
 						break;
@@ -273,7 +356,9 @@ public class MissionDisruptionManager {
 						logger.debug("ROL for change: " + changeROL.toString());
 					}
 
-					rols.add(changeROL);
+					if (changeROL != null) {
+						rols.add(changeROL);
+					}
 				}
 			}
 
@@ -288,6 +373,36 @@ public class MissionDisruptionManager {
 			}
 		}
 
+		return rols;
+	}
+	
+	public List<ROL> getDataFeedEvents() {
+		List<ROL> rols = new CopyOnWriteArrayList<>();
+		
+		DistributedConfiguration.getInstance()
+				.getRemoteConfiguration()
+				.getNetwork()
+				.getDatafeed()
+				.stream()
+				.forEach(dataFeed -> {
+					try {
+						DataFeedMetadata createFeedMeta = new DataFeedMetadata();
+						createFeedMeta.setDataFeedUid(dataFeed.getUuid());
+						createFeedMeta.setArchive(dataFeed.isArchive());
+						createFeedMeta.setArchiveOnly(dataFeed.isArchiveOnly());
+						createFeedMeta.setSync(dataFeed.isSync());
+						createFeedMeta.setFeedName(dataFeed.getName());
+						createFeedMeta.setAuthType(dataFeed.getAuth().toString());
+						createFeedMeta.setTags(dataFeed.getTag());
+						
+						rols.add(malrc.updateDataFeedToROL(createFeedMeta));
+					} catch (JsonProcessingException e) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("exception in federate data feed event", e);
+						}
+					}
+				});
+		
 		return rols;
 	}
 }

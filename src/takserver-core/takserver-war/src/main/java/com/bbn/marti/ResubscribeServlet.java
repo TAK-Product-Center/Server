@@ -19,6 +19,7 @@ import org.owasp.esapi.errors.ValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 public class ResubscribeServlet extends EsapiServlet {
 	private static final long serialVersionUID = 8695971270050381226L;
@@ -56,7 +57,7 @@ public class ResubscribeServlet extends EsapiServlet {
 		String referer = request.getHeader("referer");
 
 		try {
-			referer = validator.getValidInput(context, referer, "URL", MartiValidator.LONG_STRING_CHARS, false);
+			referer = validator.getValidInput(context, referer, "URL", MartiValidatorConstants.LONG_STRING_CHARS, false);
 		} catch (ValidationException e) {
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST,
 					"Bad value for parameter \"referer\":" + e.getMessage());

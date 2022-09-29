@@ -23,4 +23,5 @@ include 'federation-common'
 include 'federation-hub-broker'
 include 'federation-hub-policy'
 include 'federation-hub-ui'
+include 'takserver-protobuf'
 

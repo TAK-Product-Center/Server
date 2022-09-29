@@ -69,7 +69,7 @@ public class NioNettyStcpServerHandler extends NioNettyHandlerBase {
 	@Override
 	public void channelUnregistered(ChannelHandlerContext ctx) {
 		if(channelHandler != null) {			
-			submissionService.handleChannelDisconnect(channelHandler);
+			submissionService().handleChannelDisconnect(channelHandler);
 			protocolListeners.forEach(listener -> listener.onOutboundClose(channelHandler, protocol));
 		}
 		

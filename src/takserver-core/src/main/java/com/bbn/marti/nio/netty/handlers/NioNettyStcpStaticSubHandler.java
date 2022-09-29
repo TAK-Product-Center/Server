@@ -65,7 +65,7 @@ public class NioNettyStcpStaticSubHandler extends NioNettyHandlerBase {
 		setWriter();
 		setupFlushHandler();
 		createSubscription();
-		subscriptionManager.addFilterToSub(subscription, filter);
+		subscriptionManager().addFilterToSub(subscription, filter);
 	}
 	
 	private void setWriter() {
@@ -115,7 +115,7 @@ public class NioNettyStcpStaticSubHandler extends NioNettyHandlerBase {
 	
 	@Override
 	protected void createSubscription() {		
-		subscription = subscriptionManager.addSubscription(uid, protocol, channelHandler, xpath, user);
+		subscription = subscriptionManager().addSubscription(uid, protocol, channelHandler, xpath, user);
 	}
 	
 	@Override
@@ -139,7 +139,7 @@ public class NioNettyStcpStaticSubHandler extends NioNettyHandlerBase {
 		}
 
 		if(channelHandler != null) {
-			submissionService.handleChannelDisconnect(channelHandler);
+			submissionService().handleChannelDisconnect(channelHandler);
 			protocolListeners.forEach(listener -> listener.onOutboundClose(channelHandler, protocol));
 		}
 		

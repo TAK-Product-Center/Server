@@ -33,6 +33,7 @@ import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.TimeUtils;
 import com.bbn.marti.util.spring.RequestHolderBean;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
@@ -75,7 +76,7 @@ public class CotApi extends BaseRestController {
     		Validator validator = new MartiValidator();
     		try {
     			validator.getValidInput("cotquery", uid, 
-    					MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+    					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
     		} catch (ValidationException e) {
     			logger.error("ValidationException in getCotElement!", e);
     			return new ResponseEntity<String>("", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -135,7 +136,7 @@ public class CotApi extends BaseRestController {
     		Validator validator = new MartiValidator();
     		try {
     			validator.getValidInput("cotquery", uid,
-    					MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+    					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
     		} catch (ValidationException e) {
     			logger.error("ValidationException in getAllCotEvents!", e);
     			return new ResponseEntity<String>("", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -205,7 +206,7 @@ public class CotApi extends BaseRestController {
     				}
 
     				// let validation exceptions be handled by CustomExceptionHandler.java
-    				validator.getValidInput("cotquery", uid, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+    				validator.getValidInput("cotquery", uid, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
     			}
 
     			StringBuilder result = new StringBuilder();

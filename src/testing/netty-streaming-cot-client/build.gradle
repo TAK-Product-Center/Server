@@ -4,7 +4,7 @@ apply plugin: 'idea'
 apply plugin: 'eclipse'
 apply plugin: 'application'
 
-mainClassName = 'netty.NettyClientInputTest'
+mainClassName = 'netty.NettyRunnerExample'
 
 apply plugin: 'com.github.johnrengelman.shadow'
 

@@ -30,6 +30,7 @@ import com.bbn.marti.remote.UIDResult;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.service.kml.IconStrategy;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 
 import tak.server.cot.CotElement;
@@ -723,10 +724,10 @@ public class JDBCCachingKMLDao implements KMLDao {
                 cotElement.how = results.getString(10);
             } else {
                 validateTiming = System.nanoTime();
-                cotElement.uid = validator.getValidInput(servletContextPath, results.getString(1), MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
-                cotElement.cottype = validator.getValidInput(servletContextPath, results.getString(5), "CotType", MartiValidator.DEFAULT_STRING_CHARS, true);
-                cotElement.detailtext = validator.getValidInput(servletContextPath, results.getString(8), "XmlBlackList", MartiValidator.LONG_STRING_CHARS, true);
-                cotElement.how = validator.getValidInput(servletContextPath, results.getString(10), MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+                cotElement.uid = validator.getValidInput(servletContextPath, results.getString(1), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+                cotElement.cottype = validator.getValidInput(servletContextPath, results.getString(5), "CotType", MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+                cotElement.detailtext = validator.getValidInput(servletContextPath, results.getString(8), "XmlBlackList", MartiValidatorConstants.LONG_STRING_CHARS, true);
+                cotElement.how = validator.getValidInput(servletContextPath, results.getString(10), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
                 validateTiming = System.nanoTime() - validateTiming;
             }
 
@@ -773,9 +774,9 @@ public class JDBCCachingKMLDao implements KMLDao {
 
             if (validator != null) {
                 validateTiming = System.nanoTime();
-                cotElement.uid = validator.getValidInput(servletContextPath, cotElement.uid, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
-                cotElement.cottype = validator.getValidInput(servletContextPath, cotElement.cottype, "CotType", MartiValidator.DEFAULT_STRING_CHARS, true);
-                cotElement.detailtext = validator.getValidInput(servletContextPath, cotElement.detailtext, "XmlBlackList", MartiValidator.LONG_STRING_CHARS, true);
+                cotElement.uid = validator.getValidInput(servletContextPath, cotElement.uid, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+                cotElement.cottype = validator.getValidInput(servletContextPath, cotElement.cottype, "CotType", MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+                cotElement.detailtext = validator.getValidInput(servletContextPath, cotElement.detailtext, "XmlBlackList", MartiValidatorConstants.LONG_STRING_CHARS, true);
                 validateTiming = System.nanoTime() - validateTiming;
             }
 
@@ -893,9 +894,9 @@ public class JDBCCachingKMLDao implements KMLDao {
 
             if (validator != null) {
                 validateTiming = System.nanoTime();
-                cotElement.uid = validator.getValidInput(servletContextPath, cotElement.uid, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
-                cotElement.cottype = validator.getValidInput(servletContextPath, cotElement.cottype, "CotType", MartiValidator.DEFAULT_STRING_CHARS, true);
-                cotElement.detailtext = validator.getValidInput(servletContextPath, cotElement.detailtext, "XmlBlackList", MartiValidator.LONG_STRING_CHARS, true);
+                cotElement.uid = validator.getValidInput(servletContextPath, cotElement.uid, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+                cotElement.cottype = validator.getValidInput(servletContextPath, cotElement.cottype, "CotType", MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+                cotElement.detailtext = validator.getValidInput(servletContextPath, cotElement.detailtext, "XmlBlackList", MartiValidatorConstants.LONG_STRING_CHARS, true);
                 validateTiming = System.nanoTime() - validateTiming;
             }
 

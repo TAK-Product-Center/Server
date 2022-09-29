@@ -1,7 +1,7 @@
+
 package com.bbn.marti.sync;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.rmi.RemoteException;
@@ -12,6 +12,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.ParseException;
@@ -57,6 +58,7 @@ import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.service.RetentionPolicyConfig;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.Metadata.Field;
+import com.bbn.marti.util.CommonUtil;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
@@ -80,6 +82,9 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	
 	@Autowired
 	private CoreConfig coreConfig;
+	
+	@Autowired
+	private CommonUtil commonUtil;
 	
 	private Cluster clusterConfig;
 	
@@ -231,14 +236,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	@Autowired
 	private Validator validator;
 
-	public JDBCEnterpriseSyncService() {
-//		new SimpleDateFormat(com.bbn.marti.Constants.COT_DATE_FORMAT).setTimeZone(new SimpleTimeZone(0, "UTC"));
-	}
-
-	public JDBCEnterpriseSyncService(Validator validator) {
-//		new SimpleDateFormat(com.bbn.marti.Constants.COT_DATE_FORMAT).setTimeZone(new SimpleTimeZone(0, "UTC"));
-		this.validator = validator;
-	}
+	public JDBCEnterpriseSyncService() { }
 
 	/**
 	 * Deletes stored resources from the Enterprise Sync database by hash
@@ -364,8 +362,17 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 		return insertResource(metadata, new ByteArrayInputStream(content), content.length, groupVector);
 	}
+	
+	@Override
+	public Metadata insertResourceStream(Metadata metadata, InputStream contentStream, String groupVector)
+			throws SQLException, NamingException, IllegalArgumentException,
+			ValidationException, IntrusionException, IllegalStateException, IOException {
+		
+		return insertResourceStreamUID(metadata, contentStream, groupVector, true);
+	}
 
-	private Metadata insertResource(Metadata metadata, InputStream contentStream, String groupVector)
+	@Override
+	public Metadata insertResourceStreamUID(Metadata metadata, InputStream contentStream, String groupVector, boolean generateUID)
 			throws SQLException, NamingException, IllegalArgumentException,
 			ValidationException, IntrusionException, IllegalStateException, IOException {
 
@@ -373,24 +380,243 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 			throw new IllegalArgumentException("empty group vector");
 		}
 
-		// don't know length, read into byte array
-		ByteArrayOutputStream dest = new ByteArrayOutputStream();
-		byte[] buff = new byte[2048]; // half a page
-		int nread;
-		long totalRead = 0L;
+		Metadata metadataResult = null;
 
-		while ((nread = contentStream.read(buff)) != -1
-				&& (totalRead += (long) nread) <= MAX_DATA_SIZE_BYTES) {
-			dest.write(buff, 0, nread);
+		if (metadata.getNumberOfKeys() == 0) {
+			throw new IllegalArgumentException("Uplaod request contains no metadata.");
 		}
+		
+		commonUtil.validateMetadata(metadata);
 
-		if (totalRead > MAX_DATA_SIZE_BYTES) {
-			throw new IllegalArgumentException("Input Stream payload too big for database");
-		} else if (totalRead <= 0) {
-			throw new IllegalArgumentException("Read no data from Input Stream");
-		}
+		try {
+			StringBuilder queryBuilder = new StringBuilder();
+			List<TypeValuePair> metadataColumns = new LinkedList<TypeValuePair>();
 
-		return insertResource(metadata, dest.toByteArray(), groupVector);
+			queryBuilder.append("INSERT INTO ");
+			queryBuilder.append(RESOURCE_TABLE);
+			queryBuilder.append(" (");
+			queryBuilder.append(Column.data.toString());
+
+			if (generateUID && metadata.getUid() == null) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("No UID provided. Generating one.");
+				}
+				queryBuilder.append(", ");
+				queryBuilder.append(Column.uid.toString());
+				metadataColumns.add(new TypeValuePair(StoredType.string, new String[] {UUID.randomUUID().toString()}));
+			}
+
+			for (Column columnToEnter : columnToFieldMap.keySet()) {
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("metadata key: " + columnToEnter);
+				}
+
+				if (columnToEnter.name().equalsIgnoreCase("octet_length")) {
+					continue;
+				}
+
+				String[] metadataValues = metadata.getAll(columnToFieldMap.get(columnToEnter));
+				if (metadataValues != null) {
+					metadataColumns.add(new TypeValuePair(columnToEnter.type, metadataValues));
+					queryBuilder.append(", ");
+					queryBuilder.append(columnToEnter.toString());
+				}
+			}
+			queryBuilder.append(", ");
+			queryBuilder.append(Column.location.toString());
+
+			queryBuilder.append(", groups");
+
+			queryBuilder.append(") VALUES (?"); // first wildcard is for the data
+			for (int index = 0; index < metadataColumns.size(); index++) {
+				queryBuilder.append(", ?");
+			}
+			boolean haveLocation = (!metadata.getLatitude().isNaN() && !metadata.getLongitude().isNaN());
+			if (haveLocation) {
+				queryBuilder.append(", ST_GeometryFromText(?,4326)");
+			} else {
+				queryBuilder.append(", ?");
+			}
+
+			queryBuilder.append(", ?" + RemoteUtil.getInstance().getGroupType()); // groups
+
+			queryBuilder.append(");");
+
+			try (Connection connection = ds.getConnection(); PreparedStatement statement = connection.prepareStatement(queryBuilder.toString(), Statement.RETURN_GENERATED_KEYS)) {
+
+				// bind input stream to database
+				if (logger.isDebugEnabled()) {
+					logger.debug("query: " + queryBuilder.toString());
+					logger.debug("binding binary stream to the database query");
+				}
+				statement.setBinaryStream(1, contentStream);
+
+				int columnIndex = 2;
+				for (TypeValuePair toStore : metadataColumns) {
+					switch (toStore.type) {
+					case decimal:
+						if (toStore.value == null) {
+							statement.setNull(columnIndex, java.sql.Types.DECIMAL);
+						} else {
+							double number = Double.parseDouble(((String[])toStore.value)[0]);
+							statement.setDouble(columnIndex, number);
+						}
+						break;
+					case geometry:
+						// Should not be present in columnToFieldMap, so forget it
+						break;
+					case integer:
+						if (toStore.value == null) {
+							statement.setNull(columnIndex, java.sql.Types.INTEGER);
+						} else {
+							statement.setInt(columnIndex, Integer.parseInt(((String[])toStore.value)[0]));
+						}
+						break;
+					case string:
+						if (toStore.value == null) {
+							statement.setNull(columnIndex, java.sql.Types.VARCHAR);
+						} else {
+							statement.setString(columnIndex, ((String[])toStore.value)[0]);
+						}
+						break;
+					case stringArray:
+						if (toStore.value == null) {
+							statement.setNull(columnIndex, java.sql.Types.ARRAY);
+						} else {
+							statement.setArray(columnIndex,
+									wrapper.createArrayOf("varchar", (String[])toStore.value, connection));
+						}
+						break;
+					case timestamp:
+						if (toStore.value == null) {
+							statement.setNull(columnIndex, java.sql.Types.TIMESTAMP);
+						} else {
+
+							SimpleDateFormat sdf = new SimpleDateFormat(Constants.COT_DATE_FORMAT);
+
+							sdf.setTimeZone(new SimpleTimeZone(0, "UTC"));
+
+							try {
+
+								if (logger.isDebugEnabled()) {
+									logger.debug("timestamp type " + toStore.value.getClass().getName() + " value: " + toStore.value);
+								}
+
+								String submissionTime = ((String[]) toStore.value)[0];
+
+								if (!Strings.isNullOrEmpty(submissionTime)) {
+
+									Timestamp ts = new Timestamp(sdf.parse(submissionTime).getTime());
+
+									statement.setTimestamp(columnIndex, ts);
+								}
+							} catch (Exception e) {
+								log.fine("exception storing timestamp " + e.getMessage());
+							}
+						}
+						break;
+					default:
+						throw new IllegalArgumentException("Cannot store type " + toStore.type.toString());
+					}
+					columnIndex++;
+				}
+
+				if (haveLocation) {
+					statement.setString(columnIndex, metadata.getPointString());
+				} else {
+					statement.setNull(columnIndex, java.sql.Types.OTHER);
+				}
+
+				columnIndex++;
+				statement.setString(columnIndex, groupVector);
+
+				wrapper.auditLog(queryBuilder.toString());
+
+				int insertResult = statement.executeUpdate();
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("insertResult: " + insertResult);
+				}
+
+				Integer primaryKey = null;
+
+				try (ResultSet generatedKeys = wrapper.getGeneratedKeys(statement)) {
+					generatedKeys.next();
+
+					primaryKey = new Integer(generatedKeys.getInt(1));
+					Timestamp submissionTime = generatedKeys.getTimestamp(11,
+							new GregorianCalendar());
+
+					metadataResult = Metadata.copy(metadata);
+					metadataResult.set(Field.PrimaryKey, primaryKey.toString());
+
+					metadataResult.set(Field.SubmissionDateTime,
+							new SimpleDateFormat(tak.server.Constants.COT_DATE_FORMAT).format(submissionTime));
+				} catch (Exception e) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("exception getting generated keys", e);
+					}
+				}
+
+				if (primaryKey == null) {
+					throw new IllegalArgumentException("null primary key returned from file insert - unable to set hash");
+				}
+
+				String updateHashUidSql = "update resource set hash = encode(digest(data, 'sha256'), 'hex') where id = ? returning hash;";
+
+				if (metadata.getUid() != null) {
+					// support request-specified or autogenerated random UID 
+					updateHashUidSql = "update resource set hash = encode(digest(data, 'sha256'), 'hex') where id = ? returning hash;";
+				} else {
+					// set UID to hash - for data packages
+					updateHashUidSql = "update resource set hash = encode(digest(data, 'sha256'), 'hex'), uid = encode(digest(data, 'sha256'), 'hex') where id = ? returning hash;";
+				}
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("updateHashUidSql: " + updateHashUidSql);
+				}
+
+				// Always calculate the SHA-256 hash in the database
+				// This has to be done after the insert, postgres won't allow the hash to be calculated during the insert statement
+				try (PreparedStatement updateHashStatement = connection.prepareStatement(updateHashUidSql, Statement.RETURN_GENERATED_KEYS)) {
+
+					if (logger.isDebugEnabled()) {
+						logger.debug("primary key for hash update: " + primaryKey);
+					}
+
+					updateHashStatement.setInt(1, primaryKey);
+					updateHashStatement.execute();
+
+					try (ResultSet updateHashResult = wrapper.getGeneratedKeys(updateHashStatement)) {
+						updateHashResult.next();
+
+						String hash = updateHashResult.getString(1);
+
+						if (logger.isDebugEnabled()) {
+							logger.debug("hash: " + hash);
+						}
+
+
+						if (Strings.isNullOrEmpty(hash)) {
+							throw new IllegalArgumentException("null hash");
+						}
+
+						// set returned hash in metadata object
+						metadataResult.set(Field.Hash, hash);
+						
+						if (metadataResult.getUid() == null) {
+							metadataResult.set(Field.UID, hash);
+						}
+					}
+				} 				
+			} catch (Exception e) {
+				logger.error("exception inserting resource ", e);
+				throw e;
+			}
+		} finally { }
+
+		return metadataResult;		
 	}
 
 	private Metadata insertResource(Metadata metadata, InputStream contentStream, long contentLen, String groupVector)
@@ -402,7 +628,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		}
 
 		if (contentLen == -1) {
-			return insertResource(metadata, contentStream, groupVector);
+			return insertResourceStream(metadata, contentStream, groupVector);
 		}
 
 		Metadata returnedMetadata = null;
@@ -417,10 +643,9 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		if (metadata.getNumberOfKeys() == 0) {
 			throw new IllegalArgumentException("Uplaod request contains no metadata.");
 		}
-		if (validator != null) {
-			metadata.validate(validator);
-		}
-
+		
+		commonUtil.validateMetadata(metadata);
+		
 		try {
 			StringBuilder queryBuilder = new StringBuilder();
 			List<TypeValuePair> metadataColumns = new LinkedList<TypeValuePair>();
@@ -1421,6 +1646,20 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 			log.fine("Executing SQL: " + query.toString());
 			updated = query.executeUpdate() > 0;
 		}
+		
+		// evict from cache
+		if (updated) {
+			String cacheKey = "getMetadataByHash_" + hash + "_" + groupVector;
+			Cache cache = null;
+			if (isCacheEsync()) {
+				cache = cacheManager.getCache(Constants.ENTERPRISE_SYNC_CACHE_NAME);
+				if (cache == null) {
+					throw new IllegalStateException("unable to get " + Constants.ENTERPRISE_SYNC_CACHE_NAME);
+				}
+				cache.evictIfPresent(cacheKey);
+			}
+		}
+		
 		return updated;
 	}
 

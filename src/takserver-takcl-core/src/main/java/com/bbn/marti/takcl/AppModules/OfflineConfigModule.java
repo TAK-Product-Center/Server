@@ -84,8 +84,6 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 
 			if (!Files.exists(configPath)) {
 				Files.copy(Paths.get(TAKCLConfigModule.getInstance().getCleanConfigFilepath()), Paths.get(fileLocation), StandardCopyOption.REPLACE_EXISTING);
-			} else {
-				System.out.println("Configuration file \"" + fileLocation + "\" already exists. Using existing values.");
 			}
 
 			this.configuration = Util.loadJAXifiedXML(fileLocation, Configuration.class.getPackage().getName());

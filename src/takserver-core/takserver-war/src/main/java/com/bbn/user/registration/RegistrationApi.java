@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.bbn.marti.config.Whitelist;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.bbn.user.registration.model.TAKUser;
 import com.bbn.user.registration.repository.TAKUserRepository;
 import com.bbn.user.registration.service.UserRegistrationService;
@@ -55,9 +56,9 @@ public class RegistrationApi {
         try {
             // validate input
             validator.getValidInput("RegistrationApi", token,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+                    MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             validator.getValidInput("RegistrationApi", emailAddress,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 
             String[] groupNames = null;
             com.bbn.marti.config.Email email = userManagementService.getEmailConfig();
@@ -91,15 +92,15 @@ public class RegistrationApi {
 
             // validate inputs
             validator.getValidInput("RegistrationApi", token,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
             validator.getValidInput("RegistrationApi", firstName,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
             validator.getValidInput("RegistrationApi", lastName,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
             validator.getValidInput("RegistrationApi", phoneNumber,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
             validator.getValidInput("RegistrationApi", organization,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 
             boolean status = userManagementService.activateUser(
                     token, firstName, lastName, phoneNumber, organization, "",
@@ -125,10 +126,10 @@ public class RegistrationApi {
 
         // validate input
         validator.getValidInput("RegistrationApi", emailAddress,
-                MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+        		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
         for (String group : groupNames) {
             validator.getValidInput("RegistrationApi", group,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
         }
 
         boolean status = userManagementService.inviteUser(emailAddress,

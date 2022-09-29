@@ -17,6 +17,12 @@ app.controller('newUserController', function($scope, $http) {
 
     $scope.init_new_user();
 
+    $scope.showPassword = false;
+
+    $scope.toggleShowPassword = function() {
+        $scope.showPassword = !$scope.showPassword;
+    }
+
     $scope.create_user = function(){
 
         data = {

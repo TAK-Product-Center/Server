@@ -8,6 +8,7 @@ import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.nio.netty.handlers.NioNettyTlsServerHandler;
+import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 
 import atakmap.commoncommo.protobuf.v1.Takmessage.TakMessage;
@@ -42,6 +43,12 @@ public class NioGrpcChannelHandler extends NioNettyTlsServerHandler {
 			}
 			protocolListeners.forEach(listener -> listener.onDataReceived(cotEventContainer, channelHandler, protocol));
 		}
+    	
+    	InputMetric inputMetric = submissionService().getInputMetric(input.getName());
+    	if (inputMetric != null) {
+    		inputMetric.getMessagesReceived().incrementAndGet();
+    		inputMetric.getBytesRecieved().addAndGet(message.toString().length());
+    	}
     }
     
     @Override
@@ -73,7 +80,7 @@ public class NioGrpcChannelHandler extends NioNettyTlsServerHandler {
     @Override
     public void channelUnregistered(ChannelHandlerContext ctx) {    	
     	if (channelHandler != null) {
-            submissionService.handleChannelDisconnect(channelHandler);
+            submissionService().handleChannelDisconnect(channelHandler);
             protocolListeners.forEach(listener -> listener.onOutboundClose(channelHandler, protocol));
         }
     	

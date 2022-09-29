@@ -37,6 +37,10 @@ app.config(['$routeProvider',
 		templateUrl: 'partials/modifyPluginDataFeed.html',
 		controller: 'DataFeedModificationCtrl'
 	}).
+	when('/modifyFederationDataFeed/:name', {
+		templateUrl: 'partials/modifyFederationDataFeed.html',
+		controller: 'DataFeedModificationCtrl'
+	}).
 	otherwise({
 		redirectTo: '/'
 	});

@@ -133,7 +133,7 @@ final class CursedTAKController {
 	}
 
 	public void disconnect() {
-		client.disconnect();
+		client.disconnect(false);
 	}
 
 

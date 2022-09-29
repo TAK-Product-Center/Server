@@ -51,6 +51,8 @@ cd ~/takserver/repo/takserver/src/takserver-core && ../gradlew buildDockerCA
 
 ** build postgres / postgis base image and takserver-db container image (do once, or if there are code changes)
 cd ~/takserver/repo/takserver/src/takserver-schemamanager && docker build -f Dockerfile.postgres10_postgis24 -t tak/postgres10_postgis24:latest . && ../gradlew clean shadowJar buildDocker && cd build/docker && docker build -t 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:database . && docker push 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server
+*** NOTE: to build postgres / postgis base image and the hardened-takserver-db container image use
+cd ~/takserver/repo/takserver/src/takserver-schemamanager && docker build -f Dockerfile.postgres10_postgis24 -t tak/postgres10_postgis24:latest . && ../gradlew clean shadowJar buildHardenedDocker && cd build/docker-hardened && docker build -t 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:database . && docker push 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server
 
 ** Set up namesapce and service account for Apache ignite (distributed cache cluster) (do once)
 cd ~/takserver/repo/takserver/utils/cluster
@@ -122,6 +124,8 @@ etc.
 
 ** build tak server, build takserver-core docker container image, build provisioned core takserver image (including certs and truststore), deploy takserver-core
 cd ~/takserver/repo/takserver/src/takserver-core && ../gradlew clean bootWar buildDocker && cd build/docker && docker build -t 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:core-base . && cd ~/takserver/repo/takserver/utils/cluster && docker build -f Dockerfile.takserver-core-provisioned -t 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:core-provisioned . && docker push 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server && kubectl create -f takserver-core-service-and-deployment.yml
+*** NOTE: to build hardened tak server and tak database container images use:
+cd ~/takserver/repo/takserver/src/takserver-core && ../gradlew clean bootWar buildHardenedDocker && cd build/docker-hardened && docker build -t 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:core-base . && cd ~/takserver/repo/takserver/utils/cluster && docker build -f Dockerfile.takserver-core-provisioned -t 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server:core-provisioned . && docker push 317760611666.dkr.ecr.us-east-1.amazonaws.com/tak/server && kubectl create -f takserver-core-service-and-deployment.yml
 
 ** optional: create DNS entry for network load balancer, manual step in console
 service.tyr.takdata.net

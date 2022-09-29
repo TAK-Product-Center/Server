@@ -5,44 +5,44 @@ task copyLicense(type: Copy) {
 }
 // Copy db-utils scripts
 task copyDbScripts(type: Copy) {
-	from project(':takserver-schemamanager').file('scripts')
-	into "$buildDir/takArtifacts/db-utils"
+    from project(':takserver-schemamanager').file('scripts')
+    into "$buildDir/takArtifacts/db-utils"
 }
 
 // Gather all wars into this build
 task copyWars(type: Copy) {
-	from project(':takserver-core').collect { it.tasks.withType(War) }
-	into "$buildDir/takArtifacts"
-	rename('takserver-core-' + version + '.war', 'takserver.war')
-	exclude 'takserver-war*', 'takserver-war-*.war'
+    from project(':takserver-core').collect { it.tasks.withType(War) }
+    into "$buildDir/takArtifacts"
+    rename('takserver-core-' + version + '.war', 'takserver.war')
+    exclude 'takserver-war*', 'takserver-war-*.war'
 }
 
 // Get CoreConfig.xsd, other XSDs
 task copyCoreConfigXSD(type: Copy) {
-	from project(':takserver-common').file('src/main/xsd')
-	include '*.xsd'
-	into "$buildDir/takArtifacts"
+    from project(':takserver-common').file('src/main/xsd')
+    include '*.xsd'
+    into "$buildDir/takArtifacts"
 }
 
 // Get CoreConfig.example.xml
 task copyCoreConfigExample(type: Copy) {
-	from project(':takserver-core').file('example/')
-	include 'CoreConfig.example.xml', 'logging-restrictsize.xml'
-	into "$buildDir/takArtifacts"
+    from project(':takserver-core').file('example/')
+    include 'CoreConfig.example.xml', 'logging-restrictsize.xml'
+    into "$buildDir/takArtifacts"
 }
 
 // Copy scripts
 task copyCoreScripts(type: Copy) {
-	from project(':takserver-core').file('scripts')
-	into "$buildDir/takArtifacts"
-	exclude 'messaging*', 'API*', 'plugins*', 'retention*', "launcher*"
+    from project(':takserver-core').file('scripts')
+    into "$buildDir/takArtifacts"
+    exclude 'messaging*', 'API*', 'plugins*', 'retention*', "launcher*"
 }
 
 // Copy docs
 task copyDocs(type: Copy) {
-	from getRootProject().file('docs')
-	include '*.pdf'
-	into "$buildDir/takArtifacts/docs"
+    from getRootProject().file('docs')
+    include '*.pdf'
+    into "$buildDir/takArtifacts/docs"
 }
 
 // Copy selinux policy
@@ -54,111 +54,172 @@ task copyPolicy(type: Copy) {
 
 // Gather all jars into this build (including shadow jars)
 task copyJars(type: Copy) {
-	from getRootProject().subprojects.collect { it.tasks.withType(Jar) }
-	into "$buildDir/takArtifacts"
-	rename('schemamanager-' + version + '-uber.jar', 'db-utils/SchemaManager.jar')
-	rename('UserManager-' + version + '-all.jar', 'utils/UserManager.jar')
-	rename('takcl-' + version + '-exe.jar', 'utils/takcl.jar')
-	exclude 'takserver-common*', 'takserver-core*', 'takserver-package*', 'API*', 'messaging*',
-			'database*', 'takserver-schemamanager*', 'takserver-takcl*', 'takserver-usermanager*',
-			'takserver-war-*', 'takcl-dev*', 'takserver-plugin*',
-			'takserver-plugin-manager*', 'takserver-cluster*', 'takserver-fig-core*', 'takserver-retention*',
-			'rol*', 'Periodic*', 'launcher*', 'takserver-' + version + '*',
-			'federation-hub-*', 'federation-common-*'
+    from getRootProject().subprojects.collect { it.tasks.withType(Jar) }
+    into "$buildDir/takArtifacts"
+    rename('schemamanager-' + version + '-uber.jar', 'db-utils/SchemaManager.jar')
+    rename('UserManager-' + version + '-all.jar', 'utils/UserManager.jar')
+    rename('takcl-' + version + '-exe.jar', 'utils/takcl.jar')
+    exclude 'takserver-common*', 'takserver-core*', 'takserver-package*', 'API*', 'messaging*',
+    'database*', 'takserver-schemamanager*', 'takserver-takcl*', 'takserver-usermanager*',
+    'takserver-war-*', 'takcl-dev*', 'takserver-plugin*',
+    'takserver-plugin-manager*','takserver-cluster*', 'takserver-fig-core*', 'takserver-retention*',
+    'rol*', 'Periodic*', 'launcher*', 'takserver-' + version + '*',
+    'federation-hub-*', 'federation-common-*', 'takserver-protobuf-*'
 }
 
 // Gather all jars into this build (including shadow jars)
 task copyJarsNoDb(type: Copy) {
-	from getRootProject().subprojects.collect { it.tasks.withType(Jar) }
-	into "$buildDir/takArtifacts"
-	rename('UserManager-' + version + '-all.jar', 'utils/UserManager.jar')
-	rename('takcl-' + version + '-exe.jar', 'utils/takcl.jar')
-	exclude 'takserver-common*', 'takserver-core*', 'takserver-package*', 'API*', 'messaging*',
-			'database*', 'takserver-schemamanager*', 'schemamanager*', 'takserver-takcl*',
-			'takserver-usermanager*', 'takserver-war-*', 'takcl-dev*', 'takserver-plugin*', 'takserver-plugin-manager*',
-			'takserver-cluster*', 'takserver-fig-core*', 'takserver-retention*', 'rol*', 'Periodic*', 'launcher*', 'takserver-' + version + '*',
-			'federation-hub-*', 'federation-common-*'
+    from getRootProject().subprojects.collect { it.tasks.withType(Jar) }
+    into "$buildDir/takArtifacts"
+    rename('UserManager-' + version + '-all.jar', 'utils/UserManager.jar')
+    rename('takcl-' + version + '-exe.jar', 'utils/takcl.jar')
+    exclude 'takserver-common*', 'takserver-core*', 'takserver-package*', 'API*', 'messaging*',
+    'database*', 'takserver-schemamanager*', 'schemamanager*', 'takserver-takcl*',
+    'takserver-usermanager*', 'takserver-war-*', 'takcl-dev*', 'takserver-plugin*', 'takserver-plugin-manager*',
+    'takserver-cluster*', 'takserver-fig-core*', 'takserver-retention*', 'rol*', 'Periodic*', 'launcher*', 'takserver-' + version + '*',
+    'federation-hub-*', 'federation-common-*', 'takserver-protobuf-*'
 }
 
 // Copy scripts
 task copyAPIScripts(type: Copy) {
-	from project(':takserver-core').file('scripts')
-	into "$buildDir/takArtifacts"
-	exclude 'utils*', 'messaging*', 'plugins*', 'retention*', 'launcher*', 'takserver.sh'
+    from project(':takserver-core').file('scripts')
+    into "$buildDir/takArtifacts"
+    exclude 'utils*', 'messaging*', 'plugins*', 'retention*', 'launcher*', 'takserver.sh'
 }
 
 // Copy scripts
 task copyMessagingScripts(type: Copy) {
-	from project(':takserver-core').file('scripts')
-	into "$buildDir/takArtifacts"
-	exclude 'utils*', 'API*', 'launcher*', 'plugins*', 'retention*', 'takserver.sh'
+    from project(':takserver-core').file('scripts')
+    into "$buildDir/takArtifacts"
+    exclude 'utils*', 'API*', 'launcher*', 'plugins*', 'retention*', 'takserver.sh'
 }
 
 // Copy scripts
 task copyPluginsScripts(type: Copy) {
-	from project(':takserver-core').file('scripts/plugins')
-	into "$buildDir/takArtifacts"
-}
+    from project(':takserver-core').file('scripts/plugins')
+    into "$buildDir/takArtifacts"
+ }
 
 // Copy retention config files
 task copyRetentionConfigs(type: Copy) {
-	from project(':takserver-retention').file('conf/')
-	into "$buildDir/takArtifacts"
+    from project(':takserver-retention').file('conf/retention')
+    into "$buildDir/takArtifacts/conf/retention"
 }
 
 // Copy retention mission archive store dir
 task copyRetentionMissionStoreDir(type: Copy) {
 	from project(':takserver-retention').file('mission-archive/')
-	into "$buildDir/takArtifacts/retention"
+	into "$buildDir/takArtifacts/mission-archive"
 }
 
 // Copy scripts
 task copyRetentionScripts(type: Copy) {
-	from project(':takserver-core').file('scripts/retention/')
-	into "$buildDir/takArtifacts/retention"
+    from project(':takserver-core').file('scripts/retention/')
+    into "$buildDir/takArtifacts/retention"
 }
 
 // Gather all jars into this build (including shadow jars)
 task copySchemaManagerJar(type: Copy) {
-	from project(':takserver-schemamanager').collect { it.tasks.withType(Jar) }
-	into "$buildDir/takArtifacts"
-	rename('schemamanager-' + version + '-uber.jar', 'db-utils/SchemaManager.jar')
-	exclude 'takserver-schemamanager*'
+    from project(':takserver-schemamanager').collect { it.tasks.withType(Jar) }
+    into "$buildDir/takArtifacts"
+    rename('schemamanager-' + version + '-uber.jar', 'db-utils/SchemaManager.jar')
+    exclude 'takserver-schemamanager*'
 }
 
 // Copy db-utils scripts from dbonly directory
 task copyDbOnlyScripts(type: Copy) {
-	from project(':takserver-schemamanager').file('scripts-dbonly')
-	into "$buildDir/takArtifacts/db-utils"
+    from project(':takserver-schemamanager').file('scripts-dbonly')
+    into "$buildDir/takArtifacts/db-utils"
 }
 
 // Copy takserver dockerfiles
 task copyTakserverDockerFiles(type: Copy) {
-	from project(':takserver-core').file('docker')
-	into "$buildDir/docker"
-	rename('configureInDocker.sh', '../takArtifacts/configureInDocker.sh')
-	rename('CoreConfig.xml', '../takArtifacts/CoreConfig.xml')
+    from project(':takserver-core').file('docker')
+    into "$buildDir/docker"
+    exclude "hardened"
+    exclude "full"
+    rename('configureInDocker.sh', '../takArtifacts/configureInDocker.sh')
+    rename('CoreConfig.xml', '../takArtifacts/CoreConfig.xml')
+}
+
+// Copy full takserver dockerfiles
+task copyFullTakserverDockerFiles(type: Copy) {
+    from project(':takserver-core').file('docker/full')
+    into "$buildDir/docker-full"
+    rename('CoreConfig.xml', '../takArtifacts/CoreConfig.xml')
+    rename('coreConfigEnvHelper.py', '../takArtifacts/coreConfigEnvHelper.py')
+    rename('docker_entrypoint.sh', '../takArtifacts/docker_entrypoint.sh')
 }
 
 // Copy schemamanager dockerfiles
-task copySchemaManagerFiles(type: Copy) {
-	from project(':takserver-schemamanager').file('docker')
-	into "$buildDir/docker"
-	rename('configureInDocker.sh', '../takArtifacts/db-utils/configureInDocker.sh')
-	rename('pg_hba.conf', '../takArtifacts/db-utils/pg_hba.conf')
-	rename('postgresql.conf', '../takArtifacts/db-utils/postgresql.conf')
+task copySchemaManagerFullFiles(type: Copy) {
+    from project(':takserver-schemamanager').file('docker/full')
+    into "$buildDir/docker-full"
+    rename('configureInDocker.sh', '../takArtifacts/db-utils/configureInDocker.sh')
+    rename('pg_hba.conf', '../takArtifacts/db-utils/pg_hba.conf')
+    rename('postgresql.conf', '../takArtifacts/db-utils/postgresql.conf')
 }
 
+// Copy schemamanager full dockerfiles
+task copySchemaManagerFiles(type: Copy) {
+    from project(':takserver-schemamanager').file('docker')
+    exclude "hardened"
+    into "$buildDir/docker"
+    rename('configureInDocker.sh', '../takArtifacts/db-utils/configureInDocker.sh')
+    rename('pg_hba.conf', '../takArtifacts/db-utils/pg_hba.conf')
+    rename('postgresql.conf', '../takArtifacts/db-utils/postgresql.conf')
+}
+
+// Copy hardened takserver dockerfiles
+task copyHardenedTakserverDockerFiles(type: Copy) {
+    from project(':takserver-core').file('docker/hardened')
+    exclude "health"
+    exclude "rpms"
+    exclude "epel-release*"
+    into "$buildDir/docker/hardened"
+    rename('CoreConfig.xml', '../hardened/takArtifacts/CoreConfig.xml')
+    from project(':takserver-core').file('docker/configureInDocker.sh')
+    into "$buildDir/docker/hardened"
+    rename('configureInDocker.sh', '../hardened/takArtifacts/configureInDocker.sh')
+}
+
+// Copy hardened schemamanager dockerfiles
+task copyHardenedSchemaManagerFiles(type: Copy) {
+    from project(':takserver-schemamanager').file('docker')
+    include 'pg_hba.conf'
+    include 'postgresql.conf'
+    include 'hardened/*'
+    into "$buildDir/docker"
+    rename('pg_hba.conf', '../docker/hardened/takArtifacts/db-utils/pg_hba.conf')
+    rename('postgresql.conf', '../docker/hardened/takArtifacts/db-utils/postgresql.conf')
+    rename('configureInDocker.sh', '../hardened/takArtifacts/db-utils/configureInDocker.sh')
+    rename('takserver-setup-db.sh', '../hardened/takArtifacts/db-utils/takserver-setup-db.sh')
+}
+
+
 task copyPluginsJar(type: Copy) {
-	from project(':takserver-plugin-manager').collect { it.tasks.withType(Jar) }
-	into "$buildDir/takArtifacts"
-	rename('takserver-plugin-manager-' + version + '.jar', 'takserver-pm.jar')
+    from project(':takserver-plugin-manager').collect { it.tasks.withType(Jar) }
+    into "$buildDir/takArtifacts"
+    rename('takserver-plugin-manager-' + version + '.jar', 'takserver-pm.jar')
 }
 
 task copyRetentionJar(type: Copy) {
-	from project(':takserver-retention').collect { it.tasks.withType(Jar) }
-	into "$buildDir/takArtifacts"
-	rename('takserver-retention-' + version + '.jar', 'takserver-retention.jar')
+    from project(':takserver-retention').collect { it.tasks.withType(Jar) }
+    into "$buildDir/takArtifacts"
+    rename('takserver-retention-' + version + '.jar', 'takserver-retention.jar')
+}
+
+task copyDockerSecurityFiles(type: Copy) {
+    from project(':takserver-core').file('docker/hardened')
+    include "rpms/repos/*"
+    include "rpms/signatures/*"
+    include "epel-release*"
+    into "$buildDir/docker/hardened/takArtifacts/security"
+}
+
+task copyHealthCheckScripts(type: Copy) {
+    from project(':takserver-core').file('docker/hardened/health')
+    into "$buildDir/docker/hardened/takArtifacts/health"
 }
 
 task createCIVersionArtifacts() {
@@ -193,25 +254,32 @@ task createCIVersionArtifacts() {
 					"TAK_DOCKER_PRIMARY_TAG=\"$primaryDockerTag\"\n"
 }
 
-task createVersionFile() {
-	def takArtifacts = "$buildDir/takArtifacts"
-	doLast {
-		new File(takArtifacts, "version.txt").text = """$version"""
-	}
+task createVersionFile()  {
+    def takArtifacts = "$buildDir/takArtifacts"
+    doLast {
+        new File(takArtifacts, "version.txt").text = """$version"""
+    }
 }
 
-task createLogDir() {
-	def logs = new File("$buildDir/takArtifacts/logs")
-	doLast {
-		logs.mkdirs()
-		new File(logs, "takserver.log").text = ""
-	}
+task createLogDir()  {
+    def logs = new File("$buildDir/takArtifacts/logs")
+    doLast {
+        logs.mkdirs()
+        new File(logs, "takserver.log").text = ""
+    }
 }
 
-task createPluginsLibDir() {
-	def logs = new File("$buildDir/takArtifacts/lib")
+task createPluginsLibDir()  {
+    def logs = new File("$buildDir/takArtifacts/lib")
+    doLast {
+        logs.mkdirs()
+    }
+}
+
+task createWebtakPluginsDir() {
+	def webtakPluginsDir = new File("$buildDir/takArtifacts/webcontent/webtak-plugins")
 	doLast {
-		logs.mkdirs()
+		webtakPluginsDir.mkdirs()
 	}
 }
 
@@ -224,4 +292,31 @@ task zipTakserverDocker(type: Zip) {
 	from('build/docker') {
 		into('takserver-docker-' + version + '/docker/')
 	}
+}
+
+task zipHardenedTakserverDocker(type: Zip) {
+    archiveName 'takserver-docker-hardened-' + version + '.zip'
+    duplicatesStrategy 'exclude'
+    destinationDir(file('build/distributions'))
+    from('build/docker/hardened/takArtifacts') {
+        into('takserver-docker-hardened-' + version + '/tak/')
+    }
+    from('build/takArtifacts') {
+        into('takserver-docker-hardened-' + version + '/tak/')
+    }
+    from('build/docker/hardened') {
+        exclude 'takArtifacts'
+        into('takserver-docker-hardened-' + version + '/docker/')
+    }
+}
+
+task zipFullTakserverDocker(type: Zip) {
+    archiveName 'takserver-docker-full-' + version + '.zip'
+    destinationDir(file('build/distributions'))
+    from('build/takArtifacts') {
+        into('takserver-docker-full-' + version + '/tak/')
+    }
+    from('build/docker-full') {
+        into('takserver-docker-full-' + version + '/docker/')
+    }
 }

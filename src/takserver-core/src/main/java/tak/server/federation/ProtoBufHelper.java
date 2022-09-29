@@ -26,6 +26,7 @@ import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 
+import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 import tak.server.util.NumericUtil;
 
@@ -121,6 +122,16 @@ public class ProtoBufHelper {
 		} catch (Exception e) {
 			throw new IllegalArgumentException("exception setting how", e);
 		}
+		
+		try {
+			String feedUid = (String) cot.getContextValue(Constants.DATA_FEED_UUID_KEY);
+			if (!Strings.isNullOrEmpty(feedUid)) {
+				geoBuilder.setFeedUid((String) cot.getContextValue(Constants.DATA_FEED_UUID_KEY));
+			}
+		} catch (Exception e) {
+			throw new IllegalArgumentException("exception setting how", e);
+		}
+		
 
 		if (detailE != null) {
 			try {
@@ -251,6 +262,10 @@ public class ProtoBufHelper {
 				l.add(geo.getPtpUids(i));
 			}
 			rval.setContextValue("explicitBrokeringUid", l);
+		}
+		
+		if (!Strings.isNullOrEmpty(geo.getFeedUid())) {
+			rval.setContextValue(Constants.DATA_FEED_UUID_KEY, geo.getFeedUid());
 		}
 
 		return rval;

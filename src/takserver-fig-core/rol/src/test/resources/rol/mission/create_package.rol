@@ -1,2 +1,2 @@
 create mission
-{"type":"MissionCreateDetails","name":"4","creatorUid":"user","description":"","chatRoom":null,"tool":"public"};
+{"type":"MissionMetadata","name":"4","creatorUid":"user","description":"","chatRoom":null,"tool":"public"};

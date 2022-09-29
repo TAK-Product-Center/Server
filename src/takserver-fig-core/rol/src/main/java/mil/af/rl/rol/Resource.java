@@ -12,5 +12,6 @@ public enum Resource {
     PRIORITY,
     RESOURCE,
     PACKAGE,
-    MISSION
+    MISSION,
+    DATA_FEED
 }

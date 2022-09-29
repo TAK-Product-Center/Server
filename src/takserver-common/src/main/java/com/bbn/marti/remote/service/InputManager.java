@@ -19,6 +19,8 @@ public interface InputManager {
 
 	ConnectionModifyResult modifyInput(String id, Input input);
 	
+	void updateFederationDataFeed(DataFeed dataFeed);
+	
 	void deleteInput(String name);
 	
 	void deleteDataFeed(String name);

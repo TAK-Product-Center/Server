@@ -99,11 +99,10 @@ import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SSLConfig;
 import com.bbn.marti.service.Subscription;
 import com.bbn.marti.service.SubscriptionStore;
-import com.bbn.marti.sync.EnterpriseSyncService;
-import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.roger.fig.FederationUtils;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Multimap;
@@ -668,10 +667,33 @@ public class DistributedFederationManager implements FederationManager, Service 
 		} catch (Exception e) {
 			logger.warn("error updating federation user group config", e);
 		}
+		
+		updateFederateGroups(federateConfig);
 
 		coreConfig.setAndSaveFederation(fedConfig);
 
 		clusterAddFederateUsersToGroups(federateUID, localGroupNames, Direction.OUT, true);
+	}
+	
+	private void updateFederateGroups(Federate federateConfig) {
+		try {
+			if (federateConfig == null || !federateConfig.isFederatedGroupMapping()) return;
+			
+			for (FederateSubscription s : SubscriptionStore.getInstanceFederatedSubscriptionManager().getFederateSubscriptions()) {
+				checkNotNull(s, "federate subscription");
+
+				if (checkNotNull(checkNotNull(checkNotNull(((FederateUser) s.getUser()), "FederateUser")
+						.getFederateConfig(),"federate user FederateConfig")
+						.getId(),"federate user FederateConfig id")
+						.compareTo(federateConfig.getId()) == 0) {
+					if (s instanceof FigFederateSubscription) {
+						((FigFederateSubscription) s).submitFederateGroups(new HashSet<String>(federateConfig.getOutboundGroup()));
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Error submitting update to federate groups", e);
+		}
 	}
 
 	@Override
@@ -812,15 +834,19 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
 
+		Federate federateConfig = null;
 		List<Federate> federates = fedConfig.getFederate();
 		for (Federate f : federates) {
 			if (f.getId().compareTo(federateUID) == 0) {
+				federateConfig = f;
 				for (String gname : localGroupNames) {
 					f.getOutboundGroup().remove(gname);
 				}
 				break;
 			}
 		}
+		
+		updateFederateGroups(federateConfig);
 
 		coreConfig.setAndSaveFederation(fedConfig);
 
@@ -1314,22 +1340,15 @@ public class DistributedFederationManager implements FederationManager, Service 
 			if (logger.isTraceEnabled()) {
 				logger.trace("adding federate chain of trust entry: " + ca);
 			}
-
-			Tls tlsConfig = coreConfig.getRemoteConfiguration().getFederation().getFederationServer().getTls();
-
+			
 			String dn = ca.getSubjectX500Principal().getName();
 
-			if (logger.isTraceEnabled()) {
-				logger.trace("new chain of trust entry dn: " + dn);
-			}
+			logger.info("new chain of trust entry dn: " + dn);
 
-			// Use the CN as the truststore alias. This will throw an exception if the CN
-			// can't be figured out.
-			String alias = MessageConversionUtil.getCN(dn);
-
-			if (logger.isTraceEnabled()) {
-				logger.trace("new chain of trust entry alias: " + alias);
-			}
+			// Use the sha256 hash of the ca cert as the truststore alias.
+			String alias = FederationUtils.getBytesSHA256(ca.getEncoded());
+			
+			logger.info("adding CA with fingerprint {} as truststore alias", alias);
 
 			SSLConfig sslConfig = getSSLCache().get(SSL_TRUSTSTORE_KEY);
 			sslConfig.getTrust().setEntry(alias, new KeyStore.TrustedCertificateEntry(ca), null);
@@ -2048,59 +2067,55 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public void submitFederateROL(ROL rol, final NavigableSet<Group> groups, String fileHash) {
-		if (logger.isDebugEnabled()) {
-			logger.debug("Federated ROL: " + rol.getProgram() + " groups: " + groups);
-		}
-		
-		
-		// Populate the file contents here in messaging if no content provided. Avoids serializing file over ignite
 		try {
-			if (rol.getPayloadList().isEmpty() && !Strings.isNullOrEmpty(fileHash)) {
-				
-		        String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
-				
-				// use the file hash to load the file from db / cache
-				byte[] fileBytes = MessagingDependencyInjectionProxy.getInstance().esyncService().getContentByHash(fileHash, groupVector);
-				
-				if (logger.isDebugEnabled()) {
-					if (fileBytes == null) {
-						logger.debug("null bytes for file " + fileHash);
-					} else {
-					
-					logger.debug("fetched " + fileBytes.length + " for hash " + fileHash);
-					
-					}
-				}
-				
-				BinaryBlob filePayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(fileBytes))).build();
-
-				ROL.Builder rolBuilder = rol.toBuilder();
-				
-				rolBuilder.addPayload(filePayload);
-				
-				if (logger.isDebugEnabled()) {
-					logger.debug("Added file payload size " + fileBytes.length + " bytes to rol");
-				}
-				
-				rol = rolBuilder.build();
-				
-			}
-		} catch (Exception e) {
-			if (logger.isWarnEnabled()) {
-				logger.warn("exception fetching file for federation from data layer", e);
-			}
-		}
-		
-		final ROL finalRol = rol;
-
-
-		try {
-
 			// Federate this ROL message if there is a reachability relationship
-			Resources.brokerMatchingProcessor.execute(new Runnable() {
+			Resources.federationROLExecutor.execute(new Runnable() {
 				@Override
 				public void run() {
+					if (logger.isDebugEnabled()) {
+						logger.debug("Federated ROL: " + rol.getProgram() + " groups: " + groups);
+					}
+					
+					ROL finalRol = rol;
+					
+					// Populate the file contents here in messaging if no content provided. Avoids serializing file over ignite
+					try {
+						if (rol.getPayloadList().isEmpty() && !Strings.isNullOrEmpty(fileHash)) {
+							
+					        String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
+							
+							// use the file hash to load the file from db / cache
+							byte[] fileBytes = MessagingDependencyInjectionProxy.getInstance().esyncService().getContentByHash(fileHash, groupVector);
+							
+							if (logger.isDebugEnabled()) {
+								if (fileBytes == null) {
+									logger.debug("null bytes for file " + fileHash);
+								} else {
+								
+								logger.debug("fetched " + fileBytes.length + " for hash " + fileHash);
+								
+								}
+							}
+							
+							BinaryBlob filePayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(fileBytes))).build();
 
+							ROL.Builder rolBuilder = rol.toBuilder();
+							
+							rolBuilder.addPayload(filePayload);
+							
+							if (logger.isDebugEnabled()) {
+								logger.debug("Added file payload size " + fileBytes.length + " bytes to rol");
+							}
+							
+							finalRol = rolBuilder.build();
+							
+						}
+					} catch (Exception e) {
+						if (logger.isWarnEnabled()) {
+							logger.warn("exception fetching file for federation from data layer", e);
+						}
+					}
+					
 					try {
 
 						for (FederateSubscription destFed : SubscriptionStore.getInstanceFederatedSubscriptionManager().getFederateSubscriptions()) {

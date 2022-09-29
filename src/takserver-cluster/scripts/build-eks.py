@@ -18,6 +18,7 @@ AWS_ACCESS_KEY_ID = os.environ['AWS_ACCESS_KEY_ID']
 AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
 
 # Cluster Config
+KUBERNETES_SERVER_VERSION = '1.21'
 CLUSTER_HOME_DIR = os.environ['CLUSTER_HOME_DIR']
 TAK_CLUSTER_NAME = os.environ['TAK_CLUSTER_NAME']
 TAK_CLUSTER_ZONES = os.environ['TAK_CLUSTER_ZONES']
@@ -130,6 +131,7 @@ def modEksClusterConfig():
 	for _yaml in eks_yaml:
 		_yaml['metadata']['name'] = TAK_CLUSTER_NAME
 		_yaml['metadata']['region'] = TAK_CLUSTER_REGION
+		_yaml['metadata']['version'] = KUBERNETES_SERVER_VERSION
 		_yaml['availabilityZones'] = TAK_CLUSTER_ZONES.split(',')
 
 		for entry in _yaml['managedNodeGroups'][0]:
@@ -432,6 +434,16 @@ def generateTakseverCertificates():
 	runCmd(config_map_cmd)
 
 
+def addCoreConfigMap():
+	fp = os.path.join(CLUSTER_HOME_DIR, 'CoreConfig.xml')
+	if not os.path.isfile(fp):
+		printJson('No CoreConfig.source.xml found. It should be located in the root of the cluster directory!')
+		sys.exit(1)
+
+	print('Loading CoreConfig.source.xml found in cluster root into the cluster ConfigMap.')
+	config_map_cmd = 'kubectl create configmap core-config --from-file="' + fp + '" --dry-run=client -o yaml >' + CLUSTER_HOME_DIR +  '/deployments/helm/templates/core-config.yaml'
+	runCmd(config_map_cmd)
+
 
 # Deploy Takserver Core
 def publishTakserverCoreImages():
@@ -655,6 +667,8 @@ print("\n---------- Running AWS Load Balancer Service Commands ----------")
 deployLoadBalancer()
 print("\n---------- Running Takserver Certificate Generation Commands ----------")
 generateTakseverCertificates()
+print("\n---------- Adding CoreConfigMap ----------")
+addCoreConfigMap()
 print("\n---------- Publishing Takserver Core Docker Images ----------")
 publishTakserverCoreImages()
 if TAK_PLUGINS == '1':

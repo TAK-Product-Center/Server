@@ -95,14 +95,20 @@ public class JDBCQueryAuditLogHelper {
 
 		return sql.executeUpdate();
 	}
-
+	
 	public ResultSet getGeneratedKeys(PreparedStatement sql) throws SQLException {
 		return sql.getGeneratedKeys();
 	}
 
-	private void auditLog(PreparedStatement sql) {
+	public void auditLog(PreparedStatement sql) {
 		if (sql != null) {
 			AuditLogUtil.auditLog(sql.toString());
+		}
+	}
+	
+	public void auditLog(String sqlString) {
+		if (sqlString != null) {
+			AuditLogUtil.auditLog(sqlString);
 		}
 	}
 }

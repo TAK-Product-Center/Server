@@ -1,0 +1,25 @@
+# need java for keytool
+FROM openjdk:11-jdk-stretch
+RUN apt update && \
+	apt install -y apt-utils && \
+    apt install -y openssl && \
+    apt install -y vim
+
+RUN useradd -g 0 -u 1001 tak \
+    && usermod -a -G root tak
+USER tak:0
+
+ARG ARG_CA_NAME
+ENV CA_NAME=$ARG_CA_NAME
+ARG ARG_STATE
+ENV STATE=$ARG_STATE
+ARG ARG_CITY
+ENV CITY=$ARG_CITY
+ARG ARG_ORGANIZATIONAL_UNIT
+ENV ORGANIZATIONAL_UNIT=$ARG_ORGANIZATIONAL_UNIT
+COPY --chown=tak:0 tak/certs/ /tak/certs
+RUN chmod u=rwx /tak/certs \
+          && chmod u=rw /tak/certs/*.* \
+          && chmod u=rx /tak/certs/*.sh
+WORKDIR /tak/certs/
+ENTRYPOINT ["/tak/certs/generateClusterCertsIfNoneExist.sh"]

@@ -31,7 +31,7 @@ public class TestExceptions {
 
 	// Used to get around issue where closing Ignite instances causes issues starting new instances due to ThreadGroup
 	// issues. Will be fixed in a future version of ignite.
-	public static boolean DO_NOT_CLOSE_IGNITE_INSTANCES = parseEnvVarBool("DO_NOT_CLOSE_IGNITE_INSTANCES", true);
+	public static boolean DO_NOT_CLOSE_IGNITE_INSTANCES = parseEnvVarBool("DO_NOT_CLOSE_IGNITE_INSTANCES", false);
 
 	// These cover the same issue where the groups are missing from the Mission API response when a mission is created
 	// and all missions are fetched. This also applies to the endpoint to get all missions. The groups are listed when

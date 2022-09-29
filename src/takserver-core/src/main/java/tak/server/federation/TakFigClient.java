@@ -18,7 +18,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -65,6 +64,7 @@ import com.atakmap.Tak.ServerHealth;
 import com.atakmap.Tak.ServerHealth.ServingStatus;
 import com.atakmap.Tak.Subscription;
 import com.atakmap.Tak.TakServerVersion;
+import com.bbn.cot.filter.DataFeedFilter;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
 import com.bbn.marti.config.Federation.FederationOutgoing;
@@ -503,6 +503,8 @@ public class TakFigClient implements Serializable {
 				.setIdentity(Identity.newBuilder()
 						.setName(fedName)
 						.setUid(clientUid)
+						.setServerId(DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getServerId())
+						.setType(Identity.ConnectionType.FEDERATION_TAK_CLIENT)
 						.build()).setVersion(TakServerVersion.newBuilder() // TAK Server 4.3 and higher declares the federation version here. The server uses this information to tailor the federation interaction.
 								.setMajor(versionBean.getVersionInfo().getMajor())
 								.setMinor(versionBean.getVersionInfo().getMinor())
@@ -538,7 +540,7 @@ public class TakFigClient implements Serializable {
 
 				// this needs to be checked before fedEvent.getEvent()
 				if (fedEvent.getFederateGroupsList() != null) {
-					groupFederationUtil.collectRemoteGroups(new HashSet<String>(fedEvent.getFederateGroupsList()), getFederate());
+					groupFederationUtil.collectRemoteFederateGroups(new HashSet<String>(fedEvent.getFederateGroupsList()), getFederate());
 				}
 
 				if (fedEvent.hasEvent()) {
@@ -565,6 +567,15 @@ public class TakFigClient implements Serializable {
 						cot.setContext(GroupFederationUtil.FEDERATE_ID_KEY, clientUid);
 			            cot.setContext(Constants.SOURCE_HASH_KEY, figDummyChannelHandler.identityHash());
 						cot.setContext(Constants.NOFEDV2_KEY, true);
+						
+						// if this message was from a data feed, pass it through the data feed filter
+						// for mission filtering						
+						String feedUuid = (String) cot.getContextValue(Constants.DATA_FEED_UUID_KEY);
+						if (!Strings.isNullOrEmpty(feedUuid)) {
+							if (!DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation())
+								return;
+							DataFeedFilter.getInstance().filterFederatedDataFeed(cot);
+						}
 
 						if (federateSubscription != null && federateSubscription.getUser() != null) {
 							User user = federateSubscription.getUser();
@@ -741,7 +752,6 @@ public class TakFigClient implements Serializable {
 
 									@Override
 									public void onNext(final ROL rol) {
-
 										if (rol == null) {
 											if (logger.isDebugEnabled()) {
 												logger.debug("skipping null ROL message");
@@ -808,6 +818,26 @@ public class TakFigClient implements Serializable {
 								});
 								if (logger.isDebugEnabled()) {
 									logger.debug("opened client ROL stream");
+								}
+								
+								try {
+									// send out data feeds to federate
+									if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+										List<ROL> feedMessages = mdm.getDataFeedEvents();
+										
+										AtomicLong delayMs = new AtomicLong(100L);										
+										for (final ROL feedMessage : feedMessages) {
+											Resources.scheduledClusterStateExecutor.schedule(() -> {
+												try {
+													rolCall.sendMessage(feedMessage);
+												} catch (Exception e) {
+													logger.error("exception federating data feed", e);
+												}
+											}, delayMs.getAndAdd(100), TimeUnit.MILLISECONDS);
+										}
+									}
+								} catch (Exception e) {
+									logger.error("exception federating data feeds", e);
 								}
 
 								if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isEnableMissionFederationDisruptionTolerance()) {
@@ -987,11 +1017,16 @@ public class TakFigClient implements Serializable {
 				.executor(Resources.federationGrpcExecutor)
 				.eventLoopGroup(Resources.federationGrpcWorkerEventLoopGroup)
 				.channelType(NioSocketChannel.class)
-				.protocolNegotiator(new FigProtocolNegotiator(new Propagator<X509Certificate>() {
+				.protocolNegotiator(new FigProtocolNegotiator(new Propagator<X509Certificate[]>() {
 					@Override
-					public X509Certificate propogate(X509Certificate figServerClientCert) {
+					public X509Certificate[] propogate(X509Certificate[] certChain) {
+						
+						X509Certificate figServerClientCert = certChain[0];
+						X509Certificate caCert = certChain[1];
+						
 						if (logger.isDebugEnabled()) {
 							logger.debug("Received server client cert: " + figServerClientCert);
+							logger.debug("Received server ca cert: " + caCert);
 						}
 						connectionInfo.setCert(figServerClientCert);
 						try {
@@ -1034,18 +1069,6 @@ public class TakFigClient implements Serializable {
 							Federate federate = fedManager().getFederate(fingerprint);
 							federateId = fingerprint;
 
-
-							String issuerCN = Optional.ofNullable(MessageConversionUtil.getCN(issuerDN)).map(cn->cn.toLowerCase()).orElse("");
-							X509Certificate caCert = null;
-							Enumeration<String> aliases = SSLConfig.getInstance(DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getTls()).getTrust().aliases();
-							while(aliases.hasMoreElements())
-							{
-								String alias = aliases.nextElement();
-								if(issuerCN.equals(alias)) {
-									caCert = (X509Certificate) SSLConfig.getInstance(DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getTls()).getTrust().getCertificate(alias);
-									break;
-								}
-							}
 							String caFingerprint = Optional.ofNullable(caCert).map(ca->RemoteUtil.getInstance().getCertSHA256Fingerprint(ca)).orElse("");
 
 							boolean matchingCA = GroupFederationUtil.getInstance().isRemoteCASelfCA(caCert);
@@ -1183,7 +1206,7 @@ public class TakFigClient implements Serializable {
 							logger.warn("exception creating federate user: " + e.getMessage(), e);
 						}
 
-						return figServerClientCert;
+						return certChain;
 					}
 					
 				}).figTlsProtocolNegotiator(sslContext, FederationUtils.authorityFromHostAndPort(host, port)))
@@ -1296,7 +1319,7 @@ public class TakFigClient implements Serializable {
 					((FigFederateSubscription) getFederateSubscription()).submitFederateGroups(new HashSet<>(getFederate().getOutboundGroup()));
 				}
 
-				groupFederationUtil.collectRemoteGroups(new HashSet<String>(value.getFederateGroupsList()), getFederate());
+				groupFederationUtil.collectRemoteFederateGroups(new HashSet<String>(value.getFederateGroupsList()), getFederate());
 			}
 
 			@Override

@@ -180,7 +180,7 @@ public interface MissionChangeRepository extends JpaRepository<MissionChange, Lo
                     "and mc.ts >= m.create_time\n" +
                     START_END_PRED;
 
-    static final String MAP_LAYERS_AND_FEEDS =
+    static final String MAP_LAYERS =
             "select mc.id as id, change_type, null as hash, ts, servertime, null as uid, mc.creatoruid as creatoruid, null as mission_id, :missionName as mission_name, 0 as mission_createTime, external_data_uid, external_data_name, external_data_tool, external_data_token, external_data_notes, mission_feed_uid, map_layer_uid \n" +
                     "from mission_change mc \n" +
                     "inner join mission m on mc.mission_id = m.id\n" +
@@ -188,11 +188,22 @@ public interface MissionChangeRepository extends JpaRepository<MissionChange, Lo
                     "(change_type = 2 or change_type = 3)\n" + // add change type by hash
                     "and m.name = :missionName\n" +
                     "and ts >= create_time\n" +
-                    "and (mission_feed_uid is not null or map_layer_uid is not null)\n"+
+                    "and (map_layer_uid is not null)\n"+
+                    START_END_PRED;
+    
+    static final String MISSION_FEEDS =
+            "select mc.id as id, change_type, null as hash, ts, servertime, null as uid, mc.creatoruid as creatoruid, null as mission_id, :missionName as mission_name, 0 as mission_createTime, external_data_uid, external_data_name, external_data_tool, external_data_token, external_data_notes, mission_feed_uid, map_layer_uid \n" +
+                    "from mission_change mc \n" +
+                    "inner join mission m on mc.mission_id = m.id\n" +
+                    "where \n" +
+                    "(change_type = 4 or change_type = 5)\n" + // add change type by hash
+                    "and m.name = :missionName\n" +
+                    "and ts >= create_time\n" +
+                    "and (mission_feed_uid is not null)\n"+
                     START_END_PRED;
 
-    static final String MISSION_CHANGES = MISSION_CREATES_AND_DELETES + "union all " + HASH_ADDS + "union all " +  HASH_REMOVES + "union all " + UID_ADDS + "union all " + UID_REMOVES + "union all " + EXTERNAL_DATA_ADDS + "union all " + EXTERNAL_DATA_REMOVES + "union all " + MAP_LAYERS_AND_FEEDS;
-    static final String MISSION_CHANGES_FULL_HISTORY = MISSION_CREATES_AND_DELETES + "union all " + HASH_ADDS_FULL_HISTORY + "union all " +  HASH_REMOVES_FULL_HISTORY + "union all " + UID_ADDS_FULL_HISTORY + "union all " + UID_REMOVES_FULL_HISTORY + "union all " + EXTERNAL_DATA_ADDS_FULL_HISTORY + "union all " + EXTERNAL_DATA_REMOVES_FULL_HISTORY + "union all " + MAP_LAYERS_AND_FEEDS;
+    static final String MISSION_CHANGES = MISSION_CREATES_AND_DELETES + "union all " + HASH_ADDS + "union all " +  HASH_REMOVES + "union all " + UID_ADDS + "union all " + UID_REMOVES + "union all " + EXTERNAL_DATA_ADDS + "union all " + EXTERNAL_DATA_REMOVES + "union all " + MAP_LAYERS + "union all " + MISSION_FEEDS;
+    static final String MISSION_CHANGES_FULL_HISTORY = MISSION_CREATES_AND_DELETES + "union all " + HASH_ADDS_FULL_HISTORY + "union all " +  HASH_REMOVES_FULL_HISTORY + "union all " + UID_ADDS_FULL_HISTORY + "union all " + UID_REMOVES_FULL_HISTORY + "union all " + EXTERNAL_DATA_ADDS_FULL_HISTORY + "union all " + EXTERNAL_DATA_REMOVES_FULL_HISTORY + "union all " + MAP_LAYERS + "union all " + MISSION_FEEDS;
 
     // Execute all mission change queries back-to-back, and combine the results
     @Query(value = MISSION_CHANGES, nativeQuery = true)

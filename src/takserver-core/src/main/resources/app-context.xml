@@ -45,6 +45,7 @@
         <entry key="hibernate.cache.use_second_level_cache" value="false"/>
         <entry key="hibernate.dialect" value="org.hibernate.spatial.dialect.postgis.PostgisPG95Dialect"/>
         <entry key="javax.persistence.sharedCache.mode" value="ENABLE_SELECTIVE" />
+        <entry key="hibernate.enable_lazy_load_no_trans" value="true" />
       </map>
     </property>
     <property name="jpaDialect">

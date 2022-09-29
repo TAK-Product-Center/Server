@@ -13,6 +13,8 @@ import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
+
 import java.net.MalformedURLException;
 import java.net.URL;
 
@@ -97,19 +99,19 @@ public class Feed {
     		}
     		
 			validator.getValidInput("feed", getUuid(), 
-					MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 			validator.getValidInput("feed", getAlias(), 
-					MartiValidator.Regex.MartiSafeString.name(), MartiValidator.SHORT_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.SHORT_STRING_CHARS, true);
 			validator.getValidInput("feed", getLatitude(), 
-					MartiValidator.Regex.Coordinates.name(), MartiValidator.SHORT_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.Coordinates.name(), MartiValidatorConstants.SHORT_STRING_CHARS, true);
 			validator.getValidInput("feed", getLongitude(), 
-					MartiValidator.Regex.Coordinates.name(), MartiValidator.SHORT_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.Coordinates.name(), MartiValidatorConstants.SHORT_STRING_CHARS, true);
 			validator.getValidInput("feed", getFov(), 
-					MartiValidator.Regex.Double.name(), MartiValidator.SHORT_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.Double.name(), MartiValidatorConstants.SHORT_STRING_CHARS, true);
 			validator.getValidInput("feed", getHeading(), 
-					MartiValidator.Regex.Double.name(), MartiValidator.SHORT_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.Double.name(), MartiValidatorConstants.SHORT_STRING_CHARS, true);
 			validator.getValidInput("feed", getRange(), 
-					MartiValidator.Regex.Double.name(), MartiValidator.SHORT_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.Double.name(), MartiValidatorConstants.SHORT_STRING_CHARS, true);
 		
 	    } catch (ValidationException e) {
 	        e.printStackTrace();

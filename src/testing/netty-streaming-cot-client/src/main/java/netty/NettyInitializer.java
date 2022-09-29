@@ -8,6 +8,7 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.bytes.ByteArrayDecoder;
 import io.netty.handler.codec.bytes.ByteArrayEncoder;
@@ -22,10 +23,12 @@ public class NettyInitializer extends ChannelInitializer<SocketChannel> {
 	private SslContext sslContext;
 	private TrustManagerFactory trustMgrFactory;
 	private KeyManagerFactory keyMgrFactory;
+	private SimpleChannelInboundHandler<byte[]> handler;
 	
-	private NettyClientInputTest.ConnectionMeta cm;
-	NettyInitializer(NettyClientInputTest.ConnectionMeta cm) {
+	private NettyClient.ConnectionMeta cm;
+	public NettyInitializer(NettyClient.ConnectionMeta cm, SimpleChannelInboundHandler<byte[]> handler) {
 		this.cm = cm;
+		this.handler = handler;
 	}
 	
 	@Override
@@ -39,9 +42,9 @@ public class NettyInitializer extends ChannelInitializer<SocketChannel> {
 				.addLast("ssl", sslHandler)
 				.addLast(new ByteArrayDecoder())
 				.addLast(new ByteArrayEncoder())
-				.addLast(new NioNettyHandler());
+				.addLast(handler);
 	}
-	
+
 	protected SslContext buildClientSslContext() {
 		try {
 			initTrust();

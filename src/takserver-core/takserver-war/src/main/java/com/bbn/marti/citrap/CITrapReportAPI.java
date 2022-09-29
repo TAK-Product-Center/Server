@@ -39,6 +39,7 @@ import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.KmlUtils;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 @RestController
 public class CITrapReportAPI extends BaseRestController {
@@ -80,7 +81,7 @@ public class CITrapReportAPI extends BaseRestController {
         try {
             // validate inputs
             validator.getValidInput("citrap", clientUid,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 
             // Get group vector for the user associated with this session
             String groupVector = martiUtil.getGroupBitVector(request);
@@ -133,23 +134,23 @@ public class CITrapReportAPI extends BaseRestController {
         try {
             // validate inputs
             validator.getValidInput("citrap", keywords,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             validator.getValidInput("citrap", bbox,
-                    MartiValidator.Regex.Coordinates.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.Coordinates.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             validator.getValidInput("citrap", startTime,
-                    MartiValidator.Regex.Timestamp.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.Timestamp.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             validator.getValidInput("citrap", endTime,
-                    MartiValidator.Regex.Timestamp.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.Timestamp.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             validator.getValidInput("citrap", maxReportCount,
-                    MartiValidator.Regex.NonNegativeInteger.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.NonNegativeInteger.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             validator.getValidInput("citrap", type,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
             validator.getValidInput("citrap", callsign,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             validator.getValidInput("citrap", subscribe,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             validator.getValidInput("citrap", clientUid,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 
             // Get group vector for the user associated with this session
             String groupVector = martiUtil.getGroupBitVector(request);
@@ -224,9 +225,9 @@ public class CITrapReportAPI extends BaseRestController {
         try {
             // validate inputs
             validator.getValidInput("citrap", id,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
             validator.getValidInput("citrap", clientUid,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 
             // Get group vector for the user associated with this session
             String groupVector = martiUtil.getGroupBitVector(request);
@@ -300,9 +301,9 @@ public class CITrapReportAPI extends BaseRestController {
         try {
             // validate inputs
             validator.getValidInput("citrap", id,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+                    MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
             validator.getValidInput("citrap", clientUid,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 
             // Get group vector for the user associated with this session
             String groupVector = martiUtil.getGroupBitVector(request);
@@ -332,9 +333,9 @@ public class CITrapReportAPI extends BaseRestController {
         try {
             // validate inputs
             validator.getValidInput("citrap", id,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
             validator.getValidInput("citrap", clientUid,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 
             // Get group vector for the user associated with this session
             String groupVector = martiUtil.getGroupBitVector(request);
@@ -389,9 +390,9 @@ public class CITrapReportAPI extends BaseRestController {
         try {
             // validate inputs
             validator.getValidInput("citrap", id,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
             validator.getValidInput("citrap", clientUid,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 
             // Get group vector for the user associated with this session
             String groupVector = martiUtil.getGroupBitVector(request);

@@ -120,19 +120,23 @@ public class MessageConverter {
 		if (clientId != null) {
 			mb.setClientId(clientId);
 		}
-		
-		String connectionId = (String)message.getContext().get(Constants.CONNECTION_ID_KEY);
+
+		String connectionId = (String)message.getContextValue(Constants.CONNECTION_ID_KEY);
 		if (connectionId != null) {
 			mb.setConnectionId(connectionId);
 		}
 
 		@SuppressWarnings("unchecked")
-		List<String> provenance = (List<String>)message.getContext().get(Constants.PLUGIN_PROVENANCE);
+		List<String> provenance = (List<String>)message.getContextValue(Constants.PLUGIN_PROVENANCE);
 		if (provenance != null) {
 		    mb.addAllProvenance(provenance);
 		}
 		
-		Boolean archivedEnabled = (Boolean)message.getContext().get(Constants.ARCHIVE_EVENT_KEY);
+		Boolean archivedEnabled = (Boolean)message.getContextValue(Constants.ARCHIVE_EVENT_KEY);
+		// This is hacky, BUT the default behavior in the rest of TAK Server is that archiving should only be disabled
+		// 	iff the archive key is present and set to false. 
+		// Therefore, set it enabled by default here, then let it get set to the actual value of the event key if its present
+		mb.setArchive(true);
 		if (archivedEnabled != null) {
 			mb.setArchive(archivedEnabled.booleanValue());
 		}
@@ -146,11 +150,16 @@ public class MessageConverter {
 		if (destCallsigns != null && !destCallsigns.isEmpty()) {
 			mb.addAllDestCallsigns(destCallsigns);
 		}
+		
+		String dataFeedUid = (String) message.getContextValue(Constants.DATA_FEED_UUID_KEY);
+		if (!Strings.isNullOrEmpty(dataFeedUid)) {
+			mb.setFeedUuid(dataFeedUid);
+		}
 
 		if (logger.isTraceEnabled()) {
 			logger.trace("TAK proto message converted: " + mb);
 		}
-
+		
 		return mb.build().toByteArray();
 	}
 
@@ -246,6 +255,11 @@ public class MessageConverter {
 			cot.setContext(Constants.CLUSTER_MESSAGE_KEY, m.getSource());
 			cot.setContext(Constants.MESSAGING_ARCHIVER, ClusterGroupDefinition.getMessagingClusterDeploymentGroup(IgniteHolder.getInstance().getIgnite())
 					.forRandom().node().id().toString());
+		}
+		
+		String feedUid = m.getFeedUuid();
+		if (!Strings.isNullOrEmpty(feedUid)) {
+			cot.setContext(Constants.DATA_FEED_UUID_KEY, feedUid);
 		}
 
 		String clientId = m.getClientId();

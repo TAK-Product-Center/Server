@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
 import com.bbn.marti.config.Federation.Federate;
@@ -21,6 +22,8 @@ import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.RemoteSubscriptionMetrics;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.User;
+
+import io.grpc.stub.StreamObserver;
 
 public interface FederatedSubscriptionManager {
 		
@@ -70,13 +73,17 @@ public interface FederatedSubscriptionManager {
 	RemoteSubscriptionMetrics removeSubMetricsByClientUid(String clientuid);
 	RemoteSubscriptionMetrics getSubMetricsByClientUid(String clientuid);
 	
-	void putClientSteamToSession(String sessionId, GuardedStreamHolder<FederatedEvent> guardedStreamHolder);
-	GuardedStreamHolder<FederatedEvent> removeClientSteamBySession(String sessionId);
-	GuardedStreamHolder<FederatedEvent> getClientSteamBySession(String sessionId);
+	void putClientStreamToSession(String sessionId, GuardedStreamHolder<FederatedEvent> guardedStreamHolder);
+	GuardedStreamHolder<FederatedEvent> removeClientStreamHolderBySession(String sessionId);
+	GuardedStreamHolder<FederatedEvent> getClientStreamBySession(String sessionId);
 	
-	void putClientROLSteamToSession(String sessionId, GuardedStreamHolder<ROL> guardedStreamHolder);
-	GuardedStreamHolder<ROL> removeClientROLSteamBySession(String sessionId);
-	GuardedStreamHolder<ROL> getClientROLSteamBySession(String sessionId);
+	void putClientROLStreamToSession(String sessionId, GuardedStreamHolder<ROL> guardedStreamHolder);
+	GuardedStreamHolder<ROL> removeClientROLStreamBySession(String sessionId);
+	GuardedStreamHolder<ROL> getClientROLStreamBySession(String sessionId);
+	
+	void putServerGroupStreamToSession(String sessionId, StreamObserver<FederateGroups> groupStream);
+	StreamObserver<FederateGroups> removeServerGroupStreamBySession(String sessionId);
+	StreamObserver<FederateGroups> getServerGroupStreamBySession(String sessionId);
 	
 	void putRemoteContactsMapToChannelHandler(ChannelHandler channelHandler, ConcurrentHashMap<String, RemoteContactWithSA> remoteContactMap);
 	ConcurrentHashMap<String, RemoteContactWithSA> removeRemoteContactsMapByChannelHandler(ChannelHandler channelHandler);

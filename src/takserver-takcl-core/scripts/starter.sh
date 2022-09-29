@@ -3,43 +3,55 @@
 BUILD=false
 DEPLOY=false
 START=false
-MONOLITH=false
-DELETE_LOGS=false
 USE_COT_DB=false
-TEST_MODE=false
 KILL_EXISTING_TAKSERVER=false
-OVERRIDE_TEST_SETTINGS=false
 
 SERVER0_DOCKER_DB_IDENTIFIER=TakserverServer0DB
-SERVER1_DOCKER_DB_IDENTIFIER=TakserverServer1DB
-SERVER2_DOCKER_DB_IDENTIFIER=TakserverServer2DB
 POSTGRES_USER=martiuser
 POSTGRES_DB=cot
 POSTGRES_PORT=5432
 
 MESSAGING_PID=null
 API_PID=null
+PM_PID=null
+RETENTION_PID=null
 
 DEFAULT_SERVER_SRC=takserver-package/build/takArtifacts
-DEPLOYMENT_DIR=/opt/tak
 
 SRC=`realpath "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../../`
 
 cd "${SRC}"
 
-JARGS="-Dio.netty.tmpdir=/opt/tak/ 
-	-Dlogging.level.com.bbn=DEBUG 
-    -Dlogging.level.tak=DEBUG 
-    -Djava.io.tmpdir=/opt/tak/ 
-    -Dio.netty.native.workdir=/opt/tak/ 
-    -Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/ 
+if [[ "${TAKCL_SERVER_POSTGRES_PASSWORD}" == "" ]];then
+  echo The environment variable TAKCL_SERVER_POSTGRES_PASSWORD must be set to a password!
+  exit 1
+fi
+
+if [[ "${2}" == "" ]];then
+  echo The second parameter should be the ABSOLUTE path of the desired test environment!
+  exit 1
+fi
+
+if [[ -d "${2}" ]];then
+  echo The target test environment path should not exist!
+  exit 1
+fi
+
+DEPLOYMENT_DIR=${2}
+mkdir -p ${DEPLOYMENT_DIR}
+
+JARGS="-Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/ 
+    -Dio.netty.tmpdir=${DEPLOYMENT_DIR}/ 
+    -Djava.io.tmpdir=${DEPLOYMENT_DIR}/ 
+    -Dio.netty.native.workdir=${DEPLOYMENT_DIR}/ 
     -Djava.net.preferIPv4Stack=true 
     -Djava.security.egd=file:/dev/./urandom 
     -DIGNITE_UPDATE_NOTIFIER=false 
     -Djdk.tls.client.protocols=TLSv1.2 
-    -Dspring.profiles.active=messaging 
+	-Dlogging.level.com.bbn=DEBUG 
+    -Dlogging.level.tak=DEBUG 
     -Xmx2000m 
-    -XX:+HeapDumpOnOutOfMemoryError "
+    -XX:+HeapDumpOnOutOfMemoryError"
 
 
 ARGS="--logging.level.com.bbn=DEBUG 
@@ -55,12 +67,22 @@ ARGS="--logging.level.com.bbn=DEBUG
 
 
 ctrl_c() {
-	if [ $MESSAGING_PID != null ];then
-		kill $MESSAGING_PID
+	if [ $API_PID != null ];then
+		kill -9 $API_PID
 	fi
 
-	if [ $API_PID != null ];then
-		kill $API_PID
+	if [ $PM_PID != null ];then
+		kill -9 $PM_LID
+	fi
+
+	if [ $RETENTION_PID != null ];then
+		kill -9 $RETENTION_PID
+	fi
+
+	sleep 2
+
+	if [ $MESSAGING_PID != null ];then
+		kill -9 $MESSAGING_PID
 	fi
 }
 
@@ -71,10 +93,11 @@ set -e
 if [[ $1 == "" ]];then
 	printf "This script is intended to simplify local server deployment.
 
-Used Docker Container Names:
+Used Docker Container Name:
     TakserverServer0DB
-    TakserverServer1DB
-    TakserverServer2DB
+
+Required Environment Variables:
+	TAKCL_SERVER_POSTGRES_PASSWORD		The Postgres password that will be used
 	
 Optional Environment Variables:
     TAKSERVER_USER_AUTHENTICATION_FILE	Overrides the User Authentication File contents
@@ -87,16 +110,8 @@ the indicated startup tasks:
 \t(b)uild\t\tPerforms \`./gradlew clean buildRpm buildDocker\`
 \t(d)eploy\tDeploys takserver to /opt/tak
 \tsetup (c)ot databases\t\t Sets up DBs in docker and sets up the test script to use them
-\t(l)og delete\tDeletes the logs from the previous execution if they exist
 \t(s)tart\t\tStarts the server
 \t(k)ill\t\tKills the currently running takserver, if one is running
-\t(t)est\t\tif provided with 'd', deploys the server as a test would
-
-
-Test Investigation Usage:
-There are a few parameters that can be used to investigate failed test environments:
-\t0,1,2,3	Clones and starts the server with the specified identifier from the last executed test
-\to      	Overrides the server and client certificates with your certificates
 "
   exit 1
 fi
@@ -109,14 +124,6 @@ if [[ $1 == *"s"* ]]; then
 	START=true
 fi
 
-if [[ $1 == *"m"* ]];then
-	MONOLITH=true
-fi
-
-if [[ $1 == *"l"* ]];then
-	DELETE_LOGS=true
-fi
-
 if [[ $1 == *"c"* ]];then
 	USE_COT_DB=true
 fi
@@ -125,47 +132,15 @@ if [[ $1 == *"k"* ]];then
 	KILL_EXISTING_TAKSERVER=true
 fi
 
-if [[ $1 == *"o"* ]];then
-	OVERRIDE_TEST_SETTINGS=true
+SERVER_SRC="${DEFAULT_SERVER_SRC}"
+
+if [[ $1 == *"b"* ]]; then
+	BUILD=true
 fi
-
-if [[ $1 == *"t"* ]];then
-	TEST_MODE=true
-fi
-
-if [[ $1 == *"0"* ]];then
-	TEST_SERVER=0
-elif [[ $1 == *"1"* ]];then
-	TEST_SERVER=1
-elif [[ $1 == *"2"* ]];then
-	TEST_SERVER=2
-fi
-
-if [[ ${TEST_SERVER} == "" ]];then
-	SERVER_SRC="${DEFAULT_SERVER_SRC}"
-	
-	cp takserver-takcl-core/scripts/TAKCLConfig-pointsToManualTestDir.xml TAKCLConfig.xml
-	if [[ $1 == *"b"* ]]; then
-		BUILD=true
-	fi
-
-else
-  SERVER_SRC="${SRC}/takserver-takcl-core/TEST_TMP/TEST_FARM/SERVER_${TEST_SERVER}"
-  cp takserver-takcl-core/scripts/TAKCLConfig-pointsToTestCerts.xml TAKCLConfig.xml
-fi
-
 
 if [[ $USE_COT_DB == true ]];then
   if [[ "`docker ps | grep ${SERVER0_DOCKER_DB_IDENTIFIER}`" != "" ]];then
     docker stop ${SERVER0_DOCKER_DB_IDENTIFIER}
-  fi
-
-  if [[ "`docker ps | grep ${SERVER1_DOCKER_DB_IDENTIFIER}`" != "" ]];then
-    docker stop ${SERVER1_DOCKER_DB_IDENTIFIER}
-  fi
-
-  if [[ "`docker ps | grep ${SERVER2_DOCKER_DB_IDENTIFIER}`" != "" ]];then
-    docker stop ${SERVER2_DOCKER_DB_IDENTIFIER}
   fi
 fi
 
@@ -198,31 +173,7 @@ if [ $DEPLOY == true ];then
 
     DOCKER0_IP=`docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${SERVER0_DOCKER_DB_IDENTIFIER}`
 
-    if [[ "`docker ps | grep ${SERVER1_DOCKER_DB_IDENTIFIER}`" == "" ]];then
-        docker run -it -d --rm --name ${SERVER1_DOCKER_DB_IDENTIFIER} \
-        --env POSTGRES_PASSWORD=${TAKCL_SERVER_POSTGRES_PASSWORD} \
-        --env POSTGRES_HOST_AUTH_METHOD=trust \
-        --env POSTGRES_USER=${POSTGRES_USER} \
-        --env POSTGRES_DB=${POSTGRES_DB} \
-        -p ${POSTGRES_PORT} postgis/postgis:10-3.1
-    fi
-
-    DOCKER1_IP=`docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${SERVER1_DOCKER_DB_IDENTIFIER}`
-
-    if [[ "`docker ps | grep ${SERVER2_DOCKER_DB_IDENTIFIER}`" == "" ]];then
-        docker run -it -d --rm --name ${SERVER2_DOCKER_DB_IDENTIFIER} \
-        --env POSTGRES_PASSWORD=${TAKCL_SERVER_POSTGRES_PASSWORD} \
-        --env POSTGRES_HOST_AUTH_METHOD=trust \
-        --env POSTGRES_USER=${POSTGRES_USER} \
-        --env POSTGRES_DB=${POSTGRES_DB} \
-        -p ${POSTGRES_PORT} postgis/postgis:10-3.1
-    fi
-
-    DOCKER2_IP=`docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${SERVER2_DOCKER_DB_IDENTIFIER}`
-
-    DB_JARGS="-Dcom.bbn.marti.takcl.server0DbHost=${DOCKER0_IP} \\
-	-Dcom.bbn.marti.takcl.server1DbHost=${DOCKER1_IP} \\
-	-Dcom.bbn.marti.takcl.server2DbHost=${DOCKER2_IP} \\"
+    DB_JARGS="-Dcom.bbn.marti.takcl.server0DbHost=${DOCKER0_IP} \\"
 
   else
     DB_JARGS="-Dcom.bbn.marti.takcl.disableDb=true \\"
@@ -234,20 +185,11 @@ if [ $DEPLOY == true ];then
 
 	cp -R ${SERVER_SRC}/* "${DEPLOYMENT_DIR}"/
 
-	if [[ "${TEST_MODE}" == "true" ]];then
-		DEPLOYMENT_DIR="/opt/tak/TEST_RESULTS/TEST_FARM/SERVER_0"
-		mkdir -p "${DEPLOYMENT_DIR}"
-		cp -R ${SERVER_SRC}/* "${DEPLOYMENT_DIR}"/
-
-	fi
-
 	cp "${SRC}/takserver-takcl-core/src/rpm/resources/TAKCLConfig.xml" "${DEPLOYMENT_DIR}/utils/"
+	sed -i "s|/opt/tak|${DEPLOYMENT_DIR}|g" "${DEPLOYMENT_DIR}/utils/TAKCLConfig.xml"
+
 
 	echo "#!/usr/bin/env bash
-
-# alias runTest="java -Dcom.bbn.marti.takcl.takclIgniteConfig=true -Dcom.bbn.marti.takcl.disableDb=true -Djava.net.preferIPv4Stack=true -Dlogging.level.com.bbn=DEBUG -Dlogging.level.tak=DEBUG -Dlogging.level.com.bbn.marti.tests.Assert=TRACE -jar /opt/tak/utils/takcl.jar tests run"
-# alias runUserTest="java -Dcom.bbn.marti.takcl.disableDb=true -Djava.net.preferIPv4Stack=true -Dlogging.level.com.bbn=DEBUG -Dlogging.level.tak=DEBUG -Dlogging.level.com.bbn.marti.tests.Assert=TRACE -jar /opt/tak/utils/takcl.jar tests run"
-# alias runDbTest="java -Djava.net.preferIPv4Stack=true -Dlogging.level.com.bbn=DEBUG -Dlogging.level.tak=DEBUG -Dlogging.level.com.bbn.marti.tests.Assert=TRACE -jar /opt/tak/utils/takcl.jar tests run"
 
 java $DB_JARGS
 	-Djava.net.preferIPv4Stack=true \\
@@ -255,18 +197,16 @@ java $DB_JARGS
 	-Dlogging.level.tak=DEBUG \\
 	-Dlogging.level.com.bbn.marti.takcl.connectivity.missions=TRACE \\
 	-Dlogging.level.com.bbn.marti.tests.Assert=TRACE \\
-	-jar /opt/tak/utils/takcl.jar tests \$@" > /opt/tak/utils/test.sh
-	chmod +x /opt/tak/utils/test.sh
+	-jar ${DEPLOYMENT_DIR}/utils/takcl.jar tests \$@" > ${DEPLOYMENT_DIR}/utils/test.sh
+	chmod +x ${DEPLOYMENT_DIR}/utils/test.sh
 
 	if [[ "${SERVER_SRC}" == "${DEFAULT_SERVER_SRC}" ]];then
-		if [[ "${TEST_MODE}" != "true" ]];then
-			cp "${SERVER_SRC}/CoreConfig.example.xml" "${DEPLOYMENT_DIR}/CoreConfig.xml"
-			if [[ "${USE_COT_DB}" == "true" ]];then
-				sed -i "s/password=\"\"/password=\"atakatak\"/g" "${DEPLOYMENT_DIR}/CoreConfig.xml"
-				sed -i "s/jdbc:postgresql:\/\/127.0.0.1:5432\/cot/jdbc:postgresql:\/\/${DOCKER0_IP}:5432\/cot/g" /opt/tak/CoreConfig.xml
-			else
-			  sed -i 's/<repository enable="true"/<repository enable="false"/g' "${DEPLOYMENT_DIR}/CoreConfig.xml"
-			fi
+		cp "${SERVER_SRC}/CoreConfig.example.xml" "${DEPLOYMENT_DIR}/CoreConfig.xml"
+		if [[ "${USE_COT_DB}" == "true" ]];then
+			sed -i "s/password=\"\"/password=\"atakatak\"/g" "${DEPLOYMENT_DIR}/CoreConfig.xml"
+			sed -i "s/jdbc:postgresql:\/\/127.0.0.1:5432\/cot/jdbc:postgresql:\/\/${DOCKER0_IP}:5432\/cot/g" ${DEPLOYMENT_DIR}/CoreConfig.xml
+		else
+		  sed -i 's/<repository enable="true"/<repository enable="false"/g' "${DEPLOYMENT_DIR}/CoreConfig.xml"
 		fi
 
 		if [ -f "${TAKSERVER_USER_AUTHENTICATION_FILE}" ];then
@@ -287,28 +227,34 @@ if [ $START == true ];then
 		echo Waiting for DB to settle...
 		sleep 20
 		sed -i "s/<connection url=\"jdbc:postgresql:\/\/tak-database:5432\/cot\" username=\"martiuser\" password=\"\" \/>/<connection url=\"jdbc:postgresql:\/\/${DOCKER0_IP}:5432\/cot\" username=\"${POSTGRES_USER}\" password=\"${TAKCL_SERVER_POSTGRES_PASSWORD}\"\/>/g" "${DEPLOYMENT_DIR}/CoreConfig.xml"
-		java -jar /opt/tak/db-utils/SchemaManager.jar -url jdbc:postgresql://${DOCKER0_IP}:5432/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade
+		sync
+		java -jar ${DEPLOYMENT_DIR}/db-utils/SchemaManager.jar -url jdbc:postgresql://${DOCKER0_IP}:5432/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade
 	fi
 
 	{
-	if [[ "${DELETE_LOGS}" == "true" ]];then
-		if [[ -d "${DEPLOYMENT_DIR}/logs" ]] && [[ `ls "${DEPLOYMENT_DIR}/logs"` != "" ]];then
-			echo DELETING EXISTING LOGS
-			rm ${DEPLOYMENT_DIR}/logs/*
-		fi
-	fi
 
 	cd "${DEPLOYMENT_DIR}"
 	. ./setenv.sh
+
+	export IGNITE_HOME="${DEPLOYMENT_DIR}"
+	export JDK_JAVA_OPTIONS=${JARGS}
+
+	sync
 	
-	if [ $MONOLITH == true ];then
-		java ${JARGS} -jar -Dspring.profiles.active=monolith takserver.war ${ARGS} &
-		MESSAGING_PID=$!
-	else
-		java ${JARGS} -jar ${JARGS} -Dspring.profiles.active=messaging takserver.war ${ARGS} &
-		MESSAGING_PID=$!
-		java ${JARGS} -jar ${JARGS} -Dspring.profiles.active=api takserver.war ${ARGS} &
-		API_PID=$!
+	java -Dspring.profiles.active=messaging -jar takserver.war ${ARGS} &
+	MESSAGING_PID=$!
+	java -Dspring.profiles.active=api -jar takserver.war ${ARGS} &
+	API_PID=$!
+	java -jar takserver-pm.jar ${ARGS} &
+	PM_PID=$!
+	java -jar takserver-retention.jar &
+	RETENTION_PID=$!
+
+
+	if [[ "${TAKCL_TEST_CERT_SRC_DIR}" != "" ]] && [[ -d "${TAKCL_TEST_CERT_SRC_DIR}" ]] &&  [[ "${TAKCL_ADMIN_CERT}" != "" ]] && [[ -f "${TAKCL_ADMIN_CERT}" ]] ;then
+		echo Sleeping 60 seconds before adding admin user...
+		sleep 60
+		java -jar ${DEPLOYMENT_DIR}/utils/UserManager.jar certmod -A ${TAKCL_ADMIN_CERT}
 	fi
 
 	echo DONE
@@ -316,13 +262,26 @@ if [ $START == true ];then
 	sleep 1000000
 	} || {
 		echo EXITING!
-		if [[ "${MESSAGING_PID}" != "" ]];then
+		if [[ ${API_PID} != null ]];then
+			echo API_PID=${API_PID}
+			kill -9 ${API_PID}
+		fi
+
+		if [[ ${PM_PID} != null ]];then
+			echo PM_PID=${PM_PID}
+			kill -9 ${PM_PID}
+		fi
+
+		if [[ ${RETENTION_PID} != null ]];then
+			echo RETENTION_PID=${RETENTION_PID}
+			kill -9 ${RETENTION_PID}
+		fi
+
+		if [[ ${MESSAGING_PID} != null ]];then
+			echo MESSAGING_PID=${MESSAGING_PID}
 			kill -9 ${MESSAGING_PID}
 		fi
 
-		if [[ "${API_PID}" != "" ]];then
-			kill -9 ${API_PID}
-		fi
 
 	}
 fi

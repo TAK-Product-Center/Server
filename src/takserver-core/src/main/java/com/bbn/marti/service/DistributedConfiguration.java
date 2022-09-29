@@ -62,14 +62,10 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
 
 	private static final long serialVersionUID = -2752863566907557239L;
 
-	public static final String CONFIG_NAMESPACE = "http://bbn.com/marti/xml/config";
-
     public static final String DEFAULT_TRUSTSTORE = "certs/files/fed-truststore.jks";
     
     private static final String CORE_CONFIG_CACHE_KEY = "coreConfig";
 
-    static final String DEFAULT_CONFIG_FILE = "CoreConfig.xml";
-    static final String EXAMPLE_BASE_CONFIG_FILE = "CoreConfig.example.xml";
     static DistributedConfiguration instance = null;
 
     private static final Logger logger = LoggerFactory.getLogger(DistributedConfiguration.class);

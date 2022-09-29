@@ -5,7 +5,7 @@ package com.bbn.marti;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.security.web.MartiValidator.Regex;
+import com.bbn.security.web.MartiValidatorConstants.Regex;
 
 /**
  * Security constraints on an HTTP parameter.

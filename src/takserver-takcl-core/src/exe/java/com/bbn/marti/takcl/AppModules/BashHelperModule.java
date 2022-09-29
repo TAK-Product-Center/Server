@@ -272,16 +272,16 @@ public class BashHelperModule implements AppModuleInterface {
 	 *
 	 * @param targetFile The target location for the script. if it exists, an error will occur.
 	 */
-	@Command(description = "Creates a script that can be sourced to add the curently running takcl to your path and add bash completion support.")
-	@SuppressWarnings("unused")
-	public void createSourceableScript(@NotNull String targetFile) {
-		try {
-			String jarLocation = new File(TAKCLCore.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath()).getAbsolutePath();
-			String autocompletionText = BashCompletionHelper.generateBashCompletionFileContents(TAKCL.moduleMap, jarLocation);
-			Files.write(Paths.get(targetFile), autocompletionText.getBytes(), StandardOpenOption.CREATE_NEW);
-
-		} catch (IOException | URISyntaxException e) {
-			throw new RuntimeException(e);
-		}
-	}
+//	@Command(description = "Creates a script that can be sourced to add the curently running takcl to your path and add bash completion support.")
+//	@SuppressWarnings("unused")
+//	public void createSourceableScript(@NotNull String targetFile) {
+//		try {
+//			String jarLocation = new File(TAKCLCore.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath()).getAbsolutePath();
+//			String autocompletionText = BashCompletionHelper.generateBashCompletionFileContents(TAKCL.moduleMap, jarLocation);
+//			Files.write(Paths.get(targetFile), autocompletionText.getBytes(), StandardOpenOption.CREATE_NEW);
+//
+//		} catch (IOException | URISyntaxException e) {
+//			throw new RuntimeException(e);
+//		}
+//	}
 }

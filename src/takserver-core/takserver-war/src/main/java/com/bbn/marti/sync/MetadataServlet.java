@@ -22,7 +22,9 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import com.bbn.marti.util.CommonUtil;
 import com.bbn.security.web.SecurityUtils;
 
 /**
@@ -30,8 +32,6 @@ import com.bbn.security.web.SecurityUtils;
  * 
  * This servlet supports HTTP GET, only.
  */
-//@WebServlet(description = "Servlet for retrieving metadata about Enterprise Sync resources", 
-//	urlPatterns = { "/sync" })
 public class MetadataServlet extends EnterpriseSyncServlet {
 	/**
 	 * Enum of the HTTP request parameters supported by this servlet. 
@@ -45,6 +45,9 @@ public class MetadataServlet extends EnterpriseSyncServlet {
 	private static final int DEFAULT_PARAMETER_LENGTH = 1024;
 
 	private static final long serialVersionUID = -7939609448873825097L;
+	
+	@Autowired
+	private CommonUtil commonUtil;
 	
 	/**
      * @see HttpServlet#HttpServlet()
@@ -149,7 +152,7 @@ public class MetadataServlet extends EnterpriseSyncServlet {
 
 	    try {
 	        // Get group vector for the user associated with this session
-	        groupVector = martiUtil.getGroupBitVector(request);
+	        groupVector = commonUtil.getGroupBitVector(request);
 	        log.finer("groups bit vector: " + groupVector);
 	    } catch (Exception e) {
 	        log.fine("exception getting group membership for current web user " + e.getMessage());
@@ -170,7 +173,7 @@ public class MetadataServlet extends EnterpriseSyncServlet {
 			Metadata result = enterpriseSyncService.getMetadata(primaryKey, groupVector);
 			allResults = new LinkedList<Metadata>();
 			try {
-				result.validate(validator);
+				commonUtil.validateMetadata(result);
 			} catch (ValidationException ex) {
 				log.warning("Database result failed input validation, id=" + result.getPrimaryKey() 
 						+ ": " + ex.getMessage());
@@ -186,7 +189,7 @@ public class MetadataServlet extends EnterpriseSyncServlet {
 			Set<Metadata> badResults = new HashSet<Metadata>();
 			for (Metadata result : allResults) {
 				try {
-					result.validate(validator);
+					commonUtil.validateMetadata(result);
 				} catch (ValidationException ex) {
 					badResults.add(result);
 					log.warning("Database result failed input validation: " + ex.getMessage());

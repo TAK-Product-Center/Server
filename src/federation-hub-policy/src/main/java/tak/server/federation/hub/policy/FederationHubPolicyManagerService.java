@@ -25,9 +25,6 @@ public class FederationHubPolicyManagerService implements CommandLineRunner {
 
     private static Ignite ignite = null;
 
-    @Autowired
-    private FederationHubBroker fedHubBroker;
-
     public static void main(String[] args) {
         SpringApplication application = new SpringApplication(FederationHubPolicyManagerService.class);
 

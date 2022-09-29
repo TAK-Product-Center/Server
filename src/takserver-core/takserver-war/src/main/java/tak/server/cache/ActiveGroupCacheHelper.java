@@ -51,7 +51,7 @@ public class ActiveGroupCacheHelper {
                 getActiveGroupsCache();
             }
         } catch (Exception e) {
-            logger.error("exception initializing active_group_cache");
+            logger.error("exception initializing active_group_cache", e);
         }
     }
 

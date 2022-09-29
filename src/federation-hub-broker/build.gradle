@@ -4,6 +4,10 @@ buildscript {
   }
 }
 
+jar {
+    enabled = false
+}
+
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
@@ -23,7 +27,6 @@ sourceSets {
     }
   }
 }
-
 dependencies {
   compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
   compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
@@ -39,11 +42,21 @@ dependencies {
   compile group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
   compile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
 
-  compile group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_epoll_version, classifier: 'linux-x86_64'
+  compile group: 'io.netty', name: 'netty-handler', version: netty_handler_version
+  compile group: 'io.netty', name: 'netty-tcnative-boringssl-static', version: netty_tcnative_version
+  compile group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
+  compile group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
+
+  implementation('io.netty:netty-tcnative-classes') {
+      version {
+          strictly '2.0.53.Final'
+      }
+  }
 
   compile group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
   compile group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
   compile group: 'org.springframework', name: 'spring-context'
+
 
   testCompile group: 'junit', name: 'junit', version: junit_version
   testCompile group: 'org.mockito', name: 'mockito-core', version: mockito_version

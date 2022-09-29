@@ -1,6 +1,16 @@
 package tak.server.federation.hub.ui.graph;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import tak.server.federation.Federate;
 import tak.server.federation.FederateEdge;
@@ -14,9 +24,6 @@ import tak.server.federation.hub.policy.FederationPolicyGraphImpl;
 import tak.server.federation.hub.ui.GroupHolder;
 import tak.server.federation.hub.ui.StringEdge;
 import tak.server.federation.hub.ui.UidHolder;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Object used to hold front end UI's representation of a federation policy graph.
@@ -107,6 +114,14 @@ public class FederationPolicyModel {
                                                     .getProperties().getGroupIdentities()));
             policyGraph.addNode(federateNode);
         });
+        
+        cells.stream().filter(cell -> cell instanceof FederationOutgoingCell).forEach( cell -> {
+        	FederationOutgoingCell federateCell = (FederationOutgoingCell) cell;
+            FederateIdentity identity = new FederateIdentity(federateCell.getProperties().getName());
+            Federate federateOutgoing = new Federate(identity);
+            federateOutgoing.getAttributes().putAll(federateCell.getProperties().attributesToMap());
+            policyGraph.addNode(federateOutgoing);
+        });
 
         cells.stream().filter(cell -> cell instanceof EdgeCell).forEach(cell -> {
             EdgeCell edgeCell = (EdgeCell) cell;
@@ -151,6 +166,12 @@ public class FederationPolicyModel {
                 federate.setGroups(federateCell.getProperties().getGroupIdentities());
                 policy.getFederate_nodes().add(federate);
             });
+            
+            cells.stream().filter(cell -> cell instanceof FederationOutgoingCell).forEach(cell -> {
+            	FederationOutgoingCell outgoing = (FederationOutgoingCell) cell;
+                UidHolder federate =  new UidHolder(outgoing.getProperties().getName());
+                policy.getFederate_nodes().add(federate);
+            });
 
             cells.stream().filter(cell -> cell instanceof EdgeCell).forEach(cell -> {
                 EdgeCell edgeCell = (EdgeCell) cell;
@@ -183,6 +204,9 @@ public class FederationPolicyModel {
                     return ((FederateCell) cell).getProperties().getName();
                 } else if (cell instanceof GroupCell) {
                     return ((GroupCell) cell).getProperties().getName();
+                }
+                else if (cell instanceof FederationOutgoingCell) {
+                    return ((FederationOutgoingCell) cell).getProperties().getName();
                 }
                 return ((EdgeCell) cell).getProperties().getName();
             }

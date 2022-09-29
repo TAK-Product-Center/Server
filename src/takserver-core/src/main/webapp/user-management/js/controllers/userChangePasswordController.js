@@ -12,6 +12,12 @@ app.controller('userChangePasswordController', function($scope, $http) {
         $scope.form_change_password.$setUntouched();
     }
 
+    $scope.showPassword = false;
+
+    $scope.toggleShowPassword = function() {
+        $scope.showPassword = !$scope.showPassword;
+    }
+
     $scope.request_password_change = function(){
 
         data = {

@@ -70,7 +70,8 @@ import com.bbn.marti.util.Coord;
 import com.bbn.marti.util.KmlUtils;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.bbn.security.web.MartiValidator;
-import com.bbn.security.web.MartiValidator.Regex;
+import com.bbn.security.web.MartiValidatorConstants;
+import com.bbn.security.web.MartiValidatorConstants.Regex;
 import com.google.common.base.Strings;
 
 import de.micromata.opengis.kml.v_2_2_0.Document;
@@ -135,26 +136,26 @@ public class MissionKMLServlet extends LatestKMLServlet {
         optionalHttpParameters = new HashMap<String, HttpParameterConstraints>();
         
         optionalHttpParameters.put(QueryParameter.startTime.name(), 
-                new HttpParameterConstraints(Regex.Timestamp, MartiValidator.DEFAULT_STRING_CHARS));
+                new HttpParameterConstraints(Regex.Timestamp, MartiValidatorConstants.DEFAULT_STRING_CHARS));
         optionalHttpParameters.put(QueryParameter.endTime.name(), 
-                new HttpParameterConstraints(Regex.Timestamp, MartiValidator.DEFAULT_STRING_CHARS));
+                new HttpParameterConstraints(Regex.Timestamp, MartiValidatorConstants.DEFAULT_STRING_CHARS));
         optionalHttpParameters.put(QueryParameter.interval.name(), 
-        		new HttpParameterConstraints(Regex.Double, MartiValidator.SHORT_STRING_CHARS));
+        		new HttpParameterConstraints(Regex.Double, MartiValidatorConstants.SHORT_STRING_CHARS));
         optionalHttpParameters.put(QueryParameter.refreshRate.name(), 
-                new HttpParameterConstraints(MartiValidator.Regex.NonNegativeInteger, MartiValidator.SHORT_STRING_CHARS));
+                new HttpParameterConstraints(MartiValidatorConstants.Regex.NonNegativeInteger, MartiValidatorConstants.SHORT_STRING_CHARS));
         optionalHttpParameters.put(QueryParameter.format.name(), 
-                new HttpParameterConstraints(MartiValidator.Regex.SafeString, MartiValidator.SHORT_STRING_CHARS));
+                new HttpParameterConstraints(MartiValidatorConstants.Regex.SafeString, MartiValidatorConstants.SHORT_STRING_CHARS));
         optionalHttpParameters.put("uid",
-                new HttpParameterConstraints(MartiValidator.Regex.MartiSafeString, MartiValidator.DEFAULT_STRING_CHARS));
+                new HttpParameterConstraints(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS));
 
         optionalHttpParameters.put(QueryParameter.multiTrackThreshold.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.NonNegativeInteger, MartiValidator.SHORT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.NonNegativeInteger, MartiValidatorConstants.SHORT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.extendedData.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.SafeString, MartiValidator.SHORT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.SafeString, MartiValidatorConstants.SHORT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.optimizeExport.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.SafeString, MartiValidator.SHORT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.SafeString, MartiValidatorConstants.SHORT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.groups.name(), 
-                new HttpParameterConstraints(MartiValidator.Regex.MartiSafeString, MartiValidator.DEFAULT_STRING_CHARS));
+                new HttpParameterConstraints(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS));
     }
 
     @Override
@@ -403,37 +404,10 @@ public class MissionKMLServlet extends LatestKMLServlet {
     				KmlUtils.initStyles(seenUrls, doc);
 
     				if (includeExtendedData) {
-    					Schema schema = doc.createAndAddSchema();
-    					schema.setId("trackschema");
-
-    					SimpleArrayField speed = new SimpleArrayField();
-    					speed.setDisplayName("Speed m/s");
-    					speed.setName("speed");
-    					speed.setType("double");
-
-    					SimpleArrayField ce = new SimpleArrayField();
-    					ce.setDisplayName("Circular Error (m)");
-    					ce.setName("ce");
-    					ce.setType("double");
-
-    					SimpleArrayField le = new SimpleArrayField();
-    					le.setDisplayName("Linear Error (m)");
-    					le.setName("le");
-    					le.setType("double");
-
-    					schema.addToSchemaExtension(speed);
-    					schema.addToSchemaExtension(ce);
-    					schema.addToSchemaExtension(le);
+    					initKMLExtendedData(doc);
     				}
 
     				long kmlInitDuration = System.currentTimeMillis() - kmlInitStart;
-
-    				// use at least two threads in the thread pool, more per processsor to leverage multicore
-    				int numThreads = Runtime.getRuntime().availableProcessors() + 1;
-
-    				// create an executor service
-    				ExecutorService executor = Executors.newFixedThreadPool(numThreads);
-    				BlockingQueue<CotElement> queue = new LinkedBlockingQueue<>();
 
     				// Use a concurrent set for sorted, processed CoT objects. Sorting will be performed upon insertion in the set by the worker threads, with the specified Comparator, which sorts by uid, then servertime, accounting for nulls if they are encountered.
     				Set<CotElement> cotResultSet = new ConcurrentSkipListSet<>(new Comparator<CotElement>() {
@@ -484,43 +458,8 @@ public class MissionKMLServlet extends LatestKMLServlet {
     					}
     				});
 
-    				// flag to track producer (result set streaming from database) processing completion
-    				AtomicBoolean producerComplete = new AtomicBoolean(false); 
-
-    				// create worker threads to process each cot record 
-    				for (int i = 0; i < numThreads; i++) {
-    					logger.debug("creating CoT worker " + i);
-    					executor.execute(new CotParserWorker(queue, cotResultSet, producerComplete));
-    				}
-
-    				logger.debug("fetching and deserializing cot data");
-
-    				long cotFetchAndDeserializeStart = System.currentTimeMillis();
-
-    				// deserialize all cot results
-    				CotElement cursor = seekValid(results, queue);
-    				if(cursor != null) {
-    					// didn't reach the end of the row -- get baseline uid out
-    					while(results.next() && (cursor = seekValid(results, queue)) != null);
-    				}
-    				long cotFetchAndDeserializeDuration = System.currentTimeMillis() - cotFetchAndDeserializeStart;
-    				while(queue.size() != 0) {
-    					logger.debug("Still processing...");
-    					try { Thread.sleep(200); } catch(InterruptedException e) {};
-    				}
-    				producerComplete.set(true);
-
-    				logger.debug("cot queue depth: " + queue.size());
-
-    				// request thread executor shutdown
-    				executor.shutdown();
-
-    				// block waiting for thread completion
-    				while(!executor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
-    					logger.trace("awaiting thread pool termination");
-    				}
-
-    				logger.debug("cot set size: " + cotResultSet.size());
+    				// Adds found CotElements to cotResultSet
+    				long cotFetchAndDeserializeDuration = parseResultsForCotElements(cotResultSet, results);
 
     				long kmlStart = System.currentTimeMillis();
     				LinkedList<CotElement> qrs = new LinkedList<>();
@@ -744,7 +683,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
      * Populates the kml doc with the timeseries output of a particular uid.
      * @param qrs A nonempty list of cot containers for a particular uid, ordered by time ascending
      */    
-    protected void buildMissionFeatures(LinkedList<CotElement> qrs, Document doc, Set<Association<String,String>> seenUrls,
+    public void buildMissionFeatures(LinkedList<CotElement> qrs, Document doc, Set<Association<String,String>> seenUrls,
                                         Timestamp maxStartTime, String baseUrl, Map<String, byte[]> images, AllowedFormat format,
                                         boolean includeDescription, boolean includeExtendedData, int multiTrackThreshold, boolean optimizeExport)
             throws SQLException {
@@ -880,10 +819,11 @@ public class MissionKMLServlet extends LatestKMLServlet {
 
         private final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(CotParserWorker.class);
 
-        CotParserWorker(BlockingQueue<CotElement> queue, Set<CotElement> cotResultSet, AtomicBoolean producerComplete) {
+        CotParserWorker(BlockingQueue<CotElement> queue, Set<CotElement> cotResultSet, AtomicBoolean producerComplete, KMLDao dao) {
             this.queue = queue;
             this.producerComplete = producerComplete;
             this.outputSet = cotResultSet;
+            this.dao = dao;
         }
 
         @Override
@@ -892,11 +832,13 @@ public class MissionKMLServlet extends LatestKMLServlet {
 
             logger.trace("getting KML dao");
 
-            try {
-                dao = SpringContextBeanForApi.getSpringContext().getBean(KMLDao.class);
-            } catch (Exception e) {
-                logger.warn("exception initializing worker", e);
-                return;
+            if (dao == null) {
+	            try {
+	                dao = SpringContextBeanForApi.getSpringContext().getBean(KMLDao.class);
+	            } catch (Exception e) {
+	                logger.warn("exception initializing worker", e);
+	                return;
+	            }
             }
 
             while(!(producerComplete.get() && queue.isEmpty())) {
@@ -971,5 +913,77 @@ public class MissionKMLServlet extends LatestKMLServlet {
     	}
     
     	return new TimeInterval(start, end);
+    }
+    
+    public long parseResultsForCotElements(Set<CotElement> cotResultSet, ResultSet results) throws SQLException, InterruptedException {
+		// use at least two threads in the thread pool, more per processsor to leverage multicore
+		int numThreads = Runtime.getRuntime().availableProcessors() + 1;
+
+		// create an executor service
+		ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+		BlockingQueue<CotElement> queue = new LinkedBlockingQueue<>();
+		
+		// flag to track producer (result set streaming from database) processing completion
+		AtomicBoolean producerComplete = new AtomicBoolean(false); 
+
+		// create worker threads to process each cot record 
+		for (int i = 0; i < numThreads; i++) {
+			logger.debug("creating CoT worker " + i);
+			executor.execute(new CotParserWorker(queue, cotResultSet, producerComplete, kmlDao));
+		}
+
+		logger.debug("fetching and deserializing cot data");
+
+		long cotFetchAndDeserializeStart = System.currentTimeMillis();
+
+		// deserialize all cot results
+		CotElement cursor = seekValid(results, queue);
+		if(cursor != null) {
+			// didn't reach the end of the row -- get baseline uid out
+			while(results.next() && (cursor = seekValid(results, queue)) != null);
+		}
+		long cotFetchAndDeserializeDuration = System.currentTimeMillis() - cotFetchAndDeserializeStart;
+		while(queue.size() != 0) {
+			logger.debug("Still processing...");
+			try { Thread.sleep(200); } catch(InterruptedException e) {};
+		}
+		producerComplete.set(true);
+
+		logger.debug("cot queue depth: " + queue.size());
+
+		// request thread executor shutdown
+		executor.shutdown();
+
+		// block waiting for thread completion
+		while(!executor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+			logger.trace("awaiting thread pool termination");
+		}
+
+		logger.debug("cot set size: " + cotResultSet.size());
+		return cotFetchAndDeserializeDuration;
+    }
+    
+    public void initKMLExtendedData(Document doc) {
+		Schema schema = doc.createAndAddSchema();
+		schema.setId("trackschema");
+
+		SimpleArrayField speed = new SimpleArrayField();
+		speed.setDisplayName("Speed m/s");
+		speed.setName("speed");
+		speed.setType("double");
+
+		SimpleArrayField ce = new SimpleArrayField();
+		ce.setDisplayName("Circular Error (m)");
+		ce.setName("ce");
+		ce.setType("double");
+
+		SimpleArrayField le = new SimpleArrayField();
+		le.setDisplayName("Linear Error (m)");
+		le.setName("le");
+		le.setType("double");
+
+		schema.addToSchemaExtension(speed);
+		schema.addToSchemaExtension(ce);
+		schema.addToSchemaExtension(le);
     }
 }

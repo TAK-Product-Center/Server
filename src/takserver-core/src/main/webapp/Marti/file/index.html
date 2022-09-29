@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="fileConfiguration">
+  <head>
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <meta charset="utf-8">
+    <title>File Configuration</title>
+
+    <!-- <link rel="stylesheet" href="css/main.css">-->
+    <link rel="stylesheet" href="../jquery/jquery-ui.css" type="text/css" media="print, projection, screen" />
+    <link rel="stylesheet" href="../css/4.4.1/bootstrap.min.css">
+
+    <script type="text/javascript" src="../jquery/jquery-3.5.0.js"></script>
+    <script type="text/javascript" src="../jquery/jquery-ui.min.js"></script>
+
+    <script type="text/javascript" src="../lib/angular/angular.min.js"></script>
+
+    <link rel="stylesheet" href="css/main.css">
+    
+    <script src="js/app.js"></script>
+    <script src="js/controllers.js"></script>
+  </head>
+
+  <body style="font:18px arial, sans-serif;">
+    <div data-ng-include="'../menubar.html'"></div>
+    <div class="content" id="rightViewContainer" ng-controller="fileController" >
+        <h2>File Controller</h2>
+          <label class="custom-range" for="customSwitch1"> Upload File Size Limit </label>
+          <input class="custom-range" type="range" min="1" max="550" class="slider" id="sliderId" ng-model="uploadSizeLimit" >
+          <p>Value: <span id="currentValue"></span>MB</p>
+        <button class="btn btn-primary" style="margin-top:20px;" ng-click="save_changes()"> Save changes </button>
+    </div>
+    <div data-ng-include="'../footer.jsp'"></div>
+  </body>
+
+</html>

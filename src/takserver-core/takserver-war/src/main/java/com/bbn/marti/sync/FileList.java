@@ -14,7 +14,6 @@ import javax.naming.NamingException;
 import javax.servlet.http.HttpServletRequest;
 
 import org.owasp.esapi.ESAPI;
-import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.Logger;
@@ -38,7 +37,7 @@ public class FileList {
 	private static final Logger logger = LoggerFactory.getLogger(FileList.class);
 
 	@Autowired
-	private Validator validator;
+	private CommonUtil commonUtil;
 
 	@Autowired
 	private EnterpriseSyncService persistenceStore;
@@ -90,9 +89,7 @@ public class FileList {
 				for (Metadata metadata : list) {
 
 					try {
-						if (validator != null) {
-							metadata.validate(this.validator);
-						}
+						commonUtil.validateMetadata(metadata);
 					} catch (ValidationException | IntrusionException ex) {
 						StringBuilder builder = new StringBuilder();
 						builder.append("Unsafe item from Enterprise Sync datbase: ");

@@ -4,6 +4,7 @@ import java.util.Locale;
 import java.util.NavigableSet;
 import java.util.Set;
 
+import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
+import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubscriptionStore;
 
 import io.micrometer.core.instrument.Metrics;
@@ -103,6 +105,13 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 		if (!isVoidWarranty() && toSend.hasContextKey(GroupFederationUtil.FEDERATE_ID_KEY)) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("not federating federated message");
+			}
+			return;
+		}
+		
+		if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null && !DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("data feed federation disabled");
 			}
 			return;
 		}
@@ -204,6 +213,18 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 			}
 		} 
 	}
+	
+	
+
+	@Override
+	public void submitFederateGroups(Set<String> federateGroups) {
+		try {
+			SubscriptionStore.getInstance().getServerGroupStreamBySession(sessionId)
+				.onNext(FederateGroups.newBuilder().addAllFederateGroups(federateGroups).build());
+		} catch (Exception e) {
+			logger.error("Error submitting server federate groups");
+		}
+	}
 
 	@Override
     public String toString() {
@@ -212,7 +233,7 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 	
 	private GuardedStreamHolder<FederatedEvent> lazyGetClientStream() {
 		if (clientEventStreamHolder == null) {
-			clientEventStreamHolder = SubscriptionStore.getInstanceFederatedSubscriptionManager().getClientSteamBySession(sessionId);
+			clientEventStreamHolder = SubscriptionStore.getInstanceFederatedSubscriptionManager().getClientStreamBySession(sessionId);
 		}
 		
 		return clientEventStreamHolder;
@@ -220,7 +241,7 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 	
 	public GuardedStreamHolder<ROL> lazyGetROLClientStream() {
 		if (clientROLEventStreamHolder == null) {
-			clientROLEventStreamHolder = SubscriptionStore.getInstanceFederatedSubscriptionManager().getClientROLSteamBySession(sessionId);
+			clientROLEventStreamHolder = SubscriptionStore.getInstanceFederatedSubscriptionManager().getClientROLStreamBySession(sessionId);
 		}
 		
 		return clientROLEventStreamHolder;

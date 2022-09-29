@@ -1,5 +1,6 @@
 package com.cloudbees.junit.runner;
 
+import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.takcl.TestConfiguration;
 import junit.framework.JUnit4TestCaseFacade;
 import org.apache.commons.io.output.TeeOutputStream;
@@ -155,7 +156,9 @@ public class App {
 	public static class JUnitResultFormatterAsRunListener extends RunListener {
 		protected final JUnitResultFormatter formatter;
 		private ByteArrayOutputStream stdout, stderr, stdcombined;
-		private PrintStream oldStdout, oldStderr;
+
+		public static final PrintStream defaultStdout = System.out;
+		public static final PrintStream defaultStderr = System.err;
 		private int problem;
 		private long startTime;
 
@@ -179,20 +182,20 @@ public class App {
 			problem = 0;
 			startTime = System.currentTimeMillis();
 
-			this.oldStdout = System.out;
-			this.oldStderr = System.err;
+			stdout = new ByteArrayOutputStream();
+			stderr = new ByteArrayOutputStream();
 
 			stdcombined = new ByteArrayOutputStream();
-			System.setOut(new PrintStream(new TeeOutputStream(stdout = new ByteArrayOutputStream(), stdcombined)));
-			System.setErr(new PrintStream(new TeeOutputStream(stderr = new ByteArrayOutputStream(), stdcombined)));
+			System.setOut(new PrintStream(new TeeOutputStream(defaultStdout, new TeeOutputStream(stdout, stdcombined))));
+			System.setErr(new PrintStream(new TeeOutputStream(defaultStderr, new TeeOutputStream(stderr, stdcombined))));
 		}
 
 		@Override
 		public void testFinished(Description description) throws Exception {
 			System.out.flush();
 			System.err.flush();
-			System.setOut(oldStdout);
-			System.setErr(oldStderr);
+			System.setOut(defaultStdout);
+			System.setErr(defaultStderr);
 
 			formatter.setSystemOutput(stdout.toString());
 			formatter.setSystemError(stderr.toString());

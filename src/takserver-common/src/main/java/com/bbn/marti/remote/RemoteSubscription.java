@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.ignite.cache.query.annotations.QuerySqlField;
 
+import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Subscription;
 import com.bbn.marti.remote.groups.User;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -36,6 +37,8 @@ public class RemoteSubscription implements Serializable {
     @JsonIgnore @QuerySqlField public String handlerType = "";
    
     @JsonIgnore public AtomicBoolean isWebsocket =  new AtomicBoolean(false);
+    
+    @JsonIgnore public AtomicBoolean isDataFeed =  new AtomicBoolean(false);
    
     @JsonIgnore @QuerySqlField public UUID originNode;
     

@@ -11,6 +11,7 @@ import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 import org.owasp.esapi.Validator;
 import org.slf4j.Logger;
@@ -76,13 +77,13 @@ public class LocateApi {
 
             // validate inputs
             validator.getValidInput("LocateApi", Double.toString(latitude),
-                    MartiValidator.Regex.Double.name(), MartiValidator.SHORT_STRING_CHARS, false);
+                    MartiValidatorConstants.Regex.Double.name(), MartiValidatorConstants.SHORT_STRING_CHARS, false);
             validator.getValidInput("LocateApi", Double.toString(longitude),
-                    MartiValidator.Regex.Double.name(), MartiValidator.SHORT_STRING_CHARS, false);
+            		MartiValidatorConstants.Regex.Double.name(), MartiValidatorConstants.SHORT_STRING_CHARS, false);
             validator.getValidInput("LocateApi", name,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             validator.getValidInput("LocateApi", remarks,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 
             //
             // build up the cot marker

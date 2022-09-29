@@ -24,6 +24,7 @@ import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
+import com.bbn.marti.service.DistributedConfiguration;
 
 import io.grpc.ClientCall;
 import io.grpc.Metadata;
@@ -223,6 +224,13 @@ public class FigFederateSubscription extends FederateSubscription {
         	}
             return;
         }
+        
+        if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null && !DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("data feed federation disabled");
+			}
+			return;
+		}
 
         // increment the hit count in the super class
         super.incHit(hitTime);

@@ -18,6 +18,7 @@ public class GeospatialEventFilter implements CotFilter {
     private GeospatialFilter filter;
     private boolean noFilterCheckTypes = true;
     private boolean noFilterCheckTAKClient = true;
+    private boolean noFilterCheckOrigin = true;
 
     private static final List<String> noFilterTypes = Arrays.asList(
                 "b-a-o-tbl",    // NineOneOne
@@ -31,10 +32,12 @@ public class GeospatialEventFilter implements CotFilter {
         this.filter = filter;
     }
 
-    public GeospatialEventFilter(GeospatialFilter filter, boolean noFilterCheckTypes, boolean noFilterCheckTAKClient) {
+    public GeospatialEventFilter(GeospatialFilter filter, boolean noFilterCheckTypes, boolean noFilterCheckTAKClient,
+                                 boolean noFilterCheckOrigin) {
         this(filter);
         this.noFilterCheckTypes = noFilterCheckTypes;
         this.noFilterCheckTAKClient = noFilterCheckTAKClient;
+        this.noFilterCheckOrigin = noFilterCheckOrigin;
     }
 
     private boolean noFilter(CotEventContainer c) {
@@ -75,8 +78,10 @@ public class GeospatialEventFilter implements CotFilter {
         double longitude = Double.parseDouble(c.getLon());
 
         // dont apply filters to points without location info
-        if (latitude == 0 && longitude == 0) {
-            return c;
+        if (noFilterCheckOrigin) {
+            if (latitude == 0 && longitude == 0) {
+                return c;
+            }
         }
 
         // iterate over the filters

@@ -1,30 +1,11 @@
 package com.bbn.roger.fig;
 
-import static com.google.common.base.Preconditions.*;
-
-import io.grpc.Attributes;
-import io.grpc.Grpc;
-import io.grpc.InternalChannelz.Security;
-import io.grpc.InternalChannelz.Tls;
-import io.grpc.SecurityLevel;
-import io.grpc.internal.GrpcAttributes;
-import io.grpc.internal.GrpcUtil;
-import io.grpc.netty.GrpcHttp2ConnectionHandler;
-import io.grpc.netty.InternalProtocolNegotiator.ProtocolNegotiator;
-import io.grpc.netty.InternalProtocolNegotiators.ProtocolNegotiationHandler;
-import io.grpc.netty.InternalProtocolNegotiators;
-import io.grpc.netty.InternalProtocolNegotiationEvent;
-import io.grpc.netty.InternalWriteBufferingAndExceptionHandlerUtils;
-import io.grpc.netty.ProtocolNegotiationEvent;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslHandler;
-import io.netty.handler.ssl.SslHandshakeCompletionEvent;
-import io.netty.util.AsciiString;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 
 import javax.net.ssl.SSLEngine;
@@ -36,6 +17,27 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import io.grpc.Attributes;
+import io.grpc.Grpc;
+import io.grpc.InternalChannelz.Security;
+import io.grpc.InternalChannelz.Tls;
+import io.grpc.SecurityLevel;
+import io.grpc.internal.GrpcAttributes;
+import io.grpc.internal.GrpcUtil;
+import io.grpc.netty.GrpcHttp2ConnectionHandler;
+import io.grpc.netty.InternalProtocolNegotiationEvent;
+import io.grpc.netty.InternalProtocolNegotiator.ProtocolNegotiator;
+import io.grpc.netty.InternalProtocolNegotiators;
+import io.grpc.netty.InternalProtocolNegotiators.ProtocolNegotiationHandler;
+import io.grpc.netty.InternalWriteBufferingAndExceptionHandlerUtils;
+import io.grpc.netty.ProtocolNegotiationEvent;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.ssl.SslHandshakeCompletionEvent;
+import io.netty.util.AsciiString;
+
 /*
  *
  * Adapted from gRPC internals. Pulling out key pieces of the puzzle so that we can unlock access to the SSLSession,
@@ -46,7 +48,7 @@ public class FigProtocolNegotiator {
 
     private final Logger logger = LoggerFactory.getLogger(FigProtocolNegotiator.class);
 
-    private final Propagator<X509Certificate> propagator;
+    private final Propagator<X509Certificate[]> propagator;
 
     // gRPC identifier for HTTP/2 over TLS
     static final String HTTP2_VERSION = "h2";
@@ -61,7 +63,7 @@ public class FigProtocolNegotiator {
      */
     private static final String GRPC_EXP_VERSION = "grpc-exp";
 
-    public FigProtocolNegotiator(Propagator<X509Certificate> propagator) {
+    public FigProtocolNegotiator(Propagator<X509Certificate[]> propagator) {
 
         checkNotNull(propagator, "Null cert propatgator callback");
 
@@ -194,18 +196,21 @@ public class FigProtocolNegotiator {
                         checkNotNull(sslSession.getPeerCertificateChain());
                         checkState(sslSession.getPeerCertificateChain().length > 0);
 
-                        // get the client cert, and convert it from a javax.cert.X509Certificate (why, SSLEngine, why?) to java.cert.X509Certificate
-                        byte[] encoded = sslSession.getPeerCertificateChain()[0].getEncoded();
-                        ByteArrayInputStream bis = new ByteArrayInputStream(encoded);
-                        java.security.cert.CertificateFactory cf = java.security.cert.CertificateFactory.getInstance("X.509");
-                        X509Certificate cert = (java.security.cert.X509Certificate) cf.generateCertificate(bis);
-
-                        if (logger.isDebugEnabled()) {
-                            logger.debug("FIG server cert: " + cert);
+                        X509Certificate[] certs = new X509Certificate[sslSession.getPeerCertificates().length];
+                        for (int i = 0; i < sslSession.getPeerCertificates().length; i++) {
+                        	certs[i] = (X509Certificate) sslSession.getPeerCertificates()[i];
                         }
-
-                        // pass the cert to the callback
-                        propagator.propogate(checkNotNull(cert, "FIG server cert"));
+                        
+                        checkNotNull(certs[0], "FIG server cert");
+                        checkNotNull(certs[1], "FIG ca cert");
+       
+                        if (logger.isDebugEnabled()) {
+                            logger.debug("FIG server cert: " + certs[0]);
+                            logger.debug("FIG ca cert: " + certs[1]);
+                        }
+                        
+                        // pass the certs to the callback
+                        propagator.propogate(certs);
                         this.propagateTlsComplete(ctx, sslSession);
                         InternalWriteBufferingAndExceptionHandlerUtils.writeBufferingAndRemove(ctx.channel());
                     } else {

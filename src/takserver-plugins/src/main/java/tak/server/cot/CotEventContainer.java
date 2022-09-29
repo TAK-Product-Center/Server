@@ -82,6 +82,8 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 	
 	private String type = null;
 	
+	private String endpoint = null;
+	
 	// Flag to track whether this is a new message, or stored message (as is the case with Latest SA)
 	private boolean stored = false;
 	
@@ -189,12 +191,19 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 	}
 
 	public String getEndpoint() {
-		Attribute endpointAttr = (Attribute) doc.selectSingleNode("/event/detail/contact/@endpoint");
-		if (endpointAttr != null) {
-			return endpointAttr.getValue();
-		} else {
-			return null;
+
+		if (endpoint == null) {
+			synchronized(this) {
+				if (endpoint == null) {
+					Attribute endpointAttr = (Attribute) doc.selectSingleNode("/event/detail/contact/@endpoint");
+					if (endpointAttr != null) {
+						endpoint = endpointAttr.getValue();
+					} 
+				}
+			}			
 		}
+
+		return endpoint;
 	}
 
 	public Double getHae() { return NumericUtil.parseDoubleOrDefault(getPointAttribute("hae"), 0); }

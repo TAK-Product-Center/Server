@@ -33,6 +33,10 @@ shadowJar {
     version = version
 }
 
+jar {
+    enabled = false
+}
+
 task copyJar (type: Copy, dependsOn: shadowJar) {
   from file('build/libs')
   include 'schemamanager-' + version + '-uber.jar'
