@@ -20,7 +20,6 @@ import java.util.logging.Logger;
 
 import javax.naming.NamingException;
 import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -33,9 +32,11 @@ import org.owasp.esapi.errors.ValidationException;
 import org.postgresql.geometric.PGbox;
 import org.postgresql.geometric.PGcircle;
 import org.postgresql.util.PGobject;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.KmlUtils;
-import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 
 /**
@@ -95,13 +96,13 @@ public class SearchServlet extends EnterpriseSyncServlet {
 	}
 
 	private static final int DEFAULT_PARAMETER_LENGTH = 1024;
-	public static final String RESULT_COUNT_KEY = "resultCount";
-	public static final String RESULT_KEY = "results";
-
 	
 	private static final long serialVersionUID = 8326235618371629486L;
 	
     private static HashSet<String> optionalParameters;
+    
+    @Autowired
+    private CommonUtil commonUtil;
 	
     static {
     	optionalParameters = new HashSet<String>();
@@ -113,14 +114,15 @@ public class SearchServlet extends EnterpriseSyncServlet {
     /**
      * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
      */
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+    @SuppressWarnings("unchecked")
+	protected void doGet(HttpServletRequest request, HttpServletResponse response) 
     		throws ServletException, IOException {
         
         String groupVector = null;
 
         try {
             // Get group vector for the user associated with this session
-            groupVector = martiUtil.getGroupBitVector(request);
+            groupVector = commonUtil.getGroupBitVector(request);
             log.finer("groups bit vector: " + groupVector);
         } catch (Exception e) {
             log.fine("exception getting group membership for current web user " + e.getMessage());
@@ -261,7 +263,7 @@ public class SearchServlet extends EnterpriseSyncServlet {
     		for (String uid : searchResults.keySet()) {
     			if ( validator != null) {
     				if (validator.isValidInput("doGet processing database results", uid, "MartiSafeString", 
-    						MartiValidator.SHORT_STRING_CHARS, false)) {
+    						MartiValidatorConstants.SHORT_STRING_CHARS, false)) {
 						if (log.isLoggable(Level.FINE)) {
 							log.fine("Processing search results for uid " + StringUtils.normalizeSpace(uid));
 						}
@@ -273,7 +275,7 @@ public class SearchServlet extends EnterpriseSyncServlet {
     			for (Metadata item : resultsForUid) {
     			if ( validator != null ) {
     				try {
-    					item.validate(validator);
+    					commonUtil.validateMetadata(item);
     				} catch (ValidationException ex) {
     					log.warning("Database result failed input validation, id=" + item.getPrimaryKey() 
     							+ ": " + ex.getMessage());
@@ -287,8 +289,8 @@ public class SearchServlet extends EnterpriseSyncServlet {
     			}
     		}
     		JSONObject results = new JSONObject();
-    		results.put(RESULT_COUNT_KEY, array.size());
-    		results.put(RESULT_KEY, array);
+    		results.put(SearchServletConstant.RESULT_COUNT_KEY, array.size());
+    		results.put(SearchServletConstant.RESULT_KEY, array);
 
     		response.setContentType("text/json");
     		PrintWriter writer = response.getWriter();

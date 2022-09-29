@@ -51,6 +51,11 @@ public class DistributedInputManager implements InputManager, org.apache.ignite.
 	public NetworkInputAddResult createDataFeed(DataFeed dataFeed) {
 		return MessagingDependencyInjectionProxy.getInstance().submissionService().addInputAndSave(dataFeed);
 	}
+	
+	@Override
+	public void updateFederationDataFeed(DataFeed dataFeed) {
+		MessagingDependencyInjectionProxy.getInstance().submissionService().addMetric(dataFeed, new InputMetric(dataFeed));
+	}
 
 	@Override
 	public ConnectionModifyResult modifyInput(String id, Input input) {

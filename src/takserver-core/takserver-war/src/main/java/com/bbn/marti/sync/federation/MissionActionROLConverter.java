@@ -21,6 +21,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.ByteString;
 
+import mil.af.rl.rol.value.DataFeedMetadata;
 import mil.af.rl.rol.value.MissionMetadata;
 
 public class MissionActionROLConverter {
@@ -35,16 +36,34 @@ public class MissionActionROLConverter {
 		this.remoteUtil = remoteUtil;
 		this.mapper = mapper;
 	}
-
-	public ROL createMissionToROL(String name, String creatorUid, String description, String chatRoom, String tool) throws JsonProcessingException {
+	
+	public MissionMetadata missionToROLMissionMetadata(Mission mission) {
 		MissionMetadata mc = new MissionMetadata();
-
-		mc.setName(name);
-		mc.setCreatorUid(creatorUid == null ? " " : creatorUid);
-		mc.setDescription(description == null ? " " : description);
-		mc.setChatRoom(chatRoom == null ? " " : chatRoom);
-		mc.setTool(tool == null ? "public" : tool);
+		mc.setName(mission.getName());
+		mc.setCreatorUid(mission.getCreatorUid());
+		mc.setDescription(mission.getDescription());
+		mc.setChatRoom(mission.getChatRoom());
+		mc.setTool(mission.getTool());
+		mc.setBbox(mission.getBbox());
+		mc.setBoundingPolygon(mission.getBoundingPolygon());
 		
+		if (mission.getParent() != null)
+			mc.setParentMissionId(mission.getParent().getId());
+		
+		mc.setPasswordHash(mission.getPasswordHash());
+		mc.setPath(mission.getPath());
+		mc.setClassification(mission.getClassification());
+		mc.setBaseLayer(mission.getBaseLayer());
+		
+		if (mission.getDefaultRole() != null)
+			mc.setDefaultRoleId(mission.getDefaultRole().getId());
+		
+		mc.setExpiration(mission.getExpiration());
+		
+		return mc;
+	}
+
+	public ROL createMissionToROL(MissionMetadata mc) throws JsonProcessingException {		
 		return ROL.newBuilder().setProgram("create mission\n" + mapper.writeValueAsString(mc) + ";").build();
 	}
 	
@@ -57,6 +76,18 @@ public class MissionActionROLConverter {
 		mc.setCreatorUid(creatorUid);
 		
 		return ROL.newBuilder().setProgram("delete mission\n" + mapper.writeValueAsString(mc) + ";").build();
+	}
+	
+	public ROL createDataFeedToROL(DataFeedMetadata meta) throws JsonProcessingException {		
+		return ROL.newBuilder().setProgram("create data_feed\n" + mapper.writeValueAsString(meta) + ";").build();
+	}
+	
+	public ROL updateDataFeedToROL(DataFeedMetadata meta) throws JsonProcessingException {		
+		return ROL.newBuilder().setProgram("update data_feed\n" + mapper.writeValueAsString(meta) + ";").build();
+	}
+	
+	public ROL deleteDataFeedToROL(DataFeedMetadata meta) throws JsonProcessingException {		
+		return ROL.newBuilder().setProgram("delete data_feed\n" + mapper.writeValueAsString(meta) + ";").build();
 	}
 	
 	public ROL addMissionContentToROL(MissionContent content, String missionName, String creatorUid, Mission mission) {

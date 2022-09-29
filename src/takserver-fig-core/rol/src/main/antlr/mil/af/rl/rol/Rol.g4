@@ -10,7 +10,7 @@ statement : operation resource (assignment)? (constraintsClause)? (assertions)? 
 
 operation : 'create' | 'add' | 'remove' | 'update' | 'assign' | 'revoke' | 'get' | 'post' | 'put' | 'delete' | 'contains' | 'request' | 'announce' | 'disperse' | 'store' | 'enable' | 'disable' ;
 
-resource : 'query' | 'subscription' | 'staticsubscription' | 'role' role | 'role' | 'priority' | 'resource' | 'package' | 'mission' | 'input' | 'federation' | 'federate' | 'federated_connection' ;
+resource : 'query' | 'subscription' | 'staticsubscription' | 'role' role | 'role' | 'priority' | 'resource' | 'package' | 'mission' | 'input' | 'federation' | 'federate' | 'federated_connection' | 'data_feed' ;
 
 entity: 'MSG' | 'PUBLISHER' | 'CONSUMER' ;
 assignment : 'for' entity ;

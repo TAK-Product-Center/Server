@@ -8,6 +8,7 @@ import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.sync.model.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import tak.server.cache.CotCacheWrapper;
 import tak.server.cot.CotElement;
@@ -69,6 +70,8 @@ public interface MissionService {
     List<MissionInvitation> getMissionInvitations(String missionName);
 
     MissionSubscription missionSubscribe(String missionName, String clientUid, String groupVector);
+
+    MissionSubscription missionSubscribe(String missionName, String clientUid, MissionRole missionRole, String groupVector);
 
     MissionSubscription missionSubscribe(String missionName, Long missionId, String clientUid, String username, MissionRole role, String groupVector);
 
@@ -192,7 +195,11 @@ public interface MissionService {
 
     MissionFeed getMissionFeed(String missionFeedUid);
 
+    DataFeedDao getDataFeed(String dataFeedUid);
+
     MissionFeed addFeedToMission(String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterBbox, String filterType, String filterCallsign);
+    
+    MissionFeed addFeedToMission(String missionFeedUid, String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterBbox, String filterType, String filterCallsign);
 
 	void removeFeedFromMission(String missionName, String creatorUid, Mission mission, String missionFeedUid);
 
@@ -206,5 +213,7 @@ public interface MissionService {
 
     List<Mission> getMissionsForDataFeed(String feed_uid);
 
-    void sendLatestFeedEvents(Mission mission, MissionFeed missionFeed, String clientUid, String groupVector);
+    void sendLatestFeedEvents(Mission mission, MissionFeed missionFeed, List<String> clientUidList, String groupVector);
+
+	List<String> getMinimalMissionsJsonForDataFeed(String feed_uid) throws JsonProcessingException;
 }

@@ -1,0 +1,15 @@
+
+<div>
+    <h2>New Classification</h2>
+    <form name="form" role="form">
+        <div class="form-group" ng-class="{ 'has-error': form.level.$dirty && form.level.$error.required }">
+            <label for="level">Level</label>
+            <input type="text" name="level" id="level" class="form-control" ng-model="new_classification_level" required />
+            <span ng-show="form.level.$dirty && form.level.$error.required" class="help-block">Classification level is required</span>
+        </div>
+        <div class="form-actions">
+            <button ng-disabled="form.$invalid" class="btn btn-primary" ng-click="new_classification()"> Add </button>
+            <a class="btn btn-link" ng-click="closeThisDialog()">Cancel</a>
+        </div>
+    </form>
+</div>

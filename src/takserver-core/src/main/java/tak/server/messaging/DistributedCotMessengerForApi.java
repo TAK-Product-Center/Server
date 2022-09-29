@@ -24,10 +24,9 @@ public class DistributedCotMessengerForApi implements Messenger<CotEventContaine
 		this.subscriptionStore = subscriptionStore;
 		this.serverInfo = serverInfo;
 		this.messageConverter = messageConverter;
-		this.config = config;
 		
 		this.isCluster = config.getRemoteConfiguration().getCluster() != null && config.getRemoteConfiguration().getCluster().isEnabled();
-		this.isPlugins = config.getRemoteConfiguration().getPlugins().isEnabled() && config.getRemoteConfiguration().getPlugins().isUsePluginMessageQueue();
+		this.isPlugins = config.getRemoteConfiguration().getPlugins().isUsePluginMessageQueue();
 	}
 
 	private final Ignite ignite;
@@ -40,14 +39,12 @@ public class DistributedCotMessengerForApi implements Messenger<CotEventContaine
 
 	private final MessageConverter messageConverter;
 
-	private final CoreConfig config;
 	
 	private boolean isPlugins = false;
 	private boolean isCluster = false;
 
 	@Override
 	public void send(CotEventContainer message) {
-
 		CotEventContainer messageCopy = new CotEventContainer(message, true, ImmutableSet.of(Constants.SOURCE_TRANSPORT_KEY, Constants.SOURCE_PROTOCOL_KEY, Constants.USER_KEY));
 
 		// make sure the source transport is tracked so that it can be reconstitued later after serialization and deserializtion
@@ -59,16 +56,16 @@ public class DistributedCotMessengerForApi implements Messenger<CotEventContaine
 
 				ci.setConnectionId(connectionId);
 
-				messageCopy.setContextValue(Constants.CONNECTION_ID_KEY, connectionId);
+				messageCopy.setContext(Constants.CONNECTION_ID_KEY, connectionId);
 
 				if (subscriptionStore.getSubscriptionByConnectionInfo(ci) == null) {
-
-					Subscription sub = subscriptionStore.getByHandler((ChannelHandler) message.getContext(Constants.SOURCE_TRANSPORT_KEY));
-
-					if (sub != null) {
-						subscriptionStore.putSubscriptionToConnectionInfo(ci, sub);
+					ChannelHandler handler = (ChannelHandler) message.getContext(Constants.SOURCE_TRANSPORT_KEY);
+					if (handler != null) {
+						Subscription sub = subscriptionStore.getByHandler((ChannelHandler) message.getContext(Constants.SOURCE_TRANSPORT_KEY));
+						if (sub != null) {
+							subscriptionStore.putSubscriptionToConnectionInfo(ci, sub);
+						}
 					}
-
 				}
 
 			} catch (ClassCastException e) {
@@ -102,9 +99,8 @@ public class DistributedCotMessengerForApi implements Messenger<CotEventContaine
 		messageCopy.setContext(Constants.COT_MESSENGER_TOPIC_KEY, serverInfo.getSubmissionTopic());
 
 		byte[] protoMessage = messageConverter.cotToDataMessage(messageCopy);
-
 		ignite.message().send(serverInfo.getSubmissionTopic(), protoMessage);
-		
+
 		// push the message to the plugin queue, if plugins and plugin message queue are enabled
 		if (isPlugins) {
 			byte[] rawMsg = messageConverter.cotToDataMessage(new CotEventContainer(message, true, ImmutableSet.of(Constants.SOURCE_TRANSPORT_KEY, Constants.SOURCE_PROTOCOL_KEY, Constants.USER_KEY)));

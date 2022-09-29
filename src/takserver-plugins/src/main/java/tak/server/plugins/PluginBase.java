@@ -20,6 +20,12 @@ public abstract class PluginBase implements PluginLifecycle{
     
     @Autowired
     private PluginSelfStopApi pluginSelfStopApi;
+    
+    @Autowired
+	protected PluginMissionApi pluginMissionApi;
+   
+    @Autowired
+    protected PluginFileApi pluginFileApi;
 
     public PluginBase() throws ReservedConfigurationException {
         config = new PluginConfiguration(this.getClass());

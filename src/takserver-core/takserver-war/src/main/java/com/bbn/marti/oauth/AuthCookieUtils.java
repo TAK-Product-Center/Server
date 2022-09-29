@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
 
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 
 public class AuthCookieUtils {
@@ -23,7 +24,7 @@ public class AuthCookieUtils {
         String validatedContent;
         try {
             validatedContent = validator.getValidInput(AuthCookieUtils.class.getName(), content,
-                    MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, false);
+            		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, false);
         } catch (ValidationException e) {
             logger.error("ValidationException in createCookie!", e);
             return null;

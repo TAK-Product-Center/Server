@@ -1,9 +1,11 @@
 package tak.server.federation.hub;
 
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
-import tak.server.federation.hub.broker.RestartServerEvent;
 import tak.server.federation.hub.broker.SSLConfig;
+import tak.server.federation.hub.broker.events.RestartServerEvent;
 import tak.server.federation.hub.broker.FederationHubServerConfig;
+import tak.server.federation.hub.broker.HubConnectionStore;
+import tak.server.federation.hub.broker.FederationHubBroker;
 
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
@@ -77,7 +79,35 @@ public class FederationHubDependencyInjectionProxy implements ApplicationContext
 
         return fedHubServerConfig;
     }
+    
+    private FederationHubBroker federationHubBroker = null;
 
+    public FederationHubBroker federationHubBroker() {
+        if (federationHubBroker == null) {
+            synchronized (this) {
+                if (federationHubBroker == null) {
+                	federationHubBroker = springContext.getBean(FederationHubBroker.class);
+                }
+            }
+        }
+
+        return federationHubBroker;
+    }
+    
+    private HubConnectionStore hubConnectionStore = null;
+
+    public HubConnectionStore hubConnectionStore() {
+        if (hubConnectionStore == null) {
+            synchronized (this) {
+                if (hubConnectionStore == null) {
+                	hubConnectionStore = springContext.getBean(HubConnectionStore.class);
+                }
+            }
+        }
+
+        return hubConnectionStore;
+    }
+        
     public void restartV2Server() {
         springContext.publishEvent(new RestartServerEvent(this));
     }

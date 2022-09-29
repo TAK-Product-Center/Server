@@ -38,9 +38,25 @@ bootJar {
     }    
 }
 
+jar {
+    enabled = false
+}
+
 dependencies {
 
   compile group: 'xerces', name: 'xercesImpl', version: xerces_version
+
+  compile ("org.dom4j:dom4j:$dom4j_version") {
+       exclude group: 'pull-parser'
+       exclude group: 'xpp3'
+  }
+
+  compile group: 'ch.qos.logback', name: 'logback-core', version: logback_version
+
+  // imported in order to exclude pull-parser from transitive dom4j dependency in takserver-plugins
+//  compile ("org.dom4j:dom4j:$dom4j_version") {
+//       exclude group: 'pull-parser'
+//  }
 
   compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
   compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
@@ -49,6 +65,8 @@ dependencies {
 
   compile(project(':takserver-common')) {
     exclude group: 'io.micrometer', module:'micrometer-registry-cloudwatch'
+    exclude group: 'pull-parser'
+    exclude group: 'xpp3'
   }
   
   compile group: 'com.h2database', name: 'h2', version: h2_version
@@ -63,9 +81,14 @@ dependencies {
   compile group: 'io.nats', name: 'jnats', version: nats_version
   
   compile group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
-  compile group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
+//  compile group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
+//  compile group: 'org.springframework.boot', name: 'spring-boot-starter-jdbc', version: spring_boot_version
   compile group: 'org.springframework', name: 'spring-context'
-   
+//  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-jdbc'
+//  compile group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
+  
+  compile group: 'org.postgresql', name: 'postgresql', version: postgres_version
+  
   testCompile group: 'junit', name: 'junit', version: junit_version
   testCompile group: 'org.mockito', name: 'mockito-core', version: mockito_version
   testCompile("org.springframework.boot:spring-boot-starter-test") {

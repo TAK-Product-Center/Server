@@ -11,23 +11,30 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.bbn.marti.feeds.DataFeedService;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.Direction;
+import com.bbn.marti.remote.groups.FederateUser;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
+import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.service.BrokerService;
+import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.FederatedSubscriptionManager;
 import com.bbn.marti.service.Subscription;
 import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
+import com.bbn.marti.sync.service.DistributedDataFeedCotService;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 
@@ -102,6 +109,9 @@ public class MessagingUtilImpl implements MessagingUtil {
 
 	@Override
 	public void sendLatestReachableSA(User destUser) {
+		// don't send latest SA if we're in vbm mode with sa sharing disabled
+//		if (DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled() && 
+//				DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isDisableSASharing()) return;
 
 		if (destUser == null || groupManager == null || subscriptionManager == null) {
 			throw new IllegalArgumentException("null user, GroupManager or SubscriptionManager");
@@ -119,6 +129,16 @@ public class MessagingUtilImpl implements MessagingUtil {
 
 		if (destSubscription == null) {
 			throw new IllegalStateException("subscription not found for " + destUser);
+		}
+		
+		
+		if (destSubscription instanceof FederateSubscription ) {
+			// make sure if we are sending to a federate, data feed federation is enabled
+			if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+				sendLatestFeedEventsToSub(destSubscription);
+			}
+		} else {
+			sendLatestFeedEventsToSub(destSubscription);
 		}
 
 		Reachability<User> r = new CommonGroupDirectedReachability(groupManager);
@@ -180,7 +200,6 @@ public class MessagingUtilImpl implements MessagingUtil {
 							}
 						}
 					} else {
-
 						CotEventContainer sa = sub.getLatestSA();
 						
 						if (!federateMappingGroups.isEmpty()) {
@@ -207,6 +226,31 @@ public class MessagingUtilImpl implements MessagingUtil {
 			if (logger.isDebugEnabled()) {
 				logger.debug("exception sending latest SA", e);
 			}
+		}
+	}
+	
+	private void sendLatestFeedEventsToSub(Subscription sub) {
+		try {
+			if (DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled()) return;
+			
+			Set<Group> groups = groupManager.getGroups(sub.getUser());
+			groups = groups.stream().filter(g->g.getDirection() == Direction.OUT).collect(Collectors.toSet());
+			String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
+
+			DataFeedService.getDataFeedService().getDataFeedsByGroup(groupVector).forEach(feed -> {
+				if (feed.isSync()) {
+					Collection<CotEventContainer> events = DistributedDataFeedCotService.getInstance().getCachedDataFeedEvents(feed.getUUID());
+					events.forEach(event -> {
+						try {
+							sub.submit(event);
+						} catch (Exception e) {
+							logger.error("Error submitting latest feed event to sub " + sub, e);
+						}
+					});
+				}
+			});
+		} catch (Exception e) {
+			logger.error("Error getting latest feed events " + sub, e);
 		}
 	}
 

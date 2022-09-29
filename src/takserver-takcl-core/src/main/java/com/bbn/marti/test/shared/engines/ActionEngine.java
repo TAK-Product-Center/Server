@@ -6,8 +6,8 @@ import com.bbn.marti.takcl.AppModules.OnlineFileAuthModule;
 import com.bbn.marti.takcl.SSLHelper;
 import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.takcl.TestExceptions;
-import com.bbn.marti.takcl.connectivity.AbstractRunnableServer;
-import com.bbn.marti.takcl.connectivity.RunnableServerManager;
+import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
+import com.bbn.marti.takcl.connectivity.server.RunnableServerManager;
 import com.bbn.marti.takcl.connectivity.implementations.UnifiedClient;
 import com.bbn.marti.takcl.connectivity.interfaces.ClientResponseListener;
 import com.bbn.marti.takcl.connectivity.missions.MissionModels;
@@ -31,7 +31,6 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Console;
 import java.io.FileNotFoundException;
 import java.nio.file.Path;
 import java.security.cert.CertificateException;
@@ -228,7 +227,7 @@ public class ActionEngine implements EngineInterface {
 			// TODO: Disconnect?
 			for (ActionClient client : clients.values()) {
 				try {
-					client.disconnect();
+					client.disconnect(false);
 				} catch (Exception e) {
 					// Ignore
 				}
@@ -263,14 +262,13 @@ public class ActionEngine implements EngineInterface {
 	protected static int SLEEP_TIME_SERVER_STOP = (int) (SLEEP_TIME_SERVER_STOP_BASE * SLEEP_MULTIPLIER);
 	private static int SLEEP_TIME_GROUP_MANIPULATION = (int) (SLEEP_TIME_GROUP_MANIPULATION_BASE * SLEEP_MULTIPLIER);
 
-	public static AbstractRunnableServer.RUNMODE runMode = AbstractRunnableServer.RUNMODE.AUTOMATIC;
-
 	public static int getServerStartTimeDelay() {
 		return SLEEP_TIME_SERVER_START;
 	}
 
 	private static final AbstractServerProfile DEFAULT_SERVER = ImmutableServerProfiles.SERVER_0;
 
+	private static final long SERVER_KILL_DELAY_MS = 30000;
 	private static final RunnableServerManager serverManager = RunnableServerManager.getInstance();
 
 	public ActionEngine(AbstractServerProfile... servers) {
@@ -315,32 +313,15 @@ public class ActionEngine implements EngineInterface {
 		SLEEP_TIME_SEND_MESSAGE = (int) (SLEEP_TIME_SEND_MESSAGE_BASE * multiplier);
 	}
 
-	/**
-	 * If set to true, all tests will pause when the server start or shutdown instruction is sent, allowing the user to
-	 * manually turn the server on and off (useful for debugging)
-	 *
-	 * @param runMode What run mode to run in
-	 */
-	public static synchronized void setControlMode(AbstractRunnableServer.RUNMODE runMode) {
-		ActionEngine.runMode = runMode;
-		AbstractRunnableServer.setControlMode(runMode);
-	}
-
 	public static synchronized void setRemoteDebuggee(@Nullable Integer serverIdentifier) {
 		AbstractRunnableServer.setDebuggee(serverIdentifier);
 	}
 
 	public void sleep(int milliseconds) {
-		if (runMode.sleepAutomatically) {
-			try {
-				Thread.sleep(milliseconds);
-			} catch (InterruptedException e) {
-				System.out.println(e.getMessage());
-			}
-
-		} else {
-			Console console = System.console();
-			console.readLine("Press enter to continue.");
+		try {
+			Thread.sleep(milliseconds);
+		} catch (InterruptedException e) {
+			System.out.println(e.getMessage());
 		}
 	}
 
@@ -384,7 +365,7 @@ public class ActionEngine implements EngineInterface {
 		} else if (!disconnectingClient.isConnected()) {
 			System.err.println("Client " + disconnectingClient + " is already disconnected!");
 		} else {
-			disconnectingClient.disconnect();
+			disconnectingClient.disconnect(true);
 			System.out.println(disconnectingClient + " disconnected.");
 		}
 
@@ -410,7 +391,7 @@ public class ActionEngine implements EngineInterface {
 		System.out.println("Removing input \"" + input.getConsistentUniqueReadableIdentifier() + "\"(" + tTot + "s).");
 		sleep(SLEEP_ADDREMOVE_INPUT);
 	}
-	
+
 	@Override
 	public void onlineRemoveDataFeedAndVerify(@NotNull AbstractConnection dataFeed) {
 		data.engineIterationDataClear();
@@ -550,7 +531,7 @@ public class ActionEngine implements EngineInterface {
 			sleep(SLEEP_TIME_GROUP_MANIPULATION);
 		}
 	}
-	
+
 	@Override
 	public void onlineAddDataFeed(@NotNull AbstractConnection dataFeed) {
 		data.engineIterationDataClear();
@@ -571,8 +552,17 @@ public class ActionEngine implements EngineInterface {
 	@Override
 	public void startServer(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier) {
 		data.engineIterationDataClear();
-		getRunnableInstanceAndBuildIfnecessary(server).startServer(sessionIdentifier, SLEEP_TIME_SERVER_START);
+		getRunnableInstanceAndBuildIfnecessary(server).startServer(sessionIdentifier, SLEEP_TIME_SERVER_START, false);
 		// The sleep is missing here because it is already done in the above startServer call
+	}
+
+	@Override
+	public void startServerWithStartupValidation(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier, boolean enablePluginManager, boolean enableRetentionService) {
+		data.engineIterationDataClear();
+		AbstractRunnableServer serverInstance = getRunnableInstanceAndBuildIfnecessary(server);
+		serverInstance.enablePluginManagerProcess(enablePluginManager);
+		serverInstance.enableRetentionProcess(enableRetentionService);
+		serverInstance.startServer(sessionIdentifier, SLEEP_TIME_SERVER_START, true);
 	}
 
 	@Override
@@ -580,7 +570,7 @@ public class ActionEngine implements EngineInterface {
 		data.engineIterationDataClear();
 		for (AbstractServerProfile server : servers) {
 			if (serverManager.serverInstanceExists(server)) {
-				serverManager.getServerInstance(server).stopServer();
+				serverManager.getServerInstance(server).stopServer(SERVER_KILL_DELAY_MS);
 				sleep(SLEEP_TIME_SERVER_STOP);
 			}
 		}
@@ -588,7 +578,7 @@ public class ActionEngine implements EngineInterface {
 
 	@Override
 	public void engineFactoryReset() {
-		serverManager.destroyAllServers();
+		serverManager.destroyAllServers(SERVER_KILL_DELAY_MS);
 		sleep(SLEEP_TIME_SERVER_STOP);
 		data.clear();
 	}
@@ -627,7 +617,7 @@ public class ActionEngine implements EngineInterface {
 		serverManager.getServerInstance(serverProvidingSubscription).getOfflineConfigModule().addStaticSubscription(targetInput.generateMatchingStaticSubscription());
 		System.out.println("Static subsciption added to server '" + serverProvidingSubscription + "' for input '" + targetInput + "'.");
 	}
-	
+
 	@Override
 	public void offlineAddSubscriptionFromDataFeedToServer(@NotNull AbstractConnection targetDataFeed, @NotNull AbstractServerProfile serverProvidingSubscription) {
 		data.engineIterationDataClear();
@@ -857,16 +847,16 @@ public class ActionEngine implements EngineInterface {
 	public void missionDetailsGet(@NotNull AbstractUser user) {
 		data.engineIterationDataClear();
 		ActionClient client = data.getClient(user);
-		client.callResponse = client.mission.getAllMissions();;
+		client.callResponse = client.mission.getAllMissions();
 		client.callResponse.setMissionComparisonHintIfPossible(user.getConsistentUniqueReadableIdentifier() + "getMissionsResponse");
 	}
 
 	@Override
 	public void missionDetailsGetByName(@NotNull String missionName, @NotNull AbstractUser user) {
 		data.engineIterationDataClear();
-			ActionClient client = data.getClient(user);
-			client.callResponse = client.mission.getMissionByName(missionName, StateEngine.data.getMissionState(missionName).getPassword());
-			client.callResponse.setMissionComparisonHintIfPossible(user.getConsistentUniqueReadableIdentifier() + "getMissionResponse");
+		ActionClient client = data.getClient(user);
+		client.callResponse = client.mission.getMissionByName(missionName, StateEngine.data.getMissionState(missionName).getPassword());
+		client.callResponse.setMissionComparisonHintIfPossible(user.getConsistentUniqueReadableIdentifier() + "getMissionResponse");
 	}
 
 	@Override
@@ -875,7 +865,7 @@ public class ActionEngine implements EngineInterface {
 		String clientIdentifier = missionOwner.getConsistentUniqueReadableIdentifier();
 		ActionClient client = data.getClient(missionOwner);
 
-		client.callResponse = client.mission.addMissionContents(missionName,new PutMissionContents().addHashes(dataUploadHash), missionOwner.getCotUid());
+		client.callResponse = client.mission.addMissionContents(missionName, new PutMissionContents().addHashes(dataUploadHash), missionOwner.getCotUid());
 		client.callResponse.setMissionComparisonHintIfPossible(clientIdentifier + "addResourceResponse");
 
 		client.verificationCallResponse = client.mission.getMissionByName(missionName, StateEngine.data.getMissionState(missionName).getPassword());
@@ -938,7 +928,7 @@ public class ActionEngine implements EngineInterface {
 	public void missionSubscribe(@NotNull AbstractUser missionOwner, @NotNull String missionName, @NotNull AbstractUser user) {
 		data.engineIterationDataClear();
 		ActionClient ownerClient = data.getClient(missionOwner);
-		ownerClient.callResponse =  ownerClient.mission.createMissionSubscription(missionName, user.getCotUid());
+		ownerClient.callResponse = ownerClient.mission.createMissionSubscription(missionName, user.getCotUid());
 	}
 
 	@Override

@@ -2,22 +2,34 @@ package tak.server.federation.hub.broker;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 
-import com.google.common.base.Strings;
 import org.apache.ignite.services.Service;
-import org.apache.ignite.services.ServiceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.bbn.roger.fig.FederationUtils;
+import com.google.common.base.Strings;
+
 import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
+import tak.server.federation.hub.broker.events.UpdatePolicy;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
+import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
+import tak.server.federation.hub.ui.graph.FederationPolicyModel;
+import tak.server.federation.hub.ui.graph.PolicyObjectCell;
 
 public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 
@@ -25,7 +37,7 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 
     private static final Logger logger = LoggerFactory.getLogger(FederationHubBrokerImpl.class);
 
-    private static String getCN(String dn) throws RuntimeException {
+    public static String getCN(String dn) throws RuntimeException {
         if (Strings.isNullOrEmpty(dn)) {
             throw new IllegalArgumentException("empty DN");
         }
@@ -76,36 +88,69 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 
         try {
             String dn = ca.getSubjectX500Principal().getName();
-            String alias = getCN(dn);
+            String alias = FederationUtils.getBytesSHA256(ca.getEncoded());
+                        
             sslConfig.getTrust().setEntry(alias, new KeyStore.TrustedCertificateEntry(ca), null);
             saveTruststoreFile(sslConfig, fedHubConfig);
             sslConfig.refresh();
             FederationHubBrokerUtils.sendCaGroupToFedManager(fedHubPolicyManager, ca);
             depProxy.restartV2Server();
-        } catch (KeyStoreException | RuntimeException e) {
+        } catch (KeyStoreException | RuntimeException | CertificateEncodingException e) {
             logger.error("Exception adding CA", e);
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    public void cancel(ServiceContext ctx) {
+    public void cancel() {
         if (logger.isDebugEnabled()) {
             logger.debug("cancel() in " + getClass().getName());
         }
     }
 
     @Override
-    public void init(ServiceContext ctx) throws Exception {
+    public void init() throws Exception {
         if (logger.isDebugEnabled()) {
             logger.debug("init() in " + getClass().getName());
         }
     }
 
     @Override
-    public void execute(ServiceContext ctx) throws Exception {
+    public void execute() throws Exception {
         if (logger.isDebugEnabled()) {
             logger.debug("execute() in " + getClass().getName());
         }
     }
+
+	@Override
+	public void updatePolicy(FederationPolicyModel federationPolicyModel) {
+		Collection<PolicyObjectCell> cells = federationPolicyModel.getCells();
+		
+		if (cells != null) {
+			List<FederationOutgoingCell> outgoings = new ArrayList<>();
+			cells.stream().filter(cell -> cell instanceof FederationOutgoingCell).forEach( cell -> {
+				outgoings.add((FederationOutgoingCell) cell);
+	        });
+			
+			FederationHubDependencyInjectionProxy.getSpringContext().publishEvent(new UpdatePolicy(this, outgoings));
+		}
+	}
+
+	@Override
+	public List<HubConnectionInfo> getActiveConnections() {
+		return FederationHubDependencyInjectionProxy.getInstance()
+			.hubConnectionStore()
+			.getClientStreamMap()
+			.values()
+			.stream()
+			.filter(holder -> holder.isClientHealthy(FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfig().getClientTimeoutTime()))
+			.filter(holder -> holder.getSubscription() != null)
+			.map(holder -> {
+				HubConnectionInfo info = new HubConnectionInfo();
+				info.setConnectionId(holder.getFederateIdentity().getFedId());
+				info.setConnectionType(holder.getSubscription().getIdentity().getType().toString());
+				return info;
+			})
+			.collect(Collectors.toList());
+	}
 }

@@ -22,6 +22,7 @@ import org.owasp.esapi.errors.ValidationException;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
@@ -81,7 +82,7 @@ public class CreateSubscriptionServlet extends EsapiServlet {
 		
 		String uid = request.getParameter("uid").trim();
 		if (validator != null && !validator.isValidInput(CONTEXT, uid, "MartiSafeString", 
-				MartiValidator.DEFAULT_STRING_CHARS, false) || uid.isEmpty()) {
+				MartiValidatorConstants.DEFAULT_STRING_CHARS, false) || uid.isEmpty()) {
 				String message = "Bad value for request parameter \"uid\"";
 				log.severe(message);
 				response.sendError(HttpServletResponse.SC_BAD_REQUEST, message);
@@ -114,9 +115,9 @@ public class CreateSubscriptionServlet extends EsapiServlet {
 				}
 				
 				connType = validator.getValidInput(CONTEXT, connType, "SupportedProtocol", 
-							MartiValidator.SHORT_STRING_CHARS, false);
+							MartiValidatorConstants.SHORT_STRING_CHARS, false);
 				subscriberAddress = validator.getValidInput(CONTEXT, subscriberAddress, "MartiSafeString", 
-							MartiValidator.DEFAULT_STRING_CHARS, false);
+							MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 
 				subscriberPort = Integer.parseInt(request.getParameter("subport"));
 				if (subscriberPort < 0 || subscriberPort > 65535) {

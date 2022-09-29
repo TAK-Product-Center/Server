@@ -126,7 +126,10 @@ public class Resources {
 
 	// pool used for message brokering
 	public static final ExecutorService fedMissionPackageExecutor = !IS_LOW_CORE ? newExecutorService("FedMissionPackageExecutor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-
+	
+	// use a single pool here to help keep ROL submissions ordered. This is important for resource creates + updates where order matters
+	public static final ExecutorService federationROLExecutor = newExecutorService("FederationROLExecutor", 1, 1);
+	
 	// pool used for periodic auth updates
 	public static final ScheduledExecutorService authThreadPool = !IS_LOW_CORE ? newScheduledExecutor("AuthUpdateProcessor", POOL_SIZE_MAX) : lowCoreScheduledExecutorService;
 

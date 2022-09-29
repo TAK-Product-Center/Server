@@ -58,7 +58,7 @@ public class DeleteServlet extends EnterpriseSyncServlet {
         String groupVector = null;
         
         try {
-            groupVector = martiUtil.getGroupBitVector(request);
+            groupVector = commonUtil.getGroupBitVector(request);
         } catch (RemoteException e) { }
         
         if (Strings.isNullOrEmpty(groupVector)) {

@@ -7,9 +7,23 @@ import java.sql.Array;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.SimpleTimeZone;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -28,6 +42,7 @@ import org.locationtech.jts.geom.Polygon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -56,6 +71,7 @@ import com.bbn.marti.logging.AuditLogUtil;
 import com.bbn.marti.maplayer.MapLayerService;
 import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.DataFeedCotService;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.SubmissionInterface;
 import com.bbn.marti.remote.SubscriptionManagerLite;
@@ -72,24 +88,42 @@ import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.sync.MissionChangeType;
 import com.bbn.marti.remote.sync.MissionContent;
+import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.remote.util.SecureXmlParser;
 import com.bbn.marti.service.kml.KMLService;
 import com.bbn.marti.service.kml.KmlIconStrategyJaxb;
 import com.bbn.marti.sync.Metadata;
-import com.bbn.marti.sync.model.*;
+import com.bbn.marti.sync.model.DataFeedDao;
+import com.bbn.marti.sync.model.ExternalMissionData;
+import com.bbn.marti.sync.model.Location;
+import com.bbn.marti.sync.model.LogEntry;
+import com.bbn.marti.sync.model.MinimalMission;
+import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.Mission.MissionAdd;
 import com.bbn.marti.sync.model.Mission.MissionAddDetails;
+import com.bbn.marti.sync.model.MissionChange;
+import com.bbn.marti.sync.model.MissionChangeUtils;
+import com.bbn.marti.sync.model.MissionChanges;
+import com.bbn.marti.sync.model.MissionFeed;
+import com.bbn.marti.sync.model.MissionFeedUtils;
+import com.bbn.marti.sync.model.MissionInvitation;
+import com.bbn.marti.sync.model.MissionPermission;
+import com.bbn.marti.sync.model.MissionRole;
+import com.bbn.marti.sync.model.MissionSubscription;
+import com.bbn.marti.sync.model.Resource;
+import com.bbn.marti.sync.model.ResourceUtils;
+import com.bbn.marti.sync.model.UidDetails;
 import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.sync.repository.ExternalMissionDataRepository;
 import com.bbn.marti.sync.repository.LogEntryRepository;
 import com.bbn.marti.sync.repository.MissionChangeRepository;
+import com.bbn.marti.sync.repository.MissionFeedRepository;
 import com.bbn.marti.sync.repository.MissionInvitationRepository;
 import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.repository.MissionRoleRepository;
 import com.bbn.marti.sync.repository.MissionSubscriptionRepository;
 import com.bbn.marti.sync.repository.ResourceRepository;
-import com.bbn.marti.sync.repository.MissionFeedRepository;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.GeomUtils;
 import com.bbn.marti.util.TimeUtils;
@@ -97,6 +131,7 @@ import com.bbn.marti.util.missionpackage.ContentType;
 import com.bbn.marti.util.missionpackage.MissionPackage;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.beust.jcommander.internal.Lists;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
@@ -180,6 +215,13 @@ public class MissionServiceDefaultImpl implements MissionService {
 	private AsyncTaskExecutor asyncExecutor;
 
 	private static MissionService missionService;
+	
+	@Autowired
+	@Qualifier(Constants.TAKMESSAGE_MAPPER)
+	private ObjectMapper mapper;
+	
+	@Autowired
+	DataFeedCotService dataFeedCotService;
 
 	private final ThreadLocal<CotParser> cotParser = new ThreadLocal<>();
 	
@@ -1126,11 +1168,11 @@ public class MissionServiceDefaultImpl implements MissionService {
 			return null;
 		}
 	}
+
 	@Override
 	@Transactional
-	public MissionSubscription missionSubscribe(String missionName, String clientUid, String groupVector) {
+	public MissionSubscription missionSubscribe(String missionName, String clientUid, MissionRole missionRole, String groupVector) {
 		Mission mission = getMissionService().getMission(missionName, groupVector);
-		MissionRole defaultRole = getDefaultRole(mission);
 
 		String username = "";
 		try {
@@ -1141,7 +1183,14 @@ public class MissionServiceDefaultImpl implements MissionService {
 			}
 		}
 
-		return missionSubscribe(missionName, mission.getId(), clientUid, username, defaultRole, groupVector);
+		return missionSubscribe(missionName, mission.getId(), clientUid, username, missionRole, groupVector);
+	}
+
+	@Override
+	@Transactional
+	public MissionSubscription missionSubscribe(String missionName, String clientUid, String groupVector) {
+		Mission mission = getMissionService().getMission(missionName, groupVector);
+		return missionSubscribe(missionName, clientUid, getDefaultRole(mission), groupVector);
 	}
 
 	@Override
@@ -1340,6 +1389,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 				MissionChanges missionChanges = new MissionChanges();
 				missionChanges.add(change);
 
+				MissionChangeUtils.findAndSetTransientValuesForMissionChange(change);
+				
 				String changeXml = commonUtil.toXml(missionChanges);
 				
 				if (changeLogger.isTraceEnabled()) {
@@ -1449,6 +1500,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 		for (MissionChange change : changes) {
 
+			MissionChangeUtils.findAndSetContentResource(change);
+
 			// ignore non file changes
 			if (change.getContentResource() == null) {
 				continue;
@@ -1472,13 +1525,16 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 		for (MissionChange change : changes) {
 
+			MissionChangeUtils.findAndSetExternalMissionData(change);
+			ExternalMissionData externalMissionData = change.getExternalMissionData();
+			
 			// ignore non ExternalData changes
-			if (change.getExternalData() == null) {
+			if (externalMissionData == null) {
 				continue;
 			}
 
 			// skip anything that's not our ExternalData
-			if (pendingChange.getTempExternalData().getId().compareToIgnoreCase(change.getExternalData().getId()) != 0) {
+			if (pendingChange.getTempExternalData().getId().compareToIgnoreCase(externalMissionData.getId()) != 0) {
 				continue;
 			}
 
@@ -1880,6 +1936,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 		MissionChanges changes = new MissionChanges();
 		changes.add(change);
 
+		MissionChangeUtils.findAndSetTransientValuesForMissionChange(change);
+
 		try {
 			subscriptionManager.announceMissionChange(missionName, creatorUid, mission.getTool(),
 					commonUtil.toXml(changes));
@@ -1962,7 +2020,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 				// this is a hack because for some reason the resources from mission.getContents() 
 				// don't return keywords
 				try {
-					Resource resourceWithKeywords = Resource.fetchResourceByHash(resource.getHash());
+					Resource resourceWithKeywords = ResourceUtils.fetchResourceByHash(resource.getHash());
 					resource.setKeywords(resourceWithKeywords.getKeywords());
 				} catch (Exception e) {
 					logger.info("could not fetch keywords for " + resource.getHash());
@@ -2177,15 +2235,24 @@ public class MissionServiceDefaultImpl implements MissionService {
 			} else {
 				id = missionRepository.create(new Date(), trimName(name), creatorUid, groupVector, description, chatRoom, baseLayer, bbox, path, classification, tool, passwordHash, defaultRole.getId(), expirationValue, boundingPolygon);
 			}
+			
+			if (logger.isDebugEnabled()) {
+				logger.debug("saved mission " + name + " in missionRepository");
+			}
 
 			mission.setId(id);
 			mission = missionRepository.getOne(id);
 
 			createChange.setMission(mission);
 			createChange.setMissionName(trimName(name));
-
+			
 			// record the create mission action in the changelog
 			missionChangeRepository.save(createChange);
+			
+			
+			if (logger.isDebugEnabled()) {
+				logger.debug("saved createChange in missionRepository");
+			}
 
 			// in case someone subscribed to it before it was created / or concurrently
 			try {
@@ -2197,7 +2264,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 		} catch (DataIntegrityViolationException e) { // safely ignored in the case of mission that already exists
 			if (logger.isDebugEnabled()) {
-				logger.debug("mission " + name + " already exists");
+				logger.debug("mission " + name + " already exists", e);
 			}
 		} catch (Exception e) {
 			throw new TakException("exception saving mission", e);
@@ -2366,7 +2433,16 @@ public class MissionServiceDefaultImpl implements MissionService {
 		if (tool == null) {
 			missions = missionRepository.getAllMissions(passwordProtected, defaultRole, groupVector);
 		} else {
-			missions = missionRepository.getAllMissionsByTool(passwordProtected, defaultRole, tool, groupVector);
+			if (tool.equalsIgnoreCase("public") &&
+					coreConfig.getRemoteConfiguration().getVbm() != null &&
+					coreConfig.getRemoteConfiguration().getVbm().isEnabled() &&
+					coreConfig.getRemoteConfiguration().getVbm().isReturnCopsWithPublicMissions()) {
+				missions = missionRepository.getAllMissionsByTools(passwordProtected, defaultRole,
+						Arrays.asList(tool, coreConfig.getRemoteConfiguration().getNetwork().getMissionCopTool()),
+						groupVector);
+			} else {
+				missions = missionRepository.getAllMissionsByTool(passwordProtected, defaultRole, tool, groupVector);
+			}
 		}
 
 		for (Mission mission : missions) {
@@ -2546,6 +2622,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 		}
 
 		missionChangeRepository.saveAndFlush(change);
+
+		MissionChangeUtils.findAndSetTransientValuesForMissionChange(change);
 
 		return changes;
 	}
@@ -3209,6 +3287,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 		missionChangeRepository.saveAndFlush(change);
 
+		MissionChangeUtils.findAndSetTransientValuesForMissionChange(change);
+
 		return changes;
 	}
 
@@ -3218,24 +3298,53 @@ public class MissionServiceDefaultImpl implements MissionService {
 	}
 
 	@Override
+	public DataFeedDao getDataFeed(String dataFeedUid) {
+		if (!Strings.isNullOrEmpty(dataFeedUid)) {
+			List<DataFeedDao> results = dataFeedRepository.getDataFeedByUUID(dataFeedUid);
+			
+			if (results != null && results.size() > 0) {
+				return results.get(0);
+			}
+		}
+
+		return null;
+	}
+
+	@Override
 	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
 	public MissionFeed addFeedToMission(String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterBbox, String filterType, String filterCallsign) {
-		MissionFeed missionFeed = new MissionFeed();
-		missionFeed.setUid(UUID.randomUUID().toString());
-		missionFeed.setDataFeedUid(dataFeedUid);
-		missionFeed.setFilterBbox(filterBbox);
-		missionFeed.setFilterType(filterType);
-		missionFeed.setFilterCallsign(filterCallsign);
-		missionFeed.setMission(mission);
-		missionFeed = missionFeedRepository.save(missionFeed);
+		return getMissionService().addFeedToMission(UUID.randomUUID().toString(), missionName, creatorUid, mission, dataFeedUid, filterBbox, filterType, filterCallsign);
+	}
+	
+	@Override
+	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
+	public MissionFeed addFeedToMission(String missionFeedUid, String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterBbox, String filterType, String filterCallsign) {
+		MissionFeed missionFeed = missionFeedRepository.getByUidNoMission(missionFeedUid);
+	    
+		if (missionFeed == null) {
+			missionFeed = new MissionFeed();
+			missionFeed.setUid(missionFeedUid);
+			missionFeed.setDataFeedUid(dataFeedUid);
+			missionFeed.setFilterBbox(filterBbox);
+			missionFeed.setFilterType(filterType);
+			missionFeed.setFilterCallsign(filterCallsign);
+			missionFeed.setMission(mission);
+			
+			missionFeed = missionFeedRepository.save(missionFeed); // FIXME:  org.postgresql.util.PSQLException: The column name resource3_18_1_ was not found in this ResultSet
 
-		// record the change
-		MissionChanges changes = saveFeedChangeAtTime(
-				missionFeed.getUid(), creatorUid, MissionChangeType.ADD_CONTENT, mission, new Date());
+			// record the change
+			MissionChanges changes = saveFeedChangeAtTime(
+					missionFeed.getUid(), creatorUid, MissionChangeType.CREATE_DATA_FEED, mission, new Date());
 
-		// notify users of the change
-		subscriptionManager.announceMissionChange(mission.getName(),
-				ChangeType.DATA_FEED, creatorUid, mission.getTool(), commonUtil.toXml(changes));
+			// notify users of the change
+			subscriptionManager.announceMissionChange(mission.getName(),
+					ChangeType.DATA_FEED, creatorUid, mission.getTool(), commonUtil.toXml(changes));
+			
+			MissionFeedUtils.findAndSetNameForMissionFeed(missionFeed);
+		
+		}else {
+			MissionFeedUtils.findAndSetNameForMissionFeed(missionFeed);
+		}
 
 		return missionFeed;
 	}
@@ -3243,17 +3352,19 @@ public class MissionServiceDefaultImpl implements MissionService {
 	@Override
 	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
 	public void removeFeedFromMission(String missionName, String creatorUid, Mission mission, String missionFeedUid) {
-
-		missionFeedRepository.deleteByUid(missionFeedUid);
-
-		// record the change
-		MissionChanges changes = saveFeedChangeAtTime(
-				missionFeedUid, creatorUid, MissionChangeType.REMOVE_CONTENT, mission, new Date());
-
-		// notify users of the change
-		subscriptionManager.announceMissionChange(mission.getName(),
-				ChangeType.DATA_FEED, creatorUid, mission.getTool(), commonUtil.toXml(changes));
-
+		MissionFeed missionFeed = missionFeedRepository.getByUidNoMission(missionFeedUid);
+		
+		if (missionFeed != null) {
+			// record the change
+			MissionChanges changes = saveFeedChangeAtTime(
+					missionFeedUid, creatorUid, MissionChangeType.DELETE_DATA_FEED, mission, new Date());
+					
+			// notify users of the change
+			subscriptionManager.announceMissionChange(mission.getName(), 
+					ChangeType.DATA_FEED, creatorUid, mission.getTool(), commonUtil.toXml(changes));
+			
+			missionFeedRepository.deleteByUid(missionFeedUid);
+		}
 	}
 
 	private MissionChanges saveMapLayerChangeAtTime(String mapLayerUid, String creatorUid, MissionChangeType missionChangeType,
@@ -3266,8 +3377,10 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 		change.setTimestamp(date);
 		change.setCreatorUid(creatorUid);
-
+		
 		missionChangeRepository.saveAndFlush(change);
+
+		MissionChangeUtils.findAndSetTransientValuesForMissionChange(change);
 
 		return changes;
 	}
@@ -3278,7 +3391,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		try {
 			mapLayer = mapLayerService.getMapLayerForUid(mapLayerUid);
 		} catch (Exception e) {
-			logger.error("exception in getMapLayer", e);
+			logger.debug("exception in getMapLayer " + e.getMessage());
 		}
 		return mapLayer;
 	}
@@ -3325,11 +3438,26 @@ public class MissionServiceDefaultImpl implements MissionService {
 	public List<Mission> getMissionsForDataFeed(String feed_uid) {
 		return missionRepository.getMissionsForDataFeed(feed_uid);
 	}
+	
+	
+	@Override
+	@Cacheable(value = Constants.ALL_MISSION_CACHE, key="{#root.methodName, #root.args[0]}", sync = true)
+	public List<String> getMinimalMissionsJsonForDataFeed(String feed_uid) throws JsonProcessingException {
+		
+		List<String> result = new ArrayList<>();
+		
+		for (Mission m : missionRepository.getMissionsForDataFeed(feed_uid)) {
+			result.add(mapper.writeValueAsString(new MinimalMission(m))); // convert the mission to a MinimalMission
+		}
+		
+		return result;
+	}
 
 	@Override
-	public void sendLatestFeedEvents(Mission mission, MissionFeed missionFeed, String clientUid, String groupVector) {
+	public void sendLatestFeedEvents(Mission mission, MissionFeed missionFeed, List<String> clientUidList, String groupVector) {
 		try {
-			List<String> clientUidList = Collections.singletonList(clientUid);
+			if (!coreConfig.getRemoteConfiguration().getVbm().isEnabled()) return;
+			
 			NavigableSet<Group> groups = groupManager.groupVectorToGroupSet(mission.getGroupVector());
 
 			Polygon polygon = null;
@@ -3345,7 +3473,6 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 			int sent = 0;
 			for (DataFeedDao datafeed : dataFeedRepository.getDataFeedByUUID(missionFeed.getDataFeedUid())) {
-
 				if (!datafeed.isSync()) {
 					continue;
 				}
@@ -3354,36 +3481,31 @@ public class MissionServiceDefaultImpl implements MissionService {
 					logger.debug("found datafeed to sync " + datafeed.getUUID());
 				}
 
-				// list of unique event ids contained in the feed
-				List<String> feedEventUids = dataFeedRepository.getFeedEventUids(missionFeed.getDataFeedUid());
-
-				Collection<CotCacheWrapper> feedEvents = cotCacheHelper.getLatestCotWrappersForUids(
-						new HashSet<>(feedEventUids), groupVector, false);
+				Collection<CotEventContainer> feedEvents = dataFeedCotService.getCachedDataFeedEvents(datafeed.getUUID());				
 
 				if (logger.isDebugEnabled()) {
 					logger.debug("found events to sync : " + feedEvents.size());
 				}
-
+				
 				// iterate over the events
-				for (CotCacheWrapper feedEvent : feedEvents) {
-
+				for (CotEventContainer feedEvent : feedEvents) {
 					if (polygon != null && !GeomUtils.polygonContainsCoordinate(polygon,
-							feedEvent.getCotElement().lat, feedEvent.getCotElement().lon)) {
+							feedEvent.getLatDouble(), feedEvent.getLonDouble())) {
 						continue;
 					} else if (boundingBox != null && !GeomUtils.bboxContainsCoordinate(
-							boundingBox, feedEvent.getCotElement().lat, feedEvent.getCotElement().lon)) {
+							boundingBox, feedEvent.getLatDouble(), feedEvent.getLonDouble())) {
 						continue;
 					}
 
 					long now = new Date().getTime();
+					Timestamp nowTs = new Timestamp(now);
+					feedEvent.setServerTime(nowTs == null ? "" : DateUtil.toCotTime(nowTs.getTime()));
+					
 					long staleSeconds = 365 * 24 * 60 * 60;
-					feedEvent.getCotElement().setServertime(now);
-					feedEvent.getCotElement().setStaletime(now + (staleSeconds * 1000));
-
+					Timestamp staleTs = new Timestamp(staleSeconds);
+					feedEvent.setStale(staleTs == null ? "" : DateUtil.toCotTime(staleTs.getTime()));
 					// send the event to the COP subscriber
-					submission.submitCot(
-							feedEvent.getCotElement().toCotXml(), clientUidList,
-							new ArrayList<String>(), groups, false, true);
+					submission.submitCot(feedEvent, clientUidList, new ArrayList<String>(), groups, false, true);
 
 					sent++;
 				}

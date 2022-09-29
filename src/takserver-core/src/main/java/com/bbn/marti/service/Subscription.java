@@ -16,6 +16,7 @@ import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.cot.filter.DropEventFilter;
 import com.bbn.cot.filter.GeospatialEventFilter;
 import com.bbn.marti.config.Configuration;
+import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.nio.codec.Codec;
 import com.bbn.marti.nio.protocol.Protocol;
@@ -29,6 +30,7 @@ import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.google.common.collect.Lists;
 
+import tak.server.Constants;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotEventContainer;
 import tak.server.ignite.IgniteHolder;
@@ -65,6 +67,9 @@ public class Subscription extends RemoteSubscription {
 	}
 
 	public void setLatestSA(CotEventContainer latestSA) {
+		// don't store messages that came from a data feed as latest SA
+        if (isDataFeed.get()) return;
+        
 		this.latestSA = latestSA;
 		
 		String prevTeam = this.team;

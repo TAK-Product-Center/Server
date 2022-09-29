@@ -8,7 +8,6 @@ import com.bbn.marti.takcl.TestLogger;
 import com.bbn.marti.takcl.cli.EndUserReadableException;
 import com.bbn.marti.takcl.cli.simple.Command;
 import com.bbn.marti.takcl.config.common.TakclRunMode;
-import com.bbn.marti.takcl.connectivity.AbstractRunnableServer;
 import com.bbn.marti.test.shared.AbstractSingleServerTestClass;
 import com.bbn.marti.test.shared.AbstractTestClass;
 import com.bbn.marti.tests.*;
@@ -60,6 +59,7 @@ public class TestRunnerModule implements AppModuleInterface {
 			FederationV2Tests.class,
 			GeneralTests.class,
 			InputTests.class,
+			StartupTests.class,
 			StreamingDataFeedsTests.class,
 			PointToPointTests.class,
 			SubscriptionTests.class,
@@ -243,7 +243,7 @@ public class TestRunnerModule implements AppModuleInterface {
 		List<RequestContainer> requests = RequestContainer.fromTestIdentifiers(testIdentifier);
 
 		for (RequestContainer request : requests) {
-			Result result = runTestImpl(AbstractRunnableServer.RUNMODE.AUTOMATIC, null, request);
+			Result result = runTestImpl(request);
 			resultMap.put(request, result);
 			if (result.getFailureCount() > 0) {
 				testResult = false;
@@ -541,8 +541,7 @@ public class TestRunnerModule implements AppModuleInterface {
 //		}
 //	}
 
-	private Result runTestImpl(@NotNull AbstractRunnableServer.RUNMODE runMode, @Nullable Integer debugServerProfile,
-	                           @NotNull RequestContainer testRequestContainer) throws EndUserReadableException {
+	private Result runTestImpl(@NotNull RequestContainer testRequestContainer) throws EndUserReadableException {
 		Request testRequest = testRequestContainer.testRequest;
 
 		if (testRequest.getRunner().getDescription().getChildren().size() != 1) {

@@ -17,8 +17,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration;
 import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration;
-import org.springframework.cloud.aws.autoconfigure.context.properties.AwsS3ResourceLoaderProperties;
-import org.springframework.cloud.aws.autoconfigure.metrics.CloudWatchExportAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
@@ -59,8 +57,8 @@ import com.bbn.marti.nio.netty.NioNettyBuilder;
 import com.bbn.marti.nio.server.NioServer;
 import com.bbn.marti.remote.ContactManager;
 import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.DataFeedCotService;
 import com.bbn.marti.remote.FederationManager;
-import com.bbn.marti.remote.RepeaterManager;
 import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.groups.FileUserManagementInterface;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -85,10 +83,12 @@ import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.EnterpriseSyncService;
+import com.bbn.marti.sync.federation.DataFeedFederationAspect;
 import com.bbn.marti.sync.federation.FederationROLHandler;
 import com.bbn.marti.sync.federation.MissionActionROLConverter;
 import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.sync.repository.FederationEventRepository;
+import com.bbn.marti.sync.service.DistributedDataFeedCotService;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
@@ -101,8 +101,11 @@ import com.bbn.metrics.service.NetworkMetricsService;
 import com.bbn.metrics.service.QueueMetricsService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.awspring.cloud.autoconfigure.context.properties.AwsS3ResourceLoaderProperties;
+import io.awspring.cloud.autoconfigure.metrics.CloudWatchExportAutoConfiguration;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
+import tak.server.cache.DataFeedCotCacheHelper;
 import tak.server.cache.MissionCacheResolver;
 import tak.server.cache.PluginDatafeedCacheHelper;
 import tak.server.cluster.DistributedInjectionService;
@@ -180,8 +183,7 @@ public class MessagingConfiguration {
 			FederationEventRepository federationEventRepository) throws RemoteException {
 		DistributedFederationManager distributedFederationManager = new DistributedFederationManager(nettyBuilder, ignite, coreConfig);
 		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_FEDERATION_MANAGER, distributedFederationManager);
-		return (DistributedFederationManager) ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
-				.serviceProxy(Constants.DISTRIBUTED_FEDERATION_MANAGER, FederationManager.class, false);
+		return distributedFederationManager;
 	}
 
 	@Bean
@@ -382,8 +384,8 @@ public class MessagingConfiguration {
 	}
 
 	@Bean
-	public FederationROLHandler federationROLHandler(MissionService missionService, EnterpriseSyncService syncService, RemoteUtil remoteUtil, CoreConfig coreConfig) throws RemoteException {
-		return new FederationROLHandler(missionService, syncService, remoteUtil, coreConfig);
+	public FederationROLHandler federationROLHandler(MissionService missionService, EnterpriseSyncService syncService, RemoteUtil remoteUtil, CoreConfig coreConfig, DataFeedRepository dataFeedRepository) throws RemoteException {
+		return new FederationROLHandler(missionService, syncService, remoteUtil, coreConfig, dataFeedRepository);
 	}
 
 	@Bean
@@ -391,8 +393,7 @@ public class MessagingConfiguration {
 		DistributedRepeaterManager distributedRepeaterManager =  new DistributedRepeaterManager();
 		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_REPEATER_MANAGER, distributedRepeaterManager);
 
-		return (DistributedRepeaterManager) ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
-				.serviceProxy(Constants.DISTRIBUTED_REPEATER_MANAGER, RepeaterManager.class, false);
+		return distributedRepeaterManager;
 	}
 
 	@Bean
@@ -544,6 +545,12 @@ public class MessagingConfiguration {
 		return qosManager;
 	}
 	
+
+	@Bean
+	public DataFeedFederationAspect DataFeedFederationAspect(FederationManager federationManager, MissionActionROLConverter malrc) {
+		return new DataFeedFederationAspect(federationManager, malrc, null);
+	}
+	
 	@Bean
 	public PluginDataFeedApi distributedPluginDataFeedApi(Ignite ignite) {
 		
@@ -589,6 +596,22 @@ public class MessagingConfiguration {
 		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_SELF_STOP_API, distributedPluginSelfStopApi);
 
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_SELF_STOP_API, PluginSelfStopApi.class, false);
+	}
+	
+	@Bean
+	// this distributed services act as a proxy for modifying a local cache.
+	// deploy a remote version to ignite, which will be used for cache gets (infrequent).
+	// return a "local" non remote version as the bean, so that we can perform cache puts (frequent)
+	// without making remote calls to ignite for no reason
+	public DataFeedCotService distributedDataFeedCotService(Ignite ignite) {
+		DistributedDataFeedCotService distributedDataFeedCotService =  new DistributedDataFeedCotService();
+		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_DATAFEED_COT_SERVICE, distributedDataFeedCotService);
 
+		return new DistributedDataFeedCotService();
+	}
+	
+	@Bean
+	public DataFeedCotCacheHelper dataFeedCotCacheHelper(CoreConfig config) {
+		return new DataFeedCotCacheHelper();
 	}
 }

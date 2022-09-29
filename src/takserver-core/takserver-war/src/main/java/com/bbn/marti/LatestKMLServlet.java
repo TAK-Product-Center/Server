@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.bbn.marti.service.kml.KMLService;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 import de.micromata.opengis.kml.v_2_2_0.Kml;
 import tak.server.Constants;
@@ -78,19 +79,19 @@ public class LatestKMLServlet extends EsapiServlet {
 
 		optionalHttpParameters = new HashMap<String, HttpParameterConstraints>();
 		optionalHttpParameters.put(QueryParameter.cotType.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.MartiSafeString, MartiValidator.DEFAULT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.interval.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.Double, MartiValidator.SHORT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.Double, MartiValidatorConstants.SHORT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.startTime.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.Timestamp, MartiValidator.DEFAULT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.Timestamp, MartiValidatorConstants.DEFAULT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.endTime.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.Timestamp, MartiValidator.DEFAULT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.Timestamp, MartiValidatorConstants.DEFAULT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.refreshRate.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.NonNegativeInteger, MartiValidator.SHORT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.NonNegativeInteger, MartiValidatorConstants.SHORT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.secago.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.NonNegativeInteger, MartiValidator.SHORT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.NonNegativeInteger, MartiValidatorConstants.SHORT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.format.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.SafeString, MartiValidator.SHORT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.SafeString, MartiValidatorConstants.SHORT_STRING_CHARS));
 
 	}
 
@@ -127,8 +128,8 @@ public class LatestKMLServlet extends EsapiServlet {
                 if(cotType != null) {
                    if (validator != null) {
 			try {
-				cotType = validator.getValidInput(CONTEXT, cotType, MartiValidator.Regex.CotType.name(), 
-						MartiValidator.DEFAULT_STRING_CHARS, true);
+				cotType = validator.getValidInput(CONTEXT, cotType, MartiValidatorConstants.Regex.CotType.name(), 
+						MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 			} catch (ValidationException ex) {
 				response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Unsafe parameter value detected.");
 				return;
@@ -159,7 +160,7 @@ public class LatestKMLServlet extends EsapiServlet {
 		OutputStream servletReponseOutputStream = null;
 		String contentDisposition = "filename=" + DEFAULT_FILENAME_BASE + "-" + cotType + ".kml";
 		try {
-			contentDisposition = validator.getValidInput("Content Disposition", contentDisposition, "Filename", MartiValidator.DEFAULT_STRING_CHARS, false);
+			contentDisposition = validator.getValidInput("Content Disposition", contentDisposition, "Filename", MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 		} catch (ValidationException ex) {
 			log.severe(ex.getMessage());
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Unsafe filename value detected.");

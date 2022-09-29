@@ -1,9 +1,7 @@
 package com.bbn.marti.test.shared.engines;
 
-import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.takcl.TestExceptions;
 import com.bbn.marti.takcl.TestLogger;
-import com.bbn.marti.takcl.connectivity.AbstractRunnableServer;
 import com.bbn.marti.takcl.connectivity.missions.MissionModels;
 import com.bbn.marti.test.shared.data.GroupProfiles;
 import com.bbn.marti.test.shared.data.GroupSetProfiles;
@@ -45,16 +43,6 @@ public class TestEngine implements EngineInterface, Callable<String> {
 
 	public synchronized void setSendValidationDelayMultiplier(double multiplier) {
 		actionEngine.setSendValidationDelayMultiplier(multiplier);
-	}
-
-	/**
-	 * If set to true, all tests will pause when the server start or shutdown instruction is sent, allowing the user to
-	 * manually turn the server on and off (useful for debugging)
-	 *
-	 * @param runMode Whether or not to force the user to manually start/stop the server
-	 */
-	public synchronized void setControlMode(AbstractRunnableServer.RUNMODE runMode) {
-		actionEngine.setControlMode(runMode);
 	}
 
 	public synchronized void setRemoteDebuggee(@Nullable Integer serverIdentifier) {
@@ -118,74 +106,60 @@ public class TestEngine implements EngineInterface, Callable<String> {
 
 	@Override
 	public void offlineAddSubscriptionFromInputToServer(@NotNull AbstractConnection targetInput, @NotNull AbstractServerProfile serverProvidingSubscription) {
-		if (!TAKCLCore.useRunningServer) {
-			TestLogger.executeEngineCommand("offlineAddSubscriptionFromInputToServer");
-			actionEngine.offlineAddSubscriptionFromInputToServer(targetInput, serverProvidingSubscription);
-			verificationEngine.offlineAddSubscriptionFromInputToServer(targetInput, serverProvidingSubscription);
-			stateEngine.offlineAddSubscriptionFromInputToServer(targetInput, serverProvidingSubscription);
-		}
+		TestLogger.executeEngineCommand("offlineAddSubscriptionFromInputToServer");
+		actionEngine.offlineAddSubscriptionFromInputToServer(targetInput, serverProvidingSubscription);
+		verificationEngine.offlineAddSubscriptionFromInputToServer(targetInput, serverProvidingSubscription);
+		stateEngine.offlineAddSubscriptionFromInputToServer(targetInput, serverProvidingSubscription);
 	}
-	
+
 	@Override
 	public void offlineAddSubscriptionFromDataFeedToServer(@NotNull AbstractConnection targetInput, @NotNull AbstractServerProfile serverProvidingSubscription) {
-		if (!TAKCLCore.useRunningServer) {
-			TestLogger.executeEngineCommand("offlineAddSubscriptionFromInputToServer");
-			actionEngine.offlineAddSubscriptionFromDataFeedToServer(targetInput, serverProvidingSubscription);
-			verificationEngine.offlineAddSubscriptionFromDataFeedToServer(targetInput, serverProvidingSubscription);
-			stateEngine.offlineAddSubscriptionFromDataFeedToServer(targetInput, serverProvidingSubscription);
-		}
+		TestLogger.executeEngineCommand("offlineAddSubscriptionFromInputToServer");
+		actionEngine.offlineAddSubscriptionFromDataFeedToServer(targetInput, serverProvidingSubscription);
+		verificationEngine.offlineAddSubscriptionFromDataFeedToServer(targetInput, serverProvidingSubscription);
+		stateEngine.offlineAddSubscriptionFromDataFeedToServer(targetInput, serverProvidingSubscription);
 	}
 
 	@Override
 	public void offlineFederateServers(boolean useV1Federation, boolean useV2Federation, @NotNull AbstractServerProfile... serversToFederate) {
-		if (!TAKCLCore.useRunningServer) {
-			for (int i = 0; i < serversToFederate.length; i++) {
-				TestLogger.executeEngineCommand("offlineFederateServers");
-			}
-			actionEngine.offlineFederateServers(useV1Federation, useV2Federation, serversToFederate);
-			verificationEngine.offlineFederateServers(useV1Federation, useV2Federation, serversToFederate);
-			stateEngine.offlineFederateServers(useV1Federation, useV2Federation, serversToFederate);
+		for (int i = 0; i < serversToFederate.length; i++) {
+			TestLogger.executeEngineCommand("offlineFederateServers");
 		}
+		actionEngine.offlineFederateServers(useV1Federation, useV2Federation, serversToFederate);
+		verificationEngine.offlineFederateServers(useV1Federation, useV2Federation, serversToFederate);
+		stateEngine.offlineFederateServers(useV1Federation, useV2Federation, serversToFederate);
 	}
 
 	@Override
 	public void offlineAddOutboundFederateConnection(boolean useV2Federation, @NotNull AbstractServerProfile sourceServer, @NotNull AbstractServerProfile targetServer) {
-		if (!TAKCLCore.useRunningServer) {
-			TestLogger.executeEngineCommand("offlineAddOutboundFederateConnection");
-			actionEngine.offlineAddOutboundFederateConnection(useV2Federation, sourceServer, targetServer);
-			verificationEngine.offlineAddOutboundFederateConnection(useV2Federation, sourceServer, targetServer);
-			stateEngine.offlineAddOutboundFederateConnection(useV2Federation, sourceServer, targetServer);
-		}
+		TestLogger.executeEngineCommand("offlineAddOutboundFederateConnection");
+		actionEngine.offlineAddOutboundFederateConnection(useV2Federation, sourceServer, targetServer);
+		verificationEngine.offlineAddOutboundFederateConnection(useV2Federation, sourceServer, targetServer);
+		stateEngine.offlineAddOutboundFederateConnection(useV2Federation, sourceServer, targetServer);
 	}
 
 	@Override
 	public void offlineAddFederate(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate) {
-		if (!TAKCLCore.useRunningServer) {
-			TestLogger.executeEngineCommand("offlineAddFederate");
-			actionEngine.offlineAddFederate(federatedServer, federate);
-			verificationEngine.offlineAddFederate(federatedServer, federate);
-			stateEngine.offlineAddFederate(federatedServer, federate);
-		}
+		TestLogger.executeEngineCommand("offlineAddFederate");
+		actionEngine.offlineAddFederate(federatedServer, federate);
+		verificationEngine.offlineAddFederate(federatedServer, federate);
+		stateEngine.offlineAddFederate(federatedServer, federate);
 	}
 
 	@Override
 	public void offlineAddOutboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String outboundGroupIdentifier) {
-		if (!TAKCLCore.useRunningServer) {
-			TestLogger.executeEngineCommand("offlineAddOutboundFederateGroup");
-			actionEngine.offlineAddOutboundFederateGroup(federatedServer, federate, outboundGroupIdentifier);
-			verificationEngine.offlineAddOutboundFederateGroup(federatedServer, federate, outboundGroupIdentifier);
-			stateEngine.offlineAddOutboundFederateGroup(federatedServer, federate, outboundGroupIdentifier);
-		}
+		TestLogger.executeEngineCommand("offlineAddOutboundFederateGroup");
+		actionEngine.offlineAddOutboundFederateGroup(federatedServer, federate, outboundGroupIdentifier);
+		verificationEngine.offlineAddOutboundFederateGroup(federatedServer, federate, outboundGroupIdentifier);
+		stateEngine.offlineAddOutboundFederateGroup(federatedServer, federate, outboundGroupIdentifier);
 	}
 
 	@Override
 	public void offlineAddInboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String inboundGroupIdentifier) {
-		if (!TAKCLCore.useRunningServer) {
-			TestLogger.executeEngineCommand("offlineAddInboundFederateGroup");
-			actionEngine.offlineAddInboundFederateGroup(federatedServer, federate, inboundGroupIdentifier);
-			verificationEngine.offlineAddInboundFederateGroup(federatedServer, federate, inboundGroupIdentifier);
-			stateEngine.offlineAddInboundFederateGroup(federatedServer, federate, inboundGroupIdentifier);
-		}
+		TestLogger.executeEngineCommand("offlineAddInboundFederateGroup");
+		actionEngine.offlineAddInboundFederateGroup(federatedServer, federate, inboundGroupIdentifier);
+		verificationEngine.offlineAddInboundFederateGroup(federatedServer, federate, inboundGroupIdentifier);
+		stateEngine.offlineAddInboundFederateGroup(federatedServer, federate, inboundGroupIdentifier);
 	}
 
 	@Override
@@ -214,7 +188,7 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		verificationEngine.onlineRemoveInputAndVerify(input);
 		stateEngine.onlineRemoveInputAndVerify(input);
 	}
-	
+
 	@Override
 	public synchronized void onlineRemoveDataFeedAndVerify(@NotNull AbstractConnection dataFeed) {
 		TestLogger.executeEngineCommand("onlineRemoveDataFeedAndVerify");
@@ -238,7 +212,7 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		verificationEngine.onlineAddDataFeed(input);
 		stateEngine.onlineAddDataFeed(input);
 	}
-	
+
 
 	@Override
 	/**
@@ -248,12 +222,10 @@ public class TestEngine implements EngineInterface, Callable<String> {
 	 * @param input
 	 */
 	public synchronized void offlineAddUsersAndConnectionsIfNecessary(@NotNull AbstractUser... users) {
-		if (!TAKCLCore.useRunningServer) {
-			TestLogger.executeEngineCommand("offlineAddUsersAndConnectionsIfNecessary");
-			actionEngine.offlineAddUsersAndConnectionsIfNecessary(users);
-			verificationEngine.offlineAddUsersAndConnectionsIfNecessary(users);
-			stateEngine.offlineAddUsersAndConnectionsIfNecessary(users);
-		}
+		TestLogger.executeEngineCommand("offlineAddUsersAndConnectionsIfNecessary");
+		actionEngine.offlineAddUsersAndConnectionsIfNecessary(users);
+		verificationEngine.offlineAddUsersAndConnectionsIfNecessary(users);
+		stateEngine.offlineAddUsersAndConnectionsIfNecessary(users);
 	}
 
 
@@ -388,13 +360,11 @@ public class TestEngine implements EngineInterface, Callable<String> {
 
 	@Override
 	public void offlineEnableLatestSA(boolean enabled, @NotNull AbstractServerProfile... servers) {
-		if (!TAKCLCore.useRunningServer) {
-			TestLogger.executeEngineCommand("offlineEnableLatestSA");
-			System.out.println("Offline: LatestSA " + (enabled ? "enabled." : "disabled."));
-			actionEngine.offlineEnableLatestSA(enabled, servers);
-			verificationEngine.offlineEnableLatestSA(enabled, servers);
-			stateEngine.offlineEnableLatestSA(enabled, servers);
-		}
+		TestLogger.executeEngineCommand("offlineEnableLatestSA");
+		System.out.println("Offline: LatestSA " + (enabled ? "enabled." : "disabled."));
+		actionEngine.offlineEnableLatestSA(enabled, servers);
+		verificationEngine.offlineEnableLatestSA(enabled, servers);
+		stateEngine.offlineEnableLatestSA(enabled, servers);
 	}
 
 	@Override
@@ -403,6 +373,14 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		actionEngine.startServer(server, sessionIdentifier);
 		verificationEngine.startServer(server, sessionIdentifier);
 		stateEngine.startServer(server, sessionIdentifier);
+	}
+
+	@Override
+	public void startServerWithStartupValidation(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier, boolean enablePluginManager, boolean enableRetentionService) {
+		TestLogger.executeEngineCommand("startServerWithStartupValidation");
+		actionEngine.startServerWithStartupValidation(server, sessionIdentifier, enablePluginManager, enableRetentionService);
+		verificationEngine.startServerWithStartupValidation(server, sessionIdentifier, enablePluginManager, enableRetentionService);
+		stateEngine.startServerWithStartupValidation(server, sessionIdentifier, enablePluginManager, enableRetentionService);
 	}
 
 	@Override

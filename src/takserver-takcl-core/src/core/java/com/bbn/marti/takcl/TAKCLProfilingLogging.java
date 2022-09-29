@@ -4,11 +4,11 @@ import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
 import com.bbn.marti.test.shared.data.users.AbstractUser;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
+import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -276,17 +276,63 @@ public class TAKCLProfilingLogging {
 			this.logger = logger;
 		}
 
-		public void begin(@NotNull LogActivityInterface logEntity) {
+		private void logAtLevel(@NotNull String msg, @NotNull Level logLevel) {
+			switch (logLevel) {
+				case ERROR:
+					logger.error(msg);
+					break;
+				case WARN:
+					logger.warn(msg);
+					break;
+				case INFO:
+					logger.info(msg);
+					break;
+				case DEBUG:
+					logger.debug(msg);
+					break;
+				case TRACE:
+					logger.trace(msg);
+					break;
+			}
+		}
+
+		private void innerBegin(@NotNull LogActivityInterface logEntity, @NotNull Level logLevel) {
 			if (startTimeMap.containsKey(logEntity)) {
 				throw new RuntimeException("Activity '" + logEntity + "' has not ended!");
 			}
 			startTimeMap.put(logEntity, System.currentTimeMillis());
-			logger.info("[" + entityLabel + "] - " + logEntity.startMessage());
+			logAtLevel("[" + entityLabel + "] - " + logEntity.startMessage(), logLevel);
+		}
+
+		private void innerEnd(@NotNull LogActivityInterface logEntity, @NotNull Level logLevel) {
+			logAtLevel("[" + entityLabel + "] - " + logEntity.finishMessage() + " in " +
+					(System.currentTimeMillis() - startTimeMap.remove(logEntity)) + "ms.", logLevel);
+		}
+
+		public void begin(@NotNull LogActivityInterface logEntity) {
+			innerBegin(logEntity, Level.INFO);
 		}
 
 		public void end(@NotNull LogActivityInterface logEntity) {
-			logger.info("[" + entityLabel + "] - " + logEntity.finishMessage() + " in " +
-					(System.currentTimeMillis() - startTimeMap.remove(logEntity)) + "ms.");
+			innerEnd(logEntity, Level.INFO);
+		}
+
+		public void beginDebug(@NotNull LogActivityInterface logEntity) {
+			innerBegin(logEntity, Level.DEBUG);
+		}
+
+		public void endDebug(@NotNull LogActivityInterface logEntity) {
+			innerEnd(logEntity, Level.DEBUG);
+
+		}
+
+		public void beginTrace(@NotNull LogActivityInterface logEntity) {
+			innerBegin(logEntity, Level.TRACE);
+		}
+
+		public void endTrace(@NotNull LogActivityInterface logEntity) {
+			innerEnd(logEntity, Level.TRACE);
+
 		}
 	}
 }

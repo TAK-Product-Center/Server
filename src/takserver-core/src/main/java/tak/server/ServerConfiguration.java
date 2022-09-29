@@ -7,8 +7,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Paths;
 import java.rmi.RemoteException;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -63,7 +61,6 @@ import com.bbn.marti.config.Cluster;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.Connection;
 import com.bbn.marti.config.Network;
-import com.bbn.marti.config.Repository;
 import com.bbn.marti.config.Security;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.config.Tls.Crl;
@@ -92,11 +89,11 @@ import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.service.kml.KMLService;
 import com.bbn.marti.service.kml.KMLServiceImpl;
 import com.bbn.marti.service.kml.KmlIconStrategyJaxb;
-import com.bbn.marti.swaggerconfig.SwaggerConfig;
 import com.bbn.marti.sync.cache.AllCopMissionsCacheKeyGenerator;
 import com.bbn.marti.sync.cache.AllMissionsCacheKeyGenerator;
 import com.bbn.marti.sync.cache.MethodNameMultiStringArgCacheKeyGenerator;
 import com.bbn.marti.sync.model.MissionChange;
+import com.bbn.marti.sync.model.MissionFeed;
 import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.sync.repository.ExternalMissionDataRepository;
 import com.bbn.marti.sync.repository.LogEntryRepository;
@@ -124,7 +121,6 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Strings;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 import tak.server.cache.ActiveGroupCacheHelper;
@@ -142,9 +138,10 @@ import tak.server.ignite.IgniteHolder;
 import tak.server.ignite.grid.SubscriptionManagerProxyHandler;
 import tak.server.messaging.MessageConverter;
 import tak.server.profile.ProfileTracker;
+import tak.server.util.DataSourceUtils;
 
 @ImportResource({"classpath:app-context.xml", "classpath:security-context.xml"})
-@Import({ApiConfiguration.class, ApiOnlyConfiguration.class, MessagingConfiguration.class, MessagingOnlyConfiguration.class, SwaggerConfig.class})
+@Import({ApiConfiguration.class, ApiOnlyConfiguration.class, MessagingConfiguration.class, MessagingOnlyConfiguration.class})
 @EnableCaching
 @EnableAsync
 @EnableGlobalMethodSecurity(prePostEnabled = true)
@@ -532,12 +529,9 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 			profiles.add(Constants.CLUSTER_PROFILE_NAME);
 		}
 
-		if (config.getPlugins().isEnabled()) {
-			profiles.add(Constants.PLUGINS_ENABLED_PROFILE_NAME);
-		} else {
-			profiles.add(Constants.PLUGINS_DISABLED_PROFILE_NAME);
-		}
-
+		// plugins are always enabled
+		profiles.add(Constants.PLUGINS_ENABLED_PROFILE_NAME);
+		
 		application.setAdditionalProfiles(profiles.toArray(new String[0]));
 
 		if (config.getSecurity().getTls() == null) {
@@ -696,7 +690,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		}
 		// make static content available
 		try {
-			properties.put("spring.resources.static-locations", "file:" + config.getNetwork().getExtWebContentDir() + ",classpath:/META-INF/resources/,classpath:/resources/,classpath:/static/,classpath:/public/");
+			properties.put("spring.web.resources.static-locations", "file:" + config.getNetwork().getExtWebContentDir() + ",classpath:/META-INF/resources/,classpath:/resources/,classpath:/static/,classpath:/public/");
 		} catch (Exception e) {
 			logger.warn("exception setting webcontent directory location option", e);
 		}
@@ -707,63 +701,9 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	@Bean
 	public HikariDataSource dataSource() {
         CoreConfig config = DistributedConfiguration.getInstance();
-	
-	    Repository repository = config.getRemoteConfiguration().getRepository();
-	    Connection coreDbConnection = repository.getConnection();
-
-        int max_connections = 0;
-	    if (repository.isEnable()) {
-	        Properties props = new Properties();
-	        props.setProperty("user", coreDbConnection.getUsername());
-	        props.setProperty("password", coreDbConnection.getPassword());
-	        try(java.sql.Connection conn = DriverManager.getConnection(coreDbConnection.getUrl(), props); ResultSet res = conn.createStatement().executeQuery("show max_connections")) {
-	            
-	            res.next();
-	            max_connections = res.getInt(1);
-	        } catch (Exception ee) {
-	            logger.error("error connecting to database", ee);
-	        }
-	    }
-
-        // this will set a min of 200 connections for 4 cpus (c5.xlarge) to 1045 for 96
-        // cpus (c5.24xlarge) (max is 1045 regardless)
-        int numDbConnections;
-        if (repository.isConnectionPoolAutoSize()) {
-            numDbConnections = config.getRemoteConfiguration().getRepository().getPoolScaleFactor() + (int) Math.min(845, (Runtime.getRuntime().availableProcessors() - 4) * 9.2);
-            numDbConnections = Math.min(Math.max(1, (max_connections - 2) / 2), numDbConnections);
-        } else {
-            numDbConnections = repository.getNumDbConnections();
-        }
         
-        if (logger.isDebugEnabled()) {
-            logger.debug("There are: " + Runtime.getRuntime().availableProcessors()
-                    + " cpus currently available; The max connections is: " + max_connections
-                    + " and the computed connection pool size is: " + numDbConnections);
-        }
+        return DataSourceUtils.setupDataSourceFromCoreConfig(config);
         
-        if (logger.isDebugEnabled()) {
-            logger.debug("We are setting up a connection pool of size: " + numDbConnections);
-        }
-
-        HikariConfig hikariConfig = new HikariConfig();
-        hikariConfig.setUsername(coreDbConnection.getUsername());
-        hikariConfig.setPassword(coreDbConnection.getPassword());
-        hikariConfig.setJdbcUrl(coreDbConnection.getUrl());
-        hikariConfig.setMaxLifetime(repository.getDbConnectionMaxLifetimeMs());
-        hikariConfig.setIdleTimeout(repository.getDbConnectionMaxIdleMs());
-        hikariConfig.setMaximumPoolSize(numDbConnections);
-        hikariConfig.setConnectionTimeout(repository.getDbTimeoutMs());
-        hikariConfig.setAllowPoolSuspension(true);
-        hikariConfig.setInitializationFailTimeout(-1);
-        hikariConfig.setMinimumIdle(1);
-
-        if (!repository.isEnable()) {
-                // Zero would be ideal.... But an exception is thrown if less than 250 is chosen
-        	hikariConfig.setConnectionTimeout(250);
-        }
-
-        HikariDataSource hds = new HikariDataSource(hikariConfig);
-        return hds;
 	}
 
 	@Bean
@@ -916,8 +856,8 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	}
 	
 	@Bean
-	DataFeedService dataFeedService(DataSource dataSource, DataFeedRepository dataFeedRepository) {
-		return new DataFeedService(dataSource, dataFeedRepository);
+	DataFeedService dataFeedService(DataSource dataSource, DataFeedRepository dataFeedRepository, CacheManager cacheManager) {
+		return new DataFeedService(dataSource, dataFeedRepository, cacheManager);
 	}
 
 	@Bean("kmlDao")
@@ -928,6 +868,11 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	@Bean
 	public MissionChange missionChange() {
 		return new MissionChange();
+	}
+
+	@Bean
+	public MissionFeed missionFeed() {
+		return new MissionFeed();
 	}
 
 	@Bean
@@ -1109,6 +1054,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		ObjectMapper mapper = new ObjectMapper();
 		mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 		mapper.configure(MapperFeature.DEFAULT_VIEW_INCLUSION, true);
+		mapper.enable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT);
 
 		return mapper;
 	}

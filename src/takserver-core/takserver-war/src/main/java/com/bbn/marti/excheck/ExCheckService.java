@@ -63,6 +63,7 @@ import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.model.*;
 import com.bbn.marti.sync.service.MissionTokenUtils;
+import com.bbn.marti.sync.repository.MissionRoleRepository;
 import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
@@ -87,6 +88,9 @@ public class ExCheckService {
 
     @Autowired
     private SubscriptionManagerLite subscriptionManager;
+
+    @Autowired
+    private MissionRoleRepository missionRoleRepository;
 
     @Autowired
     private DataSource ds;
@@ -477,7 +481,7 @@ public class ExCheckService {
 
 
     public String startChecklist(String id, String clientUid, String callsign,
-                                 String name, String description, String startTime, String groupVector) {
+                                 String name, String description, String startTime, MissionRole.Role defaultRole, String groupVector) {
 
         Checklist checklist = getTemplateFromESync(id, groupVector);
         if (checklist == null) {
@@ -502,7 +506,7 @@ public class ExCheckService {
             task.setUid(UUID.randomUUID().toString());
         }
 
-        createOrUpdateChecklistMission(checklist, clientUid, groupVector);
+        createOrUpdateChecklistMission(checklist, clientUid, defaultRole, groupVector);
 
         return toXml(checklist);
     }
@@ -537,7 +541,7 @@ public class ExCheckService {
     }
 
 
-    public void createChecklistMission(Checklist checklist, String clientUid, String groupVector) {
+    public void createChecklistMission(Checklist checklist, String clientUid, MissionRole.Role defaultRole, String groupVector) {
         // add the new checklist to esync
         String xml = toXml(checklist);
         String checklistId = checklist.getChecklistDetails().getUid();
@@ -546,9 +550,14 @@ public class ExCheckService {
         keywords.add("Template");
         Metadata metadata = addToEnterpriseSync(xml.getBytes(), groupVector, checklistId, keywords);
 
+        MissionRole useDefaultRole = null;
+        if (defaultRole != null) {
+            useDefaultRole = missionRoleRepository.findFirstByRole(defaultRole);
+        }
+
         // create a new mission for the checklist
-        Mission checklistMission = missionService.createMission(checklistId, EXCHECK_TOOL, groupVector,
-                checklist.getChecklistDetails().getDescription(), null, null, null, null, null, EXCHECK_TOOL, null, null, null, null);
+        Mission checklistMission = missionService.createMission(checklistId, clientUid, groupVector,
+                checklist.getChecklistDetails().getDescription(), null, null, null, null, null, EXCHECK_TOOL, null, useDefaultRole, null, null);
 
         // add the new checklist to the checklist mission
         MissionContent content = new MissionContent();
@@ -578,7 +587,8 @@ public class ExCheckService {
 
         // whoever starts the checklist gets automatically subscribed
         try {
-            missionService.missionSubscribe(checklistId, clientUid, groupVector);
+            MissionRole ownerRole = missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_OWNER);
+            missionService.missionSubscribe(checklistId, clientUid, ownerRole, groupVector);
         } catch (JpaSystemException e) { } // DuplicateKeyException comes through as JpaSystemException due to transaction
 
         // add the checklist mission to the ExCheck mission
@@ -653,7 +663,7 @@ public class ExCheckService {
                 checklistUid, SubscriptionManagerLite.ChangeType.METADATA, clientUid, EXCHECK_TOOL, null);
     }
 
-    public void createOrUpdateChecklistMission(Checklist checklist, String clientUid, String groupVector) {
+    public void createOrUpdateChecklistMission(Checklist checklist, String clientUid, MissionRole.Role defaultRole, String groupVector) {
         try {
             Checklist existing = getChecklist(checklist.getChecklistDetails().getUid(),
                     -1L, groupVector,false);
@@ -665,7 +675,7 @@ public class ExCheckService {
             updateChecklistMission(existing, checklist, clientUid, groupVector);
 
         } catch (NotFoundException nfe) {
-            createChecklistMission(checklist, clientUid, groupVector);
+            createChecklistMission(checklist, clientUid, defaultRole, groupVector);
         }
     }
 

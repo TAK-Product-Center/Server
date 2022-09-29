@@ -1,0 +1,40 @@
+version: '3.4'
+
+services:
+  takserver_init:
+    #    container_name: takserver
+    image: takserver-full:latest
+    env_file:
+      - 'EDIT_ME.env'
+    build: .
+    volumes:
+      - '../takdata/logs:/opt/tak/data/logs'
+      - '../takdata/certs:/opt/tak/data/certs'
+    entrypoint: bash /opt/tak/docker_entrypoint.sh
+    networks:
+      - taknet
+    ports:
+      - '8080:8080'
+      - '8443:8443'
+      - '8444:8444'
+      - '8446:8446'
+      - '8087:8087'
+      - '8088:8088'
+      - '9000:9000'
+      - '9001:9001'
+
+  takdb:
+    image: postgis/postgis:10-3.1
+    networks:
+      - taknet
+    env_file:
+      - 'EDIT_ME.env'
+    volumes:
+      - 'cluster_takserver_db_data:/var/lib/postgresql/data'
+
+networks:
+  taknet:
+
+volumes:
+  cluster_takserver_db_data:
+    driver: local

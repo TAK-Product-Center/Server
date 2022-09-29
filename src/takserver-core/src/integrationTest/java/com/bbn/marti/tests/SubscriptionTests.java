@@ -2,7 +2,7 @@ package com.bbn.marti.tests;
 
 import com.bbn.marti.takcl.SSLHelper;
 import com.bbn.marti.takcl.TestLogger;
-import com.bbn.marti.takcl.connectivity.AbstractRunnableServer;
+import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
 import com.bbn.marti.test.shared.AbstractTestClass;
 import com.bbn.marti.test.shared.data.generated.ImmutableConnections;
 import com.bbn.marti.test.shared.data.generated.ImmutableUsers;
@@ -60,6 +60,8 @@ public class SubscriptionTests extends AbstractTestClass {
 				engine.offlineAddUsersAndConnectionsIfNecessary(ImmutableUsers.s0_tcp01t_anonuser_01t);
 				engine.offlineAddUsersAndConnectionsIfNecessary(ImmutableUsers.s0_stcp01_anonuser_01f);
 				engine.offlineAddUsersAndConnectionsIfNecessary(ImmutableUsers.s0_stcp_anonuser_t_B);
+				engine.offlineAddUsersAndConnectionsIfNecessary(ImmutableUsers.s0_stcp0_anonuser_0f);
+				engine.offlineAddUsersAndConnectionsIfNecessary(ImmutableUsers.s0_tcp12_anonuser_12f);
 
 				engine.offlineAddUsersAndConnectionsIfNecessary(ImmutableUsers.s1_stcp_anonuser_t_A);
 				engine.offlineAddUsersAndConnectionsIfNecessary(ImmutableUsers.s1_mcast_anonuser_t);

@@ -88,7 +88,7 @@
       </xs:sequence>
       <xs:attribute name="multicastTTL" type="xs:int" default="1"/>
       <xs:attribute name="serverId" type="xs:string" default=""/>
-      <xs:attribute name="enterpriseSyncSizeLimitMB" type="xs:int" default="200"/>
+      <xs:attribute name="enterpriseSyncSizeLimitMB" type="xs:int" default="400"/>
       <xs:attribute name="missionPackageAutoExtractSizeLimitMB" type="xs:int" default="10"/>
       <xs:attribute name="httpSessionTimeoutMinutes" type="xs:int" default="130"/>
       <xs:attribute name="extWebContentDir" type="xs:string" default="webcontent"/>
@@ -978,6 +978,7 @@
       <xs:attribute name="iVoidMyWarrantyAndWantToForwardFederationTraffic" type="xs:boolean" default="false" />
       <xs:attribute name="allowFederatedDelete" type="xs:boolean" default="false" />
       <xs:attribute name="allowMissionFederation" type="xs:boolean" default="true" />
+      <xs:attribute name="allowDataFeedFederation" type="xs:boolean" default="true" />
       <xs:attribute name="enableMissionFederationDisruptionTolerance" type="xs:boolean" default="true" />
       <xs:attribute name="missionFederationDisruptionToleranceRecencySeconds" type="xs:long" default="43200" />
       <xs:attribute name="federateOnlyPublicMissions" type="xs:boolean" default="true" />
@@ -1072,8 +1073,6 @@
       <xs:annotation>
         <xs:documentation>Plugin Configuration</xs:documentation>
       </xs:annotation>
-      <xs:attribute name="enabled" type="xs:boolean" default="false" />
-      <xs:attribute name="rogerConfigFile" type="xs:string" default="plugins/roger.json" />
       <xs:attribute name="usePluginMessageQueue" type="xs:boolean" default="true" />
     </xs:complexType>
   </xs:element>
@@ -1177,6 +1176,7 @@
                 <xs:element name="tag" block="extension" minOccurs="0" maxOccurs="unbounded" type="xs:string"/>
                 <xs:element name="sync" type="xs:boolean" />
             </xs:sequence>
+            <xs:attribute name="syncCacheRetentionSeconds" type="xs:int" default="3600" />
         </xs:extension>
        </xs:complexContent>
     </xs:complexType>
@@ -1188,6 +1188,7 @@
       </xs:annotation>
       <xs:sequence>
         <xs:element name="whitelist" type="whitelist" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:element name="logAlertsExtension" minOccurs="0" maxOccurs="unbounded" type="xs:string"/>
       </xs:sequence>
       <xs:attribute name="host" type="xs:string" use="required" />
       <xs:attribute name="port" type="xs:int" use="required" />
@@ -1197,6 +1198,9 @@
       <xs:attribute name="supportName" type="xs:string" use="required" />
       <xs:attribute name="supportEmail" type="xs:string" use="required" />
       <xs:attribute name="registrationPort" type="xs:int" default="8446" />
+      <xs:attribute name="logAlertsEnabled" type="xs:boolean" default="false" />
+      <xs:attribute name="logAlertsTo" type="xs:string" use="optional" />
+      <xs:attribute name="logAlertsSubject" type="xs:string" use="optional" />
     </xs:complexType>
   </xs:element>
 
@@ -1217,6 +1221,7 @@
       <xs:attribute name="enabled" type="xs:boolean" default="false"/>
       <xs:attribute name="disableSASharing" type="xs:boolean" default="true"/>
       <xs:attribute name="disableChatSharing" type="xs:boolean" default="false"/>
+      <xs:attribute name="returnCopsWithPublicMissions" type="xs:boolean" default="true"/>
     </xs:complexType>
   </xs:element>
 

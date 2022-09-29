@@ -1,0 +1,66 @@
+## Environment variables outside image context. These will be available until the first FROM statement.
+ARG BASE_REGISTRY=registry1.dso.mil
+ARG BASE_DEPLOY_IMAGE=ironbank/opensource/postgres/postgresql10
+ARG BASE_DEPLOY_TAG=10.17
+
+####################################################################################################
+
+## Base deploy image
+FROM ${BASE_REGISTRY}/${BASE_DEPLOY_IMAGE}:${BASE_DEPLOY_TAG} as deploy_container
+
+USER root
+
+# Upgrade first
+RUN dnf -y upgrade --nodocs \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+# Adding RHEL repos and signatures
+COPY tak/security/rpms/repos/* /etc/yum.repos.d/
+COPY tak/security/rpms/signatures /opt/signatures
+
+# Install EPEL 8 repo
+COPY tak/security/*.rpm .
+RUN rpm -Uvh epel-release-8-10.el8.noarch.rpm
+
+# Install dependencies
+RUN rpm --import /opt/signatures/* \
+    && dnf -y install https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm \
+    && dnf -qy module disable postgresql \
+    && dnf -y upgrade --nodocs \
+    && dnf -y install --nodocs \
+        java-11-openjdk \
+        postgis24_10 \
+        && sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/pgsql-10/share/postgresql.conf.sample \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+RUN usermod -a -G root postgres
+
+VOLUME /var/lib/postgresql/data
+
+RUN chown -R postgres:0 /var/lib/postgresql && \
+    chmod -R 775 /var/lib/postgresql && \
+    chown -R postgres:0 /var/run/postgresql && \
+    chmod -R 777 /var/run/postgresql && \
+    chown -R postgres:0 /var/lib/pgsql && \
+    chmod -R 770 /var/lib/pgsql
+
+ENV POSTGRES_HOST_AUTH_METHOD=trust
+
+#runs in takserver-setup-db.sh but fails because of permissions. running as root to prevent error
+RUN chkconfig --level 345 postgresql-10 on
+
+RUN usermod -a -G root postgres
+USER postgres:0
+COPY --chown=postgres:0 tak/ /opt/tak
+
+RUN chmod u=rwx /opt/tak \
+    && find /opt/tak/ -type d -exec chmod u=rwx {} \; \
+	&& find /opt/tak/ -type f -name "*.*" -exec chmod u=rw {} \; \
+	&& find /opt/tak/ -type f -name "*.sh" -exec chmod u=rx {} \;
+
+HEALTHCHECK --start-period=120s --interval=30s --timeout=30s --retries=10 CMD opt/tak/health/takserver-db/health_check.sh || exit 1
+
+# Default startup executable. Can include elements of 'docker run' command as parameters.
+ENTRYPOINT ["/opt/tak/db-utils/configureInDocker.sh"]

@@ -24,6 +24,7 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
@@ -124,7 +125,7 @@ public class AuditLogUtil {
 
         try {
             if (validator != null) {
-                username = validator.getValidInput(validatorContext, username, MartiValidator.Regex.CertCommonName.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+                username = validator.getValidInput(validatorContext, username, MartiValidatorConstants.Regex.CertCommonName.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
                 logger.trace("validated username: " + username);
             } else {
                 logger.trace("null validator in AuditLogUtil. Not validating username.");

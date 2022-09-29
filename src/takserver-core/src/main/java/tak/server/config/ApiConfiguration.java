@@ -33,6 +33,7 @@ import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import com.bbn.cluster.ClusterGroupDefinition;
+import com.bbn.file.FileConfigurationApi;
 import com.bbn.locate.LocateApi;
 import com.bbn.marti.CotImageBean;
 import com.bbn.marti.CreateSubscriptionServlet;
@@ -103,6 +104,7 @@ import com.bbn.marti.sync.MissionPackageQueryServlet;
 import com.bbn.marti.sync.MissionPackageUploadServlet;
 import com.bbn.marti.sync.SearchServlet;
 import com.bbn.marti.sync.UploadServlet;
+import com.bbn.marti.sync.api.ClassificationApi;
 import com.bbn.marti.sync.api.ContactsApi;
 import com.bbn.marti.sync.api.CopViewApi;
 import com.bbn.marti.sync.api.CotApi;
@@ -110,6 +112,7 @@ import com.bbn.marti.sync.api.MissionApi;
 import com.bbn.marti.sync.api.PropertiesApi;
 import com.bbn.marti.sync.api.SequenceApi;
 import com.bbn.marti.sync.api.SubscriptionApi;
+import com.bbn.marti.sync.federation.DataFeedFederationAspect;
 import com.bbn.marti.sync.federation.EnterpriseSyncFederationAspect;
 import com.bbn.marti.sync.federation.MissionActionROLConverter;
 import com.bbn.marti.sync.federation.MissionFederationAspect;
@@ -145,6 +148,8 @@ import com.bbn.vbm.VBMConfigurationApi;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import tak.server.Constants;
+import tak.server.api.DistributedPluginFileApi;
+import tak.server.api.DistributedPluginMissionApi;
 import tak.server.cache.ContactCacheHelper;
 import tak.server.cache.MissionCacheResolver;
 import tak.server.federation.FederationConfigManager;
@@ -152,7 +157,9 @@ import tak.server.grid.MissionArchiveManagerProxyFactory;
 import tak.server.grid.PluginManagerProxyFactory;
 import tak.server.grid.RetentionPolicyConfigProxyFactory;
 import tak.server.plugins.PluginDataApi;
+import tak.server.plugins.PluginFileApi;
 import tak.server.plugins.PluginManagerApi;
+import tak.server.plugins.PluginMissionApi;
 import tak.server.qos.QoSApi;
 import tak.server.qos.QoSManager;
 import tak.server.retention.RetentionApi;
@@ -588,7 +595,7 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	public MissionFederationAspect missionFederationAspect() {
 		return new MissionFederationAspect();
 	}
-
+	
 	@Bean
 	public EnterpriseSyncFederationAspect enterpriseSyncFederationAspect() {
 		return new EnterpriseSyncFederationAspect();
@@ -724,6 +731,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Bean
 	public ContactsApi contactsApi() {
 		return new ContactsApi();
+	}
+
+	@Bean
+	public ClassificationApi classificationApi() {
+		return new ClassificationApi();
 	}
 
 	@Bean
@@ -881,6 +893,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	}
 	
 	@Bean
+	public FileConfigurationApi fileConfigurationApi() {
+		return new FileConfigurationApi();
+	}
+	
+	@Bean
 	public VideoConnectionManagerV2 videoConnectionManagerV2()  {
 		return new VideoConnectionManagerV2();
 	}
@@ -894,5 +911,31 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	public ExecutorSource executorSource(CoreConfig conf) {
 		return new ExecutorSource(conf);
 	}
+
+	@Bean
+	public PluginMissionApi pluginMissionApi(Ignite ignite) {
+		
+		DistributedPluginMissionApi distributedPluginMissionApi =  new DistributedPluginMissionApi();
+		
+		ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_MISSION_API, distributedPluginMissionApi);
+
+		return ignite.services(ClusterGroupDefinition.getApiLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_MISSION_API, PluginMissionApi.class, false);
+
+	}
 	
+	public DataFeedFederationAspect DataFeedFederationAspect(MissionFederationManager mfm) {
+		return new DataFeedFederationAspect(null, null, mfm);
+	}
+	
+	@Bean
+	public PluginFileApi pluginFileApi(Ignite ignite) {
+		
+		DistributedPluginFileApi distributedPluginFileApi =  new DistributedPluginFileApi();
+		
+		ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_FILE_API, distributedPluginFileApi);
+
+		return ignite.services(ClusterGroupDefinition.getApiLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_FILE_API, PluginFileApi.class, false);
+
+	}
+
 }

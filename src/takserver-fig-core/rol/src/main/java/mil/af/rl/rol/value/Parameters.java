@@ -16,7 +16,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
               defaultImpl=ResourceDetails.class)
 @JsonSubTypes({ 
     @Type(value = ResourceDetails.class, name = "ResourceDetails"),
-    @Type(value = MissionMetadata.class, name = "MissionMetadata")
+    @Type(value = MissionMetadata.class, name = "MissionMetadata"),
+    @Type(value = DataFeedMetadata.class, name = "DataFeedMetadata")
 })
 public abstract class Parameters implements Serializable {
 

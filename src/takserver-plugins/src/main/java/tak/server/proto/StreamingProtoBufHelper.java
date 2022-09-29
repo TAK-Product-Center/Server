@@ -2,16 +2,13 @@ package tak.server.proto;
 
 import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Date;
-import java.util.List;
 
 import org.dom4j.Attribute;
 import org.dom4j.Document;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
-import org.h2.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

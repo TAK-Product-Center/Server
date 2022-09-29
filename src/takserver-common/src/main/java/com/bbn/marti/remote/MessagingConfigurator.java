@@ -15,7 +15,7 @@ public interface MessagingConfigurator {
     void removeInputAndSave(String name);
 
     Collection<InputMetric> getInputMetrics(boolean excludeDataFeeds);
-
+        
     ConnectionModifyResult modifyInputAndSave(String inputName, Input input);
 
     MessagingConfigInfo getMessagingConfig();
@@ -43,4 +43,6 @@ public interface MessagingConfigurator {
 	void addInput(Input newInput, boolean cluster) throws IOException;
 
 	void removeDataFeedAndSave(String name);
+
+	InputMetric getInputMetric(String name);
 }

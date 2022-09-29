@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import javax.security.auth.x500.X500Principal;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -27,7 +28,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -327,7 +327,9 @@ public class CertManagerApi extends BaseRestController {
     ResponseEntity<String> signClientCertV2(
             @RequestParam(value = "clientUid", defaultValue = "") String clientUid,
             @RequestParam(value = "version", required = false) String version,
-            @RequestBody String base64CSR)
+            @RequestBody String base64CSR,
+            HttpServletRequest request,
+            HttpServletResponse response)
             throws Exception {
 
         try {
@@ -338,23 +340,52 @@ public class CertManagerApi extends BaseRestController {
 
             takCertRepository.save(cert);
 
-            ObjectMapper mapper = new ObjectMapper();
-            ObjectNode rootNode = mapper.createObjectNode();
-
-            String clientCertPem = Util.certToPEM(cert.getX509Certificate(), false);
-            rootNode.put("signedCert", clientCertPem);
-
-            int ndx = 0;
-            for (X509Certificate ca : cert.getX509CertificateChain()) {
-                String caPem = Util.certToPEM(ca, false);
-                rootNode.put("ca" + ndx++, caPem);
+            String accept = request.getHeader("Accept");
+            if (accept != null) {
+                accept = accept.toLowerCase();
             }
 
-            String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(rootNode);
+            String result = "";
+            if (accept == null ||
+                    (accept.contains("*/*") || accept.contains("application/json") || accept.length() == 0)) {
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            return new ResponseEntity<String>(json, HttpStatus.OK);
+                ObjectMapper mapper = new ObjectMapper();
+                ObjectNode rootNode = mapper.createObjectNode();
+
+                String clientCertPem = Util.certToPEM(cert.getX509Certificate(), false);
+                rootNode.put("signedCert", clientCertPem);
+
+                int ndx = 0;
+                for (X509Certificate ca : cert.getX509CertificateChain()) {
+                    String caPem = Util.certToPEM(ca, false);
+                    rootNode.put("ca" + ndx++, caPem);
+                }
+
+                result = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(rootNode);
+                response.addHeader("Content-Type", "application/json");
+
+            } else if (accept.contains("application/xml")) {
+
+                StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+                xml.append("<enrollment>");
+                xml.append("<signedCert>");
+                xml.append(Util.certToPEM(cert.getX509Certificate(), false));
+                xml.append("</signedCert>");
+                for (X509Certificate ca : cert.getX509CertificateChain()) {
+                    xml.append("<ca>");
+                    xml.append(Util.certToPEM(ca, false));
+                    xml.append("</ca>");
+                }
+                xml.append("</enrollment>");
+
+                result = xml.toString();
+                response.addHeader("Content-Type", "application/xml");
+
+            } else {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            }
+
+            return new ResponseEntity<String>(result, HttpStatus.OK);
 
         } catch (Exception e) {
             logger.error("Exception in signClientCertV2!", e);

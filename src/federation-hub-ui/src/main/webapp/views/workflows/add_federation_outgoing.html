@@ -1,0 +1,56 @@
+<div class="modal-header">
+    <div style="clear: both">
+        <h3 class="modal-title" style="float: left">{{editorTitle}} {{roger_federation.type}}</h3>
+        <h4 ng-if="editExisting" style="float: right">{{roger_federation.stringId}}</h4>
+    </div>
+</div>
+
+<div class="modal-body" data-ng-init="initialize()">
+    <form name="federateForm">
+
+        <div class="row form-group" ng-class="{ 'has-error': federateForm.name.$touched && federateForm.name.$invalid }">
+            <label class="col-sm-3">Outgoing Name</label>
+            <div class="col-sm-9">
+                <input type="text" name="name" class="form-control" ng-model="roger_federation.stringId" required/>
+                <div class="help-block" ng-messages="federateForm.name.$error" ng-if="federateForm.name.$touched">
+                </div>
+                <div style="color: red" ng-if="outgoingNameExists" class="help-block">
+                    Outgoing name already exists
+                </div>
+            </div>
+        </div>
+
+        <div class="row form-group" ng-class="{ 'has-error': federateForm.host.$touched && federateForm.host.$invalid }">
+            <label class="col-sm-3">Host</label>
+            <div class="col-sm-9">
+                <input type="text" name="host" class="form-control" ng-model="roger_federation.host" required/>
+                <div class="help-block" ng-messages="federateForm.host.$error" ng-if="federateForm.host.$touched">
+                </div>
+            </div>
+        </div>
+
+        <div class="row form-group" ng-class="{ 'has-error': federateForm.port.$touched && federateForm.port.$invalid }">
+            <label class="col-sm-3">Port</label>
+            <div class="col-sm-9">
+                <input type="number" name="port" class="form-control" ng-model="roger_federation.port" min="1" max="65535" required/>
+                <div class="help-block" ng-messages="federateForm.port.$error" ng-if="federateForm.port.$touched">
+                </div>
+            </div>
+        </div>
+
+        <div class="row form-group">
+            <label class="col-sm-3">Enabled</label>
+            <div class="col-sm-9">
+                <input type="checkbox" name="outgoingEnabled" class="form-control" ng-model="roger_federation.outgoingEnabled"/>
+                <div class="help-block" ng-messages="federateForm.outgoingEnabled.$error" ng-if="federateForm.outgoingEnabled.$touched">
+                </div>
+            </div>
+        </div>
+
+
+        <div class="modal-footer">
+            <button class="btn btn-primary" type="button" ng-click="submit()" ng-disabled="!federateForm.$valid">OK</button>
+            <button class="btn btn-primary" type="button" ng-click="cancel()">Cancel</button>
+        </div>
+    </form>
+</div>

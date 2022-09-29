@@ -59,7 +59,7 @@ public class NioNettyFederationServerHandler extends NioNettyHandlerBase {
 							setReader();
 							new FederateSslPreAuthCodec(null, DummyAuthenticator.getInstance()).handleOnConnect(connectionInfo);
 							alreadyClosed.set(false);
-							federationManager.handleOnConnect(channelHandler, fedProto);
+							federationManager().handleOnConnect(channelHandler, fedProto);
 						}else {
 							ctx.close();
 						}
@@ -177,7 +177,7 @@ public class NioNettyFederationServerHandler extends NioNettyHandlerBase {
 				try {
 					FederatedEvent event = FederatedEvent.parseFrom(eventBytes);
 					nextSize = -1;
-					federationManager.handleOnDataReceived(event, channelHandler, fedProto);
+					federationManager().handleOnDataReceived(event, channelHandler, fedProto);
 				} catch (InvalidProtocolBufferException e) {
 					log.error("parsing problem with Federated Event: " + e.getMessage());
 					channelHandler.forceClose();
@@ -189,7 +189,7 @@ public class NioNettyFederationServerHandler extends NioNettyHandlerBase {
 	@Override
 	public void channelUnregistered(ChannelHandlerContext ctx) {
 		if(connectionInfo != null && channelHandler != null && alreadyClosed.compareAndSet(false, true) == true) {
-			messagingUtil.processFederateClose(connectionInfo, channelHandler, SubscriptionStore.getInstance().getByHandler(channelHandler));
+			messagingUtil().processFederateClose(connectionInfo, channelHandler, SubscriptionStore.getInstance().getByHandler(channelHandler));
 		}
 		ctx.close();
 		super.channelUnregistered(ctx);

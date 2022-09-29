@@ -13,19 +13,24 @@ import javax.xml.transform.Source;
 import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.SchemaFactory;
 
-import org.apache.log4j.Logger;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.io.SAXReader;
-import org.xml.sax.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.xml.sax.ErrorHandler;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXNotRecognizedException;
+import org.xml.sax.SAXNotSupportedException;
+import org.xml.sax.SAXParseException;
 
 import tak.server.cot.CotParser.ValidationErrorCallback.ErrorLevel;
 
 public class CotParser {
     public static final String SCHEMA_FILE = "Event_modified.xsd";
 
-    @SuppressWarnings("unused")
-    private static final Logger logger = Logger.getLogger(CotParser.class.getCanonicalName());
+    private static final Logger logger = LoggerFactory.getLogger(CotParser.class);
 
     /////////////////////////////////////////////
     // Individual parsers

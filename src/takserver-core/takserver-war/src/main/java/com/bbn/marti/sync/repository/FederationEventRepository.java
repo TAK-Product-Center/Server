@@ -31,10 +31,13 @@ public interface FederationEventRepository extends JpaRepository<Mission, Long> 
     @Query(value = "select fe.event_time, fek.event_kind from fed_event fe inner join fed_event_kind_pl fek on fe.event_kind_id = fek.id where fe.fed_id = :fedId order by fe.event_time desc limit 1", nativeQuery = true)
     Tuple getLastEventForFederate(@Param("fedId") String fedId);
     
-    @Query(value = "select uid from resource where submissiontime between :start and :end", nativeQuery = true)
-    List<String> getResourceHashesForTimeInterval(@Param("start") Date start, @Param("end") Date end);
-    
     @Query(value = "delete from fed_event returning 1", nativeQuery = true)
     void clearFederationEvents();
+    
+    @Query(value = "WITH resource_join AS (SELECT mission_id, resource_id, uid FROM resource INNER JOIN mission_resource ON mission_resource.resource_id = resource.id WHERE resource.submissiontime BETWEEN :start AND :end) select resource_join.uid from mission INNER JOIN resource_join ON mission.id = resource_join.mission_id;", nativeQuery = true)
+    List<String> getMissionResourceHashesForTimeInterval(@Param("start") Date start, @Param("end") Date end);
+    
+    @Query(value = "WITH resource_join AS (SELECT mission_id, resource_id, uid FROM resource INNER JOIN mission_resource ON mission_resource.resource_id = resource.id WHERE resource.submissiontime BETWEEN :start AND :end) select resource_join.uid from mission INNER JOIN resource_join ON mission.id = resource_join.mission_id WHERE mission.tool = :tool ;", nativeQuery = true)
+    List<String> getMissionResourceHashesForToolForTimeInterval(@Param("tool") String  tool, @Param("start") Date start, @Param("end") Date end);
 }
 

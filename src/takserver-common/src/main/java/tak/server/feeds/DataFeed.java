@@ -17,7 +17,8 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 	public enum DataFeedType {
 		Streaming,
 		API,
-		Plugin
+		Plugin,
+		Federation
 	}
 	
 	private String uuid;
@@ -53,6 +54,8 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 	private String coreVersion2TlsVersions;
 	
 	private List<String> filterGroups;
+		
+	private int syncCacheRetentionSeconds = 3600;
 	
 	private DataFeed() {}
 	
@@ -79,6 +82,7 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 		this.coreVersion = datafeed.getCoreVersion();
 		this.coreVersion2TlsVersions = datafeed.getCoreVersion2TlsVersions();
 		this.filterGroups = datafeed.getFiltergroup();
+		this.syncCacheRetentionSeconds = datafeed.getSyncCacheRetentionSeconds();		
 		
 		if (datafeed.getPort() == 0) {
 			this.port = null;
@@ -226,12 +230,23 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 	public void setFilterGroups(List<String> filterGroups) {
 		this.filterGroups = filterGroups;
 	}
-	
+
+	public int getsSyncCacheRetentionSeconds() {
+		return syncCacheRetentionSeconds;
+	}
+
+	public void setSyncCacheRetentionSeconds(int syncCacheRetentionSeconds) {
+		this.syncCacheRetentionSeconds = syncCacheRetentionSeconds;
+	}
+
 	@Override
 	public String toString() {
-		return "RemoteDataFeed [uuid=" + uuid + ", name=" + name + ", type=" + type + ", tags=" + tags + ", auth=" + auth + ", authRequired=" + authRequired +
-				", protocol=" + protocol + ", port=" + port + ", group=" + group + ", iface=" + iface + ", archive=" + archive + ", anongroup=" + anongroup + ", sync=" + sync +
-				", archiveOnly=" + archiveOnly + ", coreVersion=" + coreVersion + ", coreVersion2TlsVersions=" + coreVersion2TlsVersions + ", filterGroups=" + filterGroups + "]";
+		return "DataFeed [uuid=" + uuid + ", name=" + name + ", type=" + type + ", tags=" + tags + ", auth=" + auth
+				+ ", port=" + port + ", authRequired=" + authRequired + ", protocol=" + protocol + ", group=" + group
+				+ ", iface=" + iface + ", archive=" + archive + ", anongroup=" + anongroup + ", archiveOnly="
+				+ archiveOnly + ", sync=" + sync + ", coreVersion=" + coreVersion + ", coreVersion2TlsVersions="
+				+ coreVersion2TlsVersions + ", filterGroups=" + filterGroups + ", latestSACacheSeconds="
+				+ syncCacheRetentionSeconds + "]";
 	}
 
 	@Override

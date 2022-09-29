@@ -22,6 +22,7 @@ public class FederationConfigInfo implements Serializable {
 	private String tlsVersion;
 	private String webBaseURL;
 	private boolean allowMissionFederation;
+	private boolean allowDataFeedFederation;
 	private boolean allowFederatedDelete;
 	private boolean enableMissionFederationDisruptionTolerance;
 	private long missionFederationDisruptionToleranceRecencySeconds;
@@ -39,7 +40,7 @@ public class FederationConfigInfo implements Serializable {
 
 	public FederationConfigInfo(boolean isEnabled, List<V1Tls> v1Tls, List<FederationPort> v1Ports, int serverPortv1, int serverPortv2, boolean serverPortEnabled,
 								boolean serverPortEnabledv2, String truststorePath, String truststorePass, String tlsVersion,
-								String webBaseURL, boolean allowMissionFederation, boolean allowFederatedDelete, boolean enableMissionFederationDisruptionTolerance,
+								String webBaseURL, boolean allowMissionFederation, boolean allowDataFeedFederation, boolean allowFederatedDelete, boolean enableMissionFederationDisruptionTolerance,
 								long missionFederationDisruptionToleranceRecencySeconds, List<Mission> missionInterval, int coreVersion, boolean federatedGroupMapping,
 								boolean automaticGroupMapping, boolean enableDataPackageAndMissionFileFilter, List<String> fileExtension) {
 
@@ -54,6 +55,7 @@ public class FederationConfigInfo implements Serializable {
 		this.tlsVersion = tlsVersion;
 		this.webBaseURL = webBaseURL;
 		this.allowMissionFederation = allowMissionFederation;
+		this.allowDataFeedFederation = allowDataFeedFederation;
 		this.allowFederatedDelete = allowFederatedDelete;
 		this.enableMissionFederationDisruptionTolerance = enableMissionFederationDisruptionTolerance;
 		this.missionFederationDisruptionToleranceRecencySeconds = missionFederationDisruptionToleranceRecencySeconds;
@@ -160,6 +162,14 @@ public class FederationConfigInfo implements Serializable {
 
 	public void setAllowMissionFederation(boolean allowMissionFederation) {
 		this.allowMissionFederation = allowMissionFederation;
+	}
+	
+	public boolean isAllowDataFeedFederation() {
+		return allowDataFeedFederation;
+	}
+
+	public void setAllowDataFeedFederation(boolean allowDataFeedFederation) {
+		this.allowDataFeedFederation = allowDataFeedFederation;
 	}
 
 	public boolean isAllowFederatedDelete() {

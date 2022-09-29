@@ -174,7 +174,7 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 
 		try {
 			// Get group vector for the user associated with this session
-			groupVector = martiUtil.getGroupBitVector(request);
+			groupVector = commonUtil.getGroupBitVector(request);
 			log.finer("groups bit vector: " + groupVector);
 		} catch (Exception e) {
 			log.fine("exception getting group membership for current web user " + e.getMessage());
@@ -295,7 +295,7 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 				try {
 					logger.debug("submitting mission package announce CoT message: " + cotMessage);
 
-					submission.submitCot(cotMessage, martiUtil.getGroupsFromRequest(request));
+					submission.submitCot(cotMessage, commonUtil.getGroupsFromRequest(request));
 
 				} catch (Exception exi) {
 

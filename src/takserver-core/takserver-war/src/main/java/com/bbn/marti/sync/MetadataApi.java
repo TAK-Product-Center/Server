@@ -25,6 +25,7 @@ import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 @RestController
 public class MetadataApi extends BaseRestController {
@@ -54,11 +55,11 @@ public class MetadataApi extends BaseRestController {
         try {
             try {
                 validator.getValidInput("MetadataApi", hash,
-                        MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+                		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
                 validator.getValidInput("MetadataApi", metadataField,
-                        MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+                		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
                 validator.getValidInput("MetadataApi", metadataValue,
-                        MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+                		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             } catch (com.bbn.marti.remote.exception.ValidationException e) {
                 logger.error("ValidationException in setMetadata!", e);
                 return new ResponseEntity(HttpStatus.BAD_REQUEST);
@@ -94,10 +95,10 @@ public class MetadataApi extends BaseRestController {
         try {
             try {
                 validator.getValidInput("MetadataApi", hash,
-                        MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+                		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
                 for (String keyword : keywords) {
                     validator.getValidInput("MetadataApi", keyword,
-                            MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+                    		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
                 }
             } catch (com.bbn.marti.remote.exception.ValidationException e) {
                 logger.error("ValidationException in setMetadataKeywords!", e);
@@ -126,7 +127,7 @@ public class MetadataApi extends BaseRestController {
         try {
             try {
                 validator.getValidInput("MetadataApi", hash,
-                        MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+                		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             } catch (com.bbn.marti.remote.exception.ValidationException e) {
                 logger.error("ValidationException in setExpiration!", e);
                 return new ResponseEntity(HttpStatus.BAD_REQUEST);

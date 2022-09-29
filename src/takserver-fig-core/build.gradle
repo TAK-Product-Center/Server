@@ -1,19 +1,9 @@
 apply plugin: 'java'
-apply plugin: 'com.google.protobuf'
-apply plugin: 'maven-publish'
-
-buildscript {
-  dependencies {
-    classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.8'
-  }
-}
-
-//apply plugin: 'com.github.johnrengelman.shadow'
-
-group = 'com.bbn.roger'
-version = '0.0.1-SNAPSHOT'
 
 dependencies {
+
+  // use protobuf generated code from takserver-protobuf project
+  compile project(':takserver-protobuf')
 
   compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
   compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
@@ -29,7 +19,7 @@ dependencies {
 
   // Google's OpenSSL variant
   // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
-  compile 'io.netty:netty-tcnative-boringssl-static:' + boringssl_static_version
+  compile 'io.netty:netty-tcnative-boringssl-static:' + netty_tcnative_version
 
   //compile 'javax.activation:activation:' + javax_activation_version
 
@@ -57,84 +47,34 @@ dependencies {
 
 }
 
-// protobuf code generation step
-protobuf {
-  protoc {
-    artifact = 'com.google.protobuf:protoc:3.0.0'
-  }
-  plugins {
-    grpc {
-      artifact = 'io.grpc:protoc-gen-grpc-java:1.0.2'
-    }
-  }
-  generateProtoTasks {
-    all()*.plugins {
-      grpc {
-        // To generate deprecated interfaces and static bindService method,
-        // turn the enable_deprecated option to true below:
-        option 'enable_deprecated=false'
-      }
-    }
-  }
-}
-
-
-
 apply plugin: 'idea'
 apply plugin: 'eclipse'
 
-idea {
-  module {
-    // Not using generatedSourceDirs because of
-    // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
-    sourceDirs += file("${projectDir}/build/generated/source/proto/main/java");
-    sourceDirs += file("${projectDir}/build/generated/source/proto/main/grpc");
+// This should be fixed in  Gradle 7.2 according to 
+// https://github.com/gradle/gradle/issues/4505, but that's a larger task than 
+// A five minute work-around.
+if ("$System.env.TAK_GRADLE_CI_MODE" != "true") {
+  println("NOT USING CI")
+  idea {
+    module {
+      // Not using generatedSourceDirs because of
+      // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
+      sourceDirs += file("${projectDir}/build/generated/source/proto/main/java");
+      sourceDirs += file("${projectDir}/build/generated/source/proto/main/grpc");
+    }
   }
 }
 
-sourceSets {
+/*sourceSets {
   main {
     java {
       srcDir 'build/generated/source/proto/main/grpc'
       srcDir 'build/generated/source/proto/main/java'
     }
   }
-}
+}*/
 
 clean {
   delete 'bin'
 }
 
-/**
-shadowJar {
-  baseName = 'fig'
-  classifier = 'core'
-  version = version
-}
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-        }
-    }
-}
-**/
-
-//Generates protobuf code, applies the patch
-task applyGrpcPatch{
-  dependsOn 'generateProto'
-  description 'Patches the generated protobuf to make it compatible with both versions 2 and 3'
-  doLast{
-  //Ant used to apply the patch file
-  //(Need to specify the specific file that is getting patched because ant can't figure out which file to patch from the diff file)
-  ant.patch(patchfile: 'proto2compatFix.patch', originalfile: 'build/generated/source/proto/main/java/com/atakmap/Tak/GeoEvent.java')
-}
-println 'APPLYING PROTO PATCH'
-}
-
-compileJava.finalizedBy(tasks.applyGrpcPatch)
-
-task wrapper(type: Wrapper) {
-  gradleVersion = '2.13'
-}

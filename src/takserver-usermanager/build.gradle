@@ -9,6 +9,10 @@ mainClassName = 'com.bbn.marti.UserManager'
 
 apply plugin: 'com.github.johnrengelman.shadow'
 
+jar {
+    enabled = false
+}
+
 shadowJar {
     baseName = 'UserManager'
     classifier = 'all'

@@ -5,7 +5,7 @@ import com.bbn.marti.takcl.SSLHelper;
 import com.bbn.marti.takcl.cli.EndUserReadableException;
 import com.bbn.marti.takcl.cli.simple.Command;
 import com.bbn.marti.takcl.config.common.TakclRunMode;
-import com.bbn.marti.takcl.connectivity.RunnableServerManager;
+import com.bbn.marti.takcl.connectivity.server.RunnableServerManager;
 import com.bbn.marti.takcl.connectivity.implementations.UnifiedClient;
 import com.bbn.marti.takcl.connectivity.interfaces.ClientResponseListener;
 import com.bbn.marti.test.shared.CotGenerator;
@@ -18,12 +18,10 @@ import com.bbn.marti.test.shared.data.generated.ImmutableUsers;
 import com.bbn.marti.test.shared.data.servers.CLIImmutableServerProfiles;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.cert.CertificateException;
 
 /**
  * Used to maniuplate the simulated test environment, including setting up servers, federating servers,

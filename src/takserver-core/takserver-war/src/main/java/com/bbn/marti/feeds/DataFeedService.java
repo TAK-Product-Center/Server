@@ -12,22 +12,33 @@ import javax.sql.DataSource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 
+import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.sync.model.DataFeedDao;
 import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.google.common.base.Strings;
+
+import tak.server.Constants;
 
 /*
  */
 public class DataFeedService {
 	
 	private static final Logger logger = LoggerFactory.getLogger(DataFeedService.class);
+	
+	@Autowired
+	private CoreConfig coreConfig;
 
 	private final DataSource dataSource;
 	private final DataFeedRepository dataFeedRepository;
+	private final CacheManager cacheManager;
 	
 	private static DataFeedService dataFeedService;
-	private synchronized DataFeedService getDataFeedService() {
+	public static synchronized DataFeedService getDataFeedService() {
 		if (dataFeedService != null) {
 			return dataFeedService;
 		}
@@ -37,15 +48,45 @@ public class DataFeedService {
 			return dataFeedService;
 		} catch (Exception e) {
 			logger.error("exception trying to get DataFeedService bean!", e);
-			return this;
+			return null;
 		}
 	}
 	
-	public DataFeedService(DataSource dataSource, DataFeedRepository dataFeedRepository) {
+	public DataFeedService(DataSource dataSource, DataFeedRepository dataFeedRepository, CacheManager cacheManager) {
 		this.dataSource = dataSource;
 		this.dataFeedRepository = dataFeedRepository;
+		this.cacheManager = cacheManager;
 	}
 	
+	@Cacheable(value = Constants.DATA_FEED_CACHE, key="{#root.methodName, #root.args[0]}", sync = true)
+	public DataFeedDao getDataFeedByUid(String feed_uid) {
+		return dataFeedRepository.getDataFeedByUUID(feed_uid).stream().findFirst().orElse(null);
+	}
+	
+	@Cacheable(value = Constants.DATA_FEED_CACHE, key="{#root.methodName, #root.args[0]}", sync = true)
+	public DataFeedDao getDataFeedById(Long feed_id) {
+		return dataFeedRepository.getDataFeedById(feed_id).stream().findFirst().orElse(null);
+	}
+	
+	@Cacheable(value = Constants.DATA_FEED_CACHE, key="{#root.methodName, #root.args[0]}", sync = true)
+	public DataFeedDao getDataFeedByName(String name) {
+		return dataFeedRepository.getDataFeedByName(name).stream().findFirst().orElse(null);
+	}
+	
+	@Cacheable(value = Constants.DATA_FEED_CACHE, key="{#root.methodName}", sync = true)
+	public List<DataFeedDao> getCachedDataFeeds() {
+		return dataFeedRepository.getDataFeeds();
+	}
+	
+	@Cacheable(value = Constants.DATA_FEED_CACHE, key="{#root.methodName, #root.args[0]}", sync = true)
+	public List<String> getDataFeedTagsById(Long id) {
+		return dataFeedRepository.getDataFeedTagsById(id);
+	}
+	
+	@Cacheable(value = Constants.DATA_FEED_CACHE, key="{#root.methodName, #root.args[0]}", sync = true)
+	public List<DataFeedDao> getDataFeedsByGroup(String groupVector) {
+		return dataFeedRepository.getDataFeedsByGroups(groupVector);
+	}
 	
 	public List<String> getDataFeedsWithinBbox(double minLat, double maxLat, double minLong, double maxLong) {
 		List<String> dataFeedsInBounds = new ArrayList<>();

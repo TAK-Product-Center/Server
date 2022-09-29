@@ -1,5 +1,6 @@
 package com.bbn.marti.sync.federation;
 
+import java.io.InputStream;
 import java.rmi.RemoteException;
 
 import org.aspectj.lang.JoinPoint;
@@ -44,7 +45,7 @@ public class EnterpriseSyncFederationAspect {
     
     @Around("execution(* com.bbn.marti.sync.EnterpriseSyncService.insertResource(..)))") 
     public Object insertResource(ProceedingJoinPoint jp) throws Throwable {
-    
+        
     	if (logger.isDebugEnabled()) {
     		logger.debug("EnterpriseSyncService.insertResource() : " + jp.getSignature().getName() + ": Before Method Execution");
     	}
@@ -80,20 +81,78 @@ public class EnterpriseSyncFederationAspect {
         			logger.debug("esync advice " + jp.getSignature().getName() + " " + jp.getKind());
         		}
         		
-        		executorSource.missionRepositoryProcessor.submit(() -> 	{
-        			try {
-        				// federate only file metadata (no content)
-        				mfm.insertResource((Metadata) jp.getArgs()[0], (byte[]) jp.getArgs()[1], gm.groupVectorToGroupSet((String) jp.getArgs()[2]));
-        			} catch (Exception e) {
-        				logger.error("exception federating file", e);
+        		try {
+    				// federate only file metadata (no content)
+    				mfm.insertResource((Metadata) result, (byte[]) jp.getArgs()[1], gm.groupVectorToGroupSet((String) jp.getArgs()[2]));
+    			} catch (Exception e) {
+    				logger.error("exception federating file", e);
+    			}
+        	} catch (Exception e) {
+        		logger.debug("exception executing create mission advice: " + e);
+        	}
+
+            
+            return result;
+        } finally { }
+    }
+    
+    @Around("execution(* com.bbn.marti.sync.EnterpriseSyncService.insertResourceStream(..)))") 
+    public Object insertResourceStream(ProceedingJoinPoint jp) throws Throwable {
+    	return federateStreamResource(jp);
+    }
+    
+    @Around("execution(* com.bbn.marti.sync.EnterpriseSyncService.insertResourceStreamUID(..)))") 
+    public Object insertResourceStreamUID(ProceedingJoinPoint jp) throws Throwable {
+    	return federateStreamResource(jp);
+    }
+    
+    private Object federateStreamResource(ProceedingJoinPoint jp) throws Throwable {
+    	if (logger.isDebugEnabled()) {
+    		logger.debug("EnterpriseSyncService.insertResource() : " + jp.getSignature().getName() + ": Before Method Execution");
+    	}
+        try {
+            Object result = jp.proceed();
+            
+            if (logger.isDebugEnabled()) {
+            	logger.debug("result: " + result);
+            	logger.debug("EnterpriseSyncService.insertResource() : " + jp.getSignature().getName() + ": After Method Execution");
+            }
+            
+            if (!coreConfig.getRemoteConfiguration().getFederation().isEnableFederation()) {
+    			return result;
+    		}
+    
+        	if (!coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) {
+        		if (logger.isDebugEnabled()) {
+        			logger.debug("mission federation disabled in config");
+        		}
+        		return result;
+        	}
+        	
+        	try {
+        		
+        		if (isCyclic()) {
+        			if (logger.isDebugEnabled()) {
+        				logger.debug("skipping cyclic esync aspect execution");
         			}
-        		});
+        			return result;
+        		}
+        		
+        		if (logger.isDebugEnabled()) {
+        			logger.debug("esync advice " + jp.getSignature().getName() + " " + jp.getKind());
+        		}
+        		
+        		try {
+    				// federate only file metadata (no content)
+    				mfm.insertResource((Metadata) result, (InputStream) jp.getArgs()[1], gm.groupVectorToGroupSet((String) jp.getArgs()[2]));
+    			} catch (Exception e) {
+    				logger.error("exception federating file", e);
+    			}
         		
 
         	} catch (Exception e) {
         		logger.debug("exception executing create mission advice: " + e);
         	}
-
             
             return result;
         } finally { }

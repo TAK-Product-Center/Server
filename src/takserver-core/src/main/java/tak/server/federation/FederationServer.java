@@ -9,6 +9,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -68,9 +69,11 @@ import com.atakmap.Tak.Empty;
 import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederatedChannelGrpc;
 import com.atakmap.Tak.FederatedEvent;
+import com.atakmap.Tak.Identity;
 import com.atakmap.Tak.ROL;
 import com.atakmap.Tak.ServerHealth;
 import com.atakmap.Tak.Subscription;
+import com.bbn.cot.filter.DataFeedFilter;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Input;
@@ -546,13 +549,13 @@ public class FederationServer {
 					throw new IllegalArgumentException("client cert not available");
 				}
 
-				streamHolder = new GuardedStreamHolder<FederatedEvent>(clientStream, fedName, FederationUtils.getBytesSHA256(clientCertArray[0].getEncoded()), subscription, new Comparator<FederatedEvent>() {
+				streamHolder = new GuardedStreamHolder<FederatedEvent>(clientStream, fedName, FederationUtils.getBytesSHA256(clientCertArray[0].getEncoded()), session, subscription, new Comparator<FederatedEvent>() {
 
 					@Override
 					public int compare(FederatedEvent a, FederatedEvent b) {
 						return ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result();
 					}
-				});
+				}, false);
 
 				ConnectionInfo connection = new ConnectionInfo();
 				connection.setConnectionId(getCurrentSessionId());
@@ -563,7 +566,7 @@ public class FederationServer {
 					logger.debug("fedSub: " + fedSub);
 				}
 
-				federatedSubscriptionManager.putClientSteamToSession(getCurrentSessionId(), streamHolder);
+				federatedSubscriptionManager.putClientStreamToSession(getCurrentSessionId(), streamHolder);
 
 				if (logger.isDebugEnabled()) {
 					logger.debug("set client event stream holder for fed sub in clientEventStream");
@@ -672,10 +675,11 @@ public class FederationServer {
 						clientStream,
 						clientName,
 						fedCertHash,
+						session,
 						subscription,
-						(ROL a, ROL b) -> ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result());
+						(ROL a, ROL b) -> ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result(), false);
 
-				federatedSubscriptionManager.putClientROLSteamToSession(getCurrentSessionId(), rolStreamHolder);
+				federatedSubscriptionManager.putClientROLStreamToSession(getCurrentSessionId(), rolStreamHolder);
 
 				// keep track of clientStream and its associated federate identity
 				String id = new String(session.getId(), Charsets.UTF_8);
@@ -688,6 +692,26 @@ public class FederationServer {
 
 				ConnectionInfo connection = new ConnectionInfo();
 				connection.setConnectionId(getCurrentSessionId());
+
+				try {
+					// send out data feeds to federate
+					if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+						List<ROL> feedMessages = mdm.getDataFeedEvents();
+						
+						AtomicLong delayMs = new AtomicLong(100L);										
+						for (final ROL feedMessage : feedMessages) {
+							Resources.scheduledClusterStateExecutor.schedule(() -> {
+								try {
+									clientStream.onNext(feedMessage);
+								} catch (Exception e) {
+									logger.error("exception federating data feed", e);
+								}
+							}, delayMs.getAndAdd(100), TimeUnit.MILLISECONDS);
+						}
+					}
+				} catch (Exception e) {
+					logger.error("exception federating data feeds", e);
+				}
 
 				// send missions from disruption period
 				// use fed sub to send ROL. get groups from federate.
@@ -991,6 +1015,14 @@ public class FederationServer {
 		// handle subscription requests from other takservers and open a stream of messages to send back to them
 		@Override
 		public StreamObserver<FederatedEvent> serverEventStream(StreamObserver<Subscription> responseObserver) {
+			String sessionId = getCurrentSessionId();
+                        
+        	Subscription subscription = Subscription.newBuilder()
+        			.setFilter("")
+        			.setIdentity(Identity.newBuilder().setType(Identity.ConnectionType.FEDERATION_TAK_SERVER).setServerId(DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getServerId()).setName(sessionId).setUid(sessionId).build())
+        			.build();
+        	
+        	responseObserver.onNext(subscription);
 			return new StreamObserver<FederatedEvent>() {
 				
 				FigServerFederateSubscription federateSubscription = null;
@@ -1145,7 +1177,7 @@ public class FederationServer {
 								public void forceClose() {
 									try {
 
-										federatedSubscriptionManager.getClientSteamBySession(sessionId).throwDeadlineExceptionToClient();;
+										federatedSubscriptionManager.getClientStreamBySession(sessionId).throwDeadlineExceptionToClient();;
 									}catch (Exception e) {
 										if (logger.isInfoEnabled()) {
 											logger.info("Could not forceClose V2 federation server handler " + e);
@@ -1264,7 +1296,6 @@ public class FederationServer {
 
 				@Override
 				public void onError(Throwable t) {
-
 					if (logger.isDebugEnabled()) {
 						logger.debug("serverEventStream onError: " + t);
 					}
@@ -1320,10 +1351,9 @@ public class FederationServer {
 				@Override
 				public void onNext(FederateGroups value) {
 					if (logger.isDebugEnabled()) {
-						logger.debug("Sending client federate groups: " + value);
+						logger.debug("Collecting client federate groups: " + value);
 					}
-					
-					groupFederationUtil.collectRemoteGroups(new HashSet<String>(value.getFederateGroupsList()),  federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())));
+					groupFederationUtil.collectRemoteFederateGroups(new HashSet<String>(value.getFederateGroupsList()),  federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())));
 				}
 
 				@Override
@@ -1341,6 +1371,7 @@ public class FederationServer {
 		@Override
 		public void serverFederateGroupsStream(Subscription request, StreamObserver<FederateGroups> responseObserver) {
 			serverFederateGroupStreamMap.put(getCurrentSessionId(), responseObserver);
+			federatedSubscriptionManager.putServerGroupStreamToSession(getCurrentSessionId(), responseObserver);
 			// let the client know the group stream is ready
 			responseObserver.onNext(FederateGroups.newBuilder().setStreamUpdate(ServerHealth.newBuilder().setStatus(ServerHealth.ServingStatus.SERVING).build()).build());
 			if (logger.isDebugEnabled()) {
@@ -1755,7 +1786,7 @@ public class FederationServer {
 		
 		// this needs to be checked before fedEvent.getEvent()
 		if (fedEvent.getFederateGroupsList() != null) {
-			groupFederationUtil.collectRemoteGroups(new HashSet<String>(fedEvent.getFederateGroupsList()), federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())));
+			groupFederationUtil.collectRemoteFederateGroups(new HashSet<String>(fedEvent.getFederateGroupsList()), federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())));
 		}
 
 		// covert to a CoT message and submit to broker
@@ -1786,6 +1817,15 @@ public class FederationServer {
 				cot.setContext(GroupFederationUtil.FEDERATE_ID_KEY, getCurrentSessionId());
 	            cot.setContext(Constants.SOURCE_HASH_KEY, handler.identityHash());
 				cot.setContext(Constants.NOFEDV2_KEY, true);
+				
+				// if this message was from a data feed, pass it through the data feed filter
+				// for mission filtering						
+				String feedUuid = (String) cot.getContextValue(Constants.DATA_FEED_UUID_KEY);
+				if (!Strings.isNullOrEmpty(feedUuid)) {
+					if (!DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation())
+						return;
+					DataFeedFilter.getInstance().filterFederatedDataFeed(cot);
+				}
 
 				if (federateSubscription != null && federateSubscription.getUser() != null) {
 					User user = federateSubscription.getUser();
@@ -1974,7 +2014,6 @@ public class FederationServer {
 				if (logger.isDebugEnabled()) {
 					logger.debug("Detected FederatedEvent client stream {} inactivity", clientStreamEntry.getValue().getFederateIdentity());
 				}
-
 				clientStreamEntry.getValue().throwDeadlineExceptionToClient();
 
 				clientStreamMap.remove(clientStreamEntry.getKey());

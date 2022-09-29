@@ -3,22 +3,63 @@ apply plugin: 'org.openrepose.gradle.plugins.jaxb'
 
 
 dependencies {
+
+  compile(project(':takserver-plugins')) {
+    exclude group: 'dom4j'
+    exclude group: 'pull-parser'
+    exclude group: 'xpp3'
+  }
+
+  runtime(project(':takserver-plugins')) {
+    exclude group: 'dom4j'
+    exclude group: 'pull-parser'
+    exclude group: 'xpp3'
+  }
+
+
+/*  compile ("org.dom4j:dom4j:$dom4j_version") {
+       exclude group: 'pull-parser'
+       exclude group: 'xpp'
+  }
+
+  runtime ("org.dom4j:dom4j:$dom4j_version") {
+       exclude group: 'pull-parser'
+       exclude group: 'xpp'
+  }   */
+
+  compile group: 'io.netty', name: 'netty-tcnative-boringssl-static', version: netty_tcnative_version
+//  compile group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
+  compile group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
+
   compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
   compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
   compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  
+// try to exclude unwanted xml parsers - we want to use Xerces
 
-  compile project(':takserver-plugins')	     
+
+/*runtimeClasspath - Runtime classpath of source set 'main'.
++--- org.dom4j:dom4j:2.1.3
+|    +--- jaxen:jaxen:1.1.6 -> 1.2.0
+|    +--- javax.xml.stream:stax-api:1.0-2
+|    +--- net.java.dev.msv:xsdlib:2013.6.1
+|    |    \--- relaxngDatatype:relaxngDatatype:20020414
+|    +--- javax.xml.bind:jaxb-api:2.2.12 -> 2.3.1
+|    |    \--- javax.activation:javax.activation-api:1.2.0
+|    +--- pull-parser:pull-parser:2
+|    \--- xpp3:xpp3:1.1.4c*/
+
 
   compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
 
-  compile 'org.glassfish.jaxb:jaxb-runtime:' + jaxb_version
-  compile 'org.glassfish.jaxb:jaxb-core:' + jaxb_core_version
-  compile 'javax.activation:activation:' + javax_activation_version
+  compile group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: jaxb_glassfish_version
+  compile group: 'org.glassfish.jaxb', name: 'jaxb-core', version: jaxb_glassfish_core_version
+  compile group: 'javax.activation', name: 'activation', version: javax_activation_version
 
-  jaxb 'org.glassfish.jaxb:jaxb-xjc:' + jaxb_version
-  jaxb 'org.glassfish.jaxb:jaxb-core:' + jaxb_core_version
-  jaxb 'org.glassfish.jaxb:jaxb-runtime:' + jaxb_version
-  jaxb 'javax.activation:activation:' + javax_activation_version
+  jaxb group: 'org.glassfish.jaxb', name: 'jaxb-xjc', version: jaxb_glassfish_version
+  jaxb group: 'org.glassfish.jaxb', name: 'jaxb-core', version: jaxb_glassfish_core_version
+  jaxb group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: jaxb_glassfish_version
+  jaxb group: 'javax.activation', name: 'activation', version: javax_activation_version
 
   compile group: 'com.google.guava', name: 'guava', version: guava_version
   compile group: 'com.intellij', name: 'annotations', version: intellij_annotations_version // IntelliJ @NotNull annotation
@@ -27,16 +68,16 @@ dependencies {
   compile group: 'joda-time', name: 'joda-time', version: joda_version
   compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
   compile group: 'org.springframework', name: 'spring-context', version: spring_version
-  compile group: 'org.dom4j', name: 'dom4j', version: dom4j_version
   
   // apache ignite (cache and distributed service grid)
   compile group: 'org.apache.ignite', name: 'ignite-indexing', version: ignite_version
-  compile group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_spring_version
+  compile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
   compile group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
+  compile group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
 
   compile group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeine_version
-
-  compile group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeine_version
+  
+  compile group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
   
   compile project(':takserver-fig-core')
 
@@ -61,7 +102,7 @@ jaxb {
   episodesDir = "${buildDir}/episodes"
   xjc {
     destinationDir = "${buildDir}/src-generated"
+    }
   }
-}
 
 compileJava.dependsOn xjc

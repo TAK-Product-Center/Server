@@ -44,6 +44,7 @@ import com.bbn.marti.remote.RemoteContact;
 import com.bbn.marti.service.FederationHttpConnectorManager;
 import com.bbn.marti.sync.repository.FederationEventRepository;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.collect.ComparisonChain;
 //import com.sun.tools.jxc.ap.Const;
 import com.google.common.collect.Multimap;
@@ -343,7 +344,7 @@ public class FederationApi extends BaseRestController {
 				Validator validator = MartiValidator.getInstance();
 				if (groupsInbound != null && !groupsInbound.isEmpty()) {
 					for (String group : groupsInbound){
-						if(validator.isValidInput("Federate group", group, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false)) {
+						if(validator.isValidInput("Federate group", group, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
 							federateGroupAssociations.add(new FederateGroupAssociation(federateId, group, DirectionValue.INBOUND));
 						}
 					}
@@ -351,7 +352,7 @@ public class FederationApi extends BaseRestController {
 
 				if (groupsOutbound != null && !groupsOutbound.isEmpty()) {
 					for (String group : groupsOutbound) {
-						if(validator.isValidInput("Federate group", group, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false)) {
+						if(validator.isValidInput("Federate group", group, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
 							federateGroupAssociations.add(new FederateGroupAssociation(federateId, group, DirectionValue.OUTBOUND));
 						}
 					}
@@ -631,13 +632,13 @@ public class FederationApi extends BaseRestController {
 
 				Validator validator = MartiValidator.getInstance();
 				for(String groupName : inboundGroups){
-					if(validator.isValidInput("Federate CA group", groupName, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false)) {
+					if(validator.isValidInput("Federate CA group", groupName, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
 						federateCAGroupAssociations.add(new FederateCAGroupAssociation(caId, groupName, DirectionValue.INBOUND));
 					}
 				}
 
 				for(String groupName : outboundGroups){
-					if(validator.isValidInput("Federate CA group", groupName, MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, false)) {
+					if(validator.isValidInput("Federate CA group", groupName, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
 						federateCAGroupAssociations.add(new FederateCAGroupAssociation(caId, groupName, DirectionValue.OUTBOUND));
 					}
 				}

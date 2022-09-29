@@ -19,7 +19,6 @@ import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.network.BaseRestController;
 
-import io.swagger.annotations.Api;
 import tak.server.Constants;
 
 
@@ -29,7 +28,6 @@ import tak.server.Constants;
  *
  */
 @RestController
-@Api(value = "MapLayers")
 public class MapLayersApi extends BaseRestController {
 
 	@Autowired

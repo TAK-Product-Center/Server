@@ -22,6 +22,7 @@ public class InputMetric implements Serializable, Comparable<InputMetric> {
     private AtomicLong readsReceived = new AtomicLong();
     private AtomicLong messagesReceived = new AtomicLong();
     private AtomicLong numClients = new AtomicLong();
+    private AtomicLong bytesRecieved = new AtomicLong();
     
     public InputMetric(Input input) {
         if (input == null) {
@@ -62,6 +63,14 @@ public class InputMetric implements Serializable, Comparable<InputMetric> {
     public void setNumClients(AtomicLong numClients) {
         this.numClients = numClients;
     }
+
+	public AtomicLong getBytesRecieved() {
+		return bytesRecieved;
+	}
+
+	public void setBytesRecieveds(AtomicLong bytesRecieved) {
+		this.bytesRecieved = bytesRecieved;
+	}
 
     public String getId() {
         return id;

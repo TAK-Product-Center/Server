@@ -1,5 +1,6 @@
 package tak.server.federation.hub.policy;
 
+import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -11,6 +12,7 @@ import tak.server.federation.Federate;
 import tak.server.federation.FederateEdge;
 import tak.server.federation.FederateGroup;
 import tak.server.federation.FederateIdentity;
+import tak.server.federation.FederateOutgoing;
 import tak.server.federation.FederationException;
 import tak.server.federation.FederationFilter;
 import tak.server.federation.FederationNode;
@@ -19,8 +21,9 @@ import tak.server.federation.FederationPolicyGraph;
 /**
  * Created on 4/4/2017.
  */
-public class FederationPolicyGraphImpl implements FederationPolicyGraph {
-    private String name;
+public class FederationPolicyGraphImpl implements FederationPolicyGraph, Serializable {
+	private static final long serialVersionUID = -7327365173619071592L;
+	private String name;
     private ConcurrentHashMap<FederateIdentity, FederationNode> nodeMap;
 //    private ConcurrentHashMap<FederateIdentity, FederateGroup> groupMap;
     private Set<FederateEdge> edgeSet;
@@ -102,6 +105,8 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph {
     public void addNode(FederationNode federationNode) {
         if (federationNode instanceof Federate) {
             addFederate((Federate) federationNode);
+        } else if (federationNode instanceof FederateOutgoing) {
+        	nodeMap.put(federationNode.getFederateIdentity(), federationNode);
         } else {
             addGroup((FederateGroup) federationNode);
         }
@@ -129,7 +134,7 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph {
 
     @Override
     public Federate getFederate(FederateIdentity federateIdentity) {
-        FederationNode node = nodeMap.get(federateIdentity);
+    	 FederationNode node = nodeMap.get(federateIdentity);
         if (node instanceof Federate) {
             return (Federate) node;
         }
@@ -210,6 +215,8 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph {
         } else if (isEdgeInGraph(federateEdge)) {
             throw new FederationException("A edge with this source and destination already exists in the graph.");
         }
+
+        
 
         edgeSet.add(federateEdge);
         nodeMap.get(federateEdge.getSourceIdentity()).addOutgoingEdge(federateEdge);
@@ -295,7 +302,7 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph {
         Set<Federate> reachableFederates = new HashSet<>();
         Set<FederateEdge> edgesFromNode = source.getOutgoingEdges();
         unvisitedNodes.remove(source);
-
+                
         for (FederateEdge edge : edgesFromNode) {
             FederationNode destinationNode = nodeMap.get(edge.getDestinationIdentity());
             if (destinationNode instanceof FederateGroup) {
@@ -318,7 +325,6 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph {
             // Remove source node in case it was added by a group add operation
             reachableFederates.remove(sourceFederate);
         }
-
         return reachableFederates;
     }
 

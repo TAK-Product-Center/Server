@@ -90,7 +90,7 @@ public class NioNettyFederationClientHandler extends NioNettyFederationServerHan
 							setReader();
 							new FederateSslPreAuthCodec(null, DummyAuthenticator.getInstance()).handleOnConnect(connectionInfo);
 							alreadyClosed.set(false);
-							federationManager.handleOnConnect(channelHandler, fedProto);
+							federationManager().handleOnConnect(channelHandler, fedProto);
 						}else {
 							federationError = future.cause().getMessage();
 							log.info("NioNettyFederationHandler error connecting to federate " + federationError);
@@ -110,11 +110,11 @@ public class NioNettyFederationClientHandler extends NioNettyFederationServerHan
 	@Override
 	public void channelUnregistered(ChannelHandlerContext ctx) {
 		if (connectionInfo != null && channelHandler != null && alreadyClosed.compareAndSet(false, true) == true) {
-			messagingUtil.processFederateClose(connectionInfo, channelHandler, SubscriptionStore.getInstance().getByHandler(channelHandler));
+			messagingUtil().processFederateClose(connectionInfo, channelHandler, SubscriptionStore.getInstance().getByHandler(channelHandler));
 		}
 		
 		if (status.getConnectionStatusValue() != ConnectionStatusValue.RETRY_SCHEDULED && !duplicateActiveConnection.get()) {
-			federationManager.checkAndSetReconnectStatus(federationManager.getOutgoingConnection(outgoingName), federationError);
+			federationManager().checkAndSetReconnectStatus(federationManager().getOutgoingConnection(outgoingName), federationError);
 		}
 				
 		ctx.close();

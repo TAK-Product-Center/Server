@@ -149,6 +149,11 @@ public class StateEngine implements EngineInterface {
 	}
 
 	@Override
+	public void startServerWithStartupValidation(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier, boolean enablePluginManager, boolean enableRetentionService) {
+		data.updateState();
+	}
+
+	@Override
 	public void stopServers(@NotNull AbstractServerProfile... servers) {
 //        data.resetState();
 //        data.clearLatestSA(servers);

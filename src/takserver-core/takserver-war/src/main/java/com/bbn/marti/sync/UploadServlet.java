@@ -2,7 +2,6 @@
 
 package com.bbn.marti.sync;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
@@ -31,10 +30,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.sync.Metadata.Field;
 import com.google.common.base.Strings;
-import com.google.common.io.ByteSource;
-import com.google.common.io.ByteStreams;
 
 import io.micrometer.core.instrument.Metrics;
+import tak.server.PluginManager;
 
 /**
  * Servlet that accepts POST requests (only) to upload resources to the
@@ -42,8 +40,6 @@ import io.micrometer.core.instrument.Metrics;
  * add a new resource or update an existing one.
  */
 public class UploadServlet extends EnterpriseSyncServlet {
-
-	public static final String SIZE_LIMIT_VARIABLE_NAME = "EnterpriseSyncSizeLimitMB";
 
 	private static final long serialVersionUID = -8151782550681449153L;
 	private static final int DEFAULT_PARAMETER_LENGTH = 1024;
@@ -53,6 +49,9 @@ public class UploadServlet extends EnterpriseSyncServlet {
 
 	@Autowired
 	private CoreConfig coreConfig;
+	
+	@Autowired(required = false)	
+	protected PluginManager pluginManager;
 
 	private int uploadSizeLimitMB;
 
@@ -73,6 +72,11 @@ public class UploadServlet extends EnterpriseSyncServlet {
 
 
 		uploadSizeLimitMB = coreConfig.getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
+		
+		if (uploadSizeLimitMB > 550) {
+			throw new IllegalArgumentException("Invalid configuration in CoreConfig for EnterpriseSyncSizeLimitMB. Must be 550MB or less");
+		}
+		
 		logger.info("Enterprise Sync upload limit is " + uploadSizeLimitMB + " MB");
 
 
@@ -113,7 +117,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 
 		try {
 			// Get group vector for the user associated with this session
-			groupVector = martiUtil.getGroupBitVector(request);
+			groupVector = commonUtil.getGroupBitVector(request);
 			if (logger.isDebugEnabled()) {
 				logger.debug("groups bit vector: " + groupVector);
 			}
@@ -185,7 +189,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 				}
 			}
 			Metadata toStore = Metadata.fromMap(metadataParameters);
-			toStore.validate(validator);
+			commonUtil.validateMetadata(toStore);
 			
 			if (logger.isDebugEnabled()) {
 				logger.debug("Request is: " + toStore.toJSONObject().toJSONString());
@@ -214,9 +218,11 @@ public class UploadServlet extends EnterpriseSyncServlet {
 			if (toStore.getUid() == null || toStore.getUid().isEmpty()) {
 				toStore.set(Metadata.Field.UID, new String[] {UUID.randomUUID().toString()});
 			} 
-			byte[] payload = null;
+
 			String mimeType = request.getHeader("Content-Type");
 
+			InputStream inputStream = request.getInputStream();
+			
 			if (mimeType == null || !mimeType.contains("multipart/form-data")) {
 				
 				if (logger.isDebugEnabled()) {
@@ -227,11 +233,8 @@ public class UploadServlet extends EnterpriseSyncServlet {
 					logger.debug("reading payload from request");
 				}
 				
-				payload = readByteArray(request.getInputStream());
+				inputStream = request.getInputStream();
 				
-				if (logger.isDebugEnabled()) {
-					logger.debug("done reading payload from request - size: " + payload.length + " bytes");
-				}
 			} else {
 				Collection<Part> parts = request.getParts();
 				
@@ -246,17 +249,12 @@ public class UploadServlet extends EnterpriseSyncServlet {
 				}
 
 				if (part != null) {
-					try(InputStream is = part.getInputStream()) {
+					
+					inputStream = part.getInputStream();
 						
 						if (logger.isDebugEnabled()) {
 							logger.debug("reading payload from request");
 						}
-						payload = readByteArray(is);
-						
-						if (logger.isDebugEnabled()) {
-							logger.debug("done reading payload from request - size: " + payload.length + " bytes");
-						}
-					}
 				} else {
 					for (Part myPart : parts) {
 						if (logger.isDebugEnabled()) {
@@ -316,11 +314,20 @@ public class UploadServlet extends EnterpriseSyncServlet {
 				toStore.set(Metadata.Field.SubmissionUser, userName);
 			}
 
-			if (logger.isDebugEnabled()) {
-				logger.debug("inserting resource " + toStore + " payload length: " +  payload.length);
-			}
-			uploadedMetadata = enterpriseSyncService.insertResource(toStore, payload, groupVector); // do not validate file length, as that's already checked above 
+			uploadedMetadata = enterpriseSyncService.insertResourceStream(toStore, inputStream, groupVector); // do not validate file length, as that's already checked above 
+
 			Metrics.counter("UploadMissionContent", "missions", "content").increment();
+			
+			inputStream.close();
+			
+			// if plugin classname is set, notify the plugin with the file upload event. The notification event will include the Metadata object and will not include the full byte[] payload.
+			if (toStore.getPluginClassName() != null) {
+				
+				logger.info("~~~ Notifying the plugin {} with file upload event", toStore.getPluginClassName());
+				pluginManager.onFileUpload(toStore.getPluginClassName(), toStore);
+
+			} 
+			
 		} catch (NamingException|SQLException ex) {
 			String msg = "Enterprise Sync database failed to process write operation.";
 			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, msg);
@@ -372,7 +379,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 			}
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Intrusion attempt detected! HTTP request denied.");
 			return;
-		} 
+		}
 
 		PrintWriter writer = response.getWriter();
 		
@@ -398,20 +405,20 @@ public class UploadServlet extends EnterpriseSyncServlet {
 				"HTTP Put is not supported. Use HTTP POST instead.");
 	}
 
-	/**
-	 * Utility method that reads a byte array from an input stream using Guava.
-	 * 
-	 * @param in
-	 *            any InputStream containing some data
-	 * @return the InputStream's contents as a byte array; may be size 0 but
-	 *         will not be null.
-	 * @throws IOException
-	 *             if a read error occurs
-	 */
-	private byte[] readByteArray(InputStream in) throws IOException {
-	    
-	    return ByteStreams.toByteArray(in);
-	}
+//	/**
+//	 * Utility method that reads a byte array from an input stream using Guava.
+//	 * 
+//	 * @param in
+//	 *            any InputStream containing some data
+//	 * @return the InputStream's contents as a byte array; may be size 0 but
+//	 *         will not be null.
+//	 * @throws IOException
+//	 *             if a read error occurs
+//	 */
+//	private byte[] readByteArray(InputStream in) throws IOException {
+//	    
+//	    return ByteStreams.toByteArray(in);
+//	}
 
 	@Override
 	protected void initalizeEsapiServlet() {

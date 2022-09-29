@@ -340,6 +340,11 @@ public class VerificationEngine implements EngineInterface {
 	}
 
 	@Override
+	public void startServerWithStartupValidation(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier, boolean enablePluginManager, boolean enableRetentionService) {
+		data.engineIterationDataClear();
+	}
+
+	@Override
 	public void stopServers(@NotNull AbstractServerProfile... servers) {
 
 		data.engineIterationDataClear();

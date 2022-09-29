@@ -34,7 +34,7 @@ import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.remote.util.SecureXmlParser;
 import com.bbn.marti.video.Feed.Type;
 import com.bbn.security.web.MartiValidator;
-
+import com.bbn.security.web.MartiValidatorConstants;
 
 public class VideoManagerService {
 	
@@ -83,16 +83,16 @@ public class VideoManagerService {
             			
             	try {
         			validator.getValidInput("feed", xml, 
-        					MartiValidator.Regex.XmlBlackList.name(), MartiValidator.LONG_STRING_CHARS, true);
+        					MartiValidatorConstants.Regex.XmlBlackList.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
         			Feed.Type type = feed.getType();
         			if (type != null) {
-						validator.getValidInput("feed type", type.toString(), MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+						validator.getValidInput("feed type", type.toString(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 					}
-        			validator.getValidInput("feed alias", feed.getAlias(), MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
-        			validator.getValidInput("feed fov", feed.getFov(), MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
-        			validator.getValidInput("feed heading", feed.getHeading(), MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
-        			validator.getValidInput("feed range", feed.getRange(), MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
-        			validator.getValidInput("feed uuid", feed.getUuid(), MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+        			validator.getValidInput("feed alias", feed.getAlias(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+        			validator.getValidInput("feed fov", feed.getFov(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+        			validator.getValidInput("feed heading", feed.getHeading(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+        			validator.getValidInput("feed range", feed.getRange(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+        			validator.getValidInput("feed uuid", feed.getUuid(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
         	    } catch (ValidationException e) {
         	        logger.error("Exception!", e);	    	
         	        return false;
@@ -155,7 +155,7 @@ public class VideoManagerService {
         			
         	try {
     			validator.getValidInput("feed", xml, 
-    					MartiValidator.Regex.XmlBlackList.name(), MartiValidator.LONG_STRING_CHARS, true);
+    					MartiValidatorConstants.Regex.XmlBlackList.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
     	    } catch (ValidationException e) {
     	        logger.error("Exception!", e);	    	
     	        return false;

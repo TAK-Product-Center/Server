@@ -11,7 +11,12 @@ dependencies {
   compile project(':takserver-fig-core')
 
   // Apache Ignite (cache and distributed service grid).
-  compile group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_spring_version
+//  compile group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_spring_version
+//  compile group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
+  compile group: 'org.springframework', name: 'spring-beans', version: spring_version
+  compile group: 'org.springframework', name: 'spring-context', version: spring_version
+
+
   compile group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
   compile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
 }

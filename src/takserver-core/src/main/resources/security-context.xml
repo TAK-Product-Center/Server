@@ -202,6 +202,11 @@
               <sec:intercept-url pattern="/Marti/api/sync/**" access="ROLE_ANONYMOUS" />
               <sec:intercept-url pattern="/Marti/api/cot/**" access="ROLE_ANONYMOUS" />
 			  <sec:intercept-url pattern="/Marti/api/cops/**" access="ROLE_ANONYMOUS" />
+			  <sec:intercept-url pattern="/Marti/api/classification/**" method="GET" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/api/classification/**" method="PUT" access="ROLE_ADMIN" />
+              <sec:intercept-url pattern="/Marti/api/classification/**" method="POST" access="ROLE_ADMIN" />
+              <sec:intercept-url pattern="/Marti/api/classification/**" method="DELETE" access="ROLE_ADMIN" />
+              <sec:intercept-url pattern="/Marti/api/caveat/**" access="ROLE_ADMIN" />
 
               <!--  properties API -->
               <sec:intercept-url pattern="/Marti/api/properties/**" access="ROLE_ANONYMOUS" />
@@ -341,6 +346,7 @@
 			  <sec:intercept-url pattern="/schedule/**" access="ROLE_ADMIN"/>
 			  
 			  <sec:intercept-url pattern="/user-management/**" access="ROLE_ADMIN"/>
+			  <sec:intercept-url pattern="/classification/**" access="ROLE_ADMIN"/>
               <sec:intercept-url pattern="/vbm/**" access="ROLE_ADMIN"/>
 
 			   <!-- static content -->
@@ -365,8 +371,6 @@
 	<bean id="LocateAuthorizationProvider" class="com.bbn.locate.LocateAuthorizationProvider"/>
 	<bean id="UserManagementAuthorizationProvider" class="com.bbn.user.registration.UserManagementAuthorizationProvider"/>
 
-	<bean id="SwaggerConfig" class="com.bbn.marti.swaggerconfig.SwaggerConfig"/>
-
 	<bean id="NullRequestCacheAwareFilter" class="org.springframework.security.web.savedrequest.NullRequestCache"/>
 
 	<bean id="SessionRegistry" class="org.springframework.security.core.session.SessionRegistryImpl"/>
@@ -374,7 +378,7 @@
 	<bean id="SwaggerAuthorizationFilter" class="com.bbn.marti.swaggerconfig.SwaggerAuthorizationFilter"/>
 	<bean id="swaggerFilterRegistrationBean" class="org.springframework.boot.web.servlet.FilterRegistrationBean">
 		<property name="filter" ref="SwaggerAuthorizationFilter"/>
-		<property name="urlPatterns" value="/swagger-resources/**, /swagger-ui.html, /v2/api-doc"/>
+		<property name="urlPatterns" value="/swagger-resources/**, /swagger-ui/index.html, /swagger-ui.html, /v3/api-docs"/>
 	</bean>
 
 	<bean id="martiPreAuthenticationFilter" class="com.bbn.marti.util.spring.TakPreAuthenticatedProcessingFilter">

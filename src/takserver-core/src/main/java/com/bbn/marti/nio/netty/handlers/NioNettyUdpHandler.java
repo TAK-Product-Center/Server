@@ -21,6 +21,7 @@ import com.bbn.marti.nio.protocol.Protocol;
 import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
 import com.bbn.marti.nio.protocol.connections.SingleCotProtocol;
 import com.bbn.marti.nio.protocol.connections.SingleProtobufOrCotProtocol;
+import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.service.DistributedConfiguration;
@@ -44,9 +45,6 @@ import tak.server.qos.MessageDeliveryStrategy;
 
 public class NioNettyUdpHandler extends MessageToMessageDecoder<DatagramPacket> {
 	private final static Logger log = Logger.getLogger(NioNettyUdpHandler.class);
-	protected SubmissionService submissionService;
-	protected DistributedSubscriptionManager subscriptionManager;
-	protected DistributedFederationManager federationManager;
 	protected MessagingUtilImpl messagingUtil;
 	protected DistributedConfiguration config;
 	protected Protocol<CotEventContainer> protocol;
@@ -57,11 +55,6 @@ public class NioNettyUdpHandler extends MessageToMessageDecoder<DatagramPacket> 
 	
 	public NioNettyUdpHandler(Input input) {
 		this.input = input;
-		this.submissionService = SubmissionService.getInstance();
-		this.subscriptionManager = DistributedSubscriptionManager.getInstance();
-		this.federationManager = DistributedFederationManager.getInstance();
-		this.messagingUtil = MessagingUtilImpl.getInstance();
-		this.config = DistributedConfiguration.getInstance();
 		this.parser = CotParserCreator.newInstance();
 		
 		TransportCotEvent transport = TransportCotEvent.findByID(input.getProtocol());
@@ -86,6 +79,11 @@ public class NioNettyUdpHandler extends MessageToMessageDecoder<DatagramPacket> 
                     .withConnectionInfo(connectionInfo);
 
             handler.withInput(input);
+            
+            InputMetric inputMetric = SubmissionService.getInstance().getInputMetric(input.getName());
+            if (inputMetric != null) {
+                inputMetric.getMessagesReceived().incrementAndGet();
+            }
                         
             if (protoSupported.get()) {
             	CotEventContainer cot = SingleProtobufOrCotProtocol.byteBufToCot(packet.content().nioBuffer(), handler, parser);
@@ -136,7 +134,7 @@ public class NioNettyUdpHandler extends MessageToMessageDecoder<DatagramPacket> 
 					.newInstance(channelHandler, protocol));
 		}
 
-		protocol.addProtocolListener(submissionService.onDataReceivedCallback.newInstance(channelHandler, protocol));
+		protocol.addProtocolListener(SubmissionService.getInstance().onDataReceivedCallback.newInstance(channelHandler, protocol));
 		
 		return protocol;
 	}

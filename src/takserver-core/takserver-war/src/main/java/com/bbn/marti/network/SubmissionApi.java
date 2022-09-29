@@ -2,6 +2,7 @@
 
 package com.bbn.marti.network;
 
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -10,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -17,10 +19,15 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
+import org.apache.ignite.internal.processors.service.GridServiceProxy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.aop.framework.Advised;
+import org.springframework.aop.framework.AopProxyUtils;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,15 +41,21 @@ import com.bbn.marti.CotImageBean;
 import com.bbn.marti.config.AuthType;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.cot.search.model.ApiResponse;
+import com.bbn.marti.feeds.DataFeedService;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.MessagingConfigInfo;
 import com.bbn.marti.remote.groups.ConnectionModifyResult;
+import com.bbn.marti.remote.groups.Group;
+import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.NetworkInputAddResult;
 import com.bbn.marti.remote.service.InputManager;
+import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.model.DataFeedDao;
 import com.bbn.marti.sync.repository.DataFeedRepository;
+import com.bbn.marti.util.CommonUtil;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.collect.ComparisonChain;
 
 import tak.server.Constants;
@@ -72,8 +85,20 @@ public class SubmissionApi extends BaseRestController {
     @Autowired
 	private CoreConfig coreConfig;
     
+	@Autowired
+	private CommonUtil martiUtil;
+
+    @Autowired
+    private GroupManager groupManager;
+    
+    @Autowired
+    private RemoteUtil remoteUtil;
+	
     @Autowired
     DataFeedRepository dataFeedRepository;
+    
+    @Autowired
+    DataFeedService dfs;
     
     @Autowired
 	DataSource ds;
@@ -85,11 +110,15 @@ public class SubmissionApi extends BaseRestController {
         List<DataFeed> dataFeeds = new ArrayList<>();
 
 		try {
-			List<DataFeedDao> dataFeedDaos = dataFeedRepository.getDataFeeds();
-			for (DataFeedDao dao : dataFeedDaos) {
-				DataFeed dataFeed = convertDataFeedDao(dao);
-				dataFeeds.add(dataFeed);
-        	}
+			String groupVector = martiUtil.getGroupVectorBitString();
+			List<DataFeedDao> dataFeedDaos = dataFeedRepository.getDataFeedsByGroups(groupVector);
+			
+			if (dataFeedDaos != null) {
+				for (DataFeedDao dao : dataFeedDaos) {
+					DataFeed dataFeed = convertDataFeedDao(dao);
+					dataFeeds.add(dataFeed);
+				}
+			}
         } catch (Exception e) {
         	logger.error("Failed getting data feeds", e);
             return new ResponseEntity<ApiResponse<List<DataFeed>>>(new ApiResponse<List<DataFeed>>(Constants.API_VERSION, DataFeed.class.getName(), null), HttpStatus.INTERNAL_SERVER_ERROR);
@@ -97,7 +126,7 @@ public class SubmissionApi extends BaseRestController {
         
         return new ResponseEntity<ApiResponse<List<DataFeed>>>(new ApiResponse<List<DataFeed>>(Constants.API_VERSION, DataFeed.class.getName(), dataFeeds), HttpStatus.OK);
     }
-    
+
     @RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.GET)
     public ResponseEntity<ApiResponse<DataFeed>> getDataFeed(@PathVariable("name") String name) {
     	ResponseEntity<ApiResponse<DataFeed>> result = null;
@@ -106,16 +135,17 @@ public class SubmissionApi extends BaseRestController {
                 result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
                 		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
             } else {
-                List<DataFeedDao> dataFeeds = dataFeedRepository.getDataFeedByName(name);
+            	String groupVector = martiUtil.getGroupVectorBitString();
+                List<DataFeedDao> dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
                 if (dataFeeds == null || dataFeeds.size() != 1) {
                     result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
                     		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
                 } else {
 					DataFeedDao dataFeed = dataFeeds.get(0);
-					DataFeed returnDataFeed = this.convertDataFeedDao(dataFeed);
-					result = new ResponseEntity<ApiResponse<DataFeed>>(
-							new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), returnDataFeed),
-							HttpStatus.OK);
+    				DataFeed returnDataFeed = this.convertDataFeedDao(dataFeed);
+    				result = new ResponseEntity<ApiResponse<DataFeed>>(
+    						new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), returnDataFeed),
+    						HttpStatus.OK);
                 }
             }
         } catch (Exception e) {
@@ -131,7 +161,35 @@ public class SubmissionApi extends BaseRestController {
     public ResponseEntity<ApiResponse<DataFeed>> deleteDataFeed(@PathVariable("name") String name) {
 
     	ResponseEntity<ApiResponse<DataFeed>> result = null;
+    	String groupVector = martiUtil.getGroupVectorBitString();
+    	List<DataFeedDao> dataFeeds = new ArrayList<>();
 
+    	// Verify correct groups before deleting from config file
+        try {
+            if (!getInputNameValidationErrors(name).isEmpty()) {
+                result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+                		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+            } else {
+            	// only check groups if not admin
+            	if (!martiUtil.isAdmin()) {
+            		dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
+                    if (dataFeeds == null || dataFeeds.size() != 1) {
+                        result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+        						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+                    }	
+            	} else {
+            		dataFeeds = dataFeedRepository.getDataFeedByName(name);
+            	}
+            }
+        } catch (Exception ex) {
+        	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+        			HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        
+        if (result != null) {
+        	return result;
+        }
+    	
         try {
             if (!getInputNameValidationErrors(name).isEmpty()) {
                 return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
@@ -151,19 +209,21 @@ public class SubmissionApi extends BaseRestController {
 
         try {
 			// Delete from database
-			List<DataFeedDao> dataFeeds = dataFeedRepository.getDataFeedByName(name);
-
-			if (dataFeeds.size() >0 && dataFeeds.get(0) != null) {
+			if (dataFeeds.size() > 0 && dataFeeds.get(0) != null) {
 				Long dataFeedId = dataFeeds.get(0).getId();
 
 				dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
 				dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
-				dataFeedRepository.deleteDataFeed(name);
+				dataFeedRepository.deleteDataFeed(name, groupVector);
+				result = new ResponseEntity<ApiResponse<DataFeed>>(
+						new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+						HttpStatus.OK);
+			} else {
+                result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
 			}
 
-			result = new ResponseEntity<ApiResponse<DataFeed>>(
-					new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
-					HttpStatus.OK);
+
 		} catch (Exception e) {
 			logger.error("Exception deleting data feed from database.", e);
         	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
@@ -174,41 +234,64 @@ public class SubmissionApi extends BaseRestController {
     }
 
     @RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.PUT)
-    public ResponseEntity<ApiResponse<DataFeed>> modifyDataFeed(@PathVariable("name") String name, @RequestBody com.bbn.marti.config.DataFeed dataFeed) {
+    public ResponseEntity<ApiResponse<DataFeed>> modifyDataFeed(@PathVariable("name") String name,
+    		 @RequestBody com.bbn.marti.config.DataFeed dataFeed) {
     	ResponseEntity<ApiResponse<DataFeed>> result = null;
     	
+    	
     	try {
+        	String groupVector = martiUtil.getGroupVectorBitString();
     		List<DataFeedDao> dataFeeds = dataFeedRepository.getDataFeedByName(name);
+			int type = DataFeedType.valueOf(dataFeed.getType()).ordinal();
+
             if (!getInputNameValidationErrors(name).isEmpty() || dataFeeds == null || dataFeeds.size() != 1) {
                 result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
 						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+			} else if (DataFeedType.valueOf(dataFeed.getType()) == DataFeedType.Federation){	
+				// federation needs to be handled a little different. it does not have a core config entry, and only has a few editable attributes
+				dataFeedRepository.updateDataFeedWithGroupVector(dataFeed.getUuid(), dataFeed.getName(), type,
+						dataFeed.getAuth().toString(), dataFeed.getPort(), dataFeed.isAuthRequired(), dataFeed.getProtocol(),
+						dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(), dataFeed.isAnongroup(),
+						dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
+						dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector);
+				
+				inputManager.updateFederationDataFeed(dataFeed);
+
 			} else {
+	    		dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
+	    		if (dataFeeds == null || dataFeeds.size() != 1) {
+	    			return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+							DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+	    		}
+
+				Long dataFeedId = dataFeeds.get(0).getId();
 				// Update config file
 				ConnectionModifyResult updateResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
 						.modifyInput(name, dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
 
 				if (updateResult.getHttpStatusCode() == ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
-					// Update data base
-					Long dataFeedId = dataFeeds.get(0).getId();
-					int type = DataFeedType.valueOf(dataFeed.getType()).ordinal();
-					dataFeedRepository.modifyDataFeed(dataFeed.getUuid(), dataFeed.getName(), type, dataFeed.isArchive(), dataFeed.isArchiveOnly(), dataFeed.isSync());
-
-					dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
-					for (String tag : dataFeed.getTag()) {
-						dataFeedRepository.addDataFeedTag(dataFeedId, tag);
+					dataFeedRepository.updateDataFeedWithGroupVector(dataFeed.getUuid(), dataFeed.getName(), type,
+							dataFeed.getAuth().toString(), dataFeed.getPort(), dataFeed.isAuthRequired(), dataFeed.getProtocol(),
+							dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(), dataFeed.isAnongroup(),
+							dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
+							dataFeed.isSync(), 1, groupVector);
+					
+					if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
+						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
+						dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag());
 					}
 
-					dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
-					for (String filterGroup: dataFeed.getFiltergroup()) {
-						dataFeedRepository.addDataFeedFilterGroup(dataFeedId, filterGroup);
+					if (dataFeed.getFiltergroup() != null && dataFeed.getFiltergroup().size() > 0) {
+						dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
+						dataFeedRepository.addDataFeedFilterGroups(dataFeedId, dataFeed.getFiltergroup());
 					}
 
-    				result = new ResponseEntity<ApiResponse<DataFeed>>(
-    						new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
-    						HttpStatus.OK);
+	    			result = new ResponseEntity<ApiResponse<DataFeed>>(
+	    					new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+	    					HttpStatus.OK);
 				} else {
 					result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
-	        			HttpStatus.INTERNAL_SERVER_ERROR);
+		        		HttpStatus.INTERNAL_SERVER_ERROR);
 				}
 			}
     	} catch (Exception e) {
@@ -226,8 +309,16 @@ public class SubmissionApi extends BaseRestController {
     	ResponseEntity<ApiResponse<DataFeed>> result = null;
     	DataFeed returnDataFeed = new DataFeed(dataFeed);
         List<String> errors = new ArrayList<>();
+        
+        // Needed for permissions to access data feed
+        if (dataFeed.getFiltergroup().size() == 0) {
+        	dataFeed.getFiltergroup().add(Constants.ANON_GROUP);
+        }
+        
+		Set<Group> groups = groupManager.findGroups(dataFeed.getFiltergroup());
+		String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
 
-        try {
+		try {
         	if (dataFeed.getUuid() == null) {
         		dataFeed.setUuid(UUID.randomUUID().toString());
         	}
@@ -247,14 +338,16 @@ public class SubmissionApi extends BaseRestController {
 	            	Long dataFeedId = dataFeedRepository.addDataFeed(dataFeed.getUuid(), dataFeed.getName(), type, auth, dataFeed.getPort(),
 	            			dataFeed.isAuthRequired(), dataFeed.getProtocol(), dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(),
 	            			dataFeed.isAnongroup(), dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-	            			dataFeed.isSync());
+	            			dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector);
 
-	            	for (String tag: dataFeed.getTag()) {
-	            		dataFeedRepository.addDataFeedTag(dataFeedId, tag);
+	            	if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
+	            		dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag());
 	            	}
-	            	for (String filterGroup: dataFeed.getFiltergroup()) {
-	            		dataFeedRepository.addDataFeedFilterGroup(dataFeedId, filterGroup);
-	            	}
+	            	
+					if (dataFeed.getFiltergroup() != null && dataFeed.getFiltergroup().size() > 0) {
+						dataFeedRepository.addDataFeedFilterGroups(dataFeedId, dataFeed.getFiltergroup());
+					}
+	            	
 					result = new ResponseEntity<ApiResponse<DataFeed>>(
 							new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), returnDataFeed),
 							HttpStatus.OK);
@@ -334,10 +427,9 @@ public class SubmissionApi extends BaseRestController {
                 		Input.class.getName(), null), HttpStatus.BAD_REQUEST);
             } else {
 	        	if (inputManager != null) {
-	    			MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service)
-	    					.deleteInput(name), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
-
-		            //Again, we're returning ok even if nothing was actually deleted, which is not ideal, but we need to change the
+	        		MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service).deleteInput(name), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+		            
+	        		//Again, we're returning ok even if nothing was actually deleted, which is not ideal, but we need to change the
 		            //interface to return something besides void here
 		            result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION,
 		            		Input.class.getName(), null), HttpStatus.OK);
@@ -491,7 +583,7 @@ public class SubmissionApi extends BaseRestController {
 	public ResponseEntity<ApiResponse<String>> modifyConfigInfo(@RequestBody MessagingConfigInfo msgInfo){
     	try{
     	    //Validate username thats displayed to prevent XSS exploit
-    		validator.getValidInput(CONTEXT, msgInfo.getDbUsername(), "MartiSafeString", MartiValidator.DEFAULT_STRING_CHARS, false);
+    		validator.getValidInput(CONTEXT, msgInfo.getDbUsername(), "MartiSafeString", MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 
     		MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service)
 					.modifyConfigInfo(msgInfo), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
@@ -712,6 +804,7 @@ public class SubmissionApi extends BaseRestController {
     	dataFeed.setSync(dao.isSync());
     	dataFeed.setTags(tags);
     	dataFeed.setFilterGroups(filterGroups);
+    	dataFeed.setSyncCacheRetentionSeconds(dao.getSyncCacheRetentionSeconds());
 
     	
 		if (dao.getPort() == 0) {

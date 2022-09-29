@@ -4,7 +4,6 @@ import java.util.Date;
 import java.util.List;
 
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -88,6 +87,12 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
             "and tool = :tool AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
     List<Mission> getAllMissionsByTool(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("tool") String tool, @Param("groupVector") String groupVector);
+
+    @Query(value = missionAttributes + " from mission where" +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+            "and tool in :tools AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
+    List<Mission> getAllMissionsByTools(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("tools") List<String> tools, @Param("groupVector") String groupVector);
 
     @Query(value = missionAttributes + " from mission where" +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to

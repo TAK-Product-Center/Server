@@ -38,7 +38,7 @@ task copyScripts(type: Copy, dependsOn: copyCoreExample) {
 task setupCluster() {
   doFirst {
     copy {
-      from war
+      from bootWar
       into "$buildDir/cluster"
     }
   }
@@ -115,10 +115,34 @@ bootWar {
     }    
 }
 
+jar {
+    enabled = false
+}
+war {
+    enabled = false
+}
+
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
 dependencies {
+
+  compile group: 'io.netty', name: 'netty-handler', version: netty_handler_version
+
+  // gRPC
+//  compile group: 'io.grpc', name: 'grpc-netty', version: grpc_version
+//  compile group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
+//  compile group: 'io.grpc', name: 'grpc-stub', version: grpc_version
+
+  // Google's OpenSSL variant
+  // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
+  compile 'io.netty:netty-tcnative-boringssl-static:' + netty_tcnative_version
+
+  compile group: 'io.netty', name: 'netty-tcnative-classes', version: '2.0.53.Final'
+
+//  compile group: 'io.netty', name: 'netty-tcnative-boringssl-static', version: netty_tcnative_version
+//  compile group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
+//  compile group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
 
   compile group: 'xerces', name: 'xercesImpl', version: xerces_version
 
@@ -143,18 +167,20 @@ dependencies {
   compile group: 'org.dom4j', name: 'dom4j', version: dom4j_version
   compile group: 'com.google.code.gson', name: 'gson', version: gson_version
 
+  // apache ignite (cache)
+//  compile group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
+  compile group: 'org.apache.ignite', name: 'ignite-core', version: ignite_version
+  compile ("org.apache.ignite:ignite-spring:$ignite_version") {
+	exclude group: 'org.springframework', module: 'spring-context'
+  }
+
   compile group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: spring_boot_version 
-
-
-
   compile group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: spring_boot_version
   compile group: 'org.springframework.boot', name: 'spring-boot-starter-cache', version: spring_boot_version
   
   compile group: 'io.micrometer', name: 'micrometer-core'
   
   
-    // apache ignite (cache)
-  compile group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_spring_version
     
   // cloudwatch metrics
   compile group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_cloudwatch_version
@@ -201,7 +227,7 @@ dependencies {
   compile group: 'org.apache.httpcomponents', name: 'httpclient', version: httpcomponents_version
   compile group: 'org.apache.httpcomponents', name: 'httpmime', version: httpcomponents_version
   
- compile group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_epoll_version, classifier: 'linux-x86_64'
+
 
   // nats message queue
   compile group: 'io.nats', name: 'jnats', version: nats_version
@@ -210,11 +236,12 @@ dependencies {
   testCompile group: 'org.apache.ignite', name: 'ignite-indexing', version: ignite_version
   testCompile group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
   testCompile group: 'org.apache.ignite', name: 'ignite-log4j', version: ignite_version
+  testCompile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
 
    
   testCompile group: 'junit', name: 'junit', version: junit_version
   testCompile group: 'org.mockito', name: 'mockito-core', version: mockito_version
-  testCompile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+
   testCompile("org.springframework.boot:spring-boot-starter-test") {
     exclude group: "com.vaadin.external.google", module:"android-json"
   }

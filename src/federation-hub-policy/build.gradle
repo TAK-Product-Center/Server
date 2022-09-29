@@ -4,10 +4,18 @@ buildscript {
   }
 }
 
+jar {
+    enabled = false
+}
+
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
+
+jar {
+    enabled = false
+}
 
 test {
   testLogging.showStandardStreams = true

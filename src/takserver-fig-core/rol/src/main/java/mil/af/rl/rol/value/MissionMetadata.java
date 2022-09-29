@@ -4,11 +4,23 @@ public class MissionMetadata extends Parameters {
     
     private static final long serialVersionUID = 9065876638429942749L;
     
-    private String name;
-    private String creatorUid;
-    private String description;
-    private String chatRoom;
-    private String tool;
+    private String type = "MissionMetadata";
+    private String name = "";
+    private String creatorUid = "";
+    private String description = "";
+    private String chatRoom = "";
+    private String tool = "public";
+    private String boundingPolygon = "";
+    private String bbox = "";
+    private String passwordHash = "";
+    private String path = "";
+    private String classification = "";
+    private String baseLayer = "";
+    private long parentMissionId;
+    private long defaultRoleId;
+    private long expiration;
+    
+    
     public String getName() {
         return name;
     }
@@ -38,21 +50,68 @@ public class MissionMetadata extends Parameters {
     }
     public void setTool(String tool) {
         this.tool = tool;
-    }
-    @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("MissionMetadata [name=");
-        builder.append(name);
-        builder.append(", creatorUid=");
-        builder.append(creatorUid);
-        builder.append(", description=");
-        builder.append(description);
-        builder.append(", chatRoom=");
-        builder.append(chatRoom);
-        builder.append(", tool=");
-        builder.append(tool);
-        builder.append("]");
-        return builder.toString();
-    }
+    }    
+    public String getBoundingPolygon() {
+		return boundingPolygon;
+	}
+	public void setBoundingPolygon(String boundingPolygon) {
+		this.boundingPolygon = boundingPolygon;
+	}
+	public String getBbox() {
+		return bbox;
+	}
+	public void setBbox(String bbox) {
+		this.bbox = bbox;
+	}
+	public String getPath() {
+		return path;
+	}
+	public void setPath(String path) {
+		this.path = path;
+	}
+	public String getClassification() {
+		return classification;
+	}
+	public void setClassification(String classification) {
+		this.classification = classification;
+	}
+	public long getParentMissionId() {
+		return parentMissionId;
+	}
+	public void setParentMissionId(long parenMissionId) {
+		this.parentMissionId = parenMissionId;
+	}
+	public long getDefaultRoleId() {
+		return defaultRoleId;
+	}
+	public void setDefaultRoleId(long defaultRoleId) {
+		this.defaultRoleId = defaultRoleId;
+	}
+	public long getExpiration() {
+		return expiration;
+	}
+	public void setExpiration(long expiration) {
+		this.expiration = expiration;
+	}
+	public String getPasswordHash() {
+		return passwordHash;
+	}
+	public void setPasswordHash(String passwordHash) {
+		this.passwordHash = passwordHash;
+	}
+	public String getBaseLayer() {
+		return baseLayer;
+	}
+	public void setBaseLayer(String baseLayer) {
+		this.baseLayer = baseLayer;
+	}
+	@Override
+	public String toString() {
+		return "MissionMetadata [name=" + name + ", creatorUid=" + creatorUid + ", description=" + description
+				+ ", chatRoom=" + chatRoom + ", tool=" + tool + ", boundingPolygon=" + boundingPolygon + ", bbox="
+				+ bbox + ", passwordHash=" + passwordHash + ", path=" + path + ", classification=" + classification
+				+ ", baseLayer=" + baseLayer + ", parentMissionId=" + parentMissionId + ", defaultRoleId="
+				+ defaultRoleId + ", expiration=" + expiration + "]";
+	}
+
 }

@@ -5,7 +5,6 @@ package com.bbn.marti.sync;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
-import java.rmi.RemoteException;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashSet;
@@ -17,6 +16,7 @@ import java.util.logging.Logger;
 import javax.naming.NamingException;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
+import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.Part;
@@ -27,17 +27,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.sync.Metadata.Field;
 import com.google.common.base.Strings;
 
 /**
  * Servlet that accepts POST requests (only) to upload mission packages to the
  * Enterprise Sync database. 
+ * 
+ * path: /Marti/sync/missionupload
  *
- * Requires the parameters "senderuid", "hash", and "filename".
  */
-//@WebServlet("/sync/missionupload")
-//@MultipartConfig
-public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
+public class MissionPackageUploadServlet extends UploadServlet {
 	public static final String SIZE_LIMIT_VARIABLE_NAME = "EnterpriseSyncSizeLimitMB";
 	private static final long serialVersionUID = -1782550124681449153L;
 	private static final String MISSION_PACKAGE_KEYWORD = "missionpackage";
@@ -53,11 +53,11 @@ public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
 	static {
 		// static initializer for all required parameters
 		requiredParameters = new HashSet<String>(PostParameter.values().length);
-		requiredParameters.add("hash");
 		requiredParameters.add("filename");
 
 		optionalParameters.add(Metadata.Field.CreatorUid.toString());
 		optionalParameters.add(Metadata.Field.Tool.toString());
+		optionalParameters.add(Metadata.Field.Hash.toString());
 	}
 	/**
 	 * Required parameter enum for posting a mission package.
@@ -67,7 +67,6 @@ public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
 	 * @note One of the parameters MUST map to a metdata uid field - getUid() is used to query the database for potential collisions.
 	 */
 	private static enum PostParameter {
-		HASH        ("hash", 	 Metadata.Field.UID, true, null),
 		FILENAME    ("filename", Metadata.Field.Name, true, null),
 		MIMETYPE 	("mimetype", Metadata.Field.MIMEType, false, "application/x-zip-compressed"),
 		KEYWORD    	("keyword",  Metadata.Field.Keywords, false, MISSION_PACKAGE_KEYWORD),
@@ -110,7 +109,6 @@ public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
 	}
 
 	private int uploadSizeLimitMB;
-	private long uploadSizeLimitBytes;
 
 	@Override
 	public void init(final ServletConfig config) throws ServletException {
@@ -120,7 +118,6 @@ public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
 
 		logger.info("Enterprise Sync upload limit is " + uploadSizeLimitMB + " MB");
 
-		uploadSizeLimitBytes = ((long) uploadSizeLimitMB) * 1000000L;
 	}
 
 	@Override
@@ -142,21 +139,20 @@ public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
 		String groupVector = null;
 
 		try {
-			logger.debug("martiUtil: " + martiUtil);
-
 			// Get group vector for the user associated with this session
-			groupVector = martiUtil.getGroupBitVector(request);
-			logger.trace("groups bit vector: " + groupVector);
+			groupVector = commonUtil.getGroupBitVector(request);
 		} catch (Exception e) {
-			logger.debug("exception getting group membership for current web user " + e.getMessage());
+			if (logger.isWarnEnabled()) {
+				logger.warn("exception getting group membership for current web user ", e);
+			}
 		}
 
 		if (Strings.isNullOrEmpty(groupVector)) {
 			throw new IllegalStateException("empty group vector");
 		}
 
-		Metadata uploadedMetadata = null;
-		try {
+		Metadata metadataResult = null;
+		try (ServletInputStream requestInputStream = request.getInputStream()) {
 			initAuditLog(request);
 
 			// validate all parameters -- enforces required/optional parameter presence, throws an exception if invalid
@@ -166,14 +162,18 @@ public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
 						optionalParameters);
 			}
 
-			InputStream payloadIn = null ;
+			InputStream payloadInputStream = null ;
 			String mimeType = request.getHeader("Content-Type");
 			if (mimeType == null || !mimeType.contains("multipart/form-data")) {
-				logger.debug("Uploading content.");
-				request.getInputStream(); // we already did this above
+				String msg = "Data package upload must use multipart/form-data POST. See https://everything.curl.dev/http/multipart for more info about multipart POST. Part name should be named 'assetfile'";
+				logger.error(msg);
+				response.sendError(HttpServletResponse.SC_BAD_REQUEST, msg);
+				return;
 			} else {
 				Collection<Part> parts = request.getParts();
-				logger.debug("Uploading multi-part content with " + parts.size() + " parts.");
+				if (logger.isDebugEnabled()) {
+					logger.debug("Uploading multi-part content with " + parts.size() + " parts.");
+				}
 				// ATAK sends a part called "assetfile"
 				Part part = request.getPart("assetfile");
 				if (part == null) {
@@ -182,12 +182,14 @@ public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
 				}
 
 				if (part != null) {
-					payloadIn = part.getInputStream();
+					payloadInputStream = part.getInputStream();
 				} else {
-					for (Part myPart : parts) {
-						logger.trace(myPart.getName() + ": " + myPart.getContentType() );
+					if (logger.isTraceEnabled()) {
+						for (Part myPart : parts) {
+							logger.trace(myPart.getName() + ": " + myPart.getContentType() );
+						}
 					}
-					log.severe("Unable to find content in multi-part submission");
+					logger.error("Unable to find content in multi-part submission");
 					response.sendError(HttpServletResponse.SC_BAD_REQUEST,
 							"Upload request was not formatted in a way Marti can understand.\n"
 									+ "Please try a different browser.");
@@ -197,56 +199,59 @@ public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
 
 			// map post parameters to metadata field entries 
 			Map<String,String[]> paramsMap = request.getParameterMap();
-			Metadata toStore = new Metadata();
-			byte [] data = null;
+			Metadata requestMetadata = new Metadata();
 			for (PostParameter param : PostParameter.values()) {
 				String[] args = paramsMap.get(param.getParameterString());
 				if (param.isRequired()
 						&& args == null) {
 					// required param not present
 					String message = String.format("Required parameter %s is not present", param.getParameterString());
-					logger.warn(TAG + message);
+					if (logger.isWarnEnabled()) {
+						logger.warn(TAG + message);
+					}
 					response.sendError(HttpServletResponse.SC_BAD_REQUEST, message);
 					return;
 				} else if (args == null) {
 					// optional param not present
-					toStore.set(param.getMetadataField(), param.getDefault());
+					requestMetadata.set(param.getMetadataField(), param.getDefault());
 				} else {
 					// param present (required present, optional present)
-					toStore.set(param.getMetadataField(), args);
+					requestMetadata.set(param.getMetadataField(), args);
 				}
-				if (!isNewDatabaseEntry(toStore, groupVector)) {
+				if (!isNewDatabaseEntry(requestMetadata, groupVector)) {
 					// send back response message with same uri as was given to the existing message
-					String message = String.format("HTTP post attempting to overwrite existing database entry with same values. Request: " + toStore.toJSONObject().toJSONString());
-					logger.warn(message);
+					String message = String.format("HTTP post attempting to overwrite existing database entry with same values. Request: " + requestMetadata.toJSONObject().toJSONString());
+					if (logger.isWarnEnabled()) {
+						logger.warn(message);
+					}
 					// special response for attempting to overwrite
 					response.sendError(HttpServletResponse.SC_FORBIDDEN, message);
 					return;
 				}
 			}
-			logger.debug("Request is: " + toStore.toJSONObject().toJSONString());
-			logger.debug("Content length is " + payloadIn.available());
-			data = new byte[payloadIn.available()];
-			payloadIn.read(data);
-			toStore.set(Metadata.Field.SubmissionUser, SecurityContextHolder.getContext().getAuthentication().getName());
-			long payloadByteCount = (long) data.length;
-			if (payloadByteCount > uploadSizeLimitBytes) {
-				String message = "Uploaded file exceeds server's size limit of " + uploadSizeLimitBytes
-						+ " MB! (limit is set in server's conf/context.xml)";
-				logger.warn(message);
-				response.sendError(HttpServletResponse.SC_BAD_REQUEST, message);
-				return;
-			} else if (payloadByteCount == 0) {
-				String message = "HTTP post body has no content.";
-				logger.warn(message);
-				response.sendError(HttpServletResponse.SC_BAD_REQUEST, message);
-				return;
+			if (logger.isDebugEnabled()) {
+				logger.debug("Request is: " + requestMetadata.toJSONObject().toJSONString());
+				logger.debug("Content length is " + payloadInputStream.available());
+			}
+			requestMetadata.set(Metadata.Field.SubmissionUser, SecurityContextHolder.getContext().getAuthentication().getName());
+
+			// insert row in resource as stream, and use hash as uid (calculated by database)
+			metadataResult = enterpriseSyncService.insertResourceStreamUID(requestMetadata, payloadInputStream, groupVector, false);
+			
+			if (logger.isDebugEnabled()) {
+				logger.debug("result hash: " + metadataResult.getHash() + " uid: " + metadataResult.getUid());
+			}
+			
+			// if plugin classname is set, notify the plugin with the file upload event. The notification event will include the Metadata object and will not include the full byte[] payload.
+			String pluginClassnames[] = paramsMap.get(Metadata.Field.PluginClassName.name());
+			if (pluginClassnames != null) {
+				String pluginClassname = pluginClassnames[0]; // To be consistent with UploadServlet where we allow only 1 pluginClassname
+				logger.info("~~~ Notifying the plugin {} with file upload event", pluginClassname);
+				pluginManager.onFileUpload(pluginClassname, requestMetadata);
 			}
 
-			uploadedMetadata = enterpriseSyncService.insertResource(toStore, data, groupVector);
-
 			// retrieve host name from request
-			String responseStr = String.format("%s/Marti/sync/content?hash=%s", MissionPackageQueryServlet.getBaseUrl(request), uploadedMetadata.getUid());
+			String responseStr = String.format("%s/Marti/sync/content?hash=%s", MissionPackageQueryServlet.getBaseUrl(request), metadataResult.getUid());
 
 			if (response.containsHeader("Content-Type")) {
 				response.setHeader("Content-Type", "text/plain");
@@ -259,8 +264,9 @@ public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
 			writer.close();
 
 		} catch (Exception e) {
-			e.printStackTrace();
-			logger.warn(e.getMessage());
+			if (logger.isErrorEnabled()) {
+				logger.error("error processing and storing data package", e);
+			}
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.toString());
 			return;
 		}
@@ -274,7 +280,7 @@ public class MissionPackageUploadServlet extends EnterpriseSyncServlet {
 	}
 
 	/**
-	 * Executes a database query to see if the proposed metadata entry is a unique filename and hash double.
+	 * Executes a database query to check if the metadata entry is a unique filename and hash pair.
 	 */
 	private boolean isNewDatabaseEntry(Metadata proposed, String groupVector) throws SQLException, NamingException, ValidationException {
 		String databaseUid = proposed.getUid();

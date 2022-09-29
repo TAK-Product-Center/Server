@@ -142,6 +142,7 @@ inputManagerControllers.controller('InputListCtrl', ['$rootScope', '$window', '$
 											$scope.inputMetrics = [];
 											$scope.streamingDataFeeds = [];
 											$scope.pluginDataFeeds = [];
+											$scope.federationDataFeeds = [];
 											let inputLength = apiResponse.data.length;
 											for (let i = 0; i < inputLength; i ++) {
 												let loopInput = apiResponse.data[i];
@@ -150,6 +151,8 @@ inputManagerControllers.controller('InputListCtrl', ['$rootScope', '$window', '$
 														$scope.streamingDataFeeds.push(loopInput);
 													} else if (loopInput.input.type === 'Plugin') {
 														$scope.pluginDataFeeds.push(loopInput);
+													} else if (loopInput.input.type === 'Federation') {
+														$scope.federationDataFeeds.push(loopInput);
 													}
 												} else {
 													$scope.inputMetrics.push(loopInput);
@@ -437,6 +440,7 @@ inputManagerControllers.controller('DataFeedModificationCtrl', ['$scope', '$loca
 	$scope.updateDataFeed = function(updatedDataFeed) {
 			updatedDataFeed.filtergroup = updatedDataFeed.filterGroups;
 			updatedDataFeed.tag = updatedDataFeed.tags;
+			updatedDataFeed.group = $scope.dataFeed.group;
 			DataFeedManagerService.update({name: updatedDataFeed.name}, updatedDataFeed,
 						function(apiResponse) {
 						$location.path('/');

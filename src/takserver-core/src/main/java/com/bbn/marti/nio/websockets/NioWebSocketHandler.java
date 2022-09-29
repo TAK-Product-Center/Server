@@ -84,7 +84,7 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
     		.stopLocalListen("websocket-read-listener-" + connectionId, igniteReadListenerPredicate);
        
     	if (channelHandler != null) {
-            submissionService.handleChannelDisconnect(channelHandler);
+            submissionService().handleChannelDisconnect(channelHandler);
             protocolListeners.forEach(listener -> listener.onOutboundClose(channelHandler, protocol));
         }
     	

@@ -18,13 +18,20 @@ public class PluginDataFeed implements Serializable{
 	private boolean archive;
 
 	private boolean sync;
+	
+	private List<String> filterGroups;
 
-	public PluginDataFeed(String uuid, String name, List<String> tags, boolean archive, boolean sync) {
+	public PluginDataFeed(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> filterGroups) {
 		this.uuid = uuid;
 		this.name = name;
 		this.tags.addAll(tags);
 		this.archive = archive;
 		this.sync = sync;
+		this.filterGroups = filterGroups;
+	}
+	
+	public PluginDataFeed(String uuid, String name, List<String> tags, boolean archive, boolean sync) {
+		this(uuid, name, tags, archive, sync, new ArrayList<String>());
 	}
 
 	public String getUuid() {
@@ -67,6 +74,14 @@ public class PluginDataFeed implements Serializable{
 		this.sync = sync;
 	}
 
+	public List<String> getFilterGroups() {
+		return filterGroups;
+	}
+	
+	public void setFilterGroups(List<String> filterGroups) {
+		this.filterGroups = filterGroups;
+	}
+	
 	@Override
 	public String toString() {
 		return "PluginDataFeed [uuid=" + uuid + ", name=" + name + ", tags=" + tags + ", archive=" + archive + ", sync="

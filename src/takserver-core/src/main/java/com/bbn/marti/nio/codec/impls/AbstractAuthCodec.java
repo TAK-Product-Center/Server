@@ -14,12 +14,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 
-import com.bbn.cot.exception.AuthBufferExhaustedException;
 import com.bbn.cot.exception.AuthenticationFailedException;
 import com.bbn.cot.model.AuthCot;
 import com.bbn.cot.model.AuthMessage;
 import com.bbn.marti.groups.AbstractAuthenticator;
 import com.bbn.marti.groups.MessagingUtilImpl;
+import com.bbn.marti.groups.PeriodicUpdateCancellationException;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.nio.codec.ByteCodec;
 import com.bbn.marti.nio.codec.PipelineContext;
@@ -152,7 +152,20 @@ public abstract class AbstractAuthCodec implements ByteCodec {
             try {
                 authBuffer.put(ByteUtils.getString(buffer).getBytes());
             } catch (java.nio.BufferOverflowException e) {
-                throw new AuthBufferExhaustedException("Auth message buffer (" + BUFFER_SIZE + " bytes) exceeded - trigger connection close");
+                authStatus.set(AuthStatus.EXCEPTION);
+                ((ChannelHandler) connectionInfo.getHandler()).forceClose();
+
+                // catch the PeriodicUpdateCancellationException thrown by some Codecs, no need to propagate that up
+                // since we haven't called authenticateAsync yet
+                try {
+                    cleanup(connectionInfo, null);
+                } catch (PeriodicUpdateCancellationException periodicUpdateCancellationException) {}
+
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Auth message buffer (" + BUFFER_SIZE + " bytes) exceeded - trigger connection close");
+                }
+
+                return ByteUtils.getEmptyReadBuffer();
             }
 
             if (logger.isDebugEnabled()) {
@@ -183,7 +196,24 @@ public abstract class AbstractAuthCodec implements ByteCodec {
                 }
             } else {
                 if(authMessageString.contains("<auth>") != true) {
-                    doAuth(null, null);
+                    authStatus.set(AuthStatus.EXCEPTION);
+                    ((ChannelHandler) connectionInfo.getHandler()).forceClose();
+
+                    // catch the PeriodicUpdateCancellationException thrown by some Codecs, no need to propagate that up
+                    // since we haven't called authenticateAsync yet
+                    try {
+                        cleanup(connectionInfo, null);
+                    } catch (PeriodicUpdateCancellationException e) {}
+
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Auth message not found, read " + authMessageString.length() +  " bytes");
+                    }
+
+                    if (logger.isTraceEnabled()) {
+                        logger.trace("Found instead : " + authMessageString);
+                    }
+
+                    return ByteUtils.getEmptyReadBuffer();
                 }
                 //logger.debug("end tag not found");
             }

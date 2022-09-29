@@ -43,9 +43,9 @@ import org.slf4j.LoggerFactory;
  */
 public class MartiValidator extends DefaultValidator {
 	
-	public static final int LONG_STRING_CHARS = 2047;
-	public static final int DEFAULT_STRING_CHARS = 255;
-	public static final int SHORT_STRING_CHARS = 128;
+//	public static final int LONG_STRING_CHARS = 2047;
+//	public static final int DEFAULT_STRING_CHARS = 255;
+//	public static final int SHORT_STRING_CHARS = 128;
 	
 	private static final Logger logger = LoggerFactory.getLogger(com.bbn.security.web.MartiValidator.class);
 	
@@ -54,31 +54,31 @@ public class MartiValidator extends DefaultValidator {
 	 * 
 	 *
 	 */
-	public enum Regex {
-	
-	    CertCommonName,     		// allow only word characters, whitespace, ',' and '='
-		Coordinates, 				// decimal latitude or longitude
-		ConfigAttribute, 			// attribute name for Core Config
-		CotType,					// CoT type such as "a-f-.-u"
-		Double,						// signed or unsigned decimal
-		DirectoryName,     		 	// POSIX directory name
-		Hexidecimal,				// hexidecimal numbers
-		KmlGeometry,				// <Point><coordinates>  tag in KML
-		MartiSafeString, 			// Alphanumeric plus certain special characters such _, -, :, /
-		NonNegativeInteger, 		// Digits only
-		URL,						// http, https, ftp, and ftps URLs
-		SafeString,					// Alphanumeric plus space character
-		RestrictedRegex,			// Simple regex patterns (no grouping) for pattern matches
-		SupportedProtocol,  		// STCP, TCP, or UDP (case insensitive)
-		Timestamp,					// CoT timestamp,
-		WordList,					// comma-separated list of alphanumeric words
-		XmlBlackList,				// disallowed strings for XML
-		XmlBlackListWordOnly, 		// disallowed strings for XML, relaxed to allow 'script' as substring, ex <description>
-		XpathBlackList,				// disallowed string for XPath expressions
-		VideoURL,					// similar to URL, but includes addition protocols for video streaming
-		Filename,					// valid filenames
-		PreventDirectoryTraversal	// disallow attempts at directory traversal by not allowing .. in paths
-	}
+//	public enum Regex {
+//	
+//	    CertCommonName,     		// allow only word characters, whitespace, ',' and '='
+//		Coordinates, 				// decimal latitude or longitude
+//		ConfigAttribute, 			// attribute name for Core Config
+//		CotType,					// CoT type such as "a-f-.-u"
+//		Double,						// signed or unsigned decimal
+//		DirectoryName,     		 	// POSIX directory name
+//		Hexidecimal,				// hexidecimal numbers
+//		KmlGeometry,				// <Point><coordinates>  tag in KML
+//		MartiSafeString, 			// Alphanumeric plus certain special characters such _, -, :, /
+//		NonNegativeInteger, 		// Digits only
+//		URL,						// http, https, ftp, and ftps URLs
+//		SafeString,					// Alphanumeric plus space character
+//		RestrictedRegex,			// Simple regex patterns (no grouping) for pattern matches
+//		SupportedProtocol,  		// STCP, TCP, or UDP (case insensitive)
+//		Timestamp,					// CoT timestamp,
+//		WordList,					// comma-separated list of alphanumeric words
+//		XmlBlackList,				// disallowed strings for XML
+//		XmlBlackListWordOnly, 		// disallowed strings for XML, relaxed to allow 'script' as substring, ex <description>
+//		XpathBlackList,				// disallowed string for XPath expressions
+//		VideoURL,					// similar to URL, but includes addition protocols for video streaming
+//		Filename,					// valid filenames
+//		PreventDirectoryTraversal	// disallow attempts at directory traversal by not allowing .. in paths
+//	}
 	
 	public MartiValidator() {
 		super();
@@ -123,8 +123,10 @@ public class MartiValidator extends DefaultValidator {
 			}
 		}
 		if (missing.size() > 0) {
-			throw new ValidationException( context + ": Invalid HTTP request missing parameters", 
-					"Invalid HTTP request missing parameters " + missing + ": context=" + context, context );
+
+			String message = "Invalid HTTP request missing parameters " + missing + ": context=" + context;
+			
+			throw new ValidationException(message, message, context);
 		}
 
 		// verify ONLY optional + required parameters are present
@@ -149,7 +151,7 @@ public class MartiValidator extends DefaultValidator {
 			while (extraItr.hasNext()) {
 				String badExtra = extraItr.next();
 				if (this.isValidInput("assertValidHttpRequestParameterSet", badExtra, "HTTPParameterName",
-						DEFAULT_STRING_CHARS, false)) {
+						MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
 					badParameters.append(badExtra);
 				} else {
 					badParameters.append("[redacted]");
@@ -159,8 +161,7 @@ public class MartiValidator extends DefaultValidator {
 				}
 			}
 			
-			throw new ValidationException( context + ": Invalid HTTP request extra parameters " 
-					+ badParameters.toString(), 
+			throw new ValidationException( context + ": Invalid HTTP request extra parameters (redacted) ", 
 					"Invalid HTTP request extra parameters " + badParameters.toString() + ": context=" + context, context );
 		}
 	}

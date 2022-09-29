@@ -216,6 +216,8 @@ prePackage.dependsOn copyRetentionConfigs
 prePackage.dependsOn copyRetentionMissionStoreDir
 prePackage.dependsOn copyRetentionScripts
 prePackage.dependsOn copyLauncherScripts
+prePackage.dependsOn copyHealthCheckScripts
+prePackage.dependsOn copyDockerSecurityFiles
 prePackage.dependsOn copyDbScripts
 prePackage.dependsOn copyDocs
 prePackage.dependsOn copyPolicy

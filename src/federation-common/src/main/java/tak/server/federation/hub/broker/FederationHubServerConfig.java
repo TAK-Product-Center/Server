@@ -3,6 +3,11 @@ package tak.server.federation.hub.broker;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
+
+import org.apache.commons.lang3.RandomStringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public class FederationHubServerConfig {
 
@@ -10,6 +15,8 @@ public class FederationHubServerConfig {
         this.tlsVersions = new ArrayList<String>();
         this.tlsVersions.add("TLSv1.2");
         this.tlsVersions.add("TLSv1.3");
+        this.nonce = RandomStringUtils.random(8, true, true);
+        this.fullId = this.id + "-" + this.nonce;
     }
 
     /* Shared parameters. */
@@ -44,7 +51,45 @@ public class FederationHubServerConfig {
     private Integer maxConcurrentCallsPerConnection;
     private boolean enableHealthCheck = true;
     private boolean useCaGroups = true;
+    
+    private String serverName = "";
+    private int outgoingReconnectSeconds = 5;
+    private String id;
+    @JsonIgnore
+    private String nonce;
+    @JsonIgnore
+    private String fullId;
+   
+    
+    public int getOutgoingReconnectSeconds() {
+		return outgoingReconnectSeconds;
+	}
 
+	public void setOutgoingReconnectSeconds(int outgoingReconnectSeconds) {
+		this.outgoingReconnectSeconds = outgoingReconnectSeconds;
+	}
+
+	public String getServerName() {
+		return serverName;
+	}
+    
+	public void setServerName(String serverName) {
+		this.serverName = serverName;
+	}
+	
+	public String getId() {
+		return id;
+	}
+	
+	public void setId(String id) {
+		this.id = id;
+		this.fullId = this.id + "-" + this.nonce;
+	}
+
+	public String getFullId() {
+		return this.fullId;
+ 	}
+	
     /*
      * Shared parameters.
      */
@@ -222,64 +267,20 @@ public class FederationHubServerConfig {
     public void setUseCaGroups(boolean useCaGroups) {
         this.useCaGroups = useCaGroups;
     }
-
-    @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("FederationHubServerConfig [General parameters: keystoreType=");
-        builder.append(keystoreType);
-        builder.append(", keystoreFile=");
-        builder.append(keystoreFile);
-        builder.append(", keystorePassword=");
-        builder.append(keystorePassword);
-        builder.append(", truststoreType=");
-        builder.append(truststoreType);
-        builder.append(", truststoreFile=");
-        builder.append(truststoreFile);
-        builder.append(", truststorePassword=");
-        builder.append(truststorePassword);
-        builder.append(", keymanagerType=");
-        builder.append(keyManagerType);
-        builder.append("] ");
-
-        builder.append("[v1 parameters: [v1Enabled=");
-        builder.append(v1Enabled);
-        builder.append(", v1Port=");
-        builder.append(v1Port);
-        builder.append(", useEpoll=");
-        builder.append(useEpoll);
-        builder.append(", context=");
-        builder.append(context);
-        builder.append(", allow128cipher=");
-        builder.append(allow128cipher);
-        builder.append(", allowNonSuiteB=");
-        builder.append(allowNonSuiteB);
-        builder.append(", enableOCSP=");
-        builder.append(enableOCSP);
-        builder.append(", tlsVersions=");
-        builder.append(Arrays.toString(tlsVersions.toArray()));
-        builder.append("] ");
-
-        builder.append("[v2 parameters: [v2Enabled=");
-        builder.append(v2Enabled);
-        builder.append(", v2Port=");
-        builder.append(v2Port);
-        builder.append(", maxMessageSizeBytes=");
-        builder.append(maxMessageSizeBytes);
-        builder.append(", metricsLogIntervalSeconds=");
-        builder.append(metricsLogIntervalSeconds);
-        builder.append(", clientTimeoutTime=");
-        builder.append(clientTimeoutTime);
-        builder.append(", clientRefreshTime=");
-        builder.append(clientRefreshTime);
-        builder.append(", maxConcurrentCallsPerConnection=");
-        builder.append(maxConcurrentCallsPerConnection);
-        builder.append(", enableHealthCheck=");
-        builder.append(enableHealthCheck);
-        builder.append(", useCaGroups=");
-        builder.append(useCaGroups);
-        builder.append("]");
-
-        return builder.toString();
-    }
+	
+	@Override
+	public String toString() {
+		return "FederationHubServerConfig [keystoreType=" + keystoreType + ", keystoreFile=" + keystoreFile
+				+ ", keystorePassword=" + keystorePassword + ", truststoreType=" + truststoreType + ", truststoreFile="
+				+ truststoreFile + ", truststorePassword=" + truststorePassword + ", keyManagerType=" + keyManagerType
+				+ ", v1Enabled=" + v1Enabled + ", v1Port=" + v1Port + ", context=" + context + ", useEpoll=" + useEpoll
+				+ ", allow128cipher=" + allow128cipher + ", allowNonSuiteB=" + allowNonSuiteB + ", enableOCSP="
+				+ enableOCSP + ", tlsVersions=" + tlsVersions + ", v2Enabled=" + v2Enabled + ", v2Port=" + v2Port
+				+ ", maxMessageSizeBytes=" + maxMessageSizeBytes + ", metricsLogIntervalSeconds="
+				+ metricsLogIntervalSeconds + ", clientTimeoutTime=" + clientTimeoutTime + ", clientRefreshTime="
+				+ clientRefreshTime + ", maxConcurrentCallsPerConnection=" + maxConcurrentCallsPerConnection
+				+ ", enableHealthCheck=" + enableHealthCheck + ", useCaGroups=" + useCaGroups + ", serverName="
+				+ serverName + ", outgoingReconnectSeconds=" + outgoingReconnectSeconds + ", id=" + id + ", nonce="
+				+ nonce + ", fullId=" + fullId + "]";
+	}
 }

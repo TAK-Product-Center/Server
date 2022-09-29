@@ -924,6 +924,15 @@ angular
                 controller: 'AddFederateGroupController'
             });
 
+            modalStateProvider.state('workflows.editor.addFederationOutgoing', {
+                backdrop: 'static',
+                keyboard: false,
+                size: 'lg',
+                url: '/addFederationOutgoing',
+                templateUrl: "views/workflows/add_federation_outgoing.html",
+                controller: 'AddFederationOutgoingController'
+            });
+
             modalStateProvider.state('workflows.editor.addBPMNFederatePolicy', {
                 backdrop: 'static',
                 keyboard: false,

@@ -3,7 +3,7 @@ package com.bbn.marti.tests;
 import com.bbn.marti.takcl.SSLHelper;
 import com.bbn.marti.takcl.TestConfiguration;
 import com.bbn.marti.takcl.TestLogger;
-import com.bbn.marti.takcl.connectivity.AbstractRunnableServer;
+import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
 import com.bbn.marti.test.shared.AbstractTestClass;
 import com.bbn.marti.test.shared.data.generated.ImmutableUsers;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;

@@ -2,34 +2,37 @@
 
 ## Cluster Unimplemented Features
 - Latest SA
-- Port changes / Input definitions. We don't recommended trying this. If you really want to, you'll have to make sure all of the kubernetes services and deployment files have been updated beforehand.
-- UserManager - It is recommended to use filter groups or LDAP for group assignment
+- Port changes / Input definitions. It's possible to change these in the cluster (add / remove / modify inputs), but the cluster kubernetes YAML would need to be changed also to reflect the changes.
+- The file-based user management UI is available in the cluster, but has not been tested. Using LDAP or AD for group assignment is recommended.
 - Certificate Revocation
 - Federated Group Mapping (standard inbound/outbound groups work) 
-- Client Dashboard
-- Metrics Dashboard
-- Contacts when working with data sync / mission packages from the TAK Server Admin UI will be inconsistent  
+- Client Dashboard. The client dashboard will currently only show users who are connected to the messaging pod you are load-balanced to when accessing it.
+- Metrics Dashboard. The metrics dashboard will currently show stats for the messaging pod you are load-balaced to when accessing it.
+- Contacts when working with data sync / mission packages from the TAK Server Admin UI will be inconsistent.
 - Injectors
 - Plugins - untested
 
 ## Prerequisites
 - AWS:
-  - Commercial AWS Access (GovCloud not supported yet)
+  - An AWS commerical account. AWS GovCloud has not been recently tested.
   - __OPTIONAL:__ A DNS Hosted Zone registered in AWS Route 53 - https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-register.html. This can be used to map a domain name to the Load Balancer, but is not required
-- Software Installed on Workstation:
-  - python3.7
-  - pip3.7
-  - run `pip3 install -r cluster/scripts/requirements.txt`
-  - Kubernetes - https://kubernetes.io/docs/tasks/tools/install-kubectl/ (1.21)
-  - Docker - Engine 19 (make sure its running)
-  - Java 11
-  - aws-cli 2.2.1 - https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html
-  - [helm](https://helm.sh/)
   
-
-## Software Check
-- run `kubectl version` to ensure it is reachable globally and you have the right version
-- run `docker ps` to ensure docker is running
+- The following software must be installed on the workstation you are using to create the cluster:
+  - python 3.7
+  - pip 3.7
+  - Kubectl (kubernetes client version 1.21)
+  -- Download version 1.21 here: https://kubernetes.io/docs/tasks/tools/install-kubectl/ and make sure it is on your command-line path
+  - Docker Engine 20
+  -- Either a command-line only install or a GUI Docker Desktop will work
+  - Java 11
+  - AWS CLI - Install as described here: https://aws.amazon.com/cli
+  - helm - Install as described here: https://helm.sh
+  - eksctl - Required to create and manage AWS EKS clusters. Install as described here: https://eksctl.io
+  
+## Install Dependencies and Check Software
+- run `pip3 install -r cluster/scripts/requirements.txt` to install python dependencies
+- run `kubectl version` to ensure it is available from your user account, and that it is version 1.21.
+- run `docker run hello-world` to ensure docker is running
 
 ## Configuring AWS Credentials
 - Set Region : `aws configure set region <region>` [(List of Regions)](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html)
@@ -41,31 +44,22 @@
                     `aws configure set aws_secret_access_key 318860611555`
 - View config :   `aws configure list`
 
-
-
 ## Create a CA and X.509 certificates for TAK Server
-- The Build Script will automatically generate certs at cluster/takserver-core/certs/files unless certs are already present. You can import your own certs into cluster/takserver-core/certs/files to use existing ones. However, the current cluster implementation follows a specific naming convention for certs. We currently recommend only resuing certs that have been generated through the clustering process.
+- The installer script will automatically generate certs at cluster/takserver-core/certs/files unless certs are already present. You can import your own certs into cluster/takserver-core/certs/files to use existing ones. However, a naming convention for certs is used so we recommend following the automatic generation process first.
 
-## Set Up Required Environment Variables
+## Set Up Environment Variables
 - Edit __cluster/cluster-properties__
+-- Set and review the options here including the cluster name, number of EC2 nodes, domain name to register (optional). The number of pods per service (messaging, API etc) is defined based on the total number of EC2 nodes.
 - Source __cluster/cluster-properties__
 `source cluster/cluster-properties`
 
-## Build Cluster
-- Note if you installed python3.7, you may need to run the script with python3
-- __EKS is recommended over Kops__
-`python cluster/scripts/build-eks.py` 
-- __KOPS with registered Route 53 domain__
-  `python cluster/scripts/build-kops.py`
-- __KOPS with gossip-based DNS (Route 53 not required)__
-  `python cluster/scripts/build-kops-gossip.py`
+## Build AWS EKS TAK Server Cluster (see note about alternate KOPS method at the bottom of this README)
+- Depending on your environment, your python command may be `python` rather than `python3`.
+`python3 cluster/scripts/build-eks.py` 
   
-## Delete Cluster
-- Note if you installed python3.7, you may need to run the script with python3
-- __Run the appropriate EKS or KOPS delete script:__
-  - `python cluster/scripts/delete-eks.py`
-  - `python cluster/scripts/delete-kops.py`
-  - `python cluster/scripts/delete-kops-gossip.py`
+## Delete EKS TAK Server Cluster __this command will delete your cluster and all data__
+- Depending on your environment, your python command may be `python` rather than `python3`.
+- `python cluster/scripts/delete-eks.py`
 
 ## Notes
 - AWS DNS propagation can take some time. When building the cluster and testing the load balancer, you may experience connection refused or host not found errors. Give them a reasonable amount of time to resolve, 20-30 minutes, before troubleshooting / debugging
@@ -88,7 +82,7 @@
 
 ## Developer steps for building docker images:
 
-1. Run ./gradlew buildDocker
+1. Run ./gradlew buildDocker or for hardened takserver and tak-database docker images run ./gradlew buildHardenedDocker
 2. Set your working directory to `src/takserver-cluster/build/deployments`
 3. Set the environment variables DB_URL, DB_USERNAME, and DB_PASSWORD. These values are used by default.
     1. For local development use the following values:
@@ -133,3 +127,17 @@ docker push docker-devtest-local.artifacts.tak.gov/takserver-cluster/takserver-d
 
 3. Uninstall deployment when work is complete.
 - helm uninstall takserver -n takserver
+
+
+## kOps is an alternate install mechanism that uses AWS resources directly, including EC2, rather that EKS. See https://kops.sigs.k8s.io for more information about kOps.
+## Build Cluster with kOps
+- Note if you installed python3.7, you may need to run the script with python3
+- __kOps with registered Route 53 domain__
+  `python3 cluster/scripts/build-kops.py`
+- __kOpsS with gossip-based DNS (Route 53 not required)__
+  `python3 cluster/scripts/build-kops-gossip.py`
+
+## Delete kOps TAK Server Cluster
+- Depending on your environment, your python command may be `python` rather than `python3`. Use the delete-kops-gossip.py script if you built a gossip-based cluster.
+- `python cluster/scripts/delete-kops.py`
+- `python cluster/scripts/delete-kops-gossip.py`

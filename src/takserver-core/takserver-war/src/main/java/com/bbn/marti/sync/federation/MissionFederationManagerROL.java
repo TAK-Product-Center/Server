@@ -1,8 +1,11 @@
 package com.bbn.marti.sync.federation;
 
 import java.io.IOException;
-import java.util.Locale;
+import java.io.InputStream;
+import java.sql.SQLException;
 import java.util.NavigableSet;
+
+import javax.naming.NamingException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +25,13 @@ import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.Metadata.Field;
 import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionChange;
+import com.bbn.marti.sync.model.MissionChangeUtils;
 import com.bbn.marti.sync.service.MissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Strings;
+
+import mil.af.rl.rol.value.DataFeedMetadata;
+import mil.af.rl.rol.value.MissionMetadata;
 
 /*
  * Mission federation manager implementation that federates ROL-encoded representations of Mission API commands.
@@ -41,7 +49,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 	MissionService missionService;
 
 	@Autowired
-	protected EnterpriseSyncService persistenceStore;
+	protected EnterpriseSyncService syncService;
 
 	@Autowired
 	private ObjectMapper mapper;
@@ -59,23 +67,22 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 	}
 
 	@Override
-	public void createMission(String name, String creatorUid, String description, String chatRoom, String tool, NavigableSet<Group> groups) {
-
+	public void createMission(MissionMetadata missionMeta, NavigableSet<Group> groups) {
 		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
 			return;
 		}
 		
 		try {
-			if (coreConfig.getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions() && tool != null && !tool.toLowerCase(Locale.ENGLISH).equals("public")) {
+			if (!isMissionAllowed(missionMeta.getTool())) {
 				if (logger.isDebugEnabled()) {
-					logger.debug("not federation mission " + name + " with tool of " + tool);
+					logger.debug("not federation mission " + missionMeta.getName() + " with tool of " + missionMeta.getTool());
 				}
 				return;
 			}
 
 			try {
 				if (coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) {
-					fedMgr.submitFederateROL(malrc.createMissionToROL(name, creatorUid, description, chatRoom, tool), groups);
+					fedMgr.submitFederateROL(malrc.createMissionToROL(missionMeta), groups);
 				}
 			} catch (Exception e) {
 				logger.warn("remote exception sending ROL", e);
@@ -94,7 +101,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
 			return;
 		}
-		
+		 
 		try {
 
 			if (logger.isDebugEnabled()) {
@@ -109,6 +116,97 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("exception constructing or sending mission create federated ROL", e);
+			}
+		}
+	}
+	
+	@Override
+	public void createMissionFeed(Mission mission, DataFeedMetadata missionMeta, NavigableSet<Group> groups) {
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) || !(coreConfig.getRemoteConfiguration().getFederation().isAllowDataFeedFederation())) {
+			return;
+		}
+		
+		if (isMissionAllowed(mission.getTool())) {
+			createDataFeed(missionMeta, groups);
+		} else {
+			if (logger.isDebugEnabled()) {
+				logger.debug("not federating non-public mission action for mission " + mission.getName());
+			}
+		}
+	
+	}
+
+	@Override
+	public void updateMissionFeed(Mission mission, DataFeedMetadata missionMeta, NavigableSet<Group> groups) {
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) || !(coreConfig.getRemoteConfiguration().getFederation().isAllowDataFeedFederation())) {
+			return;
+		}
+		
+		if (isMissionAllowed(mission.getTool())) {
+			updateDataFeed(missionMeta, groups);
+		} else {
+			if (logger.isDebugEnabled()) {
+				logger.debug("not federating non-public mission action for mission " + mission.getName());
+			}
+		}
+	}
+
+	@Override
+	public void deleteMissionFeed(Mission mission, DataFeedMetadata missionMeta, NavigableSet<Group> groups) {
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) || !(coreConfig.getRemoteConfiguration().getFederation().isAllowDataFeedFederation())) {
+			return;
+		}
+		
+		if (isMissionAllowed(mission.getTool())) {
+			deleteDataFeed(missionMeta, groups);
+		} else {
+			if (logger.isDebugEnabled()) {
+				logger.debug("not federating non-public mission action for mission " + mission.getName());
+			}
+		}
+	}
+
+	@Override
+	public void createDataFeed(DataFeedMetadata feedMeta, NavigableSet<Group> groups) {
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowDataFeedFederation())) {
+			return;
+		}
+		
+		try { 
+			fedMgr.submitFederateROL(malrc.createDataFeedToROL(feedMeta), groups);
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending feed create federated ROL", e);
+			}
+		}
+	}
+
+	@Override
+	public void updateDataFeed(DataFeedMetadata feedMeta, NavigableSet<Group> groups) {
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowDataFeedFederation())) {
+			return;
+		}
+		
+		try { 
+			fedMgr.submitFederateROL(malrc.updateDataFeedToROL(feedMeta), groups);
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending feed update federated ROL", e);
+			}
+		}
+	}
+
+	@Override
+	public void deleteDataFeed(DataFeedMetadata feedMeta, NavigableSet<Group> groups) {
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowDataFeedFederation())) {
+			return;
+		}
+
+		try { 
+			fedMgr.submitFederateROL(malrc.deleteDataFeedToROL(feedMeta), groups);
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending feed delete federated ROL", e);
 			}
 		}
 	}
@@ -134,7 +232,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 				throw new IllegalArgumentException("can't federate mission change for mission " + missionName + " that does not exist");
 			}
 
-			if (coreConfig.getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions() && mission.getTool() != null && !mission.getTool().equals("public")) {
+			if (!isMissionAllowed(mission.getTool())) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("not federating non-public mission action for mission " + missionName);
 				}
@@ -144,6 +242,8 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			if (isBlockedFileEnabled()) {
 				MissionChange latestMission = missionService.getLatestMissionChangeForContentHash(missionName, content.getHashes().get(0));
 				String fileExt = "." + coreConfig.getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
+				
+				MissionChangeUtils.findAndSetContentResource(latestMission);
 				String name = latestMission.getContentResource().getName();
 				// TODO do we need to check file name instead?
 				if (name != null) {
@@ -187,7 +287,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 				throw new IllegalArgumentException("can't federate mission change for mission " + missionName + " that does not exist");
 			}
 
-			if (coreConfig.getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions() && mission.getTool() != null && !mission.getTool().equals("public")) {
+			if (!isMissionAllowed(mission.getTool())) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("not federating delete command for non-public mission " + missionName);
 				}
@@ -271,11 +371,72 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 		}
 	}
 	
+	 /*
+     * save file with without payload from byte array
+     */
+    @Override
+    public void insertResource(Metadata metadata, byte[] content, NavigableSet<Group> groups) {
+
+        if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+
+            if (logger.isDebugEnabled()) {
+                logger.debug("skipping federation of a file  " +  metadata);
+            }
+
+            return;
+        }
+
+        try {
+            if (coreConfig.getRemoteConfiguration().getNetwork().isEsyncEnableCotFilter()) {
+                String cotFilter = coreConfig.getRemoteConfiguration().getNetwork().getEsyncCotFilter();
+                if (cotFilter != null && cotFilter.length() > 0) {
+                    content = DataPackageFileBlocker.blockCoT(metadata, content, cotFilter);
+                    if (content == null) {
+                        if (logger.isDebugEnabled()) {
+                            logger.debug("filtered content is null, not federating enterprise sync insert resource");
+                        }
+                        return;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("exception federating enterprise sync insert resource", e);
+        }
+
+        if (isBlockedFileEnabled()) {
+            String fileExt = coreConfig.getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
+            try {
+                byte[] filteredContent = DataPackageFileBlocker.blockResourceContent(metadata, content, fileExt);
+                if (filteredContent != null) {
+                    fedMgr.submitFederateROL(malrc.getInsertResourceROL(metadata, filteredContent), groups);
+                } else {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("filtered content is null, not federating enterprise sync insert resource");
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("exception federating enterprise sync insert resource", e);
+            }
+        } else { // just let it ROL
+            try {
+                String hash = metadata.getFirst(Field.Hash);
+
+                fedMgr.submitFederateROL(malrc.getInsertResourceROLNoContent(metadata), groups, hash);
+            } catch (IOException e) {
+                logger.error("exception federating enterprise sync insert resource", e);
+            }
+        }
+    }
+	
 	/*
-	 * save file with without payload
+	 * save file with without payload from InputStream
 	 */
 	@Override
-	public void insertResource(Metadata metadata, byte[] content, NavigableSet<Group> groups) {
+	public void insertResource(Metadata metadata, InputStream contentStream, NavigableSet<Group> groups) {
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("metadata json for federated insert resource: " + metadata.toJSONObject() + " hash: " + metadata.getHash());
+		}
 
 		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
 
@@ -285,11 +446,38 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 
 			return;
 		}
-
+		
+		if (metadata == null) {
+			logger.warn("not federating file - null metadata");
+			return;
+		}
+		
+		if (Strings.isNullOrEmpty(metadata.getHash())) {
+			logger.warn("not federating file - blank hash");
+			return;
+		}
+		
+		byte[] content = null;
+		
+		// need to get content from database / cache instead of being passed in above.
 		try {
 			if (coreConfig.getRemoteConfiguration().getNetwork().isEsyncEnableCotFilter()) {
 				String cotFilter = coreConfig.getRemoteConfiguration().getNetwork().getEsyncCotFilter();
+				
+				try {
+					content = syncService.getContentByHash(metadata.getHash(), remoteUtil.bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups)));
+				} catch (SQLException | NamingException e) {
+					logger.error("exception fetching content for file " + metadata.getHash() + " - not federating this file");
+					return;
+				}
+				
 				if (cotFilter != null && cotFilter.length() > 0) {
+					
+					if (content == null || content.length == 0) {
+						logger.warn("not trying to federate empty file");
+						return;
+					}
+					
 					content = DataPackageFileBlocker.blockCoT(metadata, content, cotFilter);
 					if (content == null) {
 						if (logger.isDebugEnabled()) {
@@ -308,7 +496,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			try {
 				byte[] filteredContent = DataPackageFileBlocker.blockResourceContent(metadata, content, fileExt);
 				if (filteredContent != null) {
-					fedMgr.submitFederateROL(malrc.getInsertResourceROL(metadata, filteredContent), groups);
+					fedMgr.submitFederateROL(malrc.getInsertResourceROLNoContent(metadata), groups);
 				} else {
 					if (logger.isDebugEnabled()) {
 						logger.debug("filtered content is null, not federating enterprise sync insert resource");
@@ -348,4 +536,24 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 				(! fileExt.isEmpty()));
 	}
 
+	private boolean isMissionAllowed(String tool) {
+		tool = tool == null ? "public" : tool;
+		boolean onlyFederatePublic = coreConfig.getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions();
+		boolean isVBM = coreConfig.getRemoteConfiguration().getVbm().isEnabled();
+		
+		// federate all missions		
+		if (!onlyFederatePublic) return true;
+		
+		else if (tool.equals("public")) {
+			return true;
+		} 
+		// if tool == cop attribute, always allow if vbm is enabled
+		else if(tool.equals(coreConfig.getRemoteConfiguration().getNetwork().getMissionCopTool())) {
+			return isVBM;
+		}
+		// disallow if no conditions are met
+		else {
+			return false;
+		}
+	}
 }

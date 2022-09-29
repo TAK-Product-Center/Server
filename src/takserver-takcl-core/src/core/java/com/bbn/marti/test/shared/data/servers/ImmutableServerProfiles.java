@@ -33,7 +33,8 @@ public class ImmutableServerProfiles extends AbstractServerProfile {
 	static {
 		int portCounter = 17651;
 		UNDEFINED = new ImmutableServerProfiles("UNDEFINED", "", "127.0.0.1", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null); // Generic test source meant to be used for anything
-		SERVER_0 = new ImmutableServerProfiles("SERVER_0", "s0", "127.0.0.1", 17600, 9, 18600, 9, portCounter++, portCounter++, 8443, portCounter++, portCounter++, portCounter++, TAKCLCore.TakclOption.Server0DbHost.getStringOrNull()); // Used for generated tests
+//		SERVER_0 = new ImmutableServerProfiles("SERVER_0", "s0", "127.0.0.1", 17600, 9, 18600, 9, portCounter++, portCounter++, 8443, portCounter++, portCounter++, portCounter++, TAKCLCore.TakclOption.Server0DbHost.getStringOrNull()); // Used for generated tests
+		SERVER_0 = new ImmutableServerProfiles("SERVER_0", "s0", "127.0.0.1", 47500, 9, 47100, 9, portCounter++, portCounter++, 8443, portCounter++, portCounter++, portCounter++, TAKCLCore.TakclOption.Server0DbHost.getStringOrNull()); // Used for generated tests
 		SERVER_1 = new ImmutableServerProfiles("SERVER_1", "s1", "127.0.0.1", 17610, 9, 18610, 9, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, TAKCLCore.TakclOption.Server1DbHost.getStringOrNull()); // Used for generated tests
 		SERVER_2 = new ImmutableServerProfiles("SERVER_2", "s2", "127.0.0.1", 17620, 9, 18620, 9, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, TAKCLCore.TakclOption.Server2DbHost.getStringOrNull()); // Used for generated tests
 		SERVER_CLI = new ImmutableServerProfiles("SERVER_CLI", "sCLI", "127.0.0.1", 17640, 9, 17600, 9, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, null); // Used for CLI tools

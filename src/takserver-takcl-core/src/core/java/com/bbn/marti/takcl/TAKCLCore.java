@@ -1,20 +1,11 @@
 package com.bbn.marti.takcl;
 
-import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
-import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
-import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
-import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Created on 1/15/16.
@@ -46,18 +37,26 @@ public class TAKCLCore {
 	public static final String coreConfigPath;
 	public static final boolean cliIgnoreCoreConfig;
 	public static final long igniteManualRetryTimeout;
-	public static final boolean useMonolithProfile;
 	public static boolean useTakclIgniteConfig;
 	public static final boolean disableApiProcess;
+
+	public static final boolean disableRetentionProcess;
+
+	public static final boolean disablePluginManagerProcess;
 	@Nullable
 	public static final Path testCertSourceDir;
-	public static final boolean useRunningServer;
 	public static final boolean keepServersRunning;
 	public static final boolean printRestDetails;
 	@Nullable
 	public static final Integer serverStartupWaitTime;
 	@Nullable
 	public static final String postgresPassword;
+
+	@Nullable
+	public static final String serverLogLevelOverrides;
+
+	@Nullable
+	public static final Integer systemMonitorPeriodSeconds;
 
 	public enum TakclOption {
 		// TestConfiguration settings
@@ -81,17 +80,19 @@ public class TAKCLCore {
 		CoreConfigPath(SYSARG_PREFIX + "coreConfigPath", "TAKCL_CORECONFIG_PATH", null, false),
 		UserManagerTimeout("com.bbn.marti.usermanager.timeout", "USERMANAGER_TIMEOUT", "120000", false),
 		CliIgnoreCoreConfig(SYSARG_PREFIX + "ignoreCoreConfig", "TAKCL_CLI_IGNORE_CORE_CONFIG", "false", true),
-		UseMonolithProfile(SYSARG_PREFIX + "monolith", "TAKCL_USE_MONOLITH_PROFILE", "false", true),
 		TakclConfigPath(SYSARG_PREFIX + "config.filepath", "TAKCL_CONFIG_PATH", null, false),
 		// TODO: This is a hack. We should figure out why the tests don't like the ConfigurationHolder from takserver-common
 		UseTakclIgniteConfig(SYSARG_PREFIX + "takclIgniteConfig", "TAKCL_IGNITE_CONFIG", "true", true),
 		DisableApiProcess(SYSARG_PREFIX + "disableApiProcess", "TAKCL_DISABLE_API_PROCESS", "false", true),
+		DisableRetentionProcess(SYSARG_PREFIX + "disableRetentionProcess", "TAKCL_DISABLE_RETENTION_PROCESS", "true", true),
+		DisablePluginManagerProcess(SYSARG_PREFIX + "disablePluginManagerProcess", "TAKCL_DISABLE_PLUGIN_MANAGER_PROCESS", "true", true),
 		TestCertSourceDir(SYSARG_PREFIX + "testCertSourceDir", "TAKCL_TEST_CERT_SRC_DIR", null, false),
-		UseRunningServer(SYSARG_PREFIX + "useRunningServer", "TAKCL_USE_RUNNING_SERVER", "false", true),
 		KeepServersRunning(SYSARG_PREFIX + "keepServersRunning", "TAKCL_KEEP_SERVERS_RUNNING", "false", true),
 		PrintRestDetails(SYSARG_PREFIX + "printRestDetails", "TAKCL_PRINT_REST_DETAILS", "false", true),
 		ServerStartupWaitTime(SYSARG_PREFIX + "serverStartupWaitTime", "TAKCL_SERVER_STARTUP_WAIT_TIME", null, false),
-		PostgresPassword(SYSARG_PREFIX + "postgresPassword", "TAKCL_SERVER_POSTGRES_PASSWORD", null, false);
+		PostgresPassword(SYSARG_PREFIX + "postgresPassword", "TAKCL_SERVER_POSTGRES_PASSWORD", null, false),
+		ServerLogLevelOverrides(SYSARG_PREFIX + "serverLogLevelOverrides", "TAKCL_SERVER_LOG_LEVEL_OVERRIDES", null, false),
+		SystemMonitorPeriodSeconds(SYSARG_PREFIX + "systemMonitorPeriodSeconds", "TAKCL_SYSTEM_MONITOR_PERIOD_SECONDS", null, false);
 
 		public final String sysPropKey;
 		public final String value;
@@ -227,14 +228,16 @@ public class TAKCLCore {
 		igniteIpAddressOverride = TakclOption.IgniteIpAddressOverride.getStringOrNull();
 		coreConfigPath = TakclOption.CoreConfigPath.getStringOrNull();
 		cliIgnoreCoreConfig = TakclOption.CliIgnoreCoreConfig.getBoolean();
-		useMonolithProfile = TakclOption.UseMonolithProfile.getBoolean();
 		useTakclIgniteConfig = TakclOption.UseTakclIgniteConfig.getBoolean() && TestExceptions.USE_TAKCL_IGNITE_CONFIGURATION_AS_INDICATED;
 		disableApiProcess = TakclOption.DisableApiProcess.getBoolean();
+		disablePluginManagerProcess = TakclOption.DisablePluginManagerProcess.getBoolean();
+		disableRetentionProcess = TakclOption.DisableRetentionProcess.getBoolean();
 		testCertSourceDir = TakclOption.TestCertSourceDir.getPathOrNull(true);
-		useRunningServer = TakclOption.UseRunningServer.getBoolean();
 		keepServersRunning = TakclOption.KeepServersRunning.getBoolean();
 		printRestDetails = TakclOption.PrintRestDetails.getBoolean();
 		serverStartupWaitTime = TakclOption.ServerStartupWaitTime.getIntegerOrNull();
 		postgresPassword = TakclOption.PostgresPassword.getStringOrNull();
+		serverLogLevelOverrides = TakclOption.ServerLogLevelOverrides.getStringOrNull();
+		systemMonitorPeriodSeconds = TakclOption.SystemMonitorPeriodSeconds.getIntegerOrNull();
 	}
 }

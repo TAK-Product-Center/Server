@@ -126,9 +126,6 @@ dependencies {
 	coreCompile group: 'com.h2database', name: 'h2', version: h2_version
 
 
-
-
-
     compile sourceSets.core.output
     compile (project(':takserver-common')) {
 	    exclude group: 'ch.qos.logback', module: 'logback-classic'
@@ -208,4 +205,101 @@ dependencies {
 
     cursedtakCompile 'com.googlecode.lanterna:lanterna:3.0.1'
 	cursedtakCompile group: 'xerces', name: 'xercesImpl', version: xerces_version
+}
+
+
+task devDeployCore(type: GradleBuild) {
+	group = 'TAKServer'
+	description = 'Rebuilds and copies takserver.war, takserver-pm.jar, takserver-retention.jar, and takcl.jar into their appropriate location in takserver-package/build/takArtifacts'
+	buildName = 'devDeployCore'
+	dependsOn(
+			':federation-common:clean',
+			':takserver-common:clean',
+			':takserver-core:clean',
+			':takserver-fig-core:clean',
+			':takserver-plugins:clean',
+	)
+	doFirst {
+		tasks = [
+				':takserver-core:bootWar',
+				':takserver-takcl-core:publicJar'
+		]
+}
+	doLast {
+		copy {
+			into("${rootDir}/takserver-package/build/takArtifacts")
+			from "${rootDir}/takserver-core/build/libs/takserver-core-${version}.war"
+			rename("takserver-core-${version}.war", "takserver.war")
+		}
+	}
+}
+
+
+
+task devDeployTakcl(type: GradleBuild) {
+	group = 'TAKServer'
+	description = 'Rebuilds and copies takserver.war, takserver-pm.jar, takserver-retention.jar, and takcl.jar into their appropriate location in takserver-package/build/takArtifacts'
+	buildName = 'devDeployTakcl'
+	dependsOn(
+			':takserver-takcl-core:clean',
+	)
+	doFirst {
+		tasks = [
+				':takserver-takcl-core:publicJar'
+		]
+	}
+	doLast {
+		copy {
+			into("${rootDir}/takserver-package/build/takArtifacts")
+			from "${buildDir}/libs/takcl-${version}-exe.jar"
+			rename("takcl-${version}-exe.jar", "utils/takcl.jar")
+		}
+	}
+}
+
+
+task devDeployAux(type: GradleBuild) {
+	group = 'TAKServer'
+	description = 'Rebuilds and copies takserver.war, takserver-pm.jar, takserver-retention.jar, and takcl.jar into their appropriate location in takserver-package/build/takArtifacts'
+	buildName = 'devDeployAux'
+	dependsOn(
+			':federation-common:clean',
+			':takserver-common:clean',
+			':takserver-fig-core:clean',
+			':takserver-plugin-manager:clean',
+			':takserver-plugins:clean',
+			':takserver-retention:clean',
+			':takserver-usermanager:clean',
+			':takserver-schemamanager:clean'
+	)
+	doFirst {
+		tasks = [
+				':takserver-plugin-manager:bootJar',
+				':takserver-retention:bootJar',
+				':takserver-usermanager:shadowJar',
+				':takserver-schemamanager:shadowJar'
+		]
+	}
+	doLast {
+		copy {
+			into("${rootDir}/takserver-package/build/takArtifacts/db-utils")
+			from "${rootDir}/takserver-schemamanager/build/libs/schemamanager-${version}-uber.jar"
+			rename("schemamanager-${version}-uber.jar", "SchemaManager.jar")
+		}
+		copy {
+			into("${rootDir}/takserver-package/build/takArtifacts/utils")
+			from "${rootDir}/takserver-usermanager/build/libs/UserManager-${version}-all.jar"
+			rename("UserManager-${version}-all.jar", "UserManager.jar")
+		}
+		copy {
+			into("${rootDir}/takserver-package/build/takArtifacts")
+			from "${rootDir}/takserver-retention/build/libs/takserver-retention-${version}.jar"
+			rename("takserver-retention-${version}.jar", "takserver-retention.jar")
+		}
+		copy {
+			into("${rootDir}/takserver-package/build/takArtifacts")
+			from "${rootDir}/takserver-plugin-manager/build/libs/takserver-plugin-manager-${version}.jar"
+			rename("takserver-plugin-manager-${version}.jar", "takserver-pm.jar")
+		}
+	}
 }

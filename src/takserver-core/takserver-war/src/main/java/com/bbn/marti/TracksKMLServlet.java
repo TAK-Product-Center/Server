@@ -33,7 +33,7 @@ import com.bbn.marti.kml.KmlParser;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.util.KmlUtils;
 import com.bbn.marti.util.CommonUtil;
-import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 
 import de.micromata.opengis.kml.v_2_2_0.Kml;
@@ -72,17 +72,17 @@ public class TracksKMLServlet extends EsapiServlet {
 		
 		requiredHttpParameters = new HashMap<String, HttpParameterConstraints>();
 		requiredHttpParameters.put(QueryParameter.uid.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.MartiSafeString, MartiValidator.DEFAULT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS));
 		requiredHttpParameters.put(QueryParameter.callsign.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.MartiSafeString, MartiValidator.DEFAULT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS));
 	
 		optionalHttpParameters = new HashMap<String, HttpParameterConstraints>();		
 		optionalHttpParameters.put(QueryParameter.cotType.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.MartiSafeString, MartiValidator.DEFAULT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.groupName.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.MartiSafeString, MartiValidator.DEFAULT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS));
 		optionalHttpParameters.put(QueryParameter.groupRole.name(), 
-				new HttpParameterConstraints(MartiValidator.Regex.MartiSafeString, MartiValidator.DEFAULT_STRING_CHARS));
+				new HttpParameterConstraints(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS));
 	}
 	
 	private List<Integer> getNextPrimaryKeyBatchFromSequence(String sequence, int batchSize) {
@@ -157,17 +157,17 @@ public class TracksKMLServlet extends EsapiServlet {
 				// validate the cot element before inserting into the database
 				//
 				validator.getValidInput("tracksKml", cotTrack.uid, 
-						MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+						MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 				validator.getValidInput("tracksKml", cotTrack.cottype, 
-						MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+						MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 				validator.getValidInput("tracksKml", Double.toString(hae), 
-						MartiValidator.Regex.Double.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+						MartiValidatorConstants.Regex.Double.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 				validator.getValidInput("tracksKml", Double.toString(cotTrack.ce), 
-						MartiValidator.Regex.Double.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+						MartiValidatorConstants.Regex.Double.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 				validator.getValidInput("tracksKml", Double.toString(cotTrack.le), 
-						MartiValidator.Regex.Double.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+						MartiValidatorConstants.Regex.Double.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 				validator.getValidInput("tracksKml", cotTrack.detailtext, 
-						MartiValidator.Regex.XmlBlackList.name(), MartiValidator.LONG_STRING_CHARS, true);
+						MartiValidatorConstants.Regex.XmlBlackList.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 
 			} catch (ValidationException e) {
 				logger.error("EASPI ValiationException!", e);	    	
@@ -289,7 +289,7 @@ public class TracksKMLServlet extends EsapiServlet {
 	      	String input = IOUtils.toString(request.getInputStream());
 	    	try {
 				validator.getValidInput("tracksKml", input, 
-						MartiValidator.Regex.XmlBlackListWordOnly.name(), input.length(), true);
+						MartiValidatorConstants.Regex.XmlBlackListWordOnly.name(), input.length(), true);
 			
 		    } catch (ValidationException e) {
 		        logger.error("EASPI ValiationException!", e);	    	

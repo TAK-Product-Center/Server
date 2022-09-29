@@ -13,12 +13,13 @@ dependencies {
   providedCompile group: 'javax.mail', name: 'javax.mail-api', version: mail_api_version
   providedCompile group: 'org.apache.tomcat', name: 'tomcat-catalina', version: tomcat_version
 
-  compile "io.springfox:springfox-swagger2:2.9.2"
-  compile "io.springfox:springfox-swagger-ui:2.9.2"
+  // swagger
+  compile group: 'org.springdoc', name: 'springdoc-openapi-ui', version: springdoc_version
+
   compile(project(':takserver-common'))
   
   // cloudwatch metrics
-  compile group: 'org.springframework.cloud', name: 'spring-cloud-starter-aws', version: spring_cloud_starter_version
+  compile group: 'io.awspring.cloud', name: 'spring-cloud-starter-aws', version: spring_cloud_starter_version
   compile group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_cloudwatch_version
   compile group: 'io.micrometer', name: 'micrometer-core'
   
@@ -95,6 +96,8 @@ dependencies {
   compile group: 'org.json', name: 'json', version: json_org_version
   compile group: 'io.jsonwebtoken', name: 'jjwt', version: jsonwebtoken_version
   compile group: 'org.igniterealtime.whack', name: 'core', version: whack_version
+  compile group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
+
 
   compile 'javax.xml.bind:jaxb-api:' + jaxb_api_version
   compile('javax.activation:activation:1.1')

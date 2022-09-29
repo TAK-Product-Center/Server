@@ -71,6 +71,7 @@ public class LocalConfiguration {
 	public static final String DEFAULT_TRUSTSTORE = "certs/files/fed-truststore.jks";
 	public static String CONFIG_FILE = null;
 	static final String DEFAULT_CONFIG_FILE = "CoreConfig.xml";
+	static final String ALT_DEFAULT_CONFIG_FILE = "data/CoreConfig.xml";
 	static final String EXAMPLE_BASE_CONFIG_FILE = "CoreConfig.example.xml";
 	public static boolean doUpgrades = true;
 	private Configuration configuration;
@@ -151,8 +152,11 @@ public class LocalConfiguration {
 			if (CONFIG_FILE == null) {
 				CONFIG_FILE = DEFAULT_CONFIG_FILE;
 				Path configPath = Paths.get(CONFIG_FILE);
+				Path altConfigPath = Paths.get(ALT_DEFAULT_CONFIG_FILE);
 
-				if (!Files.exists(configPath)) {
+				if (Files.exists(altConfigPath)) {
+					CONFIG_FILE = ALT_DEFAULT_CONFIG_FILE;
+				} else if (!Files.exists(configPath)) {
 					Files.copy(Paths.get(EXAMPLE_BASE_CONFIG_FILE), configPath);
 					configPath.toFile().setWritable(true);
 				}

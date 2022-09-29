@@ -139,12 +139,12 @@ public class UnifiedClient implements ConnectingInterface, SendingInterface, Rec
 	}
 
 	@Override
-	public synchronized void disconnect() {
-		if (connector == null) {
+	public synchronized void disconnect(boolean logInconsistentState) {
+		if (connector == null && logInconsistentState) {
 			throw new RuntimeException("User " + toString() + " is not using a connectable protocol!");
 		}
 
-		connector.disconnect();
+		connector.disconnect(logInconsistentState);
 		latestSA = null;
 	}
 

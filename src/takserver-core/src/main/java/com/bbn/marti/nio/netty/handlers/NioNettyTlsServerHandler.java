@@ -155,7 +155,7 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 		}
 
 		if(channelHandler != null) {
-			submissionService.handleChannelDisconnect(channelHandler);
+			submissionService().handleChannelDisconnect(channelHandler);
 			protocolListeners.forEach(listener -> listener.onOutboundClose(channelHandler, protocol));
 		}
 		

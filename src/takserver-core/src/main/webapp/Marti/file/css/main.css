@@ -1,0 +1,10 @@
+   
+.content {
+    padding: 10px;
+    height: 200px;
+}
+
+input[type="range"] {
+  width:400px;
+}
+

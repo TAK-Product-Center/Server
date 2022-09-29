@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.bbn.marti.JDBCQueryAuditLogHelper;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 public class PersistenceStore {
 
@@ -42,17 +43,17 @@ public class PersistenceStore {
 				"values ( ?, ?, ?, ?, ?, ?, ? )", connection)) {
     		
     		validator.getValidInput("errorLog", errorLog.getUid(), 
-					MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+    				MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 			validator.getValidInput("errorLog", errorLog.getCallsign(), 
-					MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 			validator.getValidInput("errorLog", errorLog.getPlatform(), 
-					MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 			validator.getValidInput("errorLog", errorLog.getMajorVersion(), 
-					MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 			validator.getValidInput("errorLog", errorLog.getMinorVersion(), 
-					MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 			validator.getValidInput("errorLog", errorLog.getFilename(), 
-					MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
     		
 			insert.setString(1, errorLog.getUid());
 			insert.setString(2, errorLog.getCallsign());
@@ -184,7 +185,7 @@ public class PersistenceStore {
 			boolean hasQuery = query != null && query.length() != 0;
 			if (hasQuery) {
 				validator.getValidInput("feed", query, 
-						MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+						MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 				sql += " and ( ";
 				sql += " uid like ? or ";
 				sql += " callsign like ? or ";

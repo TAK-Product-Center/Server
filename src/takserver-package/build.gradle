@@ -211,7 +211,7 @@ task bundleRpmCoreDb(type: Zip) {
 }
 
 task bundlePublishArtifacts(type: Copy) {
-   dependsOn('database:buildRpm', 'federation-hub:buildRpm', 'takserver:buildRpm', 'launcher:buildRpm', 'buildDocker', 'createCIVersionArtifacts', ':takserver-cluster:buildCluster')
+   dependsOn('database:buildRpm', 'federation-hub:buildRpm', 'takserver:buildRpm', 'launcher:buildRpm', 'buildDocker', 'buildHardenedDocker', 'createCIVersionArtifacts', ':takserver-cluster:buildCluster')
 
     def rpmv = "${takversion}-${takreleaserpm}"
     def zipv = "${takversion}-${takrelease}"
@@ -219,6 +219,7 @@ task bundlePublishArtifacts(type: Copy) {
             "takserver/build/takArtifacts/docs/TAK_Server_Configuration_Guide.pdf",
             "takserver/build/distributions/takserver-${rpmv}.noarch.rpm",
             "takserver/build/distributions/takserver-docker-${zipv}.zip",
+            "takserver/build/distributions/takserver-docker-hardened-${zipv}.zip",
             "launcher/build/distributions/takserver-core-${rpmv}.noarch.rpm",
             "database/build/distributions/takserver-database-${rpmv}.noarch.rpm",
             "${rootDir}/takserver-cluster/build/distributions/takserver-cluster-${zipv}.zip",
@@ -232,6 +233,8 @@ task bundlePublishArtifacts(type: Copy) {
 
 
 task buildDocker(type: GradleBuild) { 
+  group = 'TAKServer'
+  description = 'Builds takserver-docker-' + takversion + '-' + takreleaserpm + '.zip'
   buildName = 'buildDocker'
   tasks = [
     'prePackage',
@@ -246,6 +249,52 @@ task buildDocker(type: GradleBuild) {
     'createVersionFile',
     'createLogDir',
     'createPluginsLibDir',
+	'createWebtakPluginsDir',
     'zipTakserverDocker'
+  ]
+}
+
+task buildHardenedDocker(type: GradleBuild) {
+  group = 'TAKServer'
+  description = 'Builds takserver-docker-hardened-' + takversion + '-' + takreleaserpm + '.zip'
+  buildName = 'buildHardenedDocker'
+  tasks = [
+    'prePackage',
+    'copyHardenedTakserverDockerFiles',
+    'copyHardenedSchemaManagerFiles',
+    'copyPluginsScripts',
+    'copyPluginsJar',
+    'copyRetentionConfigs',
+    'copyRetentionMissionStoreDir',
+    'copyRetentionScripts',
+    'copyRetentionJar',
+    'copyHealthCheckScripts',
+    'copyDockerSecurityFiles',
+    'createVersionFile',
+    'createLogDir',
+    'createPluginsLibDir',
+    'createWebtakPluginsDir',
+    'zipHardenedTakserverDocker'
+  ]
+}
+
+task buildFullDocker(type: GradleBuild) {
+  group = 'TAKServer'
+  description = 'Builds takserver-docker-full-' + takversion + '-' + takreleaserpm + '.zip'
+  buildName = 'buildFullDocker'
+  tasks = [
+    'prePackage',
+    'copyFullTakserverDockerFiles',
+    'copySchemaManagerFullFiles',
+    'copyPluginsScripts',
+    'copyPluginsJar',
+    'copyRetentionConfigs',
+    'copyRetentionMissionStoreDir',
+    'copyRetentionScripts',
+    'copyRetentionJar',
+    'createVersionFile',
+    'createLogDir',
+    'createPluginsLibDir',
+    'zipFullTakserverDocker'
   ]
 }

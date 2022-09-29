@@ -48,6 +48,8 @@ public interface EngineInterface {
 
 	void startServer(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier);
 
+	void startServerWithStartupValidation(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier, boolean enablePluginManager, boolean enableRetentionService);
+
 	void stopServers(@NotNull AbstractServerProfile... servers);
 
 	void engineFactoryReset();

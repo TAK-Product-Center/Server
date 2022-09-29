@@ -4,14 +4,15 @@
 * Linux / MacOS is recommended for development. If using Windows, replace "gradlew" with "gradlew.bat" in commands below.
 
 Links:
- * [CI Test Execution](src/takserver-takcl-core/docs/ci_testing.md)
+ * [Test Execution](src/takserver-takcl-core/docs/testing.md)
+ * [Test Architecture and Development](src/takserver-takcl-core/docs/Development.md)
  * [Publishing](src/docs/publishing.md)
 
 ---
-Clean and Build TAK Server
+Clean and Build TAK Server, including war, retention service, plugin manager, user manager and schema manager.
 ```
 cd src
-./gradlew clean bootWar
+./gradlew clean bootWar bootJar shadowJar
 ```
 
 In Eclipse, choose File -> Import -> Gradle -> Existing Gradle Project
@@ -20,11 +21,11 @@ Navigate to `takserver/src`
 
 Select Finish. The TAK Server parent project, and all subprojects, will be imported into Eclipse.
 
-Install Postgres Server locally. Make sure that the PostGIS extension is also installed.
+Install PostgreSQL + PostGIS extension locally on your workstation, or run the docker container as described below. If installing locally, use 
 
 Start the Postres server.
 
-The easiest way to set up and start a Postgres server with the PostGIS plugins is to use the official PostGIS database docker container as follows and change the environment variables supplied to the container as necessary. Note the '--rm' means the container will be destroyed when it is stopped!
+To run a local PostgreSQL + PostGIS container, follow the commands below using the official PostGIS database docker container as follows, and changing the environment variables supplied to the container as necessary. Note the '--rm' means the container will be destroyed when it is stopped.
 
 ```
 docker run -it -d --rm --name TakserverServer0DB \
@@ -32,12 +33,12 @@ docker run -it -d --rm --name TakserverServer0DB \
     --env POSTGRES_HOST_AUTH_METHOD=trust \
     --env POSTGRES_USER=martiuser \
     --env POSTGRES_DB=cot \
-    -p 5432
+    -p 5432 postgis/postgis:10-3.1
 
 echo SQL SERVER IP: `docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' TakserverServer0DB`
 ```
 
-Setup Local Database
+Setup Local Database. If the postgis container was used, only the last two lines should be necessary.  
 ```
 - cd src/takserver-schemamanager
 - psql -d postgres  -c "CREATE ROLE martiuser LOGIN ENCRYPTED PASSWORD 'md564d5850dcafc6b4ddd03040ad1260bc2' SUPERUSER INHERIT CREATEDB NOCREATEROLE;"
@@ -51,6 +52,7 @@ Configure Local CoreConfig and Certs
 
 This is the CoreConfig that takserver war will look for when running from the takserver-core/example directory. From this point, just follow the instructions at takserver/src/docs/TAK_Server_Configuration_Guide.pdf to set up the CoreConfig and Certs. Make sure that the CoreConfig now points to the directory where the certs were generated locally.
 
+See appendix B in src/docs/TAK_Server_Configuration_Guide.pdf for cert generation instructions.
 
 ### Build and run TAK server locally for development
 
@@ -63,14 +65,14 @@ export JDK_JAVA_OPTIONS="-Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/
 
 TAK server consists of two processes: Messaging and API. The messaging process can run independently, but the API process needs to connect to the ignite server that runs as a part of the messaging process. For both processes, -Xmx should always be specified.
 
-Run Messaging
+Run Messaging (note - this command and the following one to run api include the **duplicatelogs** profile. This turns off the filter that blocks duplicated log messages that cause log spam in operational deployments of TAK Server.
 ```
-java -Xmx<value> -Dspring.profiles.active=messaging -jar ../build/libs/takserver-core-xyz.war
+java -Xmx<value> -Dspring.profiles.active=messaging,duplicatelogs -jar ../build/libs/takserver-core-xyz.war
 ```
 
 Run API
 ```
-java -Xmx<value> -Dspring.profiles.active=api -jar ../build/libs/takserver-core-xyz.war
+java -Xmx<value> -Dspring.profiles.active=api,duplicatelogs -jar ../build/libs/takserver-core-xyz.war
 ```
 
 Run Plugin Manager (useful when working on plugin capability)
@@ -141,7 +143,7 @@ https://localhost:8443/swagger-ui.html
 ### Integration Tests
 
 Integration tests are executed against master nightly. In addition to this, they can be executed on any branch as follows:  
-1.  Navigate to the [TAKServer Dashboard](https://git.takmaps.com/core/takserver).  
+1.  Navigate to the [TAKServer Dashboard](https://git.tak.gov/core/takserver).  
 2.  On the sidebar, hover over 'CI/CD' and select 'Pipelines'.  
 3.  Find your commit from the list and tap the Play button to the right, and select the test suite you would like to execute.  The Main suites are what is executed nightly and execute all the tests.  
 

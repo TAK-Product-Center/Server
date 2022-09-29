@@ -418,6 +418,17 @@ def generateTakseverCertificates():
 	runCmd(config_map_cmd)
 
 
+def addCoreConfigMap():
+	fp = os.path.join(CLUSTER_HOME_DIR, 'CoreConfig.xml')
+	if not os.path.isfile(fp):
+		printJson('No CoreConfig.source.xml found. It should be located in the root of the cluster directory!')
+		sys.exit(1)
+
+	print('Loading CoreConfig.source.xml found in cluster root into the cluster ConfigMap.')
+	config_map_cmd = 'kubectl create configmap core-config --from-file="' + fp + '" --dry-run=client -o yaml >' + CLUSTER_HOME_DIR +  '/deployments/helm/templates/core-config.yaml'
+	runCmd(config_map_cmd)
+
+
 def publishTakserverCoreImages():
 	base_cmd = ('cd ' + CLUSTER_HOME_DIR + ' && docker build -t ' + AWS_ECR_URI + ':core-base -f docker-files/Dockerfile.takserver-base . && docker push ' + AWS_ECR_URI + ':core-base')
 	cmd_status = runCmd(base_cmd)
@@ -642,6 +653,8 @@ print("\n---------- Running AWS Load Balancer Service Commands ----------")
 deployLoadBalancer()
 print("\n---------- Running Takserver Certificate Generation Commands ----------")
 generateTakseverCertificates()
+print("\n---------- Adding CoreConfigMap ----------")
+addCoreConfigMap()
 print("\n---------- Publishing Takserver Core Docker Images ----------")
 publishTakserverCoreImages()
 if TAK_PLUGINS == '1':

@@ -31,7 +31,6 @@ public class PluginDataFeedJdbc {
 	private DataSource dataSource;
 	
 	public List<PluginDataFeed> getPluginDataFeeds(){
-		
 		HashMap<String, PluginDataFeed> hashTable = new HashMap<>();
 		
 		List<PluginDataFeedWithTagEntry> dbItems = queryPluginDataFeedWithTagEntries();
@@ -40,19 +39,27 @@ public class PluginDataFeedJdbc {
 			PluginDataFeed pluginFeed = hashTable.get(dbItem.getUuid());
 			if (pluginFeed == null) {
 				List<String> tags = new ArrayList<String>();
+				List<String> filterGroups = new ArrayList<String>();
 				if (dbItem.getTag() != null) {
 					tags.add(dbItem.getTag());
 				}
-				pluginFeed = new PluginDataFeed(dbItem.getUuid(), dbItem.getName(), tags, dbItem.isArchive(), dbItem.isSync());
+				if (dbItem.getFilterGroup() != null) {
+					filterGroups.add(dbItem.getFilterGroup());
+				}
+				pluginFeed = new PluginDataFeed(dbItem.getUuid(), dbItem.getName(), tags, dbItem.isArchive(), dbItem.isSync(), filterGroups);
 				hashTable.put(dbItem.getUuid(),pluginFeed);
 			}else {
-				if (dbItem.getTag() != null) {
+				if (dbItem.getTag() != null && !pluginFeed.getTags().contains(dbItem.getTag())) {
 					pluginFeed.getTags().add(dbItem.getTag());
+				}
+				if (dbItem.getFilterGroup() != null && !pluginFeed.getFilterGroups().contains(dbItem.getFilterGroup())) {
+					pluginFeed.getFilterGroups().add(dbItem.getFilterGroup());
 				}
 			}
 		}
     	
 		List<PluginDataFeed> allPluginDatafeeds = new ArrayList<PluginDataFeed>(hashTable.values());
+
 		return allPluginDatafeeds;
 	}
 
@@ -60,7 +67,7 @@ public class PluginDataFeedJdbc {
 		
 		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
-		String query = "select uuid, name, tag, archive, sync from data_feed left join data_feed_tag on data_feed_tag.data_feed_id = data_feed.id where type = " + DataFeedType.Plugin.ordinal();
+		String query = "select uuid, name, tag, archive, sync, groups, filter_group from data_feed left join data_feed_tag on data_feed_tag.data_feed_id = data_feed.id left join data_feed_filter_group on data_feed_filter_group.data_feed_id = data_feed.id where type = " + DataFeedType.Plugin.ordinal();
 		
 		List<PluginDataFeedWithTagEntry> result = jdbcTemplate.query(query, new PluginDataFeedWithTagEntryMapper());
 
@@ -81,6 +88,7 @@ public class PluginDataFeedJdbc {
 			pluginDataFeedWithTagEntry.setTag(rs.getString("tag"));
 			pluginDataFeedWithTagEntry.setArchive(rs.getBoolean("archive"));
 			pluginDataFeedWithTagEntry.setSync(rs.getBoolean("sync"));
+			pluginDataFeedWithTagEntry.setFilterGroup(rs.getString("filter_group"));
 
 			return pluginDataFeedWithTagEntry;
 		}
@@ -101,16 +109,19 @@ public class PluginDataFeedJdbc {
 		
 		private boolean sync;
 		
+		private String filterGroup;
+		
 		public PluginDataFeedWithTagEntry() {
 		}
 				
-		public PluginDataFeedWithTagEntry(String uuid, String name, String tag, boolean archive, boolean sync) {
+		public PluginDataFeedWithTagEntry(String uuid, String name, String tag, boolean archive, boolean sync, String filterGroup) {
 			super();
 			this.uuid = uuid;
 			this.name = name;
 			this.tag = tag;
 			this.archive = archive;
 			this.sync = sync;
+			this.filterGroup = filterGroup;
 		}
 
 		public String getUuid() {
@@ -151,6 +162,14 @@ public class PluginDataFeedJdbc {
 
 		public void setSync(boolean sync) {
 			this.sync = sync;
+		}
+		
+		public String getFilterGroup() {
+			return filterGroup;
+		}
+		
+		public void setFilterGroup(String filterGroup) {
+			this.filterGroup = filterGroup;
 		}
 
 		@Override

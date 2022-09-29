@@ -53,7 +53,7 @@ public class NioNettyTcpStaticSubHandler extends NioNettyHandlerBase {
 		((AbstractBroadcastingChannelHandler) channelHandler).withHandlerType("NettyTCPClient");
 		setWriter();
 		createSubscription();
-		subscriptionManager.addFilterToSub(subscription, filter);
+		subscriptionManager().addFilterToSub(subscription, filter);
 	}
 	
 	@Override
@@ -67,7 +67,7 @@ public class NioNettyTcpStaticSubHandler extends NioNettyHandlerBase {
 	
 	@Override
 	protected void createSubscription() {		
-		subscription = subscriptionManager.addSubscription(uid, protocol, channelHandler, xpath, user);
+		subscription = subscriptionManager().addSubscription(uid, protocol, channelHandler, xpath, user);
 	}
 	
 	@Override

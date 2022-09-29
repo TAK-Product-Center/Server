@@ -22,7 +22,6 @@ import javax.net.ssl.SSLPeerUnverifiedException;
 
 import org.apache.log4j.Logger;
 
-import com.bbn.cot.CotParserCreator;
 import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.groups.GroupFederationUtil;
@@ -38,12 +37,14 @@ import com.bbn.marti.nio.protocol.Protocol;
 import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
 import com.bbn.marti.nio.protocol.connections.StreamingProtoBufOrCoTProtocol;
 import com.bbn.marti.nio.server.Server;
+import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SubmissionService;
+import com.bbn.marti.service.Subscription;
 import com.bbn.marti.service.TransportCotEvent;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
@@ -66,12 +67,6 @@ import tak.server.qos.MessageReadStrategy;
  */
 public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<byte[]> {
 	private final static Logger log = Logger.getLogger(NioNettyHandlerBase.class);
-	protected SubmissionService submissionService;
-	protected DistributedSubscriptionManager subscriptionManager;
-	protected DistributedFederationManager federationManager;
-	protected GroupFederationUtil groupFederationUtil;
-	protected MessagingUtilImpl messagingUtil;
-	protected DistributedConfiguration config;
 	protected final GroupManager groupManager;
 	protected Input input;
 	private AtomicBoolean isDataFeedInput = null;
@@ -100,12 +95,30 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 
 	public NioNettyHandlerBase()  {
 		groupManager = getGroupManager();
-		submissionService = SubmissionService.getInstance();
-		subscriptionManager = DistributedSubscriptionManager.getInstance();
-		federationManager = DistributedFederationManager.getInstance();
-		groupFederationUtil = GroupFederationUtil.getInstance();
-		messagingUtil = MessagingUtilImpl.getInstance();
-		config = DistributedConfiguration.getInstance();
+	}
+	
+	protected SubmissionService submissionService() {
+		return SubmissionService.getInstance();
+	}
+	
+	protected DistributedSubscriptionManager subscriptionManager() {
+		return DistributedSubscriptionManager.getInstance();
+	}
+	
+	protected DistributedFederationManager federationManager() {
+		return DistributedFederationManager.getInstance();
+	}
+	
+	protected GroupFederationUtil groupFederationUtil() {
+		return GroupFederationUtil.getInstance();
+	}
+	
+	protected MessagingUtilImpl messagingUtil() {
+		return MessagingUtilImpl.getInstance();
+	}
+	
+	protected DistributedConfiguration config() {
+		return DistributedConfiguration.getInstance();
 	}
 	
 	private ThreadLocal<CotParser> cotParser = new ThreadLocal<>();
@@ -155,6 +168,16 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 
 		((TcpChannelHandler) channelHandler).totalTcpBytesRead.getAndAdd(msg.length);
 		((TcpChannelHandler) channelHandler).totalTcpNumberOfReads.getAndIncrement();
+
+		try {
+			InputMetric inputMetric = submissionService().getInputMetric(((TcpChannelHandler) channelHandler).getInput().getName());
+			if (inputMetric != null) {
+				inputMetric.getReadsReceived().incrementAndGet();
+			}
+		} catch (NullPointerException ex) {
+			log.info("Channel handler has null input");
+		}
+
 		connectionInfo.getReadCount().getAndIncrement();
 		reader.read(msg);
 
@@ -357,7 +380,7 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 		TransportCotEvent transport = TransportCotEvent.findByID(input.getProtocol());
 
 		if (transport != TransportCotEvent.TCP)
-			protocol.addProtocolListener(submissionService.callsignExtractorCallback.newInstance(channelHandler, protocol));
+			protocol.addProtocolListener(submissionService().callsignExtractorCallback.newInstance(channelHandler, protocol));
 
 		if (input.isArchiveOnly()) {
 			protocol.addProtocolListener(
@@ -370,7 +393,7 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 					.newInstance(channelHandler, protocol));
 		}
 
-		protocol.addProtocolListener(submissionService.onDataReceivedCallback.newInstance(channelHandler, protocol));
+		protocol.addProtocolListener(submissionService().onDataReceivedCallback.newInstance(channelHandler, protocol));
 
 	}
 
@@ -426,11 +449,15 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 	protected void createSubscription() {
 		if (input == null) return;
 		
-		submissionService.createSubscriptionFromConnection(channelHandler, protocol);
+		Subscription sub = submissionService().createSubscriptionFromConnection(channelHandler, protocol, null);
+		
+		if (isDataFeedInput()) {
+			sub.isDataFeed.getAndSet(true);
+		}
 	}
 
 	protected void createWebsocketSubscription(UUID websocketApiNode) {
-		submissionService.createSubscriptionFromConnection(channelHandler, protocol, websocketApiNode);
+		Subscription sub = submissionService().createSubscriptionFromConnection(channelHandler, protocol, websocketApiNode);
 	}
 
 	public Exception spelunkToBottomOfExceptionChain(Throwable e) {
@@ -554,7 +581,7 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 				lastMessageCountResetTime.set(curtime);
 			}
 
-		}, 0, config.getBuffer().getQueue().getFlushInterval(), TimeUnit.MILLISECONDS);
+		}, 0, config().getBuffer().getQueue().getFlushInterval(), TimeUnit.MILLISECONDS);
 	}
 
 	@Override

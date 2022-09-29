@@ -3,6 +3,7 @@
 package com.bbn.marti.sync;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.ParseException;
@@ -40,12 +41,24 @@ public interface EnterpriseSyncService {
     void delete(List<Integer> primaryKeys, String groupVector) throws SQLException, NamingException;
 	
 	/**
-	* Inserts the given byte array into the database, with the given metadata mapped to columns.
+	* Inserts the file source from a byte array into the database, with the given metadata mapped to columns.
 	* 
 	*/
 	Metadata insertResource(Metadata metadata, byte[] content, String groupVector)
 			throws SQLException, NamingException, IllegalArgumentException,
 			ValidationException, IntrusionException, IllegalStateException, IOException;
+	
+	/**
+	* Writes the file sourced from an InputStream into the database, with the given metadata mapped to columns.
+	* 
+	*/
+	Metadata insertResourceStream(Metadata metadata, InputStream contentStream, String groupVector)
+			throws SQLException, NamingException, IllegalArgumentException,
+			ValidationException, IntrusionException, IllegalStateException, IOException;
+	
+	Metadata insertResourceStreamUID(Metadata metadata, InputStream contentStream, String groupVector, boolean generateUID)
+			throws SQLException, NamingException, IllegalArgumentException, ValidationException, IntrusionException,
+			IllegalStateException, IOException;
 	
 	/**
 	 * Gets all Metadata in the database
@@ -209,4 +222,6 @@ public interface EnterpriseSyncService {
 
 	 boolean updateMetadataKeywords(String hash, List<String> keywords) throws
 			SQLException, NamingException, ValidationException;
+
+	
 }

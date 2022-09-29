@@ -1,11 +1,18 @@
 package com.bbn.marti.takcl;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.turbo.TurboFilter;
+import ch.qos.logback.core.spi.FilterReply;
+import org.apache.ignite.IgniteCheckedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -20,7 +27,39 @@ public class TAKCLogging {
 	private static BiFunction<Class<?>, String, Logger> classLoggerBuilder;
 	private static BiFunction<String, String, Logger> stringLoggerBuilder;
 
+
+	public static class UnneededClassLoaderExceptionFilter extends TurboFilter {
+
+		private static final List<String> usedIgniteClasses = List.of(
+				"com.bbn.marti.remote.groups.FileUserManagementInterface",
+				"com.bbn.marti.remote.service.InputManager"
+		);
+
+		@Override
+		public FilterReply decide(Marker marker, ch.qos.logback.classic.Logger logger, Level level, String format, Object[] params, Throwable t) {
+			if (t == null) {
+				return FilterReply.NEUTRAL;
+			}
+
+			if (t instanceof IgniteCheckedException) {
+				Throwable child = t.getCause();
+				if (child != null) {
+					if (child instanceof ClassNotFoundException) {
+						if (usedIgniteClasses.contains(child.getMessage())) {
+							return FilterReply.NEUTRAL;
+						} else {
+							return FilterReply.DENY;
+						}
+					}
+				}
+			}
+			return FilterReply.NEUTRAL;
+		}
+	}
+
 	static {
+		((LoggerContext) LoggerFactory.getILoggerFactory()).addTurboFilter(new UnneededClassLoaderExceptionFilter());
+
 		Map<String, String> logLevelMap = System.getProperties().stringPropertyNames().stream()
 				.filter(x -> x.startsWith(LOGGING_PREFIX)).collect(Collectors.toMap(
 						x -> x.replace(LOGGING_PREFIX, ""), x -> x

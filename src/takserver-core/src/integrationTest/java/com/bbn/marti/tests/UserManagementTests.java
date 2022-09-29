@@ -2,7 +2,6 @@ package com.bbn.marti.tests;
 
 import com.bbn.marti.takcl.SSLHelper;
 import com.bbn.marti.takcl.TestLogger;
-import com.bbn.marti.takcl.Util;
 import com.bbn.marti.test.shared.AbstractTestClass;
 import com.bbn.marti.test.shared.data.GroupProfiles;
 import com.bbn.marti.test.shared.data.connections.MutableConnection;
@@ -11,7 +10,7 @@ import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import com.bbn.marti.test.shared.data.servers.MutableServerProfile;
 import com.bbn.marti.test.shared.data.users.BaseUsers;
 import com.bbn.marti.test.shared.data.users.MutableUser;
-import com.bbn.marti.takcl.connectivity.AbstractRunnableServer;
+import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
 import com.bbn.marti.test.shared.engines.TestEngine;
 import org.junit.BeforeClass;
 import org.junit.Test;

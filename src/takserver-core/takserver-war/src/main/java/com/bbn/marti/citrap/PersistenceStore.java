@@ -24,6 +24,7 @@ import com.bbn.marti.JDBCQueryAuditLogHelper;
 import com.bbn.marti.citrap.reports.ReportType;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
 
 public class PersistenceStore {
 
@@ -78,18 +79,18 @@ public class PersistenceStore {
 
     private void validateReport(ReportType report) throws ValidationException {
         validator.getValidInput("citrap", report.getId(),
-                MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+        		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
         validator.getValidInput("citrap", report.getType(),
-                MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+        		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
         validator.getValidInput("citrap", report.getDateTime(),
-                MartiValidator.Regex.Timestamp.name(), MartiValidator.LONG_STRING_CHARS, true);
+        		MartiValidatorConstants.Regex.Timestamp.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 // TODO add validation rule for WKT
 //        validator.getValidInput("citrap", report.getLocation(),
-//                MartiValidator.Regex.Coordinates.name(), MartiValidator.LONG_STRING_CHARS, true);
+//                MartiValidatorConstants.Regex.Coordinates.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
         validator.getValidInput("citrap", report.getEventScale(),
-                MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+        		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
         validator.getValidInput("citrap", report.getImportance(),
-                MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+        		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
     }
 
 
@@ -167,7 +168,7 @@ public class PersistenceStore {
 
     public Double[] getCentroid(String id) throws Exception {
     	validator.getValidInput("citrap", id,
-    			MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+    			MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 
     	try (Connection connection = ds.getConnection(); PreparedStatement select = wrapper.prepareStatement("with centroid as ( " +
     			"select ST_Centroid(location) as center from ci_trap where uid = ? ) " +
@@ -373,7 +374,7 @@ public class PersistenceStore {
     public int deleteReport(String uid, String groupVector) throws Exception {
 
         validator.getValidInput("citrap", uid,
-                MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+        		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 
         try (Connection connection = ds.getConnection(); PreparedStatement del = wrapper.prepareStatement("delete from ci_trap where uid = ? " +
                 " and " + RemoteUtil.getInstance().getGroupClause("ci_trap"), connection)) {
@@ -390,7 +391,7 @@ public class PersistenceStore {
         String attr = null;
 
         validator.getValidInput("citrap", uid,
-                MartiValidator.Regex.MartiSafeString.name(), MartiValidator.LONG_STRING_CHARS, true);
+        		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
 
         try (Connection connection = ds.getConnection(); PreparedStatement select = wrapper.prepareStatement("select * from ci_trap where uid = ? " +
         		" and " + RemoteUtil.getInstance().getGroupClause("ci_trap"), connection)) {
