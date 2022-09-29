@@ -10,7 +10,6 @@ import java.util.Arrays;
  * For this implementation, the parameterized type of this class is the same as the type of getBytes() -- this would not usually be the case, the content type 
  * is expected to be a POJO. https://en.wikipedia.org/wiki/Plain_Old_Java_Object
  * 
- * 
  */
 public class ByteArrayPayload implements Payload<byte[]> {
 	

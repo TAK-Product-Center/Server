@@ -3,6 +3,8 @@ package com.bbn.marti.sync.federation;
 import java.rmi.RemoteException;
 
 import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.slf4j.Logger;
@@ -13,6 +15,8 @@ import org.springframework.beans.factory.annotation.Configurable;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.sync.Metadata;
+
+import tak.server.util.ExecutorSource;
 
 @Aspect
 @Configurable
@@ -28,46 +32,71 @@ public class EnterpriseSyncFederationAspect {
     
     @Autowired
     private CoreConfig coreConfig;
+    
+    @Autowired
+    private ExecutorSource executorSource;
 
     public EnterpriseSyncFederationAspect() {
     	if (logger.isDebugEnabled()) {
     		logger.debug("EnterpriseSyncFederationAspect constructor");
     	}
     }
-
-    // If we were using AspectJ instead of Spring AOP - something like !adviceexecution() would avoid the stack tracing
-    // or name this pointcut and use !within(A)
-    @Before("execution(* com.bbn.marti.sync.EnterpriseSyncService.insertResource(..))")
-    public void insertResource(JoinPoint jp) throws RemoteException {
-
-		if (!coreConfig.getRemoteConfiguration().getFederation().isEnableFederation()) {
-			return;
-		}
-
-    	if (!coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) {
-    		if (logger.isDebugEnabled()) {
-    			logger.debug("mission federation disabled in config");
-    		}
-    		return;
+    
+    @Around("execution(* com.bbn.marti.sync.EnterpriseSyncService.insertResource(..)))") 
+    public Object insertResource(ProceedingJoinPoint jp) throws Throwable {
+    
+    	if (logger.isDebugEnabled()) {
+    		logger.debug("EnterpriseSyncService.insertResource() : " + jp.getSignature().getName() + ": Before Method Execution");
     	}
-    	
-    	try {
-    		
-    		if (isCyclic()) {
-    			if (logger.isDebugEnabled()) {
-    				logger.debug("skipping cyclic esync aspect execution");
-    			}
-    			return;
+        try {
+            Object result = jp.proceed();
+            
+            if (logger.isDebugEnabled()) {
+            	logger.debug("result: " + result);
+            	logger.debug("EnterpriseSyncService.insertResource() : " + jp.getSignature().getName() + ": After Method Execution");
+            }
+            
+            if (!coreConfig.getRemoteConfiguration().getFederation().isEnableFederation()) {
+    			return result;
     		}
-    		
-    		if (logger.isDebugEnabled()) {
-    			logger.debug("esync advice " + jp.getSignature().getName() + " " + jp.getKind());
-    		}
-    		
-    		mfm.insertResource((Metadata) jp.getArgs()[0], (byte[]) jp.getArgs()[1], gm.groupVectorToGroupSet((String) jp.getArgs()[2]));
-    	} catch (Exception e) {
-    		logger.debug("exception executing create mission advice: " + e);
-    	}
+    
+        	if (!coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) {
+        		if (logger.isDebugEnabled()) {
+        			logger.debug("mission federation disabled in config");
+        		}
+        		return result;
+        	}
+        	
+        	try {
+        		
+        		if (isCyclic()) {
+        			if (logger.isDebugEnabled()) {
+        				logger.debug("skipping cyclic esync aspect execution");
+        			}
+        			return result;
+        		}
+        		
+        		if (logger.isDebugEnabled()) {
+        			logger.debug("esync advice " + jp.getSignature().getName() + " " + jp.getKind());
+        		}
+        		
+        		executorSource.missionRepositoryProcessor.submit(() -> 	{
+        			try {
+        				// federate only file metadata (no content)
+        				mfm.insertResource((Metadata) jp.getArgs()[0], (byte[]) jp.getArgs()[1], gm.groupVectorToGroupSet((String) jp.getArgs()[2]));
+        			} catch (Exception e) {
+        				logger.error("exception federating file", e);
+        			}
+        		});
+        		
+
+        	} catch (Exception e) {
+        		logger.debug("exception executing create mission advice: " + e);
+        	}
+
+            
+            return result;
+        } finally { }
     }
     
     @Before("execution(* com.bbn.marti.sync.EnterpriseSyncService.delete(..))")
@@ -132,7 +161,7 @@ public class EnterpriseSyncFederationAspect {
 
     private boolean isCyclic() {
     	StackTraceElement[] stack = new Exception().getStackTrace();
-    	
+    		
     	for (StackTraceElement el : stack) {
     		
     		if (logger.isTraceEnabled()) {

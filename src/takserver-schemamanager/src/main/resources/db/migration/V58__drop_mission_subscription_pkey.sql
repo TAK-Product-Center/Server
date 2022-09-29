@@ -1,0 +1,1 @@
+ALTER TABLE ONLY mission_subscription DROP CONSTRAINT mission_subscription_pkey;

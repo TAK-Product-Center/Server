@@ -55,12 +55,4 @@ public class DateUtil {
 	public static final String toCotTimeMillis(long millisSinceEpochUtc) {
 		return cotDateParserMillis().print(millisSinceEpochUtc);
 	}
-
-	public static final void main(String[] args) {
-		System.out.println(DateUtil.toCotTime(System.currentTimeMillis()));
-		String test = "2016-04-26T14:53:09.213Z";
-		System.out.println("Normal out: " + DateUtil.millisFromCotTimeStr(test));
-		System.out.println("UTC out: " + iso().withZoneUTC().parseDateTime(test).getMillis());
-	}
-
 }

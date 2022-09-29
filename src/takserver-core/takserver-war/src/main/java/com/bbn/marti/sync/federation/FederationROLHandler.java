@@ -184,7 +184,7 @@ public class FederationROLHandler {
 			MissionMetadata md = (MissionMetadata) parameters;
 
 			// TODO
-			missionService.createMission(md.getName(), md.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), md.getDescription(), md.getChatRoom(), md.getTool(), null, null, null);
+			missionService.createMission(md.getName(), md.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), md.getDescription(), md.getChatRoom(), null, null, null, null, md.getTool(), null, null, null, null);
 		}
 
 		private void processDelete(ROL rol) {
@@ -243,7 +243,7 @@ public class FederationROLHandler {
 			case ADD_CONTENT:
 
 				if (!missionService.exists(mud.getMissionName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)))) {
-					missionService.createMission(mud.getMissionName(), mud.getMissionCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), mud.getMissionDescription(), mud.getMissionChatRoom(), mud.getMissionTool(), null, null, null);
+					missionService.createMission(mud.getMissionName(), mud.getMissionCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), mud.getMissionDescription(), mud.getMissionChatRoom(), null, null, null, null, mud.getMissionTool(), null, null, null, null);
 				}
 
 				if (logger.isDebugEnabled()) {

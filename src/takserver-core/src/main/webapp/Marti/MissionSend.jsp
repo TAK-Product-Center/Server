@@ -29,6 +29,7 @@
             addCell(row, cell++, document.createTextNode(_mission.description), 'top');
             addCell(row, cell++, createDiv(createContents(_mission.contents)), 'top');
             addCell(row, cell++, createDiv(createUids(_mission.uids)), 'top');
+			addCell(row, cell++, createDiv(createGroups(_mission.groups)), 'top');
             addCell(row, cell++, createDiv(createKeywords(_mission.keywords)), 'top');
             addCell(row, cell++, document.createTextNode(_mission.creatorUid), 'top');
             addCell(row, cell++, document.createTextNode(_mission.createTime), 'top');
@@ -173,6 +174,7 @@
             <th>Description</th>
             <th>Contents</th>
             <th>UIDs</th>
+            <th>Groups</th>
             <th>Keywords</th>
             <th>Creator Uid</th>
             <th>Create Time</th>

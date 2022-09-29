@@ -11,8 +11,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
+
 import javax.servlet.http.HttpServletResponse;
+import javax.sql.DataSource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,11 +27,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bbn.marti.CotImageBean;
 import com.bbn.marti.config.AuthType;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.InputMetric;
@@ -36,9 +40,14 @@ import com.bbn.marti.remote.MessagingConfigInfo;
 import com.bbn.marti.remote.groups.ConnectionModifyResult;
 import com.bbn.marti.remote.groups.NetworkInputAddResult;
 import com.bbn.marti.remote.service.InputManager;
+import com.bbn.marti.sync.model.DataFeedDao;
+import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.security.web.MartiValidator;
 import com.google.common.collect.ComparisonChain;
+
 import tak.server.Constants;
+import tak.server.feeds.DataFeed;
+import tak.server.feeds.DataFeed.DataFeedType;
 import tak.server.ignite.MessagingIgniteBroker;
 
 /**
@@ -62,9 +71,217 @@ public class SubmissionApi extends BaseRestController {
 
     @Autowired
 	private CoreConfig coreConfig;
+    
+    @Autowired
+    DataFeedRepository dataFeedRepository;
+    
+    @Autowired
+	DataSource ds;
+    
+    @RequestMapping(value = "/datafeeds", method = RequestMethod.GET)
+    public ResponseEntity<ApiResponse<List<DataFeed>>> getDataFeeds(HttpServletResponse response) {
+    	setCacheHeaders(response);
 
+        List<DataFeed> dataFeeds = new ArrayList<>();
+
+		try {
+			List<DataFeedDao> dataFeedDaos = dataFeedRepository.getDataFeeds();
+			for (DataFeedDao dao : dataFeedDaos) {
+				DataFeed dataFeed = convertDataFeedDao(dao);
+				dataFeeds.add(dataFeed);
+        	}
+        } catch (Exception e) {
+        	logger.error("Failed getting data feeds", e);
+            return new ResponseEntity<ApiResponse<List<DataFeed>>>(new ApiResponse<List<DataFeed>>(Constants.API_VERSION, DataFeed.class.getName(), null), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        
+        return new ResponseEntity<ApiResponse<List<DataFeed>>>(new ApiResponse<List<DataFeed>>(Constants.API_VERSION, DataFeed.class.getName(), dataFeeds), HttpStatus.OK);
+    }
+    
+    @RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.GET)
+    public ResponseEntity<ApiResponse<DataFeed>> getDataFeed(@PathVariable("name") String name) {
+    	ResponseEntity<ApiResponse<DataFeed>> result = null;
+        try {
+            if (!getInputNameValidationErrors(name).isEmpty()) {
+                result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+                		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+            } else {
+                List<DataFeedDao> dataFeeds = dataFeedRepository.getDataFeedByName(name);
+                if (dataFeeds == null || dataFeeds.size() != 1) {
+                    result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+                    		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+                } else {
+					DataFeedDao dataFeed = dataFeeds.get(0);
+					DataFeed returnDataFeed = this.convertDataFeedDao(dataFeed);
+					result = new ResponseEntity<ApiResponse<DataFeed>>(
+							new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), returnDataFeed),
+							HttpStatus.OK);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Exception getting data feed.", e);
+        	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+        			HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+    	return result;
+    }
+
+    @RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.DELETE)
+    public ResponseEntity<ApiResponse<DataFeed>> deleteDataFeed(@PathVariable("name") String name) {
+
+    	ResponseEntity<ApiResponse<DataFeed>> result = null;
+
+        try {
+            if (!getInputNameValidationErrors(name).isEmpty()) {
+                return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+			} else {
+				// Delete from config file
+				MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service)
+						.deleteDataFeed(name), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+			}
+		} catch (Exception e) {
+			logger.error("Exception deleting data feed from config file.", e);
+
+			// Shouldn't return error in case deleting from database is needed
+        	// return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+        	// 		HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+        try {
+			// Delete from database
+			List<DataFeedDao> dataFeeds = dataFeedRepository.getDataFeedByName(name);
+
+			if (dataFeeds.size() >0 && dataFeeds.get(0) != null) {
+				Long dataFeedId = dataFeeds.get(0).getId();
+
+				dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
+				dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
+				dataFeedRepository.deleteDataFeed(name);
+			}
+
+			result = new ResponseEntity<ApiResponse<DataFeed>>(
+					new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+					HttpStatus.OK);
+		} catch (Exception e) {
+			logger.error("Exception deleting data feed from database.", e);
+        	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+        			HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+        return result;
+    }
+
+    @RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.PUT)
+    public ResponseEntity<ApiResponse<DataFeed>> modifyDataFeed(@PathVariable("name") String name, @RequestBody com.bbn.marti.config.DataFeed dataFeed) {
+    	ResponseEntity<ApiResponse<DataFeed>> result = null;
+    	
+    	try {
+    		List<DataFeedDao> dataFeeds = dataFeedRepository.getDataFeedByName(name);
+            if (!getInputNameValidationErrors(name).isEmpty() || dataFeeds == null || dataFeeds.size() != 1) {
+                result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+			} else {
+				// Update config file
+				ConnectionModifyResult updateResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
+						.modifyInput(name, dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+
+				if (updateResult.getHttpStatusCode() == ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
+					// Update data base
+					Long dataFeedId = dataFeeds.get(0).getId();
+					int type = DataFeedType.valueOf(dataFeed.getType()).ordinal();
+					dataFeedRepository.modifyDataFeed(dataFeed.getUuid(), dataFeed.getName(), type, dataFeed.isArchive(), dataFeed.isArchiveOnly(), dataFeed.isSync());
+
+					dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
+					for (String tag : dataFeed.getTag()) {
+						dataFeedRepository.addDataFeedTag(dataFeedId, tag);
+					}
+
+					dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
+					for (String filterGroup: dataFeed.getFiltergroup()) {
+						dataFeedRepository.addDataFeedFilterGroup(dataFeedId, filterGroup);
+					}
+
+    				result = new ResponseEntity<ApiResponse<DataFeed>>(
+    						new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+    						HttpStatus.OK);
+				} else {
+					result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+	        			HttpStatus.INTERNAL_SERVER_ERROR);
+				}
+			}
+    	} catch (Exception e) {
+    		logger.error("Failed updating data feed", e);
+        	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+        			HttpStatus.INTERNAL_SERVER_ERROR);
+    	}
+
+    	return result;
+    }
+
+    @RequestMapping(value = "/datafeeds", method = RequestMethod.POST)
+    public ResponseEntity<ApiResponse<DataFeed>> createDataFeed(@RequestBody com.bbn.marti.config.DataFeed dataFeed) {
+
+    	ResponseEntity<ApiResponse<DataFeed>> result = null;
+    	DataFeed returnDataFeed = new DataFeed(dataFeed);
+        List<String> errors = new ArrayList<>();
+
+        try {
+        	if (dataFeed.getUuid() == null) {
+        		dataFeed.setUuid(UUID.randomUUID().toString());
+        	}
+
+			errors = getDataFeedValidationErrors(dataFeed);
+
+        	if (errors.isEmpty()) {
+            	// Add dataFeed to config file
+	            NetworkInputAddResult addResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
+	            		.createDataFeed(dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+	            
+	            if (addResult == NetworkInputAddResult.SUCCESS) {
+	        		// Add dataFeed to database
+	            	int type = DataFeedType.valueOf(dataFeed.getType()).ordinal();
+	            	String auth = dataFeed.getAuth().toString();
+
+	            	Long dataFeedId = dataFeedRepository.addDataFeed(dataFeed.getUuid(), dataFeed.getName(), type, auth, dataFeed.getPort(),
+	            			dataFeed.isAuthRequired(), dataFeed.getProtocol(), dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(),
+	            			dataFeed.isAnongroup(), dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
+	            			dataFeed.isSync());
+
+	            	for (String tag: dataFeed.getTag()) {
+	            		dataFeedRepository.addDataFeedTag(dataFeedId, tag);
+	            	}
+	            	for (String filterGroup: dataFeed.getFiltergroup()) {
+	            		dataFeedRepository.addDataFeedFilterGroup(dataFeedId, filterGroup);
+	            	}
+					result = new ResponseEntity<ApiResponse<DataFeed>>(
+							new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), returnDataFeed),
+							HttpStatus.OK);
+	            } else {
+	            	logger.error("Error adding data feed to config file " + addResult.getDisplayMessage());
+	            	errors.add(addResult.getDisplayMessage());
+	            }
+            } else {
+	            result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+	            		DataFeed.class.getName(), returnDataFeed, errors), HttpStatus.BAD_REQUEST);
+            }
+        } catch (Exception e) {
+            logger.error("Exception adding input.", e);
+            errors.add(e.getMessage());
+        }
+
+        if (result == null) {
+        	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null, errors),
+        			HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        return result;
+    }
+    
     @RequestMapping(value = "/inputs", method = RequestMethod.GET)
-    public ResponseEntity<ApiResponse<SortedSet<InputMetric>>> getInputMetrics(HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<SortedSet<InputMetric>>> getInputMetrics(
+    		@RequestParam(value = "excludeDataFeeds", defaultValue = "false") boolean excludeDataFeeds, HttpServletResponse response) {
 
     	setCacheHeaders(response);
 
@@ -82,7 +299,7 @@ public class SubmissionApi extends BaseRestController {
                 }
             });
 
-            Collection<InputMetric> inputs = inputManager.getInputMetrics();
+            Collection<InputMetric> inputs = inputManager.getInputMetrics(excludeDataFeeds);
 
             if (logger.isDebugEnabled()) {
             	logger.debug("inputs: " + inputs);
@@ -229,7 +446,7 @@ public class SubmissionApi extends BaseRestController {
                 result = new ResponseEntity<ApiResponse<InputMetric>>(new ApiResponse<InputMetric>(Constants.API_VERSION,
                 		InputMetric.class.getName(), null), HttpStatus.BAD_REQUEST);
             } else {
-            	Collection<InputMetric> metrics = inputManager.getInputMetrics();
+            	Collection<InputMetric> metrics = inputManager.getInputMetrics(false);
             	if (metrics != null) {
             		for (InputMetric m : metrics) {
             			if (m.getInput().getName().equalsIgnoreCase(name)) {
@@ -365,10 +582,10 @@ public class SubmissionApi extends BaseRestController {
 	    	}
 
 	    	//Validate protocol
-	    	if (!PROTOCOLS.contains(input.getProtocol().toLowerCase())) {
+	    	if (!PROTOCOLS.contains(input.getProtocol().toString().toLowerCase())) {
 	    		errors.add("Invalid protocol selection.");
 	    	} else {
-	    		input.setProtocol(input.getProtocol().toLowerCase());
+	    		input.setProtocol(input.getProtocol());
 	    	}
 
 	    	//Validate port
@@ -417,6 +634,93 @@ public class SubmissionApi extends BaseRestController {
     	}
 
     	return errors;
+    }
+    
+    private List<String> getDataFeedValidationErrors(com.bbn.marti.config.DataFeed dataFeed) {
+    	List<String> errors = new ArrayList<>();
+
+    	if (dataFeed == null) {
+    		//Should not occur
+    		errors.add("Missing data feed definition.");
+    	} else {
+
+	    	//Validate input name
+	    	errors.addAll(getInputNameValidationErrors(dataFeed.getName()));
+	    	if (dataFeed.getName() != null) {
+	    		dataFeed.setName(dataFeed.getName().trim());
+	    	}
+
+	    	//Validate feed type
+			if (dataFeed.getType() == null) {
+				errors.add("Null data feed type provided");
+			}
+
+	    	//Validate multicast group
+	    	if (dataFeed.getGroup() != null && dataFeed.getGroup().trim().length() > 0) {
+	    		dataFeed.setGroup(dataFeed.getGroup().trim());
+	    		if (dataFeed.getGroup().replaceFirst("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", "").length() > 0) {
+	    			errors.add("Invalid multicast group value.");
+	    		}
+	    	}
+
+	    	//Validate interface
+	    	if (dataFeed.getIface() != null && dataFeed.getIface().trim().length() > 0) {
+	    		dataFeed.setIface(dataFeed.getIface().trim());
+	    		if (dataFeed.getIface().replaceFirst("^[A-Za-z0-9]+$", "").length() > 0) {
+	    			errors.add("Invalid interface value.");
+	    		}
+	    	}
+
+	    	//Enforce (File v LDAP) <=> (stcp v tls v prototls v cottls))
+	    	//If auth type is file or ldap, then protocol must be stcp or tls
+	    	if ((dataFeed.getAuth() == AuthType.FILE || dataFeed.getAuth() == AuthType.LDAP) && !(dataFeed.getProtocol().equals("stcp") || dataFeed.getProtocol().equals("tls") || dataFeed.getProtocol().equals("prototls") || dataFeed.getProtocol().equals("cottls"))) {
+	    		errors.add("If Authentication Type is set to File or LDAP, then Protocol should be be Streaming TCP or Secure Streaming TCP.");
+	    	}
+
+	    	//If protocol is mcast, then multicast group must not be empty
+	    	if ((dataFeed.getProtocol().equals("mcast") || dataFeed.getProtocol().equals("cotmcast")) && (dataFeed.getGroup() == null || dataFeed.getGroup().trim().isEmpty())) {
+	    		errors.add("If Protocol is set to Multicast, then the Multicast Group must be provided.");
+	    	}
+
+	    	//If multicast group must is not empty, then protocol must be mcast
+	    	if (dataFeed.getGroup() != null && !dataFeed.getGroup().trim().isEmpty() && !dataFeed.getProtocol().equals("mcast") && !dataFeed.getProtocol().equals("cotmcast")) {
+	    		errors.add("If the Multicast Group is provided, then Protocol should be set to Multicast.");
+	    	}
+    	}
+		return errors;
+    }
+    
+    private DataFeed convertDataFeedDao(DataFeedDao dao) {
+		DataFeedType type = DataFeedType.values()[dao.getType()];
+		List<String> tags = dataFeedRepository.getDataFeedTagsById(dao.getId());
+		List<String> filterGroups = dataFeedRepository.getDataFeedFilterGroupsById(dao.getId());
+		AuthType auth = AuthType.valueOf(dao.getAuth());
+
+    	DataFeed dataFeed = new DataFeed(dao.getUUID(), dao.getName(), type,  new ArrayList<String>());
+
+    	dataFeed.setAuth(auth);
+    	dataFeed.setAnongroup(dao.getAnongroup());
+    	dataFeed.setAuthRequired(dao.getAuthRequired());
+    	dataFeed.setProtocol(dao.getProtocol());
+    	dataFeed.setGroup(dao.getFeedGroup());
+    	dataFeed.setIface(dao.getIface());
+    	dataFeed.setArchive(dao.getArchive());
+    	dataFeed.setAnongroup(dao.getAnongroup());
+    	dataFeed.setArchiveOnly(dao.getArchiveOnly());
+    	dataFeed.setCoreVersion(dao.getCoreVersion().intValue());
+    	dataFeed.setCoreVersion2TlsVersions(dao.getCoreVersion2TlsVersions());
+    	dataFeed.setSync(dao.isSync());
+    	dataFeed.setTags(tags);
+    	dataFeed.setFilterGroups(filterGroups);
+
+    	
+		if (dao.getPort() == 0) {
+			dataFeed.setPort(null);
+		} else {
+			dataFeed.setPort(dao.getPort());
+		}
+
+    	return dataFeed;
     }
 
     private static final int INPUT_NAME_MAX_LENGTH = 30;

@@ -6,15 +6,14 @@ import org.apache.ignite.services.ServiceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.MessagingConfigInfo;
 import com.bbn.marti.remote.groups.ConnectionModifyResult;
 import com.bbn.marti.remote.groups.NetworkInputAddResult;
 import com.bbn.marti.remote.service.InputManager;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-
-import tak.server.Constants;
 
 /**
  */
@@ -49,6 +48,11 @@ public class DistributedInputManager implements InputManager, org.apache.ignite.
 	}
 
 	@Override
+	public NetworkInputAddResult createDataFeed(DataFeed dataFeed) {
+		return MessagingDependencyInjectionProxy.getInstance().submissionService().addInputAndSave(dataFeed);
+	}
+
+	@Override
 	public ConnectionModifyResult modifyInput(String id, Input input) {
 		return MessagingDependencyInjectionProxy.getInstance().submissionService().modifyInputAndSave(id, input);
 	}
@@ -59,8 +63,13 @@ public class DistributedInputManager implements InputManager, org.apache.ignite.
 	}
 
 	@Override
-	public Collection<InputMetric> getInputMetrics() {
-		return MessagingDependencyInjectionProxy.getInstance().submissionService().getInputMetrics();
+	public void deleteDataFeed(String name) {
+		MessagingDependencyInjectionProxy.getInstance().submissionService().removeDataFeedAndSave(name);
+	}
+
+	@Override
+	public Collection<InputMetric> getInputMetrics(boolean excludeDataFeeds) {
+		return MessagingDependencyInjectionProxy.getInstance().submissionService().getInputMetrics(excludeDataFeeds);
 	}
 
 	@Override

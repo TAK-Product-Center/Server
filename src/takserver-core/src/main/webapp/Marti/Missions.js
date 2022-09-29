@@ -86,6 +86,16 @@ function displayInUnits ( seconds ) {
     return 'less than a second'; //'just now' //or other string you like;
 }
 
+function createGroups(groups) {
+    var html = "";
+    for (var i = 0; i < groups.length - 1; i++) {
+        html += sanitize(groups[i]);
+        html += ", ";
+    }
+    html += sanitize(groups[groups.length - 1])
+    return html;
+}
+
 function createKeywords(keywords) {
     var html = "";
     for (var i = 0; i < keywords.length; i++) {
@@ -114,6 +124,7 @@ function createMissionTable(missions) {
         addCell(row, cell++, document.createTextNode(missions[i].description), 'top');
         addCell(row, cell++, createDiv(createContents(missions[i].contents)), 'top');
         addCell(row, cell++, createDiv(createUids(missions[i].uids)), 'top');
+		addCell(row, cell++, createDiv(createGroups(missions[i].groups)), 'top');
         addCell(row, cell++, createDiv(createKeywords(missions[i].keywords)), 'top');
         addCell(row, cell++, document.createTextNode(missions[i].creatorUid), 'top');
         addCell(row, cell++, document.createTextNode(missions[i].createTime), 'top');

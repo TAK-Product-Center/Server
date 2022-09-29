@@ -1,9 +1,9 @@
 
-
 package com.bbn.marti.network;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -41,50 +41,45 @@ public class ContactManagerApi extends BaseRestController {
     @Autowired
 	private CommonUtil martiUtil;
 
-	@RequestMapping(value = "/clientEndPoints", method = RequestMethod.GET)
-	public ResponseEntity<ApiResponse<List<ClientEndpoint>>> getClientEndpoints(HttpServletRequest request, HttpServletResponse response,
-			@RequestParam(value="secAgo", required=false, defaultValue="-1") long secAgo,
-			@RequestParam(value="showCurrentlyConnectedClients", required=false, defaultValue="false") String showCurrentlyConnectedClients,
-			@RequestParam(value="showMostRecentOnly", required=false, defaultValue="false") String showMostRecentOnly) {
+    @RequestMapping(value = "/clientEndPoints", method = RequestMethod.GET)
+    public Callable<ResponseEntity<ApiResponse<List<ClientEndpoint>>>> getClientEndpoints(HttpServletRequest request, HttpServletResponse response,
+    		@RequestParam(value="secAgo", required=false, defaultValue="0") long secAgo,
+    		@RequestParam(value="showCurrentlyConnectedClients", required=false, defaultValue="false") String showCurrentlyConnectedClients,
+    		@RequestParam(value="showMostRecentOnly", required=false, defaultValue="false") String showMostRecentOnly) {
 
-		if (logger.isDebugEnabled()) {
-			logger.debug("Received REST call for clientEndPoints with params: secAgo = " + secAgo + ", showCurrentlyConnectedClients = " + showCurrentlyConnectedClients);
-		}
+    	if (logger.isDebugEnabled()) {
+    		logger.debug("Received REST call for clientEndPoints with params: secAgo = " + secAgo + ", showCurrentlyConnectedClients = " + showCurrentlyConnectedClients);
+    	}
 
-		setCacheHeaders(response);
+    	final String groupVector = martiUtil.getGroupVectorBitString(request, Direction.OUT);
 
-		List<String> errors = new ArrayList<String>();
+    	return () -> {
 
-		ResponseEntity<ApiResponse<List<ClientEndpoint>>> result = null;
-		boolean connected = Boolean.valueOf(showCurrentlyConnectedClients);
-		boolean recent = Boolean.valueOf(showMostRecentOnly);
+    		setCacheHeaders(response);
 
-		List<ClientEndpoint> data = null;
+    		List<String> errors = new ArrayList<String>();
 
-		String groupVector = martiUtil.getGroupVectorBitString(request, Direction.OUT);
+    		ResponseEntity<ApiResponse<List<ClientEndpoint>>> result = null;
+    		boolean connected = Boolean.valueOf(showCurrentlyConnectedClients);
+    		boolean recent = Boolean.valueOf(showMostRecentOnly);
 
-		try {
-			
-			if (secAgo >= 0) {
-				data = contactManagerService.getClientEndpointData(secAgo, connected, groupVector);
-			} else {
-				// use default limit from CoreConfig.buffer.queue.contactCacheRecencyLimitSeconds
-				data = contactManagerService.getCachedClientEndpointData(connected, recent, groupVector);
-			} 
-			
-			result = new ResponseEntity<ApiResponse<List<ClientEndpoint>>>(new ApiResponse<List<ClientEndpoint>>(Constants.API_VERSION, ClientEndpoint.class.getName(), data), HttpStatus.OK);
+    		if (secAgo < 0) {
+    			throw new IllegalArgumentException("invalid secAgo parameter " + secAgo);
+    		}
 
-		} catch (Exception e) { 
-			errors.add("Exception getting client endpoint search results.");
-			logger.error("Exception getting client endpoint search results.", e);  
-		}
+    		try {
+
+    			return new ResponseEntity<ApiResponse<List<ClientEndpoint>>>(new ApiResponse<List<ClientEndpoint>>(Constants.API_VERSION, ClientEndpoint.class.getName(), contactManagerService.getCachedClientEndpointData(connected, recent, groupVector, secAgo)), HttpStatus.OK);
+
+    		} catch (Exception e) { 
+    			errors.add("Exception getting client endpoint search results.");
+    			logger.error("Exception getting client endpoint search results.", e);  
+    		}
 
 
-		if (result == null) {
-			//This would be an error condition (not an empty list)
-			result = new ResponseEntity<ApiResponse<List<ClientEndpoint>>>(new ApiResponse<List<ClientEndpoint>>(Constants.API_VERSION, ClientEndpoint.class.getName(), null, errors), HttpStatus.INTERNAL_SERVER_ERROR);
-		}
+    		
 
-		return result;
-	}
+    		return result;
+    	};
+    }
 }

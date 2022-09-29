@@ -36,6 +36,8 @@ dependencies {
 
   compile group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeine_version
 
+  compile group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeine_version
+  
   compile project(':takserver-fig-core')
 
   testCompile group: 'junit', name: 'junit', version: junit_version

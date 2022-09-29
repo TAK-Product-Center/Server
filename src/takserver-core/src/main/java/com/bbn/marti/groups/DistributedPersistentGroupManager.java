@@ -761,7 +761,7 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
     }
     
     @Override
-    public List<LdapGroup> searchGroups(String groupNameFilter) {
+    public List<LdapGroup> searchGroups(String groupNameFilter, boolean exactMatch) {
     	
     	List<LdapGroup> results = new ArrayList<LdapGroup>();
     	
@@ -782,7 +782,12 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
 			Object[] args = null;
 			
 			if (groupNameFilter != null && groupNameFilter.trim().length() > 0) {
-				groupFilter = "(&(objectclass={0})(CN=*{1}*))";
+			    if (exactMatch) {
+                    groupFilter = "(&(objectclass={0})(CN={1}))";
+                } else {
+                    groupFilter = "(&(objectclass={0})(CN=*{1}*))";
+                }
+
 				args = new Object[2];
 				args[0] = ldapConfig.getGroupObjectClass().trim();
 				args[1] = groupNameFilter.trim();

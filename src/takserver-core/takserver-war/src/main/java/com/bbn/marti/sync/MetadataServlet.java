@@ -10,6 +10,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
@@ -18,6 +19,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 
@@ -177,7 +179,9 @@ public class MetadataServlet extends EnterpriseSyncServlet {
 			}
 			allResults.add(result);
 		} else {
-			log.fine("Getting metadata for UID " + uid);
+			if (log.isLoggable(Level.FINE)) {
+				log.fine("Getting metadata for UID " + StringUtils.normalizeSpace(uid));
+			}
 			allResults = enterpriseSyncService.getMetadataByUid(uid, groupVector);
 			Set<Metadata> badResults = new HashSet<Metadata>();
 			for (Metadata result : allResults) {

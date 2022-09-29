@@ -249,6 +249,11 @@ public class VerificationEngine implements EngineInterface {
 		data.validateAllUserExpectations("InputRemoved");
 		data.engineIterationDataClear();
 	}
+	
+	@Override
+	public void onlineRemoveDataFeedAndVerify(@NotNull AbstractConnection dataFeed) {
+		onlineRemoveInputAndVerify(dataFeed);
+	}
 
 	@Override
 	public void attemptSendFromUserAndVerify(@NotNull AbstractUser sendingUser, @NotNull AbstractUser... targetUsers) {
@@ -312,11 +317,20 @@ public class VerificationEngine implements EngineInterface {
 	@Override
 	public void offlineAddSubscriptionFromInputToServer(@NotNull AbstractConnection targetInput, @NotNull AbstractServerProfile serverProvidingSubscription) {
 		data.engineIterationDataClear();
-
+	}
+	
+	@Override
+	public void offlineAddSubscriptionFromDataFeedToServer(@NotNull AbstractConnection targetInput, @NotNull AbstractServerProfile serverProvidingSubscription) {
+		data.engineIterationDataClear();
 	}
 
 	@Override
 	public void onlineAddInput(@NotNull AbstractConnection input) {
+		data.engineIterationDataClear();
+	}
+	
+	@Override
+	public void onlineAddDataFeed(@NotNull AbstractConnection dataFeed) {
 		data.engineIterationDataClear();
 	}
 

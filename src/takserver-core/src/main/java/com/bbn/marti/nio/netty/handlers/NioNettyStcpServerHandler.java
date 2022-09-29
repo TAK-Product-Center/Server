@@ -3,12 +3,13 @@ package com.bbn.marti.nio.netty.handlers;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
+import com.bbn.cot.filter.DataFeedFilter;
 import com.bbn.marti.config.AuthType;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.nio.channel.connections.TcpChannelHandler;
 import com.bbn.marti.nio.codec.impls.AbstractAuthCodec;
@@ -21,7 +22,6 @@ import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.google.common.base.Charsets;
 
-
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
 import tak.server.ignite.IgniteHolder;
@@ -29,7 +29,6 @@ import tak.server.ignite.IgniteHolder;
 /*
  */
 public class NioNettyStcpServerHandler extends NioNettyHandlerBase {
-	private final static Logger log = Logger.getLogger(NioNettyStcpServerHandler.class);
 	private AbstractAuthCodec authCodec;
 	private AuthType authenticationType;
 	protected ScheduledFuture<?> flushFuture;
@@ -97,10 +96,14 @@ public class NioNettyStcpServerHandler extends NioNettyHandlerBase {
 			if(msgBuf == null || msgBuf.remaining() == 0) return;
 			
 			StreamingCotProtocol
-				.add(builder, Charsets.UTF_8.decode(msgBuf), parser, channelHandler)
+				.add(builder, Charsets.UTF_8.decode(msgBuf), cotParser(), channelHandler)
 				.forEach(c -> {
-					if (isNotDOSLimited(c)  && isNotReadLimited(c))
-						protocolListeners.forEach(listener -> listener.onDataReceived(c, channelHandler, protocol));
+					if (isNotDOSLimited(c)  && isNotReadLimited(c)) {
+						if (isDataFeedInput()) {
+							DataFeedFilter.getInstance().filter(c, (DataFeed) input);
+						}
+ 						protocolListeners.forEach(listener -> listener.onDataReceived(c, channelHandler, protocol));
+					}
 				});
 		};
 	}

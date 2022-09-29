@@ -7,7 +7,7 @@ fi
 cd /opt/tak
 . ./setenv.sh
 java -jar -Xmx${MESSAGING_MAX_HEAP}m -Dspring.profiles.active=messaging takserver.war &
-java -jar -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api takserver.war &
+java -jar -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api -Dkeystore.pkcs12.legacy takserver.war &
 java -jar -Xmx${PLUGIN_MANAGER_MAX_HEAP}m takserver-pm.jar &
 
 if ! [ $# -eq 0 ]

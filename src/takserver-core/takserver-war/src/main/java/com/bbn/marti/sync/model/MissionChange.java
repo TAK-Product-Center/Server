@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.sync.MissionChangeType;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.xml.DateAdapter;
@@ -77,6 +78,8 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
     protected String externalDataTool;
     protected String externalDataToken;
     protected String externalDataNotes;
+    protected String missionFeedUid;
+    protected String mapLayerUid;
 
     protected Mission mission;
     protected String missionName; // mission name is denormalized here to track all event by mission name, even deletions (because if the mission id foreign key was joined on, the mission name would be lost when the mission record is deleted.
@@ -376,6 +379,67 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
         this.externalDataNotes = externalDataNotes;
     }
 
+    @JsonIgnore
+    @XmlTransient
+    @Column(name = "mission_feed_uid")
+    public String getMissionFeedUid() {
+        return missionFeedUid;
+    }
+
+    public void setMissionFeedUid(String missionFeedUid) {
+        this.missionFeedUid = missionFeedUid;
+    }
+
+    @Transient
+    @JsonProperty("missionFeed")
+    @XmlElement(name = "missionFeed")
+    public MissionFeed getMissionFeed() {
+        if (missionFeedUid != null) {
+            MissionFeed missionFeed =  missionService.getMissionFeed(missionFeedUid);
+            if (missionFeed == null) {
+                missionFeed = new MissionFeed();
+                missionFeed.setUid(missionFeedUid);
+            }
+
+            return missionFeed;
+        }
+
+        return null;
+    }
+
+    @JsonIgnore
+    @XmlTransient
+    @Column(name = "map_layer_uid")
+    public String getMapLayerUid() {
+        return mapLayerUid;
+    }
+
+    public void setMapLayerUid(String mapLayerUid) {
+        this.mapLayerUid = mapLayerUid;
+    }
+
+
+    @Transient
+    @JsonProperty("mapLayer")
+    @XmlElement(name = "mapLayer")
+    public MapLayer getMapLayer() {
+        try {
+            if (mapLayerUid != null) {
+                MapLayer mapLayer = missionService.getMapLayer(mapLayerUid);
+                if (mapLayer == null) {
+                    mapLayer = new MapLayer();
+                    mapLayer.setUid(mapLayerUid);
+                }
+
+                return mapLayer;
+            }
+        } catch (Exception e) {
+            logger.error("exception in getMapLayer", e);
+        }
+
+        return null;
+    }
+
     public void setExternalData(ExternalMissionData externalMissionData) {
         this.tempExternalMissionData = externalMissionData;
     }
@@ -403,7 +467,5 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
 
         return null;
     }
+
 }
-
-
-

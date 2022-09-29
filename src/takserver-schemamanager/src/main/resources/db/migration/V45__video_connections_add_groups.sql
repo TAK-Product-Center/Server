@@ -1,0 +1,1 @@
+alter table video_connections add column groups bit varying;

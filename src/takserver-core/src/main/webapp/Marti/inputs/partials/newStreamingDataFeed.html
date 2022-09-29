@@ -1,0 +1,275 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+  
+  .rowHeader {
+  	text-align:right;
+  	padding-right:5px;
+  	width:200px;
+  	vertical-align:top;
+  }
+  
+  .rowValue {
+  	width:400px;
+  	text-align:right;
+  	vertical-align:top;
+  }
+  
+  .rowValue select {
+  	width:100%;
+  }
+
+  .rowValue input {
+  	width:400px;
+  }
+  
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+
+  table {
+  	border-collapse: separate;
+  	border-spacing:10px
+  }
+
+  .inlineHelp {
+  	font:13px arial, sans-serif;
+  	font-style:italic;
+  	text-align:right;
+  	color:green;
+  }  
+</style>
+
+<div>
+  <h3>Create Streaming Data Feed</h3>
+
+  <div data-ng-show="serviceReportedMessages">
+  	<ul>
+  		<li class="error" data-ng-repeat="message in messages">{{message}}</li>
+  	</ul>
+  </div>
+  
+  <form name="dataFeedForm" novalidate data-ng-submit="dataFeedForm.$valid && saveStreamingDataFeed(dataFeed)">
+  	<table>
+  		<tr>
+  			<td class="rowHeader"><label for="name">*Name</label></td>
+  			<td class="rowValue">
+  				<input type="text" data-ng-model="dataFeed.name" required  maxlength="30" data-ng-pattern="/^[A-Za-z0-9_\s]+$/" data-ng-change="isInputNameUnique(dataFeed.name)"/>
+  				<br/><span class="inlineHelp">Name may contain upper and lower case letters, numbers, spaces and underscores up to 30 characters.</span>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeedForm.name.$touched">
+  					<span data-ng-show="dataFeedForm.name.$error.required">Data Feed name is required.</span>
+  					<span data-ng-show="dataFeedForm.name.$error.maxLength">Data Feed name must be between 1 and 30 characters</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="tag">Tags</label></td>
+  			<td class="rowValue">
+				<textarea style="width:100%;resize:none;" data-ng-model="dataFeed.tag" data-ng-list="&#10;" data-ng-trim="false"></textarea>
+  				<br/><span class="inlineHelp">Provide 0 or more tags separated by newlines.
+  				Example: red,green,blue</span>
+			</td>
+			<td>&nbsp;</td>
+  		</tr>
+  		
+
+  		<tr>
+  			<td class="rowHeader"><label for="protocol">*Protocol</label></td>
+				<td class="rowValue"><select name="protocol"
+					data-ng-model="dataFeed.protocol" required>
+						<option value="tcp">Standard TCP (TCP)</option>
+						<option value="udp">Standard UDP (UDP)</option>
+						<option value="stcp">Streaming TCP (STCP)</option>
+						<option value="tls">Secure Streaming TCP (TLS) CoT or
+							Protobuf</option>
+						<option value="grpc">Secure Streaming with gRPC</option>
+						<option value="cottls">Secure Streaming TCP (COTTLS) CoT
+							Only</option>
+						<option value="mcast">Multicast (MCAST)</option>
+				</select></td>
+				<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeedForm.protocol.$touched">
+  					<span data-ng-show="dataFeedForm.protocol.$error.required">Protocol is required</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="auth">*Authentication Type</label></td>
+  			<td class="rowValue">
+				<select name="auth" data-ng-model="dataFeed.auth" required>
+      				<option value="LDAP">LDAP</option>
+					<option value="FILE">File</option>
+					<option value="X_509">X.509</option>
+					<option value="ANONYMOUS">None (Anonymous)</option>
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeedForm.auth.$touched">
+  					<span data-ng-show="dataFeedForm.auth.$error.required">Authentication Type is required</span>
+  				</span>
+  			</td>
+  		</tr>
+  		  		
+  		<tr>
+  			<td class="rowHeader"><label for="port">*Port</label></td>
+  			<td class="rowValue">
+  				<input type="number" data-ng-model="dataFeed.port" name="port" required min="1" max="65535" data-ng-pattern="/^[0-9]+$/"/>
+  				<br/><span class="inlineHelp">Port must be an integer between 1 and 65535.</span>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeedForm.port.$touched">
+  					<span data-ng-show="dataFeedForm.port.$error.required">Port value is required. </span>
+  					<span data-ng-show="dataFeedForm.port.$error.min || dataFeedForm.port.$error.max">Port value must be an integer between 1 and 65535. </span>
+  					<span data-ng-show="dataFeedForm.port.$error.number">Port value must be an integer. </span>
+  					<span data-ng-show="dataFeedForm.port.$error.pattern">Port value may only contain digits. </span>
+  				</span>
+  			</td>
+  		</tr>
+  		
+  		<tr>
+  			<td class="rowHeader"><label for="coreVersion">Core Messaging Version</label></td>
+  			<td class="rowValue">
+				<select name="coreVersion" data-ng-model="dataFeed.coreVersion" required>
+				    <option value="2">2 (high performance)</option>
+					<option value="1">1 (legacy)</option>
+				</select>
+				<br/>
+			</td>
+			<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeed.coreVersion.$touched">
+  					<span data-ng-show="dataFeed.coreVersion.$error.required">Core Version is required</span>
+  				</span>
+  			</td>
+  		</tr>
+  		
+  		<tr data-ng-show="dataFeed.coreVersion == 2" style="width:400px;">
+  			<td class="rowHeader"></td>
+  			<td>
+  				<span style="width:100%; display:block; text-align:center" class="inlineHelp">Core Messaging 2 TLS Version(s):</span>
+  				<table style="font-size:13px">
+                  <tr>
+                    <td>TLSv1: <input data-ng-model="tls['TLSv1']" type="checkbox"></td>
+                    <td>TLSv1.1: <input data-ng-model="tls['TLSv1.1']" type="checkbox"></td>
+                    <td>TLSv1.2: <input data-ng-model="tls['TLSv1.2']" type="checkbox"></td>
+                    <td>TLSv1.3: <input data-ng-model="tls['TLSv1.3']" type="checkbox"></td>
+                  </tr>
+                </table>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="dataFeed.coreVersion2TlsVersions === ''">At least one TLS Version is required</span>
+  			</td>
+  		</tr>
+  		
+  		<tr>
+  			<td class="rowHeader"><label for="group">Multicast Group</label></td>
+  			<td class="rowValue">
+  				<input type="text" data-ng-model="dataFeed.group" name="group" data-ng-pattern="/^([0-9]{1,3}\.){3}[0-9]{1,3}$/"/>
+  				<br/><span class="inlineHelp">Provide an optional valid IPv4 multicast address.</span>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeedForm.group.$touched">
+  					<span data-ng-show="dataFeedForm.group.$error.pattern">Provide a valid IPv4 multicast address containing only digits and periods.</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="iface">Interface</label></td>
+  			<td class="rowValue">
+  				<input type="text" data-ng-model="dataFeed.iface" name="iface" data-ng-maxlength="15" data-ng-minlength="1" data-ng-pattern="/^[A-Za-z0-9]+$/"/>
+  				<br/><span class="inlineHelp">Provide an optional valid network interface name (e.g., en0).</span>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeedForm.iface.$touched">
+  					<span data-ng-show="dataFeedForm.iface.$error.pattern">Provide a valid network interface name containing only letters and numbers.</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="archive">Archive</label></td>
+  			<td class="rowValue">
+				<select name="archive" data-ng-model="dataFeed.archive" required>
+      				<option value="true">True</option>
+					<option value="false">False</option>
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeedForm.archive.$touched">
+  					<span data-ng-show="dataFeedForm.archive.$error.required">Archive is required</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="anongroup">Anonymous Group</label></td>
+  			<td class="rowValue">
+				<select name="anongroup" data-ng-model="dataFeed.anongroup" required>
+      				<option value="true">True</option>
+					<option value="false">False</option>
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeedForm.anongroup.$touched">
+  					<span data-ng-show="dataFeedForm.anongroup.$error.required">Anonymous Group is required</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="archiveOnly">Archive Only</label></td>
+  			<td class="rowValue">
+				<select name="archiveOnly" data-ng-model="dataFeed.archiveOnly" required>
+      				<option value="true">True</option>
+					<option value="false">False</option>
+				</select>
+			</td>
+			<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeedForm.archiveOnly.$touched">
+  					<span data-ng-show="dataFeedForm.archiveOnly.$error.required">Archive Only is required</span>
+  				</span>
+  			</td>
+  		</tr>
+
+  		<tr>
+  			<td class="rowHeader"><label for="filtergroup">Filter Groups</label></td>
+  			<td class="rowValue">
+				<textarea style="width:100%;resize:none;" data-ng-model="dataFeed.filtergroup" data-ng-list="&#10;" data-ng-trim="false"></textarea>
+  				<br/><span class="inlineHelp">Provide 0 or more LDAP distinguished names separated by newlines.
+  				Example: cn=John Smith,ou=test,dc=xyz,dc=gov</span>
+			</td>
+			<td>&nbsp;</td>
+  		</tr>
+
+		<tr>
+			<td class="rowHeader"><label for="sync">Sync</label></td>
+			<td class="rowValue">
+				<select name="sync" data-ng-model="dataFeed.sync" required>
+					<option value="true">True</option>
+					<option value="false">False</option>
+				</select>
+			</td>
+		</tr>
+
+		<tr>
+			<td style="text-align:right;">*Required</td>
+			<td style="padding:10px;" align="right">
+				<input type="button" data-ng-click="cancelInput()" value="Cancel" />&nbsp;
+				<input type="submit" value="Save" data-ng-disabled="submitInProgress" />
+			</td>
+			<td>&nbsp;</td>
+		</tr>
+
+  	</table>
+  </form>
+</div>

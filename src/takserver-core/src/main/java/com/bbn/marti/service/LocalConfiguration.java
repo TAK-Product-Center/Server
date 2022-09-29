@@ -54,6 +54,7 @@ import com.bbn.marti.config.Subscription;
 import com.bbn.marti.config.Thumbnail;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.config.Urladd;
+import com.bbn.marti.config.Vbm;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.util.MessageConversionUtil;
@@ -485,6 +486,10 @@ public class LocalConfiguration {
 		if (configuration.getCluster() == null) {
 			configuration.setCluster(new Cluster());
 			changed = true;
+		}
+		
+		if (configuration.getVbm() == null) {
+			configuration.setVbm(new Vbm());
 		}
 
 		return changed;

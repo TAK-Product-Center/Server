@@ -35,7 +35,7 @@ def test_mission_api(host, port, cert, password, verbose=True):
 
         logger.info("subcribing to a mission?...")
         files = {'file': open('Mission-API.pdf', 'rb')}
-        response = sess.post(enterprise_sync + "upload", params={"name": "test_file.pdf", "creatorUid": "test_User"}, files=files, headers={"Content-Type": "application/pdf"})
+        response = sess.post(enterprise_sync + "upload", params={"name": "test_file.pdf", "creatorUid": "test"}, files=files, headers={"Content-Type": "application/pdf"})
 
 
         logger.info(pformat(response))
@@ -160,6 +160,7 @@ def test_websocket_proto(host, port, websocket_path, cert, password,
             for p in procs:
                 p.join()
             exit(0)
+    logger.info("Done with setting up " + str(clients) + " clients")
 
     while True:
         try:
@@ -246,7 +247,8 @@ def test_streaming_cot(host, port, cert, password,
                        sequential_uids=True,
                        mission_config=None,
                        mission_port=None,
-                       mission_api_config=None):
+                       mission_api_config=None,
+                       debug=False):
     if sequential_uids:
         uids = ["PyTAK-%04d" % i for i in range(clients)]
     else:
@@ -286,7 +288,8 @@ def test_streaming_cot(host, port, cert, password,
                                          uid=uids[i],
                                          self_sa_delta=self_sa_delta,
                                          mission_config=mission_api_config,
-                                         data_dict=data_dict)
+                                         data_dict=data_dict,
+                                         debug = debug)
             procs.append(p)
             p.start()
             time.sleep(offset)
@@ -514,7 +517,8 @@ if __name__ == "__main__":
                            sequential_uids=args.sequential_uids,
                            mission_config=config.get("Missions"),
                            mission_port=https,
-                           mission_api_config=mission_api_config)
+                           mission_api_config=mission_api_config,
+                           debug = args.verbose)
 
     if args.test_pytak_proto:
         logger.info("")

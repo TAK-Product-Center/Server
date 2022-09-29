@@ -24,7 +24,7 @@ public class MissionDataFlowTests extends AbstractConfigurationA {
 
 	@Test(timeout = SHORT_TIMEOUT)
 	public void c_adminSubscribeMemberToMission() {
-		engine.missionSubscribe(admin, missionName, existingMember);
+		engine.missionSubscribe(existingMember, missionName, existingMember);
 	}
 
 	@Test(timeout = SHORT_TIMEOUT)
@@ -53,7 +53,7 @@ public class MissionDataFlowTests extends AbstractConfigurationA {
 		engine.onlineAddUser(newMember);
 		engine.connectClientsAndVerify(true, newMember);
 		onfam.certmod(newMember.getCertPublicPemPath().toString(), null, null, false, null, newMember.getDefinedGroupSet().stringArray(), null, null);
-		engine.missionSubscribe(admin, missionName, newMember);
+		engine.missionSubscribe(newMember, missionName, newMember);
 	}
 
 	@Test(timeout = SHORT_TIMEOUT)

@@ -8,6 +8,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import io.swagger.models.auth.In;
+import org.apache.commons.lang3.StringUtils;
 import org.jivesoftware.whack.ExternalComponentManager;
 import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.ValidationException;
@@ -157,10 +159,19 @@ public class XmppAPI extends BaseRestController {
                 return new ResponseEntity(HttpStatus.NOT_MODIFIED);
             }
 
-            response.setContentType(metadata.getFirst(Metadata.Field.MIMEType));
-            response.setContentLength(metadata.getSize());
+            String mimeType = metadata.getFirst(Metadata.Field.MIMEType);
+            mimeType = validator.getValidInput("MIME Type", mimeType, "MartiSafeString", MartiValidator.DEFAULT_STRING_CHARS, false);
+            response.setContentType(mimeType);
+
+            String sizeStrVal = String.valueOf(metadata.getSize());
+            sizeStrVal = validator.getValidInput("Content length", sizeStrVal, "NonNegativeInteger", MartiValidator.LONG_STRING_CHARS, true);
+            response.setContentLength(Integer.parseInt(sizeStrVal));
+
             response.setHeader( "Cache-Control", "max-age=31536000" );
-            response.setHeader( "ETag", metadata.getHash());
+
+            String hash = metadata.getHash();
+            hash = validator.getValidInput("Header Etag", hash, "Hexidecimal", MartiValidator.LONG_STRING_CHARS, false);
+            response.setHeader( "ETag", hash);
 
             response.getOutputStream().write(contents);
             return new ResponseEntity(HttpStatus.OK);
@@ -218,7 +229,9 @@ public class XmppAPI extends BaseRestController {
                     if (!slotContentType.equalsIgnoreCase(contentType)) {
                         String message = "Content type in request " + contentType +
                                 " does not correspond with slot content type " + slotContentType;
-                        logger.info(message);
+                       message = validator.getValidInput(XMPP_TOOL, message,
+                                MartiValidator.Regex.MartiSafeString.name(), MartiValidator.DEFAULT_STRING_CHARS, true);
+                        logger.info(message); // log forging prevention
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message);
                     }
                 }
@@ -244,7 +257,9 @@ public class XmppAPI extends BaseRestController {
             //
             Metadata metadata = syncStore.insertResource(toStore, contents, martiUtil.getGroupBitVector(request));
 
-            response.setHeader("Location", request.getRequestURL().toString());
+            String url = request.getRequestURL().toString();
+           url = validator.getValidInput("Location", url, "MartiSafeString", MartiValidator.DEFAULT_STRING_CHARS, true);
+            response.setHeader("Location", url);
             return new ResponseEntity(HttpStatus.CREATED);
 
         } catch (ValidationException e) {

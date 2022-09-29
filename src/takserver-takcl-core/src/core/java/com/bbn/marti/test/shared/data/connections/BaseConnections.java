@@ -42,8 +42,34 @@ public enum BaseConnections {
 	subudp(ProtocolProfiles.SUBSCRIPTION_UDP, 17717, AuthType.ANONYMOUS, null, GroupSetProfiles.Set_None),
 	substcp(ProtocolProfiles.SUBSCRIPTION_STCP, 17718, AuthType.ANONYMOUS, null, GroupSetProfiles.Set_None),
 	submcast(ProtocolProfiles.SUBSCRIPTION_MCAST, 17719, AuthType.ANONYMOUS, null, GroupSetProfiles.Set_None, "239.2.3.1"),
-	stcp3(ProtocolProfiles.INPUT_STCP, 17720, AuthType.ANONYMOUS, null, GroupSetProfiles.Set_3);
-
+	stcp3(ProtocolProfiles.INPUT_STCP, 17720, AuthType.ANONYMOUS, null, GroupSetProfiles.Set_3),
+	
+	// Data feed connections
+	stcp01_data(ProtocolProfiles.DATAFEED_STCP, 18742, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_01),
+	stcp12_data(ProtocolProfiles.DATAFEED_STCP, 18743, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_12),
+	stcp0_data(ProtocolProfiles.DATAFEED_STCP, 17723, AuthType.ANONYMOUS, null, "Streaming",  GroupSetProfiles.Set_0),
+	authstcp_data(ProtocolProfiles.DATAFEED_STCP, 18746, AuthType.FILE, null, "Streaming", GroupSetProfiles.Set_None),
+	stcp01t_data(ProtocolProfiles.DATAFEED_STCP, 17725, AuthType.ANONYMOUS, true, "Streaming", GroupSetProfiles.Set_01),
+	stcp2f_data(ProtocolProfiles.DATAFEED_STCP, 17726, AuthType.ANONYMOUS, false, "Streaming", GroupSetProfiles.Set_2),
+	tcp12_data(ProtocolProfiles.DATAFEED_TCP, 18749, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_12),
+	tcp01t_data(ProtocolProfiles.DATAFEED_TCP, 18747, AuthType.ANONYMOUS, true, "Streaming", GroupSetProfiles.Set_01),
+	tcp2f_data(ProtocolProfiles.DATAFEED_TCP, 18748, AuthType.ANONYMOUS, false, "Streaming", GroupSetProfiles.Set_2),
+	udp01_data(ProtocolProfiles.DATAFEED_UDP, 18752, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_01),
+	udp12t_data(ProtocolProfiles.DATAFEED_UDP, 18753, AuthType.ANONYMOUS, true, "Streaming", GroupSetProfiles.Set_12),
+	udp3f_data(ProtocolProfiles.DATAFEED_UDP, 18754, AuthType.ANONYMOUS, false, "Streaming", GroupSetProfiles.Set_3),
+	stcp_data(ProtocolProfiles.DATAFEED_STCP, 8088, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_None),
+	stcp3_data(ProtocolProfiles.DATAFEED_STCP, 18720, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_3),
+	mcast_data(ProtocolProfiles.DATAFEED_MCAST, 18734, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_None, "239.2.3.1"),
+	saproxy_data(ProtocolProfiles.DATAFEED_MCAST, 6969, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_None, "239.2.3.1"),
+	authssl_data(ProtocolProfiles.DATAFEED_TLS, 8090, AuthType.FILE, null, "Streaming", GroupSetProfiles.Set_None),
+	mcast01_data(ProtocolProfiles.DATAFEED_MCAST, 18755, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_01, "239.2.3.1"),
+	udp_data(ProtocolProfiles.DATAFEED_UDP, 8087, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_None),
+	ssl_data(ProtocolProfiles.DATAFEED_SSL, 8089, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_None),
+	mcast12t_data(ProtocolProfiles.DATAFEED_MCAST, 18756, AuthType.ANONYMOUS, true, "Streaming", GroupSetProfiles.Set_12, "239.2.3.1"),
+	tls_data(ProtocolProfiles.DATAFEED_TLS, 8089, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_None),
+	authtls_data(ProtocolProfiles.DATAFEED_TLS, 8090, AuthType.FILE, null, "Streaming", GroupSetProfiles.Set_None),
+	mcast3f_data(ProtocolProfiles.DATAFEED_MCAST, 18715, AuthType.ANONYMOUS, false, "Streaming", GroupSetProfiles.Set_3, "239.2.3.1"),
+	tcp_data(ProtocolProfiles.DATAFEED_TCP, 8087, AuthType.ANONYMOUS, null, "Streaming", GroupSetProfiles.Set_None);
 
 	BaseConnections(@NotNull ProtocolProfiles protocol, @NotNull int port, @NotNull AuthType authType, @Nullable Boolean isAnon, @NotNull GroupSetProfiles groupSet, @NotNull String mcastGroup) {
 		this.protocol = protocol;
@@ -52,6 +78,7 @@ public enum BaseConnections {
 		this.isAnon = isAnon;
 		this.groupSet = groupSet;
 		this.mcastGroup = mcastGroup;
+		this.type = null;
 	}
 
 	BaseConnections(@NotNull ProtocolProfiles protocol, @NotNull int port, @NotNull AuthType authType, @Nullable Boolean isAnon, @NotNull GroupSetProfiles groupSet) {
@@ -61,6 +88,27 @@ public enum BaseConnections {
 		this.isAnon = isAnon;
 		this.groupSet = groupSet;
 		this.mcastGroup = null;
+		this.type = null;
+	}
+	
+	BaseConnections(@NotNull ProtocolProfiles protocol, @NotNull int port, @NotNull AuthType authType, @Nullable Boolean isAnon, @NotNull String type, @NotNull GroupSetProfiles groupSet, @NotNull String mcastGroup) {
+		this.protocol = protocol;
+		this.port = port;
+		this.authType = authType;
+		this.isAnon = isAnon;
+		this.groupSet = groupSet;
+		this.mcastGroup = mcastGroup;
+		this.type = type;
+	}
+	
+	BaseConnections(@NotNull ProtocolProfiles protocol, @NotNull int port, @NotNull AuthType authType, @Nullable Boolean isAnon, @NotNull String type, @NotNull GroupSetProfiles groupSet) {
+		this.protocol = protocol;
+		this.port = port;
+		this.authType = authType;
+		this.isAnon = isAnon;
+		this.groupSet = groupSet;
+		this.mcastGroup = null;
+		this.type = type;
 	}
 
 	public static BaseConnections getByProtocolProfile(ProtocolProfilesInterface protocolProfile) {
@@ -84,6 +132,9 @@ public enum BaseConnections {
 
 	@Nullable
 	private final String mcastGroup;
+	
+	@Nullable
+	private final String type;
 
 	@NotNull
 	public ProtocolProfiles getProtocol() {
@@ -113,6 +164,11 @@ public enum BaseConnections {
 	@Nullable
 	public String getMcastGroup() {
 		return mcastGroup;
+	}
+	
+	@Nullable
+	public String getType() {
+		return type;
 	}
 
 	public boolean requiresAuthentication() {

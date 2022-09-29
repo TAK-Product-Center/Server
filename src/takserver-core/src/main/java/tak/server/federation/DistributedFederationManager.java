@@ -4,6 +4,7 @@ package tak.server.federation;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.KeyStore;
@@ -52,6 +53,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 
+import com.atakmap.Tak.BinaryBlob;
 import com.atakmap.Tak.CRUD;
 import com.atakmap.Tak.ContactListEntry;
 import com.atakmap.Tak.FederatedEvent;
@@ -97,6 +99,8 @@ import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SSLConfig;
 import com.bbn.marti.service.Subscription;
 import com.bbn.marti.service.SubscriptionStore;
+import com.bbn.marti.sync.EnterpriseSyncService;
+import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
@@ -105,6 +109,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.SortedSetMultimap;
 import com.google.common.collect.TreeMultimap;
+import com.google.protobuf.ByteString;
 
 import io.micrometer.core.instrument.Metrics;
 import tak.server.Constants;
@@ -138,7 +143,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	private final AtomicReference<Messenger<CotEventContainer>> cotMessenger = new AtomicReference<>();
 
 	private static AtomicBoolean outgoingsInitiated = new AtomicBoolean();
-
+	
 	@SuppressWarnings("unchecked")
 	private Messenger<CotEventContainer> messenger() {
 		if (cotMessenger.get() == null) {
@@ -2034,12 +2039,60 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 		return coreConfig.getRemoteConfiguration().getFederation().getFederate();
 	}
-
+	
 	@Override
 	public void submitFederateROL(final ROL rol, final NavigableSet<Group> groups) {
+		
+		submitFederateROL(rol, groups, null);
+	}
+
+	@Override
+	public void submitFederateROL(ROL rol, final NavigableSet<Group> groups, String fileHash) {
 		if (logger.isDebugEnabled()) {
 			logger.debug("Federated ROL: " + rol.getProgram() + " groups: " + groups);
 		}
+		
+		
+		// Populate the file contents here in messaging if no content provided. Avoids serializing file over ignite
+		try {
+			if (rol.getPayloadList().isEmpty() && !Strings.isNullOrEmpty(fileHash)) {
+				
+		        String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
+				
+				// use the file hash to load the file from db / cache
+				byte[] fileBytes = MessagingDependencyInjectionProxy.getInstance().esyncService().getContentByHash(fileHash, groupVector);
+				
+				if (logger.isDebugEnabled()) {
+					if (fileBytes == null) {
+						logger.debug("null bytes for file " + fileHash);
+					} else {
+					
+					logger.debug("fetched " + fileBytes.length + " for hash " + fileHash);
+					
+					}
+				}
+				
+				BinaryBlob filePayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(fileBytes))).build();
+
+				ROL.Builder rolBuilder = rol.toBuilder();
+				
+				rolBuilder.addPayload(filePayload);
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("Added file payload size " + fileBytes.length + " bytes to rol");
+				}
+				
+				rol = rolBuilder.build();
+				
+			}
+		} catch (Exception e) {
+			if (logger.isWarnEnabled()) {
+				logger.warn("exception fetching file for federation from data layer", e);
+			}
+		}
+		
+		final ROL finalRol = rol;
+
 
 		try {
 
@@ -2068,7 +2121,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 									continue;
 								}
 
-								ROL.Builder builder = rol.toBuilder();
+								ROL.Builder builder = finalRol.toBuilder();
 
 								if (federate.isFederatedGroupMapping()) {
 									Set<String> outGroups = GroupFederationUtil.getInstance().filterFedOutboundGroups(

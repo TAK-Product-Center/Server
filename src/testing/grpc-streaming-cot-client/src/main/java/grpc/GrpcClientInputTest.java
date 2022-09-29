@@ -2,6 +2,7 @@ package grpc;
 
 import static io.grpc.MethodDescriptor.generateFullMethodName;
 
+import java.util.Date;
 import java.io.FileInputStream;
 import java.security.KeyStore;
 import java.util.concurrent.BlockingQueue;
@@ -20,7 +21,16 @@ import com.atakmap.Tak.InputChannelGrpc.InputChannelStub;
 import com.google.common.base.Strings;
 
 import atakmap.commoncommo.protobuf.v1.Takmessage;
+import atakmap.commoncommo.protobuf.v1.ContactOuterClass.Contact;
+import atakmap.commoncommo.protobuf.v1.Cotevent.CotEvent;
+import atakmap.commoncommo.protobuf.v1.DetailOuterClass.Detail;
+import atakmap.commoncommo.protobuf.v1.GroupOuterClass.Group;
+import atakmap.commoncommo.protobuf.v1.Precisionlocation.PrecisionLocation;
+import atakmap.commoncommo.protobuf.v1.StatusOuterClass.Status;
 import atakmap.commoncommo.protobuf.v1.Takmessage.TakMessage;
+import atakmap.commoncommo.protobuf.v1.Takmessage.TakMessage.Builder;
+import atakmap.commoncommo.protobuf.v1.TakvOuterClass.Takv;
+import atakmap.commoncommo.protobuf.v1.TrackOuterClass.Track;
 import io.grpc.ClientCall;
 import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
@@ -61,14 +71,14 @@ public class GrpcClientInputTest {
 
 	// TODO EDIT THESE TO FIT YOUR ENV
 	private final String host = "localhost";
-	private final int port = 30001;
+	private final int port = 8079;
 	private final String[] tlsVersions = { "TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3" };
 	// path to user cert to use for x509 auth: <usercert.jks>
-	private final String keystoreFile = "";
-	private final String keystorePassword = "";
+	private final String keystoreFile = "admin.jks" ;
+	private final String keystorePassword = "atakatak";
 	// path to trust store: <truststore.jks>
-	private final String truststoreFile = "";
-	private final String truststorePassword = "";
+	private final String truststoreFile = "truststore-root.jks";
+	private final String truststorePassword = "atakatak";
 
 	// Bounded Executor pool for grpc input server and channel builders
 	private final BlockingQueue<Runnable> workQueue = new BlockingArrayQueue<>(0, 1, 1000);
@@ -105,8 +115,8 @@ public class GrpcClientInputTest {
 		openSendStream();
 		openReceiveStream();
 
-		while (true) {
-		}
+		// keep the process running
+		while (true) {}
 	}
 
 	public void openSendStream() {
@@ -130,6 +140,8 @@ public class GrpcClientInputTest {
 
 			@Override
 			public void onReady() {
+				// send in an SA once the connection is good
+				clientCall.sendMessage(cot2protoBuf());
 			}
 
 		}, new Metadata());
@@ -145,7 +157,8 @@ public class GrpcClientInputTest {
 			@Override
 			public void onNext(Takmessage.TakMessage value) {
 				// ECHO
-				clientCall.sendMessage(value);
+				// clientCall.sendMessage(value);
+				System.out.println(value);
 			}
 
 			@Override
@@ -201,4 +214,51 @@ public class GrpcClientInputTest {
 				.trustManager(trustMgrFactory)
 				.build();
 	}
+
+    public TakMessage cot2protoBuf() {
+        try {
+            CotEvent.Builder cotEventBuilder = CotEvent.newBuilder();
+            cotEventBuilder.setType("a-f-G-U-C-I");
+            cotEventBuilder.setUid("GLIDER-909");
+            cotEventBuilder.setHow("h-g-i-g-o");
+            cotEventBuilder.setSendTime(new Date().getTime());
+            cotEventBuilder.setStartTime(new Date().getTime());
+            cotEventBuilder.setStaleTime(new Date().getTime());
+
+            cotEventBuilder.setLat(41.644598);
+            cotEventBuilder.setLon(-70.610919);
+            cotEventBuilder.setHae(9999999.0);
+            cotEventBuilder.setCe(9999999.0);
+            cotEventBuilder.setLe(9999999.0);
+            
+            Contact.Builder contactBuilder = Contact.newBuilder();
+            contactBuilder.setCallsign("glider909");
+            contactBuilder.setEndpoint("*:-1:stcp");
+            Contact contact = contactBuilder.build();
+            Detail.Builder detailBuilder = Detail.newBuilder();
+            detailBuilder.setContact(contact);
+
+            Group.Builder groupBuilder = Group.newBuilder();
+            groupBuilder.setName("Magenta");
+            groupBuilder.setRole("Team Member");
+
+            Group group = groupBuilder.build();
+            detailBuilder.setGroup(group);
+            
+            
+            Detail detail = detailBuilder.build();
+            cotEventBuilder.setDetail(detail);
+            
+            CotEvent cotEvent = cotEventBuilder.build();
+
+            TakMessage.Builder takMessageBuilder = TakMessage.newBuilder();
+            takMessageBuilder.setCotEvent(cotEvent);
+            TakMessage takMessage = takMessageBuilder.build();
+
+            return takMessage;
+        } catch (Exception e) {
+            System.out.println("exception in cot2protoBuf!" +  e);
+            return null;
+        }
+    }
 }

@@ -6,11 +6,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
-import java.rmi.RemoteException;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -34,6 +31,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.sync.Metadata.Field;
 import com.google.common.base.Strings;
+import com.google.common.io.ByteSource;
+import com.google.common.io.ByteStreams;
 
 import io.micrometer.core.instrument.Metrics;
 
@@ -49,6 +48,8 @@ public class UploadServlet extends EnterpriseSyncServlet {
 	private static final long serialVersionUID = -8151782550681449153L;
 	private static final int DEFAULT_PARAMETER_LENGTH = 1024;
 	private static Set<String> optionalParameters;
+	
+	private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UploadServlet.class);
 
 	@Autowired
 	private CoreConfig coreConfig;
@@ -72,7 +73,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 
 
 		uploadSizeLimitMB = coreConfig.getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
-		log.info("Enterprise Sync upload limit is " + uploadSizeLimitMB + " MB");
+		logger.info("Enterprise Sync upload limit is " + uploadSizeLimitMB + " MB");
 
 
 	}
@@ -113,9 +114,11 @@ public class UploadServlet extends EnterpriseSyncServlet {
 		try {
 			// Get group vector for the user associated with this session
 			groupVector = martiUtil.getGroupBitVector(request);
-			log.finer("groups bit vector: " + groupVector);
+			if (logger.isDebugEnabled()) {
+				logger.debug("groups bit vector: " + groupVector);
+			}
 		} catch (Exception e) {
-			log.fine("exception getting group membership for current web user " + e.getMessage());
+			logger.error("exception getting group membership for current user ", e);
 		}
 
 		if (Strings.isNullOrEmpty(groupVector)) {
@@ -174,24 +177,35 @@ public class UploadServlet extends EnterpriseSyncServlet {
 									field.maximumLength, true);
 						}
 					}
-					log.finer("Added " + field.toString() + " (" + values.length + ") values");
+					
+					if (logger.isDebugEnabled()) {
+						logger.debug("Added " + field.toString() + " (" + values.length + ") values");
+					}
 					metadataParameters.put(field, values);
 				}
 			}
 			Metadata toStore = Metadata.fromMap(metadataParameters);
 			toStore.validate(validator);
-			log.fine("Request is: " + toStore.toJSONObject().toJSONString());
-			log.fine("Content length is " + request.getContentLength());
+			
+			if (logger.isDebugEnabled()) {
+				logger.debug("Request is: " + toStore.toJSONObject().toJSONString());
+				logger.debug("Content length is " + request.getContentLength());
+			}
 
 			if (request.getContentLength() > uploadSizeLimitMB * 1000000) {
-				String message = "Uploaded file exceeds server's size limit of " + uploadSizeLimitMB 
-						+ " MB! (limit is set in server's conf/context.xml)";
-				log.warning(badRequestPrefix + message);
+				String message = "Uploaded file exceeds server's size limit of " + uploadSizeLimitMB + " MB! (limit is set in CoreConfig.xml network.enterpriseSyncSizeLimitMB";
+				
+				if (logger.isWarnEnabled()) {
+					logger.warn(badRequestPrefix + message);
+				}
 				response.sendError(HttpServletResponse.SC_BAD_REQUEST, message);
 				return;
 			} else if (request.getContentLength() < 1) {
 				String message = "HTTP request body has no content.";
-				log.warning(badRequestPrefix + message);
+				
+				if (logger.isWarnEnabled()) {
+					logger.warn(badRequestPrefix + message);
+				}
 				response.sendError(HttpServletResponse.SC_BAD_REQUEST, message);
 				return;
 			}
@@ -204,11 +218,26 @@ public class UploadServlet extends EnterpriseSyncServlet {
 			String mimeType = request.getHeader("Content-Type");
 
 			if (mimeType == null || !mimeType.contains("multipart/form-data")) {
-				log.fine("Uploading content.");
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("Uploading content.");
+				}
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("reading payload from request");
+				}
+				
 				payload = readByteArray(request.getInputStream());
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("done reading payload from request - size: " + payload.length + " bytes");
+				}
 			} else {
 				Collection<Part> parts = request.getParts();
-				log.fine("Uploading multi-part content with " + parts.size() + " parts.");
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("Uploading multi-part content with " + parts.size() + " parts.");
+				}
 				// ATAK sends a part called "assetfile"
 				Part part = request.getPart("assetfile");
 				if (part == null) {
@@ -218,13 +247,26 @@ public class UploadServlet extends EnterpriseSyncServlet {
 
 				if (part != null) {
 					try(InputStream is = part.getInputStream()) {
+						
+						if (logger.isDebugEnabled()) {
+							logger.debug("reading payload from request");
+						}
 						payload = readByteArray(is);
+						
+						if (logger.isDebugEnabled()) {
+							logger.debug("done reading payload from request - size: " + payload.length + " bytes");
+						}
 					}
 				} else {
 					for (Part myPart : parts) {
-						log.finer(myPart.getName() + ": " + myPart.getContentType() );
+						if (logger.isDebugEnabled()) {
+							logger.debug(myPart.getName() + ": " + myPart.getContentType() );
+						}
 					}
-					log.severe("Unable to find content in multi-part submission");
+					
+					if (logger.isErrorEnabled()) {
+						logger.error("Unable to find content in multi-part submission");
+					}
 					response.sendError(HttpServletResponse.SC_BAD_REQUEST,
 							"Upload request was not formatted in a way Marti can understand.\n"
 									+ "Please try a different browser.");
@@ -233,7 +275,10 @@ public class UploadServlet extends EnterpriseSyncServlet {
 
 				// Get the file name from the part's content-disposition header if possible
 				String cd = part.getHeader("content-disposition");
-				log.fine("content-disposition is: " + cd);
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("content-disposition is: " + cd);
+				}
 				String filenameToken = "filename=\"";
 				if (cd != null && cd.contains(filenameToken)) {
 					int filenameIndex = cd.indexOf(filenameToken);
@@ -271,17 +316,28 @@ public class UploadServlet extends EnterpriseSyncServlet {
 				toStore.set(Metadata.Field.SubmissionUser, userName);
 			}
 
-			uploadedMetadata = enterpriseSyncService.insertResource(toStore, payload, groupVector);
+			if (logger.isDebugEnabled()) {
+				logger.debug("inserting resource " + toStore + " payload length: " +  payload.length);
+			}
+			uploadedMetadata = enterpriseSyncService.insertResource(toStore, payload, groupVector); // do not validate file length, as that's already checked above 
 			Metrics.counter("UploadMissionContent", "missions", "content").increment();
 		} catch (NamingException|SQLException ex) {
-			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-					"Enterprise Sync database failed to process write operation.");
-			ex.printStackTrace();
+			String msg = "Enterprise Sync database failed to process write operation.";
+			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, msg);
+			
+			if (logger.isErrorEnabled()) {
+				logger.error(msg, ex);
+			}
 			return;
 		} catch (ServletException srvex) {
 			// Thrown by request.getPart if request is not a well-formed 
-			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Unparseable multi-part content in request.");
-			srvex.printStackTrace();
+			
+			String msg = "Unparseable multi-part content in request.";
+			
+			response.sendError(HttpServletResponse.SC_BAD_REQUEST, msg);
+			if (logger.isErrorEnabled()) {
+				logger.error(msg, srvex);
+			}
 			return;
 		} catch (IOException ioex) {
 			String errorMessage;
@@ -289,27 +345,41 @@ public class UploadServlet extends EnterpriseSyncServlet {
 			if (request.getContentLength() == 0) {
 				responseCode = HttpServletResponse.SC_BAD_REQUEST;
 				errorMessage = "POST request contained no data!";
-				log.warning(badRequestPrefix + errorMessage);
+				if (logger.isWarnEnabled()) {
+					logger.warn(badRequestPrefix + errorMessage, ioex);
+				}
 			} else {
 				responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 				errorMessage = "Failed to read data from HTTP POST body";
-				ioex.printStackTrace();
+				
+				if (logger.isErrorEnabled()) {
+					logger.error(errorMessage, ioex);
+				}
 			}
 			response.sendError(responseCode, errorMessage);
 			return;
 
 		} catch (ValidationException ex) {
-			log.warning(badRequestPrefix + ex.getLogMessage());
+			if (logger.isWarnEnabled()) {
+				logger.warn(badRequestPrefix + ex.getLogMessage());
+			}
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST, 
 					"Illegal characters detected. Accents and most punctuation characters are not allowed for security.");
 			return;
 		} catch (IntrusionException evilException) {
-			log.severe("Intrusion attempt from " + remoteHost + ": " + evilException.getLogMessage());
+			if (logger.isErrorEnabled()) {
+				logger.error("Intrusion attempt from " + remoteHost + ": ", evilException);
+			}
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Intrusion attempt detected! HTTP request denied.");
 			return;
 		} 
 
 		PrintWriter writer = response.getWriter();
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("response: " + response + " uploadedMetadata: " + uploadedMetadata);
+		}
+		
 		writer.print(uploadedMetadata.toJSONObject());
 		writer.close();
 		if (response.containsHeader("Content-Type")) {
@@ -329,8 +399,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 	}
 
 	/**
-	 * Utility method that reads a byte array from an input stream. This
-	 * implementation is not efficient.
+	 * Utility method that reads a byte array from an input stream using Guava.
 	 * 
 	 * @param in
 	 *            any InputStream containing some data
@@ -339,18 +408,9 @@ public class UploadServlet extends EnterpriseSyncServlet {
 	 * @throws IOException
 	 *             if a read error occurs
 	 */
-	public static byte[] readByteArray(InputStream in) throws IOException {
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		int value = in.read();
-
-		while (value != -1) {
-			out.write(value);
-			value = in.read();
-		}
-
-		out.flush();
-		out.close();
-		return out.toByteArray();
+	private byte[] readByteArray(InputStream in) throws IOException {
+	    
+	    return ByteStreams.toByteArray(in);
 	}
 
 	@Override

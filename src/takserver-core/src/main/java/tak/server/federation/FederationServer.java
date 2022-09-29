@@ -2,6 +2,9 @@ package tak.server.federation;
 
 import static java.util.Objects.requireNonNull;
 
+import com.bbn.marti.config.Federation.Federate;
+import com.bbn.marti.config.Federation.FederateCA;
+
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -70,9 +73,7 @@ import com.atakmap.Tak.ServerHealth;
 import com.atakmap.Tak.Subscription;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.Federation;
-import com.bbn.marti.config.Federation.Federate;
-import com.bbn.marti.config.Federation.FederateCA;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.groups.CommonGroupDirectedReachability;
 import com.bbn.marti.groups.GroupFederationUtil;
@@ -280,7 +281,7 @@ public class FederationServer {
 			serverConfig.setTruststoreFile(fedServerConfig.getTls().getTruststoreFile());
 			serverConfig.setTruststorePass(fedServerConfig.getTls().getTruststorePass());
 			serverConfig.setSkipGateway(true); // eliminate this
-			serverConfig.setMaxMessageSizeBytes(134217728); // put in coreconfig
+			serverConfig.setMaxMessageSizeBytes(fedConfig().getFederationServer().getMaxMessageSizeBytes()); // put in coreconfig
 			serverConfig.setMetricsLogIntervalSeconds(60); // put in coreconfig
 			serverConfig.setClientTimeoutTime(15); // put in coreconfig
 			serverConfig.setClientRefreshTime(5); // put in coreconfig
@@ -338,10 +339,6 @@ public class FederationServer {
 
 		try {
 			requireNonNull(config, "v2 fed configuration object");
-
-			if (logger.isDebugEnabled()) {
-				logger.debug("v2 fed configuration: " + config);
-			}
 
 			sslConfig = new SSLConfig();
 
@@ -1461,7 +1458,7 @@ public class FederationServer {
 							logger.debug("submitting federated mission package announcement: " + announceCotResult + " groups " + groups + " to submission service.");
 						}
 
-						submission.submitCot(announceCotResult.getAnnoucement(), announceCotResult.getUids(), announceCotResult.getCallsigns(), groups, false);
+						submission.submitCot(announceCotResult.getAnnoucement(), announceCotResult.getUids(), announceCotResult.getCallsigns(), groups, false, false);
 
 					} catch (Exception e) {
 						logger.warn("exception processing federated mission package announcement.", e);

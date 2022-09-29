@@ -309,7 +309,7 @@ dataRetentionControllers.controller('MissionArchiveCtrl', [
     ) {
 
         $scope.missions = {}
-        $scope.missions.missonArchiveStoreEntries = []
+        $scope.missions.missionArchiveStoreEntries = []
 
         $scope.missions.queryMissionName = ''
         $scope.missions.queryCreateTime = ''
@@ -319,11 +319,11 @@ dataRetentionControllers.controller('MissionArchiveCtrl', [
             $window.location.href = '/Marti/data_retention/index.html#!/';
         }
 
-        $scope.restoreMission = function(missonArchiveStoreEntry) {
-            $scope.missions.missonArchiveStoreEntries = $scope.missions.missonArchiveStoreEntries.filter(function(entry, index, arr) { 
-                return entry.id !== missonArchiveStoreEntry.id;
+        $scope.restoreMission = function(missionArchiveStoreEntry) {
+            $scope.missions.missionArchiveStoreEntries = $scope.missions.missionArchiveStoreEntries.filter(function(entry, index, arr) {
+                return entry.id !== missionArchiveStoreEntry.id;
             });
-            MissionRestoreService.save(missonArchiveStoreEntry.id,
+            MissionRestoreService.save(missionArchiveStoreEntry.id,
                 function(apiResponse) {
                     alert(apiResponse.data)
                 }
@@ -332,11 +332,11 @@ dataRetentionControllers.controller('MissionArchiveCtrl', [
 
         MissionArchiveService.query(res =>{
             let data = JSON.parse(res.data)
-            if (data && data.missonArchiveStoreEntries) {
-                $scope.missions.missonArchiveStoreEntries = data.missonArchiveStoreEntries;
-                console.log($scope.missonArchiveStoreEntries)
+            if (data && data.missionArchiveStoreEntries) {
+                $scope.missions.missionArchiveStoreEntries = data.missionArchiveStoreEntries;
+                console.log($scope.missionArchiveStoreEntries)
             } else {
-                $scope.missions.missonArchiveStoreEntries = []   
+                $scope.missions.missionArchiveStoreEntries = []
             }
          })
 
@@ -373,7 +373,7 @@ dataRetentionControllers.controller('MissionArchiveCtrl', [
 
         $scope.archiveMissionByNoContentActivity = false;
         $scope.archiveMissionByNoSubscriptionActivity = false;
-        $scope.archiveAfterNoActivityDays = 365;
+        $scope.timeToArchiveAfterNoActivityDays = 365;
         $scope.removeFromArchiveAfterDays = 1065;
 
         MissionArchiveConfigService.query(

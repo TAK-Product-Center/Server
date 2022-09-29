@@ -32,7 +32,7 @@ import com.bbn.marti.nio.channel.connections.TcpChannelHandler;
 import com.bbn.marti.nio.protocol.connections.StreamingProtoBufProtocol;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 
 import tak.server.cot.CotEventContainer;

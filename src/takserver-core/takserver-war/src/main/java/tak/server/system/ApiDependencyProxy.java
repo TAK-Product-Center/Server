@@ -8,6 +8,7 @@ import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.repository.MissionRoleRepository;
 
+import tak.server.PluginManager;
 import tak.server.cache.CoTCacheHelper;
 
 public class ApiDependencyProxy implements ApplicationContextAware {
@@ -93,5 +94,6 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		}
 
 		return cotCacheHelper;
-	}	
+	}
+	
 }

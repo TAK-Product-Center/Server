@@ -97,6 +97,7 @@ public class Constants {
 
 	// distributed cache / messaging names (ignite)
 	public static final String ALL_MISSION_CACHE = "allMissionCache";
+	public static final String ALL_COPS_MISSION_CACHE = "allCopsMissionCache";
 	public static final String MISSION_ROLE_CACHE = "missionRoleCache";
 	public static final String MISSION_SUBSCRIPTION_CACHE = "missionSubscriptionCache";
 	public static final String ENTERPRISE_SYNC_CACHE_NAME = "enterprise-sync-cache";
@@ -114,6 +115,7 @@ public class Constants {
 	public static final String LATEST_COT_CACHE = "latest-cot-cache";
 	public static final String CLIENT_MSG_TS_CACHE = "client-msg-ts-cache";
 	public static final String CERTIFICATE_CACHE = "certificate-cache";
+	public static final String VIDEO_CACHE = "video-cache";
 
 	// distributed message topics (ignite)
 	public static final String SUBMISSION_TOPIC_BASE = "submission-topic-";
@@ -146,20 +148,22 @@ public class Constants {
 	public static final String DEFAULT_FLOWTAG_TEXT = "marti";
 	public static final String USER_KEY = "user";
 	public static final String GROUPS_KEY = "groups";
+	public static final String GROUPS_BIT_VECTOR_KEY = "groups.bit.vector";
 	public static final String NOFEDV2_KEY = "nofedv2";
 	public static final String REPEATER_KEY = "repeater";
 	public static final String TOPICS_KEY = "topics";
 	public static final String OFFLINE_CHANGE_TIME_KEY = "offlineChangeTime";
 	public static final String CLIENT_UID_KEY = "clientUid";
 	public static final String DO_NOT_BROKER_KEY = "brokering.needed";
-	public static final String ARCHIVE_EVENT_KEY = "respository.archive";
+	public static final String ARCHIVE_EVENT_KEY = "respository.archive"; // value is a Boolean
 	public static final String SUBSCRIBER_HITS_KEY = "SUBSCRIBER_HITS_KEY";
 	public static final String CONNECTION_ID_KEY = "connection.id";
 	public static final String COT_MESSENGER_TOPIC_KEY = "tak.messenger.topic";
 	public static final String PROCESSED_COUNT = "processed.count";
-	public static final String MESSAGING_ARCHIVER = "messaging.archiver";
+	public static final String MESSAGING_ARCHIVER = "messaging.archiver"; // value is a String
 	public static final String PLUGIN_PROVENANCE = "plugin.provenance";
 	public static final String STORE_FORWARD_KEY = "storeforward";
+	public static final String DATA_FEED_KEY = "data.feed";
 
 	// Grid Service Names
 	public static final String DISTRIBUTED_FEDERATION_MANAGER = "distributed-federation-manager";
@@ -181,6 +185,10 @@ public class Constants {
 	public static final String DISTRIBUTED_RETENTION_POLICY_CONFIGURATION = "distributed-retention-policy-configuration";
 	public static final String DISTRIBUTED_MISSION_ARCHIVE_MANAGER = "distributed-mission-archive-manager";
 	public static final String DISTRIBUTED_QOS_MANAGER = "distributed-qos-manager";
+	public static final String DISTRIBUTED_SYSTEM_INFO_API = "distributed-system-info-api";
+    public static final String DISTRIBUTED_PLUGIN_DATA_FEED_API = "distributed-plugin-data-feed-api";
+    public static final String DISTRIBUTED_PLUGIN_API = "plugin-api";
+    public static final String DISTRIBUTED_PLUGIN_SELF_STOP_API = "distributed-plugin-self-stop-api";
 
     // Bean Names
     public static final String DISTRIBUTED_COT_MESSENGER = "cotMessenger";
@@ -235,7 +243,9 @@ public class Constants {
     public static final String METRIC_CLIENT_DISCONNECT = "client.disconnect";
     
     public static final String METRIC_REPOSITORY_QUEUE_FULL_SKIP = "message.repository.q.skip";
-
-
+    
+    // Provenance keys used in Message
+    public static final String PLUGIN_MANAGER_PROVENANCE = "PluginManager";
+    public static final String PLUGIN_INTERCEPTOR_PROVENANCE = "PluginInterceptor";
     
 }

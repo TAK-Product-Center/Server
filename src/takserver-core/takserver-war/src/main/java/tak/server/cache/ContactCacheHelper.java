@@ -3,10 +3,10 @@ package tak.server.cache;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import javax.annotation.PostConstruct;
+
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.context.event.EventListener;
 
 import com.bbn.marti.remote.ClientEndpoint;
 import com.bbn.marti.remote.CoreConfig;
@@ -24,7 +24,7 @@ public class ContactCacheHelper {
 	@Autowired
 	private CoreConfig config;
 
-	@EventListener({ContextRefreshedEvent.class})
+	@PostConstruct
 	public void init() {
 
 		if (log.isDebugEnabled()) {
@@ -54,7 +54,7 @@ public class ContactCacheHelper {
 		return contactCache;
 	}
 
-	public String getKeyGetCachedClientEndpointData(boolean connected, boolean recent) {
-		return "getCachedClientEndpointData_" + connected + "_" + recent;
+	public String getKeyGetCachedClientEndpointData(boolean connected, boolean recent, long secAgo) {
+		return "getCachedClientEndpointData_" + connected + "_" + recent + "_" + secAgo;
 	}
 }

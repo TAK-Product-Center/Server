@@ -36,7 +36,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 
 import tak.server.cot.XmlContainer;
 import tak.server.retention.config.MissionArchiveStoreConfig;
-import tak.server.retention.config.MissionArchiveStoreConfig.MissonArchiveStoreEntry;
+import tak.server.retention.config.MissionArchiveStoreConfig.MissionArchiveStoreEntry;
 
 public class MissionArchiveHelper {
 	
@@ -46,16 +46,16 @@ public class MissionArchiveHelper {
 	private static final String MISSION_STORE_FILE = ARCHIVE_DIR + "mission-store.yml";
 
 	@Autowired
-	private MissionArchiveStoreConfig missionArchiveStore;
+	MissionArchiveStoreConfig missionArchiveStore;
 	
 	@Autowired
 	RetentionQueryService retentionQueryService;
 	
 	public void removeExpiredArchiveEntries(double ttlDays) {
-		List<MissonArchiveStoreEntry> entriesToRemove = new ArrayList<>();
-		List<MissonArchiveStoreEntry> entriesToKeep = new ArrayList<>();
+		List<MissionArchiveStoreEntry> entriesToRemove = new ArrayList<>();
+		List<MissionArchiveStoreEntry> entriesToKeep = new ArrayList<>();
 		
-        missionArchiveStore.getMissonArchiveStoreEntries().forEach(missionArchiveStoreEntry-> {
+        missionArchiveStore.getMissionArchiveStoreEntries().forEach(missionArchiveStoreEntry-> {
         	double msInArchive = new Date().getTime() - Double.valueOf(missionArchiveStoreEntry.getArchiveTimeMs());
         	double daysInArchive = msInArchive / 1000 / 60 / 60 / 24;
         	if (daysInArchive > ttlDays) {		
@@ -67,14 +67,14 @@ public class MissionArchiveHelper {
         
         if (entriesToRemove.size() == 0) return;
         
-        missionArchiveStore.setMissonArchiveStoreEntries(entriesToKeep);
+        missionArchiveStore.setMissionArchiveStoreEntries(entriesToKeep);
         
         try {
         	ObjectMapper mapper = new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
 	        File file = new File(MISSION_STORE_FILE);
 	        
 	        MissionArchiveStoreConfig newMissionArchiveStoreConfig = new MissionArchiveStoreConfig();
-	        newMissionArchiveStoreConfig.setMissonArchiveStoreEntries(entriesToKeep);
+	        newMissionArchiveStoreConfig.setMissionArchiveStoreEntries(entriesToKeep);
 			mapper.writeValue(file, newMissionArchiveStoreConfig);
 			
 			logger.info("Removed Expired Mission Archive Entries " + Arrays.toString(entriesToRemove.toArray()));
@@ -95,7 +95,7 @@ public class MissionArchiveHelper {
 	public String getMissionStoreJson() {
 		try {
 			MissionArchiveStoreConfig newMissionArchiveStoreConfig = new MissionArchiveStoreConfig();
-            newMissionArchiveStoreConfig.setMissonArchiveStoreEntries(missionArchiveStore.getMissonArchiveStoreEntries());
+            newMissionArchiveStoreConfig.setMissionArchiveStoreEntries(missionArchiveStore.getMissionArchiveStoreEntries());
 	
 			ObjectMapper jsonWriter = new ObjectMapper();
 			return jsonWriter.writeValueAsString(newMissionArchiveStoreConfig);
@@ -132,13 +132,13 @@ public class MissionArchiveHelper {
     
     public String restoreMissionFromArchive(int id) {
 		try {
-			Optional<MissonArchiveStoreEntry> matchingEntryOp = missionArchiveStore.getMissonArchiveStoreEntries().stream().filter(m->m.getId() == id).findFirst();
+			Optional<MissionArchiveStoreEntry> matchingEntryOp = missionArchiveStore.getMissionArchiveStoreEntries().stream().filter(m->m.getId() == id).findFirst();
 			
 			if (!matchingEntryOp.isPresent()) {
 				return "Mission to restore not found in mission index";
 			}
 					
-			MissonArchiveStoreEntry matchingEntry = matchingEntryOp.get();
+			MissionArchiveStoreEntry matchingEntry = matchingEntryOp.get();
 			String filename = ARCHIVE_DIR + matchingEntry.getCreateTime() + "_" + matchingEntry.getMissionName() + ".zip";
 			
 			Map<String, byte[]> files = new HashMap<>();
@@ -217,9 +217,9 @@ public class MissionArchiveHelper {
 		        File file = new File(MISSION_STORE_FILE);
 				
 				// remove the mission from the mission store index			
-				missionArchiveStore.getMissonArchiveStoreEntries().remove(matchingEntry);
+				missionArchiveStore.getMissionArchiveStoreEntries().remove(matchingEntry);
 				MissionArchiveStoreConfig newMissionArchiveStoreConfig = new MissionArchiveStoreConfig();
-		        newMissionArchiveStoreConfig.setMissonArchiveStoreEntries(missionArchiveStore.getMissonArchiveStoreEntries());
+		        newMissionArchiveStoreConfig.setMissionArchiveStoreEntries(missionArchiveStore.getMissionArchiveStoreEntries());
 		        mapper.writeValue(file, newMissionArchiveStoreConfig);
 				
 				// lastly, remove the zip archive file
@@ -251,17 +251,17 @@ public class MissionArchiveHelper {
         try {
             File file = new File(MISSION_STORE_FILE);
 
-            MissonArchiveStoreEntry missonArchiveStoreEntry = new MissonArchiveStoreEntry();
-            missonArchiveStoreEntry.setMissionName(missionName);
-            missonArchiveStoreEntry.setCreateTimeMs(String.valueOf(createTime.getTime()));
-            missonArchiveStoreEntry.setArchiveTimeMs(String.valueOf(archiveTime.getTime()));
-            missonArchiveStoreEntry.setCreateTime(createTime.toString().replace(":", "-"));
-            missonArchiveStoreEntry.setArchiveTime(archiveTime.toString().replace(":", "-"));
-            missonArchiveStoreEntry.setId(filename.hashCode());
-            missionArchiveStore.addMissionEntry(missonArchiveStoreEntry);
+            MissionArchiveStoreEntry missionArchiveStoreEntry = new MissionArchiveStoreEntry();
+            missionArchiveStoreEntry.setMissionName(missionName);
+            missionArchiveStoreEntry.setCreateTimeMs(String.valueOf(createTime.getTime()));
+            missionArchiveStoreEntry.setArchiveTimeMs(String.valueOf(archiveTime.getTime()));
+            missionArchiveStoreEntry.setCreateTime(createTime.toString().replace(":", "-"));
+            missionArchiveStoreEntry.setArchiveTime(archiveTime.toString().replace(":", "-"));
+            missionArchiveStoreEntry.setId(filename.hashCode());
+            missionArchiveStore.addMissionEntry(missionArchiveStoreEntry);
             
             MissionArchiveStoreConfig newMissionArchiveStoreConfig = new MissionArchiveStoreConfig();
-            newMissionArchiveStoreConfig.setMissonArchiveStoreEntries(missionArchiveStore.getMissonArchiveStoreEntries());
+            newMissionArchiveStoreConfig.setMissionArchiveStoreEntries(missionArchiveStore.getMissionArchiveStoreEntries());
             
             mapper.writeValue(file, newMissionArchiveStoreConfig);
         } catch (Exception e) {

@@ -1,5 +1,11 @@
 package tak.server.plugins.manager.loader;
 
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -13,6 +19,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 
 import tak.server.PluginRegistry;
@@ -21,9 +28,11 @@ import tak.server.plugins.MessageReceiver;
 import tak.server.plugins.MessageSender;
 import tak.server.plugins.MessageSenderReceiver;
 import tak.server.plugins.MessageSenderReceiverBase;
+import tak.server.plugins.PluginBase;
 import tak.server.plugins.PluginInfo;
 import tak.server.plugins.PluginsLoadedEvent;
 import tak.server.plugins.TakServerPlugin;
+import tak.server.plugins.TakServerPluginVersion;
 
 public class PluginLoader {
 
@@ -79,17 +88,93 @@ public class PluginLoader {
 				if (Strings.isNullOrEmpty(name)) {
 					name = bd.getBeanClassName();
 				}
-
+				
 				UUID id = UUID.randomUUID();
 
 				pluginInfo.setName(name);
 				pluginInfo.setDescription(description);
 				pluginInfo.setClassName(clazz.getName());
 				pluginInfo.setId(id); // TODO: unique id strategy - based on fully qualified class name?
+				
+				PluginSystemConfiguration pluginSytemConfiguration = new PluginSystemConfiguration(clazz);
 
+				// get the plugin's isEnabled property from the Plugin Configuration file if it exists
+				Boolean isEnabled = true;
+				if (pluginSytemConfiguration.containsProperty(PluginSystemConfiguration.PLUGIN_ENABLED_PROPERTY)) {
+					logger.debug("Plugin configuration contain {}", PluginSystemConfiguration.PLUGIN_ENABLED_PROPERTY);
+					isEnabled = (Boolean)pluginSytemConfiguration.getProperty(PluginSystemConfiguration.PLUGIN_ENABLED_PROPERTY);
+				}else {
+					logger.debug("Plugin configuration does NOT contain {}", PluginSystemConfiguration.PLUGIN_ENABLED_PROPERTY);
+				}
+				pluginInfo.setEnabled(isEnabled);
+				logger.info("Set isEnabled for plugin {} to {}", clazz, isEnabled);
+				pluginInfo.setStarted(false); // Not yet started
+				
+				// get the archiveEnabled property from the Plugin Configuration file if it exists
+				Boolean archiveEnabled = true;
+				if (pluginSytemConfiguration.containsProperty(PluginSystemConfiguration.ARCHIVE_ENABLED_PROPERTY)) {
+					logger.debug("Plugin configuration contain {}", PluginSystemConfiguration.ARCHIVE_ENABLED_PROPERTY);
+					archiveEnabled = (Boolean)pluginSytemConfiguration.getProperty(PluginSystemConfiguration.ARCHIVE_ENABLED_PROPERTY);
+				}else {
+					logger.debug("Plugin configuration does NOT contain {}", PluginSystemConfiguration.ARCHIVE_ENABLED_PROPERTY);
+				}
+				pluginInfo.setArchiveEnabled(archiveEnabled); 
+				logger.info("Set archiveEnabled for plugin {} to {}", clazz, archiveEnabled);
+				
 				// instantiate plugin
 				Object pluginInstance = clazz.newInstance();
+				
+				// set version from file. this will be overridden if version annotations are found
+				Integer major = null;
+				Integer minor = null;
+				Integer patch = 0;
+				String hash = null;
+				String tag = null;
+				if (pluginInstance instanceof PluginBase) {
+					try {
+						String path = pluginInstance.getClass().asSubclass(pluginInstance.getClass()).getProtectionDomain()
+								.getCodeSource().getLocation().getPath();
+						String decodedPath = URLDecoder.decode(path, "UTF-8");
+						URL url = loadResources("ver.json", decodedPath);
 
+						Map<String, Object> result = new ObjectMapper().readValue(url.openStream(), HashMap.class);
+						
+						if (result.get("major") != null) {
+							major = (Integer) result.get("major");
+						}
+						if (result.get("minor") != null) {
+							minor = (Integer) result.get("minor");
+						}
+						if (result.get("patch") != null) {
+							patch = (Integer) result.get("patch");
+						}
+						if (result.get("hash") != null) {
+							hash = (String) result.get("hash");
+						}	
+						if (result.get("branch") != null) {
+							tag = (String) result.get("branch");
+						}
+					} catch (Exception e) {
+						logger.error("Could not load version file. Consider upgrding the plugin: " + name, e);
+					}
+				}
+				
+				TakServerPluginVersion pluginVersionAnnotation = clazz.getAnnotation(TakServerPluginVersion.class);
+				if (pluginVersionAnnotation != null) {
+					if (pluginVersionAnnotation.major() != -1) major = pluginVersionAnnotation.major();
+					if (pluginVersionAnnotation.minor() != -1) minor = pluginVersionAnnotation.minor();
+					if (pluginVersionAnnotation.patch() != -1) patch = pluginVersionAnnotation.patch();
+					if (!"".equals(pluginVersionAnnotation.commitHash())) hash = pluginVersionAnnotation.commitHash();
+					if (!"".equals(pluginVersionAnnotation.tag())) tag = pluginVersionAnnotation.tag();
+				}
+				
+				if (major != null && minor != null && patch != null && hash != null) {
+					pluginInfo.setVersion(major + "." + minor + "." + patch + "." + hash);
+				}
+				if (tag != null) {
+					pluginInfo.setTag(tag);
+				}
+				
 				if (pluginInstance instanceof MessageSenderReceiverBase) {
 				    MessageSenderReceiver senderReceiverInstance = (MessageSenderReceiver) pluginInstance;
 
@@ -98,10 +183,10 @@ public class PluginLoader {
 				    context.registerBean(id.toString(), MessageSenderReceiver.class, () -> senderReceiverInstance);
 				    pluginInfo.setSender(true);
 				    pluginInfo.setReceiver(true);
-				    pluginInfo.setEnabled(true);
 
-				    logger.info("registered sender-receiver plugin " + senderReceiverInstance + " name: " + name + " description: " + description);
 				    senderReceiverInstance.setPluginInfo(pluginInfo);
+
+					logger.info("Registered sender-receiver plugin instance: {}, name: {}", senderReceiverInstance, name);
 
 				} else if (pluginInstance instanceof MessageSender) {
 
@@ -113,11 +198,10 @@ public class PluginLoader {
 					context.registerBean(id.toString(), MessageSender.class, () -> senderPluginInstance);
 
 					pluginInfo.setSender(true);
-					pluginInfo.setEnabled(true);
 
 					senderPluginInstance.setPluginInfo(pluginInfo);
 
-					logger.info("registered sender plugin " + senderPluginInstance + " name: " + name + " description" + description);
+					logger.info("Registered sender plugin instance: {}, name: {}", senderPluginInstance, name);
 
 				} else if (pluginInstance instanceof MessageReceiver) {
 
@@ -129,11 +213,10 @@ public class PluginLoader {
 					context.registerBean(id.toString(), MessageReceiver.class, () -> receiverPluginInstance);
 
 					pluginInfo.setReceiver(true);
-					pluginInfo.setEnabled(true);
 
 					receiverPluginInstance.setPluginInfo(pluginInfo);
 
-					logger.info("registered receiver plugin " + receiverPluginInstance);
+					logger.info("Registered receiver plugin instance: {}, name: {}", receiverPluginInstance, name);
 
 				} else if (pluginInstance instanceof MessageInterceptor) {
 
@@ -145,11 +228,10 @@ public class PluginLoader {
 					context.registerBean(id.toString(), MessageInterceptor.class, () -> interceptorPluginInstance);
 
 					pluginInfo.setInterceptor(true);
-					pluginInfo.setEnabled(true);
 
 					interceptorPluginInstance.setPluginInfo(pluginInfo);
 
-					logger.info("registered interceptor plugin " + interceptorPluginInstance);
+					logger.info("Registered interceptor plugin instance: {}, name: {}", interceptorPluginInstance, name);
 
 				} else {
 					logger.error("Skipping invalid plugin type " + pluginInstance.getClass().getName());
@@ -171,4 +253,15 @@ public class PluginLoader {
 		// get spring to set properties now
 		applicationEventPublisher.publishEvent(new PluginsLoadedEvent(this, "plugins loaded"));
 	}
+	
+	 public static URL loadResources(String name, String path) throws IOException {
+	        final Enumeration<URL> systemResources = PluginBase.class.getClassLoader().getResources(name);
+	        while (systemResources.hasMoreElements()) {
+	        	URL url = systemResources.nextElement();
+	        	if (url.getPath().toLowerCase().contains(path.toLowerCase())) {
+	        		return url;
+	        	}
+	        }
+			return null; 
+	    }
 }

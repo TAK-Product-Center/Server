@@ -1,0 +1,1 @@
+ALTER TABLE public.mission ADD COLUMN last_edited timestamp(3) with time zone;

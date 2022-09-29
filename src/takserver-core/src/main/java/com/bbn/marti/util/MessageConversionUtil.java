@@ -37,12 +37,11 @@ import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 
 import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.remote.ContactManager;
 import com.bbn.marti.remote.InputMetric;
-import com.bbn.marti.remote.MessagingConfigurator;
 import com.bbn.marti.remote.RemoteContact;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.socket.ChatMessage;

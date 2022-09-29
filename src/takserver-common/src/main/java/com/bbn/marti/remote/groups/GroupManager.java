@@ -156,7 +156,7 @@ public interface GroupManager {
      * @return List<LdapGroup> instances
      * @throws RemoteException
      */
-    List<LdapGroup> searchGroups(String groupNameFilter);
+    List<LdapGroup> searchGroups(String groupNameFilter, boolean exactMatch);
 
     /*
      * lookup an ldap user

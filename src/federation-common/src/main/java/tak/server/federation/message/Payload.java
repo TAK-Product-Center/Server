@@ -12,7 +12,6 @@ package tak.server.federation.message;
  * the payload must have a zero-argument constructor and be able to set its payload through setBytes. 
  * @see PayloadSerializationPlugin
  * 
- * 
  */
 public interface Payload<X> {
 	

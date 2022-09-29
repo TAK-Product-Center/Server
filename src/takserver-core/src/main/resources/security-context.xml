@@ -74,9 +74,15 @@
 		<property name="securityMetadataSource">
 			<sec:filter-security-metadata-source request-matcher="ant" use-expressions="false">
 			
+			  <!-- plugin data API -->
+			  <sec:intercept-url pattern="/Marti/api/plugins/*/submit" access="ROLE_ANONYMOUS"/>
+			
 			  <!-- require admin access for user manager -->
 	  	      <sec:intercept-url pattern="/users/**" access="ROLE_ADMIN" />
 	  	      
+			  <!--  set data feed security -->
+	  	      <sec:intercept-url pattern="/Marti/api/datafeeds/**" access="ROLE_ANONYMOUS" />
+
 	  	      <!--  set input manager security -->
 	  	      <sec:intercept-url pattern="/Marti/api/inputs/**" access="ROLE_ADMIN" />
 	  	      <sec:intercept-url pattern="/Marti/api/inputs/**" method="DELETE" access="ROLE_ADMIN" />
@@ -173,6 +179,7 @@
 			  <sec:intercept-url pattern="/Marti/api/tls/makeClientKeyStore" access="ROLE_NO_CLIENT_CERT" />
 			  <sec:intercept-url pattern="/Marti/api/tls/config" access="ROLE_NO_CLIENT_CERT" />
 			  <sec:intercept-url pattern="/Marti/api/tls/signClient" access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/Marti/api/tls/signClient/v2" access="ROLE_NO_CLIENT_CERT" />
 			  <sec:intercept-url pattern="/Marti/api/tls/profile/enrollment" method="GET" access="ROLE_NO_CLIENT_CERT" />
 			  <sec:intercept-url pattern="/Marti/api/tls/profile/tool/**" method="GET" access="ROLE_NO_CLIENT_CERT" />
 
@@ -194,7 +201,8 @@
 			  <sec:intercept-url pattern="/Marti/api/missions/**" access="ROLE_ANONYMOUS" />
               <sec:intercept-url pattern="/Marti/api/sync/**" access="ROLE_ANONYMOUS" />
               <sec:intercept-url pattern="/Marti/api/cot/**" access="ROLE_ANONYMOUS" />
-                     
+			  <sec:intercept-url pattern="/Marti/api/cops/**" access="ROLE_ANONYMOUS" />
+
               <!--  properties API -->
               <sec:intercept-url pattern="/Marti/api/properties/**" access="ROLE_ANONYMOUS" />
               <sec:intercept-url pattern="/Marti/api/properties/**" method="DELETE" access="ROLE_ANONYMOUS" />
@@ -221,6 +229,7 @@
               <sec:intercept-url pattern="/Marti/vcm/**" method="POST" access="ROLE_ANONYMOUS" />
               <sec:intercept-url pattern="/Marti/vcm/**" method="DELETE" access="ROLE_ADMIN" />     
               <sec:intercept-url pattern="/Marti/vcs/**" method="POST" access="ROLE_ANONYMOUS" />
+			  <sec:intercept-url pattern="/Marti/api/video/**"  access="ROLE_ANONYMOUS" />
               <sec:intercept-url pattern="/Marti/VideoManager.jsp" access="ROLE_NON_ADMIN_UI"/>
               <sec:intercept-url pattern="/Marti/VideoUpload.jsp" access="ROLE_NON_ADMIN_UI"/>
               <sec:intercept-url pattern="/Marti/VideoSend.jsp" access="ROLE_NON_ADMIN_UI"/>
@@ -332,6 +341,7 @@
 			  <sec:intercept-url pattern="/schedule/**" access="ROLE_ADMIN"/>
 			  
 			  <sec:intercept-url pattern="/user-management/**" access="ROLE_ADMIN"/>
+              <sec:intercept-url pattern="/vbm/**" access="ROLE_ADMIN"/>
 
 			   <!-- static content -->
 			  <sec:intercept-url pattern="/Marti/favicon.ico" access="ROLE_NON_ADMIN_UI" />
@@ -342,6 +352,8 @@
 
 			  <!-- require anonymous for everything else (namely extWebContentDir paths) -->
 			  <sec:intercept-url pattern="/**" access="ROLE_ANONYMOUS" />
+			  
+			  
 			  
 			  
 			  	 

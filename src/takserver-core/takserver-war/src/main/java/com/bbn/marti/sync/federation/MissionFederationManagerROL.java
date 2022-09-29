@@ -19,6 +19,7 @@ import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.DataPackageFileBlocker;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.Metadata;
+import com.bbn.marti.sync.Metadata.Field;
 import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionChange;
 import com.bbn.marti.sync.service.MissionService;
@@ -269,11 +270,19 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			}
 		}
 	}
-
+	
+	/*
+	 * save file with without payload
+	 */
 	@Override
 	public void insertResource(Metadata metadata, byte[] content, NavigableSet<Group> groups) {
-		
+
 		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("skipping federation of a file  " +  metadata);
+			}
+
 			return;
 		}
 
@@ -297,20 +306,22 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 		if (isBlockedFileEnabled()) {
 			String fileExt = coreConfig.getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
 			try {
-					byte[] filteredContent = DataPackageFileBlocker.blockResourceContent(metadata, content, fileExt);
-					if (filteredContent != null) {
-						fedMgr.submitFederateROL(malrc.getInsertResourceROL(metadata, filteredContent), groups);
-					} else {
-						if (logger.isDebugEnabled()) {
-							logger.debug("filtered content is null, not federating enterprise sync insert resource");
-						}
+				byte[] filteredContent = DataPackageFileBlocker.blockResourceContent(metadata, content, fileExt);
+				if (filteredContent != null) {
+					fedMgr.submitFederateROL(malrc.getInsertResourceROL(metadata, filteredContent), groups);
+				} else {
+					if (logger.isDebugEnabled()) {
+						logger.debug("filtered content is null, not federating enterprise sync insert resource");
 					}
-				} catch (Exception e) {
-					logger.error("exception federating enterprise sync insert resource", e);
 				}
+			} catch (Exception e) {
+				logger.error("exception federating enterprise sync insert resource", e);
+			}
 		} else { // just let it ROL
 			try {
-				fedMgr.submitFederateROL(malrc.getInsertResourceROL(metadata, content), groups);
+				String hash = metadata.getFirst(Field.Hash);
+
+				fedMgr.submitFederateROL(malrc.getInsertResourceROLNoContent(metadata), groups, hash);
 			} catch (IOException e) {
 				logger.error("exception federating enterprise sync insert resource", e);
 			}

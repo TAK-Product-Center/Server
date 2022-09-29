@@ -39,13 +39,14 @@ public class TakCert implements Serializable, Comparable<TakCert> {
     private Date expirationDate;
     private Date effectiveDate;
     private Date revocationDate;
+    public String token;
 
     public TakCert(){
 
     }
 
     public TakCert(X509Certificate cert, X509Certificate[] caChain,
-                   String creator, String userDn, Date issuanceDate, String clientUid)
+                   String creator, String userDn, Date issuanceDate, String clientUid, String token)
             throws CertificateEncodingException, NoSuchAlgorithmException {
         this.certificate = cert;
         this.subjectDn = cert.getSubjectX500Principal().getName();
@@ -57,6 +58,7 @@ public class TakCert implements Serializable, Comparable<TakCert> {
         this.hash = RemoteUtil.getInstance().getCertSHA256Fingerprint(cert);
         this.clientUid = clientUid;
         this.caChain = caChain;
+        this.token = token;
     }
 
     @Id
@@ -188,6 +190,14 @@ public class TakCert implements Serializable, Comparable<TakCert> {
         this.revocationDate = revocationDate;
     }
 
+    @Column(name = "token", unique = false, columnDefinition="VARCHAR")
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
+    }
 
     @Override
     public int compareTo(TakCert takCert) {

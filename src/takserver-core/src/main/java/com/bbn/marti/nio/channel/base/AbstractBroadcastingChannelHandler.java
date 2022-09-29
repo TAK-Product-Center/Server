@@ -9,20 +9,18 @@ import java.nio.channels.NetworkChannel;
 import java.nio.channels.SelectableChannel;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.bbn.marti.remote.groups.ConnectionInfo;
-import com.bbn.marti.util.Assertion;
-import com.bbn.marti.util.MessageConversionUtil;
-
 import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import com.bbn.marti.config.Network;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.nio.protocol.ChannelListener;
 import com.bbn.marti.nio.server.Server;
 import com.bbn.marti.nio.util.NetUtils;
+import com.bbn.marti.remote.groups.ConnectionInfo;
+import com.bbn.marti.util.Assertion;
+import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.google.common.base.Strings;
 
@@ -52,10 +50,10 @@ public abstract class AbstractBroadcastingChannelHandler implements ChannelHandl
     
     protected ConnectionInfo connectionInfo;
     
-    protected Network.Input input;
+    protected Input input;
     private String inputId;
     
-    public Network.Input getInput() {
+    public Input getInput() {
         return input;
     }
 
@@ -266,7 +264,9 @@ public abstract class AbstractBroadcastingChannelHandler implements ChannelHandl
             throw new IllegalArgumentException("null input");
         }
         
-        log.trace("set input " + input.getName() + " for channel handler " + this.getClass().getName() + " " + this + " " + this.hashCode());
+        if (log.isTraceEnabled()) {
+        	log.trace("set input " + input.getName() + " for channel handler " + this.getClass().getName() + " " + this + " " + this.hashCode());
+        }
         
         this.input = input;
         

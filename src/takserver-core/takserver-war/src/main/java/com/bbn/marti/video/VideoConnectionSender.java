@@ -100,23 +100,33 @@ public class VideoConnectionSender extends EsapiServlet {
     	
     	try {
         	initAuditLog(request);
-    	    
+
+			CommonUtil martiUtil = SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class);
+
+			Objects.requireNonNull(martiUtil, "marti util bean");
+
+			String groupVector = null;
+
+			try {
+				// Get group vector for the user associated with this session
+				groupVector = martiUtil.getGroupBitVector(request);
+				log.finer("groups bit vector: " + groupVector);
+			} catch (Exception e) {
+				log.fine("exception getting group membership for current web user " + e.getMessage());
+			}
+
     	    String[] contacts = getContacts(request);
            	
            	String[] feedIds = request.getParameter("feedId").split("\\|");
         	for (String feedId : feedIds) {
-        		Feed feed = videoManagerService.getFeed(Integer.parseInt(feedId));
+        		Feed feed = videoManagerService.getFeed(Integer.parseInt(feedId), groupVector);
         		String senderUid = UUID.randomUUID().toString();
 
 	           	for (String contact : contacts) {
 	               	String cotMessage = getCotMessage(senderUid, contact, feed.getAddress(), feed.getAlias(), 
 	               		feed.getPort(), feed.getRoverPort(), feed.getRtspReliable(), feed.getIgnoreEmbeddedKLV(),
 	               		feed.getPath(), feed.getProtocol(), feed.getNetworkTimeout(), feed.getBufferTime());
-	                   	
-	                CommonUtil martiUtil = SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class);
-	                
-	                Objects.requireNonNull(martiUtil, "marti util bean");
-	                
+
 	                submission.submitCot(cotMessage, martiUtil.getGroupsFromRequest(request));
 	           	}
         	}

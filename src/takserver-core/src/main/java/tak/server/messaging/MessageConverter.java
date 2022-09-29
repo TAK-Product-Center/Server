@@ -19,7 +19,8 @@ import org.springframework.oxm.XmlMappingException;
 import com.atakmap.Tak.ROL;
 import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.cot.CotParserCreator;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
@@ -119,11 +120,31 @@ public class MessageConverter {
 		if (clientId != null) {
 			mb.setClientId(clientId);
 		}
+		
+		String connectionId = (String)message.getContext().get(Constants.CONNECTION_ID_KEY);
+		if (connectionId != null) {
+			mb.setConnectionId(connectionId);
+		}
 
 		@SuppressWarnings("unchecked")
 		List<String> provenance = (List<String>)message.getContext().get(Constants.PLUGIN_PROVENANCE);
 		if (provenance != null) {
 		    mb.addAllProvenance(provenance);
+		}
+		
+		Boolean archivedEnabled = (Boolean)message.getContext().get(Constants.ARCHIVE_EVENT_KEY);
+		if (archivedEnabled != null) {
+			mb.setArchive(archivedEnabled.booleanValue());
+		}
+
+		List<String> destUids = (List<String>) message.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_UID_KEY);
+		if (destUids != null && !destUids.isEmpty()) {
+			mb.addAllDestClientUids(destUids);
+		}
+
+		List<String> destCallsigns = (List<String>) message.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_CALLSIGN_KEY);
+		if (destCallsigns != null && !destCallsigns.isEmpty()) {
+			mb.addAllDestCallsigns(destCallsigns);
 		}
 
 		if (logger.isTraceEnabled()) {
@@ -231,10 +252,29 @@ public class MessageConverter {
 		if (clientId != null) {
 			cot.setContext(Constants.CLIENT_UID_KEY, clientId);
 		}
+		
+		String connectionId = m.getConnectionId();
+		if (connectionId != null) {
+			cot.setContext(Constants.CONNECTION_ID_KEY, connectionId);
+		}
 
 		List<String> provenance = m.getProvenanceList();
 		if (provenance != null) {
 			cot.setContextValue(Constants.PLUGIN_PROVENANCE, provenance);
+		}
+		
+		if (provenance != null && provenance.contains(Constants.PLUGIN_MANAGER_PROVENANCE)) {
+			cot.setContextValue(Constants.ARCHIVE_EVENT_KEY, m.getArchive());
+		}
+
+		List<String> destUids = m.getDestClientUidsList();
+		if (destUids != null && !destUids.isEmpty()) {
+			cot.setContext(StreamingEndpointRewriteFilter.EXPLICIT_UID_KEY, destUids);
+		}
+
+		List<String> destCallsigns = m.getDestCallsignsList();
+		if (destCallsigns != null && !destCallsigns.isEmpty()) {
+			cot.setContext(StreamingEndpointRewriteFilter.EXPLICIT_CALLSIGN_KEY, destCallsigns);
 		}
 
 		if (logger.isTraceEnabled()) {

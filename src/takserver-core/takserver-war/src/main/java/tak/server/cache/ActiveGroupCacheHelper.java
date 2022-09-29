@@ -63,7 +63,7 @@ public class ActiveGroupCacheHelper {
         }
 
         // add the active groups to the cache
-        getActiveGroupsCache().put(username, groups);
+        activeGroupsCache.put(username, groups);
 
         // save the active groups to the database
         saveActiveGroupsForUser(username, groups);

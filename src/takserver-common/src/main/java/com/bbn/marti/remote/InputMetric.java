@@ -6,7 +6,7 @@ import java.io.Serializable;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.bbn.marti.config.Network;
+import com.bbn.marti.config.Input;
 import com.google.common.collect.ComparisonChain;
 
 /**
@@ -18,12 +18,12 @@ public class InputMetric implements Serializable, Comparable<InputMetric> {
 
     private final String id = UUID.randomUUID().toString().replace("-", "");
     
-    private Network.Input input;
+    private Input input;
     private AtomicLong readsReceived = new AtomicLong();
     private AtomicLong messagesReceived = new AtomicLong();
     private AtomicLong numClients = new AtomicLong();
     
-    public InputMetric(Network.Input input) {
+    public InputMetric(Input input) {
         if (input == null) {
             throw new IllegalArgumentException("null input");
         }
@@ -31,11 +31,11 @@ public class InputMetric implements Serializable, Comparable<InputMetric> {
         this.input = input;
     }
     
-    public Network.Input getInput() {
+    public Input getInput() {
         return input;
     }
     
-    public void setInput(Network.Input input) {
+    public void setInput(Input input) {
         this.input = input;
     }
     

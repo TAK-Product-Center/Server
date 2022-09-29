@@ -35,7 +35,7 @@ message FederatedEvent {
 }
 
 message GeoEvent {
-	 int64 sendTime = 1; 
+	 int64 sendTime = 1;
 	 int64 startTime = 2;
 	 int64 staleTime = 3;
 	 double lat = 4;  // WSG-84
@@ -58,7 +58,7 @@ message GeoEvent {
 	double course = 21;
 	BinaryBlob binary = 22; //image
 	repeated string ptpUids  = 23;
-	repeated string ptpCallsigns = 24; // ugh...shouldn't need this
+	repeated string ptpCallsigns = 24;
 }
 
 message BinaryBlob {
@@ -89,6 +89,7 @@ message Identity {
 message Subscription {
 	Identity identity = 1;
 	string filter = 2;
+    TakServerVersion version = 3;
 }
 
 message ClientHealth {
@@ -113,9 +114,18 @@ message ServerHealth {
 message ROL {
     string program = 1;
     repeated BinaryBlob payload = 2;
+	repeated string federateGroups = 3;
 }
 
 message FederateGroups {
     ServerHealth streamUpdate = 1;
 	repeated string federateGroups = 2;
+}
+
+message TakServerVersion {
+    int64 major = 1; // major version number
+    int64 minor = 2; // minor version number
+    int64 patch = 3; // patch version number
+    string branch = 4; // branch name
+    string variant = 5; // variant name
 }

@@ -22,24 +22,36 @@
 		<th scope="col">Name
 		  <small><span class="{{sort_class['name']}}" style="float:right; cursor:pointer" data-ng-click="toggle_sort('name')"></span></small>
 		</th>
+		<th scope="col">Version</th>
+		<th scope="col">Tag</th>
 		<th scope="col">Description</th>
 		<th scope="col">Plugin Type</th>
 		<th scope="col">Class Name</th>
-		<th scope="col">Startup Status</th>
+		<th scope="col">Status</th>
+		<th scope="col">Command</th>
 		<th scope="col">Enabled</th>
+        <th scope="col">Archive Enabled</th>
 	      </tr>
 	    </thead>
 
 	    <tbody>
 	      <tr scope="row" data-ng-repeat="x in pluginMetadata" data-ng-class="status_class(x.exceptionMessage)">
 			<td>{{x.name}}</td>
+			<td>{{x.version}}</td>
+			<td>{{x.tag}}</td>
 			<td>{{x.description}}</td>
 			<td class="text-center" data-ng-bind-html="x.direction" data-ng-attr-title="{{sender_receiver_title(x)}}"></td>
 			<td>{{x.className}}</td>
 			<td>{{x.status}}</td>
 			<td>
-				<input ng-model="x.name" ng-click="handleStatus(x,$event)" ng-checked="x.enabled" type="checkbox">
+                <button mdbbtn="" type="button" color="elegant" mdbwaveseffect="" ng-click="handlePluginStartedUpdate(x,$event)">{{x.start_stop_command}}</button>
+            </td>
+			<td>
+				<input ng-click="handlePluginEnabledUpdate(x,$event)" ng-checked="x.enabled" type="checkbox">
 			</td>
+			<td>
+                <input ng-click="handleArchiveUpdate(x,$event)" ng-checked="x.archiveEnabled" type="checkbox">
+            </td>
 	      </tr>
 	    </tbody>
 	  </table>

@@ -1,5 +1,3 @@
-
-
 package com.bbn.marti.sync.model;
 
 import java.io.Serializable;
@@ -25,7 +23,6 @@ import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
-import javax.persistence.OrderBy;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 
@@ -41,6 +38,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Strings;
 import com.google.common.collect.ComparisonChain;
 
+import com.bbn.marti.maplayer.model.MapLayer;
+
 import tak.server.Constants;
 
 /*
@@ -51,7 +50,7 @@ import tak.server.Constants;
 @Entity
 @Table(name = "mission")
 @Cacheable
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties(value = {"hibernateLazyInitializer", "handler"}, ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Mission implements Serializable, Comparable<Mission> {
 
@@ -70,6 +69,11 @@ public class Mission implements Serializable, Comparable<Mission> {
     protected String name;
     protected String description;
     protected String chatRoom;
+    protected String baseLayer;
+    protected String bbox;
+    protected String boundingPolygon;
+    protected String path;
+    protected String classification;
 
     protected String tool;
 
@@ -82,7 +86,9 @@ public class Mission implements Serializable, Comparable<Mission> {
     protected String creatorUid;
     
     protected Date createTime;
-    
+
+    protected Date lastEdited;
+
     protected List<MissionAdd<String>> uidAdds;
     
     protected List<MissionAdd<Resource>> resourceAdds;
@@ -96,6 +102,14 @@ public class Mission implements Serializable, Comparable<Mission> {
     protected Set<Mission> children = new ConcurrentSkipListSet<Mission>();
 
     protected Set<ExternalMissionData> externalData = new ConcurrentSkipListSet<ExternalMissionData>();
+
+    protected Set<MissionFeed> feeds = new ConcurrentSkipListSet<>();
+
+    protected Set<MapLayer> mapLayers = new ConcurrentSkipListSet<MapLayer>();
+
+    protected Long pageCount;
+    protected Long missionCount;
+    protected Long pageSize;
 
     protected String passwordHash;
     protected MissionRole defaultRole;
@@ -124,6 +138,45 @@ public class Mission implements Serializable, Comparable<Mission> {
         }
         
         setName(name);
+    }
+
+    public Mission(Mission other, Date lastEdited) {
+        id = other.id;
+        name = other.name;
+        description = other.description;
+        chatRoom = other.chatRoom;
+        baseLayer = other.baseLayer;
+        bbox = other.bbox;
+        boundingPolygon = other.boundingPolygon;
+        path = other.path;
+        classification = other.classification;
+        tool = other.tool;
+        contents = other.contents;
+        uids = other.uids;
+        keywords = other.keywords;
+        creatorUid = other.creatorUid;
+        createTime = other.createTime;
+        uidAdds = other.uidAdds;
+        resourceAdds = other.resourceAdds;
+        groupVector = other.groupVector;
+        groups = other.groups;
+        parent = other.parent;
+        children = other.children;
+        externalData = other.externalData;
+        feeds = other.feeds;
+        mapLayers = other.mapLayers;
+        pageCount = other.pageCount;
+        missionCount = other.missionCount;
+        pageSize = other.pageSize;
+        passwordHash = other.passwordHash;
+        defaultRole = other.defaultRole;
+        ownerRole = other.ownerRole;
+        token = other.token;
+        missionChanges = other.missionChanges;
+        logs = other.logs;
+        expiration = other.expiration;
+
+        this.lastEdited = lastEdited;
     }
 
     @Id
@@ -163,6 +216,51 @@ public class Mission implements Serializable, Comparable<Mission> {
 
     public void setChatRoom(String chatRoom) {
         this.chatRoom = chatRoom;
+    }
+
+    @Column(name = "base_layer", unique = false, nullable = true)
+    public String getBaseLayer() {
+        return baseLayer;
+    }
+
+    public void setBaseLayer(String baseLayer) {
+        this.baseLayer = baseLayer;
+    }
+
+    @Column(name = "bbox", unique = false, nullable = true)
+    public String getBbox() {
+        return bbox;
+    }
+
+    public void setBbox(String bbox) {
+        this.bbox = bbox;
+    }
+    
+    @Column(name = "bounding_polygon", unique = false, nullable = true)
+    public String getBoundingPolygon() {
+        return boundingPolygon;
+    }
+
+    public void setBoundingPolygon(String boundingPolygon) {
+        this.boundingPolygon = boundingPolygon;
+    }
+
+    @Column(name = "path", unique = false, nullable = true)
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
+    }
+
+    @Column(name = "classification", unique = false, nullable = true)
+    public String getClassification() {
+        return classification;
+    }
+
+    public void setClassification(String classification) {
+        this.classification = classification;
     }
 
     @Column(name = "tool", unique = false, nullable = true)
@@ -238,6 +336,16 @@ public class Mission implements Serializable, Comparable<Mission> {
         this.createTime = createTime;
     }
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = Constants.COT_DATE_FORMAT_PAD_MILLIS)
+    @Column(name = "last_edited", insertable = false, updatable = false)
+    public Date getLastEdited() {
+        return lastEdited;
+    }
+
+    public void setLastEdited(Date lastEdited) {
+        this.lastEdited = lastEdited;
+    }
+
     @Transient
     @JsonProperty("uids")
     public List<MissionAdd<String>> getUidAdds() {
@@ -295,6 +403,16 @@ public class Mission implements Serializable, Comparable<Mission> {
     public Set<ExternalMissionData> getExternalData() { return externalData; }
 
     public void setExternalData(Set<ExternalMissionData> externalData) { this.externalData = externalData; }
+
+    @OneToMany(mappedBy="mission", fetch = FetchType.EAGER)
+    public Set<MapLayer> getMapLayers() { return mapLayers; }
+
+    public void setMapLayers(Set<MapLayer> mapLayers) { this.mapLayers = mapLayers; }
+
+    @OneToMany(mappedBy="mission", fetch = FetchType.EAGER)
+    public Set<MissionFeed> getFeeds() { return feeds; }
+
+    public void setFeeds(Set<MissionFeed> feeds) { this.feeds = feeds; }
 
     @JsonIgnore
     @Column(name = "password_hash", unique = false, nullable = true)
@@ -438,5 +556,7 @@ public class Mission implements Serializable, Comparable<Mission> {
         getUids().clear();
         getUidAdds().clear();
         getExternalData().clear();
+        getMapLayers().clear();
+        getFeeds().clear();
     }
 }

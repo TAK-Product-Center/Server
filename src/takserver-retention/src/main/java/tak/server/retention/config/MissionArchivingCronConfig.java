@@ -9,7 +9,7 @@ import org.springframework.context.annotation.PropertySource;
 
 @Configuration
 @ConfigurationProperties
-@PropertySource(name="mission-archive-cron-sched", factory=YamlPropertySourceFactory.class, value="file:conf/retention/misison-archiving-config.yml")
+@PropertySource(name="mission-archive-cron-sched", factory=YamlPropertySourceFactory.class, value="file:conf/retention/mission-archiving-config.yml")
 public class MissionArchivingCronConfig implements Serializable {
 
     private String missionCronExpression = "-";

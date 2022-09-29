@@ -1,20 +1,5 @@
 package com.bbn.marti.takcl.AppModules;
 
-import com.bbn.marti.config.*;
-import com.bbn.marti.takcl.AppModules.generic.ServerAppModuleInterface;
-import com.bbn.marti.takcl.SSLHelper;
-import com.bbn.marti.takcl.TAKCLCore;
-import com.bbn.marti.takcl.TestExceptions;
-import com.bbn.marti.takcl.Util;
-import com.bbn.marti.takcl.cli.simple.Command;
-import com.bbn.marti.takcl.config.common.TakclRunMode;
-import com.bbn.marti.test.shared.data.connections.AbstractConnection;
-import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
-import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
-import javax.xml.bind.JAXBException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,6 +8,32 @@ import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import javax.xml.bind.JAXBException;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import com.bbn.marti.config.Auth;
+import com.bbn.marti.config.AuthType;
+import com.bbn.marti.config.Buffer;
+import com.bbn.marti.config.Configuration;
+import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.config.Docs;
+import com.bbn.marti.config.Federation;
+import com.bbn.marti.config.Input;
+import com.bbn.marti.config.Network;
+import com.bbn.marti.config.Repository;
+import com.bbn.marti.config.Subscription;
+import com.bbn.marti.config.Tls;
+import com.bbn.marti.takcl.SSLHelper;
+import com.bbn.marti.takcl.Util;
+import com.bbn.marti.takcl.AppModules.generic.ServerAppModuleInterface;
+import com.bbn.marti.takcl.cli.simple.Command;
+import com.bbn.marti.takcl.config.common.TakclRunMode;
+import com.bbn.marti.test.shared.data.connections.AbstractConnection;
+import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
+import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 
 /**
  * Used to modify the server CoreConfig.xml file offline. If this is used while the server is running, the changes will not take effect, and may cause undesirable behavior.
@@ -110,8 +121,12 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 		}
 	}
 
-	public List<Network.Input> getInputs() {
+	public List<Input> getInputs() {
 		return configuration.getNetwork().getInput();
+	}
+	
+	public List<DataFeed> getDataFeeds() {
+		return configuration.getNetwork().getDatafeed();
 	}
 
 	public void saveChanges() {
@@ -161,10 +176,10 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 		return (configuration.getAuth().getFile() != null);
 	}
 
-	public void addInput(final Network.Input input) {
-		List<Network.Input> inputList = configuration.getNetwork().getInput();
+	public void addInput(final Input input) {
+		List<Input> inputList = configuration.getNetwork().getInput();
 
-		for (Network.Input loopInput : inputList) {
+		for (Input loopInput : inputList) {
 			if (loopInput.getName().equals(input.getName())) {
 				inputList.remove(loopInput);
 				break;
@@ -173,16 +188,29 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 		inputList.add(input);
 		saveChanges();
 	}
+	
+	public void addDataFeed(final DataFeed dataFeed) {
+		List<DataFeed> dataFeedList = configuration.getNetwork().getDatafeed();
+		
+		for (DataFeed loopFeed : dataFeedList) {
+			if (loopFeed.getName().equals(dataFeed.getName())) {
+				dataFeedList.remove(loopFeed);
+				break;
+			}
+		}
+		dataFeedList.add(dataFeed);
+		saveChanges();
+	}
 
 	public void addConnectionIfNecessary(@NotNull AbstractConnection connection) {
 		ProtocolProfiles.ConnectionType connectionType = connection.getConnectionType();
 
 		if (connectionType == ProtocolProfiles.ConnectionType.INPUT) {
 			Set<String> inputNameSet = new HashSet<>();
-			for (Network.Input loopinput : getInputs()) {
+			for (Input loopinput : getInputs()) {
 				inputNameSet.add(loopinput.getName());
 			}
-			Network.Input input = connection.getConfigInput();
+			Input input = connection.getConfigInput();
 			if (!inputNameSet.contains(input.getName())) {
 				addInput(input);
 				if (connection.getProtocol().isTLS()) {
@@ -208,6 +236,22 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 				}
 			}
 
+		} else if (connectionType == ProtocolProfiles.ConnectionType.DATAFEED){
+			Set<String> feedNameSet = new HashSet<>();
+			for (DataFeed loopFeed : getDataFeeds()) {
+				feedNameSet.add(loopFeed.getName());
+			}
+			DataFeed dataFeed = connection.getConfigDataFeed();
+			if (!feedNameSet.contains(dataFeed.getName())) {
+				addDataFeed(dataFeed);
+				if (connection.getProtocol().isTLS()) {
+					setSSLSecuritySettings();
+				}
+			}
+
+			if (connection.getAuthType() == AuthType.FILE) {
+				fileAuth(true);
+			}
 		} else {
 			throw new RuntimeException("Invalid ConnectionType of type '" + connection.getConsistentUniqueReadableIdentifier() + "'!");
 		}
@@ -238,9 +282,9 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 	 */
 	@Command
 	public void removeInput(final String inputName) {
-		List<Network.Input> inputList = configuration.getNetwork().getInput();
+		List<Input> inputList = configuration.getNetwork().getInput();
 
-		for (Network.Input input : inputList) {
+		for (Input input : inputList) {
 			if (input.getName().equals(inputName)) {
 				inputList.remove(input);
 				break;

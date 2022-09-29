@@ -19,7 +19,7 @@ import com.atakmap.Tak.ClientSubscription;
 import com.atakmap.Tak.ClientVersion;
 import com.atakmap.Tak.InputChannelGrpc;
 import com.atakmap.Tak.ServerVersion;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.service.Resources;
 import com.google.common.primitives.Longs;

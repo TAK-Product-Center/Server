@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.bbn.marti.config.Network.Input;
 import com.bbn.marti.network.BaseRestController;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.util.CommonUtil;

@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.jetbrains.annotations.NotNull;
 
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 
 import tak.server.ignite.IgniteHolder;
 

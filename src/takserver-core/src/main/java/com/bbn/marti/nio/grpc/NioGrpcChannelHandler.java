@@ -3,10 +3,9 @@ package com.bbn.marti.nio.grpc;
 import java.net.InetSocketAddress;
 import java.security.cert.X509Certificate;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.bbn.marti.config.Network.Input;
+import com.bbn.cot.filter.DataFeedFilter;
+import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.nio.netty.handlers.NioNettyTlsServerHandler;
 import com.bbn.marti.remote.groups.ConnectionInfo;
@@ -21,7 +20,6 @@ import tak.server.proto.StreamingProtoBufHelper;
 /*
  */
 public class NioGrpcChannelHandler extends NioNettyTlsServerHandler {
-    private final static Logger logger = LoggerFactory.getLogger(NioGrpcChannelHandler.class);
     private final StreamObserver<TakMessage> stream;
     private final X509Certificate clientCertificate;
     
@@ -37,7 +35,13 @@ public class NioGrpcChannelHandler extends NioNettyTlsServerHandler {
     
     public void submitTakMessage(TakMessage message) {
     	CotEventContainer cotEventContainer = StreamingProtoBufHelper.getInstance().proto2cot(message);
-    	protocolListeners.forEach(listener -> listener.onDataReceived(cotEventContainer, channelHandler, protocol));
+    		
+    	if (isNotDOSLimited(cotEventContainer) && isNotReadLimited(cotEventContainer)) {
+			if (isDataFeedInput()) {
+				DataFeedFilter.getInstance().filter(cotEventContainer, (DataFeed) input);
+			}
+			protocolListeners.forEach(listener -> listener.onDataReceived(cotEventContainer, channelHandler, protocol));
+		}
     }
     
     @Override

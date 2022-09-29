@@ -11,6 +11,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Iterator;
+import java.util.UUID;
 
 import javax.naming.NamingException;
 import javax.sql.DataSource;
@@ -28,9 +30,11 @@ import org.w3c.dom.Document;
 
 import com.bbn.marti.JDBCQueryAuditLogHelper;
 import com.bbn.marti.logging.AuditLogUtil;
+import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.remote.util.SecureXmlParser;
 import com.bbn.marti.video.Feed.Type;
 import com.bbn.security.web.MartiValidator;
+
 
 public class VideoManagerService {
 	
@@ -40,27 +44,32 @@ public class VideoManagerService {
 	@Autowired
 	private DataSource ds;
 
+	@Autowired
+	private VideoConnectionRepository videoConnectionRepository;
+
 	protected static final Logger logger = LoggerFactory.getLogger(VideoManagerService.class);
 		
-	public boolean addFeed(Feed feed, Validator validator) {
+	public boolean addFeed(Feed feed, String groupVector, Validator validator) {
 
     	boolean status = false;
     	
     	try {
-        	
+
    	    	JAXBContext jaxbContext = JAXBContext.newInstance(Feed.class);
 	        Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
 	        StringWriter sw = new StringWriter();
         	jaxbMarshaller.marshal(feed, sw);
         	String xml = sw.toString();    		
     		
-    		//
-        	// is the feed (URL/alias) in the database already?
-    		//
+		//
+		// is the feed (URL/alias) in the database already?
+		//
 		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement(
 					"select * from video_connections where uuid = ? " +
-					" and deleted=false", connection)) {
-			query.setString(1, feed.getUuid());    		
+					" and deleted=false and ( groups is null or " + RemoteUtil.getInstance().getGroupClause() + ")",
+				connection)) {
+			query.setString(1, feed.getUuid());
+			query.setString(2, groupVector);
 			logger.debug(query.toString());
         	ResultSet results =  query.executeQuery();        	
         	boolean found = results.next();
@@ -91,8 +100,8 @@ public class VideoManagerService {
             	
 	    		try (PreparedStatement quer = wrapper.prepareStatement("insert into video_connections (" +
 		    			"owner, type, alias, " +
-		    			"latitude, longitude, fov, heading, range, uuid, xml)  " +
-		    			"values (?,?,?,?,?,?,?,?,?,?) ", connection)) {
+		    			"latitude, longitude, fov, heading, range, uuid, xml, groups)  " +
+		    			"values (?,?,?,?,?,?,?,?,?,?,?" + RemoteUtil.getInstance().getGroupType() +") ", connection)) {
             	
 	    		quer.setString(1, AuditLogUtil.getUsername());
 	    		quer.setString(2, feed.getType() != null ? feed.getType().toString() : "VIDEO");
@@ -103,7 +112,8 @@ public class VideoManagerService {
 	    		quer.setString(7, feed.getHeading());
 	    		quer.setString(8, feed.getRange());
 	    		quer.setString(9, feed.getUuid());
-	    		quer.setString(10, xml);
+				quer.setString(10, xml);
+				quer.setString(11, groupVector);
 				logger.debug(query.toString());
             			            				    		
 	    		quer.executeUpdate();
@@ -112,7 +122,7 @@ public class VideoManagerService {
 	        	status = true;
 	        	
     		} else {
-    			status = updateFeed(feed, validator);
+    			status = updateFeed(feed, groupVector, validator);
     		}
 		}
         	
@@ -127,14 +137,15 @@ public class VideoManagerService {
     	return status;
 	}
 	
-	public boolean updateFeed(Feed feed, Validator validator) {
+	public boolean updateFeed(Feed feed, String groupVector, Validator validator) {
 
     	boolean status = false;
     	
     	try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("update video_connections set " +
-    			"owner=?, type=?, alias=?, " +
-    			"latitude=?, longitude=?, fov=?, heading=?, range=?, uuid=?, xml=?  " +
-    			"where uuid=?", connection)){
+    			" owner=?, type=?, alias=?, " +
+    			" latitude=?, longitude=?, fov=?, heading=?, range=?, uuid=?, xml=?, groups=?" + RemoteUtil.getInstance().getGroupType() +
+    			" where uuid=? and ( groups is null or " + RemoteUtil.getInstance().getGroupClause() + " )",
+				connection)){
         	
    	    	JAXBContext jaxbContext = JAXBContext.newInstance(Feed.class);
 	        Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
@@ -159,9 +170,11 @@ public class VideoManagerService {
     		query.setString(7, feed.getHeading());
     		query.setString(8, feed.getRange());
     		query.setString(9, feed.getUuid());
-    		query.setString(10, xml);
-    		query.setString(11, feed.getUuid());
-    		
+			query.setString(10, xml);
+			query.setString(11, groupVector);
+    		query.setString(12, feed.getUuid());
+			query.setString(13, groupVector);
+
 			logger.debug(query.toString());
         			            				    		
     		query.executeUpdate();
@@ -227,11 +240,15 @@ public class VideoManagerService {
 		return feed;
 	}
 	
-    public Feed getFeed(int id) {
+    public Feed getFeed(int id, String groupVector) {
     	
     	Feed feed = null;
-    	try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("select * from video_connections where id = ?", connection)) {
+    	try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement(
+    			"select * from video_connections where id = ? and " +
+						" ( groups is null or " + RemoteUtil.getInstance().getGroupClause() + " )"
+				, connection)) {
 			query.setInt(1, id);
+			query.setString(2, groupVector);
 			try (ResultSet results =  query.executeQuery()) {        	
 				if (results.next())
 				{
@@ -246,20 +263,21 @@ public class VideoManagerService {
     	return feed;
     }	
 	
-    public VideoConnections getVideoConnections(boolean onlyActive) {
+    public VideoConnections getVideoConnections(boolean onlyActive, boolean includeV2, String groupVector) {
     	
     	VideoConnections videoConnections = null;
     	try
     	{
-    		String sql = "select * from video_connections where deleted=false";
+    		String sql = "select * from video_connections where deleted=false and" +
+					" ( groups is null or " + RemoteUtil.getInstance().getGroupClause() + " )";
 
     		if (onlyActive) {
     			sql += " and xml like '%<active>true</active>%'";
     		}
 
     		try (Connection connection = ds.getConnection(); PreparedStatement p = wrapper.prepareStatement(sql, connection)) {
+    			p.setString(1, groupVector);
     			try (ResultSet results = wrapper.doQuery(p)) {
-
     				videoConnections = new VideoConnections();
     				while (results.next()) {
     					Feed feed = feedFromResultSet(results);	    		
@@ -268,17 +286,30 @@ public class VideoManagerService {
     			}
     		}
 
+//    		if (includeV2) {
+//    			VideoCollections videoCollections = getVideoCollections(null, false, groupVector);
+//    			for (VideoConnection videoConnection : videoCollections.getVideoConnections()) {
+//    				for (FeedV2 feedV2 : videoConnection.getFeeds()) {
+//						Feed feedV1 = new Feed(feedV2);
+//						videoConnections.getFeeds().add(feedV1);
+//					}
+//				}
+//			}
+
     	} catch (NamingException | SQLException e) {
     		logger.error("Exception!", e);
     	}
     	return videoConnections;
     }	
     
-    public void deleteFeed(String feedId) {
+    public void deleteFeed(String feedId, String groupVector) {
     	
     	try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement(
-					"update video_connections set deleted=true where id = ?", connection)) {
-			query.setInt(1, Integer.parseInt(feedId));    		
+					"update video_connections set deleted=true where id = ? and "
+							+ "( groups is null or " + RemoteUtil.getInstance().getGroupClause() + " )"
+				, connection)) {
+			query.setInt(1, Integer.parseInt(feedId));
+			query.setString(2, groupVector);
 			logger.debug(query.toString());
 			
         	query.executeUpdate();
@@ -288,4 +319,145 @@ public class VideoManagerService {
 	        logger.error("Exception!", e);
 	    }       	
     }
+
+    public void createVideoCollections(VideoCollections videoCollections, String groupVector) {
+		try {
+			for (VideoConnection videoConnection : videoCollections.getVideoConnections()) {
+				VideoConnection existingConnection = null;
+				if (videoConnection.getUuid() != null && !videoConnection.getUuid().isEmpty()) {
+					existingConnection = videoConnectionRepository.getByUid(videoConnection.getUuid(), groupVector);
+				} else {
+					videoConnection.setUuid(UUID.randomUUID().toString());
+				}
+
+				if (existingConnection != null) {
+					updateVideoConnection(videoConnection, groupVector);
+				} else {
+					videoConnectionRepository.create(
+							videoConnection.getUuid(),
+							videoConnection.getActive(),
+							videoConnection.getAlias(),
+							videoConnection.getThumbnail(),
+							videoConnection.getClassification(),
+							videoConnectionToXml(videoConnection),
+							groupVector);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("exception in createVideoCollections!", e);
+		}
+	}
+
+	private void inflateFeedsFromXml(VideoConnection videoConnection) {
+		try {
+			JAXBContext jaxbContext = JAXBContext.newInstance(VideoConnection.class);
+			Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
+			Document doc = SecureXmlParser.makeDocument(videoConnection.getXml());
+			VideoConnection tmpVideoConnection = (VideoConnection) jaxbUnmarshaller.unmarshal(doc);
+			videoConnection.getFeeds().addAll(tmpVideoConnection.getFeeds());
+		} catch (Exception e) {
+			logger.error("exception in getVideoConnection!", e);
+		}
+	}
+
+	private String videoConnectionToXml(VideoConnection videoConnection) {
+		try {
+			JAXBContext jaxbContext = JAXBContext.newInstance(VideoConnection.class);
+			Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
+			StringWriter sw = new StringWriter();
+			jaxbMarshaller.marshal(videoConnection, sw);
+			String xml = sw.toString();
+			return xml;
+		} catch (Exception e) {
+			logger.error("exception in videoConnectionToXml!", e);
+		}
+		return null;
+	}
+
+	public VideoConnection getVideoConnection(String uid, String groupVector) {
+		try {
+			VideoConnection videoConnection = videoConnectionRepository.getByUid(uid, groupVector);
+			if (videoConnection != null) {
+				inflateFeedsFromXml(videoConnection);
+			}
+			return videoConnection;
+		} catch (Exception e) {
+			logger.error("exception in getVideoConnection!", e);
+		}
+		return null;
+	}
+
+	public VideoCollections getVideoCollections(String protocol, boolean includeV1, String groupVector) {
+		try {
+			VideoCollections videoCollections = new VideoCollections();
+			videoCollections.getVideoConnections().addAll(videoConnectionRepository.get(groupVector));
+			for (VideoConnection videoConnection : videoCollections.getVideoConnections()) {
+				inflateFeedsFromXml(videoConnection);
+			}
+
+			if (includeV1) {
+				VideoConnections videoConnectionsV1 = getVideoConnections(false, false, groupVector);
+				Iterator<Feed> feedV1Iterator = videoConnectionsV1.getFeeds().iterator();
+				while (feedV1Iterator.hasNext()) {
+					Feed feedV1 = feedV1Iterator.next();
+
+					VideoConnection wrapper = new VideoConnection();
+					wrapper.setActive(true);
+					wrapper.setUuid(feedV1.getUuid());
+					wrapper.setAlias(feedV1.getAlias());
+					wrapper.setThumbnail(feedV1.getThumbnail());
+					wrapper.setClassification(feedV1.getClassification());
+
+					FeedV2 wrapped = new FeedV2(feedV1);
+					wrapper.getFeeds().add(wrapped);
+					videoCollections.getVideoConnections().add(wrapper);
+				}
+			}
+
+			if (protocol != null) {
+				Iterator<VideoConnection> videoConnectionIterator = videoCollections.getVideoConnections().iterator();
+				while (videoConnectionIterator.hasNext()) {
+					VideoConnection videoConnection = videoConnectionIterator.next();
+					Iterator<FeedV2> feedV2Iterator = videoConnection.getFeeds().iterator();
+					while (feedV2Iterator.hasNext()) {
+						FeedV2 feedV2 = feedV2Iterator.next();
+						if (!feedV2.getUrl().startsWith(protocol)) {
+							feedV2Iterator.remove();
+						}
+					}
+					if (videoConnection.getFeeds().isEmpty()) {
+						videoConnectionIterator.remove();
+					}
+				}
+			}
+
+			return videoCollections;
+		} catch (Exception e) {
+			logger.error("exception in getVideoCollections!", e);
+		}
+		return null;
+	}
+
+	public void updateVideoConnection(VideoConnection videoConnection, String groupVector) {
+		try {
+			videoConnectionRepository.update(
+					videoConnection.getUuid(),
+					videoConnection.getActive(),
+					videoConnection.getAlias(),
+					videoConnection.getThumbnail(),
+					videoConnection.getClassification(),
+					videoConnectionToXml(videoConnection),
+					groupVector);
+		} catch (Exception e) {
+			logger.error("exception in updateVideoConnection!", e);
+		}
+	}
+
+	public void deleteVideoConnection(String uid, String groupVector) {
+		try {
+			videoConnectionRepository.delete(uid, groupVector);
+		} catch (Exception e) {
+			logger.error("exception in deleteVideoConnection!", e);
+		}
+	}
 }

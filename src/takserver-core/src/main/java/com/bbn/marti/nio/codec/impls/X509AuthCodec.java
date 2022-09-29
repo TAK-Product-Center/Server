@@ -7,21 +7,21 @@ import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.List;
 
-import com.bbn.marti.remote.exception.TakException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.groups.DummyAuthenticator;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.groups.X509Authenticator;
+import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.nio.codec.ByteCodec;
 import com.bbn.marti.nio.codec.ByteCodecFactory;
 import com.bbn.marti.nio.codec.Codec;
 import com.bbn.marti.nio.codec.PipelineContext;
 import com.bbn.marti.nio.util.CodecSource;
-import com.bbn.marti.remote.exception.RevokedException;
+import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.AuthStatus;
 import com.bbn.marti.remote.groups.AuthenticatedUser;
 import com.bbn.marti.remote.groups.ConnectionInfo;
@@ -221,6 +221,10 @@ public class X509AuthCodec extends AbstractAuthCodec implements ByteCodec {
                 return;
             }
 
+            if (cert.getNotAfter().before(new Date())) {
+                throw new TakException("found expired certificate : " + cert.getSubjectDN());
+            }
+
             logger.debug("cert: " + cert);
 
             if (cert.getSubjectDN() != null) {
@@ -263,7 +267,10 @@ public class X509AuthCodec extends AbstractAuthCodec implements ByteCodec {
             }
 
             if (e instanceof TakException) {
-                throw e;
+                logger.error("TakException in doTlsAuth {}", e.getMessage(), e);
+                if (connectionInfo != null && connectionInfo.getHandler() != null) {
+                    ((ChannelHandler) connectionInfo.getHandler()).forceClose();
+                }
             }
         }
     }

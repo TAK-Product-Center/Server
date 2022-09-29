@@ -88,6 +88,7 @@
             <xs:element name="uid" type="xs:string" minOccurs="1" maxOccurs="1"/>
             <xs:element name="value" type="xs:string" minOccurs="1" maxOccurs="unbounded"/>
             <xs:element name="status" type="checklistTaskStatus" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="customStatus" type="xs:string" minOccurs="0" maxOccurs="1"/>
             <xs:element name="completeBy" type="xs:string" minOccurs="0" maxOccurs="1"/>
             <xs:element name="completeDTG" type="xs:string" minOccurs="0" maxOccurs="1"/>
             <xs:element name="notes" type="xs:string" minOccurs="0" maxOccurs="1"/>

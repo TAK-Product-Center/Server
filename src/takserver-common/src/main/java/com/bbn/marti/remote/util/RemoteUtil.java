@@ -9,12 +9,11 @@ import java.util.Collection;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.xml.bind.DatatypeConverter;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ignite.Ignite;
-import org.apache.ignite.IgniteAtomicLong;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,8 +31,6 @@ import com.google.common.base.Strings;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
-
-import tak.server.plugins.PluginManagerConstants;
 
 /*
  * 
@@ -53,7 +50,9 @@ public class RemoteUtil {
     public static final String GROUP_CLAUSE = " :groupVector\\:\\:bit(" + GROUPS_BIT_VECTOR_LEN + ") & " +
             "lpad(groups\\:\\:character varying, " + GROUPS_BIT_VECTOR_LEN + ", '0')\\:\\:bit(" + GROUPS_BIT_VECTOR_LEN + ")\\:\\:bit varying " +
             "<> 0\\:\\:bit(" + GROUPS_BIT_VECTOR_LEN + ")\\:\\:bit varying ";
-    
+
+    public static final String GROUP_FUNCTION_CALL = " function( 'bitwiseAndGroups',  :groupVector, groups ) = TRUE ";
+
     public static final String GROUP_VECTOR = " cast(:groupVector as bit(" + GROUPS_BIT_VECTOR_LEN + "))";
 
     private String bitStringNoGroups = null;
@@ -109,7 +108,9 @@ public class RemoteUtil {
                 }
 
                 if (group.getBitpos() == null) {
-                    logger.error("empty bit position in group - skipping: " + group);
+                    if (logger.isErrorEnabled()) {
+                        logger.error("empty bit position in group - skipping: " + StringUtils.normalizeSpace(group.toString()));
+                    }
                     continue;
                 }
 
@@ -373,31 +374,5 @@ public class RemoteUtil {
         }
 
     	return false;
-    }
-    
-    public AtomicBoolean getIsIntercept(AtomicBoolean isIntercept) {
-    	if (ignite == null) {
-    		throw new IllegalStateException("ignite reference in RemoteUtil is null");
-    	}
-    	
-    	if (isIntercept == null) {
-    		IgniteAtomicLong interceptFlag = ignite.atomicLong(PluginManagerConstants.INTERCEPTOR_REGISTRATION_KEY, -1, true);
-
-    		if (interceptFlag.get() == -1) {
-    			logger.info("Interceptor plugins registration could not be determined, interceptor plugins disabled");
-    			isIntercept = new AtomicBoolean(false);
-    		} else if (interceptFlag.get() == 0) {
-    			logger.info("No interceptor plugins registered.");
-    			isIntercept = new AtomicBoolean(false);
-    		} else if (interceptFlag.get() == 1) {
-    			logger.info("One or more interceptor plugins registered.");
-    			isIntercept = new AtomicBoolean(true);
-    		} else {
-    			logger.info("Invalid value " + interceptFlag.get() + " for intercept flag, interceptor plugins disabled.");
-    			isIntercept = new AtomicBoolean(false);
-    		}
-    	}
-
-    	return isIntercept;
     }
 }

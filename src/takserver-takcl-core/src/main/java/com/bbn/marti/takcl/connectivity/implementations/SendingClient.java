@@ -84,6 +84,7 @@ public class SendingClient implements SendingInterface {
 
 		switch (user.getConnection().getProtocol()) {
 			case INPUT_TCP:
+			case DATAFEED_TCP:
 				sendTCPMessage(user.getServer().getUrl(), user.getConnection().getPort(), xmlData);
 //				dl.begin("stateChangeListener.onMessageSent");
 				stateChangeListener.onMessageSent(xmlData);
@@ -91,6 +92,7 @@ public class SendingClient implements SendingInterface {
 				break;
 
 			case INPUT_UDP:
+			case DATAFEED_UDP:
 				try {
 					sendUDPMessage(user.getServer().getUrl(), user.getConnection().getPort(), udpPort, xmlData);
 //					dl.begin("stateChangeListener.onMessageSent");
@@ -102,6 +104,7 @@ public class SendingClient implements SendingInterface {
 				break;
 
 			case INPUT_MCAST:
+			case DATAFEED_MCAST:
 				try {
 //					dl.begin("Construct DatagramPacket");
 					DatagramPacket data = new DatagramPacket(xmlData.getBytes(), xmlData.length(),
