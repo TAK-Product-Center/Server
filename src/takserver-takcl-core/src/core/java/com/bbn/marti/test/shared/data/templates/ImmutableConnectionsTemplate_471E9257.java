@@ -41,6 +41,7 @@ public class ImmutableConnectionsTemplate_471E9257 extends AbstractConnection {
 		this.groupSet = modelInput.getGroupSet();
 		this.isAnon = modelInput.getRawAnon();
 		this.mcastGroup = modelInput.getMcastGroup();
+		this.type = modelInput.getType();
 		this.connectionModel = modelInput;
 
 		valueMap.put(identifier, this);
@@ -102,6 +103,8 @@ public class ImmutableConnectionsTemplate_471E9257 extends AbstractConnection {
 	private final BaseConnections connectionModel;
 	@Nullable
 	private final String mcastGroup;
+	@Nullable
+	private final String type;
 	private String[] genUsersStrings;
 
 
@@ -118,6 +121,7 @@ public class ImmutableConnectionsTemplate_471E9257 extends AbstractConnection {
 		this.groupSet = modelInput.getGroupSet();
 		this.isAnon = modelInput.getRawAnon();
 		this.mcastGroup = modelInput.getMcastGroup();
+		this.type = modelInput.getType();
 		this.genUsersStrings = genUserNameList;
 		this.connectionModel = modelInput;
 
@@ -207,6 +211,11 @@ public class ImmutableConnectionsTemplate_471E9257 extends AbstractConnection {
 		return mcastGroup;
 	}
 
+	@Override
+	public String getType() {
+		return type;
+	}
+	
 	@Override
 	public String getConsistentUniqueReadableIdentifier() {
 		return consistentUniqueReadableIdentifier;

@@ -111,7 +111,6 @@ class PyTAKStreamingProto:
 
             self.logger.debug(data)
 
-
             msg = CotMessage(msg=data)
             if msg.server_protocol_version_support() == '1':
                 response = CotMessage(uid=msg.uid)
@@ -133,38 +132,43 @@ class PyTAKStreamingProto:
         else:
             data = await reader.read(reader._limit)
         while True:
-            if self.mission_config.get("react_to_change_message", False):
-                if leftovers is None:
-                    fullbuffer = data
-                else:
-                    fullbuffer = leftovers + data
-                    leftovers = None
-                while len(fullbuffer) > 0:
-                    if msg_size == 0:  # get the message size
-                        first_byte = fullbuffer[0].to_bytes(1, byteorder="big")
-                        if first_byte != b'\xbf':
-                            raise Exception("Magic byte is wrong: " + str(first_byte))
-                        msg_size = get_msg_size(fullbuffer[1:])
-                        if not msg_size:
-                            leftovers = fullbuffer
-                            break
-                    if len(fullbuffer) < msg_size:
+            
+            if leftovers is None:
+                fullbuffer = data
+            else:
+                fullbuffer = leftovers + data
+                leftovers = None
+            while len(fullbuffer) > 0:
+                if msg_size == 0:  # get the message size
+                    first_byte = fullbuffer[0].to_bytes(1, byteorder="big")
+                    if first_byte != b'\xbf':
+                        raise Exception("Magic byte is wrong: " + str(first_byte))
+                    msg_size = get_msg_size(fullbuffer[1:])
+                    if not msg_size:
                         leftovers = fullbuffer
                         break
+                if len(fullbuffer) < msg_size:
+                    leftovers = fullbuffer
+                    break
 
-                    next_msg = fullbuffer[:msg_size]
-                    fullbuffer = fullbuffer[msg_size:]
+                next_msg = fullbuffer[:msg_size]
+                fullbuffer = fullbuffer[msg_size:]
+                
+                if self.mission_config.get("react_to_change_message", False):
                     await self.read_socket.send(next_msg)
-                    leftovers = None
-                    msg_size = 0
+                    
+                connection_data = self.data_dict[self.uid]
+                connection_data['read'] += 1
+                #connection_data['bytes'] += len(data)
+                self.data_dict[self.uid] = connection_data
+                    
+                leftovers = None
+                msg_size = 0
+                
             data = await reader.read(reader._limit)
             if data == b'':
                 await asyncio.sleep(0.0001)
 
-            #connection_data = self.data_dict[self.uid]
-            #connection_data['read'] += count
-            #connection_data['bytes'] += len(data)
-            #self.data_dict[self.uid] = connection_data
 
     async def send_self_sa(self, writer):
         self_sa_message = CotProtoMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]))
@@ -249,8 +253,6 @@ class PyTAKStreamingProto:
                     await self.send_self_sa(writer)
                 elif write_action == "mission_cot":
                     await self.send_mission_cot(writer)
-                # elif write_action == "data_sync":
-                #     await asyncio.get_event_loop().run_in_executor(self.pool, self.data_sync_sess.make_requests)
                 await asyncio.get_event_loop().run_in_executor(self.pool, partial(data_sync_thread.join, timeout=0.1))
                 if not data_sync_thread.is_alive():
                     raise RuntimeError("There was a mission api exception")
@@ -288,6 +290,9 @@ class PyTAKStreamingProto:
                     for i in range(POOL_SIZE):
                         self.read_pool.apply_async(read_thread_zmq, args=(port, data_sync_port))
                     await asyncio.sleep(1)
+
+                # get list of recent client connect / disconnect events
+                self.data_sync_sess.get_client_endpoints()
 
                 read_task = asyncio.ensure_future(self.read_handler(reader))
                 write_task = asyncio.ensure_future(self.write_handler(writer))

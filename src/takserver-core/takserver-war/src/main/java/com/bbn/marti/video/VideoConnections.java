@@ -9,18 +9,15 @@ package com.bbn.marti.video;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-
-import com.bbn.marti.video.Feed;
 
 
 @XmlRootElement(name = "videoConnections")
 public class VideoConnections {
 
-    public VideoConnections() { 
-    	this.feeds = new ArrayList<Feed>();
+    public VideoConnections() {
+		this.feeds = new ArrayList<Feed>();
     }
 
 	@XmlElement(name = "feed")

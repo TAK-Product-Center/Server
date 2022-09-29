@@ -1,6 +1,7 @@
 package com.bbn.marti.excheck;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLDecoder;
 import java.rmi.RemoteException;
 import java.text.SimpleDateFormat;
@@ -35,6 +36,7 @@ import com.bbn.marti.sync.model.MissionChange;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.cert.exception.NotFoundException;
+import com.google.common.io.ByteStreams;
 
 import tak.server.Constants;
 
@@ -76,7 +78,7 @@ public class ExCheckAPI extends BaseRestController {
         Checklist checklist = null;
 
         if (contentType != null && contentType.compareToIgnoreCase("application/xml") == 0) {
-            payload = UploadServlet.readByteArray(request.getInputStream());
+            payload = readByteArray(request.getInputStream());
             String xml = new String(payload);
 
             checklist = exCheckService.checklistFromXml(xml);
@@ -90,7 +92,7 @@ public class ExCheckAPI extends BaseRestController {
         } else {
 
             if (contentType == null || !contentType.contains("multipart/form-data")) {
-                payload = UploadServlet.readByteArray(request.getInputStream());
+                payload = readByteArray(request.getInputStream());
             } else {
                 MultipartHttpServletRequest multipartRequest = (MultipartHttpServletRequest) request;
                 MultipartFile mpf = multipartRequest.getFile("assetfile");
@@ -553,4 +555,19 @@ public class ExCheckAPI extends BaseRestController {
                 checklistUid, missionService.trimName(missionName), clientUid, martiUtil.getGroupBitVector(request));
         return new ResponseEntity(HttpStatus.OK);
     }
+    
+    /**
+	 * Utility method that reads a byte array from an input stream using Guava.
+	 * 
+	 * @param in
+	 *            any InputStream containing some data
+	 * @return the InputStream's contents as a byte array; may be size 0 but
+	 *         will not be null.
+	 * @throws IOException
+	 *             if a read error occurs
+	 */
+	private byte[] readByteArray(InputStream in) throws IOException {
+	    
+	    return ByteStreams.toByteArray(in);
+	}
 }

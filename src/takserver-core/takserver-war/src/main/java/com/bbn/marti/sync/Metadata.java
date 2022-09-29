@@ -20,7 +20,6 @@ import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 
 import com.bbn.security.web.MartiValidator;
-import com.google.common.collect.ImmutableMap;
 
 /**
  * Metadata describing a specific resource in the Marti Enterprise Sync feature.
@@ -517,6 +516,9 @@ public class Metadata implements Serializable {
 			}
  		}
 	}
-	
-	
+
+	@Override
+	public String toString() {
+		return "Metadata [fields=" + fields + "] json: " + toJSONObject();
+	}
 }

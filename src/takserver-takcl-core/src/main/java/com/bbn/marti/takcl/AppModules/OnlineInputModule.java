@@ -1,11 +1,16 @@
 package com.bbn.marti.takcl.AppModules;
 
-import com.bbn.marti.config.Network;
+import java.util.Collection;
+
+import org.jetbrains.annotations.NotNull;
+
+import com.bbn.marti.config.Input;
 import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.groups.ConnectionModifyResult;
 import com.bbn.marti.remote.groups.NetworkInputAddResult;
-import com.bbn.marti.takcl.AppModules.generic.ServerAppModuleInterface;
+import com.bbn.marti.remote.service.InputManager;
 import com.bbn.marti.takcl.TakclIgniteHelper;
+import com.bbn.marti.takcl.AppModules.generic.ServerAppModuleInterface;
 import com.bbn.marti.takcl.cli.simple.Command;
 import com.bbn.marti.takcl.config.common.TakclRunMode;
 import com.bbn.marti.test.shared.data.connections.AbstractConnection;
@@ -14,10 +19,6 @@ import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import com.bbn.marti.test.shared.data.templates.ImmutableConnectionsTemplate_471E9257;
-import org.jetbrains.annotations.NotNull;
-import com.bbn.marti.remote.service.InputManager;
-
-import java.util.Collection;
 
 /**
  * Used to modify the server's inputs through an online remote interface. Will not work if there is no server to connect to.
@@ -75,7 +76,7 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 	 */
 	@Command(description = "Adds a network input with the specified getConsistentUniqueReadableIdentifier, protocol, and port to the server.")
 	public NetworkInputAddResult add(@NotNull ProtocolProfiles protocol, @NotNull String port, @NotNull String name) {
-		Network.Input input = new Network.Input();
+		Input input = new Input();
 		input.setName(name);
 		input.setProtocol(protocol.getValue());
 		input.setPort(Integer.parseInt(port));
@@ -87,7 +88,7 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 		return inputManager.createInput(input);
 	}
 
-	public NetworkInputAddResult add(Network.Input input) {
+	public NetworkInputAddResult add(Input input) {
 		return inputManager.createInput(input);
 	}
 
@@ -117,6 +118,10 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 
 	public void add(AbstractConnection networkInput) {
 		inputManager.createInput(networkInput.getConfigInput());
+	}
+	
+	public void addDataFeed(AbstractConnection networkInput) {
+		inputManager.createDataFeed(networkInput.getConfigDataFeed());
 	}
 
 	/**
@@ -152,9 +157,20 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 	public void remove(String name) {
 		inputManager.deleteInput(name);
 	}
+	
+	/**
+	 * Removes the dataFeed with the specified getConsistentUniqueReadableIdentifier
+	 *
+	 * @param name The getConsistentUniqueReadableIdentifier of the data feed to remove
+	 * @command
+	 */
+	@Command(description = "Removes the data feed with the specified getConsistentUniqueReadableIdentifier.")
+	public void removeDataFeed(String name) {
+		inputManager.deleteDataFeed(name);
+	}
 
 	public Collection<InputMetric> getInputMetricList() {
-		return inputManager.getInputMetrics();
+		return inputManager.getInputMetrics(false);
 	}
 
 	/**
@@ -169,7 +185,7 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 		String printString = "";
 
 		for (InputMetric inputMetric : inputMetrics) {
-			Network.Input input = inputMetric.getInput();
+			Input input = inputMetric.getInput();
 			String groupString = null;
 
 			for (String group : input.getFiltergroup()) {
@@ -196,8 +212,8 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 //    }
 //
 	public ConnectionModifyResult addInputToGroup(@NotNull String inputIdentifier, @NotNull String groupName) {
-		Collection<InputMetric> inputMetrics = inputManager.getInputMetrics();
-		Network.Input modInput = null;
+		Collection<InputMetric> inputMetrics = inputManager.getInputMetrics(false);
+		Input modInput = null;
 
 		for (InputMetric im : inputMetrics) {
 			if (im.getInput().getName().equals(inputIdentifier)) {
@@ -214,8 +230,8 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 	}
 
 	public ConnectionModifyResult removeInputFromGroup(@NotNull String inputIdentifier, @NotNull String groupName) {
-		Collection<InputMetric> inputMetrics = inputManager.getInputMetrics();
-		Network.Input modInput = null;
+		Collection<InputMetric> inputMetrics = inputManager.getInputMetrics(false);
+		Input modInput = null;
 
 		for (InputMetric im : inputMetrics) {
 			if (im.getInput().getName().equals(inputIdentifier)) {

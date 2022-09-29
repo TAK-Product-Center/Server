@@ -1,0 +1,45 @@
+# Command: python3 tak_tester.py --config <this_yml_file> --test-pytak
+# Command: python3 tak_tester.py --config <this_yml_file> --test-pytak-proto
+
+connection:
+  host: "172.31.83.222"
+  tls: 8089
+  https: 8443
+  udp: 8087
+
+authentication:
+  cert: "/home/centos/user.p12"
+  password: "atakatak" # if no password, use empty string
+
+
+PyTAK:
+  self_sa_delta: 3600 # seconds
+  offset: 1.0 # time between starting clients
+  clients: 400
+
+  websocket_path: "takproto/1"
+
+  missions:
+    random: False
+    subscribe:
+      - mission_datafeed_load_test
+    send_mission_cot: False
+    mission_write_interval: 20 # seconds
+
+Missions:
+  creatorUid: PyTAK-1
+  group: __ANON__
+
+  missions:
+    - mission_datafeed_load_test:
+        description: "Load test datafeed!"
+        #datafeed_uuids: 
+        # - "feedUUID_loadtest_1"
+        # - "feedUUID_loadtest_2"
+        # - "feedUUID_loadtest_3"
+        datafeed_uuid_pattern:
+           pattern: feedUUID_loadtest_[i]
+           start_i: 1
+           end_i: 50
+
+

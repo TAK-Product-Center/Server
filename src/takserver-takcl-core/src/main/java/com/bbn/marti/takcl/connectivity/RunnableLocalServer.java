@@ -1,20 +1,25 @@
 package com.bbn.marti.takcl.connectivity;
 
-import com.bbn.marti.config.Network;
-import com.bbn.marti.takcl.TAKCLCore;
-import com.bbn.marti.takcl.TestExceptions;
-import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
-import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
-import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
-import org.jetbrains.annotations.Nullable;
-
 import java.io.Console;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+import org.jetbrains.annotations.Nullable;
+
+import com.bbn.marti.config.Input;
+import com.bbn.marti.config.Network;
+import com.bbn.marti.takcl.TAKCLCore;
+import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
+import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
+import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 
 public class RunnableLocalServer extends AbstractRunnableServer {
 
@@ -136,15 +141,15 @@ public class RunnableLocalServer extends AbstractRunnableServer {
 	protected void innerConfigureServer(@Nullable String sessionIdentifier, boolean enableRemoteDebug) {
 		// Removing default inputs from servers other than SERVER_0 since they will cause bind conflicts
 		if (!serverIdentifier.getConsistentUniqueReadableIdentifier().equals(ImmutableServerProfiles.SERVER_0.getConsistentUniqueReadableIdentifier())) {
-			List<Network.Input> inputList = new LinkedList<>(this.getOfflineConfigModule().getInputs());
-			for (Network.Input input : inputList) {
+			List<Input> inputList = new LinkedList<>(this.getOfflineConfigModule().getInputs());
+			for (Input input : inputList) {
 				if ((input.getPort() == 8088 && input.getName().equals("streamtcp")) ||
 						(input.getPort() == 8087 && (input.getName().equals("stdudp") || input.getName().equals("stdtcp")))) {
 					this.getOfflineConfigModule().removeInput(input.getName());
 				}
 			}
 		} else {
-			for (Network.Input input : this.getOfflineConfigModule().getInputs()) {
+			for (Input input : this.getOfflineConfigModule().getInputs()) {
 				Integer networkVersion = ProtocolProfiles.getInputByValue(input.getProtocol()).getCoreNetworkVersion();
 				if (networkVersion != null) {
 					input.setCoreVersion(networkVersion);
@@ -164,15 +169,6 @@ public class RunnableLocalServer extends AbstractRunnableServer {
 		String serverPath = serverIdentifier.getServerPath();
 
 		Map<String, String> additionalEnvironmentVariables = new HashMap<>();
-
-
-//		try {
-//			ProcessBuilder psProcessBuilder = new ProcessBuilder("ps", "-aux");
-//			initFilepaths(sessionIdentifier, startTimeMs, "psaux", psProcessBuilder);
-//			psProcessBuilder.start().waitFor();
-//		} catch (IOException | InterruptedException e) {
-//			throw new RuntimeException(e);
-//		}
 
 		List<String> profiles;
 		if (TAKCLCore.useMonolithProfile) {

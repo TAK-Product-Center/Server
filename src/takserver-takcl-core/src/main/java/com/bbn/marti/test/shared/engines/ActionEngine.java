@@ -410,6 +410,17 @@ public class ActionEngine implements EngineInterface {
 		System.out.println("Removing input \"" + input.getConsistentUniqueReadableIdentifier() + "\"(" + tTot + "s).");
 		sleep(SLEEP_ADDREMOVE_INPUT);
 	}
+	
+	@Override
+	public void onlineRemoveDataFeedAndVerify(@NotNull AbstractConnection dataFeed) {
+		data.engineIterationDataClear();
+		double t0 = System.currentTimeMillis();
+		serverManager.getServerInstance(dataFeed.getServer()).getOnlineInputModule().removeDataFeed(dataFeed.getConsistentUniqueReadableIdentifier());
+		double t1 = System.currentTimeMillis();
+		double tTot = (t1 - t0) / 1000;
+		System.out.println("Removing data feed \"" + dataFeed.getConsistentUniqueReadableIdentifier() + "\"(" + tTot + "s).");
+		sleep(SLEEP_ADDREMOVE_INPUT);
+	}
 
 	@Override
 	public void attemptSendFromUserAndVerify(@NotNull AbstractUser sendingUser, @NotNull AbstractUser... targetUsers) {
@@ -539,6 +550,23 @@ public class ActionEngine implements EngineInterface {
 			sleep(SLEEP_TIME_GROUP_MANIPULATION);
 		}
 	}
+	
+	@Override
+	public void onlineAddDataFeed(@NotNull AbstractConnection dataFeed) {
+		data.engineIterationDataClear();
+		double t0 = System.currentTimeMillis();
+		serverManager.getServerInstance(dataFeed.getServer()).getOnlineInputModule().addDataFeed(dataFeed);
+		double t1 = System.currentTimeMillis();
+		double tTot = (t1 - t0) / 1000;
+		serverManager.getServerInstance(dataFeed.getServer()).getOnlineInputModule().addDataFeed(dataFeed);
+		System.out.println("Added input \"" + dataFeed.getConsistentUniqueReadableIdentifier() + "\"(" + tTot + "s).");
+		sleep(SLEEP_ADDREMOVE_INPUT);
+
+		for (GroupProfiles group : dataFeed.getGroupSet().getGroups()) {
+			serverManager.getServerInstance(dataFeed.getServer()).getOnlineInputModule().addInputToGroup(dataFeed.getConsistentUniqueReadableIdentifier(), group.name());
+			sleep(SLEEP_TIME_GROUP_MANIPULATION);
+		}
+	}
 
 	@Override
 	public void startServer(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier) {
@@ -598,6 +626,15 @@ public class ActionEngine implements EngineInterface {
 		serverManager.getServerInstance(targetServer).getOfflineConfigModule().addInput(targetInput.getConfigInput());
 		serverManager.getServerInstance(serverProvidingSubscription).getOfflineConfigModule().addStaticSubscription(targetInput.generateMatchingStaticSubscription());
 		System.out.println("Static subsciption added to server '" + serverProvidingSubscription + "' for input '" + targetInput + "'.");
+	}
+	
+	@Override
+	public void offlineAddSubscriptionFromDataFeedToServer(@NotNull AbstractConnection targetDataFeed, @NotNull AbstractServerProfile serverProvidingSubscription) {
+		data.engineIterationDataClear();
+		AbstractServerProfile targetServer = targetDataFeed.getServer();
+		serverManager.getServerInstance(targetServer).getOfflineConfigModule().addDataFeed(targetDataFeed.getConfigDataFeed());
+		serverManager.getServerInstance(serverProvidingSubscription).getOfflineConfigModule().addStaticSubscription(targetDataFeed.generateMatchingStaticSubscription());
+		System.out.println("Static subsciption added to server '" + serverProvidingSubscription + "' for data feed '" + targetDataFeed + "'.");
 	}
 
 	@Override

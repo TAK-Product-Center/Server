@@ -27,7 +27,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.concurrent.DefaultThreadFactory;
 
 public class Resources {
 

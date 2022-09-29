@@ -107,7 +107,6 @@ public class LogServlet extends EsapiServlet {
   	            while ((count = zis.read(data, 0, BUFFER)) != -1) {
   	               bos.write(data, 0, count);
   	            }
-  	            String fileContents = new String(bos.toByteArray(), "UTF-8");
 
   	            // create a Log object and store in the db
   	            Log log = new Log();
@@ -116,7 +115,7 @@ public class LogServlet extends EsapiServlet {
 				log.setPlatform(platform);
 				log.setMajorVersion(majorVersion);
 				log.setMinorVersion(minorVersion);
-				log.setLog(fileContents);
+				log.setContents(bos.toByteArray());
 				log.setFilename(entry.getName());
   	            persistenceStore.addLog(log);
   	              	            
@@ -159,14 +158,12 @@ public class LogServlet extends EsapiServlet {
 		      	Log log = persistenceStore.getLog(logId);
 	
 		        response.setContentType("text/plain");
-		        int contentLength = log.getLog().length();
+		        int contentLength = log.getContents().length;
 		        response.setContentLength(contentLength);
-		        
-				response.addHeader(
-						"Content-Disposition", 
-						"attachment; filename=" + ids[0] + "_" + log.getFilename());
-		      	
-		       response.getWriter().write(log.getLog());
+				String contentDisposition = "attachment; filename=" + ids[0] + "_" + log.getFilename();
+				contentDisposition = validator.getValidInput("Content Disposition", contentDisposition, "Filename", MartiValidator.DEFAULT_STRING_CHARS, false);
+				response.addHeader("Content-Disposition", contentDisposition);
+		        response.getOutputStream().write(log.getContents());
 	      	}
 	      	
 	      	//
@@ -188,7 +185,7 @@ public class LogServlet extends EsapiServlet {
 					}
 
       		        zos.putNextEntry(new ZipEntry(nextId + "_" + log.getFilename()));
-      		        zos.write(log.getLog().getBytes());
+      		        zos.write(log.getContents());
       		        zos.closeEntry();
 	      		}
       		    zos.close();

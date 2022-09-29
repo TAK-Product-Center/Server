@@ -3,10 +3,15 @@
 <%@ page import="java.lang.*" %>
 <%@ page import="org.owasp.esapi.ESAPI" %>
 <%@ page import="com.bbn.marti.video.Feed" %>
+<%@ page import="com.bbn.marti.util.CommonUtil" %>
+<%@ page import="com.bbn.marti.util.spring.SpringContextBeanForApi" %>
 
 
 <%
-	String title = "Add";
+  CommonUtil martiUtil = SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class);
+  String groupVector = martiUtil.getGroupBitVector(request);
+
+  String title = "Add";
   String action = "Add";
   String active = "true";
   String uuid = UUID.randomUUID().toString();
@@ -33,7 +38,7 @@
   if (feedId != null) {
     title = "Edit";
     action = "Save";
-    Feed feed = com.bbn.marti.util.spring.SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.video.VideoManagerService.class).getFeed(Integer.parseInt(feedId));
+    Feed feed = com.bbn.marti.util.spring.SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.video.VideoManagerService.class).getFeed(Integer.parseInt(feedId), groupVector);
     uuid = feed.getUuid();
     active = Boolean.toString(feed.getActive());
     alias = feed.getAlias();

@@ -76,6 +76,9 @@ public class MutableConnection extends AbstractConnection {
 	@Nullable
 	private final String mcastGroup;
 
+	@Nullable
+	private final String type;
+
 	@NotNull
 	private final AbstractServerProfile serverProfile;
 
@@ -129,6 +132,11 @@ public class MutableConnection extends AbstractConnection {
 	}
 
 	@Override
+	public String getType() {
+		return type;
+	}
+
+	@Override
 	public String getConsistentUniqueReadableIdentifier() {
 		return consistentUniqueReadableIdentifier;
 	}
@@ -161,6 +169,7 @@ public class MutableConnection extends AbstractConnection {
 		this.originalRawAnonAccess = immutableConnection.getRawAnonAccessFlag();
 		this.rawAnonAccess = this.originalRawAnonAccess;
 		this.mcastGroup = immutableConnection.getMCastGroup();
+		this.type = immutableConnection.getType();
 	}
 
 	public MutableConnection(@NotNull String identifier, @NotNull BaseConnections connectionModel, int port, @NotNull AbstractServerProfile serverProfile) {
@@ -174,6 +183,7 @@ public class MutableConnection extends AbstractConnection {
 		this.originalRawAnonAccess = connectionModel.getRawAnon();
 		this.rawAnonAccess = this.originalRawAnonAccess;
 		this.mcastGroup = connectionModel.getMcastGroup();
+		this.type = connectionModel.getType();
 	}
 
 	public void removeFromGroup(@NotNull GroupProfiles group) {

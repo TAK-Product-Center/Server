@@ -21,7 +21,6 @@ import java.util.concurrent.ConcurrentMap;
  * We may want to extend it do offer more functionality. 
  *  
  * TODO Discuss putting in the PluginContext for use by all plugins
- * 
  *
  */
 public final class MetadataUtils {

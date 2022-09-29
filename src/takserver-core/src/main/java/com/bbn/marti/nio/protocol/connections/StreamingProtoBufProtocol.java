@@ -158,11 +158,14 @@ public class StreamingProtoBufProtocol extends AbstractBroadcastingProtocol<CotE
         try {
             // set the download url
             Network network = DistributedConfiguration.getInstance().getNetwork();
-            if (network == null || network.getTakServerHost() == null || network.getTakServerHost().length() == 0) {
-                log.error("createFileTransferRequest failed, need to set takServerHost in CoreConfig <network/> ");
+            if (network == null || network.getTakServerHost() == null || network.getTakServerHost().length() == 0
+                || network.getConnector() == null || network.getConnector().size() == 0) {
+                log.error("createFileTransferRequest failed, need to set takServerHost and connector in CoreConfig <network/> ");
                 return null;
             }
-            String url = "https://" + network.getTakServerHost() + ":8443/Marti/api/cot/xml/" + data.getUid();
+
+            Network.Connector connector = network.getConnector().get(0);
+            String url = "https://" + network.getTakServerHost() + ":" + connector.getPort() + "/Marti/api/cot/xml/" + data.getUid();
 
             // compute the hash of the cot that will be downloaded
             String dataXml = Constants.XML_HEADER + data.toCotElement().toCotXml();

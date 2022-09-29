@@ -128,6 +128,20 @@ class MissionApiSession:
         if response.status_code != 200:
             print(("ERROR: ", response.text))
             return
+            
+    def get_client_endpoints(self):
+        
+        cep_url = self.base_url + "api/clientEndPoints"
+        
+        #print("client endpoints url: " + cep_url)
+
+        response = self.get(cep_url)
+        
+        #print(("clientEndPoints response: ", response.text))
+
+        if response.status_code != 200:
+            print(("ERROR: ", response.text))
+            return
 
     def create_mission(self, mission_name,
                        creator_uid=None,
@@ -216,6 +230,13 @@ class MissionApiSession:
         params = {'uid': subscriber_uid}
 
         response = self.delete(unsubscribe_url, params=params)
+        return response
+
+    def add_datafeed_to_mission(self, mission_name, datafeed_uuid, creator_uid):
+        my_url = self.base_mission_api + mission_name + "/feed"
+        params = {'creatorUid': creator_uid, 'dataFeedUid': datafeed_uuid}
+
+        response = self.post(my_url, params=params)
         return response
 
     ########### End Mission Information/Subscription #####################
@@ -445,6 +466,29 @@ class MissionApiSetup(MissionApiSession):
                 for f in attrs.get("files"):
                     self.add_mission_content(name, content_hash=self.file_hash_map.get(f))
 
+            # Add datafeed to mission:
+            if "datafeed_uuids" in attrs:
+                print("Adding datafeeds to mission " + name)
+                for datafeed_uuid in attrs.get("datafeed_uuids"):
+                    self.add_datafeed_to_mission(name, datafeed_uuid = datafeed_uuid, creator_uid=attrs.get("creatorUid", creatorUid))
+                    print("Added datafeed " + datafeed_uuid + " to mission " + name)
+                print("Done adding datafeeds to mission " + name)
+                print()
+            if "datafeed_uuid_pattern" in attrs:
+                pattern = attrs.get("datafeed_uuid_pattern").get("pattern")
+                start_i = attrs.get("datafeed_uuid_pattern").get("start_i")
+                end_i = attrs.get("datafeed_uuid_pattern").get("end_i")
+                if (pattern is None or start_i is None or end_i is None):
+                    print("ERROR: missing params in datafeed_uuid_pattern")
+                    exit(1)
+                print("Adding datafeeds with pattern " + pattern + " to mission " + name)
+                for i in range(int(start_i), int(end_i)+1):
+                    datafeed_uuid = pattern.replace("[i]", str(i))
+                    self.add_datafeed_to_mission(name, datafeed_uuid = datafeed_uuid, creator_uid=attrs.get("creatorUid", creatorUid))
+                    print("Added datafeed " + datafeed_uuid + " to mission " + name)
+                print("Done adding datafeeds with pattern " + pattern + " to mission" + name)
+
+
     def cleanup(self):
         print("cleaning up initialization data on server")
         self.delete_all_test_files()
@@ -562,6 +606,7 @@ class MissionApiPyTAKHelper(MissionApiSession):
                 c['data']['downloaded'] = True
 
     def make_requests(self):
+        
         if self.do_write:
             if len(self.all_missions) == 0:
                 self.get_all_missions()
@@ -671,13 +716,3 @@ class MissionApiPyTAKHelper(MissionApiSession):
 
         return True
 
-# if __name__ == "__main__":
-#
-#     cert = "certs/takserver.p12"
-#     password = "atakatak"
-#     host = "3.236.246.198"
-#     port = 8443
-#     m = MissionApiSession(host, port, certfile=cert, password=password, uid="load-test-12")
-#
-#     pprint(m.search_files())
-#     m.delete_all_test_files()

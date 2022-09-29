@@ -8,10 +8,23 @@ package atakmap.commoncommo.protobuf.v1;
 message Message {
     TakMessage payload = 1;
 
-    string source = 2;    
+    string source = 2;
+    
+    string clientId = 3;
 
-    repeated string groups = 3;
+    repeated string groups = 4;
+    
+    repeated string destClientUids = 5;
+    
+    repeated string destCallsigns = 6;
+    
+    repeated string provenance = 7;
+    
+    bool archive = 8;
+    
+    string feedUuid = 9;
 
-    string clientId = 4;
+    string connectionId = 10;
+
 }
 

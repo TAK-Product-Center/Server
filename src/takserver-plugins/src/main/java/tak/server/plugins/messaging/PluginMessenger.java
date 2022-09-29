@@ -50,7 +50,7 @@ public class PluginMessenger implements Messenger<Message> {
 		// if callsigns or uids are specified, set them in the message 
 		if (message.getDestCallsignsCount() != 0 || message.getDestClientUidsCount() != 0) {
 			Message.Builder mb = message.toBuilder(); 
-
+			
 			Detail.Builder db = mb.getPayloadBuilder().getCotEventBuilder().getDetailBuilder();
 			
 			try {

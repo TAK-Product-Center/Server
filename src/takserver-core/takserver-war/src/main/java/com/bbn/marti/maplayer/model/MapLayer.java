@@ -4,20 +4,15 @@ import java.io.Serializable;
 import java.util.Date;
 import java.util.Objects;
 
-import javax.persistence.Cacheable;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
+import javax.persistence.*;
+import javax.xml.bind.annotation.XmlTransient;
 
+import com.bbn.marti.sync.model.Mission;
 import org.jetbrains.annotations.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.swagger.annotations.ApiModel;
 import tak.server.Constants;
@@ -26,6 +21,7 @@ import tak.server.Constants;
 @Table(name = "maplayer")
 @Cacheable
 @ApiModel
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class MapLayer implements Serializable, Comparable<MapLayer> {
 
 	/**
@@ -33,25 +29,74 @@ public class MapLayer implements Serializable, Comparable<MapLayer> {
 	 */
 	private static final long serialVersionUID = 1L;
 	private Long id;
+	private Integer minZoom;
+	private Integer maxZoom;
+    private Double north;
+    private Double south;
+    private Double east;
+    private Double west;
     private String uid;
     private String creatorUid;
     private String name;
     private String description;
-    private String type; // MapTile or WMS
+    private String type = "MapTile"; // MapTile or WMS
     private String url;
+    private String tileType;
+    private String serverParts;
+    private String backgroundColor;
+    private String tileUpdate;
+    private String additionalParameters;
+    private String coordinateSystem;
+    private String version;
+    private String layers;
+    private Integer opacity;
     private Date createTime;
     private Date modifiedTime;
     private boolean defaultLayer;
     private boolean enabled;
+    private boolean ignoreErrors;
+    private boolean invertYCoordinate;
+    protected Mission mission;
 
 
     public MapLayer() {
+    }
+
+    public MapLayer(MapLayer other) {
+        this.minZoom = other.minZoom;
+        this.maxZoom = other.maxZoom;
+        this.north = other.north;
+        this.south = other.south;
+        this.east = other.east;
+        this.west = other.west;
+        //this.uid = other.uid;
+        this.creatorUid = other.creatorUid;
+        this.name = other.name;
+        this.description = other.description;
+        this.type = other.type;
+        this.url = other.url;
+        this.tileType = other.tileType;
+        this.serverParts = other.serverParts;
+        this.backgroundColor = other.backgroundColor;
+        this.tileUpdate = other.tileUpdate;
+        this.additionalParameters = other.additionalParameters;
+        this.coordinateSystem = other.coordinateSystem;
+        this.layers = other.layers;
+        this.createTime = other.createTime;
+        this.modifiedTime = other.modifiedTime;
+        this.defaultLayer = other.defaultLayer;
+        this.enabled = other.enabled;
+        this.ignoreErrors = other.ignoreErrors;
+        this.invertYCoordinate = other.invertYCoordinate;
+        this.opacity = other.opacity;
+        this.version = other.version;
     }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", unique = true, nullable = false)
     @JsonIgnore
+    @XmlTransient
     public Long getId() {
         return id;
     }
@@ -154,15 +199,201 @@ public class MapLayer implements Serializable, Comparable<MapLayer> {
         this.defaultLayer = defaultLayer;
     }
 
+    @Column(name = "min_zoom")
+    public Integer getMinZoom() {
+        return minZoom;
+    }
+
+    public void setMinZoom(Integer minZoom) {
+        this.minZoom = minZoom;
+    }
+
+    @Column(name = "max_zoom")
+    public Integer getMaxZoom() {
+        return maxZoom;
+    }
+
+    public void setMaxZoom(Integer maxZoom) {
+        this.maxZoom = maxZoom;
+    }
+
+    @Column(name = "tile_type")
+    public String getTileType() {
+        return tileType;
+    }
+
+    public void setTileType(String tileType) {
+        this.tileType = tileType;
+    }
+
+    @Column(name = "server_parts")
+    public String getServerParts() {
+        return serverParts;
+    }
+
+    public void setServerParts(String serverParts) {
+        this.serverParts = serverParts;
+    }
+
+    @Column(name = "background_color")
+    public String getBackgroundColor() {
+        return backgroundColor;
+    }
+
+    public void setBackgroundColor(String backgroundColor) {
+        this.backgroundColor = backgroundColor;
+    }
+
+    @Column(name = "tile_update")
+    public String getTileUpdate() {
+        return tileUpdate;
+    }
+
+    public void setTileUpdate(String tileUpdate) {
+        this.tileUpdate = tileUpdate;
+    }
+
+    @Column(name = "ignore_errors")
+    public boolean isIgnoreErrors() {
+        return ignoreErrors;
+    }
+
+    public void setIgnoreErrors(boolean ignoreErrors) {
+        this.ignoreErrors = ignoreErrors;
+    }
+
+    @Column(name = "invert_y_coordinate")
+    public boolean isInvertYCoordinate() {
+        return invertYCoordinate;
+    }
+
+    public void setInvertYCoordinate(boolean invertYCoordinate) {
+        this.invertYCoordinate = invertYCoordinate;
+    }
+
+    @Column(name = "north")
+    public Double getNorth() {
+        return north;
+    }
+
+    public void setNorth(Double north) {
+        this.north = north;
+    }
+
+    @Column(name = "south")
+    public Double getSouth() {
+        return south;
+    }
+
+    public void setSouth(Double south) {
+        this.south = south;
+    }
+
+    @Column(name = "east")
+    public Double getEast() {
+        return east;
+    }
+
+    public void setEast(Double east) {
+        this.east = east;
+    }
+
+    @Column(name = "west")
+    public Double getWest() {
+        return west;
+    }
+
+    public void setWest(Double west) {
+        this.west = west;
+    }
+
+    @Column(name = "additional_parameters")
+    public String getAdditionalParameters() {
+        return additionalParameters;
+    }
+
+    public void setAdditionalParameters(String additionalParameters) {
+        this.additionalParameters = additionalParameters;
+    }
+
+    @Column(name = "coordinate_system")
+    public String getCoordinateSystem() {
+        return coordinateSystem;
+    }
+
+    public void setCoordinateSystem(String coordinateSystem) {
+        this.coordinateSystem = coordinateSystem;
+    }
+
+    @Column(name = "layers")
+    public String getLayers() {
+        return layers;
+    }
+
+    public void setLayers(String layers) {
+        this.layers = layers;
+    }
+
+    @Column(name = "version")
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+
+    @Column(name = "opacity")
+    public Integer getOpacity() {
+        return opacity;
+    }
+
+    public void setOpacity(Integer opacity) {
+        this.opacity = opacity;
+    }
+
+
+    @JsonIgnore
+    @XmlTransient
+    @ManyToOne
+    @JoinColumn(name="mission_id")
+    public Mission getMission() { return mission; }
+    public void setMission(Mission mission) { this.mission = mission; }
+
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         MapLayer mapLayer = (MapLayer) o;
-        return Objects.equals(uid, mapLayer.uid) &&
-                Objects.equals(url, mapLayer.url) &&
+        return
+                Objects.equals(minZoom, mapLayer.minZoom) &&
+                Objects.equals(maxZoom, mapLayer.maxZoom) &&
+                Objects.equals(north, mapLayer.north) &&
+                Objects.equals(south, mapLayer.south) &&
+                Objects.equals(east, mapLayer.east) &&
+                Objects.equals(west, mapLayer.west) &&
+                Objects.equals(uid, mapLayer.uid) &&
+                Objects.equals(creatorUid, mapLayer.creatorUid) &&
                 Objects.equals(name, mapLayer.name) &&
-                Objects.equals(type, mapLayer.type);
+                Objects.equals(description, mapLayer.description) &&
+                Objects.equals(type, mapLayer.type) &&
+                Objects.equals(url, mapLayer.url) &&
+                Objects.equals(tileType, mapLayer.tileType) &&
+                Objects.equals(serverParts, mapLayer.serverParts) &&
+                Objects.equals(backgroundColor, mapLayer.backgroundColor) &&
+                Objects.equals(tileUpdate, mapLayer.tileUpdate) &&
+                Objects.equals(additionalParameters, mapLayer.additionalParameters) &&
+                Objects.equals(coordinateSystem, mapLayer.coordinateSystem) &&
+                Objects.equals(layers, mapLayer.layers) &&
+                Objects.equals(createTime, mapLayer.createTime) &&
+                Objects.equals(modifiedTime, mapLayer.modifiedTime) &&
+                Objects.equals(defaultLayer, mapLayer.defaultLayer) &&
+                Objects.equals(enabled, mapLayer.enabled) &&
+                Objects.equals(ignoreErrors, mapLayer.ignoreErrors) &&
+                Objects.equals(invertYCoordinate, mapLayer.invertYCoordinate) &&
+                Objects.equals(opacity, mapLayer.opacity) &&
+                Objects.equals(version, mapLayer.version);
     }
 
     @Override
@@ -191,5 +422,4 @@ public class MapLayer implements Serializable, Comparable<MapLayer> {
     public int compareTo(@NotNull MapLayer mapLayer) {
         return 0;
     }
-
 }

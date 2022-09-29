@@ -60,6 +60,7 @@ public class TestRunnerModule implements AppModuleInterface {
 			FederationV2Tests.class,
 			GeneralTests.class,
 			InputTests.class,
+			StreamingDataFeedsTests.class,
 			PointToPointTests.class,
 			SubscriptionTests.class,
 			WebsocketsTests.class,

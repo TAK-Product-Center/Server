@@ -155,10 +155,6 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
         // authenticate using authenticator registered in group manager
         try {
             authResult = groupManager.authenticate(authenticatorName, user);
-
-            if (logger.isDebugEnabled()) {
-            	logger.debug("auth result: " + authResult);
-            }
         } catch (RemoteLookupFailureException e) {
             throw new CoreCommunicationException("Unable to establish connection with TAK Server core services", e);
         } catch (OAuth2Exception e) {

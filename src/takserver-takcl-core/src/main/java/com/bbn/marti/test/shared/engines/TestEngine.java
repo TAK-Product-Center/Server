@@ -125,6 +125,16 @@ public class TestEngine implements EngineInterface, Callable<String> {
 			stateEngine.offlineAddSubscriptionFromInputToServer(targetInput, serverProvidingSubscription);
 		}
 	}
+	
+	@Override
+	public void offlineAddSubscriptionFromDataFeedToServer(@NotNull AbstractConnection targetInput, @NotNull AbstractServerProfile serverProvidingSubscription) {
+		if (!TAKCLCore.useRunningServer) {
+			TestLogger.executeEngineCommand("offlineAddSubscriptionFromInputToServer");
+			actionEngine.offlineAddSubscriptionFromDataFeedToServer(targetInput, serverProvidingSubscription);
+			verificationEngine.offlineAddSubscriptionFromDataFeedToServer(targetInput, serverProvidingSubscription);
+			stateEngine.offlineAddSubscriptionFromDataFeedToServer(targetInput, serverProvidingSubscription);
+		}
+	}
 
 	@Override
 	public void offlineFederateServers(boolean useV1Federation, boolean useV2Federation, @NotNull AbstractServerProfile... serversToFederate) {
@@ -204,7 +214,14 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		verificationEngine.onlineRemoveInputAndVerify(input);
 		stateEngine.onlineRemoveInputAndVerify(input);
 	}
-
+	
+	@Override
+	public synchronized void onlineRemoveDataFeedAndVerify(@NotNull AbstractConnection dataFeed) {
+		TestLogger.executeEngineCommand("onlineRemoveDataFeedAndVerify");
+		actionEngine.onlineRemoveDataFeedAndVerify(dataFeed);
+		verificationEngine.onlineRemoveDataFeedAndVerify(dataFeed);
+		stateEngine.onlineRemoveDataFeedAndVerify(dataFeed);
+	}
 
 	@Override
 	public synchronized void onlineAddInput(@NotNull AbstractConnection input) {
@@ -214,6 +231,14 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		stateEngine.onlineAddInput(input);
 	}
 
+	@Override
+	public synchronized void onlineAddDataFeed(@NotNull AbstractConnection input) {
+		TestLogger.executeEngineCommand("onlineAddDataFeed");
+		actionEngine.onlineAddDataFeed(input);
+		verificationEngine.onlineAddDataFeed(input);
+		stateEngine.onlineAddDataFeed(input);
+	}
+	
 
 	@Override
 	/**

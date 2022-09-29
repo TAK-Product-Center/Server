@@ -34,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
@@ -46,6 +47,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
+import org.owasp.esapi.ESAPI;
+import org.owasp.esapi.errors.EncodingException;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.LoggerFactory;
@@ -244,7 +247,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
     		try {
     			interval = Double.parseDouble(intervalParam);
     		} catch (NumberFormatException ex) {
-    			log.warning("Invalid numeric string for parameter 'interval': " + intervalParam);
+    			log.warning("Invalid numeric string for parameter 'interval', double value is required");
     			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid numeric format for time interval.");
     		}
     	}
@@ -254,7 +257,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
     		try {
     			multiTrackThresholdAsInteger = Integer.parseInt(multiTrackThreshold, 10);
     		} catch (NumberFormatException ex) {
-    			log.warning("Invalid numeric string for parameter 'multiTrachThreshold': " + multiTrackThreshold);
+    			log.warning("Invalid numeric string for parameter 'multiTrachThreshold', integer value required");
     			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid numeric format for time interval.");
     		}
     	}
@@ -752,14 +755,15 @@ public class MissionKMLServlet extends LatestKMLServlet {
         
         try {
             String imageUrl = baseUrl + URLEncoder.encode(last.uid, "UTF-8");
-            
-            log.finest("key: " + imageUrl + " images: " + images);
+            if (log.isLoggable(Level.FINEST)) {
+				log.finest("key: " + ESAPI.encoder().encodeForURL(imageUrl));
+			}
             
             if (format.equals(AllowedFormat.kmz) && !images.containsKey(imageUrl)) {
                 imageTag = false;
             }
-        } catch (UnsupportedEncodingException e) { }
-        
+        } catch (UnsupportedEncodingException | EncodingException e) { }
+
         if (cotType.startsWith("b-m-r")) {
             // route
             List<Placemark> ps = buildTimeseriesLineString(qrs, maxStartTime);

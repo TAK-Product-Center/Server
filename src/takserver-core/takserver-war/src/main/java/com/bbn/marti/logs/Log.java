@@ -24,6 +24,7 @@ public class Log {
     private String majorVersion;
     private String minorVersion;
     private String log;
+    private byte[] contents;
     private String filename;
     private List<String> callstacks;
     private Timestamp time;
@@ -73,12 +74,20 @@ public class Log {
         this.minorVersion = minorVersion;
     }     
 
-    public String getLog() {
-        return log;
-    }
+//    public String getLog() {
+//        return log;
+//    }
     public void setLog(String log) {
         this.log = log;
-    }    
+    }
+
+    public byte[] getContents() {
+        return contents;
+    }
+
+    public void setContents(byte[] contents) {
+        this.contents = contents;
+    }
 
     public String getFilename() {
         return filename;

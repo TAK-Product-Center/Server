@@ -41,6 +41,7 @@ public class RequestHolderFilterBean extends GenericFilterBean {
 	private CoreConfig config;
 
 	private final String apiMissions = "/api/missions/";
+	private final String copMissions = "/api/cops/";
 
 	@Override
 	public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
@@ -57,10 +58,17 @@ public class RequestHolderFilterBean extends GenericFilterBean {
 		if (config.getRemoteConfiguration().getNetwork().isAllowAllOrigins()) {
 			resp.setHeader("Access-Control-Allow-Origin", "*");
 			resp.setHeader("Access-Control-Allow-Headers", "*");
+			resp.setHeader("Access-Control-Allow-Methods", "*");
 		}
 
 		String path = req.getRequestURI();
-		int missionStart = path.indexOf(apiMissions);
+		String apiPath = apiMissions;
+		int missionStart = path.indexOf(apiPath);
+
+		if (missionStart == -1) {
+			missionStart = path.indexOf(copMissions);
+			apiPath = copMissions;
+		}
 
 		if (logger.isDebugEnabled()) {
 			
@@ -72,7 +80,7 @@ public class RequestHolderFilterBean extends GenericFilterBean {
 
 			boolean missionCreate = false;
 
-			int missionEnd = path.indexOf("/", missionStart + apiMissions.length());
+			int missionEnd = path.indexOf("/", missionStart + apiPath.length());
 			if (missionEnd == -1) {
 				missionEnd = path.length();
 
@@ -82,7 +90,7 @@ public class RequestHolderFilterBean extends GenericFilterBean {
 				}
 			}
 
-			String missionName = path.substring(missionStart + apiMissions.length(), missionEnd);
+			String missionName = path.substring(missionStart + apiPath.length(), missionEnd);
 			if (missionName != null && !missionName.isEmpty()) {
 
 				missionName = missionService.trimName(missionName);
@@ -93,7 +101,8 @@ public class RequestHolderFilterBean extends GenericFilterBean {
 				//
 				if (missionName.compareTo("all") != 0
 				&& 	missionName.compareTo("logs") != 0
-				&& 	missionName.compareTo("invitations") != 0) {
+				&& 	missionName.compareTo("invitations") != 0
+				&& 	missionName.compareTo("hierarchy") != 0) {
 
 					//
 					// get the mission

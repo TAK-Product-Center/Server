@@ -68,6 +68,7 @@ import com.bbn.marti.config.Security;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.config.Tls.Crl;
 import com.bbn.marti.dao.kml.JDBCCachingKMLDao;
+import com.bbn.marti.feeds.DataFeedService;
 import com.bbn.marti.groups.DummyAuthenticator;
 import com.bbn.marti.groups.FileAuthenticator;
 import com.bbn.marti.groups.FileAuthenticatorAgent;
@@ -75,6 +76,7 @@ import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.groups.OAuthAuthenticator;
 import com.bbn.marti.groups.X509Authenticator;
 import com.bbn.marti.logging.AuditLogUtil;
+import com.bbn.marti.maplayer.MapLayerService;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.SubmissionInterface;
 import com.bbn.marti.remote.SubscriptionManagerLite;
@@ -91,12 +93,15 @@ import com.bbn.marti.service.kml.KMLService;
 import com.bbn.marti.service.kml.KMLServiceImpl;
 import com.bbn.marti.service.kml.KmlIconStrategyJaxb;
 import com.bbn.marti.swaggerconfig.SwaggerConfig;
+import com.bbn.marti.sync.cache.AllCopMissionsCacheKeyGenerator;
 import com.bbn.marti.sync.cache.AllMissionsCacheKeyGenerator;
 import com.bbn.marti.sync.cache.MethodNameMultiStringArgCacheKeyGenerator;
 import com.bbn.marti.sync.model.MissionChange;
+import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.sync.repository.ExternalMissionDataRepository;
 import com.bbn.marti.sync.repository.LogEntryRepository;
 import com.bbn.marti.sync.repository.MissionChangeRepository;
+import com.bbn.marti.sync.repository.MissionFeedRepository;
 import com.bbn.marti.sync.repository.MissionInvitationRepository;
 import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.repository.MissionRoleRepository;
@@ -509,6 +514,11 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
     }
 
 	@Bean
+    public KeyGenerator allCopsMissionsCacheKeyGenerator() {
+        return new AllCopMissionsCacheKeyGenerator();
+    }
+
+	@Bean
     public KeyGenerator methodNameMultiStringArgCacheKeyGenerator() {
         return new MethodNameMultiStringArgCacheKeyGenerator();
     }
@@ -841,6 +851,9 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	}
 
 	@Bean
+	MapLayerService mapLayerService() { return new MapLayerService(); }
+
+	@Bean
 	public SubscriptionManagerProxyHandler subscriptionManagerProxyHandler(CoreConfig config) {
 		return new SubscriptionManagerProxyHandler(config);
 	}
@@ -864,6 +877,9 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
     		ExternalMissionDataRepository externalMissionDataRepository,
     		MissionInvitationRepository missionInvitationRepository,
     		MissionSubscriptionRepository missionSubscriptionRepository,
+    		MissionFeedRepository missionFeedRepository,
+			DataFeedRepository dataFeedRepository,
+    		MapLayerService mapLayerService,
     		GroupManager groupManager,
     		CacheManager cacheManager,
     		CommonUtil commonUtil,
@@ -888,12 +904,20 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	    		externalMissionDataRepository,
 	    		missionInvitationRepository,
 	    		missionSubscriptionRepository,
+	    		missionFeedRepository,
+	    		dataFeedRepository,
+	    		mapLayerService,
 	    		groupManager,
 	    		cacheManager,
 	    		commonUtil,
 	    		missionRoleRepository,
 	    		cotCacheHelper,
 	    		missionCacheHelper);
+	}
+	
+	@Bean
+	DataFeedService dataFeedService(DataSource dataSource, DataFeedRepository dataFeedRepository) {
+		return new DataFeedService(dataSource, dataFeedRepository);
 	}
 
 	@Bean("kmlDao")

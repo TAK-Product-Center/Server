@@ -7,7 +7,10 @@ import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 
+import com.bbn.marti.remote.ServerInfo;
+
 import tak.server.PluginRegistry;
+import tak.server.plugins.PluginApi;
 import tak.server.plugins.PluginStarter;
 
 /*
@@ -82,5 +85,19 @@ public class PluginManagerDependencyInjectionProxy implements ApplicationContext
 		}
 
 		return pluginStarter;
+	}
+	
+	private PluginApi pluginApi = null;
+
+	public PluginApi pluginApi() {
+		if (pluginApi == null) {
+			synchronized (this) {
+				if (pluginApi == null) {
+					pluginApi = springContext.getBean(PluginApi.class);
+				}
+			}
+		}
+
+		return pluginApi;
 	}
 }

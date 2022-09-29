@@ -94,16 +94,12 @@ dependencies {
   compile group: 'com.sun.xml.ws', name: 'jaxws-rt', version: jaxwsrt_version
   compile group: 'org.json', name: 'json', version: json_org_version
   compile group: 'io.jsonwebtoken', name: 'jjwt', version: jsonwebtoken_version
-  
+  compile group: 'org.igniterealtime.whack', name: 'core', version: whack_version
+
   compile 'javax.xml.bind:jaxb-api:' + jaxb_api_version
   compile('javax.activation:activation:1.1')
   compile('org.glassfish.jaxb:jaxb-runtime:' + jaxb_api_version)
   
-
-  // some issue with this dependency
-  //compile group: 'org.igniterealtime', name: 'whack', version: whack_version, ext: 'pom'
-  compile name: 'whack_2_0_1'
-  compile name: 'xml-apis-2.11.0'
   compile name: 'JavaAPIforKml-2.2.2'
 }
 

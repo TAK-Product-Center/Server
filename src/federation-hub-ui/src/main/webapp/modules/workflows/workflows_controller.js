@@ -1,18 +1,64 @@
-
 /* globals joint */
 /* globals $ */
 'use strict';
 
 angular.module('roger_federation.Workflows')
-  .controller('WorkflowsController', ['$scope', '$rootScope', '$window', '$state', '$stateParams', '$interval', '$uibModal',
+  .controller('WorkflowsController', ['$scope', '$rootScope', '$window', '$state', '$stateParams', '$timeout', '$uibModal',
     '$log', '$http', 'uuid4', 'growl', 'WorkflowService', 'OntologyService', 'JointPaper', 'SemanticsService', workflowsController
   ]);
 
-function workflowsController($scope, $rootScope, $window, $state, $stateParams, $interval, $uibModal, $log, $http, uuid4, growl, WorkflowService, OntologyService, JointPaper, SemanticsService) {
+function workflowsController($scope, $rootScope, $window, $state, $stateParams, $timeout, $uibModal, $log, $http, uuid4, growl, WorkflowService, OntologyService, JointPaper, SemanticsService) {
   $scope.JointPaper = JointPaper;
   $scope.criticResults = [];
 
   $scope.data = "{users: 'Joe'}";
+
+  pollActiveConnections()
+
+  function pollActiveConnections() {
+    WorkflowService.getActiveConnections().then(function(activeConnections) {
+      setOutgoingNodesStatus(activeConnections)
+    }).catch(e => setOutgoingNodesStatus([]))
+    $timeout(pollActiveConnections, 2000);
+  }
+
+  function setOutgoingNodesStatus(activeConnections) {
+    if (JointPaper.paper &&  JointPaper.paper._views) {
+      var outgoingCellKeys = Object.keys(JointPaper.paper._views);
+      for (var i = 0; i < outgoingCellKeys.length; i++) {
+        let cellView = JointPaper.paper._views[outgoingCellKeys[i]]
+
+        let text = cellView.model.attributes.roger_federation.stringId +'\n\n' 
+                    + cellView.model.attributes.roger_federation.host + ':' + cellView.model.attributes.roger_federation.port
+
+        if (cellView.model.attributes.graphType === "FederationOutgoingCell") {
+          let foundConnection = undefined
+          activeConnections.forEach(activeConnection => {
+            if (activeConnection.connectionId === cellView.model.attributes.roger_federation.name)
+              foundConnection = activeConnection
+          })
+          if (foundConnection) {
+            cellView.model.attributes.attrs['.body']['fill'] = 'green'
+            text += '\n' + foundConnection.connectionType.toLowerCase()
+          } else {
+            if (cellView.model.attributes.roger_federation.outgoingEnabled)
+              cellView.model.attributes.attrs['.body']['fill'] = 'red'
+            else
+              cellView.model.attributes.attrs['.body']['fill'] = 'gray'
+          }
+
+          var shapeLabel = joint.util.breakText(text, {
+              width: 200
+          });
+
+          cellView.model.set('content', shapeLabel);
+
+          cellView.update()
+          cellView.resize()
+        }
+      }
+    }
+  }
 
   $scope.addSemanticSubscription = function() {
     $state.go('workflows.editor.addSparqlQuery', {
@@ -345,6 +391,8 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
         $state.go('workflows.editor.addBPMNFederate');
       } else if (['Group'].indexOf(propertiesType) !== -1) {
         $state.go('workflows.editor.addFederateGroup');
+      } else if (['FederationOutgoing'].indexOf(propertiesType) !== -1) {
+        $state.go('workflows.editor.addFederationOutgoing');
       }
     }
   }

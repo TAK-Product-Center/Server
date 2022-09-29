@@ -1,18 +1,20 @@
 package com.bbn.marti.test.shared.data.connections;
 
+import java.util.Comparator;
+import java.util.Set;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import com.bbn.marti.config.AuthType;
-import com.bbn.marti.config.Network;
+import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.config.Subscription;
 import com.bbn.marti.test.shared.data.GroupSetProfiles;
 import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.test.shared.data.users.AbstractUser;
 import com.bbn.marti.test.shared.data.users.UserFilter;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
-import java.util.Comparator;
-import java.util.Set;
 
 /**
  * Created on 3/4/16.
@@ -55,13 +57,13 @@ public abstract class AbstractConnection implements Comparable<Object>, Comparat
 	/**
 	 * Generates a {@link com.bbn.marti.config.Network.Input}  input for this connection. This connection must be a proper input type or this will throw an exception!
 	 *
-	 * @return A usable
+	 * @return A usable Input
 	 */
-	public final Network.Input getConfigInput() {
+	public final Input getConfigInput() {
 		if (getConnectionType() != ProtocolProfiles.ConnectionType.INPUT) {
 			throw new RuntimeException(("Cannot generate an input for for connection '" + getConsistentUniqueReadableIdentifier() + "' because it is not an input type!"));
 		}
-		Network.Input input = new Network.Input();
+		Input input = new Input();
 		input.setName(this.getConsistentUniqueReadableIdentifier());
 		input.setProtocol(getProtocol().getValue());
 		input.setPort(getPort());
@@ -77,6 +79,35 @@ public abstract class AbstractConnection implements Comparable<Object>, Comparat
 		}
 
 		return input;
+	}
+	
+	
+	/**
+	 * Generates a {@link com.bbn.marti.config.Network.DataFeed}  datafeed for this connection. This connection must be a proper datafeed type or this will throw an exception!
+	 *
+	 * @return A usable DataFeed
+	 */
+	public final DataFeed getConfigDataFeed() {
+		if (getConnectionType() != ProtocolProfiles.ConnectionType.DATAFEED) {
+			throw new RuntimeException(("Cannot generate a datafeed for connection '" + getConsistentUniqueReadableIdentifier() + "' because it is not an datafeed type!"));
+		}
+		DataFeed dataFeed = new DataFeed();
+		dataFeed.setName(this.getConsistentUniqueReadableIdentifier());
+		dataFeed.setProtocol(getProtocol().getValue());
+		dataFeed.setPort(getPort());
+		dataFeed.setAuth(getAuthType());
+		dataFeed.setGroup(getMCastGroup());
+		dataFeed.setAnongroup(getRawAnonAccessFlag());
+		dataFeed.setType(getType());
+		Integer networkVersion = getProtocol().getCoreNetworkVersion();
+		if (networkVersion != null) {
+			dataFeed.setCoreVersion(networkVersion);
+		}
+		if (getGroupSet().groupSet != null) {
+			dataFeed.getFiltergroup().addAll(getGroupSet().groupSet);
+		}
+
+		return dataFeed;
 	}
 
 
@@ -251,6 +282,12 @@ public abstract class AbstractConnection implements Comparable<Object>, Comparat
 	 */
 	public abstract Boolean getRawAnonAccessFlag();
 
+	/**
+	 * Gets the value of the data feed type (could be null/unset)
+	 *
+	 * @return The value of the data feed type, if any
+	 */
+	public abstract String getType();
 
 	/**
 	 * Gets the users associated with the connection

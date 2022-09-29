@@ -2,7 +2,8 @@ package com.bbn.marti.remote.service;
 
 import java.util.Collection;
 
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.MessagingConfigInfo;
 import com.bbn.marti.remote.groups.ConnectionModifyResult;
@@ -14,11 +15,15 @@ public interface InputManager {
 	
 	NetworkInputAddResult createInput(Input input);
 	
+	NetworkInputAddResult createDataFeed(DataFeed dataFeed);
+
 	ConnectionModifyResult modifyInput(String id, Input input);
 	
 	void deleteInput(String name);
 	
-	Collection<InputMetric> getInputMetrics();
+	void deleteDataFeed(String name);
+
+	Collection<InputMetric> getInputMetrics(boolean excludeDataFeeds);
 	
 	MessagingConfigInfo getConfigInfo();
 	

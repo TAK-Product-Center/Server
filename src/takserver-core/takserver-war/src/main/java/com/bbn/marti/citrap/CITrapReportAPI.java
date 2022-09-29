@@ -5,11 +5,11 @@ import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
-import java.util.SimpleTimeZone;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.IntrusionException;
 import org.postgresql.geometric.PGbox;
@@ -184,7 +184,9 @@ public class CITrapReportAPI extends BaseRestController {
                         missionService.missionSubscribe(reportType.getId(), clientUid, groupVector);
                     } catch (JpaSystemException e) { } // DuplicateKeyException comes through as JpaSystemException due to transaction
                     catch (NotFoundException e) {
-                        logger.error("missionSubscribe couldn't find mission for report id : " + reportType.getId());
+                        if (logger.isErrorEnabled()) {
+                            logger.error("missionSubscribe couldn't find mission for report id : " + StringUtils.normalizeSpace(reportType.getId()));
+                        }
                     }
                 }
             }

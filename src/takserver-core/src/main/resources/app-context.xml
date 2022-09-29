@@ -54,7 +54,7 @@
       <bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter" />
     </property>
     <property name="packagesToScan" value="com.bbn.marti.model.kml, com.bbn.marti.sync.model, com.bbn.tak.tls, com.bbn.marti.device.profile.model,
-              com.bbn.marti.maplayer.model, com.bbn.user.registration.model"/>
+              com.bbn.marti.maplayer.model, com.bbn.user.registration.model, com.bbn.marti.video"/>
   </bean>
  
   <bean class="org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor"/>
@@ -66,7 +66,7 @@
   </bean>
   
   <jpa:repositories base-package="com.bbn.marti.dao.kml, com.bbn.marti.sync.repository, com.bbn.tak.tls.repository, com.bbn.marti.device.profile.repository,
-com.bbn.marti.maplayer.repository, com.bbn.user.registration.repository" />
+com.bbn.marti.maplayer.repository, com.bbn.user.registration.repository, com.bbn.marti.video" />
   
    <!-- Object/	ML Marshaller/Unmarshaller for Iconsets -->
    <bean id="jaxb2Marshaller" class="org.springframework.oxm.jaxb.Jaxb2Marshaller" scope="prototype" >

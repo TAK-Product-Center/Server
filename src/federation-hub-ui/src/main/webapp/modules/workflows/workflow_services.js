@@ -1,4 +1,3 @@
-
 'use strict';
 
 angular.module('roger_federation.Workflows')
@@ -615,6 +614,17 @@ angular.module('roger_federation.Workflows')
   workflowService.getKnownCaGroups = function() {
       return $http.get(
           ConfigService.getServerBaseUrlStrV2() + 'getKnownCaGroups/').then(
+          function(res) {
+              return res.data;
+          },
+          function(reason) {
+              throw reason;
+          });
+  };
+
+  workflowService.getActiveConnections = function() {
+      return $http.get(
+          ConfigService.getServerBaseUrlStrV2() + 'getActiveConnections/').then(
           function(res) {
               return res.data;
           },

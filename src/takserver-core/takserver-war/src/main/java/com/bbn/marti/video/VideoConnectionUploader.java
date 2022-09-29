@@ -16,16 +16,19 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.bbn.marti.EsapiServlet;
+import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.video.Feed.Type;
 
 
-//@WebServlet("/vcu/*")
 public class VideoConnectionUploader extends EsapiServlet {
 	
-		private static final long serialVersionUID = 2500827655081259445L;
+	private static final long serialVersionUID = 2500827655081259445L;
 
 	@Autowired
 	private VideoManagerService videoManagerService;
+
+	@Autowired
+	protected CommonUtil martiUtil;
 
     protected static final Logger logger = LoggerFactory.getLogger(VideoConnectionManager.class);
 	
@@ -50,13 +53,23 @@ public class VideoConnectionUploader extends EsapiServlet {
     	
     	try {
         	initAuditLog(request);
-        	
+
+			String groupVector = null;
+
+			try {
+				// Get group vector for the user associated with this session
+				groupVector = martiUtil.getGroupBitVector(request);
+				log.finer("groups bit vector: " + groupVector);
+			} catch (Exception e) {
+				log.fine("exception getting group membership for current web user " + e.getMessage());
+			}
+
     		Feed feed = null;
         	String feedId = request.getParameter("feedId");
         	if (feedId == null || feedId.equals("null")) {
         		feed = new Feed();
         	} else {
-        		feed = videoManagerService.getFeed(Integer.parseInt(feedId));
+        		feed = videoManagerService.getFeed(Integer.parseInt(feedId), groupVector);
         	}
     		
         	feed.setUuid(getParameter(request, "uuid"));
@@ -85,8 +98,8 @@ public class VideoConnectionUploader extends EsapiServlet {
 			feed.setClassification(getParameter(request, "classification"));
 
     		if (!feed.validate(validator)
-    		|| (feed.getId() == 0 && !videoManagerService.addFeed(feed, validator)) 
-    		|| !videoManagerService.updateFeed(feed, validator))
+    		|| (feed.getId() == 0 && !videoManagerService.addFeed(feed, groupVector, validator))
+    		|| !videoManagerService.updateFeed(feed, groupVector, validator))
     		{
     	        response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
     			return;

@@ -1,5 +1,3 @@
-
-
 package com.bbn.marti.sync.repository;
 
 import java.util.Date;

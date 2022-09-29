@@ -71,8 +71,12 @@ if [ ! -e /opt/tak/conf/retention/retention-service.yml ]; then
     cp /opt/tak/retention/retention-service.yml /opt/tak/conf/retention/
 fi
 
-if [ ! -e /opt/tak/conf/retention/misison-archiving-config.yml ]; then
-    cp /opt/tak/retention/misison-archiving-config.yml /opt/tak/conf/retention/
+if [ -f /opt/tak/conf/retention/misison-archiving-config.yml ]; then
+    rm -rf /opt/tak/conf/retention/misison-archiving-config.yml 
+fi
+
+if [ ! -e /opt/tak/conf/retention/mission-archiving-config.yml ]; then
+    cp /opt/tak/retention/mission-archiving-config.yml /opt/tak/conf/retention/
 fi
 
 if [ ! -d "/opt/tak/mission-archive" ]; then

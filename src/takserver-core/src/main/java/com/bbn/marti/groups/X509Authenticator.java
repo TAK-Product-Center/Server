@@ -4,23 +4,28 @@ package com.bbn.marti.groups;
 
 import java.io.Serializable;
 import java.security.cert.CertificateParsingException;
-import java.util.*;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
+
 import javax.naming.NamingException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 
-import com.google.common.base.Strings;
-import com.google.common.collect.Sets;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.oauth2.common.exceptions.OAuth2Exception;
 
 import com.bbn.marti.config.Auth.Ldap;
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.remote.exception.NotFoundException;
-import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.exception.RevokedException;
+import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.AuthCallback;
 import com.bbn.marti.remote.groups.AuthResult;
 import com.bbn.marti.remote.groups.AuthStatus;
@@ -39,6 +44,8 @@ import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.bbn.marti.xml.bindings.UserAuthenticationFile;
 import com.bbn.tak.tls.TakCert;
 import com.bbn.tak.tls.repository.TakCertRepository;
+import com.google.common.base.Strings;
+import com.google.common.collect.Sets;
 
 import tak.server.cache.ActiveGroupCacheHelper;
 
@@ -117,12 +124,33 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
         	
             String certFingerprint = RemoteUtil.getInstance().getCertSHA256Fingerprint(user.getCert());
 
-            if (DistributedConfiguration.getInstance().getAuth().isX509CheckRevocation()) {
-                TakCert cert = takCertRepository.findOneByHash(certFingerprint);
+        	TakCert cert = null;
+            if (DistributedConfiguration.getInstance().getAuth().isX509CheckRevocation() ||
+                DistributedConfiguration.getInstance().getAuth().isX509TokenAuth()) {
+                cert = takCertRepository.findOneByHash(certFingerprint);
                 if (cert != null && cert.getRevocationDate() != null) {
                     throw new RevokedException("Attempt to use revoked certificate : " +
                             cert.getSubjectDn());
                 }
+            }
+
+            if (DistributedConfiguration.getInstance().getAuth().isX509TokenAuth() &&
+                    cert != null && cert.token != null && cert.token.length() > 0) {
+                user.setName(cert.token);
+                try {
+                    groupManager.authenticate("oauth", user);
+                } catch (OAuth2Exception e) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("found expired token in certificate: " + cert.token);
+                    }
+                    throw new TakException(cert.token);
+                }
+
+                if (input == null) {
+                    AuthenticatorUtil.setUserRolesBasedOnRequestPort(user, logger);
+                }
+
+                return user;
             }
 
         	if (logger.isDebugEnabled()) {

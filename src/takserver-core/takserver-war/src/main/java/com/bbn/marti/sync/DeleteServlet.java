@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
@@ -16,6 +17,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 
@@ -71,8 +73,9 @@ public class DeleteServlet extends EnterpriseSyncServlet {
 		
 		List<Integer> toDelete = new LinkedList<Integer>();
 		// Parse the HTTP parameters and slurp out all valid integers for parameters matching ID_KEY
-		
-		log.finest("http params: " + httpParameters.keySet());
+		if (log.isLoggable(Level.FINEST)) {
+			log.finest("http params: " + StringUtils.normalizeSpace(httpParameters.keySet().toString()));
+		}
 		try {
 			for (String key : httpParameters.keySet()) {
 				if (key.compareToIgnoreCase(ID_KEY) == 0 ) {
@@ -103,8 +106,9 @@ public class DeleteServlet extends EnterpriseSyncServlet {
 				    if (!(httpParameters.get(key).length == 0)) {
 
 				        String value = httpParameters.get(key)[0];
-				        
-	                    log.finest("delete by hash " + value);
+				        if (log.isLoggable(Level.FINEST)) {
+							log.finest("delete by hash " + StringUtils.normalizeSpace(value));
+						}
 
 				        try {
 				            if (validator != null) {
@@ -132,7 +136,9 @@ public class DeleteServlet extends EnterpriseSyncServlet {
 				    // delete by primary key
 				    enterpriseSyncService.delete(toDelete, groupVector);
 				} else {
-				    log.finest("delete by hash" + hash);
+					if(log.isLoggable(Level.FINEST)) {
+						log.finest("delete by hash" + StringUtils.normalizeSpace(hash));
+					}
 				    // delete by hash
 				    enterpriseSyncService.delete(hash, groupVector);
 				}

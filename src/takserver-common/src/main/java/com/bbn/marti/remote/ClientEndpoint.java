@@ -12,9 +12,10 @@ public class ClientEndpoint implements Serializable {
 
 	public ClientEndpoint() {}
 	
-	public ClientEndpoint(String callsign, String uid, Date lastEventTime, String lastEventName, String groups) {
+	public ClientEndpoint(String callsign, String uid, String username, Date lastEventTime, String lastEventName, String groups) {
 		this.callsign = callsign;
 		this.uid = uid;
+		this.username = username;
 		this.lastEventTime = lastEventTime;
 		this.lastStatus = lastEventName;
 		this.groups = groups;
@@ -34,6 +35,14 @@ public class ClientEndpoint implements Serializable {
 	
 	public void setUid(String uid) {
 		this.uid = uid;
+	}
+
+	public String getUsername() {
+		return username;
+	}
+
+	public void setUsername(String username) {
+		this.username = username;
 	}
 
 	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.S'Z'")
@@ -65,6 +74,7 @@ public class ClientEndpoint implements Serializable {
 
 	private String callsign;
 	private String uid;
+	private String username;
 	private Date lastEventTime;
 	private String lastStatus;
 	private String groups;

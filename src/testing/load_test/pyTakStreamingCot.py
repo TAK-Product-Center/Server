@@ -95,15 +95,17 @@ class PyTAKStreamingCot:
     async def read_handler(self, reader):
         while True:
             data = await reader.readuntil(b'</event>')
+            self.logger.debug("Client receives an event message")
             if self.mission_config.get("react_to_change_message", False):
                 await self.read_socket.send(data)
 
-            # connection_data = self.data_dict[self.uid]
-            # connection_data['read'] += 1
-            # connection_data['bytes'] += len(data)
-            # self.data_dict[self.uid] = connection_data
-
+            connection_data = self.data_dict[self.uid]
+            connection_data['read'] += 1
+            #connection_data['bytes'] += len(data)
+            self.data_dict[self.uid] = connection_data
+                
     async def send_self_sa(self, writer):
+        self.logger.debug("Client sends self_sa message")
         self_sa_message = CotMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]))
         self_sa_message.add_callsign_detail(group_name="Red", platform="PyTAKStreamingCot")
         writer.write(self_sa_message.to_string())
@@ -111,6 +113,7 @@ class PyTAKStreamingCot:
         self.last_sa_write = time.time()
 
     async def send_mission_cot(self, writer):
+        self.logger.debug("Client sending mission_cot")
         for mission in self.data_sync_sess.missions_subscribed:
             if self.mission_cot_prob < random.uniform(0, 1):
                 continue
@@ -220,6 +223,10 @@ class PyTAKStreamingCot:
                     for i in range(POOL_SIZE):
                         self.read_pool.apply_async(read_thread_zmq, args=(port, data_sync_port))
                     await asyncio.sleep(1)
+                    
+                    
+                # get list of recent client connect / disconnect events
+                self.data_sync_sess.get_client_endpoints()
 
                 read_task = asyncio.ensure_future(self.read_handler(reader))
                 write_task = asyncio.ensure_future(self.write_handler(writer))
@@ -284,7 +291,7 @@ def read_thread_zmq(port: int, data_sync_port):
 
 class PyTAKStreamingCotProcess(multiprocessing.Process):
     def __init__(self, address=None, uid=None, cert=None, password=None, self_sa_delta=5.0,
-                 mission_config=None, data_dict=None):
+                 mission_config=None, data_dict=None, debug=None):
         multiprocessing.Process.__init__(self)
         self.address = address
         self.uid = uid
@@ -293,6 +300,7 @@ class PyTAKStreamingCotProcess(multiprocessing.Process):
         self.self_sa_delta = self_sa_delta
         self.mission_config = mission_config
         self.data_dict = data_dict
+        self.debug = debug
         self.agent = None
 
     def run(self):
@@ -303,7 +311,8 @@ class PyTAKStreamingCotProcess(multiprocessing.Process):
                                            password=self.password,
                                            self_sa_delta=self.self_sa_delta,
                                            mission_config=self.mission_config,
-                                           data_dict=self.data_dict)
+                                           data_dict=self.data_dict,
+                                           debug=self.debug)
             if self.uid is None:
                 self.uid = self.agent.uid
             asyncio.get_event_loop().run_until_complete(self.agent.connect_socket())

@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
-import com.bbn.marti.config.Network;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.binder.ServerBinder;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
@@ -241,7 +241,7 @@ public class NioServer implements Server, Runnable, Serializable {
      * @param input Input object
      * @throws IOException
      */
-    public void bind(@NotNull ServerBinder binder, @NotNull Network.Input input) throws IOException {
+    public void bind(@NotNull ServerBinder binder, @NotNull Input input) throws IOException {
         synchronized (wrapperMap) {
             try {
                 ChannelWrapper wrapper = binder.handleBind(this);

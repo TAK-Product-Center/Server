@@ -4,6 +4,7 @@ import java.util.*;
 import javax.servlet.http.HttpServletRequest;
 
 import com.bbn.marti.config.GeospatialFilter;
+import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.sync.model.*;
@@ -23,7 +24,7 @@ import org.springframework.jdbc.core.ResultSetExtractor;
  */
 public interface MissionService {
 	
-    Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom, String tool, String passwordHash, MissionRole defaultRole, Long expiration);
+    Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom, String baseLayer, String bbox, String path, String classification, String tool, String passwordHash, MissionRole defaultRole, Long expiration, String boundingPolygon);
     
     Mission getMission(String missionName, boolean hydrateDetails);
 
@@ -34,6 +35,10 @@ public interface MissionService {
     Mission getMissionNoContent(String missionName, String groupVector);
 
     List<Mission> getAllMissions(boolean passwordProtected, boolean defaultRole, String tool, NavigableSet<Group> groups);
+
+    List<Mission> getAllCopsMissions(String tool, NavigableSet<Group> groups, String path, Integer page, Integer size);
+    
+    Long getMissionCount(String tool);
 
     Mission deleteMission(String name, String creatorUid, String groupVector, boolean deepDelete);
 
@@ -65,13 +70,13 @@ public interface MissionService {
 
     MissionSubscription missionSubscribe(String missionName, String clientUid, String groupVector);
 
-    MissionSubscription missionSubscribe(String missionName, Long missionId, String clientUid, MissionRole role, String groupVector);
+    MissionSubscription missionSubscribe(String missionName, Long missionId, String clientUid, String username, MissionRole role, String groupVector);
 
-    void missionUnsubscribe(String missionName, String uid, String groupVector);
+    void missionUnsubscribe(String missionName, String uid, String username, String groupVector, boolean disconnectOnly);
 
     Mission addMissionContent(String missionName, MissionContent content, String creatorUid, String groupVector);
 
-    Mission addMissionContentAtTime(String missionName, MissionContent content, String creatorUid, String groupVector, Date date);
+    Mission addMissionContentAtTime(String missionName, MissionContent content, String creatorUid, String groupVector, Date date, String xmlContentForNotification);
 
     boolean addMissionPackage(String missionName, byte[] missionPackage, String creatorUid, NavigableSet<Group> groups, List<MissionChange> conflicts);
 
@@ -138,9 +143,15 @@ public interface MissionService {
 
     boolean validateRoleAssignment(Mission mission, HttpServletRequest request, MissionRole attemptAssign);
 
-    void setRole(Long missionId, String clientUid, Long roleId);
+    void setRoleByClientUid(Long missionId, String clientUid, Long roleId);
 
-    boolean setRole(Mission mission, String clientUid, MissionRole role);
+    void setRoleByUsername(Long missionId, String username, Long roleId);
+
+    void setRoleByClientUidOrUsername(Long missionId, String clientUid, String username, Long roleId);
+
+    boolean setRole(Mission mission, String clientUid, String username, MissionRole role);
+
+    void setSubscriptionUsername(Long missionId, String clientUid, String username);
 
     boolean validatePermission(MissionPermission.Permission permission, HttpServletRequest request);
 
@@ -178,4 +189,22 @@ public interface MissionService {
 	Collection<CotCacheWrapper> getLatestMissionCotWrappersForUids(String missionName, Set<String> uids, String groupVector);
 
 	List<Resource> getCachedResourcesByHash(String missionName, String hash);
+
+    MissionFeed getMissionFeed(String missionFeedUid);
+
+    MissionFeed addFeedToMission(String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterBbox, String filterType, String filterCallsign);
+
+	void removeFeedFromMission(String missionName, String creatorUid, Mission mission, String missionFeedUid);
+
+	MapLayer getMapLayer(String mapLayerUid);
+
+	MapLayer addMapLayerToMission(String missionName, String creatorUid, Mission mission, MapLayer mapLayer);
+
+    MapLayer updateMapLayer(String missionName, String creatorUid, Mission mission, MapLayer mapLayer);
+
+    void removeMapLayerFromMission(String missionName, String creatorUid, Mission mission, String mapLayerUid);
+
+    List<Mission> getMissionsForDataFeed(String feed_uid);
+
+    void sendLatestFeedEvents(Mission mission, MissionFeed missionFeed, String clientUid, String groupVector);
 }

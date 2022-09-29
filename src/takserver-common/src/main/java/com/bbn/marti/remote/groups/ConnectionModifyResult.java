@@ -58,4 +58,5 @@ public class ConnectionModifyResult implements Comparator<ConnectionModifyResult
     public static final ConnectionModifyResult FAIL_NOMOD_PORT = new ConnectionModifyResult("ERROR! The connection port cannot be modified after initial creation!", 400);
     public static final ConnectionModifyResult FAIL_NOMOD_GROUP = new ConnectionModifyResult("ERROR! The connection multicast group cannot be modified after initial creation!", 400);
     public static final ConnectionModifyResult FAIL_NOMOD_IFACE = new ConnectionModifyResult("ERROR! The connection interface cannot be modified after initial creation!", 400);
+    public static final ConnectionModifyResult FAIL_NOMOD_DFEED = new ConnectionModifyResult("ERROR! The connection found was not a data feed but contained data feed attributes!", 400);
 }

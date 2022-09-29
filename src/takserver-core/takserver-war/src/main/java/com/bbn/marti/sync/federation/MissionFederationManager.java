@@ -24,7 +24,7 @@ public interface MissionFederationManager {
 	void deleteMissionContent(String missionName, String hash, String uid, String creatorUid, NavigableSet<Group> groups);
 
 	void archiveMission(String missionName, String serverName, NavigableSet<Group> groups);
-	
+
 	void insertResource(Metadata metadata, byte[] content, NavigableSet<Group> groups);
 
 	void updateMetadata(String hash, String key, String value, NavigableSet<Group> groups);
@@ -32,6 +32,7 @@ public interface MissionFederationManager {
 	void setParent(String missionName, String parentMissionName, NavigableSet<Group> groups);
 
 	void clearParent(String missionName, NavigableSet<Group> groups);
+
 }
 
     

@@ -24,6 +24,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.bbn.marti.EsapiServlet;
 import com.bbn.marti.remote.util.SecureXmlParser;
+import com.bbn.marti.util.CommonUtil;
+
 
 public class VideoConnectionManager extends EsapiServlet {
 	
@@ -31,10 +33,23 @@ public class VideoConnectionManager extends EsapiServlet {
 
 	@Autowired
 	private VideoManagerService videoManagerService;
+
+	@Autowired
+	protected CommonUtil martiUtil;
 	
     protected static final Logger logger = LoggerFactory.getLogger(VideoConnectionManager.class);
 
     private boolean addVideoConnections(HttpServletRequest request) throws JAXBException, IOException{
+
+		String groupVector = null;
+
+		try {
+			// Get group vector for the user associated with this session
+			groupVector = martiUtil.getGroupBitVector(request);
+			log.finer("groups bit vector: " + groupVector);
+		} catch (Exception e) {
+			log.fine("exception getting group membership for current web user " + e.getMessage());
+		}
 
     	//String xml = org.apache.commons.io.IOUtils.toString(request.getInputStream());
 		org.w3c.dom.Document doc = SecureXmlParser.makeDocument(request.getInputStream());
@@ -49,7 +64,7 @@ public class VideoConnectionManager extends EsapiServlet {
 					return false;
 				}
 
-				if (!videoManagerService.addFeed(feed, validator)) {
+				if (!videoManagerService.addFeed(feed, groupVector, validator)) {
 					return false;
 				}
 			}
@@ -62,14 +77,24 @@ public class VideoConnectionManager extends EsapiServlet {
     }
     
     private boolean setActive(HttpServletRequest request) {
-    	
+
+		String groupVector = null;
+
+		try {
+			// Get group vector for the user associated with this session
+			groupVector = martiUtil.getGroupBitVector(request);
+			log.finer("groups bit vector: " + groupVector);
+		} catch (Exception e) {
+			log.fine("exception getting group membership for current web user " + e.getMessage());
+		}
+
      	String feedId = request.getParameter("id");
      	String active = request.getParameter("active");
      	
-		Feed feed = videoManagerService.getFeed(Integer.parseInt(feedId));
+		Feed feed = videoManagerService.getFeed(Integer.parseInt(feedId), groupVector);
 		feed.setActive(Boolean.parseBoolean(active));
 		
-		return videoManagerService.updateFeed(feed, validator);
+		return videoManagerService.updateFeed(feed, groupVector, validator);
     }
       
     /*
@@ -115,11 +140,21 @@ public class VideoConnectionManager extends EsapiServlet {
     	
         try {
         	initAuditLog(request);
+
+			String groupVector = null;
+
+			try {
+				// Get group vector for the user associated with this session
+				groupVector = martiUtil.getGroupBitVector(request);
+				log.finer("groups bit vector: " + groupVector);
+			} catch (Exception e) {
+				log.fine("exception getting group membership for current web user " + e.getMessage());
+			}
         	
         	JAXBContext jaxbContext = JAXBContext.newInstance(VideoConnections.class, Feed.class);
 	        Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
 	        
-	        VideoConnections videoConnections = videoManagerService.getVideoConnections(false);
+	        VideoConnections videoConnections = videoManagerService.getVideoConnections(false, true, groupVector);
         	
         	StringWriter sw = new StringWriter();
         	jaxbMarshaller.marshal(videoConnections, sw);
@@ -141,9 +176,19 @@ public class VideoConnectionManager extends EsapiServlet {
 			throws ServletException, IOException {
         try {
         	initAuditLog(request);
-        	
+
+			String groupVector = null;
+
+			try {
+				// Get group vector for the user associated with this session
+				groupVector = martiUtil.getGroupBitVector(request);
+				log.finer("groups bit vector: " + groupVector);
+			} catch (Exception e) {
+				log.fine("exception getting group membership for current web user " + e.getMessage());
+			}
+
         	String id = request.getParameter("id");
-        	videoManagerService.deleteFeed(id);
+        	videoManagerService.deleteFeed(id, groupVector);
 	    } catch (Exception e) {
 	        e.printStackTrace();
 	        logger.error("Exception!", e);

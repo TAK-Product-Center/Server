@@ -179,8 +179,8 @@ public class DistributedRetentionQueryManager implements RetentionQueryService, 
 		}
 
 		missionService().createMission(properties.get("mission_name"), properties.get("creatorUid"), groupVector,
-				properties.get("description"), properties.get("chatroom"), properties.get("tool"),
-				properties.get("password_hash"), missionRole, expiration);
+				properties.get("description"), properties.get("chatroom"), properties.get("baseLayer"),
+				properties.get("bbox"), properties.get("path"), properties.get("classification"), properties.get("tool"), properties.get("password_hash"), missionRole, expiration, properties.get("bounding_polygon"));
 
 		return true;
 	}

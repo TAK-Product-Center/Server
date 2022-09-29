@@ -88,16 +88,12 @@ public class CertManager {
     }
 
     public static X509Certificate signCertificate(PKCS10 request, CertKey issuerCertficate, CERTTYPE type,
-                                                  long validityNotBeforeOffsetMinutes,  long validity,
+                                                  Date notBefore, Date notAfter,
                                                   String signatureAlg, boolean addChannelsExtUsage,
                                                   String ocspResponder) throws Exception {
-        PublicKey pub = request.getSubjectPublicKeyInfo();
         X509CertInfo info = new X509CertInfo();
-        long now = new Date().getTime();
-        long validMs = validity * 1000 * 60 * 60 * 24;
-        long validityNotBeforeOffsetMS = validityNotBeforeOffsetMinutes * 60 * 1000;
         info.set(X509CertInfo.VALIDITY, new CertificateValidity(
-                new Date(now - validityNotBeforeOffsetMS), new Date(now + validMs)));
+                notBefore, notAfter));
         info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(
                 new java.util.Random().nextInt() & 0x7fffffff));
         info.set(X509CertInfo.VERSION,

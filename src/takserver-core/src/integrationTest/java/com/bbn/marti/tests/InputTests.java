@@ -51,6 +51,12 @@ public class InputTests extends AbstractTestClass {
 					case SUBSCRIPTION_TCP:
 					case SUBSCRIPTION_UDP:
 					case SUBSCRIPTION_MCAST:
+					case DATAFEED_TCP:
+					case DATAFEED_UDP:
+					case DATAFEED_MCAST:
+					case DATAFEED_STCP:
+					case DATAFEED_TLS:
+					case DATAFEED_SSL:
 						break;
 
 					case INPUT_STCP:

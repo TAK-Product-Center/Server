@@ -165,8 +165,8 @@ public class CITrapReportService {
         missionService.addMissionContent(CI_TRAP_MISSION, content, clientUid, groupVector);
 
         // create a new mission for this report and add the report
-        missionService.createMission(report.getId(), clientUid, groupVector, null, null,
-                CI_TRAP_MISSION, null, null, null);
+        missionService.createMission(report.getId(), clientUid, groupVector, null, null, null, null, null, null,
+                CI_TRAP_MISSION, null, null, null, null);
         missionService.addMissionContent(report.getId(), content, clientUid, groupVector);
 
         // subscribe for notifications to the new report

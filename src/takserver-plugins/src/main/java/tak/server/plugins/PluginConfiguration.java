@@ -22,13 +22,13 @@ public class PluginConfiguration {
     
     static final String PLUGIN_CONFIG_BASE = "conf/plugins/";
     
-    static final String[] RESERVED_KEYWORDS = { "server", "tak" };
+    static final String[] RESERVED_KEYWORDS = { "server", "tak", "system" };
     
     public PluginConfiguration() {
         obj = new HashMap<String, Object>();
     }
     
-    public PluginConfiguration(Class clazz) throws ReservedConfigurationException {
+    public PluginConfiguration(Class clazz) {
         String configFileName = PLUGIN_CONFIG_BASE + clazz.getName() + ".yaml";
         File f = new File(configFileName);
         if (!f.exists()) {
@@ -39,11 +39,10 @@ public class PluginConfiguration {
                 logger.error(e.getMessage());
             }
         }
-        try {
-            InputStream inputStream = new FileInputStream(f);
+        try (InputStream inputStream = new FileInputStream(f);){
             Yaml yaml = new Yaml();
             obj = yaml.load(inputStream);
-        } catch (FileNotFoundException e) {
+        } catch (Exception e) {
             logger.error(e.getMessage());
         }
         if (obj == null) {
@@ -52,12 +51,9 @@ public class PluginConfiguration {
             }
             obj = new HashMap<String, Object>();
         } else {
-            // check for reserved keywords
-            for (String keyword : RESERVED_KEYWORDS) {
-                if (obj.containsKey(keyword)) {
-                    throw new ReservedConfigurationException(keyword);
-                }
-            }
+            // remove reserved keywords
+            obj.keySet().removeAll(Arrays.asList(RESERVED_KEYWORDS));
+            
         }
     }
     

@@ -19,6 +19,8 @@ import com.bbn.marti.repeater.RepeaterStore;
 import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.SubscriptionStore;
+import com.bbn.marti.sync.EnterpriseSyncService;
+import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.sync.repository.FederationEventRepository;
 import com.bbn.marti.sync.repository.MissionSubscriptionRepository;
 import com.bbn.marti.sync.service.MissionService;
@@ -376,5 +378,33 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 	public ApplicationEventPublisher eventPublisher() {
 		
 		return aep;
+	}
+	
+	private DataFeedRepository dataFeedRepository = null;
+
+	public DataFeedRepository dataFeedRepository() {
+		if (dataFeedRepository == null) {
+			synchronized (this) {
+				if (dataFeedRepository == null) {
+					dataFeedRepository = springContext.getBean(DataFeedRepository.class);
+				}
+			}
+		}
+
+		return dataFeedRepository;
+	}
+	
+	private EnterpriseSyncService esyncService = null;
+
+	public EnterpriseSyncService esyncService() {
+		if (esyncService == null) {
+			synchronized (this) {
+				if (esyncService == null) {
+					esyncService = springContext.getBean(EnterpriseSyncService.class);
+				}
+			}
+		}
+
+		return esyncService;
 	}
 }

@@ -8,28 +8,26 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 
-import tak.server.retention.service.MissionArchiveHelper;
-
 @Configuration
 @ConfigurationProperties
 @PropertySource(name="mission-store", factory=YamlPropertySourceFactory.class, value="file:mission-archive/mission-store.yml")
 public class MissionArchiveStoreConfig implements Serializable {
 	
-	private List<MissonArchiveStoreEntry> missonArchiveStoreEntries = new ArrayList<>();
+	private List<MissionArchiveStoreEntry> missionArchiveStoreEntries = new ArrayList<>();
 
-	public synchronized List<MissonArchiveStoreEntry> getMissonArchiveStoreEntries() {
-		return missonArchiveStoreEntries;
+	public synchronized List<MissionArchiveStoreEntry> getMissionArchiveStoreEntries() {
+		return missionArchiveStoreEntries;
 	}
 
-	public synchronized void setMissonArchiveStoreEntries(List<MissonArchiveStoreEntry> missonArchiveStoreEntries) {
-		this.missonArchiveStoreEntries = missonArchiveStoreEntries;
+	public synchronized void setMissionArchiveStoreEntries(List<MissionArchiveStoreEntry> missionArchiveStoreEntries) {
+		this.missionArchiveStoreEntries = missionArchiveStoreEntries;
 	}
 	
-	public synchronized void addMissionEntry(MissonArchiveStoreEntry missonArchiveStoreEntry) {
-		missonArchiveStoreEntries.add(missonArchiveStoreEntry);
+	public synchronized void addMissionEntry(MissionArchiveStoreEntry missionArchiveStoreEntry) {
+		missionArchiveStoreEntries.add(missionArchiveStoreEntry);
 	}
 
-	public static class MissonArchiveStoreEntry {
+	public static class MissionArchiveStoreEntry {
 		private String missionName;
 		private String createTimeMs;
 		private String archiveTimeMs;
@@ -75,7 +73,7 @@ public class MissionArchiveStoreConfig implements Serializable {
 		}
 		@Override
 		public String toString() {
-			return "MissonArchiveStoreEntry [missionName=" + missionName + ", createTimeMs=" + createTimeMs
+			return "MissionArchiveStoreEntry [missionName=" + missionName + ", createTimeMs=" + createTimeMs
 					+ ", archiveTimeMs=" + archiveTimeMs + ", createTime=" + createTime + ", archiveTime=" + archiveTime
 					+ ", id=" + id + "]";
 		}
@@ -83,6 +81,6 @@ public class MissionArchiveStoreConfig implements Serializable {
 
 	@Override
 	public String toString() {
-		return "MissionArchiveStoreConfig [missonArchiveStoreEntries=" + missonArchiveStoreEntries + "]";
+		return "MissionArchiveStoreConfig [missionArchiveStoreEntries=" + missionArchiveStoreEntries + "]";
 	}
 }

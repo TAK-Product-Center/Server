@@ -19,6 +19,12 @@ message Message {
     repeated string destCallsigns = 6;
     
     repeated string provenance = 7;
+    
+    bool archive = 8;
+    
+    string feedUuid = 9;
+
+    string connectionId = 10;
 
 }
 

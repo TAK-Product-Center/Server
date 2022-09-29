@@ -495,8 +495,9 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		List<String> callsignList = (List<String>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_CALLSIGN_KEY);
 		List<String> publishList = (List<String>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_PUBLISH_KEY);
 		List<String> uidList = (List<String>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_UID_KEY);
+		List<String> feedUidList = (List<String>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_FEED_UID_KEY);
 		Set<String> missionSet = (Set<String>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_MISSION_KEY);
-		
+				
 		if (missionSet != null && !missionSet.isEmpty()) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("invalidate mission cache");
@@ -510,7 +511,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		return ((callsignList != null && !callsignList.isEmpty()) ||
 				 (publishList != null && !publishList.isEmpty())) ||
 				 (uidList != null && !uidList.isEmpty()) ||
-				 (missionSet != null && !missionSet.isEmpty());
+				 (missionSet != null && !missionSet.isEmpty()) ||
+				 feedUidList != null;
 	}
 
 	/**
@@ -541,6 +543,10 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 
 		if ((destList = (List<String>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_UID_KEY)) != null) {
+			matches.addAll(getExplicitUidMatches(c, destList));
+		}
+		
+		if ((destList = (List<String>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_FEED_UID_KEY)) != null) {
 			matches.addAll(getExplicitUidMatches(c, destList));
 		}
 		
@@ -1579,6 +1585,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	private static final String detailXPath = "/event/detail";
 	private static final String linkXPath = detailXPath + "/link";
 	private static final String missionXPath = detailXPath + "/mission";
+	private static final String missionContentXPath = detailXPath + "/mission/MissionChanges/MissionChange/content";
 
 
 	private static Document deleteMessageSeed = null;
@@ -1647,9 +1654,20 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 	}
 
+	private static void addMissionChangeContentXml(Document document, String xml) {
+		try {
+			SAXReader reader = new SAXReader();
+			Document xmlDoc = reader.read(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+			Element missionElem = DocumentHelper.makeElement(document, missionContentXPath);
+			missionElem.add(xmlDoc.getRootElement());
+		} catch (DocumentException ex) {
+			logger.error("Exception attaching xml to mission change!", ex);
+		}
+	}
+
 	private static CotEventContainer createMissionMessage(
 			String missionName, String cotType, String msgType, String authorUid, String tool, String changes,
-			String uid, String token, String roleXml) {
+			String uid, String token, String roleXml, String xmlContentForNotification) {
 		// make mission change message with the given mission name
 		Document mcMessage = (Document) missionChangeMessageSeed.clone();
 
@@ -1689,16 +1707,20 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 
 		if (changes != null) {
 			addMissionXml(mcMessage, changes);
+			if (xmlContentForNotification != null) {
+				addMissionChangeContentXml(mcMessage, xmlContentForNotification);
+			}
 		}
 
 		if (roleXml != null) {
 			addMissionXml(mcMessage, roleXml);
 		}
 
+
 		return new CotEventContainer(mcMessage);
 	}
 
-	public CotEventContainer createMissionChangeMessage(String missionName, ChangeType changeType, String authorUid, String tool, String changes) {
+	public CotEventContainer createMissionChangeMessage(String missionName, ChangeType changeType, String authorUid, String tool, String changes, String xmlContentForNotification) {
 
 		String cotType;
 		switch (changeType) {
@@ -1712,23 +1734,23 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			case CONTENT:			{ cotType = "t-x-m-c";  break; }
 		}
 
-		return createMissionMessage(missionName, cotType, "CHANGE", authorUid, tool, changes, null, null, null);
+		return createMissionMessage(missionName, cotType, "CHANGE", authorUid, tool, changes, null, null, null, xmlContentForNotification);
     }
 
 	public CotEventContainer createMissionCreateMessage(String missionName, String authorUid, String tool) {
-		return createMissionMessage(missionName, "t-x-m-n", "CREATE", authorUid, tool, null, null, null, null);
+		return createMissionMessage(missionName, "t-x-m-n", "CREATE", authorUid, tool, null, null, null, null, null);
 	}
 
 	public CotEventContainer createMissionDeleteMessage(String missionName, String authorUid, String tool) {
-		return createMissionMessage(missionName, "t-x-m-d", "DELETE", authorUid, tool, null, null, null, null);
+		return createMissionMessage(missionName, "t-x-m-d", "DELETE", authorUid, tool, null, null, null, null, null);
 	}
 
 	public CotEventContainer createMissionInviteMessage(String missionName, String authorUid, String tool, String token, String roleXml) {
-		return createMissionMessage(missionName, "t-x-m-i", "INVITE", authorUid, tool,null, null, token, roleXml);
+		return createMissionMessage(missionName, "t-x-m-i", "INVITE", authorUid, tool,null, null, token, roleXml, null);
 	}
 
 	public CotEventContainer createMissionRoleChangeMessage(String missionName, String authorUid, String tool, String roleXml) {
-		return createMissionMessage(missionName, "t-x-m-r", "INVITE", authorUid, tool,null, null, null, roleXml);
+		return createMissionMessage(missionName, "t-x-m-r", "INVITE", authorUid, tool,null, null, null, roleXml, null);
 	}
 
 	@Override
@@ -1754,7 +1776,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 
 	@Override
-	public void missionUnsubscribe(String missionName, String clientUid) {
+	public void missionUnsubscribe(String missionName, String clientUid, String username, boolean disconnectOnly) {
 
 		if (logger.isDebugEnabled()) {
 			logger.debug("unsubscribe from mission " + missionName + " for uid " + clientUid);
@@ -1762,8 +1784,16 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 
 		missionDisconnect(missionName, clientUid);
 
+		if (disconnectOnly) {
+			return;
+		}
+
 		if (config().getRepository().isEnable()) {
-			missionSubscriptionRepository().deleteByMissionNameAndClientUid(missionName, clientUid);
+			if (username != null) {
+				missionSubscriptionRepository().deleteByMissionNameAndClientUidAndUsername(missionName, clientUid, username);
+			} else {
+				missionSubscriptionRepository().deleteByMissionNameAndClientUid(missionName, clientUid);
+			}
 		}
 	}
 
@@ -1775,7 +1805,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 		
 		for (String uid : subscriptionStore().getUidsByMission(missionName)) {
-			missionUnsubscribe(missionName, uid);
+			missionUnsubscribe(missionName, uid, null, false);
 		}
 	}
 
@@ -1804,18 +1834,22 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	
 	private AtomicInteger changeCount = new AtomicInteger();
 	private AtomicInteger changeHitCount = new AtomicInteger();
-	
-	@Override
-    public void announceMissionChange(String missionName, SubscriptionManagerLite.ChangeType changeType, String creatorUid, String tool, String changes) {
 
-		CotEventContainer changeMessage = createMissionChangeMessage(missionName, changeType, creatorUid, tool, changes);
-				
-		if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
-			MessagingDependencyInjectionProxy.getInstance().clusterManager().onAnnounceMissionChangeMessage(changeMessage, missionName);
-		} else {
-			submitAnnounceMissionChangeCot(missionName, changeMessage);
-		}
-   }
+	@Override
+    public void announceMissionChange(String missionName, ChangeType changeType, String creatorUid, String tool, String changes) {
+		announceMissionChange(missionName, changeType, creatorUid, tool, changes, null);
+   	}
+
+   	@Override
+   	public  void announceMissionChange(String missionName, ChangeType changeType, String creatorUid, String tool, String changes, String xmlContentForNotification) {
+	   CotEventContainer changeMessage = createMissionChangeMessage(missionName, changeType, creatorUid, tool, changes, xmlContentForNotification);
+
+	   if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+		   MessagingDependencyInjectionProxy.getInstance().clusterManager().onAnnounceMissionChangeMessage(changeMessage, missionName);
+	   } else {
+		   submitAnnounceMissionChangeCot(missionName, changeMessage);
+	   }
+   	}
 
 	public void submitAnnounceMissionChangeCot(String missionName, CotEventContainer changeMessage) {
 		if (changeLogger.isDebugEnabled()) {
@@ -1894,7 +1928,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			message = createMissionDeleteMessage(missionName, creatorUid, tool);
 		} else if (changeType == ChangeType.KEYWORD || changeType == ChangeType.METADATA) {
 			message = createMissionChangeMessage(
-					missionName, changeType, creatorUid, tool, null);
+					missionName, changeType, creatorUid, tool, null, null);
 		} else {
 			logger.error("attempt to broadcast unsupported change type: " + changeType);
 			return;

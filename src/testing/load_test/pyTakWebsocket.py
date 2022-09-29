@@ -166,6 +166,9 @@ class PyTAKWebsocket:
                         for i in range(POOL_SIZE):
                             self.read_pool.apply_async(read_thread_zmq, args=(port, data_sync_port))
                         await asyncio.sleep(1)
+                    
+                    # get list of recent client connect / disconnect events
+                    self.data_sync_sess.get_client_endpoints()
 
                     read_task = asyncio.ensure_future(self.read_handler(ws))
                     write_task = asyncio.ensure_future(self.write_handler(ws))

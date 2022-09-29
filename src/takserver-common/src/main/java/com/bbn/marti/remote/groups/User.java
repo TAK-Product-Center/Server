@@ -30,7 +30,7 @@ public abstract class User implements Node, Comparable<User>, Serializable {
     private static final long serialVersionUID = 8002622862665912632L;
 
     protected final String id;
-    protected final String name;
+    protected String name;
     protected final String connectionId;
     protected final ConnectionType connectionType;
     protected final String address;
@@ -57,7 +57,7 @@ public abstract class User implements Node, Comparable<User>, Serializable {
         this.authorities = new ConcurrentSkipListSet<>();
         this.originNode = IgniteHolder.getInstance().getIgniteId();
     }
-    
+
     public String getId() {
         return id;
     }
@@ -83,7 +83,9 @@ public abstract class User implements Node, Comparable<User>, Serializable {
     public ConnectionType getConnectionType() {
         return connectionType;
     }
-    
+
+    public void setName(String name) { this.name = name; }
+
     public String getName() {
         return name;
     }

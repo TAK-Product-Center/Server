@@ -510,17 +510,19 @@ public class ExCheckService {
     public String addEditChecklistTask(
             ChecklistTask task, Checklist checklist, String clientUid, String groupVector) {
 
+        Date now = new Date();
+
         // add the task to esync
         String xml = toXml(task);
         List<String> keywords = new ArrayList<String>();
         keywords.add("Task");
-        Metadata metadata = addToEnterpriseSync(xml.getBytes(), groupVector, task.getUid(), keywords, new Date());
+        Metadata metadata = addToEnterpriseSync(xml.getBytes(), groupVector, task.getUid(), keywords, now);
         String hash = metadata.getHash();
 
         // add the task doc to the checklist mission
         MissionContent content = new MissionContent();
         content.getHashes().add(hash);
-        missionService.addMissionContent(checklist.getChecklistDetails().getUid(), content, clientUid, groupVector);
+        missionService.addMissionContentAtTime(checklist.getChecklistDetails().getUid(), content, clientUid, groupVector, now, xml);
 
         return hash;
     }
@@ -546,7 +548,7 @@ public class ExCheckService {
 
         // create a new mission for the checklist
         Mission checklistMission = missionService.createMission(checklistId, EXCHECK_TOOL, groupVector,
-                checklist.getChecklistDetails().getDescription(), null, EXCHECK_TOOL, null, null, null);
+                checklist.getChecklistDetails().getDescription(), null, null, null, null, null, EXCHECK_TOOL, null, null, null, null);
 
         // add the new checklist to the checklist mission
         MissionContent content = new MissionContent();

@@ -30,4 +30,20 @@ public interface PluginManager {
 	 * Stop one plugin by id.
 	 */
 	void stopPluginByName(String name);
+	
+	/*
+	 * set plugin archive for one plugin
+	 */
+	void setPluginArchive(String name, boolean isArchiveEnabled);
+	
+	/*
+	 * set plugin enabled atribute for one plugin
+	 */
+	void setPluginEnabled(String name, boolean isPluginEnabled);
+	
+	/*
+	 * Submit data a plugin for processing. Implementation of this function is entirely delegated to the plugin.
+	 * 
+	 */
+	void submitDataToPlugin(String pluginClassName, String scope, String data, String contentType);
 }

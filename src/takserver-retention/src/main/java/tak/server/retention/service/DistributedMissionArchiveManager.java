@@ -21,7 +21,7 @@ import tak.server.retention.scheduler.SingleTaskSchedulerService;
 
 public class DistributedMissionArchiveManager implements MissionArchiveManager, Service {
 	
-	private static final String MISSION_ARCHIVE_CONFIG = "conf/mission-archive/misison-archiving-config.yml";
+	private static final String MISSION_ARCHIVE_CONFIG = "conf/retention/mission-archiving-config.yml";
 
 	@Autowired
 	MissionArchiveHelper missionArchiveHelper;

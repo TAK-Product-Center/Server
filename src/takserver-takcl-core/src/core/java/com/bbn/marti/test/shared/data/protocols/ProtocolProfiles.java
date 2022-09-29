@@ -23,7 +23,13 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 	SUBSCRIPTION_MCAST("mcast", 1),
 	SUBSCRIPTION_STCP("stcp", 2),
 	SUBSCRIPTION_TLS("tls", 2),
-	SUBSCRIPTION_SSL("ssl", 2);
+	SUBSCRIPTION_SSL("ssl", 2),
+	DATAFEED_TCP("tcp", 2),
+	DATAFEED_UDP("udp", 1),
+	DATAFEED_MCAST("mcast", 1),
+	DATAFEED_STCP("stcp", 2),
+	DATAFEED_TLS("tls", 2),
+	DATAFEED_SSL("ssl", 2);
 
 
 	private final String value;
@@ -58,6 +64,15 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 		throw new RuntimeException("Unexpected Protocol '" + value + "'!");
 	}
 
+	public static ProtocolProfiles getDataFeedByValue(String value) {
+		for (ProtocolProfiles protocol : ProtocolProfiles.values()) {
+			if (protocol.getValue().equals(value) && protocol.getConnectionType() == ConnectionType.DATAFEED) {
+				return protocol;
+			}
+		}
+		throw new RuntimeException("Unexpected Protocol '" + value + "'!");
+	}
+	
 	@Override
 	public ConnectionType getConnectionType() {
 		switch (this) {
@@ -77,6 +92,14 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 			case SUBSCRIPTION_SSL:
 				return ConnectionType.SUBSCRIPTION;
 
+			case DATAFEED_TCP:
+			case DATAFEED_UDP:
+			case DATAFEED_MCAST:
+			case DATAFEED_STCP:
+			case DATAFEED_TLS:
+			case DATAFEED_SSL:
+				return ConnectionType.DATAFEED;
+
 			default:
 				throw new RuntimeException("Unexpected protocol \'" + this + "'.");
 		}
@@ -95,11 +118,17 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 			case SUBSCRIPTION_STCP:
 			case SUBSCRIPTION_SSL:
 			case SUBSCRIPTION_TLS:
+			case DATAFEED_TCP:
+			case DATAFEED_UDP:
+			case DATAFEED_MCAST:
 				return false;
 
 			case INPUT_STCP:
 			case INPUT_SSL:
 			case INPUT_TLS:
+			case DATAFEED_STCP:
+			case DATAFEED_SSL:
+			case DATAFEED_TLS:
 				return true;
 
 			default:
@@ -113,6 +142,9 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 			case INPUT_TCP:
 			case INPUT_UDP:
 			case INPUT_MCAST:
+			case DATAFEED_TCP:
+			case DATAFEED_UDP:
+			case DATAFEED_MCAST:
 				return false;
 
 			case INPUT_STCP:
@@ -124,6 +156,9 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 			case SUBSCRIPTION_STCP:
 			case SUBSCRIPTION_SSL:
 			case SUBSCRIPTION_TLS:
+			case DATAFEED_STCP:
+			case DATAFEED_SSL:
+			case DATAFEED_TLS:
 				return true;
 
 			default:
@@ -140,6 +175,12 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 			case INPUT_TLS:
 			case INPUT_SSL:
 			case INPUT_MCAST:
+			case DATAFEED_TCP:
+			case DATAFEED_UDP:
+			case DATAFEED_STCP:
+			case DATAFEED_TLS:
+			case DATAFEED_SSL:
+			case DATAFEED_MCAST:
 				return true;
 
 			case SUBSCRIPTION_TCP:
@@ -161,11 +202,17 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 			case INPUT_TCP:
 			case INPUT_UDP:
 			case INPUT_MCAST:
+			case DATAFEED_TCP:
+			case DATAFEED_UDP:
+			case DATAFEED_MCAST:
 				return TestConnectivityState.SendOnly;
 
 			case INPUT_STCP:
 			case INPUT_SSL:
 			case INPUT_TLS:
+			case DATAFEED_STCP:
+			case DATAFEED_SSL:
+			case DATAFEED_TLS:
 				return TestConnectivityState.Disconnected;
 
 			case SUBSCRIPTION_TCP:
@@ -193,12 +240,18 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 			case SUBSCRIPTION_UDP:
 			case SUBSCRIPTION_MCAST:
 			case SUBSCRIPTION_STCP:
+			case DATAFEED_TCP:
+			case DATAFEED_UDP:
+			case DATAFEED_MCAST:
+			case DATAFEED_STCP:
 				return false;
 
 			case INPUT_SSL:
 			case INPUT_TLS:
 			case SUBSCRIPTION_SSL:
 			case SUBSCRIPTION_TLS:
+			case DATAFEED_SSL:
+			case DATAFEED_TLS:
 				return true;
 
 			default:
@@ -216,6 +269,9 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 			case SUBSCRIPTION_STCP:
 			case SUBSCRIPTION_TLS:
 			case SUBSCRIPTION_SSL:
+			case DATAFEED_STCP:
+			case DATAFEED_TLS:
+			case DATAFEED_SSL:
 				return false;
 
 			case INPUT_TCP:
@@ -224,6 +280,9 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 			case SUBSCRIPTION_TCP:
 			case SUBSCRIPTION_UDP:
 			case SUBSCRIPTION_MCAST:
+			case DATAFEED_TCP:
+			case DATAFEED_UDP:
+			case DATAFEED_MCAST:
 				return true;
 
 			default:
@@ -253,6 +312,7 @@ public enum ProtocolProfiles implements ProtocolProfilesInterface, Comparator<Pr
 
 	public static enum ConnectionType {
 		INPUT,
-		SUBSCRIPTION
+		SUBSCRIPTION,
+		DATAFEED
 	}
 }

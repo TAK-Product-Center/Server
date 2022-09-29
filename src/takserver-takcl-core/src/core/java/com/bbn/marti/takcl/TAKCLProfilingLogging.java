@@ -137,21 +137,27 @@ public class TAKCLProfilingLogging {
 
 			switch (protocol) {
 				case INPUT_TCP:
+				case DATAFEED_TCP:
 					assert (protocol.canSend());
 					return sendTcp;
 				case INPUT_UDP:
+				case DATAFEED_UDP:
 					assert (protocol.canSend());
 					return sendUdp;
 				case INPUT_MCAST:
+				case DATAFEED_MCAST:
 					assert (protocol.canSend());
 					return sendMcast;
 				case INPUT_STCP:
+				case DATAFEED_STCP:
 					assert (protocol.canSend());
 					return sendStcp;
 				case INPUT_TLS:
+				case DATAFEED_TLS:
 					assert (protocol.canSend());
 					return sendTls;
 				case INPUT_SSL:
+				case DATAFEED_SSL:
 					assert (protocol.canSend());
 					return sendSsl;
 				default:
@@ -165,12 +171,15 @@ public class TAKCLProfilingLogging {
 
 			switch (protocol) {
 				case INPUT_STCP:
+				case DATAFEED_STCP:
 					assert (protocol.canListen());
 					return receiveStcp;
 				case INPUT_SSL:
+				case DATAFEED_SSL:
 					assert (protocol.canListen());
 					return receiveSsl;
 				case INPUT_TLS:
+				case DATAFEED_TLS:
 					assert (protocol.canListen());
 					return receiveTls;
 				case SUBSCRIPTION_TCP:

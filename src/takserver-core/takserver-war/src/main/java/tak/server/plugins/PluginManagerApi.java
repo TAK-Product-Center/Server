@@ -64,8 +64,8 @@ public class PluginManagerApi extends BaseRestController {
 		return result;
 	}
 	
-	@RequestMapping(value = "/plugins/info/all/status", method = RequestMethod.POST)
-	public ResponseEntity<ApiResponse<Boolean>> changeAllPluginStatus(@RequestParam("status") boolean status) {
+	@RequestMapping(value = "/plugins/info/all/started", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<Boolean>> changeAllPluginStartedStatus(@RequestParam("status") boolean status) {
 		ResponseEntity<ApiResponse<Boolean>> result = null;
 		try {
 			if (status) {
@@ -86,8 +86,8 @@ public class PluginManagerApi extends BaseRestController {
 		return result;
 	}
 	 
-	@RequestMapping(value = "/plugins/info/status", method = RequestMethod.POST)
-	public ResponseEntity<ApiResponse<Boolean>> changePluginStatus(@RequestParam("name") String name, @RequestParam("status") boolean status) {
+	@RequestMapping(value = "/plugins/info/started", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<Boolean>> changePluginStartedStatus(@RequestParam("name") String name, @RequestParam("status") boolean status) {
 		ResponseEntity<ApiResponse<Boolean>> result = null;
 		try {
 			if (status) {
@@ -103,6 +103,44 @@ public class PluginManagerApi extends BaseRestController {
 		if (result == null) {
 			//This would be an error condition
 			result = new ResponseEntity<ApiResponse<Boolean>>(new ApiResponse<Boolean>(Constants.API_VERSION, Boolean.class.getName(), status), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+	
+	@RequestMapping(value = "/plugins/info/enabled", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<Boolean>> changePluginEnabledSetting(@RequestParam("name") String name, @RequestParam("status") boolean isEnabled) {
+		ResponseEntity<ApiResponse<Boolean>> result = null;
+		try {
+			pluginManager.setPluginEnabled(name, isEnabled);
+
+			result = new ResponseEntity<ApiResponse<Boolean>>(new ApiResponse<Boolean>(Constants.API_VERSION, Boolean.class.getName(), isEnabled), HttpStatus.OK);
+		} catch (Exception e) {
+			logger.debug("Exception changing plugin status.", e);
+		}
+
+		if (result == null) {
+			//This would be an error condition
+			result = new ResponseEntity<ApiResponse<Boolean>>(new ApiResponse<Boolean>(Constants.API_VERSION, Boolean.class.getName(), isEnabled), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+	
+	@RequestMapping(value = "/plugins/info/archive", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<Boolean>> changePluginArchiveSetting(@RequestParam("name") String name, @RequestParam("archiveEnabled") boolean archiveEnabled) {
+		ResponseEntity<ApiResponse<Boolean>> result = null;
+		try {
+			pluginManager.setPluginArchive(name, archiveEnabled);
+
+			result = new ResponseEntity<ApiResponse<Boolean>>(new ApiResponse<Boolean>(Constants.API_VERSION, Boolean.class.getName(), archiveEnabled), HttpStatus.OK);
+		} catch (Exception e) {
+			logger.debug("Exception changing plugin status.", e);
+		}
+
+		if (result == null) {
+			//This would be an error condition
+			result = new ResponseEntity<ApiResponse<Boolean>>(new ApiResponse<Boolean>(Constants.API_VERSION, Boolean.class.getName(), archiveEnabled), HttpStatus.INTERNAL_SERVER_ERROR);
 		}
 
 		return result;

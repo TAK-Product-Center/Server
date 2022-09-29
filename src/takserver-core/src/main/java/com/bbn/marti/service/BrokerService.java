@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
+import com.bbn.cot.filter.VBMSASharingFilter;
 import com.bbn.marti.nio.protocol.connections.StreamingProtoBufProtocol;
 import com.bbn.marti.remote.QueueMetric;
 import com.bbn.marti.remote.groups.ConnectionInfo;
@@ -64,11 +65,10 @@ public class BrokerService extends BaseService {
 				executorService.execute(() -> {
 
 					try {
-
 						streamendpointFilter.filter(c);
 
 						Collection<Subscription> hits = subMgr.getMatches(c);
-
+						
 						c.setContextValue(Constants.SUBSCRIBER_HITS_KEY, subscriptionStore.subscriptionCollectionToConnectionIdSet(hits));
 
 						inputQueue.add(c);
@@ -147,21 +147,30 @@ public class BrokerService extends BaseService {
 	}
 
 	public void processMessage(CotEventContainer cot) {
-
 		try {
 
+			if(VBMSASharingFilter.getInstance().filter(cot) == null) return;
+			
 			long hitTime = System.currentTimeMillis();
 
 			@SuppressWarnings("unchecked")
 			Set<String> hits = (Set<String>) cot.getContextValue(Constants.SUBSCRIBER_HITS_KEY);
 			Set<String> websocketHits = new ConcurrentSkipListSet<>();
 			
+			String senderConnectionId = null;
+			if (cot.getContextValue(Constants.CONNECTION_ID_KEY) != null) {
+				senderConnectionId = (String) cot.getContextValue(Constants.CONNECTION_ID_KEY);
+			}			
 
 			// pre-convert to protobuf
 			cot.setProtoBufBytes(StreamingProtoBufProtocol.convertCotToProtoBufBytes(cot));
 			
 			for (String connectionId : hits) {
-
+				// if the message was injected by a plugin, the list of hits may contain the original sender.
+				// we can filter them out by tracking the connection id the message originally came from				
+				if (cot.getContextValue(Constants.PLUGIN_PROVENANCE) != null && senderConnectionId != null 
+						&& senderConnectionId.equals(connectionId)) continue;
+				
 				Subscription subscription = null;
 
 				try {

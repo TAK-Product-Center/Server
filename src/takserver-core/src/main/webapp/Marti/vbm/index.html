@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="vbmConfiguration">
+  <head>
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <meta charset="utf-8">
+    <title>VBM Configuration</title>
+
+    <!-- <link rel="stylesheet" href="css/main.css">-->
+    <link rel="stylesheet" href="../jquery/jquery-ui.css" type="text/css" media="print, projection, screen" />
+    <link rel="stylesheet" href="../css/4.4.1/bootstrap.min.css">
+
+    <script type="text/javascript" src="../jquery/jquery-3.5.0.js"></script>
+    <script type="text/javascript" src="../jquery/jquery-ui.min.js"></script>
+
+    <script type="text/javascript" src="../lib/angular/angular.min.js"></script>
+
+    <link rel="stylesheet" href="css/main.css">
+    
+    <script src="js/app.js"></script>
+    <script src="js/controllers.js"></script>
+  </head>
+
+  <body style="font:18px arial, sans-serif;">
+    <div data-ng-include="'../menubar.html'"></div>
+    <div class="content" id="rightViewContainer" ng-controller="vbmController" >
+        <h2>VBM Controller</h2>
+        <div class="custom-control custom-switch">    
+          <input type="checkbox" class="custom-control-input" id="customSwitch1" ng-model="vbm_enabled" >
+          <label class="custom-control-label" for="customSwitch1"> Enable VBM </label>
+        </div>
+
+        <div class="custom-control custom-switch">    
+          <input data-ng-disabled="!vbm_enabled" type="checkbox" class="custom-control-input" id="customSwitch2" ng-model="sa_disabled" >
+          <label class="custom-control-label" for="customSwitch2"> Disable SA Sharing </label>
+        </div>
+
+        <div class="custom-control custom-switch">    
+          <input data-ng-disabled="!vbm_enabled" type="checkbox" class="custom-control-input" id="customSwitch3" ng-model="chat_disabled" >
+          <label class="custom-control-label" for="customSwitch3"> Disable Chat Sharing </label>
+        </div>
+        <button class="btn btn-primary" style="margin-top:20px;" ng-click="save_changes()"> Save changes </button>
+    </div>
+    <div data-ng-include="'../footer.jsp'"></div>
+  </body>
+
+</html>

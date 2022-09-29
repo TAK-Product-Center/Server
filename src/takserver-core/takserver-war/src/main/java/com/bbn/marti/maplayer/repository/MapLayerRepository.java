@@ -8,6 +8,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.bbn.marti.maplayer.model.MapLayer;
@@ -15,7 +16,15 @@ import com.bbn.marti.maplayer.model.MapLayer;
 public interface MapLayerRepository extends JpaRepository<MapLayer, Long> {
 
     MapLayer findByUid(String uid);
-    List<MapLayer> findAll(Sort sort);
+
+    @Query(value = " select id, create_time, modified_time, uid, creator_uid, name, description, type, url, " +
+            "default_layer, enabled, min_zoom, max_zoom, tile_type, server_parts, background_color, tile_update, " +
+            "ignore_errors, invert_y_coordinate, north, south, east, west, coordinate_system, " +
+            "additional_parameters, opacity, version, layers, " +
+            "null as mission_id from maplayer  where uid = :uid ", nativeQuery = true)
+    MapLayer findByUidNoMission(@Param("uid") String uid);
+
+    List<MapLayer> findAllByMissionIsNull(Sort sort);
 
     @Transactional
     void deleteByUid(String uid);
@@ -24,5 +33,10 @@ public interface MapLayerRepository extends JpaRepository<MapLayer, Long> {
     @Transactional
     @Query(value = "update maplayer set default_layer = false")
     void unsetDefault();
+
+    @Modifying
+    @Transactional
+    @Query(value = "delete from maplayer where mission_id = :mission_id", nativeQuery = true)
+    void deleteAllByMissionId(@Param("mission_id") Long mission_id);
 }
 

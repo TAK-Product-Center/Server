@@ -1,18 +1,22 @@
 package com.bbn.marti.jwt;
 
+import com.bbn.marti.config.Oauth;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtParser;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.*;
 import java.security.cert.Certificate;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.List;
 
 public class JwtUtils {
 
@@ -37,7 +41,6 @@ public class JwtUtils {
             //
             // load keys from tls keystore
             //
-
             String keyStoreType = coreConfig().getRemoteConfiguration().getSecurity().getTls().getKeystore();
             String keyStoreFile = coreConfig().getRemoteConfiguration().getSecurity().getTls().getKeystoreFile();
             String keyStorePass = coreConfig().getRemoteConfiguration().getSecurity().getTls().getKeystorePass();
@@ -118,21 +121,21 @@ public class JwtUtils {
     public PublicKey getPublicKey() { return publicKey; }
     public PrivateKey getPrivateKey() { return privateKey; }
 
-    private JwtParser getParser(SignatureAlgorithm signatureAlgorithm) {
+    private JwtParser getParser(SignatureAlgorithm signatureAlgorithm, Key key) {
 
         JwtParser parser = null;
         if (signatureAlgorithm == SignatureAlgorithm.RS256) {
             parser = jwtRsaParser.get();
             if (parser == null) {
                 parser = Jwts.parser();
-                parser.setSigningKey(privateKey);
+                parser.setSigningKey(key);
                 jwtRsaParser.set(parser);
             }
         } else if (signatureAlgorithm == SignatureAlgorithm.HS256) {
             parser = jwtHmacParser.get();
             if (parser == null) {
                 parser = Jwts.parser();
-                parser.setSigningKey(privateKey.getEncoded());
+                parser.setSigningKey(key.getEncoded());
                 jwtHmacParser.set(parser);
             }
         }
@@ -140,8 +143,76 @@ public class JwtUtils {
         return parser;
     }
 
+    public List<RSAPublicKey> getExternalVerifiers() {
+        try {
+            Oauth oAuth = coreConfig.getRemoteConfiguration().getAuth().getOauth();
+            if (oAuth == null) {
+                logger.error("OAuth config not found");
+                return null;
+            }
+
+            if (oAuth.getAuthServer() == null || oAuth.getAuthServer().size() == 0) {
+                logger.error("No auth servers configured");
+                return null;
+            }
+
+            //
+            // iterate across our configured authorization servers and add their issuer public keys
+            //
+            List<RSAPublicKey> rsaPublicKeys = new ArrayList<>();
+            for (Oauth.AuthServer authServer : oAuth.getAuthServer()) {
+                byte[] keyBytes = Files.readAllBytes(Paths.get(authServer.getIssuer()));
+                X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
+                KeyFactory kf = KeyFactory.getInstance("RSA");
+                rsaPublicKeys.add((RSAPublicKey) kf.generatePublic(spec));
+            }
+
+            return rsaPublicKeys;
+        } catch (Exception e) {
+            logger.error("exception in getExternalVerifiers!");
+            return  null;
+        }
+    }
+
+    private List<JwtParser> getExternalParsers(SignatureAlgorithm signatureAlgorithm) {
+        List<JwtParser> jwtParsers = new ArrayList<>();
+        for (RSAPublicKey rsaPublicKey : getExternalVerifiers()) {
+            jwtParsers.add(Jwts.parser().setSigningKey(rsaPublicKey));
+        }
+        return jwtParsers;
+    }
+
+    public Claims parseClaim(String token, JwtParser jwtParser) {
+        try {
+            Claims claims = jwtParser.parseClaimsJws(token).getBody();
+            if (claims != null) {
+                return claims;
+            }
+        } catch (Exception e) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("exception parsing token " + token, e);
+            }
+        }
+
+        return null;
+    }
+
     public Claims parseClaims(String token, SignatureAlgorithm signatureAlgorithm) {
-        return getParser(signatureAlgorithm).parseClaimsJws(token).getBody();
+        // try to verify the claims using the tls keystore
+        Claims claims = parseClaim(token, getParser(signatureAlgorithm, privateKey));
+        if (claims != null) {
+            return claims;
+        }
+
+        // try to verify the claims using the external verifiers
+        for (JwtParser jwtParser : getExternalParsers(signatureAlgorithm)) {
+            claims = parseClaim(token, jwtParser);
+            if (claims != null) {
+                return claims;
+            }
+        }
+
+        return null;
     }
 
     private CoreConfig coreConfig() {

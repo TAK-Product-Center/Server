@@ -46,6 +46,7 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 	public static String EXPLICIT_PUBLISH_KEY = "explicitBrokeringPub";
 	public static String EXPLICIT_CALLSIGN_KEY = "explicitBrokeringCallsign";
 	public static String EXPLICIT_UID_KEY = "explicitBrokeringUid";
+	public static String EXPLICIT_FEED_UID_KEY = "explicitFeedBrokeringUid";
 	public static String EXPLICIT_MISSION_KEY = "explicitBrokeringMission";
 
 	public static String UID_ATTR = "uid";
@@ -181,8 +182,16 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 
                     for (final String missionName : missionNames) {
 
-						MissionSubscription missionSubscription = missionSubscriptionRepository.findByMissionNameAndClientUidNoMission(
-								missionName, clientUid);
+						MissionSubscription missionSubscription = null;
+						User user = (User) cot.getContextValue(Constants.USER_KEY);
+						if (user != null) {
+							missionSubscription = missionSubscriptionRepository.findByMissionNameAndClientUidAndUsernameNoMission(
+									missionName, clientUid, user.getName());
+						} else {
+							missionSubscription = missionSubscriptionRepository.findByMissionNameAndClientUidNoMission(
+									missionName, clientUid);
+						}
+					
 						if (missionSubscription == null) {
 							logger.error("unable to find mission subscription for client " + missionName + ", " + clientUid);
 							continue;

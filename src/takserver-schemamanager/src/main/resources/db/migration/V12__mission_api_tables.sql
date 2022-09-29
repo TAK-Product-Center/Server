@@ -3,6 +3,7 @@
 --
 -- Migration script to TAK Server schema version 12
 -- Adds support for Mission API
+-- This script is a copy of mission_schema_20160224.sql
 --
 
 -- drop table if exists mission cascade;

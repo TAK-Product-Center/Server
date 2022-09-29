@@ -164,7 +164,8 @@
 	  <li><a href="/Marti/clientcerts/index.html"><span>Client Certificates</span></a></li>
 	  <li><a href="/Marti/oauth/index.html"><span>Tokens</span></a></li>
 	  <li><a href="/Marti/LogManager.jsp"><span>Device Logs</span></a></li>
-	  <li class='last'><a href="/Marti/profiles/index.html"><span>Device Profiles</span></a></li>
+	  <li><a href="/Marti/profiles/index.html"><span>Device Profiles</span></a></li>
+      <li class='last'><a href="/Marti/vbm/index.html"><span>VBM Configuration</span></a></li>
 	</ul>
       </li>
 
@@ -259,7 +260,9 @@
               console.log(data.data);
               if (data.data != 'true' && !isSecCookie) {
                   $('#securityAlert').show();
-                  $('#securityAlert span').html("<strong>ALERT!</strong> The following ports support unsecure connections: " + data.data);
+                  $('#securityAlert span').html("<strong>ALERT!</strong> The following ports support unsecure connections: " + data.data +
+                  ". Unencrypted ports may be exploited allowing unauthorized access to the system and sensitive information. " +
+                  "See section <strong> 4.4  Use Setup Wizard to Configure TAK Server</strong> in the TAK Server Configuration Guide for how to secure the configuration.");
               }
           })
       })(jQuery);

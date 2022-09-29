@@ -14,7 +14,6 @@ import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.ignite.Ignite;
-import org.apache.ignite.IgniteAtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +21,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.context.support.GenericApplicationContext;
 
-import com.google.common.base.Strings;
+import com.bbn.marti.remote.ServerInfo;
 
 import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
 import io.nats.client.Connection;
@@ -31,11 +30,7 @@ import io.nats.client.Nats;
 import tak.server.CommonConstants;
 import tak.server.messaging.Messenger;
 
-
 public class PluginStarter {
-
-	private final String natsURL;
-	private final String natsClusterId;
 
 	private Connection natsConnection;
 	private Dispatcher dispatcher;
@@ -63,26 +58,29 @@ public class PluginStarter {
 	
 	private final ForkJoinPool interceptorSendPool = newForkJoinPool("plugin-interceptor-send-worker");
 	private final ForkJoinPool interceptorProcessPool = newForkJoinPool("plugin-interceptor-process-worker");
+	
+	private final ServerInfo serverInfo;
+	private final PluginApi pluginApi;
 
-	public PluginStarter(String natsURL, String natsClusterId) {
+	public PluginStarter(ServerInfo serverInfo, PluginApi pluginApi) {
 		starterPool = Executors.newWorkStealingPool(Runtime.getRuntime().availableProcessors() * 2);
-		this.natsURL = natsURL;
-		this.natsClusterId = natsClusterId;
+		this.serverInfo = serverInfo;
+		this.pluginApi = pluginApi;
 	}
 
 	@EventListener(PluginsLoadedEvent.class)
 	private void init() {
 
 		try {
-			initSenderPlugins();
-			initReceiverPlugins();
-			initSenderReceiverPlugins();
-			initInterceptorPlugins();
+			startSenderPlugins();
+			startReceiverPlugins();
+			startSenderReceiverPlugins();
+			startInterceptorPlugins();
 
-			if (Strings.isNullOrEmpty(natsClusterId)) {
-				initIgniteListener();
-			} else {
+			if (serverInfo.isCluster()) {
 				initNatsListener();
+			} else {
+				initIgniteListener();
 			}
 		} catch (Exception e) {
 			logger.error("error inititalizing plugins", e);
@@ -98,13 +96,13 @@ public class PluginStarter {
 			Message message = Message.parseFrom(rawMessage);
 
 			receiverPlugins.forEach((name, receiver) -> {
-				if (receiver.getPluginInfo().isEnabled()) {
+				if (receiver.getPluginInfo().isStarted()) {
 					receiver.onMessage(message);
 				}
 			});
 
 			senderReceiverPlugins.forEach((name, senderReceiver) -> {
-				if (senderReceiver.getPluginInfo().isEnabled()) {
+				if (senderReceiver.getPluginInfo().isStarted()) {
 					senderReceiver.onMessage(message);
 				}
 			});
@@ -139,7 +137,8 @@ public class PluginStarter {
 						    Message.Builder mb = processedMessage.toBuilder();
 		                    
 		                    // add default provenance to guard against loops
-		                    mb.addProvenance("PluginManager");
+		                    mb.addProvenance(tak.server.Constants.PLUGIN_MANAGER_PROVENANCE);
+		                    mb.addProvenance(tak.server.Constants.PLUGIN_INTERCEPTOR_PROVENANCE);
 		                    
 							fpm.send(mb.build());
 						} catch (InterruptedException | ExecutionException e) {
@@ -160,13 +159,14 @@ public class PluginStarter {
 
 	private void initNatsListener() {
 		try {
-			natsConnection = Nats.connect(natsURL);
+			natsConnection = Nats.connect(serverInfo.getNatsURL());
 
 			// message dispatcher
 			dispatcher = natsConnection.createDispatcher();
 
 			dispatcher.subscribe(CommonConstants.CLUSTER_PLUGIN_SUBSCRIBE_TOPIC, CommonConstants.CLUSTER_PLUGIN_SUBSCRIBE_GROUP, m ->
-			submitBytesToReceivers((byte[]) (byte[]) m.getData()));
+				submitBytesToReceivers((byte[]) (byte[]) m.getData())
+			);
 		} catch (Exception e) {
 			logger.error("exception connecting to NATS server to receive messages", e);
 		}
@@ -196,81 +196,65 @@ public class PluginStarter {
 		});
 	}
 
-	private void initSenderReceiverPlugins() {
+	private void startSenderReceiverPlugins() {
 		senderReceiverPlugins = context.getBeansOfType(MessageSenderReceiver.class);
-
-		AtomicInteger senderReceiverCount = new AtomicInteger();
 
 		senderReceiverPlugins.forEach((name, senderReceiver) -> {
 			starterPool.execute(() -> {
-				senderReceiver.start();
-
-				if (logger.isDebugEnabled()) {
-					logger.debug("started sender-receiver plugin " + name + " " + senderReceiver.getClass().getName());
+				
+				if (senderReceiver.getPluginInfo().isEnabled()) {
+					senderReceiver.internalStart();
+					logger.info("started senderReceiver plugin named {}, class {}", name, senderReceiver.getClass().getName());
 				}
 
-				senderReceiverCount.incrementAndGet();
 			});
 		});
 	}
 
-	private void initReceiverPlugins() {
+	private void startReceiverPlugins() {
 		receiverPlugins = context.getBeansOfType(MessageReceiver.class);
-
-		AtomicInteger receiverCount = new AtomicInteger();
 
 		receiverPlugins.forEach((name, receiver) -> {
 			starterPool.execute(() -> {
-				receiver.start();
-
-				if (logger.isDebugEnabled()) {
-					logger.debug("started receiver plugin " + name + " " + receiver.getClass().getName());
+				
+				if (receiver.getPluginInfo().isEnabled()) {
+					receiver.internalStart();
+					logger.info("started receiver plugin named {}, class {}", name, receiver.getClass().getName());
 				}
 
-				receiverCount.incrementAndGet();
 			});
 		});
 	}
 
-	private void initSenderPlugins() {
+	private void startSenderPlugins() {
 		senderPlugins = context.getBeansOfType(MessageSender.class);
-
-		AtomicInteger senderCount = new AtomicInteger();
 
 		senderPlugins.forEach((name, sender) -> {
 			starterPool.execute(() -> {
-				sender.start();
-
-				if (logger.isDebugEnabled()) {
-					logger.debug("started sender plugin " + name + " " + sender.getClass().getName());
+				
+				if (sender.getPluginInfo().isEnabled()) {
+					sender.internalStart();
+					logger.info("started sender plugin named {}, class {}", name, sender.getClass().getName());
 				}
 
-				senderCount.incrementAndGet();
 			});
 		});
 	}
 	
-	private void initInterceptorPlugins() {
+	private void startInterceptorPlugins() {
 		interceptorPlugins = context.getBeansOfType(MessageInterceptor.class);
-
-		AtomicInteger interceptorCount = new AtomicInteger();
 		
 		// track any registration of interceptor plugins so that the messaging process submission service can behave accordingly
-		if (!interceptorPlugins.isEmpty()) {
-			ignite.atomicLong(PluginManagerConstants.INTERCEPTOR_REGISTRATION_KEY, 1, true);
-		} else {
-			ignite.atomicLong(PluginManagerConstants.INTERCEPTOR_REGISTRATION_KEY, 0, true);
-		}
+		pluginApi.addInterceptorPluginsActive(interceptorPlugins.size());
 
 		interceptorPlugins.forEach((name, interceptor) -> {
 			starterPool.execute(() -> {
-				interceptor.start();
-
-				if (logger.isDebugEnabled()) {
-					logger.debug("started interceptor plugin " + name + " " + interceptor.getClass().getName());
+				
+				if (interceptor.getPluginInfo().isEnabled()) {
+					interceptor.internalStart();
+					logger.info("started interceptor plugin named {}, class {}", name, interceptor.getClass().getName());
 				}
 
-				interceptorCount.incrementAndGet();
 			});
 		});
 	}

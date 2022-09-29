@@ -606,6 +606,7 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
             			userFileCache.put(control.getFileUser().getIdentifier(), control.getFileUser());
             		}
         		}
+
         		IgniteHolder.getInstance().getIgnite().message().send(Constants.FILE_AUTH_TOPIC, control);
         	} catch (Exception e) {
         		if (logger.isDebugEnabled()) {

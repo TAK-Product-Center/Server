@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.SimpleTimeZone;
 import java.util.SortedMap;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
@@ -24,6 +25,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang3.StringUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.owasp.esapi.errors.IntrusionException;
@@ -168,15 +170,18 @@ public class SearchServlet extends EnterpriseSyncServlet {
 			for (String key : httpParameters.keySet()) {
 				String[] values = httpParameters.get(key);
 				if (values != null && values.length > 1) {
-					log.warning("Ignoring duplicate value(s) for HTTP request parameter " + key);
+					log.warning("Ignoring duplicate value(s) for HTTP request parameter " + StringUtils.normalizeSpace(key));
 				}
 
 				RequestParameters searchParameter = RequestParameters.fromString(key);
-				log.fine("Setting search parameter " + searchParameter.toString() + "=" + values[0]);
+				if (log.isLoggable(Level.FINE)) {
+					log.fine("Setting search parameter " + StringUtils.normalizeSpace(searchParameter.toString()) + "="
+							+ StringUtils.normalizeSpace(values[0]));
+				}
 				
 				if (searchParameter != null) {	
 					if (values.length > 1) {
-						log.warning("Received " + values.length + " values for " + key + ". Ignoring all but first.");
+						log.warning("Received " + values.length + " values for " + StringUtils.normalizeSpace(key) + ". Ignoring all but first.");
 					}
 					switch (searchParameter) {
 					case BBox:
@@ -211,10 +216,12 @@ public class SearchServlet extends EnterpriseSyncServlet {
 		    		default:
 		    			Metadata.Field metadataField = Metadata.Field.fromString(key);
 		    			if (metadataField != null) {
-		    				log.fine("Setting metadata constraint " + metadataField.toString() + "=" + values[0]);
-		    				metadataConstraints.put(metadataField, values[0]);
+							if (log.isLoggable(Level.FINE)) {
+								log.fine("Setting metadata constraint " + metadataField.toString() + "=" + StringUtils.normalizeSpace(values[0]));
+							}
+							metadataConstraints.put(metadataField, values[0]);
 		    			} else {
-		    				log.warning("Unrecognized request parameter: " + key);
+		    				log.warning("Unrecognized request parameter: " + StringUtils.normalizeSpace(key));
 		    			}
 					} 
 				}	
@@ -255,8 +262,10 @@ public class SearchServlet extends EnterpriseSyncServlet {
     			if ( validator != null) {
     				if (validator.isValidInput("doGet processing database results", uid, "MartiSafeString", 
     						MartiValidator.SHORT_STRING_CHARS, false)) {
-    					log.fine("Processing search results for uid " + uid);
-    				} else {
+						if (log.isLoggable(Level.FINE)) {
+							log.fine("Processing search results for uid " + StringUtils.normalizeSpace(uid));
+						}
+					} else {
     					log.warning("Invalid UID found in database!");
     				}
     			}

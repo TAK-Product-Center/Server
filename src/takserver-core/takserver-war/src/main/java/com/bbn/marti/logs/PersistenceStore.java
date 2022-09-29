@@ -38,7 +38,7 @@ public class PersistenceStore {
     	
     	try (Connection connection = ds.getConnection(); PreparedStatement insert = wrapper.prepareStatement(
 				"insert into error_logs ( uid, callsign, platform, " +
-				"major_version, minor_version, filename, log ) " +
+				"major_version, minor_version, filename, contents ) " +
 				"values ( ?, ?, ?, ?, ?, ?, ? )", connection)) {
     		
     		validator.getValidInput("errorLog", errorLog.getUid(), 
@@ -60,7 +60,7 @@ public class PersistenceStore {
 			insert.setString(4, errorLog.getMajorVersion());
 			insert.setString(5, errorLog.getMinorVersion());
 			insert.setString(6, errorLog.getFilename());
-			insert.setString(7, errorLog.getLog());
+			insert.setBytes(7, errorLog.getContents());
 			
 			insert.executeUpdate();
 			insert.close(); 	    		
@@ -97,11 +97,17 @@ public class PersistenceStore {
 				{
 					logz = null;
 				}
-				log.setLog(logz);
+
+				if (logz != null && logz.length() > 0) {
+					log.setContents(logz.getBytes());
+				} else {
+					log.setContents(results.getBytes("contents"));
+				}
 
 				if (onlyCallstack) {
 					log.storeCallstacks();
 					log.setLog(null);
+					log.setContents(null);
 				}
 			}
 
@@ -165,7 +171,7 @@ public class PersistenceStore {
 			String sql = "select id, uid, callsign, platform, major_version, minor_version, ";
 
 			if (includeLogContents) {
-				sql += "log, ";
+				sql += "log, contents, ";
 			}
 
 			sql +=	"filename, time " +

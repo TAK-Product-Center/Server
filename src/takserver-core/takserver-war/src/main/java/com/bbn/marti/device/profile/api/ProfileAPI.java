@@ -7,8 +7,12 @@ import com.bbn.marti.device.profile.repository.ProfileRepository;
 import com.bbn.marti.device.profile.repository.ProfileFileRepository;
 import com.bbn.marti.device.profile.service.ProfileService;
 import com.bbn.marti.network.BaseRestController;
+import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.RemoteSubscription;
+import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
+import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.security.web.MartiValidator;
 
@@ -54,6 +58,36 @@ public class ProfileAPI extends BaseRestController {
     @Autowired
     private ProfileFileRepository profileFileRepository;
 
+    @Autowired
+    SubscriptionManagerLite subscriptionManager;
+
+    @Autowired
+    private GroupManager groupManager;
+
+    @Autowired
+    CoreConfig coreConfig;
+
+
+    private String getGroupVectorFromStreamingClient(String clientUid, String groupVector) {
+        try {
+            if (coreConfig.getRemoteConfiguration().getProfile() != null &&
+                    coreConfig.getRemoteConfiguration().getProfile().isUseStreamingGroup()) {
+                RemoteSubscription subscription = subscriptionManager.getRemoteSubscriptionByClientUid(clientUid);
+                if (subscription != null) {
+                    String groupVectorTmp = groupManager.getCachedOutboundGroupVectorByConnectionId(
+                            subscription.getUser().getConnectionId());
+                    if (groupVectorTmp != null && groupVectorTmp.length() > 0) {
+                        groupVector = groupVectorTmp;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("exception getting groupVector from streaming user", e);
+        }
+
+        return groupVector;
+    }
+
     @RequestMapping(value = "/tls/profile/enrollment", method = RequestMethod.GET)
     public byte[] getEnrollmentTimeProfiles(
             @RequestParam(value = "clientUid") String clientUid)
@@ -61,6 +95,8 @@ public class ProfileAPI extends BaseRestController {
         try {
             String groupVector = martiUtil.getGroupVectorBitString(request);
             String host = new URI(request.getRequestURL().toString()).getHost();
+
+            groupVector = getGroupVectorFromStreamingClient(clientUid, groupVector);
 
             List<ProfileFile> files = profileService.getProfileFiles(host, groupVector,
                     true, false, -1);
@@ -92,6 +128,8 @@ public class ProfileAPI extends BaseRestController {
             String groupVector = martiUtil.getGroupVectorBitString(request);
             String host = new URI(request.getRequestURL().toString()).getHost();
 
+            groupVector = getGroupVectorFromStreamingClient(clientUid, groupVector);
+
             List<ProfileFile> files = profileService.getProfileFiles(host, groupVector,
                     false, true, syncSecago);
 
@@ -121,6 +159,8 @@ public class ProfileAPI extends BaseRestController {
             throws ValidationException, IntrusionException, RemoteException {
         try {
             String groupVector = martiUtil.getGroupVectorBitString(request);
+
+            groupVector = getGroupVectorFromStreamingClient(clientUid, groupVector);
 
             List<ProfileFile> files = profileService.getProfileFilesForTool(groupVector,
                     toolName, syncSecago);

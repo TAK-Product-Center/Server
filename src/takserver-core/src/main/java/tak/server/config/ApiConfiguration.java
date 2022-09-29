@@ -60,6 +60,7 @@ import com.bbn.marti.device.profile.api.ProfileAdminAPI;
 import com.bbn.marti.device.profile.service.ProfileService;
 import com.bbn.marti.excheck.ExCheckAPI;
 import com.bbn.marti.excheck.ExCheckService;
+import com.bbn.marti.feeds.DataFeedApi;
 import com.bbn.marti.groups.CustomExceptionHandler;
 import com.bbn.marti.groups.GroupsApi;
 import com.bbn.marti.injector.InjectionApi;
@@ -67,6 +68,7 @@ import com.bbn.marti.kml.icon.api.IconsetIconApi;
 import com.bbn.marti.kml.icon.service.IconsetUploadProcessor;
 import com.bbn.marti.kml.icon.service.IconsetUploadProcessorImpl;
 import com.bbn.marti.logs.LogServlet;
+import com.bbn.marti.maplayer.MapLayerService;
 import com.bbn.marti.maplayer.api.MapLayersApi;
 import com.bbn.marti.network.ContactManagerApi;
 import com.bbn.marti.network.ContactManagerService;
@@ -102,6 +104,7 @@ import com.bbn.marti.sync.MissionPackageUploadServlet;
 import com.bbn.marti.sync.SearchServlet;
 import com.bbn.marti.sync.UploadServlet;
 import com.bbn.marti.sync.api.ContactsApi;
+import com.bbn.marti.sync.api.CopViewApi;
 import com.bbn.marti.sync.api.CotApi;
 import com.bbn.marti.sync.api.MissionApi;
 import com.bbn.marti.sync.api.PropertiesApi;
@@ -118,6 +121,7 @@ import com.bbn.marti.util.spring.HttpSessionCreatedEventListener;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.bbn.marti.util.spring.TakAuthSessionDestructionListener;
 import com.bbn.marti.video.VideoConnectionManager;
+import com.bbn.marti.video.VideoConnectionManagerV2;
 import com.bbn.marti.video.VideoConnectionSender;
 import com.bbn.marti.video.VideoConnectionUploader;
 import com.bbn.marti.video.VideoManagerService;
@@ -137,6 +141,7 @@ import com.bbn.tak.tls.Service.CertManagerService;
 import com.bbn.user.registration.RegistrationApi;
 import com.bbn.user.registration.service.UserRegistrationService;
 import com.bbn.useraccountmanagement.FileUserAccountManagementApi;
+import com.bbn.vbm.VBMConfigurationApi;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import tak.server.Constants;
@@ -146,11 +151,13 @@ import tak.server.federation.FederationConfigManager;
 import tak.server.grid.MissionArchiveManagerProxyFactory;
 import tak.server.grid.PluginManagerProxyFactory;
 import tak.server.grid.RetentionPolicyConfigProxyFactory;
+import tak.server.plugins.PluginDataApi;
 import tak.server.plugins.PluginManagerApi;
 import tak.server.qos.QoSApi;
 import tak.server.qos.QoSManager;
 import tak.server.retention.RetentionApi;
 import tak.server.system.ApiDependencyProxy;
+import tak.server.util.ExecutorSource;
 import tak.server.util.LoginAccessController;
 
 /*
@@ -491,6 +498,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 		return new ExCheckService();
 	}
 
+	@Bean
+	public MapLayerService mapLayerService() {
+		return new MapLayerService();
+	}
+
 	@Bean("errorLogPersistenceStore")
 	public com.bbn.marti.logs.PersistenceStore errorLogPersistenceStore() {
 		return new com.bbn.marti.logs.PersistenceStore();
@@ -633,6 +645,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	public SubmissionApi submissionApi() {
 		return new SubmissionApi();
 	}
+	
+	@Bean
+	public DataFeedApi dataFeedApi() {
+		return new DataFeedApi();
+	}
 
 	@Bean
 	public FederationApi federationApi() {
@@ -720,6 +737,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	}
 
 	@Bean
+	public CopViewApi copViewApi() {
+		return new CopViewApi();
+	}
+
+	@Bean
 	public PropertiesApi propertiesApi() {
 		return new PropertiesApi();
 	}
@@ -773,6 +795,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	public PluginManagerApi pluginManagerApi() {
 		return new PluginManagerApi();
 	}
+	
+	@Bean
+	public PluginDataApi pluginDataApi() {
+		return new PluginDataApi();
+	}
 
 	@Bean
 	public RetentionApi retentionApi() {
@@ -801,7 +828,7 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	}
 	
 	@Bean
-	public MissionArchiveManagerProxyFactory misisonArchiveManagerProxyFactory() {
+	public MissionArchiveManagerProxyFactory missionArchiveManagerProxyFactory() {
 		return new MissionArchiveManagerProxyFactory();
 	}
 
@@ -837,11 +864,6 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	}
 	
 	@Bean
-	public ContactCacheHelper contactCacheHelper() {
-		return new ContactCacheHelper();
-	}
-	
-	@Bean
 	public FileUserAccountManagementApi fileUserAccountManagementApi() {
 		return new FileUserAccountManagementApi();
 	}
@@ -852,4 +874,25 @@ public class ApiConfiguration implements WebMvcConfigurer {
 		return ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_USER_FILE_MANAGER, FileUserManagementInterface.class, false);
 		
 	}
+	
+	@Bean
+	public VBMConfigurationApi vbmConfigurationApi() {
+		return new VBMConfigurationApi();
+	}
+	
+	@Bean
+	public VideoConnectionManagerV2 videoConnectionManagerV2()  {
+		return new VideoConnectionManagerV2();
+	}
+	
+	@Bean
+	public ContactCacheHelper contactCacheHelper(CoreConfig conf) {
+		return new ContactCacheHelper();
+	}
+	
+	@Bean
+	public ExecutorSource executorSource(CoreConfig conf) {
+		return new ExecutorSource(conf);
+	}
+	
 }

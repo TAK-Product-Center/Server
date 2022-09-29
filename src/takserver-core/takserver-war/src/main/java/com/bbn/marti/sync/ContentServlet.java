@@ -19,6 +19,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.LoggerFactory;
@@ -110,7 +111,9 @@ public class ContentServlet extends EnterpriseSyncServlet {
 	  	}
 
 	  	if (content == null) {
-        	logger.error("found null content for :" + query);
+			  if (logger.isErrorEnabled()) {
+				  logger.error("found null content for :" + StringUtils.normalizeSpace(query));
+			  }
 			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			return;
 		}
@@ -122,7 +125,7 @@ public class ContentServlet extends EnterpriseSyncServlet {
 	  		logger.debug("Metadata is: " + match.toJSONObject().toString());
 	  	}
 
-        String mimeType = match.getFirst(Metadata.Field.MIMEType);
+		String mimeType = match.getFirst(Metadata.Field.MIMEType);
         if(validator != null && validator.isValidInput("MIME Type", mimeType, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false)) {
 			  // Set MIME type of HTTP response
 			  if (response.containsHeader("Content-Type")) {

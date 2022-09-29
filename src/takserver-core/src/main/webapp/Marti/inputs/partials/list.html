@@ -58,7 +58,107 @@
 				</tbody>
 			</table>
 		</div>
+		<h3>Streaming Data Feeds</h3>
+		<a data-ng-click="createDataFeed()" href="#!/createStreamingDataFeed">Add Streaming Data Feed</a>
+		<div data-ng-show="streamingDataFeeds.length">
 
+			<!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+           tablesorter js files, etc., results in a conflict with angular -->
+			<table id="streamingDataFeedsList" class="tablesorter">
+				<thead>
+					<tr>
+						<th>Auth Type</th>
+						<th>Name</th>
+						<th>Type</th>
+						<th>Sync</th>
+						<th>Tags</th>
+						<th>Protocol</th>
+						<th>Port</th>
+						<th>Core Messaging Version</th>
+						<th>TLS</th>
+						<th>Group</th>
+						<th>Interface</th>
+						<th>Archive</th>
+						<th>Filter Group</th>
+						<th>Anonymous Group</th>
+						<th>Archive Only</th>
+						<th>Reads Received</th>
+						<th>Messages Received</th>
+						<th>Number Connected</th>
+						<th>&nbsp;</th>
+						<th>&nbsp;</th>
+					</tr>
+				</thead>
+
+				<tbody>
+					<tr data-ng-repeat="x in streamingDataFeeds">
+						<td data-ng-bind="x.input.auth"></td>
+						<td data-ng-bind="x.input.name"></td>
+						<td data-ng-bind="x.input.type"></td>
+						<td data-ng-bind="x.input.sync"></td>
+						<td data-ng-bind="x.input.tag"></td>
+						<td data-ng-bind="x.input.protocol"></td>
+						<td data-ng-bind="x.input.port"></td>
+						<td data-ng-bind="x.input.coreVersion"></td>
+						<td>{{x.input.protocol === 'tls' ? (x.input.coreVersion == 2
+							? x.input.coreVersion2TlsVersions : secConfig.tlsVersion) : ''}}</td>
+						<td data-ng-bind="x.input.group"></td>
+						<td data-ng-bind="x.input.iface"></td>
+						<td data-ng-bind="x.input.archive"></td>
+						<td data-ng-bind="x.input.filtergroup"></td>
+						<td data-ng-bind="x.input.anongroup"></td>
+						<td data-ng-bind="x.input.archiveOnly"></td>
+						<td data-ng-bind="x.readsReceived"></td>
+						<td data-ng-bind="x.messagesReceived"></td>
+						<td data-ng-bind="x.numClients"></td>
+						<td><a href="" data-ng-click="deleteDataFeed(x.input.name)">Delete</a></td>
+						<td><a class="nav"
+							href="#!/modifyStreamingDataFeed/{{x.input.name | encodeURIComponent}}">Modify</a></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<h3>Plugin Data Feeds</h3>
+		<a data-ng-click="createDataFeed()" href="#!/createPluginDataFeed">Add Plugin Data Feed</a>
+		<div data-ng-show="pluginDataFeeds.length">
+
+			<!-- Use the tablesorter class, but actually following all the steps to enable client side sorting (e.g., invoking tablesorter function, including
+           tablesorter js files, etc., results in a conflict with angular -->
+			<table id="pluginDataFeedsList" class="tablesorter">
+				<thead>
+					<tr>
+						<th>Auth Type</th>
+						<th>Name</th>
+						<th>Type</th>
+						<th>Sync</th>
+						<th>Tags</th>
+						<th>Archive</th>
+						<th>Reads Received</th>
+						<th>Messages Received</th>
+						<th>Number Connected</th>
+						<th>&nbsp;</th>
+						<th>&nbsp;</th>
+					</tr>
+				</thead>
+
+				<tbody>
+					<tr data-ng-repeat="x in pluginDataFeeds">
+						<td data-ng-bind="x.input.auth"></td>
+						<td data-ng-bind="x.input.name"></td>
+						<td data-ng-bind="x.input.type"></td>
+						<td data-ng-bind="x.input.sync"></td>
+						<td data-ng-bind="x.input.tag"></td>
+						<td data-ng-bind="x.input.archive"></td>
+						<td data-ng-bind="x.readsReceived"></td>
+						<td data-ng-bind="x.messagesReceived"></td>
+						<td data-ng-bind="x.numClients"></td>
+						<td><a href="" data-ng-click="deleteDataFeed(x.input.name)">Delete</a></td>
+						<td><a class="nav"
+							href="#!/modifyPluginDataFeed/{{x.input.name | encodeURIComponent}}">Modify</a></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
 		<h3>QoS (Quality of Service)</h3>
 		<div>
 			<div>When enabled, rate limiters will be applied based on the number of connected clients, as shown in the tables.</div>
@@ -129,7 +229,6 @@
 				</table>
 			</div>
 		</div>
-
 	    <h3>Store and Forward</h3>
 	    <div>
 		  Enable Store and Forward for Chat Messages&nbsp;<input type="checkbox" data-ng-model="storeForwardChatEnabled" data-ng-change="toggleStoreForwardChatEnabled()"/>

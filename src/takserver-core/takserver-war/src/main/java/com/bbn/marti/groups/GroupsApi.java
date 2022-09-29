@@ -240,7 +240,7 @@ public class GroupsApi extends BaseRestController {
             try {
                 if (coreConfig.getRemoteConfiguration().getAuth().getDefault().equalsIgnoreCase("ldap")) {
                     for (Group group : groups) {
-                        List<LdapGroup> ldapGroups = groupManager.searchGroups(group.getName());
+                        List<LdapGroup> ldapGroups = groupManager.searchGroups(group.getName(), true);
                         if (ldapGroups.size() == 0) {
                             logger.debug("unable to find description for group! " + group.getName());
                             continue;
@@ -255,6 +255,25 @@ public class GroupsApi extends BaseRestController {
             } catch (Exception e) {
 				logger.error("exception getting group description", e);
             }
+
+            //
+            // Ensure that all groups meet the ATAK ServerGroup.isValid check
+            //
+            for (Group g : groups)  {
+                if (g.getBitpos() == null || g.getBitpos() < 0) {
+                    g.setBitpos(0);
+                }
+                if (g.getCreated() == null) {
+                    g.setCreated(new Date());
+                }
+                if (g.getType() == null) {
+                    g.setType(Group.Type.SYSTEM);
+                }
+                if (g.getDirection() == null) {
+                    g.setDirection(Direction.OUT);
+                }
+            }
+
         }
 
         return new ResponseEntity<ApiResponse<Collection<Group>>>(new ApiResponse<Collection<Group>>(

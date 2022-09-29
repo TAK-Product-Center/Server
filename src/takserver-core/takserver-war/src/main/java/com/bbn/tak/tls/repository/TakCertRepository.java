@@ -29,7 +29,6 @@ public interface TakCertRepository extends JpaRepository<TakCert, Long> {
     @Cacheable(Constants.CERTIFICATE_CACHE)
     TakCert findOneByHash(String hash);
 
-    @Cacheable(Constants.CERTIFICATE_CACHE)
     List<TakCert> findAllByUserDn(String userDn);
 
     @Cacheable(Constants.CERTIFICATE_CACHE)

@@ -168,5 +168,6 @@
 </certificateSigning>
 
 -->
+    <vbm enabled="false" />
  
 </Configuration>

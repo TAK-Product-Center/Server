@@ -14,6 +14,7 @@
 <%@ page import="com.bbn.marti.remote.RemoteSubscription" %>
 <%@ page import="org.owasp.esapi.ESAPI" %>
 <%@ page import="com.bbn.marti.util.spring.SpringContextBeanForApi" %>
+<%@ page import="com.bbn.marti.util.CommonUtil" %>
 
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
@@ -80,9 +81,12 @@
 </tr>
 
 <%
+	CommonUtil martiUtil = SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class);
+	String groupVector = martiUtil.getGroupBitVector(request);
+
 	String[] feedIds = request.getParameter("feedId").split("\\|");
 	for (String feedId : feedIds) {
-		Feed feed = com.bbn.marti.util.spring.SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.video.VideoManagerService.class).getFeed(Integer.parseInt(feedId));
+		Feed feed = com.bbn.marti.util.spring.SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.video.VideoManagerService.class).getFeed(Integer.parseInt(feedId), groupVector);
 %>
 		<tr>
 			<td><%=feed.getType().toString()%></td>

@@ -29,7 +29,8 @@ import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 import org.owasp.esapi.reference.DefaultValidator;
 import org.owasp.esapi.reference.validation.DateValidationRule;
-import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Custom Validator for Marti, which closely resembles the ESAPI DefaultValidator.
@@ -45,6 +46,8 @@ public class MartiValidator extends DefaultValidator {
 	public static final int LONG_STRING_CHARS = 2047;
 	public static final int DEFAULT_STRING_CHARS = 255;
 	public static final int SHORT_STRING_CHARS = 128;
+	
+	private static final Logger logger = LoggerFactory.getLogger(com.bbn.security.web.MartiValidator.class);
 	
 	/**
 	 * Members of this enum map to regexes defined in apache-tomcat/lib/validation.properties 
@@ -97,6 +100,12 @@ public class MartiValidator extends DefaultValidator {
 													Set<String> required, 
 													Set<String> optional) 
 		throws ValidationException, IntrusionException {
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug(" assertValidHTTPRequestParameterSet. context: " + context + " request: " + request
+					+ " required: " + required
+					+ " optional: " + optional);
+		}
 		
 		// This implementation in inefficient but performance is not much a of a concern.
 		
@@ -171,6 +180,11 @@ public class MartiValidator extends DefaultValidator {
 	@Override 
 	public String getValidInput(String context, String input, String type, int maxLength, boolean allowNull) throws ValidationException {
 		String toValidate = (input == null) ? input : input.trim();
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("getValidInput context " + context + " input: " + input + " type: " + type + " maxLength: " + maxLength + " allowNull: " + allowNull);
+		}
+		
 		return super.getValidInput(context, toValidate, type, maxLength, allowNull);
 	}
 	
@@ -181,6 +195,11 @@ public class MartiValidator extends DefaultValidator {
 	public String getValidInput(String context, String input, String type, int maxLength, boolean allowNull,
 			boolean canonicalize) throws ValidationException {
 		String toValidate = (input == null) ? input : input.trim();
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("getValidInput context " + context + " input: " + input + " type: " + type + " maxLength: " + maxLength + " allowNull: " + allowNull + " canonicalize: " + canonicalize);
+		}
+		
 		return super.getValidInput(context, toValidate, type, maxLength, allowNull, canonicalize);
 	}
 	
@@ -191,6 +210,12 @@ public class MartiValidator extends DefaultValidator {
 	public String getValidInput(String context, String input, String type, int maxLength, boolean allowNull,
 			 ValidationErrorList errorList) {
 		String toValidate = (input == null) ? input : input.trim();
+		
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("getValidInput context " + context + " input: " + input + " type: " + type + " maxLength: " + maxLength + " allowNull: " + allowNull + " validationErrorList: " + errorList);
+		}
+		
 		return super.getValidInput(context, toValidate, type, maxLength, allowNull, errorList);
 	}
 	
@@ -200,11 +225,24 @@ public class MartiValidator extends DefaultValidator {
 	@Override 
 	public String getValidInput(String context, String input, String type, int maxLength, boolean allowNull,
 			boolean canonicalize, ValidationErrorList errorList) {
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("getValidInput context " + context + " input: " + input + " type: " + type + " maxLength: " + maxLength + " allowNull: " + allowNull + " canonicalize: " + canonicalize + " validationErrorList: " + errorList);
+		}
+		
 		String toValidate = (input == null) ? input : input.trim();
 		return super.getValidInput(context, toValidate, type, maxLength, allowNull, canonicalize, errorList);
 	}
 	
-	
-	
+	@Override
+	public byte[] getValidFileContent(String context, byte[] input, int maxBytes, boolean allowNull) throws ValidationException, IntrusionException {
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("getValidFileContent: " + context, input, maxBytes, allowNull);
+		}
+		
+		return super.getValidFileContent(context, input, maxBytes, allowNull);
+		
+	}
 	
 }

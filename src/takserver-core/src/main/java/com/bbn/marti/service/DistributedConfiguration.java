@@ -32,12 +32,14 @@ import com.bbn.marti.config.Buffer.LatestSA;
 import com.bbn.marti.config.CertificateSigning;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.ContactApi;
+import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Dissemination;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.FederationServer;
 import com.bbn.marti.config.Ferry;
 import com.bbn.marti.config.Filter;
 import com.bbn.marti.config.Geocache;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.config.Network;
 import com.bbn.marti.config.Qos;
 import com.bbn.marti.config.Repeater;
@@ -46,6 +48,7 @@ import com.bbn.marti.config.Security;
 import com.bbn.marti.config.Submission;
 import com.bbn.marti.config.Subscription;
 import com.bbn.marti.config.Tls;
+import com.bbn.marti.config.Vbm;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.groups.ConnectionModifyResult;
 import com.bbn.marti.remote.groups.NetworkInputAddResult;
@@ -148,10 +151,29 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
 
     public synchronized void removeInputAndSave(String name) throws RemoteException {
         @SuppressWarnings({ "unchecked", "rawtypes" })
-		List<Network.Input> inputList = new ArrayList(getRemoteConfiguration().getNetwork().getInput());
-        for (Network.Input input : inputList) {
+		List<Input> inputList = new ArrayList(getRemoteConfiguration().getNetwork().getInput());
+        for (Input input : inputList) {
             if (input.getName().equals(name)) {
                 getRemoteConfiguration().getNetwork().getInput().remove(input);
+                saveChangesAndUpdateCache();
+            }
+        }
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        List<DataFeed> dataFeedList = new ArrayList(getRemoteConfiguration().getNetwork().getDatafeed());
+        for (DataFeed dataFeed: dataFeedList) {
+        	if (dataFeed.getName().equals(name)) {
+                getRemoteConfiguration().getNetwork().getDatafeed().remove(dataFeed);
+                saveChangesAndUpdateCache();
+        	}
+        }
+    }
+
+    public synchronized void removeDataFeedAndSave(String name) throws RemoteException {
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+		List<DataFeed> DataFeed = new ArrayList(getRemoteConfiguration().getNetwork().getDatafeed());
+        for (DataFeed dataFeed : DataFeed) {
+            if (dataFeed.getName().equals(name)) {
+                getRemoteConfiguration().getNetwork().getDatafeed().remove(dataFeed);
                 saveChangesAndUpdateCache();
             }
         }
@@ -159,7 +181,7 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
 
     @SuppressWarnings("rawtypes")
 	public synchronized ConnectionModifyResult updateInputGroupsNoSave(String inputName, String[] groupList) throws RemoteException {
-        Network.Input input = getInputByName(inputName);
+        Input input = getInputByName(inputName);
         if (input == null) {
             return ConnectionModifyResult.FAIL_NONEXISTENT;
         }
@@ -185,7 +207,7 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     }
 
     public ConnectionModifyResult setArchiveFlagNoSave(String inputName, boolean desiredState) {
-        Network.Input input = getInputByName(inputName);
+        Input input = getInputByName(inputName);
         if (input == null) {
             return ConnectionModifyResult.FAIL_NONEXISTENT;
         }
@@ -194,11 +216,52 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     }
 
     public ConnectionModifyResult setArchiveOnlyFlagNoSave(String inputName, boolean desiredState) {
-        Network.Input input = getInputByName(inputName);
+        Input input = getInputByName(inputName);
         if (input == null) {
             return ConnectionModifyResult.FAIL_NONEXISTENT;
         }
         input.setArchiveOnly(desiredState);
+        return ConnectionModifyResult.SUCCESS;
+    }
+
+    @SuppressWarnings("rawtypes")
+	public synchronized ConnectionModifyResult updateTagsNoSave(String inputName, List<String> newTagList) throws RemoteException {
+		Input input = getInputByName(inputName);
+		if (input == null) {
+			return ConnectionModifyResult.FAIL_NONEXISTENT;
+		}
+		if (!(input instanceof DataFeed)) {
+			return ConnectionModifyResult.FAIL_NOMOD_DFEED;
+		}
+		DataFeed dataFeed = (DataFeed) input;
+
+		@SuppressWarnings("unchecked")
+		List<String> currentTagList = new ArrayList(dataFeed.getTag());
+
+		for (String newTagName : newTagList) {
+			if (!currentTagList.contains(newTagName)) {
+				dataFeed.getTag().add(newTagName);
+			}
+		}
+
+		for (String existingTag : currentTagList) {
+			if (!newTagList.contains(existingTag)) {
+				dataFeed.getTag().remove(existingTag);
+			}
+		}
+		return ConnectionModifyResult.SUCCESS;
+	}
+
+    public ConnectionModifyResult setSyncFlagNoSave(String dataFeedName, boolean desiredState) {
+        Input input = getInputByName(dataFeedName);
+        if (input == null) {
+            return ConnectionModifyResult.FAIL_NONEXISTENT;
+        }
+        if (!(input instanceof DataFeed)) {
+        	return ConnectionModifyResult.FAIL_NOMOD_DFEED;
+        }
+        DataFeed dataFeed = (DataFeed) input;
+        dataFeed.setSync(desiredState);
         return ConnectionModifyResult.SUCCESS;
     }
 
@@ -239,15 +302,25 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     	saveChanges();
     }
 
-    public synchronized NetworkInputAddResult addInputAndSave(@NotNull Network.Input input) {
-        for (Network.Input loopInput : getRemoteConfiguration().getNetwork().getInput()) {
-            if (loopInput.getName().equals(input.getName())) {
-                return NetworkInputAddResult.FAIL_INPUT_NAME_EXISTS;
+    public synchronized NetworkInputAddResult addInputAndSave(@NotNull Input input) {
+        if (input instanceof DataFeed) {
+        	for (Input feedLoop : getRemoteConfiguration().getNetwork().getDatafeed()) {
+                if (((DataFeed) feedLoop).getName().equals(((DataFeed) input).getName())) {
+                    return NetworkInputAddResult.FAIL_INPUT_NAME_EXISTS;
+                }
+                if (feedLoop.getName().equals(input.getName())) {
+                    return NetworkInputAddResult.FAIL_INPUT_NAME_EXISTS;
+                }
             }
+        	getRemoteConfiguration().getNetwork().getDatafeed().add((DataFeed) input);
+        } else {
+        	for (Input loopInput : getRemoteConfiguration().getNetwork().getInput()) {
+                if (loopInput.getName().equals(input.getName())) {
+                    return NetworkInputAddResult.FAIL_INPUT_NAME_EXISTS;
+                }
+            }
+            getRemoteConfiguration().getNetwork().getInput().add(input);
         }
-
-        // add the new input to the local configuration object, not the object from the cache
-        getRemoteConfiguration().getNetwork().getInput().add(input);
 
         saveChangesAndUpdateCache();
 
@@ -259,13 +332,19 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     }
 
 
-    public synchronized Network.Input getInputByName(@NotNull String inputName) {
-        List<Network.Input> inputList = getRemoteConfiguration().getNetwork().getInput();
-        for (Network.Input input : inputList) {
+    public synchronized Input getInputByName(@NotNull String inputName) {
+        List<Input> inputList = getRemoteConfiguration().getNetwork().getInput();
+        for (Input input : inputList) {
             if (input.getName().equals(inputName)) {
                 return input;
             }
         }
+		List<DataFeed> dataFeedList = getRemoteConfiguration().getNetwork().getDatafeed();
+		for (Input input : dataFeedList) {
+			if (input.getName().equals(inputName)) {
+				return input;
+			}
+		}
         return null;
     }
 
@@ -280,7 +359,7 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     }
 
     public synchronized void setInputArchiveFlagAndSave(@NotNull String inputName, boolean desiredState) {
-        Network.Input input = getInputByName(inputName);
+        Input input = getInputByName(inputName);
         if (input != null && input.isArchive() != desiredState) {
             input.setArchive(desiredState);
             saveChangesAndUpdateCache();
@@ -301,10 +380,14 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     }
 
     @NotNull
-    public synchronized List<Network.Input> getNetworkInputs() {
+    public synchronized List<Input> getNetworkInputs() {
         return getRemoteConfiguration().getNetwork().getInput();
     }
 
+    @NotNull
+    public synchronized List<DataFeed> getNetworkDataFeeds() {
+        return getRemoteConfiguration().getNetwork().getDatafeed();
+    }
 
     public Network getNetwork() {
         return getRemoteConfiguration().getNetwork();
@@ -368,7 +451,11 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     }
 
     public Geocache getGeocache() {
-	return getRemoteConfiguration().getGeocache();
+    	return getRemoteConfiguration().getGeocache();
+    }
+    
+    public Vbm getVbm() {
+    	return getRemoteConfiguration().getVbm();
     }
 
  	@Override

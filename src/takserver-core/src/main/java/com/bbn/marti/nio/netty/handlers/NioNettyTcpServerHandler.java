@@ -2,7 +2,7 @@ package com.bbn.marti.nio.netty.handlers;
 
 import java.net.InetSocketAddress;
 
-import com.bbn.marti.config.Network.Input;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 
 import io.netty.channel.ChannelHandlerContext;

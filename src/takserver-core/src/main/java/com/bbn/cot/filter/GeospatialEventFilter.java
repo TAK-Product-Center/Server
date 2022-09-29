@@ -2,6 +2,7 @@ package com.bbn.cot.filter;
 
 import com.bbn.marti.config.GeospatialFilter;
 
+import com.bbn.marti.util.GeomUtils;
 import tak.server.cot.CotEventContainer;
 
 import org.dom4j.Node;
@@ -15,9 +16,11 @@ import java.util.List;
 public class GeospatialEventFilter implements CotFilter {
 
     private GeospatialFilter filter;
+    private boolean noFilterCheckTypes = true;
+    private boolean noFilterCheckTAKClient = true;
 
     private static final List<String> noFilterTypes = Arrays.asList(
-            "b-a-o-tbl",    // NineOneOne
+                "b-a-o-tbl",    // NineOneOne
                 "b-a-o-can",     // Cancel
                 "b-a-g",         // GeoFenceBreach
                 "b-a-o-pan",     // RingTheBell
@@ -28,19 +31,29 @@ public class GeospatialEventFilter implements CotFilter {
         this.filter = filter;
     }
 
+    public GeospatialEventFilter(GeospatialFilter filter, boolean noFilterCheckTypes, boolean noFilterCheckTAKClient) {
+        this(filter);
+        this.noFilterCheckTypes = noFilterCheckTypes;
+        this.noFilterCheckTAKClient = noFilterCheckTAKClient;
+    }
+
     private boolean noFilter(CotEventContainer c) {
 
-        // check the noFilterList
-        if (noFilterTypes.contains(c.getType())) {
-            return true;
+        if (noFilterCheckTypes) {
+            // check the noFilterList
+            if (noFilterTypes.contains(c.getType())) {
+                return true;
+            }
         }
 
-        // see if the cot event is for a TAK device
-        Node name = c.getDocument().selectSingleNode("/event/detail/__group/@name");
-        Node role = c.getDocument().selectSingleNode("/event/detail/__group/@role");
-        if (name != null && role != null &&
-                name.getText() != null && role.getText() != null) {
-            return true;
+        if (noFilterCheckTAKClient) {
+            // see if the cot event is for a TAK device
+            Node name = c.getDocument().selectSingleNode("/event/detail/__group/@name");
+            Node role = c.getDocument().selectSingleNode("/event/detail/__group/@role");
+            if (name != null && role != null &&
+                    name.getText() != null && role.getText() != null) {
+                return true;
+            }
         }
 
         return false;
@@ -69,16 +82,8 @@ public class GeospatialEventFilter implements CotFilter {
         // iterate over the filters
         for (GeospatialFilter.BoundingBox bbox : filter.getBoundingBox()) {
 
-            boolean validLongitude = false;
-            if (bbox.getMaxLongitude() > bbox.getMinLongitude()) {
-                validLongitude = longitude >= bbox.getMinLongitude() && longitude <= bbox.getMaxLongitude();
-            } else {
-                validLongitude = longitude >= bbox.getMinLongitude() || longitude <= bbox.getMaxLongitude();
-            }
-
             // return the cot event if found within one of the inputs filters
-            if (validLongitude &&
-                    latitude >= bbox.getMinLatitude() && latitude <= bbox.getMaxLatitude()) {
+            if (GeomUtils.bboxContainsCoordinate(bbox, latitude, longitude)) {
                 return c;
             }
         }

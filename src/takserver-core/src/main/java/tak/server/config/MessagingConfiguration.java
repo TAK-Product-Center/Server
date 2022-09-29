@@ -36,10 +36,12 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.messaging.SubProtocolHandler;
 
 import com.bbn.cluster.ClusterGroupDefinition;
+import com.bbn.cot.filter.DataFeedFilter;
 import com.bbn.cot.filter.FlowTagFilter;
 import com.bbn.cot.filter.ScrubInvalidValues;
 import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
 import com.bbn.cot.filter.UrlAddingFilter;
+import com.bbn.cot.filter.VBMSASharingFilter;
 import com.bbn.marti.groups.DistributedPersistentGroupManager;
 import com.bbn.marti.groups.DistributedUserManager;
 import com.bbn.marti.groups.FileAuthenticator;
@@ -52,6 +54,7 @@ import com.bbn.marti.groups.PersistentGroupDao;
 import com.bbn.marti.injector.ClusterUidCotTagInjector;
 import com.bbn.marti.injector.InjectionManager;
 import com.bbn.marti.injector.UidCotTagInjector;
+import com.bbn.marti.network.PluginDataFeedJdbc;
 import com.bbn.marti.nio.netty.NioNettyBuilder;
 import com.bbn.marti.nio.server.NioServer;
 import com.bbn.marti.remote.ContactManager;
@@ -75,6 +78,7 @@ import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.LocalConfiguration;
 import com.bbn.marti.service.MessagingInitializer;
 import com.bbn.marti.service.MissionPackageExtractor;
+import com.bbn.marti.service.PluginStore;
 import com.bbn.marti.service.RepeaterService;
 import com.bbn.marti.service.RepositoryService;
 import com.bbn.marti.service.SubmissionService;
@@ -83,6 +87,7 @@ import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.federation.FederationROLHandler;
 import com.bbn.marti.sync.federation.MissionActionROLConverter;
+import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.sync.repository.FederationEventRepository;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.MessageConversionUtil;
@@ -99,6 +104,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
 import tak.server.cache.MissionCacheResolver;
+import tak.server.cache.PluginDatafeedCacheHelper;
 import tak.server.cluster.DistributedInjectionService;
 import tak.server.cluster.DistributedInputManager;
 import tak.server.cluster.DistributedSecurityManager;
@@ -109,9 +115,16 @@ import tak.server.federation.MissionDisruptionManager;
 import tak.server.federation.TakFigClient;
 import tak.server.grid.CoreConfigProxyFactoryForMessaging;
 import tak.server.messaging.DistributedCotMessenger;
+import tak.server.messaging.DistributedPluginApi;
+import tak.server.messaging.DistributedPluginDataFeedApi;
+import tak.server.messaging.DistributedPluginSelfStopApi;
 import tak.server.messaging.DistributedTakMessenger;
 import tak.server.messaging.MessageConverter;
 import tak.server.messaging.Messenger;
+import tak.server.plugins.PluginApi;
+import tak.server.plugins.PluginDataFeedApi;
+import tak.server.plugins.PluginSelfStopApi;
+import tak.server.plugins.SystemInfoApi;
 import tak.server.profile.DistributedServerInfo;
 import tak.server.qos.DistributedQoSManager;
 import tak.server.qos.MessageDOSStrategy;
@@ -141,9 +154,9 @@ public class MessagingConfiguration {
 	public SubmissionService submissionService(DistributedFederationManager dfm, NioNettyBuilder nb, MessagingUtilImpl mui, NioServer ns, GroupManager gm,
 											   ScrubInvalidValues siv, MessageConversionUtil mcu, GroupFederationUtil gfu, InjectionManager im, RepositoryService rs, Ignite ig, SubscriptionManager sm,
 											   SubscriptionStore ss, FlowTagFilter flowTag, ContactManager contactManager, ServerInfo serverInfo, @Qualifier(Constants.MESSAGING_CORE_CONFIG_PROXY_BEAN) CoreConfig coreConfig,
-											   MessageConverter messageConverter, ActiveGroupCacheHelper activeGroupCacheHelper, RemoteUtil remoteUtil) {
+											   MessageConverter messageConverter, ActiveGroupCacheHelper activeGroupCacheHelper, RemoteUtil remoteUtil, DataFeedRepository dfr) {
 
-		return new SubmissionService(dfm, nb, mui, ns, gm, siv, mcu, gfu, im, rs, ig, sm, ss, flowTag, contactManager, serverInfo, coreConfig, messageConverter, activeGroupCacheHelper, remoteUtil);
+		return new SubmissionService(dfm, nb, mui, ns, gm, siv, mcu, gfu, im, rs, ig, sm, ss, flowTag, contactManager, serverInfo, coreConfig, messageConverter, activeGroupCacheHelper, remoteUtil, dfr);
 	}
 
 	@Bean
@@ -158,7 +171,13 @@ public class MessagingConfiguration {
 
 	@Order(Ordered.LOWEST_PRECEDENCE)
 	@Bean
-	public DistributedFederationManager distributedFederationManager(NioNettyBuilder nettyBuilder, Ignite ignite, CoreConfig coreConfig, CoreConfigProxyFactoryForMessaging coreConfigProxy, DistributedConfiguration distConf, FederationEventRepository federationEventRepository) throws RemoteException {
+	public DistributedFederationManager distributedFederationManager(
+			NioNettyBuilder nettyBuilder,
+			Ignite ignite,
+			CoreConfig coreConfig,
+			CoreConfigProxyFactoryForMessaging coreConfigProxy,
+			DistributedConfiguration distConf,
+			FederationEventRepository federationEventRepository) throws RemoteException {
 		DistributedFederationManager distributedFederationManager = new DistributedFederationManager(nettyBuilder, ignite, coreConfig);
 		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_FEDERATION_MANAGER, distributedFederationManager);
 		return (DistributedFederationManager) ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
@@ -172,6 +191,15 @@ public class MessagingConfiguration {
 
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
 				.serviceProxy(Constants.DISTRIBUTED_USER_FILE_MANAGER, FileUserManagementInterface.class, false);
+	}
+	
+	@Bean
+	public SystemInfoApi distributedSystemInfoApi(Ignite ignite) {
+		DistributedSystemInfoApi distributedSystemInfoApi =  new DistributedSystemInfoApi();
+		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SYSTEM_INFO_API, distributedSystemInfoApi);
+
+		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
+				.serviceProxy(Constants.DISTRIBUTED_SYSTEM_INFO_API, SystemInfoApi.class, false);
 	}
 
 	@Bean
@@ -196,8 +224,8 @@ public class MessagingConfiguration {
 	}
 
 	@Bean(Constants.DISTRIBUTED_COT_MESSENGER)
-	public Messenger<CotEventContainer> distributedCotMessenger(Ignite ignite, SubscriptionStore subscriptionStore, ServerInfo serverInfo, MessageConverter messageConverter, SubmissionService submissionService, CoreConfig config, RemoteUtil remoteUtil) {
-		return new DistributedCotMessenger(ignite, subscriptionStore, serverInfo,  messageConverter, submissionService, config, remoteUtil);
+	public Messenger<CotEventContainer> distributedCotMessenger(Ignite ignite, SubscriptionStore subscriptionStore, ServerInfo serverInfo, MessageConverter messageConverter, SubmissionService submissionService, CoreConfig config) {
+		return new DistributedCotMessenger(ignite, subscriptionStore, serverInfo,  messageConverter, submissionService, config);
 	}
 
 	@Bean(Constants.DISTRIBUTED_TAK_MESSENGER)
@@ -219,7 +247,17 @@ public class MessagingConfiguration {
 	public StreamingEndpointRewriteFilter streamingEnpointRewriteFilter(@Lazy MissionService missionService) {
 		return new StreamingEndpointRewriteFilter(missionService);
 	}
+	
+	@Bean
+	public DataFeedFilter dataFeedFilter() {
+		return new DataFeedFilter();
+	}
 
+	@Bean
+	public VBMSASharingFilter vbmSASharingFilter() {
+		return new VBMSASharingFilter();
+	}
+	
 	@Bean
 	public NioServer nioServer() throws IOException {
 		return new NioServer();
@@ -504,5 +542,53 @@ public class MessagingConfiguration {
 		ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_QOS_MANAGER, QoSManager.class, false);
 		
 		return qosManager;
+	}
+	
+	@Bean
+	public PluginDataFeedApi distributedPluginDataFeedApi(Ignite ignite) {
+		
+		DistributedPluginDataFeedApi distributedPluginDataFeedApi =  new DistributedPluginDataFeedApi();
+		
+		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_DATA_FEED_API, distributedPluginDataFeedApi);
+
+		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_DATA_FEED_API, PluginDataFeedApi.class, false);
+
+	}
+	
+	@Bean
+	public PluginDatafeedCacheHelper pluginDatafeedCacheHelper() {
+		return new PluginDatafeedCacheHelper();
+	}
+
+	@Bean
+	public PluginDataFeedJdbc pluginDataFeedJdbc() {
+		return new PluginDataFeedJdbc();
+	}
+	
+	@Bean
+	public PluginStore pluginStore() {
+		return new PluginStore();
+	}
+	
+	@Bean
+	public PluginApi pluginApi(Ignite ignite) {
+		
+		DistributedPluginApi distributedPluginApi =  new DistributedPluginApi();
+		
+		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_API, distributedPluginApi);
+
+		return distributedPluginApi;
+
+	}
+	
+	@Bean
+	public PluginSelfStopApi pluginSelfStopApi(Ignite ignite) {
+		
+		DistributedPluginSelfStopApi distributedPluginSelfStopApi =  new DistributedPluginSelfStopApi();
+		
+		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_SELF_STOP_API, distributedPluginSelfStopApi);
+
+		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_SELF_STOP_API, PluginSelfStopApi.class, false);
+
 	}
 }

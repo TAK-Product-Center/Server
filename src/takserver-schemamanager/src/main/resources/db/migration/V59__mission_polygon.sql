@@ -1,0 +1,1 @@
+alter table mission add column bounding_polygon text;

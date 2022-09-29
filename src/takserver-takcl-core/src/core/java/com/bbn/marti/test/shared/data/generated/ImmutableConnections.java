@@ -157,6 +157,39 @@ public class ImmutableConnections extends AbstractConnection {
     public static final ImmutableConnections sCLI_authstcpA = new ImmutableConnections("sCLI_authstcpA", ImmutableServerProfiles.SERVER_CLI, BaseConnections.authstcp, 17878, "sCLI_authstcpA_authuser012_012f", "sCLI_authstcpA_authuser_f", "sCLI_authstcpA_authuser01_01f", "NV_sCLI_authstcpA_authuser12_012f", "NV_sCLI_authstcpA_authuser01_01f", "NV_sCLI_authstcpA_authuser012_012f", "sCLI_authstcpA_authuser12_012f", "NV_sCLI_authstcpA_authuser3_3f", "NV_sCLI_authstcpA_authuser2_2f", "sCLI_authstcpA_authuser3_3f", "sCLI_authstcpA_authuser0_0f", "sCLI_authstcpA_authuser2_2f", "NV_sCLI_authstcpA_authuser0_0f", "NV_sCLI_authstcpA_authuser_f");
     public static final ImmutableConnections s1_substcp = new ImmutableConnections("s1_substcp", ImmutableServerProfiles.SERVER_1, BaseConnections.substcp, 17793, "NV_s1_substcp_anonuser_t_B", "NV_s1_substcp_anonuser_t_A", "s1_substcp_anonuser_t", "s1_substcp_anonuser_t_A", "NV_s1_substcp_anonuser_t", "s1_substcp_anonuser_t_B");
     public static final ImmutableConnections s2_saproxy = new ImmutableConnections("s2_saproxy", ImmutableServerProfiles.SERVER_2, BaseConnections.saproxy, 17801, "s2_saproxy_anonuser_t", "NV_s2_saproxy_anonuser_t", "s2_saproxy_anonuser_t_B", "s2_saproxy_anonuser_t_A", "NV_s2_saproxy_anonuser_t_A", "NV_s2_saproxy_anonuser_t_B");
+    
+    // Data feed connections
+    public static final ImmutableConnections s0_stcp12_data = new ImmutableConnections("s0_stcp12_data", ImmutableServerProfiles.SERVER_0, BaseConnections.stcp12_data, 18743, "NV_s0_stcp12_anonuser_12f_B", "NV_s0_stcp12_anonuser_12f_A", "NV_s0_stcp12_anonuser_12f", "s0_stcp12_anonuser_12f", "s0_stcp12_anonuser_12f_A", "s0_stcp12_anonuser_12f_B");
+    public static final ImmutableConnections s0_udp12t_data = new ImmutableConnections("s0_udp12t_data", ImmutableServerProfiles.SERVER_0, BaseConnections.udp12t_data, 18753, "s0_udp12t_anonuser_12t", "NV_s0_udp12t_anonuser_12t_A", "NV_s0_udp12t_anonuser_12t", "s0_udp12t_anonuser_12t_A", "s0_udp12t_anonuser_12t_B", "NV_s0_udp12t_anonuser_12t_B");
+    public static final ImmutableConnections s0_stcp_data = new ImmutableConnections("s0_stcp_data", ImmutableServerProfiles.SERVER_0, BaseConnections.stcp_data, 18732, "NV_s0_stcp_anonuser_t_B", "NV_s0_stcp_anonuser_t_A", "s0_stcp_anonuser_t_A", "s0_stcp_anonuser_t_B", "s0_stcp_anonuser_t", "NV_s0_stcp_anonuser_t");
+    public static final ImmutableConnections s0_tcp01t_data = new ImmutableConnections("s0_tcp01t_data", ImmutableServerProfiles.SERVER_0, BaseConnections.tcp01t_data, 18750, "s0_tcp01t_anonuser_01t_B", "s0_tcp01t_anonuser_01t_A", "NV_s0_tcp01t_anonuser_01t_A", "NV_s0_tcp01t_anonuser_01t_B", "s0_tcp01t_anonuser_01t", "NV_s0_tcp01t_anonuser_01t");
+    public static final ImmutableConnections s0_stcp3_data = new ImmutableConnections("s0_stcp3_data", ImmutableServerProfiles.SERVER_0, BaseConnections.stcp3_data, 18762, "NV_s0_stcp3_anonuser_3f", "s0_stcp3_anonuser_3f", "NV_s0_stcp3_anonuser_3f_A", "s0_stcp3_anonuser_3f_B", "NV_s0_stcp3_anonuser_3f_B", "s0_stcp3_anonuser_3f_A");
+    public static final ImmutableConnections s0_authstcpA_data = new ImmutableConnections("s0_authstcpA_data", ImmutableServerProfiles.SERVER_0, BaseConnections.authstcp_data, 18758, "NV_s0_authstcpA_authuser012_012f", "NV_s0_authstcpA_authuser01_01f", "s0_authstcpA_authuser01_01f", "NV_s0_authstcpA_authuser0_0f", "NV_s0_authstcpA_authuser_f", "NV_s0_authstcpA_authuser12_012f", "NV_s0_authstcpA_authuser2_2f", "s0_authstcpA_authuser_f", "s0_authstcpA_authuser12_012f", "s0_authstcpA_authuser012_012f", "NV_s0_authstcpA_authuser3_3f", "s0_authstcpA_authuser0_0f", "s0_authstcpA_authuser3_3f", "s0_authstcpA_authuser2_2f");
+    public static final ImmutableConnections s0_authstcp_data = new ImmutableConnections("s0_authstcp_data", ImmutableServerProfiles.SERVER_0, BaseConnections.authstcp_data, 18746, "NV_s0_authstcp_authuser01_01f", "NV_s0_authstcp_authuser12_012f", "NV_s0_authstcp_authuser_f", "s0_authstcp_authuser_f", "s0_authstcp_authuser012_012f", "s0_authstcp_authuser01_01f", "NV_s0_authstcp_authuser0_0f", "NV_s0_authstcp_authuser2_2f", "NV_s0_authstcp_authuser3_3f", "NV_s0_authstcp_authuser012_012f", "s0_authstcp_authuser12_012f", "s0_authstcp_authuser0_0f", "s0_authstcp_authuser3_3f", "s0_authstcp_authuser2_2f");
+    public static final ImmutableConnections s0_udp3f_data = new ImmutableConnections("s0_udp3f_data", ImmutableServerProfiles.SERVER_0, BaseConnections.udp3f_data, 18754, "NV_s0_udp3f_anonuser_3f_B", "s0_udp3f_anonuser_3f_A", "s0_udp3f_anonuser_3f_B", "NV_s0_udp3f_anonuser_3f", "NV_s0_udp3f_anonuser_3f_A", "s0_udp3f_anonuser_3f");
+    public static final ImmutableConnections s0_udp01_data = new ImmutableConnections("s0_udp01_data", ImmutableServerProfiles.SERVER_0, BaseConnections.udp01_data, 18752, "s0_udp01_anonuser_01f", "s0_udp01_anonuser_01f_B", "s0_udp01_anonuser_01f_A", "NV_s0_udp01_anonuser_01f", "NV_s0_udp01_anonuser_01f_A", "NV_s0_udp01_anonuser_01f_B");
+    public static final ImmutableConnections s0_stcp01_data = new ImmutableConnections("s0_stcp01_data", ImmutableServerProfiles.SERVER_0, BaseConnections.stcp01_data, 18742, "s0_stcp01_anonuser_01f_A", "s0_stcp01_anonuser_01f_B", "s0_stcp01_anonuser_01f", "NV_s0_stcp01_anonuser_01f", "NV_s0_stcp01_anonuser_01f_B", "NV_s0_stcp01_anonuser_01f_A");
+    public static final ImmutableConnections s0_mcast_data = new ImmutableConnections("s0_mcast_data", ImmutableServerProfiles.SERVER_0, BaseConnections.mcast_data, 18734, "s0_mcast_anonuser_t_A", "NV_s0_mcast_anonuser_t", "s0_mcast_anonuser_t_B", "NV_s0_mcast_anonuser_t_B", "NV_s0_mcast_anonuser_t_A", "s0_mcast_anonuser_t");
+    public static final ImmutableConnections s0_stcp2f_data = new ImmutableConnections("s0_stcp2f_data", ImmutableServerProfiles.SERVER_0, BaseConnections.stcp2f_data, 18748, "NV_s0_stcp2f_anonuser_2f_B", "s0_stcp2f_anonuser_2f", "NV_s0_stcp2f_anonuser_2f_A", "s0_stcp2f_anonuser_2f_A", "s0_stcp2f_anonuser_2f_B", "NV_s0_stcp2f_anonuser_2f");
+    public static final ImmutableConnections s0_stcp01t_data = new ImmutableConnections("s0_stcp01t_data", ImmutableServerProfiles.SERVER_0, BaseConnections.stcp01t_data, 18747, "NV_s0_stcp01t_anonuser_01t_A", "NV_s0_stcp01t_anonuser_01t_B", "NV_s0_stcp01t_anonuser_01t", "s0_stcp01t_anonuser_01t", "s0_stcp01t_anonuser_01t_A", "s0_stcp01t_anonuser_01t_B");
+    public static final ImmutableConnections s0_tcp12_data = new ImmutableConnections("s0_tcp12_data", ImmutableServerProfiles.SERVER_0, BaseConnections.tcp12_data, 18749, "s0_tcp12_anonuser_12f_B", "s0_tcp12_anonuser_12f_A", "s0_tcp12_anonuser_12f", "NV_s0_tcp12_anonuser_12f_A", "NV_s0_tcp12_anonuser_12f_B", "NV_s0_tcp12_anonuser_12f");
+    public static final ImmutableConnections s0_saproxy_data = new ImmutableConnections("s0_saproxy_data", ImmutableServerProfiles.SERVER_0, BaseConnections.saproxy_data, 18735, "s0_saproxy_anonuser_t_A", "NV_s0_saproxy_anonuser_t_B", "NV_s0_saproxy_anonuser_t_A", "s0_saproxy_anonuser_t", "s0_saproxy_anonuser_t_B", "NV_s0_saproxy_anonuser_t");
+    public static final ImmutableConnections s0_authsslA_data = new ImmutableConnections("s0_authsslA_data", ImmutableServerProfiles.SERVER_0, BaseConnections.authssl_data, 18740, "s0_authsslA_authuser3_3f", "NV_s0_authsslA_authuser_f", "NV_s0_authsslA_authuser01_01f", "s0_authsslA_authuser2_2f", "NV_s0_authsslA_authuser12_012f", "s0_authsslA_authuser01_01f", "s0_authsslA_authuser12_012f", "s0_authsslA_authuser0_0f", "s0_authsslA_authuser_f", "s0_authsslA_authuser012_012f", "NV_s0_authsslA_authuser2_2f", "NV_s0_authsslA_authuser012_012f", "NV_s0_authsslA_authuser3_3f", "NV_s0_authsslA_authuser0_0f");
+    public static final ImmutableConnections s0_mcast01_data = new ImmutableConnections("s0_mcast01_data", ImmutableServerProfiles.SERVER_0, BaseConnections.mcast01_data, 18755, "NV_s0_mcast01_anonuser_01f", "NV_s0_mcast01_anonuser_01f_A", "NV_s0_mcast01_anonuser_01f_B", "s0_mcast01_anonuser_01f", "s0_mcast01_anonuser_01f_A", "s0_mcast01_anonuser_01f_B");
+    public static final ImmutableConnections s0_udp_data = new ImmutableConnections("s0_udp_data", ImmutableServerProfiles.SERVER_0, BaseConnections.udp_data, 18731, "s0_udp_anonuser_t", "s0_udp_anonuser_t_A", "s0_udp_anonuser_t_B", "NV_s0_udp_anonuser_t_B", "NV_s0_udp_anonuser_t", "NV_s0_udp_anonuser_t_A");
+    public static final ImmutableConnections s0_ssl_data = new ImmutableConnections("s0_ssl_data", ImmutableServerProfiles.SERVER_0, BaseConnections.ssl_data, 18737, "NV_s0_ssl_anonuser_t_A", "NV_s0_ssl_anonuser_t_B", "NV_s0_ssl_anonuser_t", "s0_ssl_anonuser_t", "s0_ssl_anonuser_t_B", "s0_ssl_anonuser_t_A");
+    public static final ImmutableConnections s0_authssl_data = new ImmutableConnections("s0_authssl_data", ImmutableServerProfiles.SERVER_0, BaseConnections.authssl_data, 18739, "s0_authssl_authuser12_012f", "NV_s0_authssl_authuser012_012f", "s0_authssl_authuser3_3f", "s0_authssl_authuser_f", "NV_s0_authssl_authuser3_3f", "s0_authssl_authuser012_012f", "NV_s0_authssl_authuser01_01f", "NV_s0_authssl_authuser2_2f", "s0_authssl_authuser01_01f", "NV_s0_authssl_authuser0_0f", "NV_s0_authssl_authuser_f", "s0_authssl_authuser2_2f", "NV_s0_authssl_authuser12_012f", "s0_authssl_authuser0_0f");
+    public static final ImmutableConnections s0_mcast12t_data = new ImmutableConnections("s0_mcast12t_data", ImmutableServerProfiles.SERVER_0, BaseConnections.mcast12t_data, 18756, "s0_mcast12t_anonuser_12t", "NV_s0_mcast12t_anonuser_12t_B", "NV_s0_mcast12t_anonuser_12t_A", "NV_s0_mcast12t_anonuser_12t", "s0_mcast12t_anonuser_12t_A", "s0_mcast12t_anonuser_12t_B");
+    public static final ImmutableConnections s0_tls_data = new ImmutableConnections("s0_tls_data", ImmutableServerProfiles.SERVER_0, BaseConnections.tls_data, 18738, "NV_s0_tls_anonuser_t_B", "NV_s0_tls_anonuser_t_A", "NV_s0_tls_anonuser_t", "s0_tls_anonuser_t_B", "s0_tls_anonuser_t_A", "s0_tls_anonuser_t");
+    public static final ImmutableConnections s0_authtls_data = new ImmutableConnections("s0_authtls_data", ImmutableServerProfiles.SERVER_0, BaseConnections.authtls_data, 18741, "s0_authtls_authuser12_012f", "NV_s0_authtls_authuser01_01f", "NV_s0_authtls_authuser_f", "s0_authtls_authuser01_01f", "s0_authtls_authuser0_0f", "s0_authtls_authuser3_3f", "s0_authtls_authuser2_2f", "NV_s0_authtls_authuser12_012f", "s0_authtls_authuser012_012f", "NV_s0_authtls_authuser2_2f", "NV_s0_authtls_authuser3_3f", "NV_s0_authtls_authuser012_012f", "s0_authtls_authuser_f", "NV_s0_authtls_authuser0_0f");
+    public static final ImmutableConnections s0_stcpA_data = new ImmutableConnections("s0_stcpA_data", ImmutableServerProfiles.SERVER_0, BaseConnections.stcp_data, 18733, "s0_stcpA_anonuser_t", "s0_stcpA_anonuser_t_A", "s0_stcpA_anonuser_t_B", "NV_s0_stcpA_anonuser_t", "NV_s0_stcpA_anonuser_t_B", "NV_s0_stcpA_anonuser_t_A");
+    public static final ImmutableConnections s0_mcast3f_data = new ImmutableConnections("s0_mcast3f_data", ImmutableServerProfiles.SERVER_0, BaseConnections.mcast3f_data, 18757, "NV_s0_mcast3f_anonuser_3f_B", "NV_s0_mcast3f_anonuser_3f_A", "NV_s0_mcast3f_anonuser_3f", "s0_mcast3f_anonuser_3f_A", "s0_mcast3f_anonuser_3f", "s0_mcast3f_anonuser_3f_B");
+    public static final ImmutableConnections s0_tcp_data = new ImmutableConnections("s0_tcp_data", ImmutableServerProfiles.SERVER_0, BaseConnections.tcp_data, 18730, "s0_tcp_anonuser_t", "s0_tcp_anonuser_t_B", "s0_tcp_anonuser_t_A", "NV_s0_tcp_anonuser_t_B", "NV_s0_tcp_anonuser_t_A", "NV_s0_tcp_anonuser_t");
+    public static final ImmutableConnections s0_saproxyA_data = new ImmutableConnections("s0_saproxyA_data", ImmutableServerProfiles.SERVER_0, BaseConnections.saproxy_data, 18736, "s0_saproxyA_anonuser_t", "s0_saproxyA_anonuser_t_B", "s0_saproxyA_anonuser_t_A", "NV_s0_saproxyA_anonuser_t", "NV_s0_saproxyA_anonuser_t_B", "NV_s0_saproxyA_anonuser_t_A");
+    public static final ImmutableConnections s0_stcp0_data = new ImmutableConnections("s0_stcp0_data", ImmutableServerProfiles.SERVER_0, BaseConnections.stcp0_data, 18744, "s0_stcp0_anonuser_0f", "NV_s0_stcp0_anonuser_0f_B", "NV_s0_stcp0_anonuser_0f_A", "s0_stcp0_anonuser_0f_B", "s0_stcp0_anonuser_0f_A", "NV_s0_stcp0_anonuser_0f");
+    public static final ImmutableConnections s0_tcp2f_data = new ImmutableConnections("s0_tcp2f_data", ImmutableServerProfiles.SERVER_0, BaseConnections.tcp2f_data, 18751, "NV_s0_tcp2f_anonuser_2f", "NV_s0_tcp2f_anonuser_2f_A", "NV_s0_tcp2f_anonuser_2f_B", "s0_tcp2f_anonuser_2f", "s0_tcp2f_anonuser_2f_A", "s0_tcp2f_anonuser_2f_B");
+
+    
     ////////////////////////// BD6A4745-76B4-42DD-AE35-5C2251DD6301
     // End Generated Users
     //////////////////////////
@@ -184,6 +217,8 @@ public class ImmutableConnections extends AbstractConnection {
     private final BaseConnections connectionModel;
     @Nullable
     private final String mcastGroup;
+    @Nullable
+    private final String type;
     private String[] genUsersStrings;
 
     public BaseConnections getConnectionModel() {
@@ -199,6 +234,7 @@ public class ImmutableConnections extends AbstractConnection {
         this.groupSet = modelInput.getGroupSet();
         this.isAnon = modelInput.getRawAnon();
         this.mcastGroup = modelInput.getMcastGroup();
+        this.type = modelInput.getType();
         this.genUsersStrings = genUserNameList;
         this.connectionModel = modelInput;
 
@@ -297,6 +333,11 @@ public class ImmutableConnections extends AbstractConnection {
     public String getDynamicName() {
         return consistentUniqueReadableIdentifier;
     }
+
+	@Override
+	public String getType() {
+		return type;
+	}
 
     @Override
     public AbstractServerProfile getServer() {

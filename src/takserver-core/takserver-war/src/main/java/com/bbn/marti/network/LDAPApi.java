@@ -82,7 +82,7 @@ public class LDAPApi extends BaseRestController {
 	                }
 	            });
 	            
-	            List<LdapGroup> groupsAsList = groupManager.searchGroups(groupNameFilter);
+	            List<LdapGroup> groupsAsList = groupManager.searchGroups(groupNameFilter, false);
 	            
 	            groups.addAll(groupsAsList);
 	            
@@ -135,7 +135,7 @@ public class LDAPApi extends BaseRestController {
 
             if (errors.isEmpty()) {
                 for (String filter : search) {
-                    for (LdapGroup group : groupManager.searchGroups(filter)) {
+                    for (LdapGroup group : groupManager.searchGroups(filter, false)) {
                         if (group.getMembers() == null) {
                             continue;
                         }

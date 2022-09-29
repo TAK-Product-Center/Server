@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.nio.channels.SelectableChannel;
 import java.util.EnumSet;
 
-import com.bbn.marti.config.Network;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.binder.ServerBinder;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.nio.util.IOEvent;
@@ -28,7 +28,7 @@ import com.bbn.marti.util.concurrent.future.AsyncFuture;
 *
 */
 public interface Server {
-	public void bind(ServerBinder binder, Network.Input input) throws IOException;
+	public void bind(ServerBinder binder, Input input) throws IOException;
 
 	// called to start the server listening
 	public void listen();

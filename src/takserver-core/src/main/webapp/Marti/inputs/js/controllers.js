@@ -3,8 +3,8 @@
 var inputManagerControllers = angular.module('inputManagerControllers', []);
 
 inputManagerControllers.controller('InputListCtrl', ['$rootScope', '$window', '$scope', '$http', '$location', '$timeout', '$interval', 
-  'InputManagerService', 'MessagingConfigService', 'securityConfigService', 'MetricsService', 'QosService',
-      function ($rootScope, $window, $scope, $http, $location, $timeout, $interval, InputManagerService, MessagingConfigService, securityConfigService, MetricsService, QosService) {
+  'InputManagerService', 'DataFeedManagerService', 'MessagingConfigService', 'securityConfigService', 'MetricsService', 'QosService',
+      function ($rootScope, $window, $scope, $http, $location, $timeout, $interval, InputManagerService, DataFeedManagerService, MessagingConfigService, securityConfigService, MetricsService, QosService) {
 			$scope.hasAdminRole = false;
 			$scope.dbIsConnected = true;
             $scope.maxConnections = 0;
@@ -138,10 +138,28 @@ inputManagerControllers.controller('InputListCtrl', ['$rootScope', '$window', '$
     		$scope.showRmiError = false;
     		
 			(function refreshMetrics() {InputManagerService.query(
-					function(apiResponse) {	$scope.inputMetrics = apiResponse.data;
+					function(apiResponse) {	$scope.inputs = apiResponse.data;
+											$scope.inputMetrics = [];
+											$scope.streamingDataFeeds = [];
+											$scope.pluginDataFeeds = [];
+											let inputLength = apiResponse.data.length;
+											for (let i = 0; i < inputLength; i ++) {
+												let loopInput = apiResponse.data[i];
+												if (loopInput.input.type != null){
+													if (loopInput.input.type === 'Streaming') {
+														$scope.streamingDataFeeds.push(loopInput);
+													} else if (loopInput.input.type === 'Plugin') {
+														$scope.pluginDataFeeds.push(loopInput);
+													}
+												} else {
+													$scope.inputMetrics.push(loopInput);
+												}
+											}
+
 											$timeout(refreshMetrics,2000)}, 
 					function() {$scope.showRmiError = true;})})();
 
+					
 			$scope.deleteObject = function (inputName) {
 	        	
 	        	if (inputName.trim() != '') {
@@ -157,6 +175,21 @@ inputManagerControllers.controller('InputListCtrl', ['$rootScope', '$window', '$
 	        	}
 	        };
 
+			$scope.deleteDataFeed = function (dataFeedName) {
+	        	
+	        	if (dataFeedName.trim() != '') {
+		        	if (confirm('Proceed to delete the selected data feed? (Data Feed Name: ' + dataFeedName + ')')) {
+			        	var dms = new DataFeedManagerService();
+			        	dms.$delete({name:dataFeedName},
+		        			function(data) {
+		        				$scope.dataFeeds = DataFeedManagerService.query(function(apiResponse) {$scope.dataFeeds = apiResponse.data});},
+		        			function(data) {
+		        				alert('An error occurred deleting the data feed.')}
+			        	);
+		        	}
+	        	}
+	        };
+
 	        $scope.modifyObject = function() {
 	        	//Placeholder if we need preprocessing
 	        };
@@ -164,6 +197,11 @@ inputManagerControllers.controller('InputListCtrl', ['$rootScope', '$window', '$
 	        $scope.createInput = function () {
 	        	//Placeholder if we need preprocessing
 	        };
+
+	        $scope.createDataFeed = function () {
+	        	//Placeholder if we need preprocessing
+	        };
+			
 
             $scope.actualNum = 0;
 	        function getMsgConfig() {
@@ -246,6 +284,11 @@ inputManagerControllers.controller('InputCreationCtrl',
 	   	        						function(apiResponse) {$scope.inputNameDuplicate = false;});
    	        			    }
    					}
+
+					$scope.cancelInput = function() {
+						$location.path("/");
+					};
+
 				    }]);
 
 inputManagerControllers.controller('InputModificationCtrl', ['$scope', '$location', 'InputManagerService', '$routeParams',
@@ -297,3 +340,119 @@ inputManagerControllers.controller('InputModificationCtrl', ['$scope', '$locatio
 		
 }]);
 
+inputManagerControllers.controller('DataFeedCreationCtrl', 
+					['$scope', '$location', 'DataFeedManagerService', '$routeParams',
+                   function ($scope, $location, DataFeedManagerService, $routeParams) {
+					$scope.dataFeed = new DataFeedManagerService();
+					$scope.dataFeed.name = '';
+					$scope.dataFeed.type = 'Streaming';
+					$scope.dataFeed.tags = '';
+					$scope.dataFeed.auth = 'X_509';
+					$scope.dataFeed.protocol = 'tls';
+					$scope.dataFeed.archive = 'true';
+					$scope.dataFeed.anongroup = 'false';
+					$scope.dataFeed.archiveOnly = 'false';
+					$scope.dataFeed.coreVersion = "2";
+					$scope.dataFeed.protocol = 'tls';
+					$scope.dataFeed.sync = 'false';
+					$scope.inputNameDuplicate = false;
+					$scope.serviceReportedMessages = false;
+					$scope.messages = [];
+					$scope.submitInProgress = false;
+					$scope.tls = { "TLSv1": false, "TLSv1.1": false, "TLSv1.2": true, "TLSv1.3": true };
+
+   					$scope.saveStreamingDataFeed = function (dataFeed) {
+   	        			    $scope.submitInProgress = true;
+							$scope.dataFeed.type = 'Streaming';
+   	        			    DataFeedManagerService.save(dataFeed,
+	        						     function(apiResponse) {
+	        							 	$location.path('/');},
+	        						     	function(apiResponse) {
+	        							 	$scope.serviceReportedMessages = true;
+	        							 	$scope.messages = apiResponse.data.messages;
+	        							 	alert('An error occurred saving the input definition. Please correct the errors and resubmit.');
+	        							 	$scope.submitInProgress = false;}
+		        					    );
+	        			}
+
+   					$scope.savePluginDataFeed = function (dataFeed) {
+   	        			    $scope.submitInProgress = true;
+							$scope.dataFeed.type = 'Plugin';
+							$scope.dataFeed.auth = 'ANONYMOUS';
+							$scope.dataFeed.protocol = 'tls';
+							$scope.dataFeed.anongroup = 'false';
+							$scope.dataFeed.archiveOnly = 'false';
+							$scope.dataFeed.coreVersion = "2";
+							$scope.dataFeed.protocol = '';
+   	        			    DataFeedManagerService.save(dataFeed,
+	        						     function(apiResponse) {
+	        							 	$location.path('/');},
+	        						     	function(apiResponse) {
+	        							 	$scope.serviceReportedMessages = true;
+	        							 	$scope.messages = apiResponse.data.messages;
+	        							 	alert('An error occurred saving the input definition. Please correct the errors and resubmit.');
+	        							 	$scope.submitInProgress = false;}
+		        					    );
+	        			}
+
+   					$scope.isInputNameUnique = function(inputName) {
+
+   	        			    if (inputName != null && inputName.trim() != '') {
+	   	        			DataFeedManagerService.get({name:inputName},
+	   	        						function(apiResponse) {if (apiResponse.data != null) {$scope.inputNameDuplicate = true;} else {$scope.inputNameDuplicate = false};},
+	   	        						function(apiResponse) {$scope.inputNameDuplicate = false;});
+   	        			    }
+   					}
+
+
+					$scope.cancelInput = function() {
+						$location.path("/");
+					}
+
+}]);
+
+inputManagerControllers.controller('DataFeedModificationCtrl', ['$scope', '$location', 'DataFeedManagerService', '$routeParams',
+                                                             function ($scope, $location, DataFeedManagerService, $routeParams) {
+	
+	$scope.boolToStr = function(arg) {return arg ? 'True' : 'False'};
+
+	$scope.queryDataFeed = function(dataFeedName) {
+		DataFeedManagerService.query(
+				{name: dataFeedName},
+				function(apiResponse) {
+					$scope.dataFeed = apiResponse.data;
+					$scope.hideArchive = false;
+					$scope.hideArchiveOnly = false;
+					var protocol = apiResponse.data.protocol.toLowerCase();
+					$scope.hideFilterGroupList = (apiResponse.data.auth.toLowerCase() != 'anonymous');
+				},
+				function(apiResponse) {
+					$scope.showRmiError = true;
+				}
+		);
+	}
+
+	$scope.queryDataFeed($routeParams.name);
+
+	$scope.updateDataFeed = function(updatedDataFeed) {
+			updatedDataFeed.filtergroup = updatedDataFeed.filterGroups;
+			updatedDataFeed.tag = updatedDataFeed.tags;
+			DataFeedManagerService.update({name: updatedDataFeed.name}, updatedDataFeed,
+						function(apiResponse) {
+						$location.path('/');
+					},
+					function(apiResponse) {
+						if (apiResponse.data && apiResponse.data.data && apiResponse.data.data['displayMessage']) {
+							alert(apiResponse.data.data['displayMessage']);
+						} else {
+							alert(apiResponse.statusText);
+						}
+					}
+			);
+	}
+
+	$scope.cancelDataFeed = function() {
+		$location.path("/");
+	}
+
+}]);

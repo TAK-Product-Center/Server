@@ -12,4 +12,6 @@ public interface Sender<T> extends PluginLifecycle {
 	 * @see atakmap.commoncommo.protobuf.v1.Message
 	 */
 	void send(T message);
+	
+	void send(T message, String feedUuid);
 }
