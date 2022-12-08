@@ -93,3 +93,5 @@ ver.json
 src/takserver-core/ignite/
 src/takserver-cluster/deployments/helm/extras/postgresql.conf
 src/takserver-cluster/deployments/helm/extras/pg_hba.conf
+
+*.zip
