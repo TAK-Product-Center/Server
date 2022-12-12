@@ -21,6 +21,7 @@ spec:
                   number: 8443
             path: /
             pathType: Prefix
+
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -43,6 +44,7 @@ spec:
                   number: 8444
             path: /
             pathType: Prefix
+
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -67,6 +69,7 @@ spec:
                   number: 8446
             path: /
             pathType: Prefix
+
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -89,6 +92,7 @@ spec:
                   number: 8089
             path: /
             pathType: Prefix
+
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -111,6 +115,7 @@ spec:
                   number: 9000
             path: /
             pathType: Prefix
+
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

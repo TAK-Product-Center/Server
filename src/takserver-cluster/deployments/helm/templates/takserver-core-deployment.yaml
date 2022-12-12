@@ -62,6 +62,7 @@ spec:
 
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -79,7 +80,7 @@ spec:
     spec:
       serviceAccountName: takserver-ignite
       containers:
-        - name: takserver-api 
+        - name: takserver-api
           image: "{{ .Values.takserver.api.image.repository }}:{{ .Values.takserver.api.image.tag }}"
           resources:
             requests:
@@ -122,6 +123,5 @@ spec:
         - name: core-config
           configMap:
             name: {{ .Values.coreConfigMapName}}
-
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
