@@ -21,7 +21,7 @@
 	</subscription>
 
 	<repository enable="true" numDbConnections="100" primaryKeyBatchSize="500" insertionBatchSize="500">
-		<connection url="DB_URL_PLACEHOLDER" username="DB_USERNAME_PLACEHOLDER" password="DB_PASSWORD_PLACEHOLDER" />
+		<connection url="{{ .Values.postgresql.postgresqlUrl }}/{{ .Values.postgresql.postgresqlDatabase }}" username="{{ .Values.global.postgresql.postgresqlUsername }}" password="{{ .Values.global.postgresql.postgresqlPassword }}" />
 	</repository>
 
 	<repeater connectionPoolAutoSize="false" enable="true" numDbConnections="400" periodMillis="3000" staleDelayMillis="15000">
@@ -71,6 +71,6 @@
 	  </federation-server>
 	</federation>
 
-	<cluster enabled="true" kubernetes="true" natsClusterID="takserver" natsURL="nats://takserver-cluster:4222"/>
+	<cluster enabled="true" kubernetes="true" natsClusterID="takserver" natsURL="nats://takserver-nats:4222"/>
 
 </Configuration>
