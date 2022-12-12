@@ -108,6 +108,16 @@ task copyCertsConfigMap(type: Copy) {
     into project(':takserver-cluster').file('deployments/helm/templates')
 }
 
+task generateCoreConfigMap(type: Exec) {
+    workingDir "$buildDir/takserver-core"
+    commandLine 'sh', 'generateCoreConfigMap.sh'
+}
+
+task copyCoreConfigMap(type: Copy) {
+    from "$buildDir/takserver-core/core-config.yaml"
+    into project(':takserver-cluster').file('deployments/helm/templates')
+}
+
 clean {
   delete '$buildDir'
 }
@@ -117,7 +127,7 @@ task buildCluster(type: GradleBuild) {
   buildName = 'buildCluster'
   tasks = [
     'pullTakserverCore',
-    'pullSchemaManager', 
+    'pullSchemaManager',
     'pullUserManager',
     'pullPluginManager',
     'moveCoreConfig',
@@ -135,11 +145,11 @@ task buildCluster(type: GradleBuild) {
   ]
 }
 
-task buildHelmCluster(type: GradleBuild) { 
+task buildHelmCluster(type: GradleBuild) {
   buildName = 'buildHelmCluster'
   tasks = [
     'pullTakserverCore',
-    'pullSchemaManager', 
+    'pullSchemaManager',
     'pullUserManager',
     'pullPluginManager',
     'moveCoreConfig',
@@ -155,7 +165,9 @@ task buildHelmCluster(type: GradleBuild) {
     'moveZip',
     'deleteZip',
     'generateCertsConfigMap',
-    'copyCertsConfigMap'
+    'copyCertsConfigMap',
+    'generateCoreConfigMap',
+    'copyCoreConfigMap'
   ]
 }
 
