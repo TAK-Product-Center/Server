@@ -48,7 +48,7 @@ cert:
 	kubectl apply -f ./config/cert.yaml -n takserver
 
 deploy:
-	cd src/takserver-cluster/deployments/helm
+	cd src/takserver-cluster/deployments/helm && \
 	helm upgrade takserver . --install -n=takserver --create-namespace \
 		-f ./developer-values.yaml \
 		--set takserver.messaging.image.repository=$(REGISTRY)/takserver-messaging \
