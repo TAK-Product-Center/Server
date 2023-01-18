@@ -20,6 +20,8 @@ spec:
           env:
             - name: "spring_profiles_active"
               value: "k8cluster"
+            - name: DB_URL
+              value: {{ .Values.postgresql.postgresqlUrl }}
           resources:
             requests:
               cpu: {{ .Values.takserver.plugins.resources.requests.cpu }}

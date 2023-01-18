@@ -21,7 +21,7 @@
 	</subscription>
 
 	<repository enable="true" numDbConnections="100" primaryKeyBatchSize="500" insertionBatchSize="500">
-		<connection url="{{ .Values.postgresql.postgresqlUrl }}/{{ .Values.postgresql.postgresqlDatabase }}" username="{{ .Values.global.postgresql.postgresqlUsername }}" password="{{ .Values.global.postgresql.postgresqlPassword }}" />
+		<connection url="DB_URL_PLACEHOLDER" username="DB_USERNAME_PLACEHOLDER" password="DB_PASSWORD_PLACEHOLDER" />
 	</repository>
 
 	<repeater connectionPoolAutoSize="false" enable="true" numDbConnections="400" periodMillis="3000" staleDelayMillis="15000">

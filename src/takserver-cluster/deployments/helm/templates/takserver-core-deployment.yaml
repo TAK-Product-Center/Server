@@ -19,6 +19,8 @@ spec:
           env:
             - name: "spring_profiles_active"
               value: "k8cluster"
+            - name: DB_URL
+              value: {{ .Values.postgresql.postgresqlUrl }}
           resources:
             requests:
               cpu: {{ .Values.takserver.messaging.resources.requests.cpu }}
@@ -82,6 +84,9 @@ spec:
       containers:
         - name: takserver-api
           image: "{{ .Values.takserver.api.image.repository }}:{{ .Values.takserver.api.image.tag }}"
+          env:
+            - name: DB_URL
+              value: {{ .Values.postgresql.postgresqlUrl }}
           resources:
             requests:
               cpu: {{ .Values.takserver.api.resources.requests.cpu }}
