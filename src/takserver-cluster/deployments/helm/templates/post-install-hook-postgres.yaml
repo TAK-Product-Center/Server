@@ -52,6 +52,14 @@ spec:
             value: 'placeholder'
           - name: 'identifier'
             value: 'identifier'
+        volumeMounts:
+          - name: core-config
+            mountPath: /opt/tak/CoreConfig.xml
+            subPath: CoreConfig.xml
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
+      volumes:
+        - name: core-config
+          configMap:
+            name: {{ .Values.coreConfigMapName}}
 {{- end }}
