@@ -81,6 +81,7 @@ postgresql:
     tag: 10-3.1
   configurationConfigMap: postgres-configuration
   postgresqlDatabase: cot
+  postgresqlUrl: jdbc:postgresql://takserver-postgresql-headless:5432
 
 global:
   postgresql:
