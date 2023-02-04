@@ -20,7 +20,7 @@ RUN groupadd --gid 1000 vscode && \
 
 RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
-RUN curl -o /tmp/k9s.tar.gz -L `curl -s https://api.github.com/repos/derailed/k9s/releases/latest | awk -F\" '/browser_download_url.*.k9s_Linux_x86_64.tar.gz/{print $(NF-1)}'` && \
+RUN curl -o /tmp/k9s.tar.gz -L https://github.com/derailed/k9s/releases/download/v0.27.2/k9s_Linux_amd64.tar.gz && \
     mkdir /tmp/k9s && tar xvzf /tmp/k9s.tar.gz -C /tmp/k9s && mv /tmp/k9s/k9s /bin/k9s && rm -r /tmp/k9s && rm /tmp/k9s.tar.gz
 
 USER vscode
