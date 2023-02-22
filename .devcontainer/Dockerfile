@@ -11,7 +11,8 @@ RUN apt update && apt-get install -y \
     zsh \
     sudo \
     git \
-    make
+    make \
+    openjdk-11-jre
 
 RUN groupadd --gid 1000 vscode && \
     useradd --uid 1000 --gid 1000 -m vscode && \
