@@ -19,6 +19,8 @@ spec:
           env:
             - name: "spring_profiles_active"
               value: "k8cluster"
+            - name: DB_URL
+              value: {{ .Values.postgresql.postgresqlUrl }}
           resources:
             requests:
               cpu: {{ .Values.takserver.messaging.resources.requests.cpu }}
@@ -62,6 +64,7 @@ spec:
 
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -79,8 +82,11 @@ spec:
     spec:
       serviceAccountName: takserver-ignite
       containers:
-        - name: takserver-api 
+        - name: takserver-api
           image: "{{ .Values.takserver.api.image.repository }}:{{ .Values.takserver.api.image.tag }}"
+          env:
+            - name: DB_URL
+              value: {{ .Values.postgresql.postgresqlUrl }}
           resources:
             requests:
               cpu: {{ .Values.takserver.api.resources.requests.cpu }}
@@ -122,6 +128,5 @@ spec:
         - name: core-config
           configMap:
             name: {{ .Values.coreConfigMapName}}
-
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}

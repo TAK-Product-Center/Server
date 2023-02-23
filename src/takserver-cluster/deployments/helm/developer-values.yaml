@@ -81,6 +81,7 @@ postgresql:
     tag: 10-3.1
   configurationConfigMap: postgres-configuration
   postgresqlDatabase: cot
+  postgresqlUrl: jdbc:postgresql://takserver-postgresql-headless:5432
 
 global:
   postgresql:
@@ -93,9 +94,21 @@ ignite:
   serviceAccount:
     name: takserver-ignite
 
-nats-operator:
-  image:
-    tag: 0.7.2
+nats:
+  nats:
+    jetstream:
+    enabled: true
+
+    memStorage:
+      enabled: true
+      size: 2Gi
+
+    fileStorage:
+      enabled: true
+      size: 10Gi
+  auth:
+    enabled: false
   cluster:
-    auth:
-      enabled: false
+    enabled: true
+    name: "takserver"
+    replicas: 1

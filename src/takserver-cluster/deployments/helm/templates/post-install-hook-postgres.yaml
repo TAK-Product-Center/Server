@@ -15,7 +15,6 @@ metadata:
     "helm.sh/hook": post-install
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation
-
 spec:
   template:
     metadata:
@@ -35,6 +34,8 @@ spec:
               'until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT;
                 do echo waiting for database; sleep 5; done;']
           env:
+          - name: DB_URL
+            value: {{ .Values.postgresql.postgresqlUrl }}
           - name: POSTGRES_DB
             value: {{ .Values.postgresql.postgresqlDatabase }}
           - name: POSTGRES_USER

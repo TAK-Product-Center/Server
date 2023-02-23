@@ -1,0 +1,12 @@
+dependencies:
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 10.16.2
+- name: ignite
+  repository: file://../ignite
+  version: 1.2.3
+- name: nats
+  repository: https://nats-io.github.io/k8s/helm/charts/
+  version: 0.17.4
+digest: sha256:4a0e979b627f02fe04b8aa26bfa9f7c755fa39ac9f44830a8c902caeb6ec92de
+generated: "2022-12-08T11:26:42.635468272Z"

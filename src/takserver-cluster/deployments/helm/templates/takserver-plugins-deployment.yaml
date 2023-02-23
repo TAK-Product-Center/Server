@@ -15,11 +15,13 @@ spec:
     spec:
       serviceAccountName: takserver-ignite
       containers:
-        - name: takserver-plugins 
+        - name: takserver-plugins
           image: "{{ .Values.takserver.plugins.image.repository }}:{{ .Values.takserver.plugins.image.tag }}"
           env:
             - name: "spring_profiles_active"
               value: "k8cluster"
+            - name: DB_URL
+              value: {{ .Values.postgresql.postgresqlUrl }}
           resources:
             requests:
               cpu: {{ .Values.takserver.plugins.resources.requests.cpu }}
