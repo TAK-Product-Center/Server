@@ -43,7 +43,8 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           run: |
-            find ~/Server/src -name "*.rpm"
+            pwd
+            ls
           name: takServer
           path: src/takserver-package/takserver/build/distributions/takserver-4.5-RELEASE72.noarch.rpm
 
