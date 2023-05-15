@@ -42,5 +42,5 @@ jobs:
       - name: Generate .rpm
         run: |
           cd src
-          ./gradlew clean bootWar
+          ./gradlew clean buildRpm
 
