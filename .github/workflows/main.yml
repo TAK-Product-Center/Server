@@ -42,9 +42,6 @@ jobs:
       - name: Upload RPM Artifact
         uses: actions/upload-artifact@v2
         with:
-          run: |
-            pwd
-            ls
           name: takServer
-          path: src/takserver-package/takserver/build/distributions/takserver-4.5-RELEASE72.noarch.rpm
+          path: src/build/distributions/*.rpm
 
