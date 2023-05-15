@@ -29,12 +29,28 @@ jobs:
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
           
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        with:
+            tag_name: ${{ github.ref }}
+            release_name: Release ${{ github.ref }}
+            body: |
+              Changes in this Release
+              - Create RPM
+              - Upload Source RPM
+            draft: false
+            prerelease: false
+            
       - name: Clean Bootwar
         run: |
           cd src
           ./gradlew clean bootWar
           
       - name: Generate .rpm
+        id: rpm_build
         run: |
           cd src
           ./gradlew clean buildRpm
@@ -44,4 +60,14 @@ jobs:
         with:
           name: takServer
           path: src/takserver-package/build/distributions/*.rpm
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+            asset_content_type: ${{ steps.rpm_build.outputs.rpm_content_type }}
+            upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+            asset_path: ${{ steps.rpm_build.outputs.source_rpm_path }}
+            asset_name: ${{ steps.rpm_build.outputs.source_rpm_name }}
 
