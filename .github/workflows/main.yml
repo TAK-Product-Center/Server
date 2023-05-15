@@ -43,6 +43,8 @@ jobs:
         run: |
            pwd
            ls
+           cd src && ls
+           cd takserver-package && ls
       - uses: actions/upload-artifact@v3
         with:
           name: takServer
