@@ -16,4 +16,4 @@ jobs:
     - name: Run build with Gradle Wrapper
       run: |
        cd src
-       gradlew clean bootWar bootJar shadowJar
+       gradle clean bootWar bootJar shadowJar
