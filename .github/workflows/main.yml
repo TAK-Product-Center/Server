@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: takServer
-          path: src/build/distributions/*.rpm
+          path: Server/src/takserver-package/takserver/build/distributions
 
