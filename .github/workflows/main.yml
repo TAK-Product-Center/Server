@@ -40,11 +40,8 @@ jobs:
           ./gradlew clean buildRpm
           
       - name: Upload RPM Artifact
-        run: |
-           cd src/takserver-package/build/distributions
-           ls
-      - uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3
         with:
           name: takServer
-          path: Server/src/takserver-package/takserver/build/distributions
+          path: src/takserver-package/build/distributions/*.rpm
 
