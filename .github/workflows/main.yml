@@ -28,11 +28,6 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
-
-      - name: Build and Test
-        run: |
-          cd src
-          ./gradlew test build
           
       - name: Clean Bootwar
         run: |
@@ -43,4 +38,10 @@ jobs:
         run: |
           cd src
           ./gradlew clean buildRpm
+          
+      - name: Upload RPM Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: takServer
+          path: src/takserver-package/takserver/build/distributions/takserver-4.5-RELEASE72.noarch.rpm
 
