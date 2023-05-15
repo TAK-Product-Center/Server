@@ -33,3 +33,9 @@ jobs:
         run: |
           cd src
           ./gradlew test build
+          
+      - name: Clean Bootwar
+        run: |
+          cd src
+          ./gradlew clean bootWar
+
