@@ -41,9 +41,7 @@ jobs:
           
       - name: Upload RPM Artifact
         run: |
-           pwd
-           ls
-           cd src/takserver-package
+           cd src/takserver-package/build/
            ls
       - uses: actions/upload-artifact@v3
         with:
