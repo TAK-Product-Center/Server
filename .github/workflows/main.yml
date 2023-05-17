@@ -39,6 +39,11 @@ jobs:
           cd src
           ./gradlew clean buildRpm
           
+      - name: Generate .deb
+        run: |
+          cd src
+          ./gradlew clean createDeb
+          
       - name: Upload RPM Artifact
         uses: actions/upload-artifact@v3
         with:
