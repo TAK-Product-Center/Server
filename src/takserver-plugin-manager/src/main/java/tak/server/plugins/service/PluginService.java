@@ -8,6 +8,7 @@ import java.util.concurrent.ExecutionException;
 
 import javax.sql.DataSource;
 
+import com.bbn.marti.config.Tls;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.cache.spring.SpringCacheManager;
@@ -36,15 +37,7 @@ import tak.server.PluginManager;
 import tak.server.PluginRegistry;
 import tak.server.ignite.IgniteConfigurationHolder;
 import tak.server.messaging.Messenger;
-import tak.server.plugins.PluginApi;
-import tak.server.plugins.PluginDataFeedApi;
-import tak.server.plugins.PluginFileApi;
-import tak.server.plugins.PluginFileApiImpl;
-import tak.server.plugins.PluginManagerConstants;
-import tak.server.plugins.PluginMissionApi;
-import tak.server.plugins.PluginSelfStopApi;
-import tak.server.plugins.PluginStarter;
-import tak.server.plugins.SystemInfoApi;
+import tak.server.plugins.*;
 import tak.server.plugins.datalayer.PluginFileApiJDBC;
 import tak.server.plugins.manager.loader.PluginLoader;
 import tak.server.plugins.messaging.MessageConverter;
@@ -104,7 +97,7 @@ public class PluginService implements CommandLineRunner {
 	}
 	
 	@Bean
-	PluginStarter pluginIntializer(Ignite ignite, PluginDataFeedApi pdfApi, ServerInfo serverInfo, PluginApi pluginApi, PluginSelfStopApi pluginSelfStopApi, PluginMissionApi pluginMissionApi, PluginFileApi pluginFileApi) {
+	PluginStarter pluginIntializer(Ignite ignite, PluginDataFeedApi pdfApi, ServerInfo serverInfo, PluginApi pluginApi, PluginSelfStopApi pluginSelfStopApi, PluginMissionApi pluginMissionApi, PluginFileApi pluginFileApi, PluginCoreConfigApi pluginCoreConfigApi) {
 		return new PluginStarter(serverInfo, pluginApi);
 	}
 	
@@ -265,6 +258,45 @@ public class PluginService implements CommandLineRunner {
 		
 		return api;
 	}
+
+	private boolean accessPluginCoreConfigApi(PluginCoreConfigApi api) throws Exception {
+		api.getSecurity();
+		return true;
+	}
+
+	private CompletableFuture<Boolean> canAccessPluginCoreConfigApi(final PluginCoreConfigApi api) {
+
+		try {
+			logger.info("Waiting for the API process...");
+			return CompletableFuture.completedFuture(accessPluginCoreConfigApi(api));
+		} catch (Exception e) {
+			try {
+				Thread.sleep(1000L);
+			} catch (InterruptedException e1) {
+				logger.error("interruped sleep", e1);
+			}
+			return canAccessPluginCoreConfigApi(api);
+		}
+	}
+
+	@Bean
+	public PluginCoreConfigApi pluginCoreConfigApi(Ignite ignite) {
+		final PluginCoreConfigApi api = ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite))
+				.serviceProxy(Constants.DISTRIBUTED_PLUGIN_CORECONFIG_API, PluginCoreConfigApi.class, false);
+
+		boolean isApiAvailable = false;
+
+		// block and wait for PluginMissionApi to become available in API process
+		try {
+			isApiAvailable = canAccessPluginCoreConfigApi(api).get();
+		} catch (InterruptedException | ExecutionException e) {
+			logger.error("interrupted checking pluginCoreConfigApi availablity", e);
+		}
+
+		logger.info("pluginCoreConfigApi available: {}", isApiAvailable);
+
+		return api;
+	}
 	
 	@Bean
 	public PluginFileApiJDBC pluginFileApiJDBC(CoreConfig coreConfig) {
@@ -279,7 +311,7 @@ public class PluginService implements CommandLineRunner {
 
 		return new PluginFileApiImpl(pluginFileApiFromApiProcess, pluginFileApiJDBC);
 	}
-	
+
     @Bean
     public CoreConfig coreConfig(Ignite ignite) {
     	    	    	

@@ -3,9 +3,10 @@
 		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 		xsi:schemaLocation="CoreConfig.xsd">
 	<network multicastTTL="5">
-		<input _name="stdtcp" protocol="tcp" port="8087" auth="anonymous"/>
-		<input _name="stdudp" protocol="udp" port="8087" auth="anonymous"/>
-		<input _name="streamtcp" protocol="stcp" port="8088" auth="anonymous"/>
+		<input _name="stdssl" protocol="tls" port="8089" coreVersion="2"/>
+		<!-- <input _name="stdudp" protocol="udp" port="8087" auth="anonymous"/> -->
+		<!-- <input _name="streamtcp" protocol="stcp" port="8088" auth="anonymous"/> -->
+		<!-- <input _name="stdtcp" protocol="tcp" port="8087" auth="anonymous"/> -->
 		<!-- <input _name="SAproxy" protocol="mcast" group="239.2.3.1" port="6969" proxy="true" auth="anonymous" /> -->
 		<!-- <input _name="GeoChatproxy" protocol="mcast" group="224.10.10.1" port="17012" proxy="true" auth="anonymous" /> -->
 		<!--<announce enable="true" uid="Marti1" group="239.2.3.1" port="6969" interval="1" ip="192.168.1.137" />-->
@@ -33,7 +34,7 @@
 		<connector port="8444" useFederationTruststore="true" _name="fed_https"/>
 		<!-- <connector port="8446" clientAuth="false" _name="cert_https" enableWebtak="false"/> -->
 		<connector port="8446" clientAuth="false" _name="cert_https"/>
-		<connector port="8080" tls="false" _name="http_plaintext"/>
+		<!-- <connector port="8080" tls="false" _name="http_plaintext"/> -->
 	</network>
 	<auth>
                 <!-- Example OpenLDAP -->
@@ -75,6 +76,10 @@
 
 	<repository enable="true" numDbConnections="200" primaryKeyBatchSize="500" insertionBatchSize="500">
 	  <connection url="jdbc:postgresql://127.0.0.1:5432/cot" username="martiuser" password="" />
+	  <!-- <connection url="jdbc:postgresql://127.0.0.1:5432/cot" username="martiuser"
+	              sslEnabled="true" sslMode="verify-ca" 
+	              sslCert="certs/files/martiuser.pem" sslKey="certs/files/martiuser.key.pk8" 
+	              sslRootCert="certs/files/ca.pem"/> -->
 	</repository>
 
 	<repeater enable="true" periodMillis="3000" staleDelayMillis="15000">
@@ -125,16 +130,14 @@
 		
 	</security>
 	
-<!--
 	<federation>
-	  <federation-server port="9000">
+	  <federation-server port="9000" v1enabled="false" v2port="9001" v2enabled="true">
 	    <tls context="TLSv1.2" 
 		 keymanager="SunX509"
 		 keystore="JKS" keystoreFile="certs/files/takserver.jks" keystorePass="atakatak" 
 		 truststore="JKS" truststoreFile="certs/files/fed-truststore.jks" truststorePass="atakatak"/>
 	  </federation-server>
 	</federation>
--->
  <!-- previous locations of federate keystore and truststore -->
  <!-- 
  <tls context="TLSv1.2" 

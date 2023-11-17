@@ -47,7 +47,8 @@ public class WSTEPClient {
 
 	public static X509Certificate[] submitCSR(String CSR, String TemplateName, String svcUrl,
 											  String username, String password,
-											  String truststore, String truststorePassword, String tlsContext) {
+											  String truststore, String truststorePassword, boolean trustAllHosts,
+											  String tlsContext) {
 		try {
 			//
 			// create the web service client
@@ -81,9 +82,11 @@ public class WSTEPClient {
 			// wsdl location in Service.create.. but we still need to point to the endpoint
 			dispatch.getRequestContext().put(BindingProvider.ENDPOINT_ADDRESS_PROPERTY, portAddress);
 
-			// disable hostname verification, we still verify the host by requiring the trust store to be loaded
-			// in advance. This just relaxes the requirements that the cert's CN match it's hostname
-			dispatch.getRequestContext().put(JAXWSProperties.HOSTNAME_VERIFIER, new TrustAllHosts());
+			if (trustAllHosts) {
+				// disable hostname verification, we still verify the host by requiring the trust store to be loaded
+				// in advance. This just relaxes the requirements that the cert's CN match it's hostname
+				dispatch.getRequestContext().put(JAXWSProperties.HOSTNAME_VERIFIER, new TrustAllHosts());
+			}
 
 			// create a new message
 			SOAPMessage request = messageFactory.createMessage();

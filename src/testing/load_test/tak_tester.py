@@ -19,6 +19,10 @@ if sys.version_info >= (3, 6):
     from pyTakStreamingProto import PyTAKStreamingProtoProcess
     from pyTakStreamingCot import PyTAKStreamingCotProcess
 from utils import IgnoreHostNameAdapter, p12_to_pem, print_data_dict
+from stats import Stats
+from cloud_watch import cloud_watch_process, print_info_without_sending_to_cloud_watch_process
+from multiprocessing import Process, Value, Array
+
 
 global logger
 
@@ -179,7 +183,12 @@ def test_streaming_proto(host, port, cert, password,
                          sequential_uids=True,
                          mission_config=None,
                          mission_port=None,
-                         mission_api_config=None):
+                         mission_api_config=None,
+                         ping=False,
+                         ping_interval=1000,
+                         send_metrics=False,
+                         send_metrics_interval=60,
+                         cloudwatch_namespace="pyTAK-test"):
     if sequential_uids:
         uids = ["PyTAK-%04d" % i for i in range(clients)]
     else:
@@ -213,16 +222,39 @@ def test_streaming_proto(host, port, cert, password,
         mission_api_config['address'] = (host, mission_port)
     for i in range(clients):
         try:
+
+            #stats_uid = "proto_client_" + str(i)
+            uid = ("proto_client_" + str(i)) if uids[i] is None else uids[i]
+            arr = None
+
+            global stats
+            stats.init_uid(uid)
+            arr = stats.get_uid(uid)
+
             p = PyTAKStreamingProtoProcess(address=(host, port),
                                            cert=cert, password=password,
                                            uid=uids[i],
                                            self_sa_delta=self_sa_delta,
                                            mission_config=mission_api_config,
-                                           data_dict=data_dict)
+                                           data_dict=data_dict,
+                                           ping=ping,
+                                           ping_interval=ping_interval,
+                                           arr = arr)
             procs.append(p)
             p.start()
+
+            if send_metrics:
+                p_cloud_watch = Process(target=cloud_watch_process, args=(uid, arr,cloudwatch_namespace, send_metrics_interval))
+                procs.append(p_cloud_watch)
+                p_cloud_watch.start()
+            else:
+                p_info_without_sending_to_cloud_watch_process= Process(target=print_info_without_sending_to_cloud_watch_process, args=(uid, arr, send_metrics_interval))
+                procs.append(p_info_without_sending_to_cloud_watch_process)
+                p_info_without_sending_to_cloud_watch_process.start()
+                
             time.sleep(offset)
             logger.info(print_data_dict(data_dict))
+
         except KeyboardInterrupt:
             logger.info("trying to kill {} processes".format(len(procs)))
             for p in procs:
@@ -248,7 +280,13 @@ def test_streaming_cot(host, port, cert, password,
                        mission_config=None,
                        mission_port=None,
                        mission_api_config=None,
-                       debug=False):
+                       debug=False,
+                       ping=False,
+                       ping_interval=1000,
+                       send_metrics=False,
+                       send_metrics_interval=60,
+                       cloudwatch_namespace="pyTAK-test"
+                       ):
     if sequential_uids:
         uids = ["PyTAK-%04d" % i for i in range(clients)]
     else:
@@ -283,15 +321,37 @@ def test_streaming_cot(host, port, cert, password,
     data_dict = Manager().dict()
     for i in range(clients):
         try:
+            # stats_uid = "cot_client_" + str(i)
+            uid = ("cot_client_" + str(i)) if uids[i] is None else uids[i]
+            arr = None
+            
+            global stats
+            stats.init_uid(uid)
+            arr = stats.get_uid(uid)
+
             p = PyTAKStreamingCotProcess(address=(host, port),
                                          cert=cert, password=password,
                                          uid=uids[i],
                                          self_sa_delta=self_sa_delta,
                                          mission_config=mission_api_config,
                                          data_dict=data_dict,
-                                         debug = debug)
+                                         debug = debug,
+                                         ping=ping,
+                                         ping_interval=ping_interval,
+                                         arr = arr
+                                         )
             procs.append(p)
             p.start()
+
+            if send_metrics:
+                p_cloud_watch = Process(target=cloud_watch_process, args=(uid, arr,cloudwatch_namespace, send_metrics_interval))
+                procs.append(p_cloud_watch)
+                p_cloud_watch.start()
+            else:
+                p_info_without_sending_to_cloud_watch_process= Process(target=print_info_without_sending_to_cloud_watch_process, args=(uid, arr, send_metrics_interval))
+                procs.append(p_info_without_sending_to_cloud_watch_process)
+                p_info_without_sending_to_cloud_watch_process.start()
+
             time.sleep(offset)
             logger.info(print_data_dict(data_dict))
         except KeyboardInterrupt:
@@ -338,7 +398,6 @@ def test_udp(host, port, interval=0.25, track_uid=None):
             time.sleep(interval)
         except KeyboardInterrupt:
             return
-
 
 
 if __name__ == "__main__":
@@ -403,6 +462,15 @@ if __name__ == "__main__":
 
     parser.add_argument("--aws", help="running this test on AWS, so replace host ip with the server ip", action="store_true")
 
+    parser.add_argument("--ping", help="sending ping messages to server", type=bool)
+
+    parser.add_argument("--ping-interval", help="ping interval in MILLISECOND", type=int)
+
+    parser.add_argument("--send-metrics", help="sending client metrics to server", type=bool)
+
+    parser.add_argument("--send-metrics-interval", help="sending metrics interval (in seconds)", type=int)
+
+    parser.add_argument("--cloudwatch-namespace", help="CloudWatch namespace to send metrics to")
 
     args = parser.parse_args()
 
@@ -416,10 +484,9 @@ if __name__ == "__main__":
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s:\t %(message)s')
     handler = logging.FileHandler(filename="loadTest.log")
     handler.setFormatter(formatter)
-    handler.setLevel(logging.INFO)
+    handler.setLevel(level)
     logger = logging.getLogger("tak_tester")
     logger.addHandler(handler)
-
 
     config_file = args.config
     if config_file:
@@ -462,6 +529,12 @@ if __name__ == "__main__":
             if mission_api_config is None and not args.skip_mission_api:
                 logger.warning("No mission api config set for the load test client")
 
+            ping = args.ping or pytak_conf.get('ping', False)
+            ping_interval = args.ping_interval or pytak_conf.get('ping_interval', 1000)
+            send_metrics = args.send_metrics or pytak_conf.get('send_metrics', False)
+            send_metrics_interval = args.send_metrics_interval or pytak_conf.get('send_metrics_interval', 60)
+            cloudwatch_namespace = args.cloudwatch_namespace or pytak_conf.get('cloudwatch_namespace', 'pyTAK-test')
+
         udp_conf = config.get("UDPTest")
         if udp_conf:
             udp_interval = args.interval or udp_conf.get("interval", 0.1)
@@ -472,7 +545,7 @@ if __name__ == "__main__":
         logger.debug("\n"+pformat(config))
 
 
-    else:
+    else: # no config file
         cert = args.cert
         if cert is None:
             print("-c/--cert CERT required")
@@ -493,9 +566,16 @@ if __name__ == "__main__":
 
         pytak_clients = udp_clients = args.clients or 1
 
+        ping = args.ping or False
+        ping_interval = args.ping_interval or 1000
+        send_metrics = args.send_metrics or False
+        send_metrics_interval = args.send_metrics_interval or 60
+        cloudwatch_namespace = args.cloudwatch_namespace
+        
         config = {}
 
     if args.aws:
+        print ("Open TAKServerPrivateIP.txt")
         with open("TAKServerPrivateIP.txt") as f:
             host = f.readline().strip()
 
@@ -505,6 +585,9 @@ if __name__ == "__main__":
 
     if args.skip_mission_init:
         config["Missions"] = None
+
+    global stats
+    stats = Stats()
 
     if args.test_pytak:
         logger.info("")
@@ -518,7 +601,13 @@ if __name__ == "__main__":
                            mission_config=config.get("Missions"),
                            mission_port=https,
                            mission_api_config=mission_api_config,
-                           debug = args.verbose)
+                           debug = args.verbose,
+                           ping=ping,
+                           ping_interval=ping_interval,
+                           send_metrics=send_metrics,
+                           send_metrics_interval=send_metrics_interval,
+                           cloudwatch_namespace=cloudwatch_namespace
+                           )
 
     if args.test_pytak_proto:
         logger.info("")
@@ -531,7 +620,13 @@ if __name__ == "__main__":
                              sequential_uids=args.sequential_uids,
                              mission_config=config.get("Missions"),
                              mission_port=https,
-                             mission_api_config=mission_api_config)
+                             mission_api_config=mission_api_config,
+                             ping=ping,
+                             ping_interval=ping_interval,
+                             send_metrics=send_metrics,
+                             send_metrics_interval=send_metrics_interval,
+                             cloudwatch_namespace=cloudwatch_namespace
+                            )
 
     if args.test_websocket_proto:
         logger.info("")

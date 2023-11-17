@@ -159,7 +159,7 @@
             html += " password protected</td></tr>";
 
             html += "<tr><td>" +
-                "<input type=\"password\" size=50 id=\"newPassword\" " +
+                "<input type=\"password\" style=\"width:415px\" id=\"newPassword\" " +
                 "onkeyup='document.getElementById(\"setPasswordButton\").disabled = document.getElementById(\"newPassword\").value.length == 0'  />" +
                 "&nbsp;&nbsp;<input type=\"button\" id=\"setPasswordButton\" value=\"Set\" onClick=\"setPassword()\" style=\"width:50px\" disabled />";
 
@@ -229,6 +229,98 @@
                 },
                 error : function(stat, err) {
                     $.jnotify("Error getting mission", "error");
+                }
+            });
+        }
+
+
+        function addFeed() {
+            if ($("#feeds").val() != null && $("#feeds").val() !== undefined) {
+                $.ajax({
+                    url  : "api/missions/" + _mission.name + "/feed?dataFeedUid=" + $("#feeds").val() + "&creatorUid=<%=URLEncoder.encode(AuditLogUtil.getUsername(), "UTF-8")%>",
+                    type : "POST",
+                    async : false,
+                    cache : false,
+                    processData: false,
+                    contentType: 'application/json',
+                    dataType: 'text',
+                    success: function (response) {
+                        window.location.reload();
+                    },
+                    error : function(stat, err) {
+                        if (stat >= 200 || stat < 300) {
+                            window.location.reload();
+                        }
+                        $.jnotify("Error adding feed to mission", "error");
+                    }
+                });
+            }
+        }
+
+        function deleteFeed(missionFeedUid) {
+            if (!confirm("Press Ok to remove Feed from mission")) {
+                return;
+            }
+            $.ajax({
+                url  : "api/missions/" + _mission.name + "/feed/" + missionFeedUid + "?creatorUid=<%=URLEncoder.encode(AuditLogUtil.getUsername(), "UTF-8")%>",
+                type : "DELETE",
+                async : false,
+                cache : false,
+                contentType: 'application/json',
+                dataType: 'text',
+                processData: false,
+                success: function (response) {
+                    window.location.reload();
+                },
+                error : function(stat, err) {
+                    if (stat >= 200 || stat < 300) {
+                        window.location.reload();
+                    }
+                    $.jnotify("Error removing feed from mission", "error");
+                }
+            });
+        }
+
+        function addFeedsToEditor(allFeeds, missionFeeds) {
+            var html = "<br><h3>Feeds</h3><table>";
+            if (missionFeeds.length > 0) {
+                for (var i = 0; i < missionFeeds.length; i++) {
+                    html += "<tr>"
+                    html += "<td><a href=\"inputs/index.html#!/modifyPluginDataFeed/" + missionFeeds[i].name + "\">";
+                    html += missionFeeds[i].name + "</a>&nbsp;";
+                    html += "<input type=button id=\"Delete\" value=\"Remove\" onClick=\"deleteFeed('" + missionFeeds[i].uid + "');\"></td>"
+                    html += "</tr>"
+                }
+            } else {
+                html += "<tr><td>No Feeds have been added</td></tr>"
+            }
+            html += "<tr><td><select name=\"feeds\" id=\"feeds\" style=\"width:415px\">";
+            for (var i = 0; i < allFeeds.length; i++) {
+                if (missionFeeds == null || !missionFeeds.some(feed => feed.dataFeedUid == allFeeds[i].uuid)) {
+                    html += "<option value=\"" + allFeeds[i].uuid + "\">" + allFeeds[i].name + "</option>";
+                }
+            }
+            html += "</select>&nbsp;&nbsp;";
+            html += "<input type = \"button\" id=\"feedButton\" onclick = \"addFeed();\" value = \"Add\" style=\"width:50px\"></td></tr>"
+            html += "</table>";
+
+            var feedsDiv = document.getElementById('feedsDiv');
+            feedsDiv.innerHTML = html;
+        }
+
+        function loadFeeds(missionFeeds) {
+            $.ajax({
+                url  : "api/datafeeds",
+                type : "GET",
+                async : false,
+                cache : false,
+                contentType : false,
+                processData : false,
+                success: function (response) {
+                    addFeedsToEditor(response.data, missionFeeds);
+                },
+                error : function(stat, err) {
+                    $.jnotify("Error getting mission feeds", "error");
                 }
             });
         }
@@ -333,7 +425,7 @@
                     keywordText += keywords[i] + ' ';
                 }
             }
-            html += "<table><tr><td><input type=\"text\" size=50 id=\"keywords\" value=\""
+            html += "<table><tr><td><input type=\"text\" style=\"width:415px\" id=\"keywords\" value=\""
                 + keywordText
                 + "\">&nbsp;&nbsp;<input type=\"button\" id=\"keywordsButton\" value=\"Set\" onClick=\"addKeywords()\" style=\"width:50px\" /></td></tr></table>";
 
@@ -395,7 +487,7 @@
                 html += "<tr><td>No UIDs have been added</td></tr>"
             }
 
-            html += "<tr><td><input type=\"text\" size=50 id=\"uid\">&nbsp;&nbsp;<input type=\"button\" id=\"uidButton\" value=\"Add\" onClick=\"addUid();\" style=\"width:50px\"/></td></tr>";
+            html += "<tr><td><input type=\"text\" style=\"width:415px\" id=\"uid\">&nbsp;&nbsp;<input type=\"button\" id=\"uidButton\" value=\"Add\" onClick=\"addUid();\" style=\"width:50px\"/></td></tr>";
             html += "</table>";
 
             var uidsDiv = document.getElementById('uidsDiv');
@@ -416,6 +508,7 @@
             addKeywordsToEditor(_mission.keywords);
             addPasswordToEditor();
             addDefaultRoleToEditor(_mission.defaultRole);
+            loadFeeds(_mission.feeds);
             loadGroups(_mission.groups);
         }
 
@@ -472,6 +565,7 @@
     <div id="expirationDiv"></div>
     <div id="contentsDiv"></div>
     <div id="uidsDiv"></div>
+    <div id="feedsDiv"></div>
     <div id="keywordsDiv"></div>
     <div id="passwordDiv"></div>
 

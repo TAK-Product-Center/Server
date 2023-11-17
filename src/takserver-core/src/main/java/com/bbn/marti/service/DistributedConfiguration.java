@@ -541,6 +541,12 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
 	    getRemoteConfiguration().getBuffer().getQueue().setEnableStoreForwardChat(storeForwardChatEnabled);
 	    saveChangesAndUpdateCache();
     }
+	
+	@Override
+    public void setAndSaveVbmConfiguration(Vbm vbm) {
+	    getRemoteConfiguration().setVbm(vbm);
+	    saveChangesAndUpdateCache();
+    }
 
 	@Override
 	public boolean isContactApiFilter() {

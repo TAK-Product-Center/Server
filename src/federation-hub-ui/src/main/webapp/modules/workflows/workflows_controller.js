@@ -3,8 +3,8 @@
 'use strict';
 
 angular.module('roger_federation.Workflows')
-  .controller('WorkflowsController', ['$scope', '$rootScope', '$window', '$state', '$stateParams', '$timeout', '$uibModal',
-    '$log', '$http', 'uuid4', 'growl', 'WorkflowService', 'OntologyService', 'JointPaper', 'SemanticsService', workflowsController
+.controller('WorkflowsController', ['$scope', '$rootScope', '$window', '$state', '$stateParams', '$timeout', '$uibModal',
+  '$log', '$http', 'uuid4', 'growl', 'WorkflowService', 'OntologyService', 'JointPaper', 'SemanticsService', workflowsController
   ]);
 
 function workflowsController($scope, $rootScope, $window, $state, $stateParams, $timeout, $uibModal, $log, $http, uuid4, growl, WorkflowService, OntologyService, JointPaper, SemanticsService) {
@@ -17,29 +17,35 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
 
   function pollActiveConnections() {
     WorkflowService.getActiveConnections().then(function(activeConnections) {
-      setOutgoingNodesStatus(activeConnections)
-    }).catch(e => setOutgoingNodesStatus([]))
+      activeConnections.forEach(activeConnection => {
+        activeConnection.groupIdentitiesSet = new Set(activeConnection.groupIdentities)
+      })
+
+      setNodeStatus(activeConnections)
+    }).catch(e => setNodeStatus([]))
     $timeout(pollActiveConnections, 2000);
   }
 
-  function setOutgoingNodesStatus(activeConnections) {
+  function setNodeStatus(activeConnections) {
+    // console.log(JointPaper.paper)
     if (JointPaper.paper &&  JointPaper.paper._views) {
-      var outgoingCellKeys = Object.keys(JointPaper.paper._views);
-      for (var i = 0; i < outgoingCellKeys.length; i++) {
-        let cellView = JointPaper.paper._views[outgoingCellKeys[i]]
-
-        let text = cellView.model.attributes.roger_federation.stringId +'\n\n' 
-                    + cellView.model.attributes.roger_federation.host + ':' + cellView.model.attributes.roger_federation.port
+      var nodeKeys = Object.keys(JointPaper.paper._views);
+      for (var i = 0; i < nodeKeys.length; i++) {
+        let cellView = JointPaper.paper._views[nodeKeys[i]]
 
         if (cellView.model.attributes.graphType === "FederationOutgoingCell") {
+          let text = cellView.model.attributes.roger_federation.stringId +'\n\n' 
+          + cellView.model.attributes.roger_federation.host + ':' + cellView.model.attributes.roger_federation.port
+          
           let foundConnection = undefined
+          
           activeConnections.forEach(activeConnection => {
             if (activeConnection.connectionId === cellView.model.attributes.roger_federation.name)
               foundConnection = activeConnection
           })
           if (foundConnection) {
             cellView.model.attributes.attrs['.body']['fill'] = 'green'
-            text += '\n' + foundConnection.connectionType.toLowerCase()
+            text += '\n' + foundConnection.remoteConnectionType.toLowerCase()
           } else {
             if (cellView.model.attributes.roger_federation.outgoingEnabled)
               cellView.model.attributes.attrs['.body']['fill'] = 'red'
@@ -48,13 +54,32 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
           }
 
           var shapeLabel = joint.util.breakText(text, {
-              width: 200
+            width: 200
           });
 
           cellView.model.set('content', shapeLabel);
 
           cellView.update()
           cellView.resize()
+        }
+
+        if (cellView.model.attributes.graphType === "GroupCell") {
+          let linkedActiveConnections = []
+          
+          activeConnections.forEach(activeConnection => {
+            if (activeConnection.groupIdentitiesSet.has(cellView.model.attributes.roger_federation.name)) {
+              linkedActiveConnections.push(activeConnection)
+            }
+          })
+
+          if (linkedActiveConnections.length > 0) {
+            cellView.model.attributes.attrs['.body']['fill'] = 'green'
+          } else {
+            cellView.model.attributes.attrs['.body']['fill'] = 'white'
+          }
+          cellView.model.attributes.activeConnections = linkedActiveConnections
+          cellView.model.attributes.attrs['.body']['opacity'] = '0.35'
+          cellView.update()
         }
       }
     }
@@ -63,7 +88,7 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
   $scope.addSemanticSubscription = function() {
     $state.go('workflows.editor.addSparqlQuery', {
       mode: 'new_request',
-      roleProductSetId: $scope.workflow.roleProductSet
+      roleProductSetId: $rootScope.workflow.roleProductSet
     });
   };
 
@@ -75,16 +100,16 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
     curScope.request = request;
     $state.go("workflows.editor.addSparqlQuery", {
       mode: 'edit_request',
-      roleProductSetId: $scope.workflow.roleProductSet
+      roleProductSetId: $rootScope.workflow.roleProductSet
     });
   };
 
   $scope.deleteSemanticSubscription = function(request) {
     bootbox.confirm("Are you sure you want to delete the semantic subscription (" + request.name + ")?", function(confirm) {
       if (confirm) {
-        var index = $scope.workflow.semanticRequests.indexOf(request);
+        var index = $rootScope.workflow.semanticRequests.indexOf(request);
         if (index > -1) {
-          $scope.workflow.semanticRequests.splice(index, 1);
+          $rootScope.workflow.semanticRequests.splice(index, 1);
           $scope.$apply();
         }
       }
@@ -121,25 +146,25 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
       }
     });
     modalInstance.result.then(function(federation) {
-      $scope.workflow.federationId = federation.id;
-      $scope.workflow.federationName = federation.name;
+      $rootScope.workflow.federationId = federation.id;
+      $rootScope.workflow.federationName = federation.name;
     });
   };
   $scope.editFederation = function() {
     //BUG This will overwrite the diagram navigating away from with the one navigating to.
     //https://github.com/angular-ui/ui-router/issues/2485
     // $state.go('workflows.editor', {
-    //   workflowId: $scope.workflow.federationId
+    //   workflowId: $rootScope.workflow.federationId
     // });
   };
   $scope.removeFederation = function() {
-    $scope.workflow.federationId = "";
-    $scope.workflow.federationName = "";
+    $rootScope.workflow.federationId = "";
+    $rootScope.workflow.federationName = "";
   };
 
   $scope.downloadTemplateContainer = function() {
     $scope.saveGraph().then(function() {
-      WorkflowService.downloadTemplateContainer($scope.workflow.id).then(function(result) {
+      WorkflowService.downloadTemplateContainer($rootScope.workflow.id).then(function(result) {
         $scope.data = result;
         $scope.displayTemplateContainer();
       }, function(result) {
@@ -150,7 +175,7 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
 
   $scope.instantiateAndExecute = function() {
     $scope.saveGraph().then(function() {
-      WorkflowService.instantiateAndExecute($scope.workflow.id).then(function() {
+      WorkflowService.instantiateAndExecute($rootScope.workflow.id).then(function() {
         //TODO Overlay results on diagram.
       }, function(result) {
         growl.error("Failed to Instantiate and Execute BPMN graph. Error: " + result.statusText);
@@ -190,179 +215,184 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
   };
 
   $scope.policyToJson = function() {
-      $scope.saveGraphPromise().then(
-          function() {
-              WorkflowService.getGraphAsJson($scope.workflow.name).then(function(result) {
-                  console.log("Json load complete");
-                  $scope.generateJsonWindow(result);
-              }, function(result) {
-                  growl.error("Failed load JSON from the server. Error: " + result.statusText);
-              });
-          }, function(error) {
-              growl.error("Failed to save federation graph.  The policy may be out of date. Error: " + error.statusText);
-          });
+    $scope.saveGraphPromise().then(
+      function() {
+        WorkflowService.getGraphAsJson($rootScope.workflow.name).then(function(result) {
+          console.log("Json load complete");
+          $scope.generateJsonWindow(result);
+        }, function(result) {
+          growl.error("Failed load JSON from the server. Error: " + result.statusText);
+        });
+      }, function(error) {
+        growl.error("Failed to save federation graph.  The policy may be out of date. Error: " + error.statusText);
+      });
   };
 
- $scope.policyToYaml = function() {
-     $scope.saveGraphPromise().then(
-         function() {
-             WorkflowService.getGraphAsYaml($scope.workflow.name).then(function(result) {
-                 console.log("Json load complete");
-                 $scope.generateYamlWindow(result);
-             }, function(result) {
-                 growl.error("Failed load YAML from the server. Error: " + result.statusText);
-             });
-         }, function(error) {
-             growl.error("Failed to save federation graph.  The policy may be out of date. Error: " + error.statusText);
-         });
+  $scope.policyToYaml = function() {
+    $scope.saveGraphPromise().then(
+      function() {
+        WorkflowService.getGraphAsYaml($rootScope.workflow.name).then(function(result) {
+          console.log("Json load complete");
+          $scope.generateYamlWindow(result);
+        }, function(result) {
+          growl.error("Failed load YAML from the server. Error: " + result.statusText);
+        });
+      }, function(error) {
+        growl.error("Failed to save federation graph.  The policy may be out of date. Error: " + error.statusText);
+      });
   };
 
- $scope.policyJsonAsFile = function() {
-     $scope.saveGraphPromise().then(
-         function() {
-             WorkflowService.getGraphAsJson($scope.workflow.name).then(function(result) {
-                 console.log("Json load complete");
-                 var fileName = $scope.workflow.name + ".json";
-                 saveTextAsFile(result, fileName);
-             }, function(result) {
-                 growl.error("Failed load JSON from the server. Error: " + result.statusText);
-             });
-         }, function(error) {
-             growl.error("Failed to save federation graph.  The policy may be out of date. Error: " + error.statusText);
-         });
- }
+  $scope.policyJsonAsFile = function() {
+    $scope.saveGraphPromise().then(
+      function() {
+        WorkflowService.getGraphAsJson($rootScope.workflow.name).then(function(result) {
+          console.log("Json load complete");
+          var fileName = $rootScope.workflow.name + ".json";
+          saveTextAsFile(result, fileName);
+        }, function(result) {
+          growl.error("Failed load JSON from the server. Error: " + result.statusText);
+        });
+      }, function(error) {
+        growl.error("Failed to save federation graph.  The policy may be out of date. Error: " + error.statusText);
+      });
+  }
 
   function saveTextAsFile (data, filename){
 
-      if(!data) {
-          console.error('Console.save: No data')
-          return;
-      }
+    if(!data) {
+      console.error('Console.save: No data')
+      return;
+    }
 
-      if(!filename) filename = 'console.json'
+    if(!filename) filename = 'console.json'
 
       var blob = new Blob([data], {type: 'text/plain'}),
-          e    = document.createEvent('MouseEvents'),
-          a    = document.createElement('a')
+    e    = document.createEvent('MouseEvents'),
+    a    = document.createElement('a')
 // FOR IE:
 
-      if (window.navigator && window.navigator.msSaveOrOpenBlob) {
-          window.navigator.msSaveOrOpenBlob(blob, filename);
-      }
-      else{
-          var e = document.createEvent('MouseEvents'),
-              a = document.createElement('a');
+if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+  window.navigator.msSaveOrOpenBlob(blob, filename);
+}
+else{
+  var e = document.createEvent('MouseEvents'),
+  a = document.createElement('a');
 
-          a.download = filename;
-          a.href = window.URL.createObjectURL(blob);
-          a.dataset.downloadurl = ['text/plain', a.download, a.href].join(':');
-          e.initEvent('click', true, false, window,
-              0, 0, 0, 0, 0, false, false, false, false, 0, null);
-          a.dispatchEvent(e);
-      }
-  };
+  a.download = filename;
+  a.href = window.URL.createObjectURL(blob);
+  a.dataset.downloadurl = ['text/plain', a.download, a.href].join(':');
+  e.initEvent('click', true, false, window,
+    0, 0, 0, 0, 0, false, false, false, false, 0, null);
+  a.dispatchEvent(e);
+}
+};
 
 
-  $scope.sendToFederationManagerWithoutDownload = function () {
-    $scope.sendToFederationManager();
-    growl.warning("Making this the active policy does not back up the policy to a file.  Please either save the policy file, or use the send to federation manage + download button.")
-  };
+$scope.sendToFederationManagerWithoutDownload = function () {
+  $scope.sendToFederationManager();
+  growl.warning("Making this the active policy does not back up the policy to a file.  Please either save the policy file, or use the send to federation manage + download button.")
+};
 
-   $scope.sendToFederationManager = function() {
-    $scope.saveGraphPromise().then(
-        function() {
-            WorkflowService.sendToFederationManager($scope.workflow.name).then(function(result) {
-                growl.success("Successfully sent current policy to federation manager");
-                console.log("Successfully sent current policy to federation manager");
-            }, function(result) {
-                growl.error("Failed to transfer new policy to federation manager " + result.statusText);
-            });
-        }, function(error) {
-            growl.error("Failed to save federation graph.  The policy may be out of date. Error: " + error.statusText);
-        });
-   };
-
-    $scope.sendToFederationManagerAndFile = function() {
-        $scope.saveGraphPromise().then(
-            function() {
-                WorkflowService.sendToFederationManagerAndFile($scope.workflow.name).then(function(result) {
-                    growl.success("Successfully sent current policy to federation manager");
-                    console.log("Successfully sent current policy to federation manager");
-                }, function(result) {
-                    growl.error("Failed to transfer new policy to federation manager " + result.statusText);
-                });
-            }, function(error) {
-                growl.error("Failed to save federation graph.  The policy may be out of date. Error: " + error.statusText);
-            });
-    };
-
-  $scope.generateYamlWindow = function(result_object) {
-    var windowFeatures = 'menubar=no,location=no,resizable=yes,scrollbars=yes,status=no';
-    var windowName = _.uniqueId('yaml_output');
-    var yamlWindow = window.open('', windowName, windowFeatures);
-
-    yamlWindow.document.write("<html><body><pre>" + result_object + "</pre></body></html>");
-  };
-
-  $scope.generateJsonWindow = function(result_object) {
-    var newWindow = window.open('', '', 'menubar=no,location=no,resizable=yes,scrollbars=yes,status=no,width=1200,height=1200');
-        newWindow.document.write("<html><body><pre>" + angular.toJson(result_object, true) + "</pre></body></html>");
-  };
-
-  $scope.zoomToFit = function() {
-    JointPaper.paperScroller.zoomToFit({
-      padding: 100,
-      minScale: 0.2,
-      maxScale: 1
-    });
-  };
-
-  $scope.saveThumbnailAndGraph = function() {
-    try {
-      var t0 = performance.now();
-      if ($scope.workflow !== undefined) {
-        var pngOptions = {
-          width: 400,
-          height: 200
-        };
-        JointPaper.paper.toPNG(function(imageData) {
-          $scope.workflow.thumbnail = imageData;
-          console.log("Time to generate thumbnail (" + imageData.length + ") bytes : " + (performance.now() - t0) / 1000 + " seconds.");
-          $scope.saveGraph();
-        }, pngOptions);
-      }
-    } catch (ex) {
-      growl.error("Failed to save BPMN thumbnail.");
-    }
-  };
-
-  $scope.saveGraph = function() {
-    if ($scope.workflow !== undefined) {
-      var graphJSON = JointPaper.graph.toJSON();
-      $scope.workflow.cells = graphJSON.cells;
-      return WorkflowService.saveBpmnGraph(angular.toJson($scope.workflow)).then(function() {
-          console.log("Saved graph");
+$scope.sendToFederationManager = function() {
+  $scope.saveGraphPromise().then(
+    function() {
+      WorkflowService.sendToFederationManager($rootScope.workflow.name).then(function(result) {
+        growl.success("Successfully sent current policy to federation manager");
+        console.log("Successfully sent current policy to federation manager");
       }, function(result) {
-        growl.error("Failed to save BPMN graph. Error: " + result.statusText);
+        growl.error("Failed to transfer new policy to federation manager " + result.statusText);
       });
-    } else {
-      console.log("WARNING: $scope.workflow is undefined in saveGraph");
+    }, function(error) {
+      growl.error("Failed to save federation graph.  The policy may be out of date. Error: " + error.statusText);
+    });
+};
+
+$scope.sendToFederationManagerAndFile = function() {
+  $scope.saveGraphPromise().then(
+    function() {
+      WorkflowService.sendToFederationManagerAndFile($rootScope.workflow.name).then(function(result) {
+        growl.success("Successfully sent current policy to federation manager");
+        console.log("Successfully sent current policy to federation manager");
+      }, function(result) {
+        growl.error("Failed to transfer new policy to federation manager " + result.statusText);
+      });
+    }, function(error) {
+      growl.error("Failed to save federation graph.  The policy may be out of date. Error: " + error.statusText);
+    });
+};
+
+$scope.showActiveConnections = function() {
+  $rootScope.selectedCa = 'All'
+  $state.go('workflows.editor.connections');
+};
+
+$scope.generateYamlWindow = function(result_object) {
+  var windowFeatures = 'menubar=no,location=no,resizable=yes,scrollbars=yes,status=no';
+  var windowName = _.uniqueId('yaml_output');
+  var yamlWindow = window.open('', windowName, windowFeatures);
+
+  yamlWindow.document.write("<html><body><pre>" + result_object + "</pre></body></html>");
+};
+
+$scope.generateJsonWindow = function(result_object) {
+  var newWindow = window.open('', '', 'menubar=no,location=no,resizable=yes,scrollbars=yes,status=no,width=1200,height=1200');
+  newWindow.document.write("<html><body><pre>" + angular.toJson(result_object, true) + "</pre></body></html>");
+};
+
+$scope.zoomToFit = function() {
+  JointPaper.paperScroller.zoomToFit({
+    padding: 100,
+    minScale: 0.2,
+    maxScale: 1
+  });
+};
+
+$scope.saveThumbnailAndGraph = function() {
+  try {
+    var t0 = performance.now();
+    if ($rootScope.workflow !== undefined) {
+      var pngOptions = {
+        width: 400,
+        height: 200
+      };
+      JointPaper.paper.toPNG(function(imageData) {
+        $rootScope.workflow.thumbnail = imageData;
+        console.log("Time to generate thumbnail (" + imageData.length + ") bytes : " + (performance.now() - t0) / 1000 + " seconds.");
+        $scope.saveGraph();
+      }, pngOptions);
     }
-  };
+  } catch (ex) {
+    growl.error("Failed to save BPMN thumbnail.");
+  }
+};
+
+$scope.saveGraph = function() {
+  if ($rootScope.workflow !== undefined) {
+    var graphJSON = JointPaper.graph.toJSON();
+    $rootScope.workflow.cells = graphJSON.cells;
+    return WorkflowService.saveBpmnGraph(angular.toJson($rootScope.workflow)).then(function() {
+      console.log("Saved graph");
+    }, function(result) {
+      growl.error("Failed to save BPMN graph. Error: " + result.statusText);
+    });
+  } else {
+    console.log("WARNING: $rootScope.workflow is undefined in saveGraph");
+  }
+};
 
   // This function is used instead of saveGraph when we want to execute some other code after the graph is saved
   $scope.saveGraphPromise = function() {
-      if ($scope.workflow !== undefined) {
-        var graphJSON = JointPaper.graph.toJSON();
-        $scope.workflow.cells = graphJSON.cells;
-        return WorkflowService.saveBpmnGraph(angular.toJson($scope.workflow))
-      } else {
-          console.log("WARNING: $scope.workflow is undefined in saveGraph");
-      }
+    if ($rootScope.workflow !== undefined) {
+      var graphJSON = JointPaper.graph.toJSON();
+      $rootScope.workflow.cells = graphJSON.cells;
+      return WorkflowService.saveBpmnGraph(angular.toJson($rootScope.workflow))
+    } else {
+      console.log("WARNING: $rootScope.workflow is undefined in saveGraph");
+    }
   }
 
   $scope.deleteGraph = function() {
-    WorkflowService.deleteBpmnGraph($scope.workflow.id).then(function() {
+    WorkflowService.deleteBpmnGraph($rootScope.workflow.id).then(function() {
       JointPaper.graph.clear();
     }, function(result) {
       growl.error("Failed to delete BPMN graph. Error: " + result.statusText);
@@ -385,7 +415,7 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
     } else {
       if (['Product', 'Role', 'Pool', 'Message', 'Data Store', 'Data Object'].indexOf(propertiesType) !== -1) {
         $state.go('workflows.editor.addRoleProduct', {
-          roleProductSetId: $scope.workflow.roleProductSet
+          roleProductSetId: $rootScope.workflow.roleProductSet
         });
       } else if (['Federate'].indexOf(propertiesType) !== -1) {
         $state.go('workflows.editor.addBPMNFederate');
@@ -441,7 +471,7 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
           //   }
           //   return cellView.model.get('type');
           // }
-      });
+        });
       halo.removeHandle('unlink');
       halo.removeHandle('resize');
       halo.removeHandle('fork');
@@ -453,7 +483,7 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
 
   var setupJointJsGraph = function() {
     setContainerSize();
-    JointPaper.init($scope.workflow.diagramType, '#joint-diagram', '#paper-container', '#stencil-container', 3000, 3000, 1);
+    JointPaper.init($rootScope.workflow.diagramType, '#joint-diagram', '#paper-container', '#stencil-container', 3000, 3000, 1);
 
     //Graph Events
     JointPaper.graph.on('add', function(cell, collection, opt) {
@@ -471,7 +501,7 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
       if (evt.shiftKey) {
         // $state.go('workflows.editor.addOntologyElement');
         $state.go('workflows.editor.rpset', {
-          roleProductSetId: $scope.workflow.roleProductSet,
+          roleProductSetId: $rootScope.workflow.roleProductSet,
           initialDataSet: cellView.model.attributes.roger_federation.datasetName,
           initialClass: encodeURIComponent(cellView.model.attributes.roger_federation.uri)
         });
@@ -492,7 +522,7 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
         return;
       }
       OntologyService.queryClassComment(datasetName, uri).then(function(comment) {
-          OntologyService.queryClassInstances(datasetName, uri).then(function(instances) {
+        OntologyService.queryClassInstances(datasetName, uri).then(function(instances) {
             // var top10Instances = instances.data.results.bindings.map(function (item) {
             //     return item.uri.value.split("#")[1] + ' '
             //   });
@@ -515,8 +545,8 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
               targetElement.data('bs.popover').show();
             }
           }, function() {});
-        },
-        function() {});
+      },
+      function() {});
     }
 
     JointPaper.paper.on('cell:mouseover', function(cellView, evt) {
@@ -536,7 +566,7 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
         var cellType = cell.attributes.type;
         $log.debug('cell is ' + cellType);
         if (cellType === 'bpmn.Flow') { //Invoke Policy editor when creating new links
-          if ($scope.workflow.diagramType === "Federation" && cell.attributes.roger_federation.policy === undefined) {
+          if ($rootScope.workflow.diagramType === "Federation" && cell.attributes.roger_federation.policy === undefined) {
             $state.go('workflows.editor.addBPMNFederatePolicy');
           }
         } else {
@@ -588,18 +618,19 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
 
   var loadBpmnModel = function(workflowId) {
     WorkflowService.getBpmnGraph(workflowId).then(function(workflow) {
-      $scope.workflow = workflow;
+      $rootScope.workflow = workflow;
+      $rootScope.workflow = workflow;
       setupJointJsGraph();
       loadJointJsBpmnDiagram(workflow);
 
       $scope.$on('QUERY_ADDED', function(event, query) {
-        for (var i = 0; i < $scope.workflow.semanticRequests.length; i++) {
-          if ($scope.workflow.semanticRequests[i].id === query.id) {
-            $scope.workflow.semanticRequests[i] = query;
+        for (var i = 0; i < $rootScope.workflow.semanticRequests.length; i++) {
+          if ($rootScope.workflow.semanticRequests[i].id === query.id) {
+            $rootScope.workflow.semanticRequests[i] = query;
             return;
           }
         }
-        $scope.workflow.semanticRequests.push(query);
+        $rootScope.workflow.semanticRequests.push(query);
       });
 
     }, function(result) {
@@ -637,7 +668,7 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
       backdrop: 'static',
       resolve: {
         attributes: function() {
-          return $scope.workflow;
+          return $rootScope.workflow;
         }
       }
     });
@@ -645,8 +676,8 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
 
   var criticTimer;
   var runCritic = function() {
-    $scope.workflow.cells = JointPaper.graph.toJSON().cells;
-    $scope.criticResults = workflowCritic($scope.workflow);
+    $rootScope.workflow.cells = JointPaper.graph.toJSON().cells;
+    $scope.criticResults = workflowCritic($rootScope.workflow);
     var popoverContent = $scope.criticResults.join("<br>");
     var criticPopover = $("#criticIcon").data('bs.popover');
     if (criticPopover === undefined) { //Init critic popover

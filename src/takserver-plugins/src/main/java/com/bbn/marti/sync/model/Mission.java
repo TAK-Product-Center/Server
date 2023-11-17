@@ -122,6 +122,8 @@ public class Mission implements Serializable, Comparable<Mission> {
     protected List<LogEntry> logs;
 
     protected Long expiration;
+    
+    protected String guid;
 
     // no-arg constructor
     public Mission() {
@@ -464,8 +466,17 @@ public class Mission implements Serializable, Comparable<Mission> {
     public List<LogEntry> getLogs() { return logs; }
 
     public void setLogs(List<LogEntry> logs) { this.logs = logs; }
+    
+    public String getGuid() {
+		return guid;
+	}
+    
+    @Column(name = "guid", unique = true, nullable = false)
+	public void setGuid(String guid) {
+		this.guid = guid;
+	}
 
-    @Override
+	@Override
     public String toString() {
         StringBuilder builder = new StringBuilder();
         builder.append("Mission [name=");

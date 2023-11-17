@@ -85,7 +85,7 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	private final Map<ChannelHandler, ConcurrentHashMap<String, RemoteContactWithSA>> contactList = new ConcurrentHashMap<>();
 	private final Map<String, GuardedStreamHolder<FederatedEvent>> sessionClientStreamMap = new ConcurrentHashMap<>();
 	private final Map<String, GuardedStreamHolder<ROL>> sessionROLClientStreamMap = new ConcurrentHashMap<>();
-	private final Map<String, StreamObserver<FederateGroups>> sessionGroupServerStreamMap = new ConcurrentHashMap<>();
+	private final Map<String, GuardedStreamHolder<FederateGroups>> sessionGroupServerStreamMap = new ConcurrentHashMap<>();
 	private final Map<String, RemoteContact> contactMap = new ConcurrentHashMap<>();
 	private final Map<ConnectionInfo, Subscription> connectionSubMap = new ConcurrentHashMap<>();
 	private final Map<User, Subscription> userSubscriptionMap = new ConcurrentHashMap<>();
@@ -610,17 +610,17 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	}
 
 	@Override
-	public void putServerGroupStreamToSession(String sessionId, StreamObserver<FederateGroups> groupStream) {
+	public void putServerGroupStreamToSession(String sessionId, GuardedStreamHolder<FederateGroups> groupStream) {
 		sessionGroupServerStreamMap.put(sessionId, groupStream);	
 	}
 
 	@Override
-	public StreamObserver<FederateGroups> removeServerGroupStreamBySession(String sessionId) {
+	public GuardedStreamHolder<FederateGroups> removeServerGroupStreamBySession(String sessionId) {
 		return sessionGroupServerStreamMap.remove(sessionId);
 	}
 
 	@Override
-	public StreamObserver<FederateGroups> getServerGroupStreamBySession(String sessionId) {
+	public GuardedStreamHolder<FederateGroups> getServerGroupStreamBySession(String sessionId) {
 		return sessionGroupServerStreamMap.get(sessionId);
 	}
 

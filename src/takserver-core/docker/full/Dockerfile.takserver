@@ -1,5 +1,5 @@
 FROM openjdk:11-jdk-bullseye
-RUN apt update && apt-get install -y emacs-nox net-tools netcat vim nmon python-lxml
+RUN apt update && apt-get install -y emacs-nox net-tools netcat vim nmon python3-lxml
 
 COPY tak /opt/tak
 

@@ -61,13 +61,12 @@ if [ -f /etc/debian_version ]; then
 fi
 
 echo "IMPORTANT: If you are going to use a database, make sure you copy the generated database password from /opt/tak/CoreConfig.example.xml on the database machine to your CoreConfig on this machine"
-echo "Create login credentials for local adminstrative access to the configuration interface:"
-echo "sudo java -jar /opt/tak/utils/UserManager.jar usermod -A -p <password> <username>"
-echo "For secure operation, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates."
-echo "Using Firefox or Chrome on this computer, browse to this address to verify keystore and truststore configuration:"
-echo "http://localhost:8080" 
-echo "Login with the administrative credentials specified above."
-echo "Follow the instructions in the Installation section of the configuration guide to complete the setup process." 
+echo "By default, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates."
+echo "After generating certificates, use the following command to register an admin account:"
+echo "> sudo java -jar /opt/tak/utils/UserManager.jar certmod -A /opt/tak/certs/files/admin.pem"
+echo "Using Firefox or Chrome on this computer add the admin certificate to the local browser trust and browse to this address to verify keystore and truststore configuration:"
+echo "http://localhost:8443"
+echo "Follow the instructions in the Installation section of the configuration guide to complete the setup process."
 '''
 
 
@@ -96,9 +95,6 @@ ospackage {
 }
 
 task prePackage { }
-prePackage.dependsOn ':takserver-core:bootWar'
-prePackage.dependsOn ':takserver-usermanager:shadowJar'
-prePackage.dependsOn ':takserver-takcl-core:publicJar'
 prePackage.dependsOn copyJarsNoDb
 prePackage.dependsOn copyWars
 prePackage.dependsOn copyCoreConfigXSD

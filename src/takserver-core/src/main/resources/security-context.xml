@@ -213,6 +213,10 @@
               <sec:intercept-url pattern="/Marti/api/properties/**" access="ROLE_ANONYMOUS" />
               <sec:intercept-url pattern="/Marti/api/properties/**" method="DELETE" access="ROLE_ANONYMOUS" />
               
+              <!--  files API -->
+              <sec:intercept-url pattern="/Marti/api/files/**" access="ROLE_ANONYMOUS" />
+              <sec:intercept-url pattern="/Marti/api/files/**" method="DELETE" access="ROLE_ANONYMOUS" />
+              
               <!--  Group API -->
 			  <sec:intercept-url pattern="/Marti/api/groups/update/**" access="ROLE_ADMIN" />
               <sec:intercept-url pattern="/Marti/api/groups/**" access="ROLE_ANONYMOUS" />
@@ -494,7 +498,7 @@
             ROLE_ADMIN > ROLE_READONLY
             ROLE_READONLY > ROLE_ANONYMOUS
             ROLE_ADMIN > ROLE_NON_ADMIN_UI
-            ROLE_WEBTAK > ROLE_NON_ADMIN_UI
+            ROLE_WEBTAK > ROLE_ANONYMOUS
             ROLE_NON_ADMIN_UI > ROLE_ANONYMOUS
           </value>
         </property>

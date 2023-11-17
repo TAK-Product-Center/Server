@@ -74,7 +74,7 @@ java -Xmx<value> -Dspring.profiles.active=messaging,duplicatelogs -jar ../build/
 
 Run API
 ```
-java -Xmx<value> -Dspring.profiles.active=api,duplicatelogs -jar ../build/libs/takserver-core-xyz.war
+java -Xmx<value> -Dspring.profiles.active=api,duplicatelogs -Dkeystore.pkcs12.legacy -jar ../build/libs/takserver-core-xyz.war
 ```
 
 Run Plugin Manager (useful when working on plugin capability)

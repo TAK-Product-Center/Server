@@ -76,7 +76,7 @@ public class TakProtoWebSocketHandler extends BinaryWebSocketHandler {
 					.localListen("websocket-write-listener", (nodeId, message) -> {
 						if (message instanceof WebsocketMessageTransporter) {
 							final WebsocketMessageTransporter wmt = (WebsocketMessageTransporter) message;
-							final BinaryMessage binaryMessage = new BinaryMessage(wmt.cot);
+							final BinaryMessage binaryMessage = new BinaryMessage(wmt.message);
 							
 							Resources.messageSendExecutor.submit(
 									() -> {

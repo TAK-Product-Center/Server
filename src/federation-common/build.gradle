@@ -3,22 +3,24 @@ apply plugin: 'maven-publish'
 version = '0.0.1-SNAPSHOT'
 
 dependencies {
-  compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
-  compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
-  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-  compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
+  implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+  implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
+  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
 
-  compile project(':takserver-fig-core')
+  api project(':takserver-fig-core')
 
   // Apache Ignite (cache and distributed service grid).
-//  compile group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_spring_version
-//  compile group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
-  compile group: 'org.springframework', name: 'spring-beans', version: spring_version
-  compile group: 'org.springframework', name: 'spring-context', version: spring_version
+//  implementation group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_spring_version
+//  implementation group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
+  implementation group: 'org.springframework', name: 'spring-beans', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-context', version: spring_version
 
 
-  compile group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
-  compile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+  implementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
+  implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+  implementation 'org.apache.commons:commons-lang3:' + commons_lang_version
+  implementation group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
 }
 
 compileJava {

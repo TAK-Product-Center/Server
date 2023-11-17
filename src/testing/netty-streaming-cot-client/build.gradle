@@ -1,4 +1,4 @@
-apply plugin: 'java'
+apply plugin: 'java-library'
 apply plugin: 'maven-publish'
 apply plugin: 'idea'
 apply plugin: 'eclipse'
@@ -17,8 +17,8 @@ buildscript {
     }
   }
   dependencies {
-    classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.8'
-    classpath 'com.github.jengelman.gradle.plugins:shadow:6.1.0'
+    classpath 'com.google.protobuf:protobuf-gradle-plugin:' + gradle_protobuf_version
+    classpath 'gradle.plugin.com.github.johnrengelman:shadow:' + gradle_shadow_version
   }
 }
 
@@ -27,26 +27,25 @@ buildscript {
 repositories {
   mavenCentral()
   mavenLocal()
-  jcenter()
 }
 dependencies {
 
-  compile group: 'org.eclipse.jetty', name: 'jetty-util', version: '9.4.10.RC0'
-  
+  implementation group: 'org.eclipse.jetty', name: 'jetty-util', version: '9.4.10.RC0'
 
-  compile 'io.netty:netty-tcnative-boringssl-static:' + boringssl_static_version
-  
-  compile group: 'io.netty', name: 'netty-all', version: netty_epoll_version
-  
-  compile group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_epoll_version, classifier: 'linux-x86_64'
-  
-  implementation group: 'com.google.guava', name: 'guava', version: '11.0.2'
-  
 
-  compile 'javax.annotation:javax.annotation-api:1.3.2'
+  implementation 'io.netty:netty-tcnative-boringssl-static:' + boringssl_static_version
+
+  implementation group: 'io.netty', name: 'netty-all', version: netty_epoll_version
+
+  implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_epoll_version, classifier: 'linux-x86_64'
+
+  implementation group: 'com.google.guava', name: 'guava', version: guava_version
+
+
+  implementation 'javax.annotation:javax.annotation-api:' + javax_annotation_api_version
 
   // for netty performance, put javassist on the classpath
-  compile group: 'org.javassist', name: 'javassist', version: javassist_version
+  implementation group: 'org.javassist', name: 'javassist', version: javassist_version
 }
 
 

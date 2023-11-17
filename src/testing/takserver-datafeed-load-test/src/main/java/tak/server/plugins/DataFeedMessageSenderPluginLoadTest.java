@@ -33,9 +33,7 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 	private int numberOfFeeds = 2; // default value
 	private int numberOfTracksPerFeed = 3; // default value
 	
-//	private double messageRatePerTrackInSecond = 0.5; // number of messages per track in second
-//	private long period; // calculated value based on messageRatePerTrackInSecond, in milliseconds;
-	
+
 	private int delay = 10; // in milliseconds
 	
 	private ScheduledExecutorService worker;
@@ -104,8 +102,7 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 		
 		startTime = System.currentTimeMillis();
 						
-//		future = worker.scheduleAtFixedRate (new DataFeedMessageSender(), 3000, period, TimeUnit.MILLISECONDS);
-		future = worker.scheduleWithFixedDelay(new DataFeedMessageSender(), 3000, delay, TimeUnit.MILLISECONDS);	
+		future = worker.scheduleWithFixedDelay(new DataFeedMessageSender(), 3000, delay, TimeUnit.MILLISECONDS);
 	}
 	
 	private class DataFeedMessageSender implements Runnable {
@@ -161,7 +158,7 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 			logger.info("Deleting datafeeds used in load testing");
 			PluginDataFeedApi pluginDataFeedApi = getPluginDataFeedApi();
 			for (String feedUuid : feedUuids) {
-				pluginDataFeedApi.delete(feedUuid);
+				pluginDataFeedApi.delete(feedUuid, new ArrayList<String>());
 			}
 			logger.info("Deleted all datafeeds used in load testing");
 

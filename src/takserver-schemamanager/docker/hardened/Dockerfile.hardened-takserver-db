@@ -21,7 +21,7 @@ COPY tak/security/rpms/signatures /opt/signatures
 
 # Install EPEL 8 repo
 COPY tak/security/*.rpm .
-RUN rpm -Uvh epel-release-8-10.el8.noarch.rpm
+RUN rpm -Uvh epel-release-latest-8.noarch.rpm
 
 # Install dependencies
 RUN rpm --import /opt/signatures/* \

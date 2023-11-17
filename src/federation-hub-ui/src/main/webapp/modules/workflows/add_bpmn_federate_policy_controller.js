@@ -14,19 +14,34 @@ function addBpmnFederatePolicyController($rootScope, $state, $scope, $stateParam
 
     $scope.initialize = function() {
         cellView = JointPaper.inpector.options.cellView;
-        $scope.roger_federation = JSON.parse(JSON.stringify(cellView.model.attributes.roger_federation)); //Clone
-        if ($scope.roger_federation.name !== undefined) {
+        let roger_federation = JSON.parse(JSON.stringify(cellView.model.attributes.roger_federation)); //Clone
+
+        if (roger_federation.name !== undefined) {
             $scope.editorTitle = "Modify";
             $scope.editExisting = true;
         } else {
             var sourceName = cellView.sourceView.model.attributes.roger_federation.stringId;
             var destName = cellView.targetView.model.attributes.roger_federation.stringId;
-            $scope.roger_federation = {
+            roger_federation = {
                 name: sourceName + " -> " + destName,
                 type: "Federate Policy",
-                edgeFilters: []
+                edgeFilters: [],
+                groupsFilterType: 'allGroups',
+                allowedGroups: [],
+                disallowedGroups: []
             };
         }
+
+        if (roger_federation.groupsFilterType === undefined)
+            roger_federation.groupsFilterType = 'allGroups'
+
+        
+        roger_federation.allowedGroups = [...new Set(roger_federation.allowedGroups)];
+        roger_federation.disallowedGroups = [...new Set(roger_federation.disallowedGroups)];
+
+        $scope.roger_federation = roger_federation
+
+        $scope.getKnownGroupsForNode(cellView.model.attributes.source.id);
         $scope.getKnownFilters();
     };
 
@@ -90,6 +105,34 @@ function addBpmnFederatePolicyController($rootScope, $state, $scope, $stateParam
     $scope.getKnownFilters = function() {
         $scope.filters = WorkflowService.getKnownFilters();
     };
+
+    $scope.getKnownGroupsForNode = function(nodeId) {
+        WorkflowService.getKnownGroupsForNode(nodeId).then(function(groups) {
+            $scope.federateOutboundGroups  = groups
+        })
+    };
+
+    $scope.allowGroup = function(allowedGroup) {
+       if ($scope.roger_federation.allowedGroups.indexOf(allowedGroup) == -1) {
+            $scope.roger_federation.allowedGroups.push(allowedGroup)
+        }
+        $scope.deleteDisallowedGroup(allowedGroup)
+    }
+
+    $scope.deleteAllowedGroup = function(allowedGroup) {
+        $scope.roger_federation.allowedGroups = $scope.roger_federation.allowedGroups.filter(group => group !== allowedGroup)
+    }
+
+    $scope.disallowGroup = function(disallowedGroup) {
+        if ($scope.roger_federation.disallowedGroups.indexOf(disallowedGroup) == -1) {
+            $scope.roger_federation.disallowedGroups.push(disallowedGroup)
+        }
+        $scope.deleteAllowedGroup(disallowedGroup)
+    }
+
+     $scope.deleteDisallowedGroup = function(disallowedGroup) {
+        $scope.roger_federation.disallowedGroups = $scope.roger_federation.disallowedGroups.filter(group => group !== disallowedGroup)
+    }
 
     $scope.isArgumentEditable = function(arg) {
         return !(arg.type == "roger.message.Message");

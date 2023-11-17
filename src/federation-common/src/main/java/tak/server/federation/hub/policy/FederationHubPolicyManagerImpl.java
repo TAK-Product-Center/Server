@@ -23,6 +23,7 @@ import com.google.common.collect.Sets;
 
 import tak.server.federation.Federate;
 import tak.server.federation.FederateEdge;
+import tak.server.federation.FederateEdge.GroupFilterType;
 import tak.server.federation.FederateGroup;
 import tak.server.federation.FederateIdentity;
 import tak.server.federation.FederationException;
@@ -54,6 +55,9 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
     private static final String EDGE_SOURCE = "source";
     private static final String EDGE_DESTINATION = "destination";
     private static final String FILTER_EXPRESSION = "filterExpression";
+    private static final String ALLOWED_GROUPS = "allowedGroups";
+    private static final String DISALLOWED_GROUPS = "disallowedGroups";
+    private static final String GROUPS_FILTER_TYPE = "groupsFilterType";
     private static final String ADDITIONAL_DATA = "additionalData";
 
     private static final Logger logger = LoggerFactory.getLogger(FederationHubPolicyManagerImpl.class);
@@ -113,6 +117,12 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
     @Override
     public void addCaGroup(FederateGroup federateGroup) {
         groupCas.add(federateGroup);
+        cachePolicyGraph();
+    }
+    
+    @Override
+    public void removeCaGroup(FederateGroup federateGroup) {
+        groupCas.remove(federateGroup);
         cachePolicyGraph();
     }
 
@@ -323,19 +333,37 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
                 if (Strings.isNullOrEmpty(source) || Strings.isNullOrEmpty(destination)) {
                     throw new RuntimeException("Edge in the policy file is missing a source or destination node");
                 }
-
+                
                 FederationNode sourceNode = newPolicyGraph.getNode(source);
                 FederationNode destinationNode = newPolicyGraph.getNode(destination);
                 if (sourceNode != null && destinationNode != null) {
 
                     String edgeFilterExpression = "";
+                    Set<String> allowedGroups = new HashSet<>();
+                    Set<String> disallowedGroups = new HashSet<>();
+                    FederateEdge.GroupFilterType groupFilterType = GroupFilterType.ALL;
 
                     if (edgeMap.containsKey(FILTER_EXPRESSION)) {
                         edgeFilterExpression = (String)edgeMap.get(FILTER_EXPRESSION);
                     }
+                    
+                    if (edgeMap.containsKey(ALLOWED_GROUPS)) {
+                        List<String> allowedGroupsList = (List<String>) edgeMap.get(ALLOWED_GROUPS);
+                        allowedGroups.addAll(allowedGroupsList);
+                    }
+                    
+                    if (edgeMap.containsKey(DISALLOWED_GROUPS)) {
+                        List<String> disallowedGroupsList = (List<String>) edgeMap.get(DISALLOWED_GROUPS);;
+                        disallowedGroups.addAll(disallowedGroupsList);
+                    }
+                    
+                    if (edgeMap.containsKey(GROUPS_FILTER_TYPE)) {
+                    	String groupFilterTypeString = (String) edgeMap.get(GROUPS_FILTER_TYPE);
+                    	groupFilterType = FederateEdge.getGroupFilterType(groupFilterTypeString);
+                    }
 
                     FederateEdge federateEdge = new FederateEdge(sourceNode.getFederateIdentity(),
-                        destinationNode.getFederateIdentity(), edgeFilterExpression);
+                        destinationNode.getFederateIdentity(), edgeFilterExpression, allowedGroups, disallowedGroups, groupFilterType);
 
                     try {
                         newPolicyGraph.addEdge(federateEdge);

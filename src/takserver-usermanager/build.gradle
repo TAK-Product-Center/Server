@@ -13,9 +13,13 @@ jar {
     enabled = false
 }
 
+compileJava.dependsOn(':takserver-takcl-core:compileCursedtakJava')
+
 shadowJar {
+    dependsOn compileJava
     baseName = 'UserManager'
     classifier = 'all'
+	setZip64(true)
     version = version
 }
 
@@ -43,7 +47,7 @@ task integrationTest(type: Test) {
     description = "Executes integration test using the takcl framework"
     testClassesDirs = sourceSets.integrationTest.output.classesDirs
     classpath = sourceSets.integrationTest.runtimeClasspath
-    
+
     def tmpDir = "$buildDir/tmp/integrationTest/"
     def fallbackTmpDir = tmpDir
     def modelServerDir = project.parent.project(':takserver-package').buildDir.toPath().resolve('takArtifacts')
@@ -53,7 +57,7 @@ task integrationTest(type: Test) {
 
     def certificateDirectory = tmpDir + 'TEST_CERTS/'
 
-    def configurationString = 
+    def configurationString =
             """<?xml version="1.0" encoding="UTF-8"?>
 <TAKCLConfiguration xmlns="http://bbn.com/marti/takcl/config"
   xmlns:common="http://bbn.com/marti/takcl/config/common">
@@ -99,25 +103,29 @@ task integrationTest(type: Test) {
         }
     }
 
-    dependsOn(':takserver-package:prePackage')
     dependsOn('build')
+    dependsOn(':takserver-package:prePackage')
 }
 
 dependencies {
-    compile project(':takserver-takcl-core')
-	compile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
-    compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-    compile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
-    compile group: 'xerces', name: 'xercesImpl', version: xerces_version
+    implementation project(':takserver-takcl-core')
+    implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+    implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+    implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
 
     // required to fix version conflict for h2 between ignite and spring boot
-    compile group: 'com.h2database', name: 'h2', version: h2_version
+    implementation group: 'com.h2database', name: 'h2', version: h2_version
 
-    integrationTestCompile project(':takserver-takcl-core')
-    integrationTestCompile group: 'xerces', name: 'xercesImpl', version: xerces_version
+    integrationTestImplementation project(':takserver-takcl-core')
+    integrationTestImplementation project(':takserver-common')
+    integrationTestImplementation group: 'commons-io', name: 'commons-io', version: commons_io_version
+    integrationTestImplementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
+    integrationTestImplementation group: 'junit', name: 'junit', version: junit_version
+    integrationTestImplementation group: 'xerces', name: 'xercesImpl', version: xerces_version
 
     // required to fix version conflict for h2 between ignite and spring boot
-    integrationTestCompile group: 'com.h2database', name: 'h2', version: h2_version
+    integrationTestImplementation group: 'com.h2database', name: 'h2', version: h2_version
 }
 
 task copyJar (type: Copy, dependsOn: shadowJar) {
@@ -130,5 +138,12 @@ task copyJar (type: Copy, dependsOn: shadowJar) {
 task setupCluster (type: Copy, dependsOn: copyJar) {}
 
 clean {
-  delete '$buildDir/cluster'
+    doFirst {
+        delete '$buildDir/cluster'
+    }
+}
+
+project.tasks.named("processIntegrationTestResources") {
+    // This duplication strategy de-conflicts user000.pem conflict for processIntegrationTestResources task
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

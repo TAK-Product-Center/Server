@@ -150,6 +150,9 @@ public class Resources {
 	// pool for repeaters and federate health check messages
 	public static final ScheduledExecutorService metricsReportingPool = !IS_LOW_CORE ? newScheduledExecutor("MetricsReportingPool", 1) : lowCoreScheduledExecutorService;
 
+	// pool for running the ghost connection cleanup check
+	public static final ScheduledExecutorService ghostConnectionCleanupPool = !IS_LOW_CORE ? newScheduledExecutor("GhostConnectionCleanupPool", 1) : lowCoreScheduledExecutorService;
+
 	// pool for listener removal
 	public static ExecutorService removeListenerPool = !IS_LOW_CORE ? newExecutorService("removeListenerPool", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
 

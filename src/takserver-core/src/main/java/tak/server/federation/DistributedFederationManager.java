@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
@@ -494,7 +495,6 @@ public class DistributedFederationManager implements FederationManager, Service 
 	 *
 	 */
 	public void addFederateToConfig(@NotNull Federate federate) {
-
 		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
 
 		fedConfig.getFederate().add(federate);
@@ -602,6 +602,17 @@ public class DistributedFederationManager implements FederationManager, Service 
 		return new ArrayList<String>();
 	}
 
+	@Override
+	public int getCAMaxHops(@NotNull String caID) {
+		List<Federation.FederateCA> federateCAs = coreConfig.getRemoteConfiguration().getFederation().getFederateCA();
+		for (Federation.FederateCA ca : federateCAs) {
+			if (ca.getFingerprint().compareTo(caID) == 0) {
+				return ca.getMaxHops();
+			}
+		}
+		return -1;
+	}
+	
 	@Override
 	public void addFederateToGroupsInbound(String federateUID, Set<String> localGroupNames) {
 
@@ -924,6 +935,38 @@ public class DistributedFederationManager implements FederationManager, Service 
 					ca.getOutboundGroup().remove(gname);
 				}
 				break;
+			}
+		}
+
+		coreConfig.setAndSaveFederation(fedConfig);
+	}
+	
+	@Override
+	public synchronized void addMaxHopsToCA(@NotNull String caID, int maxHops) {
+		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+
+		List<Federation.FederateCA> federateCAs = fedConfig.getFederateCA();
+		boolean foundCA = false;
+		for (Federation.FederateCA ca : federateCAs) {
+			if (ca.getFingerprint().compareTo(caID) == 0) {
+				foundCA = true;
+				ca.setMaxHops(maxHops);
+				break;
+			}
+		}
+		// If the CA doesn't exist yet in the CoreConfig.xml, see if it exists in
+		// overall CA store
+		if (!foundCA) {
+			RemoteUtil remoteUtil = RemoteUtil.getInstance();
+			for (X509Certificate cert : getCAList()) {
+				if (caID.compareTo(remoteUtil.getCertSHA256Fingerprint(cert)) == 0) {
+					// Add CA to the CoreConfig
+					Federation.FederateCA federateCA = new Federation.FederateCA();
+					federateCA.setFingerprint(caID);
+					federateCA.setMaxHops(maxHops);
+					fedConfig.getFederateCA().add(federateCA);
+					break;
+				}
 			}
 		}
 
@@ -1867,8 +1910,15 @@ public class DistributedFederationManager implements FederationManager, Service 
 				.setOperation(CRUD.CREATE)
 				.build();
 		try {
-			FederatedEvent f = FederatedEvent.newBuilder().setContact(newContact).build();
+			// attach federate out groups to the contact message
 			Subscription srcSub = SubscriptionStore.getInstance().getByHandler(src);
+			List<String> srcGroups = groupManager().getGroups(srcSub.getUser())
+					.stream()
+					.filter(g -> g.getDirection() == Direction.OUT)
+					.map(g -> g.getName())
+					.collect(Collectors.toList());
+			
+			FederatedEvent f = FederatedEvent.newBuilder().setContact(newContact).addAllFederateGroups(srcGroups).build();
 			
 			Set<Subscription> reachable = GroupFederationUtil.getInstance().getReachableSubscriptionsSet(srcSub);
 			reachable.addAll(GroupFederationUtil.getInstance().getReachableFederatedGroupMappingSubscriptons(srcSub));
@@ -2014,7 +2064,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	}
 
 	@Override
-	public void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, String notes) {
+	public void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, String notes, int maxHops) {
 
 		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
 
@@ -2027,10 +2077,31 @@ public class DistributedFederationManager implements FederationManager, Service 
 				f.setFederatedGroupMapping(federatedGroupMapping);
 				f.setAutomaticGroupMapping(automaticGroupMapping);
 				f.setNotes(notes);
+				f.setMaxHops(maxHops);
 				break;
 			}
 		}
 		coreConfig.setAndSaveFederation(fedConfig);
+		
+		// dynamically update maxHops to active connections
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().getFederateSubscriptions().forEach(sub -> {
+			if (sub instanceof FigServerFederateSubscription) {
+				FigServerFederateSubscription figServerSub = (FigServerFederateSubscription) sub;
+				
+				if (federateId.equals(figServerSub.getFederate().getId())) {
+					figServerSub.lazyGetClientStream().setMaxFederateHops(maxHops);
+					figServerSub.lazyGetGroupClientStream().setMaxFederateHops(maxHops);
+					figServerSub.lazyGetROLClientStream().setMaxFederateHops(maxHops);
+				}
+			} else if (sub instanceof FigFederateSubscription) {
+				FigFederateSubscription figSub = (FigFederateSubscription) sub;
+				if (federateId.equals(figSub.getFederate().getId())) {
+					figSub.getFigClient().getRolCall().setMaxFederateHops(maxHops);
+					figSub.getClientCallHolder().setMaxFederateHops(maxHops);
+					figSub.getGroupsCallHolder().setMaxFederateHops(maxHops);
+				}
+			}
+		});
 	}
 
 	@Override
@@ -2175,7 +2246,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 										logger.debug("for FigFederateSubscription - sending federated ROL " + rolWithGroups.getProgram()
 										+ " from groups " + groups + " to " + destFed.getUser());
 									}
-									((FigFederateSubscription) destFed).getFigClient().getRolCall().sendMessage(rolWithGroups);
+									((FigFederateSubscription) destFed).getFigClient().getRolCall().send(rolWithGroups);
 
 									trackSendChangesEventForFederate(((FigFederateSubscription) destFed).getFederate().getId(), ((FigFederateSubscription) destFed).getFederate().getName(), false);
 									
@@ -2321,7 +2392,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 										logger.debug("for FigFederateSubscription - sending federated ROL " + rolWithGroups.getProgram()
 										+ " from groups " + groups + " to " + destFed.getUser());
 									}
-									((FigFederateSubscription) destFed).getFigClient().getRolCall().sendMessage(rolWithGroups);
+									((FigFederateSubscription) destFed).getFigClient().getRolCall().send(rolWithGroups);
 
 									trackSendChangesEventForFederate(((FigFederateSubscription) destFed).getFederate().getId(), ((FigFederateSubscription) destFed).getFederate().getName(), false);
 									

@@ -107,6 +107,7 @@ import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
 import tak.server.cache.DataFeedCotCacheHelper;
 import tak.server.cache.MissionCacheResolver;
+import tak.server.cache.MissionLayerCacheResolver;
 import tak.server.cache.PluginDatafeedCacheHelper;
 import tak.server.cluster.DistributedInjectionService;
 import tak.server.cluster.DistributedInputManager;
@@ -519,6 +520,9 @@ public class MessagingConfiguration {
 
 	@Bean("missionCacheResolver")
 	public MissionCacheResolver missionCacheResolver() { return new MissionCacheResolver(); }
+
+	@Bean("missionLayerCacheResolver")
+	public MissionLayerCacheResolver missionLayerCacheResolver() { return new MissionLayerCacheResolver(); }
 
 	@Bean
 	public MessageDeliveryStrategy mds() {

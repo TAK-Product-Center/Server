@@ -1,0 +1,61 @@
+## Environment variables outside image context. These will be available until the first FROM statement.
+ARG BASE_REGISTRY=registry1.dso.mil
+ARG BASE_DEPLOY_IMAGE=ironbank/redhat/openjdk/openjdk11
+ARG BASE_DEPLOY_TAG=1.11
+
+####################################################################################################
+
+## Base deploy image
+FROM ${BASE_REGISTRY}/${BASE_DEPLOY_IMAGE}:${BASE_DEPLOY_TAG} as deploy_container
+
+USER root
+
+# Upgrade first
+RUN dnf -y upgrade --nodocs \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+COPY tak/security/*.rpm .
+# Install EPEL 8 repo
+RUN rpm -Uvh epel-release-latest-8.noarch.rpm
+
+# Install dependencies
+RUN dnf update -y --disableplugin=subscription-manager --nodocs \
+    && dnf install -y --disableplugin=subscription-manager --nodocs \
+           xemacs-nox \
+           net-tools \
+           openssl \
+           netcat \
+           vim \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+#fix fips related issue, takserver needs the non fips providers so simply set them as fips providers so that they are available
+RUN echo "fips.provider.1=SUN" >> $JAVA_HOME/conf/security/java.security
+RUN echo "fips.provider.2=SunRsaSign" >> $JAVA_HOME/conf/security/java.security
+RUN echo "fips.provider.3=SunEC" >> $JAVA_HOME/conf/security/java.securitysudo
+RUN echo "fips.provider.4=SunJSSE" >> $JAVA_HOME/conf/security/java.security
+RUN echo "fips.provider.5=SunJCE" >> $JAVA_HOME/conf/security/java.security
+RUN echo "fips.provider.6=SunJGSS" >> $JAVA_HOME/conf/security/java.security
+RUN echo "fips.provider.7=SunSASL" >> $JAVA_HOME/conf/security/java.security
+RUN echo "fips.provider.8=XMLDSig" >> $JAVA_HOME/conf/security/java.security
+RUN echo "fips.provider.9=SunPCSC" >> $JAVA_HOME/conf/security/java.security
+RUN echo "fips.provider.10=JdkLDAP" >> $JAVA_HOME/conf/security/java.security
+RUN echo "fips.provider.11=JdkSASL" >> $JAVA_HOME/conf/security/java.security
+RUN echo "fips.provider.12=SunPKCS11" >> $JAVA_HOME/conf/security/java.security
+
+RUN useradd -g 0 -u 1001 tak \
+    && usermod -a -G root tak
+
+USER tak:0
+COPY --chown=tak:0 tak/ /opt/tak
+
+RUN chmod u=rwx /opt/tak \
+    && find /opt/tak/ -type d -exec chmod u=rwx {} \; \
+	&& find /opt/tak/ -type f -name "*.*" -exec chmod u=rw {} \; \
+	&& find /opt/tak/ -type f -name "*.sh" -exec chmod u=rx {} \;
+
+HEALTHCHECK --start-period=120s --interval=30s --timeout=30s --retries=10 CMD /opt/tak/health/takserver/health_check.sh || exit 1
+
+# Default startup executable. Can include elements of 'docker run' command as parameters.
+ENTRYPOINT ["/bin/bash", "-c", "/opt/tak/configureInDocker.sh init |& tee /opt/tak/logs/takserver.log"]

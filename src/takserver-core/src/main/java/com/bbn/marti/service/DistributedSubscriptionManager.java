@@ -227,6 +227,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
         // load static subscriptions
         loadStaticSubscriptions();
         schedulePeriodicSubscriptionCacheUpdates();
+		schedulePeriodicPingTimeoutCheck();
         
 		clientCountRef.set(Metrics.gauge(Constants.METRIC_CLIENT_COUNT, clientCountRef.get()));
 	}
@@ -250,7 +251,49 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			IgniteCacheHolder.getIgniteSubscriptionClientUidTackerCache().putAll(cuidMap);
 		}, 5, 5, TimeUnit.SECONDS);
 	}
-	
+
+	private void schedulePeriodicPingTimeoutCheck() {
+		Integer pingTimeoutSeconds = DistributedConfiguration.getInstance().
+				getRemoteConfiguration().getNetwork().getPingTimeoutSeconds();
+		if (pingTimeoutSeconds == null) {
+			return;
+		}
+
+		int pingTimeoutCheckIntervalSeconds = DistributedConfiguration.getInstance().
+				getRemoteConfiguration().getNetwork().getPingTimeoutCheckIntervalSeconds();
+
+		Resources.ghostConnectionCleanupPool.scheduleWithFixedDelay(() -> {
+			subscriptionStore()
+					.getAllSubscriptions()
+					.stream()
+					.forEach(sub -> {
+						try {
+							// ignore data feeds
+							if (sub.isDataFeed.get()) {
+								return;
+							}
+
+							// ignore federate subscriptions
+							if (sub instanceof FederateSubscription) {
+								return;
+							}
+
+							if (sub.lastPingTime.longValue() != 0 &&
+									(new Date().getTime() - sub.lastPingTime.longValue()) >
+											(pingTimeoutSeconds * 1000)) {
+								deleteSubscription(sub.uid);
+								logger.error("cleaned up ghost connection for {} {}",
+										sub.callsign != null ? sub.callsign : "",
+										sub.clientUid != null ? sub.clientUid : "");
+							}
+
+						} catch (Exception e) {
+							logger.error("exception performing periodicPingTimeoutCheck", e);
+						}
+					});
+		}, pingTimeoutCheckIntervalSeconds, pingTimeoutCheckIntervalSeconds, TimeUnit.SECONDS);
+	}
+
 	private void setupIgniteListeners() {
 		// we need to remove websocket subscriptions that were created from an api node that went down
 		IgnitePredicate<DiscoveryEvent> ignitePredicate = new IgnitePredicate<DiscoveryEvent>() {
@@ -1459,9 +1502,25 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 
 	public void setClientForSubscription(String clientUid, String callsign, ChannelHandler handler, boolean overwriteSub) {
-		
+
+		String source = "";
+		try {
+			if (handler != null && handler.host() != null) {
+				source = "source=" + handler.host().getHostAddress() + ":" + handler.port();
+			}
+		}
+		catch (UnsupportedOperationException e) {
+			// handlers for federate subscriptions do not support host/port
+		}
+		catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception getting source in setClientForSubscription", e);
+			}
+		}
+
 		if (logger.isDebugEnabled()) {
-			logger.debug("trying to set client for subscription: " + clientUid + " to " + callsign + " (" + handler + ")");
+			logger.debug("trying to set client for subscription: " + clientUid + " to " + callsign + " (" + handler + ") "
+					+ source);
 		}
 		
         Subscription match = subscriptionStore().getByHandler(handler);
@@ -1478,7 +1537,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
                 match.notes = match.getUser().getId();
             }
             
-            logger.info("Set client for subscription: " + match.uid + " to " + callsign + " (" + clientUid + ")");
+            logger.info("Set client for subscription: " + match.uid + " to " + callsign + " (" + clientUid + ") "
+					+ source);
         } else {
         	logger.warn(" unable to set callsign for clientUid: " + clientUid + " to " + callsign + " (" + clientUid + ") - can't find subscription for handler " + handler);
         }
@@ -1737,6 +1797,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			case RESOURCE_KEYWORD:	{ cotType = "t-x-m-c-k-c"; break; }
 			case METADATA:			{ cotType = "t-x-m-c-m"; break; }
 			case EXTERNAL_DATA:		{ cotType = "t-x-m-c-e"; break; }
+			case MISSION_LAYER:		{ cotType = "t-x-m-c-h"; break; }
 			default:
 			case CONTENT:			{ cotType = "t-x-m-c";  break; }
 		}
@@ -1909,7 +1970,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
     	}
         
         if (!websocketHits.isEmpty()) {
-			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, changeMessage);
+			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, changeMessage, config().getNetwork().getServerId());
 		} 
         
         if (!explicitTopics.isEmpty()) {
@@ -2007,7 +2068,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		sendToPlugins(message);
 
     	if (!websocketHits.isEmpty()) {
-			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, message);
+			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, message, config().getNetwork().getServerId());
 		}
 	}
 
@@ -2053,7 +2114,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 		
 		if (!websocketHits.isEmpty()) {
-			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, inviteMessage);
+			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, inviteMessage, config().getNetwork().getServerId());
 		}
 
 		sendToPlugins(inviteMessage);
@@ -2087,7 +2148,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			if (sub.isWebsocket.get() && sub.getHandler() instanceof AbstractBroadcastingChannelHandler) {
 				Set<String> websocketHits = new ConcurrentSkipListSet<>();
 				websocketHits.add(((AbstractBroadcastingChannelHandler) sub.getHandler()).getConnectionId());
-				WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, roleChangeMessage);
+				WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, roleChangeMessage, config().getNetwork().getServerId());
 			} else {
 				sub.submit(roleChangeMessage);
 			}
@@ -2400,6 +2461,28 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		Set<Group> outGroups = groupManager().groupVectorToGroupSet(outGroupVector, Direction.OUT.getValue());
 		groups.addAll(outGroups);
 		groupManager().updateGroups(groupManager().getUserByConnectionId(connectionId), groups);
+	}
+	
+	@Override
+	public String linkWebsocketToExistingSub(String connectionId, String clientUid, String username) {
+		Subscription s = subscriptionStore().getSubscriptionByClientUid(clientUid);
+		if (s != null && s.getUser() != null && s.getUser().getId() != null && s.getUser().getId().equals(username)) {
+			s.isLinkedToWebsocket.set(true);
+			s.linkedWebsocketConnectionId = connectionId;
+			
+			return IgniteHolder.getInstance().getIgniteStringId();
+		}
+		
+		return null;
+	}
+	
+	@Override
+	public void unlinkWebsocketExistingSub(String connectionId, String clientUid) {
+		Subscription s = subscriptionStore().getSubscriptionByClientUid(clientUid);
+		if (s != null) {
+			s.isLinkedToWebsocket.set(false);
+			s.linkedWebsocketConnectionId = null;
+		}
 	}
 	
 	@Override

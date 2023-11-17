@@ -1,5 +1,6 @@
 package com.bbn.marti.jwt;
 
+import com.bbn.marti.config.MissionTls;
 import com.bbn.marti.config.Oauth;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
@@ -31,6 +32,34 @@ public class JwtUtils {
 
     private static JwtUtils instance = null;
 
+    private KeyPair loadKeyPair(String keyStoreType, String keyStoreFile, String keyStorePass) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance(keyStoreType);
+            keyStore.load(new FileInputStream(keyStoreFile), keyStorePass.toCharArray());
+
+            PrivateKey privateKeyTmp = null;
+            PublicKey publicKeyTmp = null;
+
+            PrivateKey search = null;
+            Enumeration<String> aliases = keyStore.aliases();
+            while (aliases.hasMoreElements() && privateKeyTmp == null) {
+                String alias = aliases.nextElement();
+                privateKeyTmp = (PrivateKey) keyStore.getKey(alias, keyStorePass.toCharArray());
+                if (privateKeyTmp != null) {
+                    Certificate cert = keyStore.getCertificate(alias);
+                    publicKeyTmp = cert.getPublicKey();
+                }
+            }
+
+            KeyPair keyPair = new KeyPair(publicKeyTmp, privateKeyTmp);
+            return keyPair;
+
+        } catch (Exception e) {
+            logger.error("exception in loadKeyPair", e);
+            return null;
+        }
+    }
+
     private void loadKeys()  {
 
         if (keysLoaded) {
@@ -45,19 +74,14 @@ public class JwtUtils {
             String keyStoreFile = coreConfig().getRemoteConfiguration().getSecurity().getTls().getKeystoreFile();
             String keyStorePass = coreConfig().getRemoteConfiguration().getSecurity().getTls().getKeystorePass();
 
-            KeyStore keyStore = KeyStore.getInstance(keyStoreType);
-            keyStore.load(new FileInputStream(keyStoreFile), keyStorePass.toCharArray());
-
-            PrivateKey search = null;
-            Enumeration<String> aliases = keyStore.aliases();
-            while (aliases.hasMoreElements() && privateKey == null) {
-                String alias = aliases.nextElement();
-                privateKey = (PrivateKey)keyStore.getKey(alias, keyStorePass.toCharArray());
-                if (privateKey != null) {
-                    Certificate cert = keyStore.getCertificate(alias);
-                    publicKey = cert.getPublicKey();
-                }
+            KeyPair keyPair = loadKeyPair(keyStoreType, keyStoreFile, keyStorePass);
+            if (keyPair == null) {
+                logger.error("loadKeyPair returned null");
+                return;
             }
+
+            publicKey = keyPair.getPublic();
+            privateKey = keyPair.getPrivate();
 
             if (privateKey == null) {
                 logger.error("JwtUtils unable to find PrivateKey in keystore!");
@@ -145,7 +169,7 @@ public class JwtUtils {
 
     public List<RSAPublicKey> getExternalVerifiers() {
         try {
-            Oauth oAuth = coreConfig.getRemoteConfiguration().getAuth().getOauth();
+            Oauth oAuth = coreConfig().getRemoteConfiguration().getAuth().getOauth();
             if (oAuth == null) {
                 logger.error("OAuth config not found");
                 return null;
@@ -156,15 +180,15 @@ public class JwtUtils {
                 return null;
             }
 
-            //
-            // iterate across our configured authorization servers and add their issuer public keys
-            //
+
             List<RSAPublicKey> rsaPublicKeys = new ArrayList<>();
-            Oauth.AuthServer authServer = oAuth.getAuthServer();
-            byte[] keyBytes = Files.readAllBytes(Paths.get(authServer.getIssuer()));
-            X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            rsaPublicKeys.add((RSAPublicKey) kf.generatePublic(spec));
+
+            for (Oauth.AuthServer authServer : oAuth.getAuthServer()) {
+                byte[] keyBytes = Files.readAllBytes(Paths.get(authServer.getIssuer()));
+                X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
+                KeyFactory kf = KeyFactory.getInstance("RSA");
+                rsaPublicKeys.add((RSAPublicKey) kf.generatePublic(spec));
+            }
 
             return rsaPublicKeys;
         } catch (Exception e) {
@@ -175,21 +199,32 @@ public class JwtUtils {
 
     private List<JwtParser> getExternalParsers(SignatureAlgorithm signatureAlgorithm) {
         List<JwtParser> jwtParsers = new ArrayList<>();
-        for (RSAPublicKey rsaPublicKey : getExternalVerifiers()) {
-            jwtParsers.add(Jwts.parser().setSigningKey(rsaPublicKey));
+        List<RSAPublicKey> rsaPublicKeys = getExternalVerifiers();
+        if (rsaPublicKeys != null) {
+            for (RSAPublicKey rsaPublicKey : rsaPublicKeys) {
+                jwtParsers.add(Jwts.parser().setSigningKey(rsaPublicKey));
+            }
         }
         return jwtParsers;
     }
 
     public Claims parseClaim(String token, JwtParser jwtParser) {
-        try {
-            Claims claims = jwtParser.parseClaimsJws(token).getBody();
-            if (claims != null) {
-                return claims;
-            }
-        } catch (Exception e) {
-            if (logger.isDebugEnabled()) {
-                logger.debug("exception parsing token " + token, e);
+        return jwtParser.parseClaimsJws(token).getBody();
+    }
+
+    public Claims parseClaims(String token, List<JwtParser> jwtParsers) {
+        for (JwtParser jwtParser : jwtParsers) {
+            try {
+                Claims claims = parseClaim(token, jwtParser);
+                if (claims != null) {
+                    return claims;
+                }
+            } catch (ExpiredJwtException exp) {
+                throw exp;
+            } catch (Exception e) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("exception in parseClaims", e);
+                }
             }
         }
 
@@ -197,21 +232,28 @@ public class JwtUtils {
     }
 
     public Claims parseClaims(String token, SignatureAlgorithm signatureAlgorithm) {
-        // try to verify the claims using the tls keystore
-        Claims claims = parseClaim(token, getParser(signatureAlgorithm, privateKey));
-        if (claims != null) {
-            return claims;
-        }
+        List<JwtParser> jwtParsers = getExternalParsers(signatureAlgorithm);
+        jwtParsers.add(getParser(signatureAlgorithm, privateKey));
 
-        // try to verify the claims using the external verifiers
-        for (JwtParser jwtParser : getExternalParsers(signatureAlgorithm)) {
-            claims = parseClaim(token, jwtParser);
-            if (claims != null) {
-                return claims;
+        return parseClaims(token, jwtParsers);
+    }
+
+    public Claims parseMissionTokenClaims(String token) {
+        List<JwtParser> jwtParsers = new ArrayList<>();
+
+        jwtParsers.add(getParser(SignatureAlgorithm.HS256, privateKey));
+
+        try {
+            for (MissionTls missionTls : coreConfig().getRemoteConfiguration().getSecurity().getMissionTls()) {
+                KeyPair keyPair = loadKeyPair(
+                        missionTls.getKeystore(), missionTls.getKeystoreFile(), missionTls.getKeystorePass());
+                jwtParsers.add(Jwts.parser().setSigningKey(keyPair.getPrivate().getEncoded()));
             }
+        } catch (Exception e) {
+            logger.error("exception adding missionTls keystores", e);
         }
 
-        return null;
+        return parseClaims(token, jwtParsers);
     }
 
     private CoreConfig coreConfig() {

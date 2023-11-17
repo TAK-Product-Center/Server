@@ -749,6 +749,29 @@ public class FederationApi extends BaseRestController {
 		return result;
 	}
 
+	@RequestMapping(value = "/federatecahops", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<String>> setFederateCAHops(@RequestBody FederateCAHopsAssociation federateCAHopsAssociation){
+		ResponseEntity<ApiResponse<String>> result = null;
+
+		List<String> errors = new ArrayList<>();
+		try{
+			federationInterface.addMaxHopsToCA(federateCAHopsAssociation.getCaId(), federateCAHopsAssociation.getMaxHops());
+			
+			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION,
+					String.class.getName(), federateCAHopsAssociation.getCaId()), HttpStatus.OK);
+		}
+		catch(Exception e){
+			logger.error("Exception changing federate CA hops", e);
+			errors.add(e.getMessage());
+		}
+
+		if(result == null){
+			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), null, errors),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+		return result;
+	}
+
 	@RequestMapping(value = "/outgoingconnections", method = RequestMethod.POST)
 	public ResponseEntity<ApiResponse<Federation.FederationOutgoing>> createOutgoingConnection(@RequestBody Federation.FederationOutgoing outgoingConnection) {
 
@@ -846,7 +869,10 @@ public class FederationApi extends BaseRestController {
 			x509Certificates = federationInterface.getCAList();
 			if (x509Certificates != null) {
 				for (X509Certificate x : x509Certificates) {
-					certificateSummaries.add(new CertificateSummary(x.getIssuerDN().getName(), x.getSubjectDN().getName(), x.getSerialNumber(), getCertFingerprint(x)));
+					String fingerprint = getCertFingerprint(x);
+					int maxHops = federationInterface.getCAMaxHops(fingerprint);
+					
+					certificateSummaries.add(new CertificateSummary(x.getIssuerDN().getName(), x.getSubjectDN().getName(), x.getSerialNumber(), fingerprint, maxHops));
 				}
 			}
 			result = new ResponseEntity<ApiResponse<List<CertificateSummary>>>(new ApiResponse<List<CertificateSummary>>(Constants.API_VERSION, CertificateSummary.class.getName(), certificateSummaries), HttpStatus.OK);
@@ -964,7 +990,7 @@ public class FederationApi extends BaseRestController {
 			errors = getValidationErrors(federate);
 			if (errors.isEmpty()) {
 				federationInterface.updateFederateDetails(federate.getId(), federate.isArchive(), federate.isShareAlerts(),
-						federate.isFederatedGroupMapping(), federate.isAutomaticGroupMapping(), federate.getNotes());
+						federate.isFederatedGroupMapping(), federate.isAutomaticGroupMapping(), federate.getNotes(), federate.getMaxHops());
 
 				result = new ResponseEntity<ApiResponse<Federate>>(new ApiResponse<Federate>(Constants.API_VERSION,
 						Federate.class.getName(), federate), HttpStatus.OK);

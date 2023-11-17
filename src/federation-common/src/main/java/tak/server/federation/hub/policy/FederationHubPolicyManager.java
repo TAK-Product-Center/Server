@@ -18,4 +18,5 @@ public interface FederationHubPolicyManager {
     void setPolicyGraph(FederationPolicyModel newPolicyModel, Object updateFile) throws FederationException;
 	Collection<PolicyObjectCell> getPolicyCells();
 	void updatePolicyGraph(FederationPolicyModel federationPolicyModel, Object updateFile) throws FederationException;
+	void removeCaGroup(FederateGroup federateGroup);
 }

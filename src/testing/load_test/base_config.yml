@@ -18,6 +18,12 @@ PyTAK:
 
   websocket_path: "takproto/1"
 
+  ping: True
+  ping_interval: 10000 # in milliseconds
+  send_metrics: True
+  send_metrics_interval: 60 # seconds
+  cloudwatch_namespace: "pyTAK-test"
+
   missions:
     random: False
     subscribe:

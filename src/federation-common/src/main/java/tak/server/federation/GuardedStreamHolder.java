@@ -3,21 +3,20 @@ package tak.server.federation;
 import static java.util.Objects.requireNonNull;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 import javax.net.ssl.SSLSession;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.atakmap.Tak.BinaryBlob;
 import com.atakmap.Tak.ClientHealth;
 import com.atakmap.Tak.FederateGroups;
+import com.atakmap.Tak.FederateHops;
 import com.atakmap.Tak.FederateProvenance;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
@@ -45,6 +44,7 @@ public class GuardedStreamHolder<T> {
     private ClientHealth lastHealthStatus;
     private FederateIdentity federateIdentity;
     private Subscription subscription;
+    private int maxFederateHops = -1;
     
     private boolean isHub = false;
 
@@ -57,7 +57,7 @@ public class GuardedStreamHolder<T> {
     // for outgoing connections
     public GuardedStreamHolder(ClientCall<T, Subscription> clientCall, String fedId, Comparator<T> comp, boolean isHub) {
 
-        requireNonNull(clientCall, "FederatedEvent groupCall");
+    	requireNonNull(clientCall, "FederatedEvent groupCall");
 
         requireNonNull(comp, "comparator");
         
@@ -134,6 +134,7 @@ public class GuardedStreamHolder<T> {
             return;
         }
         
+        T modifiedEvent = null;
         if (isHub) {
         	// since hub outgoing connections can forward traffic to other hubs, we need to keep a list of visited nodes
             // so that we can stop cycles
@@ -142,46 +143,138 @@ public class GuardedStreamHolder<T> {
         			.setFederationServerName(FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfig().getServerName())
         			.build();
             
-            if (event instanceof FederatedEvent) {
-            	FederatedEvent fedEvent = (FederatedEvent) event;
-            	List<FederateProvenance> federateProvenances = new ArrayList<>(fedEvent.getFederateProvenanceList());
-            	federateProvenances.add(prov);
-            	
-            	event = (T) fedEvent.toBuilder().addAllFederateProvenance(federateProvenances).build();
-            }
+            Set<FederateProvenance> federateProvenances = new HashSet<>();
+            federateProvenances.add(prov);
             
-            if (event instanceof FederateGroups) {
-            	FederateGroups fedGroup = (FederateGroups) event;
-            	List<FederateProvenance> federateProvenances = new ArrayList<>(fedGroup.getFederateProvenanceList());
-            	federateProvenances.add(prov);
-            	
-            	event = (T) fedGroup.toBuilder().addAllFederateProvenance(federateProvenances).build();
-            }
-            
-            if (event instanceof ROL) {
-            	ROL rol = (ROL) event;
-            	List<FederateProvenance> federateProvenances = new ArrayList<>(rol.getFederateProvenanceList());
-            	federateProvenances.add(prov);
-            	
-            	event = (T) rol.toBuilder().addAllFederateProvenance(federateProvenances).build();
-            }
-            
-            if (event instanceof BinaryBlob) {
-            	BinaryBlob blob = (BinaryBlob) event;
-            	List<FederateProvenance> federateProvenances = new ArrayList<>(blob.getFederateProvenanceList());
-            	federateProvenances.add(prov);
-            	
-            	event = (T) blob.toBuilder().addAllFederateProvenance(federateProvenances).build();
-            }
+            modifiedEvent = addPropertiesToEvent(event, federateProvenances);
+        } else {
+        	modifiedEvent = addPropertiesToEvent(event, null);
         }
         
+        // possible reasons for null: message is at its hop limit
+    	if (modifiedEvent == null) {
+    		return;
+    	}
+    	        
         // clientStream = stream of messages going from server to a connected outgoing client
         if (clientStream != null) 
-        	clientStream.onNext(event);
+        	clientStream.onNext(modifiedEvent);
         
         // clientCall = stream of messages going from outgoing client to a server
-        if (clientCall != null)  
-        	clientCall.sendMessage(event);
+        if (clientCall != null)  {
+        	clientCall.sendMessage(modifiedEvent);
+        }
+    }
+    
+    public T addPropertiesToEvent(T event, Set<FederateProvenance> federateProvenances) {
+        if (event instanceof FederatedEvent) {
+        	FederatedEvent fedEvent = (FederatedEvent) event;
+        	FederatedEvent.Builder builder = fedEvent.toBuilder();
+        	
+        	// if hops exist, check/increment them, if no hops exist, we need to add them
+        	FederateHops federateHops = fedEvent.hasFederateHops() ? checkHops(event, fedEvent.getFederateHops()) : 
+        		FederateHops.newBuilder().setCurrentHops(0).setMaxHops(maxFederateHops).build();
+        	
+        	if (federateHops == null) {
+        		return null;
+        	} else {
+        		builder.setFederateHops(federateHops);
+        	}
+        	
+        	if (federateProvenances != null) {
+        		federateProvenances.addAll(fedEvent.getFederateProvenanceList());
+        		builder.clearFederateProvenance();
+        		builder.addAllFederateProvenance(federateProvenances);
+        	}
+        	
+        	return (T) builder.build();
+        }
+        
+        if (event instanceof FederateGroups) {
+        	FederateGroups fedGroup = (FederateGroups) event;
+        	FederateGroups.Builder builder = fedGroup.toBuilder();
+        	
+        	// if hops exist, check/increment them, if no hops exist, we need to add them
+        	FederateHops federateHops = fedGroup.hasFederateHops() ? checkHops(event, fedGroup.getFederateHops()) : 
+        		FederateHops.newBuilder().setCurrentHops(0).setMaxHops(maxFederateHops).build();
+        	
+        	if (federateHops == null) {
+        		return null;
+        	} else {
+        		builder.setFederateHops(federateHops);
+        	}
+        	
+        	if (federateProvenances != null) {
+        		federateProvenances.addAll(fedGroup.getFederateProvenanceList());
+        		builder.clearFederateProvenance();
+        		builder.addAllFederateProvenance(federateProvenances);
+        	}
+        	
+        	return (T) builder.build();
+        }
+        
+        if (event instanceof ROL) {
+        	ROL rol = (ROL) event;
+        	ROL.Builder builder = rol.toBuilder();
+        	
+        	// if hops exist, check/increment them, if no hops exist, we need to add them
+        	FederateHops federateHops = rol.hasFederateHops() ? checkHops(event, rol.getFederateHops()) : 
+        		FederateHops.newBuilder().setCurrentHops(0).setMaxHops(maxFederateHops).build();
+        	
+        	if (federateHops == null) {
+        		return null;
+        	} else {
+        		builder.setFederateHops(federateHops);
+        	}
+        	
+        	if (federateProvenances != null) {
+        		federateProvenances.addAll(rol.getFederateProvenanceList());
+        		builder.clearFederateProvenance();
+        		builder.addAllFederateProvenance(federateProvenances);
+        	}
+        	
+        	return (T) builder.build();
+        }
+        
+        if (event instanceof BinaryBlob) {
+        	BinaryBlob blob = (BinaryBlob) event;
+        	BinaryBlob.Builder builder = blob.toBuilder();
+        	
+        	// if hops exist, check/increment them, if no hops exist, we need to add them
+        	FederateHops federateHops = blob.hasFederateHops() ? checkHops(event, blob.getFederateHops()) : 
+        		FederateHops.newBuilder().setCurrentHops(0).setMaxHops(maxFederateHops).build();
+        	
+        	if (federateHops == null) {
+        		return null;
+        	} else {
+        		builder.setFederateHops(federateHops);
+        	}
+        	
+        	if (federateProvenances != null) {
+        		federateProvenances.addAll(blob.getFederateProvenanceList());
+        		builder.clearFederateProvenance();
+        		builder.addAllFederateProvenance(federateProvenances);
+        	}
+        	
+        	return (T) builder.build();
+        }
+        
+		return null;
+    }
+    
+    private FederateHops checkHops(T event, FederateHops federateHops) {
+    	long maxHops = federateHops.getMaxHops();
+		long currentHops = federateHops.getCurrentHops() + 1;
+		    		
+		if (currentHops >= maxHops && maxHops != -1) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("dropping message because of hop limit " + event);
+			}
+			return null;
+		}
+		else {
+			return FederateHops.newBuilder().setCurrentHops(currentHops).setMaxHops(maxHops).build();
+		}
     }
 
     public void throwDeadlineExceptionToClient() {
@@ -201,6 +294,15 @@ public class GuardedStreamHolder<T> {
             logger.warn("exception sending StatusRuntimeException - PERMISSION_DENIED to client", e);
         }
     }
+    
+    public void cancel(String message, Throwable cause) {
+    	if (clientCall != null) {
+    		clientCall.cancel(message, cause);
+    	}
+    	if (clientStream != null) {
+    		clientStream.onError(cause);
+    	}
+    }
 
     public FederateIdentity getFederateIdentity() {
         return federateIdentity;
@@ -208,6 +310,10 @@ public class GuardedStreamHolder<T> {
 
     public Subscription getSubscription() {
         return subscription;
+    }
+    
+    public void setMaxFederateHops(int maxFederateHops) {
+    	this.maxFederateHops = maxFederateHops;
     }
 
     @Override

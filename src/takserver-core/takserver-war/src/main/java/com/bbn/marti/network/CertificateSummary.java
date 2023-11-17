@@ -8,11 +8,12 @@ public class CertificateSummary {
 
 	public CertificateSummary() {}
 	
-	public CertificateSummary(String issuerDN, String subjectDN, BigInteger serialNumber, String fingerPrint) {
+	public CertificateSummary(String issuerDN, String subjectDN, BigInteger serialNumber, String fingerPrint, int maxHops) {
 		this.issuerDN = issuerDN;
 		this.subjectDN = subjectDN;
 		this.serialNumber = serialNumber;
 		this.fingerPrint = fingerPrint;
+		this.maxHops = maxHops;
 	}
 	
 	public String getIssuerDN() {
@@ -47,8 +48,17 @@ public class CertificateSummary {
 		this.fingerPrint = fingerPrint;
 	}
 
+	public int getMaxHops() {
+		return maxHops;
+	}
+
+	public void setMaxHops(int maxHops) {
+		this.maxHops = maxHops;
+	}
+
 	private String issuerDN;
 	private String subjectDN;
 	private BigInteger serialNumber;
 	private String fingerPrint;
+	private int maxHops;
 }

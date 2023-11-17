@@ -1,8 +1,18 @@
 package tak.server.plugins;
 
+import com.fasterxml.jackson.core.exc.StreamReadException;
+import com.fasterxml.jackson.databind.DatabindException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.LoaderOptions;
+
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -11,36 +21,35 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
-
 public class PluginConfiguration {
     private static final Logger logger = LoggerFactory.getLogger(PluginConfiguration.class);
-    
+
     private Map<String, Object> obj;
-    
+    private final File sourceFile;
+
     static final String PLUGIN_CONFIG_BASE = "conf/plugins/";
-    
-    static final String[] RESERVED_KEYWORDS = { "server", "tak", "system" };
-    
+
+    static final String[] RESERVED_KEYWORDS = {"server", "tak", "system"};
+
     public PluginConfiguration() {
         obj = new HashMap<String, Object>();
+        sourceFile = null;
     }
-    
-    public PluginConfiguration(Class clazz) {
+
+    public PluginConfiguration(Class<?> clazz) {
         String configFileName = PLUGIN_CONFIG_BASE + clazz.getName() + ".yaml";
-        File f = new File(configFileName);
-        if (!f.exists()) {
-            f.getParentFile().mkdirs();
+        sourceFile = new File(configFileName);
+        if (!sourceFile.exists()) {
+            sourceFile.getParentFile().mkdirs();
             try {
-                f.createNewFile();
+                sourceFile.createNewFile();
             } catch (IOException e) {
                 logger.error(e.getMessage());
             }
         }
-        try (InputStream inputStream = new FileInputStream(f);){
-            Yaml yaml = new Yaml();
+        try (InputStream inputStream = new FileInputStream(sourceFile);) {
+        	LoaderOptions options = new LoaderOptions();
+        	Yaml yaml = new Yaml(new SafeConstructor(options));
             obj = yaml.load(inputStream);
         } catch (Exception e) {
             logger.error(e.getMessage());
@@ -52,64 +61,71 @@ public class PluginConfiguration {
             obj = new HashMap<String, Object>();
         } else {
             // remove reserved keywords
-            obj.keySet().removeAll(Arrays.asList(RESERVED_KEYWORDS));
-            
+            Arrays.asList(RESERVED_KEYWORDS).forEach(obj.keySet()::remove);
         }
     }
-    
+
     public Object getProperty(String key) {
-        List<String> propChain = Arrays.asList(key.split("\\."));
+        String[] propChain = key.split("\\.");
         Object cur = obj;
         for (String prop : propChain) {
             if (cur instanceof Map) {
-                cur = ((Map) cur).get(prop);
+                cur = ((Map<?, ?>) cur).get(prop);
             } else {
-                logger.error("no such property: " + key);
+                logger.error("No such property: {}", key);
                 return null;
             }
         }
         return cur;
     }
-    
+
     public boolean containsProperty(String property) {
-        String[] propChain = property.split("\\.");
-        Object cur = obj;
-        for (String prop : propChain) {
-            if (cur instanceof Map) {
-                cur = ((Map) cur).get(prop);
-            } else {
-                return false;
-            }
-        }
-        if (cur != null) {
-            return true;
-        } else {
-            return false;
-        }
+        return getProperty(property) != null;
     }
-    
+
     public List<String> getProperties() {
         List<String> properties = new ArrayList<String>();
-        for (String prop : obj.keySet()) {
+        for (Map.Entry<String, Object> entry : obj.entrySet()) {
+            String prop = entry.getKey();
             properties.add(prop);
-            if (obj.get(prop) instanceof Map) {
-                properties.addAll(this.getProperties(prop, (Map<String, ?>)obj.get(prop)));
+            if (entry.getValue() instanceof Map) {
+                properties.addAll(getProperties(prop, (Map<String, ?>) entry.getValue()));
             }
         }
         return properties;
     }
-    
+
     private List<String> getProperties(String baseProp, Map<String, ?> map) {
         List<String> props = new ArrayList<String>();
-        for (String prop : map.keySet()) {
-            String subProp = baseProp + "." + prop;
+        for (Map.Entry<String, ?> entry : map.entrySet()) {
+            String subProp = baseProp + "." + entry.getKey();
             props.add(subProp);
-            if (map.get(prop) instanceof Map) {
-                props.addAll(this.getProperties(subProp, (Map<String, ?>) map.get(prop)));
+            if (entry.getValue() instanceof Map) {
+                props.addAll(getProperties(subProp, (Map<String, ?>) entry.getValue()));
             }
         }
         return props;
     }
-    
-    
+
+    /**
+     * Re-reads and returns the contents of the plugin's configuration file.
+     *
+     * @param pluginClazz Concrete implementation of a TAK Server plugin, {@link PluginBase}.
+     * @return Refreshed plugin configuration that will reflect any changes made to the configuration file.
+     * @since 4.9
+     */
+    public PluginConfiguration reloadPluginConfiguration(Class<?> pluginClazz) {
+        return new PluginConfiguration(pluginClazz);
+    }
+
+    public <T> T parseConfigToObject(Class<T> objectType) throws DatabindException, IOException, StreamReadException {
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+        return parseConfigToObject(objectType, mapper);
+    }
+
+    public <T> T parseConfigToObject(Class<T> objectType, ObjectMapper customMapper) throws DatabindException, IOException, StreamReadException {
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+        mapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+        return mapper.readValue(sourceFile, objectType);
+    }
 }

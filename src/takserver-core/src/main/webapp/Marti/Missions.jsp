@@ -104,6 +104,7 @@
 			addCell(row, cell++, createDiv(createContents(missions[i].contents)), 'top');
 			addCell(row, cell++, createDiv(createUids(missions[i].uids)), 'top');
 			addCell(row, cell++, createDiv(createGroups(missions[i].groups)), 'top');
+			addCell(row, cell++, createDiv(createFeeds(missions[i].feeds)), 'top');
 			addCell(row, cell++, createDiv(createKeywords(missions[i].keywords)), 'top');
 			addCell(row, cell++, document.createTextNode(missions[i].creatorUid), 'top');
 			addCell(row, cell++, document.createTextNode(missions[i].createTime), 'top');
@@ -201,6 +202,7 @@
             <th>Contents</th>
             <th>UIDs</th>
             <th>Groups</th>
+            <th>Feeds</th>
             <th>Keywords</th>
             <th>Creator Uid</th>
             <th>Create Time</th>

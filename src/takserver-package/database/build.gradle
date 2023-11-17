@@ -101,9 +101,6 @@ Distribution Statement A: Approved for public release; distribution is unlimited
 
 ----
 
-echo "Configure or upgrade your TAK Server database:" 
-echo "Run the following: sudo /opt/tak/db-utils/takserver-setup-db.sh" 
-
 EOF
 ''' + '''
 
@@ -117,6 +114,8 @@ if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
     mv /opt/tak/db-utils/clear-old-data.sql /opt/tak/db-utils/clear-old-data.sql.dist.$tak_full_version
     mv /opt/tak/db-utils/clear-old-data.sql.bak /opt/tak/db-utils/clear-old-data.sql
 fi
+
+sudo /opt/tak/db-utils/takserver-setup-db.sh
 
 '''
 
@@ -150,17 +149,16 @@ prePackageDbOnlyScripts.dependsOn copyDbOnlyScripts
 
 task prePackage { }
 prePackage.dependsOn prePackageDbOnlyScripts
-prePackage.dependsOn ':takserver-schemamanager:shadowJar'
 prePackage.dependsOn copySchemaManagerJar
 prePackage.dependsOn copyCoreConfigExampleOnly
 prePackage.dependsOn copyDbScripts
 prePackage.dependsOn copyDocs
 prePackage.dependsOn copyLicense
 
-
-
 buildRpm.dependsOn prePackage
 buildRpm.dependsOn copyRpmDbScript
+
+buildDeb.dependsOn prePackage
 
 buildRpm {
     requires('java-11-openjdk-devel')
@@ -169,6 +167,9 @@ buildRpm {
     requires('postgresql15-server')
     requires('postgresql15-contrib')
 }
+
+buildDeb.dependsOn prePackage
+buildDeb.dependsOn copyRpmDbScript
 
 // TODO: add deb package dependencies here
 buildDeb {

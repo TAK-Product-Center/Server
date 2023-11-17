@@ -1,23 +1,24 @@
 apply plugin: 'maven-publish'
-apply plugin: 'org.openrepose.gradle.plugins.jaxb'
 
-
+configurations {
+  jaxb
+}
 dependencies {
 
-  compile(project(':takserver-plugins')) {
+  api(project(':takserver-plugins')) {
     exclude group: 'dom4j'
     exclude group: 'pull-parser'
     exclude group: 'xpp3'
   }
 
-  runtime(project(':takserver-plugins')) {
+  runtimeOnly(project(':takserver-plugins')) {
     exclude group: 'dom4j'
     exclude group: 'pull-parser'
     exclude group: 'xpp3'
   }
 
 
-/*  compile ("org.dom4j:dom4j:$dom4j_version") {
+/*  implementation ("org.dom4j:dom4j:$dom4j_version") {
        exclude group: 'pull-parser'
        exclude group: 'xpp'
   }
@@ -27,18 +28,20 @@ dependencies {
        exclude group: 'xpp'
   }   */
 
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
-//  compile group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
-  compile group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
+//  implementation group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
+  api group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
 
-  compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
-  compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
-  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-  
+  implementation 'org.apache.commons:commons-lang3:' + commons_lang_version
+  implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+  implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
+  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+
 // try to exclude unwanted xml parsers - we want to use Xerces
 
 
@@ -54,40 +57,42 @@ dependencies {
 |    \--- xpp3:xpp3:1.1.4c*/
 
 
-  compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+  implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
 
-  compile group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: jaxb_glassfish_version
-  compile group: 'org.glassfish.jaxb', name: 'jaxb-core', version: jaxb_glassfish_core_version
-  compile group: 'javax.activation', name: 'activation', version: javax_activation_version
+  implementation group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: jaxb_glassfish_version
+  implementation group: 'org.glassfish.jaxb', name: 'jaxb-core', version: jaxb_glassfish_core_version
+  implementation group: 'javax.activation', name: 'activation', version: javax_activation_version
 
   jaxb group: 'org.glassfish.jaxb', name: 'jaxb-xjc', version: jaxb_glassfish_version
   jaxb group: 'org.glassfish.jaxb', name: 'jaxb-core', version: jaxb_glassfish_core_version
   jaxb group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: jaxb_glassfish_version
   jaxb group: 'javax.activation', name: 'activation', version: javax_activation_version
 
-  compile group: 'com.google.guava', name: 'guava', version: guava_version
-  compile group: 'com.intellij', name: 'annotations', version: intellij_annotations_version // IntelliJ @NotNull annotation
-  compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jackson_version
-  compile group: 'jaxen', name: 'jaxen', version: jaxen_version
-  compile group: 'joda-time', name: 'joda-time', version: joda_version
-  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-  compile group: 'org.springframework', name: 'spring-context', version: spring_version
-  
+  api group: 'com.google.guava', name: 'guava', version: guava_version
+  api group: 'com.intellij', name: 'annotations', version: intellij_annotations_version // IntelliJ @NotNull annotation
+  implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jackson_version
+  implementation group: 'jaxen', name: 'jaxen', version: jaxen_version
+  implementation group: 'joda-time', name: 'joda-time', version: joda_version
+  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  api group: 'org.springframework', name: 'spring-context', version: spring_version
+
   // apache ignite (cache and distributed service grid)
-  compile group: 'org.apache.ignite', name: 'ignite-indexing', version: ignite_version
-  compile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
-  compile group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
-  compile group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
+  api group: 'org.apache.ignite', name: 'ignite-indexing', version: ignite_version
+  api group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+  api group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
+  api group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
 
-  compile group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeine_version
-  
-  compile group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
-  
-  compile project(':takserver-fig-core')
+  api group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeine_version
 
-  testCompile group: 'junit', name: 'junit', version: junit_version
-  testCompile group: 'org.json', name: 'json', version: json_org_version
-  testCompile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  api group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
+
+  api project(':takserver-fig-core')
+
+  testImplementation group: 'junit', name: 'junit', version: junit_version
+  testImplementation group: 'org.json', name: 'json', version: json_org_version
+  // grab the xerces sax parser
+  testImplementation group: 'xerces', name: 'xercesImpl', version: xerces_version
+  testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
 }
 
 sourceSets {
@@ -98,15 +103,23 @@ sourceSets {
     }
 }
 
-jaxb {
+task jaxb {
+  inputs.dir("${projectDir}/src/main/xsd")
+  outputs.dir("${buildDir}/src-generated")
   System.setProperty('javax.xml.accessExternalSchema', 'all')
-  xsdDir = "${projectDir}/src/main/xsd"
-  bindingsDir = "${projectDir}/src/main/xsd"
-  bindings = ['XmlBindings.xjb']
-  episodesDir = "${buildDir}/episodes"
-  xjc {
-    destinationDir = "${buildDir}/src-generated"
+  def jaxbTargetDir = file("${buildDir}/src-generated")
+  doLast {
+    jaxbTargetDir.mkdirs()
+    ant.taskdef(name: 'xjc', classname: 'com.sun.tools.xjc.XJCTask', classpath: configurations.jaxb.asPath)
+    ant.jaxbTargetDir = jaxbTargetDir
+    ant.xjc(
+            destdir: jaxbTargetDir) {
+      schema(dir: "${projectDir}/src/main/xsd", includes: '*.xsd')
+      binding(dir: "${projectDir}/src/main/xsd", includes: '*.xjb')
+      episodesDir = "${buildDir}/episodes"
+      arg(value: '-verbose')
+      arg(value: '-extension')
     }
   }
-
-compileJava.dependsOn xjc
+}
+compileJava.dependsOn jaxb

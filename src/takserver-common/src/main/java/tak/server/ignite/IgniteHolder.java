@@ -69,8 +69,7 @@ public class IgniteHolder {
 			apiAddr.addAll(api.addresses());
 		});
 		
-		
-		return messagingAddr.equals(apiAddr);
+		return messagingAddr.equals(apiAddr) || apiAddr.isEmpty();
 	}
 
 }

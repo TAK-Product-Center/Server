@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package gov.tak.cop.proto.v1;
+
+message BinaryPayload {
+    string type = 1;        // type identifier for the BinaryPayload. Use this type to determine decoding strategy
+    string version = 2;     // version identifier for the binary message
+    bytes data = 3;         // binary message payload data
+	int64 timestamp = 4;    // timestamp when ingested
+    string uuid = 5;            // unique id for this BinaryPayload
+}
+

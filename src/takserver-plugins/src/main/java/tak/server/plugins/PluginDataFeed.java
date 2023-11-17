@@ -23,7 +23,9 @@ public class PluginDataFeed implements Serializable{
 	
 	private boolean federated;
 	
-	public PluginDataFeed(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> filterGroups, boolean federated) {
+	private boolean binaryPayloadWebsocketOnly;
+	
+	public PluginDataFeed(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> filterGroups, boolean federated, boolean binaryPayloadWebsocketOnly) {
 		this.uuid = uuid;
 		this.name = name;
 		this.tags.addAll(tags);
@@ -31,6 +33,11 @@ public class PluginDataFeed implements Serializable{
 		this.sync = sync;
 		this.filterGroups = filterGroups;
 		this.federated = federated;
+		this.binaryPayloadWebsocketOnly = binaryPayloadWebsocketOnly;
+	}
+	
+	public PluginDataFeed(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> filterGroups, boolean federated) {
+		this(uuid, name, tags, archive, sync, filterGroups, federated, false);
 	}
 
 //	public PluginDataFeed(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> filterGroups) {
@@ -101,10 +108,19 @@ public class PluginDataFeed implements Serializable{
 		this.federated = federated;
 	}
 
+	public boolean isBinaryPayloadWebsocketOnly() {
+		return binaryPayloadWebsocketOnly;
+	}
+
+	public void setBinaryPayloadWebsocketOnly(boolean binaryPayloadWebsocketOnly) {
+		this.binaryPayloadWebsocketOnly = binaryPayloadWebsocketOnly;
+	}
+
 	@Override
 	public String toString() {
 		return "PluginDataFeed [uuid=" + uuid + ", name=" + name + ", tags=" + tags + ", archive=" + archive + ", sync="
-				+ sync + ", filterGroups=" + filterGroups + ", federated=" + federated + "]";
-	}
+				+ sync + ", filterGroups=" + filterGroups + ", federated=" + federated + ", binaryPayloadWebsocketOnly="
+				+ binaryPayloadWebsocketOnly + "]";
+	}	
 	
 }

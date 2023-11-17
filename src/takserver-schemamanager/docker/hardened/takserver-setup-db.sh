@@ -25,6 +25,14 @@ if [ -z "$password" ]; then
     password=$(echo $(grep -m 1 "<connection" /opt/tak/CoreConfig.example.xml)  | sed 's/.*password="//; s/".*//')
   fi
 fi
+
+# If the envpass environment variable is set, set the password for the example. 
+# This allows for prebuilt docker containers (such as ironbank) to have configuration passed to them
+if [ ! -z "$envpass" ]; then
+  password=$envpass
+  sed -i "s/password=\"\"/password=\"$envpass\"/g" /opt/tak/CoreConfig.example.xml
+fi
+
 # cant find password - request one from user
 if [ -z "$password" ]; then
   : ${1?' Could not find a password in /opt/tak/CoreConfig.xml or /opt/tak/CoreConfig.example.xml. Please supply a plaintext database password as the first parameter'}

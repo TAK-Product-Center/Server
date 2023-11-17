@@ -33,6 +33,7 @@ message FederatedEvent {
 	ContactListEntry contact = 2;
 	repeated string federateGroups = 3;
 	repeated FederateProvenance federateProvenance = 4;
+	FederateHops federateHops = 5;
 }
 
 message GeoEvent {
@@ -70,6 +71,7 @@ message BinaryBlob {
 	int64 timestamp = 4; 
 	string description = 5;
 	repeated FederateProvenance federateProvenance = 6;
+	FederateHops federateHops = 7;
 }
 	
 message ContactListEntry {
@@ -127,12 +129,15 @@ message ROL {
     repeated BinaryBlob payload = 2;
 	repeated string federateGroups = 3;
 	repeated FederateProvenance federateProvenance = 4;
+	FederateHops federateHops = 5;
 }
 
 message FederateGroups {
     ServerHealth streamUpdate = 1;
 	repeated string federateGroups = 2;
 	repeated FederateProvenance federateProvenance = 3;
+	FederateHops federateHops = 4;
+	repeated FederateGroups nestedGroups = 5;
 }
 
 message TakServerVersion {
@@ -146,6 +151,11 @@ message TakServerVersion {
 message FederateProvenance {
 	string federationServerId = 1;
 	string federationServerName = 2;
+}
+
+message FederateHops {
+	int64 maxHops = 1;
+	int64 currentHops = 2;
 }
 
 

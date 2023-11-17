@@ -96,6 +96,17 @@ function createGroups(groups) {
     return html;
 }
 
+function createFeeds(feeds) {
+    var html = "";
+    for (var i = 0; i < feeds.length; i++) {
+        if (i!=0) html += "<br>";
+        // use datafeed UID to get datafeed's url/info to encode the url
+        html +=  "<a href=\"inputs/index.html#!/modifyPluginDataFeed/" + feeds[i].name + "\">";
+        html += sanitize(feeds[i].name) + "</a></li>";
+    }
+    return html;
+}
+
 function createKeywords(keywords) {
     var html = "";
     for (var i = 0; i < keywords.length; i++) {
@@ -125,6 +136,7 @@ function createMissionTable(missions) {
         addCell(row, cell++, createDiv(createContents(missions[i].contents)), 'top');
         addCell(row, cell++, createDiv(createUids(missions[i].uids)), 'top');
 		addCell(row, cell++, createDiv(createGroups(missions[i].groups)), 'top');
+        addCell(row, cell++, createDiv(createFeeds(missions[i].feeds)), 'top');
         addCell(row, cell++, createDiv(createKeywords(missions[i].keywords)), 'top');
         addCell(row, cell++, document.createTextNode(missions[i].creatorUid), 'top');
         addCell(row, cell++, document.createTextNode(missions[i].createTime), 'top');

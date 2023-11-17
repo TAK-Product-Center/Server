@@ -385,19 +385,7 @@ public class SSLConfig implements SslSource, Serializable {
 		return sslParameters;
 	}
 
-	/**
-	 * Does set AND between the things we want and the things available
-	 */
 	private static String[] getCiphers(SSLContext sslContext) {
-		Tls tls = DistributedConfiguration.getInstance().getSecurity().getTls();
-
-		boolean include128 = ConfigHelper.DEFAULT_SSL_ALLOW_128_CIPHER;
-		boolean allowNonSuiteB = ConfigHelper.DEFAULT_SSL_ALLOW_NON_SUITE_B;
-
-		if (tls != null) {
-			include128 = tls.isAllow128Cipher();
-			allowNonSuiteB = tls.isAllowNonSuiteB();
-		}
 
 		List<String> wantedCiphers = new LinkedList<String>();
 		// these are Suite B ciphers from http://tools.ietf.org/html/rfc6460
@@ -405,29 +393,6 @@ public class SSLConfig implements SslSource, Serializable {
 		wantedCiphers.add("TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384");
 		wantedCiphers.add("TLS_AES_128_GCM_SHA256");
 		wantedCiphers.add("TLS_AES_256_GCM_SHA384");
-
-		if (include128) {
-			wantedCiphers.add("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256");
-		}
-
-		if (allowNonSuiteB) {
-			//wantedCiphers.add("TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384");  // causing problems with Android 6 (5/8/16)
-			wantedCiphers.add("TLS_ECDH_RSA_WITH_AES_256_GCM_SHA384");
-			wantedCiphers.add("TLS_DHE_DSS_WITH_AES_256_GCM_SHA384");
-			wantedCiphers.add("TLS_DHE_RSA_WITH_AES_256_GCM_SHA384");
-			wantedCiphers.add("TLS_RSA_WITH_AES_256_GCM_SHA384");
-			wantedCiphers.add("TLS_DH_anon_WITH_AES_256_GCM_SHA384");
-			// these three are the only ones implemented in JREs version < 8
-			wantedCiphers.add("TLS_DHE_RSA_WITH_AES_256_CBC_SHA256");
-			wantedCiphers.add("TLS_DHE_RSA_WITH_AES_256_CBC_SHA");
-			wantedCiphers.add("TLS_RSA_WITH_AES_256_CBC_SHA");
-
-			if (include128) {
-				wantedCiphers.add("TLS_DHE_RSA_WITH_AES_128_CBC_SHA256");
-				wantedCiphers.add("TLS_DHE_RSA_WITH_AES_128_CBC_SHA");
-				wantedCiphers.add("TLS_RSA_WITH_AES_128_CBC_SHA");
-			}
-		}
 
 		String[] supportedCipherArray = sslContext != null ? sslContext.getSupportedSSLParameters().getCipherSuites() : new String[]{};
 		Set<String> supportedCiphers = new HashSet<String>(Arrays.asList(supportedCipherArray));

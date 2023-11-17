@@ -69,6 +69,6 @@ public class MissionTokenUtils {
     }
 
     public Claims decodeMissionToken(String token) {
-        return JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.HS256);
+        return JwtUtils.getInstance().parseMissionTokenClaims(token);
     }
 }

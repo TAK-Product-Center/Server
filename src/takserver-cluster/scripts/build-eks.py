@@ -1,3 +1,4 @@
+import argparse
 import boto3
 import time
 import subprocess
@@ -12,6 +13,11 @@ import ast
 import fileinput
 import hashlib
 import xml.etree.ElementTree
+
+_parser = argparse.ArgumentParser('TAKServer AWS Cluster Deployer')
+_parser.add_argument('--validate-deployment', action='store_true',
+                     help='Validates the helm files using a currently connected k8s instance or minikube')
+
 
 # AWS CREDS
 AWS_ACCESS_KEY_ID = os.environ['AWS_ACCESS_KEY_ID']
@@ -44,6 +50,7 @@ TAK_ORGANIZATIONAL_UNIT = os.environ['TAK_ORGANIZATIONAL_UNIT']
 CLUSTER_CONFIG_FILE = CLUSTER_HOME_DIR + '/eks-cluster.yaml'
 LOAD_BALANCER_DEPLOYMENT_FILE = CLUSTER_HOME_DIR + '/deployments/ingress-infrastructure/load-balancer-deployment.yaml'
 HELM_DIRECTORY = CLUSTER_HOME_DIR + '/deployments/helm'
+PROPERTIES_FILE = HELM_DIRECTORY + '/production-values.yaml'
 
 CERT_CONFIGMAP_FILE = os.environ['CERT_CONFIGMAP_FILE']
 
@@ -476,6 +483,16 @@ def publishTakserverPluginImages():
 		print("\nTakserver Services was not deployed")
 
 
+def publishIntegrationTestImages():
+	cmd = 'cd ' + CLUSTER_HOME_DIR + ' && docker build -t ' + AWS_ECR_URI + ':integrationtests-provisioned -f docker-files/Dockerfile.takserver-integrationtests --build-arg TAKSERVER_IMAGE_REPO=' + AWS_ECR_URI + ' . && docker push ' + AWS_ECR_URI + ' --all-tags'
+	cmd_status = runCmd(cmd)
+
+	if cmd_status == 0:
+		print("\nTakserver integreation tests deployed")
+	else:
+		print("\nTakserver integration tests was not deployed")
+
+
 # Find Cluster Load Balancer.. Wait Until It's Found AND Active. Return Its DNS
 def getLoadBalancerDNS():
 	dns = ''
@@ -614,7 +631,23 @@ def printTakserverEntryPoints(domain_name):
 		print ('\nError reading entrypoints from CoreConfig.xml...')
 		sys.exit(1)
 
-def installHelmChart():
+def validate_helm_deployment():
+	if subprocess.run(['kubectl', 'cluster-info']).returncode != 0:
+		if subprocess.run(['which', 'minikube']).returncode == 0:
+			if subprocess.run(['minikube', 'status']).returncode != 0:
+				subprocess.run(['minikube', 'stop'])
+				subprocess.run(['minikube', 'delete'])
+				subprocess.run([
+					'minikube', 'start', '--memory=2048m', '--cpus=2',
+					'--kubernetes-version=v1.21.14', '--insecure-registry=127.0.0.1:5000'
+				], check=True)
+
+		else:
+			raise Exception('Kubectl is not currently connected to a cluster and no minikube installation found!')
+
+	installHelmChart(True)
+
+def installHelmChart(dry_run=False):
 	max_tak_pods = int(TAK_CLUSTER_NODE_COUNT) * 3
 
 	total_msg = math.floor(max_tak_pods * .667)
@@ -624,18 +657,24 @@ def installHelmChart():
 	password = runCmd("aws ecr get-login-password")
 	configmap = 'cert-migration'
 
-	if CERT_CONFIGMAP_FILE != '':
-		runCmd('kubectl create -f cert-migration-replacement.yaml -n takserver')
-		configmap = 'cert-migration-replacement'
+	if dry_run:
+		print('Skipping kubectl configuration for dry-run...')
+	else:
+		if CERT_CONFIGMAP_FILE != '':
+			runCmd('kubectl create -f cert-migration-replacement.yaml -n takserver')
+			configmap = 'cert-migration-replacement'
 
-	runCmd('kubectl delete secret -n takserver reg-cred --ignore-not-found')
-	runCmd('kubectl create secret -n takserver docker-registry reg-cred \
-			--docker-server=$AWS_ACCOUNT_ID.dkr.ecr.$TAK_CLUSTER_REGION.amazonaws.com \
-			--docker-username=AWS \
-			--docker-password=' + str(password) + '\
-			--namespace=takserver')
+		runCmd('kubectl delete secret -n takserver reg-cred --ignore-not-found')
+		runCmd('kubectl create secret -n takserver docker-registry reg-cred \
+				--docker-server=$AWS_ACCOUNT_ID.dkr.ecr.$TAK_CLUSTER_REGION.amazonaws.com \
+				--docker-username=AWS \
+				--docker-password=' + str(password) + '\
+				--namespace=takserver')
+
 	runCmd('helm dependency update ' + HELM_DIRECTORY)
-	runCmd(('helm upgrade --install -n takserver takserver ' + HELM_DIRECTORY + ' -f ' + HELM_DIRECTORY + '/production-values.yaml'
+	runCmd(('helm upgrade' + (' --dry-run' if dry_run else '')
+			+ ' --install -n takserver takserver ' + HELM_DIRECTORY
+	        + ' -f ' + PROPERTIES_FILE
 			+ ' --set certConfigMapName=' + configmap
 			+ ' --set takserver.plugins.enabled=' + str(TAK_PLUGINS == '1')
 			+ ' --set takserver.messaging.replicas=' + str(total_msg)
@@ -643,57 +682,65 @@ def installHelmChart():
 			+ ' --set takserver.messaging.image.repository=' + AWS_ECR_URI
 			+ ' --set takserver.api.image.repository=' + AWS_ECR_URI
 			+ ' --set takserver.plugins.image.repository=' + AWS_ECR_URI
+			+ ' --set takserver.integrationtests.image.repository=' + AWS_ECR_URI
 			+ ' --set ignite.replicaCount=' + str(total_ignite)
 			+ ' --set nats.cluster.replicas=' + str(total_nats)
 			+ ' --set stan.cluster.replicas=' + str(total_nats)))
 
-print("\n---------- Running AWS ECR Setup Commands ----------")
-setupECR()
-print("\n---------- Running AWS Cluster Initialization Commands ----------")
-setupCluster()
-print("\n---------- Running KubeCtl Validation Commands ----------")
-validateKubeCtl()
-print("\n---------- Running AWS RDS Setup Commands ----------")
-setupRDS()
-print("\n---------- Running Docker Check ----------")
-checkDocker()
-print("\n---------- Running AWS RDS Deployment Commands ----------")
-deployDatabaseSetupPod()
-print("\n---------- Running nginx Ingress Setup and Deployment Commands ----------")
-deployIngress()
-print("\n---------- Running Docker Check ----------")
-checkDocker()
-print("\n---------- Running AWS Load Balancer Service Commands ----------")
-deployLoadBalancer()
-print("\n---------- Running Takserver Certificate Generation Commands ----------")
-generateTakseverCertificates()
-print("\n---------- Adding CoreConfigMap ----------")
-addCoreConfigMap()
-print("\n---------- Publishing Takserver Core Docker Images ----------")
-publishTakserverCoreImages()
-if TAK_PLUGINS == '1':
-	print("\n---------- Publishing Takserver Plugin Docker Images ----------")
-	publishTakserverPluginImages()
-else:
-	print("\n---------- Plugins Disabled, Plugin Docker Image Publications ----------")
-print("\n---------- Deploying services to cluster ----------")
-installHelmChart()
-print("\n---------- Running AWS Get Load Balancer DNS Commands ----------")
-dns = getLoadBalancerDNS()
 
-if TAK_CLUSTER_DOMAIN_NAME != None and TAK_CLUSTER_DOMAIN_NAME != '':
-	print("\n---------- Running AWS Get Hosted Zone ID Commands ----------")
-	zone = getHostedZoneId()
-	print("\n---------- Running AWS Create CNAME Record Set Commands ----------")
-	createCNAMEForLoadBalancerDNS(zone, dns)
-	print("\n---------- Running AWS Test CNAME DNS Commands ----------")
-	domain_name = testTakseverCNAME(zone)
-	print("\n---------- Running TAK Entrypoint Commands ----------")
-	printTakserverEntryPoints(domain_name)
-else:
-	print("\n---------- Running TAK Entrypoint Commands ----------")
-	printTakserverEntryPoints(dns)
+if __name__ == '__main__':
+	args = _parser.parse_args()
 
+	if args.validate_deployment:
+		validate_helm_deployment()
 
+	else:
+		print("\n---------- Running AWS ECR Setup Commands ----------")
+		setupECR()
+		print("\n---------- Running AWS Cluster Initialization Commands ----------")
+		setupCluster()
+		print("\n---------- Running KubeCtl Validation Commands ----------")
+		validateKubeCtl()
+		print("\n---------- Running AWS RDS Setup Commands ----------")
+		setupRDS()
+		print("\n---------- Running Docker Check ----------")
+		checkDocker()
+		print("\n---------- Running AWS RDS Deployment Commands ----------")
+		deployDatabaseSetupPod()
+		print("\n---------- Running nginx Ingress Setup and Deployment Commands ----------")
+		deployIngress()
+		print("\n---------- Running Docker Check ----------")
+		checkDocker()
+		print("\n---------- Running AWS Load Balancer Service Commands ----------")
+		deployLoadBalancer()
+		print("\n---------- Running Takserver Certificate Generation Commands ----------")
+		generateTakseverCertificates()
+		print("\n---------- Adding CoreConfigMap ----------")
+		addCoreConfigMap()
+		print("\n---------- Publishing Takserver Core Docker Images ----------")
+		publishTakserverCoreImages()
+		if TAK_PLUGINS == '1':
+			print("\n---------- Publishing Takserver Plugin Docker Images ----------")
+			publishTakserverPluginImages()
+		else:
+			print("\n---------- Plugins Disabled, Plugin Docker Image Publications ----------")
+		if os.path.exists('docker-files/Dockerfile.takserver-integrationtests'):
+			print("\n---------- Publishing Takserver Integration Tests Docker Images ----------")
+			publishIntegrationTestImages()
+		print("\n---------- Deploying services to cluster ----------")
+		installHelmChart()
+		print("\n---------- Running AWS Get Load Balancer DNS Commands ----------")
+		dns = getLoadBalancerDNS()
 
-
+		if TAK_CLUSTER_DOMAIN_NAME != None and TAK_CLUSTER_DOMAIN_NAME != '':
+			print("\n---------- Running AWS Get Hosted Zone ID Commands ----------")
+			zone = getHostedZoneId()
+			print("\n---------- Running AWS Create CNAME Record Set Commands ----------")
+			createCNAMEForLoadBalancerDNS(zone, dns)
+			print("\n---------- Running AWS Test CNAME DNS Commands ----------")
+			domain_name = testTakseverCNAME(zone)
+			print("\n---------- Running TAK Entrypoint Commands ----------")
+			printTakserverEntryPoints(domain_name)
+		else:
+			print("\n---------- Running TAK Entrypoint Commands ----------")
+			printTakserverEntryPoints(dns)

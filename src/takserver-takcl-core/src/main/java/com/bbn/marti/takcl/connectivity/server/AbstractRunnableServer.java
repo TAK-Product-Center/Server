@@ -18,9 +18,12 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -45,6 +48,10 @@ public abstract class AbstractRunnableServer {
 		}
 
 		public abstract void start(boolean enableReomteDebug);
+
+		public ServerProcessDefinition getDefinition() {
+			return definition;
+		}
 
 		public abstract boolean isRunning();
 
@@ -100,7 +107,7 @@ public abstract class AbstractRunnableServer {
 
 	protected static String logDirectory;
 
-	protected final List<LocalRunnableServer.LocalServerProcessContainer> processes = new ArrayList<>(ServerProcessDefinition.values().length);
+	protected final List<? extends AbstractServerProcess> processes;
 
 
 	public final OfflineConfigModule getOfflineConfigModule() {
@@ -133,10 +140,11 @@ public abstract class AbstractRunnableServer {
 	}
 
 	protected AbstractRunnableServer(AbstractServerProfile serverIdentifier) {
+		this.logger = LoggerFactory.getLogger(serverIdentifier.toString());
 		this.serverIdentifier = serverIdentifier;
 		this.offlineConfigModule.init(serverIdentifier);
 		this.offlineFileAuthtModule.init(serverIdentifier);
-		this.logger = LoggerFactory.getLogger(serverIdentifier.toString());
+		this.processes = createProcessContainerList();
 	}
 
 	public final synchronized void stopServer(long serverKillDelayMS) {
@@ -147,6 +155,11 @@ public abstract class AbstractRunnableServer {
 		logger.info("Stopping server " + serverIdentifier + "...");
 
 		try {
+			// Since stopping the process will kill the container logs must be collected before shutdown
+			if (TAKCLCore.k8sMode) {
+				collectFinalLogs();
+			}
+
 			serverState = ServerState.STOPPING;
 
 			Exception igniteException = null;
@@ -188,7 +201,9 @@ public abstract class AbstractRunnableServer {
 			}
 		} finally {
 			serverIdentifier.rerollIgnitePorts();
-			collectFinalLogs();
+			if (!TAKCLCore.k8sMode) {
+				collectFinalLogs();
+			}
 		}
 	}
 
@@ -219,6 +234,7 @@ public abstract class AbstractRunnableServer {
 		}
 
 		this.offlineConfigModule.enableSwagger();
+		this.offlineConfigModule.setSSLSecuritySettings();
 		this.offlineConfigModule.saveChanges();
 
 		if (TestConfiguration.getInstance().dbEnabled)
@@ -259,12 +275,12 @@ public abstract class AbstractRunnableServer {
 		serverState = ServerState.DEPLOYING;
 
 		innerDeployServer(sessionIdentifier, enableRemoteDebug);
-		System.out.println(serverIdentifier.getConsistentUniqueReadableIdentifier() + "' started.");
+		System.out.println(serverIdentifier.getConsistentUniqueReadableIdentifier() + "' started. Waiting for successful initialization.");
 		serverState = ServerState.RUNNING;
 
 		waitForServerReady(maxWaitMs, failTestOnStartupFailure);
 
-		System.out.println("Server started successfully after " + ((System.currentTimeMillis() - startTimeMs) / 1000) + " seconds.");
+		System.out.println("Server initialized successfully after " + ((System.currentTimeMillis() - startTimeMs) / 1000) + " seconds.");
 		if (!isRunning()) {
 			throw new RuntimeException("Server '" + serverIdentifier.getConsistentUniqueReadableIdentifier() + "' appears to have shutdown immediately after starting. Please ensure another server isn't already running and your config is valid!");
 		}
@@ -279,8 +295,8 @@ public abstract class AbstractRunnableServer {
 		}
 	}
 
-	private void waitForServerReady(int maxWaitTime, boolean failTestOnStartupFailure) {
-		List<AbstractServerProcess> processes = Collections.synchronizedList(getEnabledServerProcesses());
+	private void waitForServerReady(int maxWaitTimeMs, boolean failTestOnStartupFailure) {
+		List<? extends AbstractServerProcess> processes = Collections.synchronizedList(getEnabledServerProcesses());
 		Map<AbstractServerProcess, List<String>> results = new ConcurrentHashMap<>();
 
 //		try {
@@ -288,14 +304,14 @@ public abstract class AbstractRunnableServer {
 //		} catch (InterruptedException e) {
 //			throw new RuntimeException(e);
 //		}
-		processes.parallelStream().forEach(p -> results.put(p, p.waitForMissingLogStatements(maxWaitTime)));
+		processes.parallelStream().forEach(p -> results.put(p, p.waitForMissingLogStatements(maxWaitTimeMs)));
 
 		if (results.values().stream().mapToInt(List::size).sum() > 0 && failTestOnStartupFailure) {
 			StringBuilder errorBuilder = new StringBuilder();
 			for (AbstractServerProcess process : results.keySet()) {
 				List<String> failures = results.get(process);
 				if (failures.size() > 0) {
-					errorBuilder.append("Server init timeout of " + maxWaitTime + " ms reached for process " +
+					errorBuilder.append("Server init timeout of " + maxWaitTimeMs + " ms reached for process " +
 							process.getIdentifier() + ".The following log statements were not seen:\n\t" +
 							String.join("\"\n\t\"", failures) + "\n There is a good chance the tests may fail!");
 				}
@@ -318,6 +334,9 @@ public abstract class AbstractRunnableServer {
 	private synchronized void checkServerState(boolean shouldBeOnline) {
 		boolean currentStateValid;
 		boolean serverProcessRunning = isServerProcessRunning(shouldBeOnline);
+		logger.trace("STATE: serverProcessRunning=" + serverProcessRunning);
+		logger.trace("STATE: serverState=" + serverState);
+		logger.trace("STATE: shouldBeOnline=" + shouldBeOnline);
 
 		switch (serverState) {
 			case CONFIGURING:
@@ -340,16 +359,62 @@ public abstract class AbstractRunnableServer {
 
 		if (!currentStateValid) {
 			String callingMethod = Thread.currentThread().getStackTrace()[2].getMethodName();
-			throw new RuntimeException("Cannot call " + callingMethod + " on server '" +
+			String msg = "Cannot call " + callingMethod + " on server '" +
 					serverIdentifier.getConsistentUniqueReadableIdentifier() + "' while it its state is " +
-					serverState.name() + " and the server process is " + (serverProcessRunning ? "" : "not") + " running!!");
+					serverState.name() + " and the server process is " + (serverProcessRunning ? "" : "not") + " running!!";
+			logger.error(msg);
+			throw new RuntimeException(msg);
 		}
 	}
 
+	private final TreeMap<String, Boolean> lastKnownEnabledProcessStates = new TreeMap<>();
+
+	public TreeMap<String, Boolean> updateEnabledProcessStates() {
+		synchronized (lastKnownEnabledProcessStates) {
+			boolean print = false;
+			StringBuilder sb = new StringBuilder("Process States:\n\t");
+
+			// Get the state of all enabled processes
+			TreeMap<String, Boolean> currentEnabledProcessStates = new TreeMap<>(processes.stream().filter(
+					AbstractServerProcess::isEnabled).collect(Collectors.toMap(
+					AbstractServerProcess::getIdentifier, AbstractServerProcess::isRunning)));
+
+			for (AbstractServerProcess process : processes) {
+				String processIdentifier = process.getIdentifier();
+
+				if (currentEnabledProcessStates.containsKey(processIdentifier)) {
+					boolean isRunning = currentEnabledProcessStates.get(processIdentifier);
+
+					if (!lastKnownEnabledProcessStates.containsKey(processIdentifier) ||
+							lastKnownEnabledProcessStates.get(processIdentifier) != isRunning) {
+						print = true;
+					}
+
+					sb.append("\n\t").append(processIdentifier).append(": ").append(isRunning ? "RUNNING" : "NOT RUNNING");
+				} else {
+					sb.append("\n\t").append(processIdentifier).append(": DISABLED");
+				}
+			}
+
+			if (print) {
+				logger.info(sb.toString());
+			}
+			lastKnownEnabledProcessStates.clear();
+			lastKnownEnabledProcessStates.putAll(currentEnabledProcessStates);
+			return lastKnownEnabledProcessStates;
+		}
+	}
+
+
 	protected void offlineFactoryResetServer() {
-		checkServerState(false);
-		offlineConfigModule.resetConfig();
-		offlineFileAuthtModule.resetConfig();
+		// TODO: This "offline factory reset" should probably be cleanly removed to bring parity to test deployments and be replaced with server "destruction"
+		if (!TAKCLCore.k8sMode) {
+			logger.error("offlineFactoryResetServer");
+			checkServerState(false);
+			offlineConfigModule.resetConfig();
+			offlineFileAuthtModule.resetConfig();
+			logger.error("offlineFactoryResetServer-end");
+		}
 	}
 
 	public final void killServer() {
@@ -357,6 +422,60 @@ public abstract class AbstractRunnableServer {
 			logger.info("Killing server " + serverIdentifier + "...");
 			innerKillServer();
 		}
+	}
+
+	protected boolean isServerProcessRunning(boolean shouldBeOnline) {
+		// If they aren't all the same, raise an exception indicating the difference
+		Boolean sharedState = null;
+
+		// Get the state of all enabled processes
+		Map<String, Boolean> enabledProcessStates = updateEnabledProcessStates();
+
+		// If no processes have been enabled, the test has not started yet, and things are effectively not running
+		if (enabledProcessStates.isEmpty()) {
+			return false;
+		}
+
+		for (String processName : enabledProcessStates.keySet()) {
+			boolean state = enabledProcessStates.get(processName);
+
+			if (shouldBeOnline && !state) {
+
+				if (TAKCLCore.k8sMode) {
+					logger.error("The server process " + processName + " Should be running but it is not!");
+				} else {
+
+					logger.error("The server process " + processName + " Should be running but it is not!  `ps -aux` output:");
+					try {
+						File f = File.createTempFile("PsOutput", ".txt");
+						ProcessBuilder pb = new ProcessBuilder().command("ps", "-aux").redirectErrorStream(true).redirectOutput(f);
+						Process p = pb.start();
+						p.waitFor();
+						String psResults = Files.readString(f.toPath());
+						System.out.println(psResults);
+
+					} catch (Exception e) {
+						throw new RuntimeException(e);
+					}
+				}
+
+			} else if (!shouldBeOnline && state) {
+				logger.error("The server process " + processName + " Should not be running but it is!");
+			}
+
+			if (sharedState == null) {
+				sharedState = state;
+			}
+			if (state != sharedState) {
+				StringBuilder sb = new StringBuilder("Inconsistent process states for " + serverIdentifier + ":");
+				for (String processName2 : enabledProcessStates.keySet()) {
+					sb.append(" ").append(processName2).append(".isRunning=").append(enabledProcessStates.get(processName2));
+				}
+				logger.error(sb.toString());
+				throw new RuntimeException(sb.toString());
+			}
+		}
+		return sharedState;
 	}
 	
 	public final void enableFederationHubProcess() {	
@@ -384,9 +503,9 @@ public abstract class AbstractRunnableServer {
 
 	protected abstract void innerKillServer();
 
-	protected abstract boolean isServerProcessRunning(boolean shouldBeOnline);
-
-	public abstract List<AbstractServerProcess> getEnabledServerProcesses();
+	public abstract List<? extends AbstractServerProcess> getEnabledServerProcesses();
 
 	protected abstract void collectFinalLogs();
+
+	protected abstract List<? extends AbstractServerProcess> createProcessContainerList();
 }

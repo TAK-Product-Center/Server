@@ -2,17 +2,15 @@ package tak.server.federation;
 
 import static io.grpc.MethodDescriptor.generateFullMethodName;
 
+import java.util.Comparator;
 import java.util.Locale;
 import java.util.NavigableSet;
 import java.util.Set;
 
-import com.atakmap.Tak.FederateGroups;
-import io.grpc.MethodDescriptor;
-import io.micrometer.core.instrument.Metrics;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.Subscription;
 import com.bbn.marti.config.DataFeed;
@@ -25,9 +23,12 @@ import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.service.DistributedConfiguration;
+import com.google.common.collect.ComparisonChain;
 
 import io.grpc.ClientCall;
 import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
+import io.micrometer.core.instrument.Metrics;
 import tak.server.Constants;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotEventContainer;
@@ -51,9 +52,9 @@ public class FigFederateSubscription extends FederateSubscription {
     private final TakFigClient figClient;
 
     private boolean isAutoMapped = false;
-
-	private ClientCall<FederatedEvent, Subscription> clientCall;
-    private ClientCall<FederateGroups, Subscription> groupsCall;
+    
+    private GuardedStreamHolder<FederatedEvent> clientCallHolder;
+    private GuardedStreamHolder<FederateGroups> groupsCallHolder;
         
     public Reachability<User> getReachability() {
         return reachability;
@@ -70,11 +71,7 @@ public class FigFederateSubscription extends FederateSubscription {
         
         if (figClient != null) {
         	setupGroupStream();
-        } else {
-        	clientCall = null;
-        	groupsCall = null;
-        }
-
+        } 
     }
 
     public void setLastProcTime(long curTime) {
@@ -83,13 +80,23 @@ public class FigFederateSubscription extends FederateSubscription {
     }
 
     private void setupGroupStream() {
-    	groupsCall = figClient.getChannel()
+    	ClientCall<FederateGroups, Subscription> groupsCall = figClient.getChannel()
 				.newCall(io.grpc.MethodDescriptor.create(MethodDescriptor.MethodType.CLIENT_STREAMING,
 						generateFullMethodName("com.atakmap.FederatedChannel", "ClientFederateGroupsStream"),
 						io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.FederateGroups.getDefaultInstance()),
 						io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance())),
 						figClient.getAsyncFederatedChannel().getCallOptions());
 
+		groupsCallHolder = new GuardedStreamHolder<FederateGroups>(groupsCall, figClient.getClientName(),
+				new Comparator<FederateGroups>() {
+					@Override
+					public int compare(FederateGroups a, FederateGroups b) {
+						return ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result();
+					}
+				}, false);
+		
+		groupsCallHolder.setMaxFederateHops(getFederate().getMaxHops());
+    	
 		// use listener to respect flow control, and send messages to the server when it
 		// is ready
 		groupsCall.start(new ClientCall.Listener<Subscription>() {
@@ -111,12 +118,22 @@ public class FigFederateSubscription extends FederateSubscription {
     }
     
     public void setupEventStream() { 
-    	clientCall = figClient.getChannel().newCall(io.grpc.MethodDescriptor.create(
+    	ClientCall<FederatedEvent, Subscription> clientCall = figClient.getChannel().newCall(io.grpc.MethodDescriptor.create(
     			io.grpc.MethodDescriptor.MethodType.CLIENT_STREAMING,
     			generateFullMethodName("com.atakmap.FederatedChannel", "ServerEventStream"),
     			io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.FederatedEvent.getDefaultInstance()),
     			io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance())), figClient.getAsyncFederatedChannel().getCallOptions());
 
+		clientCallHolder = new GuardedStreamHolder<FederatedEvent>(clientCall, figClient.getClientName(),
+				new Comparator<FederatedEvent>() {
+					@Override
+					public int compare(FederatedEvent a, FederatedEvent b) {
+						return ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result();
+					}
+				}, false);
+		
+		clientCallHolder.setMaxFederateHops(getFederate().getMaxHops());
+    	
     	// use listener to respect flow control, and send messages to the server when it is ready 
     	clientCall.start(new ClientCall.Listener<Subscription>() {
 
@@ -162,7 +179,7 @@ public class FigFederateSubscription extends FederateSubscription {
     }
 
     private synchronized void sendMessageProtected(FederatedEvent e) {
-        clientCall.sendMessage(e);
+    	clientCallHolder.send(e);
         
         try {
         	
@@ -311,7 +328,7 @@ public class FigFederateSubscription extends FederateSubscription {
                 	logger.debug("sending FederatedEvent: " + fEvent);
                 }
 
-                if (clientCall == null) {
+                if (clientCallHolder == null) {
                 	if (logger.isDebugEnabled()) {
                 		logger.debug("null clientCall");
                 	}
@@ -345,18 +362,18 @@ public class FigFederateSubscription extends FederateSubscription {
         if (logger.isDebugEnabled()) {
             logger.debug("Submitting federate groups: " + federateGroups);
         }
-        groupsCall.sendMessage(FederateGroups.newBuilder().addAllFederateGroups(federateGroups).build());
+        groupsCallHolder.send(FederateGroups.newBuilder().addAllFederateGroups(federateGroups).build());
     }
 
     public void closeGroupStream(Throwable t) {
     	try {
-    		groupsCall.cancel("Close group stream", t);
+    		groupsCallHolder.cancel("Close group stream", t);
     	} catch (Exception e) {}
     }
 
     public void closeClientCall(Throwable t) {
         try {
-            clientCall.cancel("Close client call", t);
+            clientCallHolder.cancel("Close client call", t);
         } catch (Exception e) {}
     }
 
@@ -377,4 +394,11 @@ public class FigFederateSubscription extends FederateSubscription {
         return figClient.getFederate();
     }
 
+	public GuardedStreamHolder<FederatedEvent> getClientCallHolder() {
+		return clientCallHolder;
+	}
+
+	public GuardedStreamHolder<FederateGroups> getGroupsCallHolder() {
+		return groupsCallHolder;
+	}
 }

@@ -31,6 +31,11 @@ task copyFedHubConfigs(type: Copy) {
 
 // Copy executables.
 task copyFedHubJars(type: Copy) {
+    dependsOn(':federation-hub-broker:build')
+    dependsOn(':federation-hub-policy:build')
+    dependsOn(':federation-hub-ui:bootWar')
+    dependsOn(':federation-hub-ui:shadowJar')
+
     from getRootProject().subprojects.collect { "${it.buildDir}/libs" }
     into "$buildDir/artifacts/jars"
     include 'federation-hub-*-' + version + '.jar', 'federation-hub-ui-' + version + '.war'
@@ -75,6 +80,7 @@ uid=`id -u tak 2>/dev/null`
 set -e
 if [ -z "$uid" ] ; then
     # User id 1491 is arbitrary
+    echo "Adding 'tak' user"
     useradd tak -r -u 1491 --no-create-home -d /opt/tak
 fi
 
@@ -224,10 +230,6 @@ with or without a co-located TAK server.
 }
 
 task prePackage { }
-prePackage.dependsOn ':federation-hub-broker:build'
-prePackage.dependsOn ':federation-hub-policy:build'
-prePackage.dependsOn ':federation-hub-ui:bootWar'
-prePackage.dependsOn ':federation-hub-ui:shadowJar'
 prePackage.dependsOn copyFedHubReadme
 prePackage.dependsOn copyFedHubDockerReadme
 prePackage.dependsOn copyFedHubConfigs
@@ -268,7 +270,9 @@ def copyDocsToTopLevelDef() { return copySpec {
 }}
 
 task createFedhubDockerLogDir() {
-    mkdir "build/artifacts/logs"
+    doLast{
+        mkdir "build/artifacts/logs"
+    }
 }
 
 def copyFedhubVersionFile = copyFedhubVersionFileDef()
@@ -281,10 +285,12 @@ def copyDocsToTopLevel = copyDocsToTopLevelDef()
 task constructFedhubDockerZip(type: Zip) {
     dependsOn createVersionFile
     dependsOn createFedhubDockerLogDir
-    archiveName 'fedhub-docker-' + version + '.zip'
+    dependsOn buildRpm
+
+    archiveName 'takserver-fedhub-docker-' + version + '.zip'
     duplicatesStrategy 'fail'
     destinationDir(file("$buildDir/distributions"))
-    into('fedhub-docker-' + version)
+    into('takserver-fedhub-docker-' + version)
 
     with copyFedhubVersionFile.into('tak')
     with copyFedhubResources.into('tak/federation-hub')

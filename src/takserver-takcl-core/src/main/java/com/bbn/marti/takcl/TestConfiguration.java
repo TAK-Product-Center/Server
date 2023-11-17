@@ -17,6 +17,7 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.SQLException;
 import java.util.concurrent.TimeUnit;
 
 public class TestConfiguration {
@@ -56,9 +57,10 @@ public class TestConfiguration {
 		try {
 			Connection c = DriverManager.getConnection("jdbc:postgresql://" + server.getDbHost() + ":5432/cot", "martiuser", server.getDbPassword());
 			c.close();
-			log.debug(server + " SQL Host: " + server.getDbHost() + ". Status: Available");
+			log.debug("{} SQL Host: {}. Status: Available", server, server.getDbHost());
 			return true;
 		} catch (SQLException e) {
+			log.debug("SQLException occurred", e);
 			log.debug(server + " SQL Host: " + server.getDbHost() + ". Status: Unavailable");
 			return false;
 		}
@@ -98,7 +100,7 @@ public class TestConfiguration {
 		}
 
 		boolean server0Available = testDb(ImmutableServerProfiles.SERVER_0);
-		
+
 		if (TestConfiguration.getInstance().dbEnabled) {
 			if (server0Available) {
 				dbAvailable = true;

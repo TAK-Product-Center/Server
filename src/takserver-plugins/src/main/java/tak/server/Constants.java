@@ -198,6 +198,7 @@ public class Constants {
     public static final String DISTRIBUTED_PLUGIN_MISSION_API = "distributed-plugin-mission-api";
     public static final String DISTRIBUTED_DATAFEED_COT_SERVICE = "distributed-datafeed-cot-service";
     public static final String DISTRIBUTED_PLUGIN_FILE_API = "distributed-plugin-file-api";
+	public static final String DISTRIBUTED_PLUGIN_CORECONFIG_API = "distributed-plugin-coreconfig-api";
 
     // Bean Names
     public static final String DISTRIBUTED_COT_MESSENGER = "cotMessenger";

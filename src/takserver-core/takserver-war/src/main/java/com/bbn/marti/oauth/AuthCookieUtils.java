@@ -23,7 +23,7 @@ public class AuthCookieUtils {
     private static final Logger logger = LoggerFactory.getLogger(AuthCookieUtils.class);
     private static final int MAX_NAME_VALUE_SIZE = 4096;
 
-    public static ResponseCookie createCookie(final String name, final String value, int maxAge, boolean sameSiteStrict) {
+    public static ResponseCookie createCookie(final String name, final String value, int maxAge, boolean sameSiteStrict, String path) {
 
         String validatedName;
         String validatedValue;
@@ -31,7 +31,7 @@ public class AuthCookieUtils {
             validatedName = validator.getValidInput(AuthCookieUtils.class.getName(), name,
             		MartiValidatorConstants.Regex.MartiSafeString.name(), MAX_NAME_VALUE_SIZE, false);
             validatedValue = validator.getValidInput(AuthCookieUtils.class.getName(), value,
-                    MartiValidatorConstants.Regex.MartiSafeString.name(), MAX_NAME_VALUE_SIZE, false);
+                    MartiValidatorConstants.Regex.MartiSafeString.name(), MAX_NAME_VALUE_SIZE, true);
         } catch (ValidationException e) {
             logger.error("ValidationException in createCookie!", e);
             return null;
@@ -41,7 +41,7 @@ public class AuthCookieUtils {
                 .from(validatedName, validatedValue)
                 .secure(true)
                 .httpOnly(true)
-                .path("/")
+                .path(path)
                 .maxAge(maxAge);
 
         if (sameSiteStrict) {
@@ -49,6 +49,10 @@ public class AuthCookieUtils {
         }
 
         return responseCookieBuilder.build();
+    }
+
+    public static ResponseCookie createCookie(final String name, final String value, int maxAge, boolean sameSiteStrict) {
+        return createCookie(name, value, maxAge, sameSiteStrict, "/");
     }
 
     public static void logout(HttpServletRequest request, HttpServletResponse response, DefaultTokenServices defaultTokenServices) {

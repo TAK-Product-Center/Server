@@ -1,0 +1,46 @@
+
+
+connection:
+  host: "127.0.0.1"
+  tls: 8089
+  https: 8443
+  udp: 8087
+
+authentication:
+  cert: "/Users/edo/takserver/src/takserver-core/example/certs/files/user.p12"
+  password: "atakatak" # if no password, use empty string
+
+
+PyTAK:
+  self_sa_delta: 60 # seconds
+  offset: 1.0 # time between starting clients
+  clients: 40
+
+  websocket_path: "takproto/1"
+
+  ping: True
+  ping_interval: 100 # in milliseconds
+  send_metrics: True
+  send_metrics_interval: 60 # seconds
+  cloudwatch_namespace: "pyTAK-test-run1"
+
+  missions:
+    random: False
+    subscribe: []
+    send_mission_cot: False
+    send_mission_cot_probability: 0
+    send_only_new_tracks: False
+    mission_write_interval: 20 # seconds
+    react_to_change_message: False
+    download_mission_content: 0 # percent of clients that download file (from 0 -> 1)
+    download_existing_content: False
+    uploads:
+      probability: 0
+      size: 1000000 # 1mb
+      interval: 1200 # in seconds (20 min)
+
+Missions:
+  creatorUid: PyTAK-0
+  group: __ANON__
+  size_files: []
+  missions: []

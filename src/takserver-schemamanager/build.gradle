@@ -10,28 +10,31 @@ apply plugin: 'maven-publish'
 
 buildscript {
     dependencies {
-      classpath 'net.sf.proguard:proguard-gradle:5.2.1'
+      classpath 'net.sf.proguard:proguard-gradle:' + gradle_proguard_version
     }
 }
 
 dependencies {
-  compile (project(':takserver-common')) {
+  implementation (project(':takserver-common')) {
   	  exclude group: 'io.grpc', module: 'grpc-netty'
 	  exclude group: 'io.netty', module: 'netty-tcnative-boringssl-static'
 	  exclude group:  'io.netty', module: 'netty-transport-native-epoll'
+	  exclude group: 'org.apache.ignite'
+	  exclude group: 'org.springframework'
+          exclude group: 'com.google.protobuf'
+	  exclude group: 'commons-beanutils'
 }
 
-  compile group: 'org.flywaydb', name: 'flyway-core', version: flyway_version
-  compile group: 'com.beust', name: 'jcommander', version: jcommander_version
-  compile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
-  //compile group: 'org.postgresql', name: 'postgresql', version: postgres_version
-  // Switched to an Xray recommended version of postgresql since the version
-  // previously used, 42.2.5, was susceptible to vulnerability CVE-2022-21724
-  compile group: 'org.postgresql', name: 'postgresql', version: '42.3.2'
-  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-  compile group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
-  compile group: 'xerces', name: 'xercesImpl', version: xerces_version
+  implementation 'org.apache.commons:commons-lang3:' + commons_lang_version
+  implementation group: 'org.flywaydb', name: 'flyway-core', version: flyway_version
+  implementation group: 'com.beust', name: 'jcommander', version: jcommander_version
+  implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  implementation group: 'org.postgresql', name: 'postgresql', version: postgres_version
+  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  implementation group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
+  implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
 }
+
 
 shadowJar {
     mainClassName = 'com.bbn.tak.schema.SchemaManager'
@@ -61,7 +64,9 @@ task copyScripts (type: Copy, dependsOn: copyJar) {
 task setupCluster (type: Copy, dependsOn: copyScripts) {}
 
 clean {
-  delete '$buildDir/cluster'
+    doFirst {
+        delete '$buildDir/cluster'
+    }
 }
 
 group = 'tak'

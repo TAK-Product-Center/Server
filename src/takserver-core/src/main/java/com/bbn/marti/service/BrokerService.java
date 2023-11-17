@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -186,7 +187,11 @@ public class BrokerService extends BaseService {
 					}
 
 					if (subscription != null) {
-						if (subscription.isWebsocket.get()) {
+						if (!CollectionUtils.isEmpty(cot.getBinaryPayloads())) {
+							if (subscription.isLinkedToWebsocket.get()) {
+								websocketHits.add(subscription.linkedWebsocketConnectionId);
+							}
+						} else if (subscription.isWebsocket.get()) {
 							websocketHits.add(connectionId);
 							subscription.incHit(hitTime);
 						} else {
@@ -209,7 +214,8 @@ public class BrokerService extends BaseService {
 			}
 
 			if (!websocketHits.isEmpty()) {
-				WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, cot);
+				WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, cot,
+						DistributedConfiguration.getInstance().getNetwork().getServerId());
 			}
 
 			// clear the sub list from the cot message - so it can be garbage-collected

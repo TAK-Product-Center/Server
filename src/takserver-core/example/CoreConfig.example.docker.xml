@@ -3,9 +3,10 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="CoreConfig.xsd">
     <network multicastTTL="5">
-        <input _name="stdtcp" protocol="tcp" port="8087" auth="anonymous"/>
-        <input _name="stdudp" protocol="udp" port="8087" auth="anonymous"/>
-        <input _name="streamtcp" protocol="stcp" port="8088" auth="anonymous"/>
+        <input _name="stdssl" protocol="tls" port="8089" coreVersion="2"/>
+        <!-- <input _name="stdtcp" protocol="tcp" port="8087" auth="anonymous"/> -->
+        <!-- <input _name="stdudp" protocol="udp" port="8087" auth="anonymous"/> -->
+        <!-- <input _name="streamtcp" protocol="stcp" port="8088" auth="anonymous"/> -->
         <!-- <input _name="SAproxy" protocol="mcast" group="239.2.3.1" port="6969" proxy="true" auth="anonymous" /> -->
         <!-- <input _name="GeoChatproxy" protocol="mcast" group="224.10.10.1" port="17012" proxy="true" auth="anonymous" /> -->
         <!--<announce enable="true" uid="Marti1" group="239.2.3.1" port="6969" interval="1" ip="192.168.1.137" />-->
@@ -28,7 +29,7 @@
         <connector port="8443" _name="https"/>
         <connector port="8444" useFederationTruststore="true" _name="fed_https"/>
         <connector port="8446" clientAuth="false" _name="cert_https"/>
-        <connector port="8080" tls="false" _name="http_plaintext"/>
+        <!-- <connector port="8080" tls="false" _name="http_plaintext"/> -->
     </network>
     <auth>
                 <!-- Example OpenLDAP -->

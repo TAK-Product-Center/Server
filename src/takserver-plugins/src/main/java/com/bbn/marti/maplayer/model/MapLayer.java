@@ -8,6 +8,7 @@ import javax.persistence.*;
 import javax.xml.bind.annotation.XmlTransient;
 
 import com.bbn.marti.sync.model.Mission;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.jetbrains.annotations.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -49,6 +50,8 @@ public class MapLayer implements Serializable {
     private String coordinateSystem;
     private String version;
     private String layers;
+    private String path;
+    private String after;
     private Integer opacity;
     private Date createTime;
     private Date modifiedTime;
@@ -81,15 +84,17 @@ public class MapLayer implements Serializable {
         this.tileUpdate = other.tileUpdate;
         this.additionalParameters = other.additionalParameters;
         this.coordinateSystem = other.coordinateSystem;
+        this.version = other.version;
         this.layers = other.layers;
+        this.path = other.path;
+        this.after = other.after;
+        this.opacity = other.opacity;
         this.createTime = other.createTime;
         this.modifiedTime = other.modifiedTime;
         this.defaultLayer = other.defaultLayer;
         this.enabled = other.enabled;
         this.ignoreErrors = other.ignoreErrors;
         this.invertYCoordinate = other.invertYCoordinate;
-        this.opacity = other.opacity;
-        this.version = other.version;
     }
 
     @Id
@@ -352,6 +357,15 @@ public class MapLayer implements Serializable {
         this.opacity = opacity;
     }
 
+    @Column(name = "path")
+    public String getPath() { return path; }
+
+    public void setPath(String path) { this.path = path; }
+
+    @Column(name = "after")
+    public String getAfter() { return after; }
+
+    public void setAfter(String after) { this.after = after; }
 
     @JsonIgnore
     @XmlTransient
@@ -373,6 +387,7 @@ public class MapLayer implements Serializable {
                 Objects.equals(south, mapLayer.south) &&
                 Objects.equals(east, mapLayer.east) &&
                 Objects.equals(west, mapLayer.west) &&
+                //Objects.equals(uid, mapLayer.uid) &&
                 Objects.equals(name, mapLayer.name) &&
                 Objects.equals(description, mapLayer.description) &&
                 Objects.equals(type, mapLayer.type) &&
@@ -383,7 +398,11 @@ public class MapLayer implements Serializable {
                 Objects.equals(tileUpdate, mapLayer.tileUpdate) &&
                 Objects.equals(additionalParameters, mapLayer.additionalParameters) &&
                 Objects.equals(coordinateSystem, mapLayer.coordinateSystem) &&
+                Objects.equals(version, mapLayer.version) &&
                 Objects.equals(layers, mapLayer.layers) &&
+                Objects.equals(path, mapLayer.path) &&
+                Objects.equals(after, mapLayer.after) &&
+                Objects.equals(opacity, mapLayer.opacity) &&
                 // Dont use these attributes in equality check since they are not always sent up from clients
                 //Objects.equals(creatorUid, mapLayer.creatorUid) &&
                 //Objects.equals(createTime, mapLayer.createTime) &&
@@ -391,9 +410,7 @@ public class MapLayer implements Serializable {
                 Objects.equals(defaultLayer, mapLayer.defaultLayer) &&
                 Objects.equals(enabled, mapLayer.enabled) &&
                 Objects.equals(ignoreErrors, mapLayer.ignoreErrors) &&
-                Objects.equals(invertYCoordinate, mapLayer.invertYCoordinate) &&
-                Objects.equals(opacity, mapLayer.opacity) &&
-                Objects.equals(version, mapLayer.version);
+                Objects.equals(invertYCoordinate, mapLayer.invertYCoordinate);
     }
 
     @Override

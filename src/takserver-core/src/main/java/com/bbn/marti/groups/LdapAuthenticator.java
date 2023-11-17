@@ -7,6 +7,7 @@ import java.rmi.RemoteException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.naming.CommunicationException;
 import javax.naming.Context;
@@ -363,9 +364,73 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         }
 
         return env;
-    }  
+    }
+
+    // traverses up the group hierarchy and returns the list of nested group names
+    public List<String> findNestedGroups(
+            List<String> nestedGroups, DirContext context, String filter, String groupName,
+            SearchControls constraints, List<String> parents, Set<String> processed) {
+
+        try {
+            processed.add(groupName);
+
+            NamingEnumeration results = context.search(conf.getGroupBaseRDN(), filter, constraints);
+            if (results == null || !results.hasMore()) {
+                if (parents.isEmpty()) {
+                    return nestedGroups;
+                } else {
+                    parents.remove(groupName);
+                }
+            }
+
+            while (results.hasMore()) {
+                SearchResult result = (SearchResult) results.next();
+                parents.add(result.getNameInNamespace());
+                nestedGroups.add(result.getNameInNamespace());
+            }
+
+            Iterator<String> it = parents.iterator();
+            while (it.hasNext()) {
+                String groupDn = it.next();
+                String nextfilter = "(&(member=" + groupDn + ")(objectClass=groupOfNames))";
+                parents.remove(groupDn);
+                if (!processed.contains(groupDn)) {
+                    findNestedGroups(nestedGroups, context, nextfilter, groupDn, constraints, parents, processed);
+                }
+            }
+
+        } catch (Exception e) {
+            logger.error("exception in findNestedGroups", e);
+        }
+
+        return nestedGroups;
+    }
+
+    private Map<String, String> getNestedGroupInfoByDN(DirContext ctx, String userBindDn) {
+        Map<String, String> groupAttrs = new ConcurrentHashMap<>();
+
+        Set<String> processed = new ConcurrentSkipListSet<>();
+        List<String> parents = new CopyOnWriteArrayList<String>();
+        List<String> nestedGroups = new CopyOnWriteArrayList<String>();
+
+        SearchControls constraints = new SearchControls();
+        constraints.setSearchScope(SearchControls.SUBTREE_SCOPE);
+
+        String filter = "(&(member=" + userBindDn + ")(objectClass=groupOfNames))";
+        nestedGroups = findNestedGroups(nestedGroups, ctx, filter, userBindDn, constraints, parents, processed);
+
+        for (String groupName : nestedGroups) {
+            groupAttrs.put("memberOf" + groupAttrs.size(), groupName);
+        }
+
+        return groupAttrs;
+    }
 
     private Map<String, String> getGroupInfoByDN(DirContext ctx, String userBindDn) {
+
+        if (getConf().isNestedGroupLookup()) {
+            return getNestedGroupInfoByDN(ctx, userBindDn);
+        }
 
         Map<String, String> groupAttrs = new ConcurrentHashMap<>();
         NamingEnumeration<?> results = null;

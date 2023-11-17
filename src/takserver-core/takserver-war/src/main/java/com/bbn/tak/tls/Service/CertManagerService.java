@@ -210,6 +210,7 @@ public class CertManagerService {
                         microsoftCAConfig.getPassword(),
                         microsoftCAConfig.getTruststore(),
                         microsoftCAConfig.getTruststorePass(),
+                        microsoftCAConfig.isTrustAllHosts(),
                         tlsConfig.getContext());
 
                 if (certs == null || certs.length < 2) {

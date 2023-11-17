@@ -29,6 +29,7 @@ import com.bbn.marti.remote.service.MissionArchiveManager;
 import com.bbn.marti.remote.service.RetentionPolicyConfig;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.service.MissionService;
+import com.bbn.marti.util.CommonUtil;
 @RestController
 public class RetentionApi extends BaseRestController {
 
@@ -45,6 +46,9 @@ public class RetentionApi extends BaseRestController {
 
     @Autowired
     private EnterpriseSyncService syncStore;
+    
+    @Autowired
+    private CommonUtil martiUtil;
 
     @RequestMapping(value = "/retention/policy", method = RequestMethod.GET)
     ResponseEntity<ApiResponse<Map<String, Integer>>> getRetentionPolicy(HttpServletResponse response) {
@@ -160,7 +164,8 @@ public class RetentionApi extends BaseRestController {
 
         if (seconds != null) {
             try {
-                missionService.setExpiration(missionName, seconds);
+            	String groupVector = martiUtil.getGroupVectorBitString(request);
+                missionService.setExpiration(missionName, seconds, groupVector);
                 retentionPolicyConfig.setMissionExpiryTask(missionName, seconds);
             } catch (Exception e) {
                 if (logger.isDebugEnabled()) {

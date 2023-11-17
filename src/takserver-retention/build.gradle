@@ -6,7 +6,7 @@ buildscript {
 
 apply plugin: 'eclipse'
 apply plugin: 'idea'
-apply plugin: 'java'
+apply plugin: 'java-library'
 apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
 
@@ -32,7 +32,7 @@ dependencies {
     implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
     implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
 
-    compile project(':takserver-common')
+    implementation project(':takserver-common')
     implementation group: 'com.h2database', name: 'h2', version: h2_version
 
     implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
@@ -47,11 +47,13 @@ dependencies {
     implementation group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_version
     implementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
     implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
-    runtimeOnly 'org.postgresql:postgresql'
-    testCompile group: 'junit', name: 'junit', version: junit_version
-    testCompile group: 'org.mockito', name: 'mockito-core', version: mockito_version
-    testCompile("org.springframework.boot:spring-boot-starter-test") {
+    runtimeOnly "org.postgresql:postgresql:$postgres_version"
+
+
+    testImplementation group: 'junit', name: 'junit', version: junit_version
+    testImplementation group: 'org.mockito', name: 'mockito-core', version: mockito_version
+    testImplementation("org.springframework.boot:spring-boot-starter-test") {
         exclude group: "com.vaadin.external.google", module: "android-json"
     }
-    testCompile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+    testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
 }

@@ -17,20 +17,69 @@ import java.util.Set;
  *     Filter Expression - the filter expression of this edge.
  */
 public class FederateEdge {
+	
+	public enum GroupFilterType {
+		ALL, ALLOWED, DISALLOWED, ALLOWED_AND_DISALLOWED
+		
+	}
+	
+	public static GroupFilterType getGroupFilterType(String name) {
+		if ("allGroups".equals(name.toLowerCase())) {
+			return GroupFilterType.ALL;
+		}
+		
+		if ("allowed".equals(name.toLowerCase())) {
+			return GroupFilterType.ALLOWED;
+		}
+		
+		if ("disallowed".equals(name.toLowerCase())) {
+			return GroupFilterType.DISALLOWED;
+		}
+		
+		if ("allowedanddisallowed".equals(name.toLowerCase())) {
+			return GroupFilterType.ALLOWED_AND_DISALLOWED;
+		}
+		
+		return GroupFilterType.ALL;
+	}
+	
     private final FederateIdentity source;
     private final FederateIdentity destination;
     private final Set<FederationFilter> filterSet;
     private final String filterExpression;
+    private final Set<String> allowedGroups;
+    private final Set<String> disallowedGroups;
+    private final GroupFilterType filterType;
 
     public FederateEdge(FederateIdentity source, FederateIdentity destination,
-            String filterExpression) {
+            String filterExpression, Set<String> allowedGroups, Set<String> disallowedGroups,
+            GroupFilterType filterType) {
         this.source = source;
         this.destination = destination;
+
         filterSet = new HashSet<>();
         this.filterExpression = filterExpression;
+        
+        this.allowedGroups = allowedGroups;
+        this.disallowedGroups = disallowedGroups;
+        this.filterType = filterType;
     }
+    
+    
 
-    public FederateIdentity getSourceIdentity() {
+    public Set<String> getAllowedGroups() {
+		return allowedGroups;
+	}
+
+	public Set<String> getDisallowedGroups() {
+		return disallowedGroups;
+	}
+
+	public GroupFilterType getFilterType() {
+		return filterType;
+	}
+
+	public FederateIdentity getSourceIdentity() {
         return source;
     }
 
@@ -75,17 +124,9 @@ public class FederateEdge {
     }
 
     @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder(67);
-        builder.append("FederateEdge [source=")
-            .append(source)
-            .append(", destination=")
-            .append(destination)
-            .append(", filterSet=")
-            .append(filterSet)
-            .append(", filterExpression=")
-            .append(filterExpression)
-            .append(']');
-        return builder.toString();
-    }
+	public String toString() {
+		return "FederateEdge [source=" + source + ", destination=" + destination + ", filterSet=" + filterSet
+				+ ", filterExpression=" + filterExpression + ", allowedGroups=" + allowedGroups + ", disallowedGroups="
+				+ disallowedGroups + ", filterType=" + filterType + "]";
+	}
 }

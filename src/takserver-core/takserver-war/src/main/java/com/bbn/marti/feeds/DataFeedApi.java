@@ -18,6 +18,8 @@ import com.bbn.marti.network.BaseRestController;
 
 import tak.server.Constants;
 import tak.server.feeds.DataFeed;
+import tak.server.feeds.DataFeedStats;
+import tak.server.feeds.DataFeedStatsHelper;
 
 /*
  */
@@ -68,6 +70,41 @@ public class DataFeedApi extends BaseRestController {
 		return new ResponseEntity<ApiResponse<List<String>>>(
 				new ApiResponse<List<String>>(Constants.API_VERSION, DataFeed.class.getName(), dataFeeds),
 				HttpStatus.OK);
+	}
+
+	@RequestMapping(value = "/datafeeds/stats/{uuid}", method = RequestMethod.GET)
+	public ResponseEntity<ApiResponse<DataFeedStats>> getStatsForDataFeed(@PathVariable("uuid") String uuid) {
+		DataFeedStatsHelper dataFeedStatsHelper = DataFeedStatsHelper.getInstance();
+		DataFeedStats dataFeedStats = null;
+		HttpStatus hs = HttpStatus.OK;
+		try {
+   			    dataFeedStats = dataFeedStatsHelper.getLatestDataFeedStats(uuid);
+		} catch (Exception e) {
+			hs = HttpStatus.INTERNAL_SERVER_ERROR;
+			logger.error("Failed getting data feeds", e);
+		}
+
+		return new ResponseEntity<ApiResponse<DataFeedStats>>(
+				new ApiResponse<DataFeedStats>(Constants.API_VERSION, DataFeedStats.class.getName(), dataFeedStats),
+				hs);
+	}
+
+	@RequestMapping(value = "/datafeeds/stats", method = RequestMethod.GET)
+	public ResponseEntity<ApiResponse<List<DataFeedStats>>> getStatsForDataFeed() {
+		DataFeedStatsHelper dataFeedStatsHelper = DataFeedStatsHelper.getInstance();
+		List<DataFeedStats> dataFeedStatsList = null;
+		HttpStatus hs = HttpStatus.OK;
+
+		try {
+			dataFeedStatsList = dataFeedStatsHelper.getAllLatestDataFeedStats();
+		} catch (Exception e) {
+			hs = HttpStatus.INTERNAL_SERVER_ERROR;
+			logger.error("Failed getting data feeds", e);
+		}
+
+		return new ResponseEntity<ApiResponse<List<DataFeedStats>>>(
+				new ApiResponse<List<DataFeedStats>>(Constants.API_VERSION, DataFeedStats.class.getName(), dataFeedStatsList),
+				hs);
 	}
 
 }

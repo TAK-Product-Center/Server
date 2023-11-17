@@ -14,8 +14,36 @@ task copyLauncherScripts(type: Copy) {
     exclude 'utils*', 'messaging*', 'API*', 'plugins*', 'retention*', 'takserver.sh'
 }
 
+def preinstall_script= '''\
+echo "takserver-package launcher: preinstall $1 $2"
+
+if [ ! -f /etc/debian_version ]; then
+    # Backup existing retention config files
+    if [ -f /opt/tak/conf/retention/retention-policy.yml ]; then
+        echo "Backing up existing retention policy configuration"
+        cp /opt/tak/conf/retention/retention-policy.yml /opt/tak/conf/retention/retention-policy_bak.yml
+    fi
+
+    if [ -f /opt/tak/conf/retention/retention-service.yml ]; then
+        echo "Backing up existing retention service configuration"
+        cp /opt/tak/conf/retention/retention-service.yml /opt/tak/conf/retention/retention-service_bak.yml
+    fi
+
+    if [ -f /opt/tak/conf/retention/mission-archiving-config.yml ]; then
+        echo "Backing up existing mission archive configuration"
+        cp /opt/tak/conf/retention/mission-archiving-config.yml /opt/tak/conf/retention/mission-archiving-config_bak.yml
+    fi
+    
+    if [ -f /opt/tak/mission-archive/mission-store.yml ]; then
+        echo "Backing up existing mission store"
+        cp /opt/tak/mission-archive/mission-store.yml /opt/tak/mission-archive/mission-store_bak.yml
+    fi
+fi
+'''
+
 // rpm postinstall script
 def postinstall_script_launcher = '''\
+echo "takserver-package launcher: postinstall $1 $2"
 
 # Add tak user if it doesn't already exist.
 set +e
@@ -23,6 +51,7 @@ uid=`id -u tak 2>/dev/null`
 set -e
 if [ -z "$uid" ] ; then
     # User id 1491 is arbitrary
+    echo "Adding 'tak' user"
     useradd tak -r -u 1491 --no-create-home -d /opt/tak
 fi
 
@@ -72,31 +101,26 @@ chown root:root  /opt/tak/retention/takserver-retention
 chmod 755 /opt/tak/retention/takserver-retention
 cp /opt/tak/retention/takserver-retention /etc/init.d
 
-mkdir -p /opt/tak/conf/retention
-
-if [ ! -e /opt/tak/conf/retention/retention-policy.yml ]; then
-    cp /opt/tak/retention/retention-policy.yml /opt/tak/conf/retention/
+# Reinstate existing retention config files
+if [ -f /opt/tak/conf/retention/retention-policy_bak.yml ]; then
+    echo "Restoring retention policy configuration from backup"
+    mv /opt/tak/conf/retention/retention-policy_bak.yml /opt/tak/conf/retention/retention-policy.yml 
 fi
 
-if [ ! -e /opt/tak/conf/retention/retention-service.yml ]; then
-    cp /opt/tak/retention/retention-service.yml /opt/tak/conf/retention/
+if [ -f /opt/tak/conf/retention/retention-service_bak.yml ]; then
+    echo "Restoring retention service configuration from backup"
+    mv /opt/tak/conf/retention/retention-service_bak.yml /opt/tak/conf/retention/retention-service.yml
 fi
 
-if [ -f /opt/tak/conf/retention/misison-archiving-config.yml ]; then
-    rm -rf /opt/tak/conf/retention/misison-archiving-config.yml 
+if [ -f /opt/tak/conf/retention/mission-archiving-config_bak.yml ]; then
+    echo "Restoring existing mission archive configuration from backup"
+    mv /opt/tak/conf/retention/mission-archiving-config_bak.yml /opt/tak/conf/retention/mission-archiving-config.yml
 fi
 
-if [ ! -e /opt/tak/conf/retention/mission-archiving-config.yml ]; then
-    cp /opt/tak/retention/mission-archiving-config.yml /opt/tak/conf/retention/
+if [ -f /opt/tak/mission-archive/mission-store_bak.yml ]; then
+    echo "Restoring existing mission store from backup"
+    mv /opt/tak/mission-archive/mission-store_bak.yml /opt/tak/mission-archive/mission-store.yml
 fi
-
-if [ ! -d "/opt/tak/mission-archive" ]; then
-    mkdir -p /opt/tak/mission-archive
-    if [ -f "/opt/tak/retention/mission-store.yml" ]; then
-        cp /opt/tak/retention/mission-store.yml /opt/tak/mission-archive/
-    fi
-fi
-
 
 chown -fR tak:tak /opt/tak/conf
 chown -fR tak:tak /opt/tak/mission-archive
@@ -156,19 +180,16 @@ Distribution Statement A: Approved for public release; distribution is unlimited
 
 IMPORTANT: If you are going to use a database, make sure you copy the generated database password from /opt/tak/CoreConfig.example.xml on the database machine to your CoreConfig on this machine.
 
-Create login credentials for local adminstrative access to the configuration interface:
+By default, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates.
 
-sudo java -jar /opt/tak/utils/UserManager.jar usermod -A -p <password> <username>
+After generating certificates, use the following command to register an admin account:
+> sudo java -jar /opt/tak/utils/UserManager.jar certmod -A /opt/tak/certs/files/admin.pem
 
-For secure operation, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates.
-
-Using Firefox or Chrome on this computer, browse to this address to verify keystore and truststore configuration:
-
-http://localhost:8080
+Using Firefox or Chrome on this computer add the admin certificate to the local browser trust and browse to this address to verify keystore and truststore configuration:
  
-Login with the administrative credentials specified above.
+http://localhost:8443
 
-Follow the instructions in the Installation section of the configuration guide to complete the setup process. 
+Follow the instructions in the Installation section of the configuration guide to complete the setup process.
 
 EOF
 '''
@@ -186,7 +207,8 @@ ospackage {
     url = _url
     summary = _summary
 
-    preInstall _preinstall_script
+    preInstall preinstall_script
+    preUninstall _preuninstall_script
     postInstall postinstall_script_launcher
     postUninstall _postuninstall_script
 
@@ -198,9 +220,6 @@ ospackage {
 }
 
 task prePackage { }
-prePackage.dependsOn ':takserver-core:bootWar'
-prePackage.dependsOn ':takserver-usermanager:shadowJar'
-prePackage.dependsOn ':takserver-takcl-core:publicJar'
 prePackage.dependsOn copyJarsNoDb
 prePackage.dependsOn copyWars
 prePackage.dependsOn copyPluginsJar
@@ -211,6 +230,7 @@ prePackage.dependsOn copyMessagingScripts
 prePackage.dependsOn copyAPIScripts
 prePackage.dependsOn copyPluginsScripts
 prePackage.dependsOn copyRetentionConfigs
+prePackage.dependsOn copyRetentionMissionStoreDir
 prePackage.dependsOn copyRetentionScripts
 prePackage.dependsOn copyLauncherScripts
 prePackage.dependsOn copyDocs

@@ -18,109 +18,109 @@ dependencies {
   providedCompile group: 'org.apache.tomcat', name: 'tomcat-catalina', version: tomcat_version
 
   // swagger
-  // compile group: 'org.springdoc', name: 'springdoc-openapi-ui', version: springdoc_version
-  compile ("org.springdoc:springdoc-openapi-ui:$springdoc_version") {
+  // implementation group: 'org.springdoc', name: 'springdoc-openapi-ui', version: springdoc_version
+  implementation ("org.springdoc:springdoc-openapi-ui:$springdoc_version") {
   	  // Added to exclude dom4j 1.6.1, a transitive dependency
   	  exclude group: 'dom4j', module: 'dom4j'
   }
-  compile(project(':takserver-common'))
+  implementation(project(':takserver-common'))
 
   // cloudwatch metrics
-  compile group: 'io.awspring.cloud', name: 'spring-cloud-starter-aws', version: spring_cloud_starter_version
-  compile group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_cloudwatch_version
-  compile group: 'io.micrometer', name: 'micrometer-core'
+  api group: 'io.awspring.cloud', name: 'spring-cloud-starter-aws', version: spring_cloud_starter_version
+  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_cloudwatch_version
+  implementation group: 'io.micrometer', name: 'micrometer-core'
 
-  compile group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
-  compile group: 'org.dom4j', name: 'dom4j', version: dom4j_version
-  compile group: 'org.owasp.antisamy', name: 'antisamy', version: antisamy_version
-  compile group: 'org.apache.xmlgraphics', name: 'batik-css', version: batik_version
-  compile group: 'org.codehaus.castor', name: 'castor-xml', version: castor_version
-  compile group: 'com.fasterxml', name: 'classmate', version: classmate_version
-  compile group: 'org.apache.commons', name: 'commons-collections4', version: commons_collections_version
-  compile group: 'commons-fileupload', name: 'commons-fileupload', version: commons_fileupload_version
-  compile group: 'commons-io', name: 'commons-io', version: commons_io_version
-  compile group: 'commons-validator', name: 'commons-validator', version: commons_validator_version
-  compile group: 'org.apache.commons', name: 'commons-pool2', version: commons_pool_version
-  compile group: 'org.owasp.esapi', name: 'esapi', version: esapi_version
-  compile group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
-  compile group: 'org.hibernate', name: 'hibernate-entitymanager', version: hibernate_version
-  compile group: 'org.hibernate', name: 'hibernate-spatial', version: hibernate_version
-  compile group: 'org.hibernate', name: 'hibernate-validator', version: hibernate_validator_version
+  implementation group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
+  implementation group: 'org.dom4j', name: 'dom4j', version: dom4j_version
+  implementation group: 'org.owasp.antisamy', name: 'antisamy', version: antisamy_version
+  implementation group: 'org.apache.xmlgraphics', name: 'batik-css', version: batik_version
+  implementation group: 'org.codehaus.castor', name: 'castor-xml', version: castor_version
+  implementation group: 'com.fasterxml', name: 'classmate', version: classmate_version
+  api group: 'org.apache.commons', name: 'commons-collections4', version: commons_collections_version
+  implementation group: 'commons-fileupload', name: 'commons-fileupload', version: commons_fileupload_version
+  api group: 'commons-io', name: 'commons-io', version: commons_io_version
+  implementation group: 'commons-validator', name: 'commons-validator', version: commons_validator_version
+  implementation group: 'org.apache.commons', name: 'commons-pool2', version: commons_pool_version
+  api group: 'org.owasp.esapi', name: 'esapi', version: esapi_version
+  implementation group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
+  implementation group: 'org.hibernate', name: 'hibernate-entitymanager', version: hibernate_version
+  implementation group: 'org.hibernate', name: 'hibernate-spatial', version: hibernate_version
+  implementation group: 'org.hibernate', name: 'hibernate-validator', version: hibernate_validator_version
 
-  compile group: 'org.hibernate.javax.persistence', name: 'hibernate-jpa-2.1-api', version: hibernate_jpa_version
-  compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jackson_version
-  compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jackson_version
-  compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jackson_version
-  compile group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: jackson_version
-  compile group: 'org.jboss', name: 'jandex', version: jandex_version
-  compile group: 'org.javassist', name: 'javassist', version: javassist_version
-  compile group: 'javax.inject', name: 'javax.inject', version: javax_inject_version
-  compile group: 'org.eclipse.persistence', name: 'javax.persistence', version: javax_persistence_version
-  compile group: 'org.jboss.logging', name: 'jboss-logging', version: jboss_logging_version
-  compile group: 'org.jboss.spec.javax.transaction', name: 'jboss-transaction-api_1.2_spec', version: javax_transaction_version
-  compile group: 'org.slf4j', name: 'jcl-over-slf4j', version: slf4j_version
-  compile group: 'com.beust', name: 'jcommander', version: jcommander_version
-  compile group: 'com.googlecode.json-simple', name: 'json-simple', version: json_simple_version
-  compile group: 'javax.ws.rs', name: 'jsr311-api', version: jsr311_version
-  compile group: 'org.slf4j', name: 'jul-to-slf4j', version: slf4j_version
-  compile group: 'org.gnu.inet', name: 'libidn', version: libidn_version
+  implementation group: 'org.hibernate.javax.persistence', name: 'hibernate-jpa-2.1-api', version: hibernate_jpa_version
+  implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jackson_version
+  implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jackson_version
+  implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jackson_version
+  implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: jackson_version
+  implementation group: 'org.jboss', name: 'jandex', version: jandex_version
+  implementation group: 'org.javassist', name: 'javassist', version: javassist_version
+  implementation group: 'javax.inject', name: 'javax.inject', version: javax_inject_version
+  implementation group: 'org.eclipse.persistence', name: 'javax.persistence', version: javax_persistence_version
+  implementation group: 'org.jboss.logging', name: 'jboss-logging', version: jboss_logging_version
+  implementation group: 'org.jboss.spec.javax.transaction', name: 'jboss-transaction-api_1.2_spec', version: javax_transaction_version
+  implementation group: 'org.slf4j', name: 'jcl-over-slf4j', version: slf4j_version
+  api group: 'com.beust', name: 'jcommander', version: jcommander_version
+  implementation group: 'com.googlecode.json-simple', name: 'json-simple', version: json_simple_version
+  implementation group: 'com.google.code.gson', name: 'gson', version: gson_version
+  implementation group: 'javax.ws.rs', name: 'jsr311-api', version: jsr311_version
+  implementation group: 'org.slf4j', name: 'jul-to-slf4j', version: slf4j_version
+  implementation group: 'org.gnu.inet', name: 'libidn', version: libidn_version
 
   // required for audit log custom logging filter
-  compile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
 
-  compile group: 'net.sourceforge.nekohtml', name: 'nekohtml', version: neko_version
-  compile group: 'org.postgresql', name: 'postgresql', version: postgres_version
-  compile group: 'org.ocpsoft.prettytime', name: 'prettytime', version: prettytime_version
-  compile group: 'org.simpleframework', name: 'simple-xml', version: simplexml_version
-  compile group: 'org.springframework', name: 'spring-aop', version: spring_version
-  compile group: 'org.springframework', name: 'spring-aspects', version: spring_version
-  compile group: 'org.springframework', name: 'spring-beans', version: spring_version
-  compile group: 'org.springframework', name: 'spring-context', version: spring_version
-  compile group: 'org.springframework', name: 'spring-context-support', version: spring_version
-  compile group: 'org.springframework.data', name: 'spring-data-commons', version: spring_data_commons_version
-  compile group: 'org.springframework.data', name: 'spring-data-jpa', version: spring_data_version
-  compile group: 'org.springframework', name: 'spring-expression', version: spring_version
-  compile group: 'org.springframework', name: 'spring-beans', version: spring_version
-  compile group: 'org.springframework', name: 'spring-jdbc', version: spring_version
-  compile group: 'org.springframework', name: 'spring-tx', version: spring_version
-  compile group: 'org.springframework', name: 'spring-messaging', version: spring_version
-  compile group: 'org.springframework', name: 'spring-orm', version: spring_version
-  compile group: 'org.springframework', name: 'spring-oxm', version: spring_version
-  compile group: 'org.springframework', name: 'spring-web', version: spring_version
-  compile group: 'org.springframework', name: 'spring-webmvc', version: spring_version
-  compile group: 'org.springframework', name: 'spring-websocket', version: spring_version
-  compile group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
-  compile group: 'org.springframework.security', name: 'spring-security-config', version: spring_security_version
-  compile group: 'org.springframework.security', name: 'spring-security-messaging', version: spring_security_version
-  compile group: 'org.springframework.security', name: 'spring-security-web', version: spring_security_version
-  compile group: 'org.springframework.security', name: 'spring-security-jwt', version: spring_security_jwt_version
-  compile group: 'org.springframework.security.oauth', name: 'spring-security-oauth2', version: spring_security_oauth_version
-  compile group: 'org.springframework.security.oauth.boot', name: 'spring-security-oauth2-autoconfigure', version: spring_security_oauth2_autoconfigure_version
-  // compile group: 'org.igniterealtime', name: 'tinder', version: tinder_version
-  compile ("org.igniterealtime:tinder:$tinder_version") {
+  api group: 'org.postgresql', name: 'postgresql', version: postgres_version
+  implementation group: 'org.ocpsoft.prettytime', name: 'prettytime', version: prettytime_version
+  implementation group: 'org.simpleframework', name: 'simple-xml', version: simplexml_version
+  implementation group: 'org.springframework', name: 'spring-aop', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-aspects', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-beans', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-context', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-context-support', version: spring_version
+  implementation group: 'org.springframework.data', name: 'spring-data-commons', version: spring_data_commons_version
+  implementation group: 'org.springframework.data', name: 'spring-data-jpa', version: spring_data_version
+  implementation group: 'org.springframework', name: 'spring-expression', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-beans', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-jdbc', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-tx', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-messaging', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-orm', version: spring_version
+  api group: 'org.springframework', name: 'spring-oxm', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-web', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-webmvc', version: spring_version
+  implementation group: 'org.springframework', name: 'spring-websocket', version: spring_version
+  implementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
+  implementation group: 'org.springframework.security', name: 'spring-security-config', version: spring_security_version
+  implementation group: 'org.springframework.security', name: 'spring-security-messaging', version: spring_security_version
+  implementation group: 'org.springframework.security', name: 'spring-security-web', version: spring_security_version
+  implementation group: 'org.springframework.security', name: 'spring-security-jwt', version: spring_security_jwt_version
+  api group: 'org.springframework.security.oauth', name: 'spring-security-oauth2', version: spring_security_oauth_version
+  implementation group: 'org.springframework.security.oauth.boot', name: 'spring-security-oauth2-autoconfigure', version: spring_security_oauth2_autoconfigure_version
+  // implementation group: 'org.igniterealtime', name: 'tinder', version: tinder_version
+  implementation ("org.igniterealtime:tinder:$tinder_version") {
   	  // Added to exclude dom4j 1.6.1, a transitive dependency
   	  exclude group: 'dom4j', module: 'dom4j'
   }
-  compile group: 'gov.nasa', name: 'worldwind', version: worldwind_version
-  compile group: 'xerces', name: 'xercesImpl', version: xerces_version
-  compile group: 'xpp3', name: 'xpp3_min', version: xpp3_version
-  compile group: 'com.sun.xml.ws', name: 'jaxws-rt', version: jaxwsrt_version
-  compile group: 'org.json', name: 'json', version: json_org_version
-  compile group: 'io.jsonwebtoken', name: 'jjwt', version: jsonwebtoken_version
-  //compile group: 'org.igniterealtime.whack', name: 'core', version: whack_version
-  compile ("org.igniterealtime.whack:core:$whack_version") {
+  implementation group: 'gov.nasa', name: 'worldwind', version: worldwind_version
+  implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
+  implementation group: 'xpp3', name: 'xpp3_min', version: xpp3_version
+  implementation group: 'com.sun.xml.ws', name: 'jaxws-rt', version: jaxwsrt_version
+  api group: 'org.json', name: 'json', version: json_org_version
+  api group: 'io.jsonwebtoken', name: 'jjwt', version: jsonwebtoken_version
+  //implementation group: 'org.igniterealtime.whack', name: 'core', version: whack_version
+  implementation ("org.igniterealtime.whack:core:$whack_version") {
   	  // Added to exclude dom4j 1.6.1, a transitive dependency
   	  exclude group: 'dom4j', module: 'dom4j'
   }
 
-  compile group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
+  implementation group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
 
 
-  compile 'javax.xml.bind:jaxb-api:' + jaxb_api_version
-  compile('javax.activation:activation:1.1')
-  compile('org.glassfish.jaxb:jaxb-runtime:' + jaxb_api_version)
+  implementation 'javax.xml.bind:jaxb-api:' + jaxb_api_version
+  implementation 'javax.activation:activation:' + javax_activation_version
+  implementation('org.glassfish.jaxb:jaxb-runtime:' + jaxb_api_version)
 
-  compile name: 'JavaAPIforKml-2.2.2'
-  compile group: 'com.squareup.okhttp3', name: 'okhttp', version: okhttp3_version
+  api name: 'JavaAPIforKml-2.2.2'
+  implementation group: 'com.squareup.okhttp3', name: 'okhttp', version: okhttp3_version
 }
 

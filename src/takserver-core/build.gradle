@@ -102,10 +102,17 @@ task copyVerFile(type: Copy) {
     into file("${buildDir}/resources")
 }
 
+writeVerFile.dependsOn compileJava
+copyVerFile.dependsOn writeVerFile
+compileTestJava.dependsOn copyVerFile
+bootWarMainClassName.dependsOn copyVerFile
+test.dependsOn compileIntegrationTestJava
+processResources.dependsOn copyVerFile
+bootWar.dependsOn copyVerFile
+bootJar.dependsOn copyVerFile
 bootWar.dependsOn test
-bootWar.dependsOn compileIntegrationTestJava
-compileJava.finalizedBy writeVerFile
-writeVerFile.finalizedBy copyVerFile
+bootWar.dependsOn ":takserver-tool-ui:deployToCore"
+
 
 bootWar {
     enabled = true
@@ -127,149 +134,156 @@ targetCompatibility = 1.8
 
 dependencies {
 
-  compile group: 'io.netty', name: 'netty-handler', version: netty_handler_version
+  implementation group: 'io.netty', name: 'netty-handler', version: netty_handler_version
 
   // gRPC
-//  compile group: 'io.grpc', name: 'grpc-netty', version: grpc_version
-//  compile group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
-//  compile group: 'io.grpc', name: 'grpc-stub', version: grpc_version
+  //  implementation group: 'io.grpc', name: 'grpc-netty', version: grpc_version
+//  implementation group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
+//  implementation group: 'io.grpc', name: 'grpc-stub', version: grpc_version
 
   // Google's OpenSSL variant
   // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
 
-  compile group: 'io.netty', name: 'netty-tcnative-classes', version: netty_tcnative_version
+  implementation group: 'io.netty', name: 'netty-tcnative-classes', version: netty_tcnative_version
 
-//  compile group: 'io.netty', name: 'netty-tcnative-boringssl-static', version: netty_tcnative_version
-//  compile group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
-//  compile group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
+//  implementation group: 'io.netty', name: 'netty-tcnative-boringssl-static', version: netty_tcnative_version
+//  implementation group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
+//  implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
 
-  compile group: 'xerces', name: 'xercesImpl', version: xerces_version
+  implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
 
-  compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
-  compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
-  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+  implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
+  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
 
 
 
 
   // required to fix version conflict for h2 between ignite and spring boot
-  compile group: 'com.h2database', name: 'h2', version: h2_version
+  implementation group: 'com.h2database', name: 'h2', version: h2_version
 
-  compile group: 'javax.cache', name: 'cache-api', version: '1.1.1'
+  implementation group: 'javax.cache', name: 'cache-api', version: '1.1.1'
 
-  compile project(':takserver-common')
-  compile project(':federation-common')
-
-  compile group: 'org.locationtech.spatial4j', name: 'spatial4j', version: '0.6'
-  // implementation group: 'org.locationtech.spatial4j', name: 'spatial4j', version: '0.6'
-
-  compile group: 'org.dom4j', name: 'dom4j', version: dom4j_version
-  compile group: 'com.google.code.gson', name: 'gson', version: gson_version
-
-  // apache ignite (cache)
-//  compile group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
-  compile group: 'org.apache.ignite', name: 'ignite-core', version: ignite_version
-  compile ("org.apache.ignite:ignite-spring:$ignite_version") {
-	exclude group: 'org.springframework', module: 'spring-context'
-  }
-
-  compile group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: spring_boot_version
-  compile group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: spring_boot_version
-  compile group: 'org.springframework.boot', name: 'spring-boot-starter-cache', version: spring_boot_version
-
-  compile group: 'io.micrometer', name: 'micrometer-core'
-
-
-
-  // cloudwatch metrics
-  compile group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_cloudwatch_version
-
-  compile(project(':takserver-core:takserver-war')) {
+  api(project(':takserver-core:takserver-war')) {
     exclude group: 'ch.qos.logback', module: 'logback-classic'
     exclude group: 'org.slf4j'
     exclude group: 'log4j', module: 'log4j'
     // Added to exclude dom4j 1.6.1, a transitive dependency
     exclude group: 'dom4j', module: 'dom4j'
   }
-  compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
-  compile group: 'org.slf4j', name: 'jul-to-slf4j', version: slf4j_version
+  implementation project(':takserver-common')
+  implementation project(':federation-common')
+
+  implementation group: 'org.locationtech.spatial4j', name: 'spatial4j', version: '0.6'
+
+  implementation group: 'org.dom4j', name: 'dom4j', version: dom4j_version
+  implementation group: 'com.google.code.gson', name: 'gson', version: gson_version
+
+  // apache ignite (cache)
+//  implementation group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
+  implementation group: 'org.apache.ignite', name: 'ignite-core', version: ignite_version
+  implementation ("org.apache.ignite:ignite-spring:$ignite_version") {
+	exclude group: 'org.springframework', module: 'spring-context'
+  }
+
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-cache', version: spring_boot_version
+
+  implementation group: 'io.micrometer', name: 'micrometer-core'
+
+
+
+  // cloudwatch metrics
+  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_cloudwatch_version
+
+  implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
+  implementation group: 'org.slf4j', name: 'jul-to-slf4j', version: slf4j_version
 
   // tomcat
-  compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-jasper', version: tomcat_version
-  compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-el', version: tomcat_version
-  compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-websocket', version: tomcat_version
-  compile group: 'org.apache.tomcat', name: 'tomcat-jsp-api', version: tomcat_version
-  compile group: 'org.apache.tomcat', name: 'tomcat-el-api', version: tomcat_version
-  compile group: 'org.apache.tomcat', name: 'tomcat-annotations-api', version: tomcat_version
+  implementation group: 'org.apache.tomcat.embed', name: 'tomcat-embed-jasper', version: tomcat_version
+  implementation group: 'org.apache.tomcat.embed', name: 'tomcat-embed-el', version: tomcat_version
+  implementation group: 'org.apache.tomcat.embed', name: 'tomcat-embed-websocket', version: tomcat_version
+  implementation group: 'org.apache.tomcat', name: 'tomcat-jsp-api', version: tomcat_version
+  implementation group: 'org.apache.tomcat', name: 'tomcat-el-api', version: tomcat_version
+  implementation group: 'org.apache.tomcat', name: 'tomcat-annotations-api', version: tomcat_version
 
 
-  compile group: 'javax.servlet', name: 'jstl'
-  compile group: 'javax.mail', name: 'javax.mail-api'
-  compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-core', version: tomcat_version
-  compile group: 'org.springframework.boot', name: 'spring-boot-starter-tomcat', version: spring_boot_version
-  compile group: 'org.springframework.boot', name: 'spring-boot-starter-data-jpa', version: spring_boot_version
-  compile group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
-  compile group: 'org.springframework.boot', name: 'spring-boot-starter-mail', version: spring_boot_version
-  compile group: 'org.springframework.boot', name: 'spring-boot-starter-websocket', version: spring_boot_version
-  compile group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
-  compile group: 'org.springframework.security', name: 'spring-security-config', version: spring_security_version
-  compile group: 'org.springframework.security', name: 'spring-security-messaging', version: spring_security_version
-  compile group: 'org.springframework.security', name: 'spring-security-web', version: spring_security_version
-  compile group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
-  compile group: 'org.hibernate', name: 'hibernate-entitymanager', version: hibernate_version
+  implementation group: 'javax.servlet', name: 'jstl'
+  implementation group: 'javax.mail', name: 'javax.mail-api'
+  implementation group: 'org.apache.tomcat.embed', name: 'tomcat-embed-core', version: tomcat_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-tomcat', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-jpa', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-mail', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-websocket', version: spring_boot_version
+  implementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
+  implementation group: 'org.springframework.security', name: 'spring-security-config', version: spring_security_version
+  implementation group: 'org.springframework.security', name: 'spring-security-messaging', version: spring_security_version
+  implementation group: 'org.springframework.security', name: 'spring-security-web', version: spring_security_version
+  implementation group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
+  implementation group: 'org.hibernate', name: 'hibernate-entitymanager', version: hibernate_version
 
-
+  implementation group: 'org.postgresql', name: 'postgresql', version: postgres_version
 
 
   // core deps
 
-  compile group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
-  compile group: 'org.apache.httpcomponents', name: 'fluent-hc', version: httpcomponents_version
-  compile group: 'org.apache.httpcomponents', name: 'httpclient', version: httpcomponents_version
-  compile group: 'org.apache.httpcomponents', name: 'httpmime', version: httpcomponents_version
+  implementation group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
+  implementation 'org.apache.commons:commons-lang3:' + commons_lang_version
+  implementation group: 'commons-collections', name: 'commons-collections', version: '3.2.2'
+  implementation group: 'org.apache.httpcomponents', name: 'fluent-hc', version: httpcomponents_version
+  implementation group: 'org.apache.httpcomponents', name: 'httpclient', version: httpcomponents_version
+  implementation group: 'org.apache.httpcomponents', name: 'httpmime', version: httpcomponents_version
 
 
 
   // nats message queue
-  compile group: 'io.nats', name: 'jnats', version: nats_version
+  implementation group: 'io.nats', name: 'jnats', version: nats_version
 
     // apache ignite (cache and distributed service grid)
-  testCompile group: 'org.apache.ignite', name: 'ignite-indexing', version: ignite_version
-  testCompile group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
-  testCompile group: 'org.apache.ignite', name: 'ignite-log4j', version: ignite_version
-  testCompile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+  testImplementation group: 'org.apache.ignite', name: 'ignite-indexing', version: ignite_version
+  testImplementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
+  testImplementation group: 'org.apache.ignite', name: 'ignite-log4j', version: ignite_version
+  testImplementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
 
 
-  testCompile group: 'junit', name: 'junit', version: junit_version
-  testCompile group: 'org.mockito', name: 'mockito-core', version: mockito_version
+  testImplementation group: 'junit', name: 'junit', version: junit_version
+  testImplementation group: 'org.mockito', name: 'mockito-core', version: mockito_version
 
-  testCompile("org.springframework.boot:spring-boot-starter-test") {
+  testImplementation("org.springframework.boot:spring-boot-starter-test") {
     exclude group: "com.vaadin.external.google", module:"android-json"
   }
 
-  testCompile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
 
-  integrationTestCompile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
-  integrationTestCompile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
-  integrationTestCompile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  integrationTestImplementation group: 'com.intellij', name: 'annotations', version: intellij_annotations_version // IntelliJ @NotNull annotation
+  integrationTestImplementation group: 'junit', name: 'junit', version: junit_version
+  integrationTestImplementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+  integrationTestImplementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
+  integrationTestImplementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  integrationTestImplementation group: 'org.dom4j', name: 'dom4j', version: dom4j_version
 
-  integrationTestCompile project(':takserver-takcl-core')
+  integrationTestImplementation project(':federation-common')
+  integrationTestImplementation project(':takserver-takcl-core')
 
   // required to fix version conflict for h2 between ignite and spring boot
-  integrationTestCompile group: 'com.h2database', name: 'h2', version: h2_version
-  integrationTestCompile group: 'xerces', name: 'xercesImpl', version: xerces_version
+  integrationTestImplementation group: 'com.h2database', name: 'h2', version: h2_version
+  integrationTestImplementation group: 'xerces', name: 'xercesImpl', version: xerces_version
 
 
 }
 
 clean {
-  delete 'src/main/resources/ver.txt'
-  delete '$buildDir/cluster'
+  doFirst {
+      delete 'src/main/resources/ver.txt'
+      delete '$buildDir/cluster'
+  }
 }
 
 task integrationTest(type: Test) {
@@ -339,3 +353,7 @@ task integrationTest(type: Test) {
     dependsOn('build')
 }
 
+project.tasks.named("processIntegrationTestResources") {
+    // This duplication strategy de-conflicts logback-test.xml conflict for processIntegrationTestResources task
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}

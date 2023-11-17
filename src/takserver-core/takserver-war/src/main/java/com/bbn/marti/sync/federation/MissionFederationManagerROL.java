@@ -13,11 +13,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.atakmap.Tak.ROL;
 import com.atakmap.Tak.ROL.Builder;
+import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationManager;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.sync.MissionContent;
+import com.bbn.marti.remote.sync.MissionExpiration;
 import com.bbn.marti.remote.sync.MissionHierarchy;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayer;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayer;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.DataPackageFileBlocker;
 import com.bbn.marti.sync.EnterpriseSyncService;
@@ -26,6 +30,8 @@ import com.bbn.marti.sync.Metadata.Field;
 import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionChange;
 import com.bbn.marti.sync.model.MissionChangeUtils;
+import com.bbn.marti.sync.model.MissionLayer;
+import com.bbn.marti.sync.model.MissionLayer.Type;
 import com.bbn.marti.sync.service.MissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
@@ -343,11 +349,8 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 				logger.debug("federated setParent " + missionName + "," + parentMissionName + ", groups: " + groups);
 			}
 
-			Builder rol = ROL.newBuilder().setProgram("assign mission\n" +
-					mapper.writeValueAsString(missionHierarchy) + ";");
-
 			try {
-				fedMgr.submitMissionFederateROL(rol.build(), groups, missionName);
+				fedMgr.submitMissionFederateROL(malrc.setParentToROL(missionHierarchy), groups, missionName);
 			} catch (Exception e) {
 				logger.warn("remote exception sending ROL", e);
 			}
@@ -374,11 +377,8 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 				logger.debug("federated clearParent " + missionName + ", groups: " + groups);
 			}
 
-			Builder rol = ROL.newBuilder().setProgram("assign mission\n" +
-					mapper.writeValueAsString(missionHierarchy) + ";");
-
 			try {
-				fedMgr.submitMissionFederateROL(rol.build(), groups, missionName);
+				fedMgr.submitMissionFederateROL(malrc.setParentToROL(missionHierarchy), groups, missionName);
 			} catch (Exception e) {
 				logger.warn("remote exception sending ROL", e);
 			}
@@ -395,6 +395,10 @@ public class MissionFederationManagerROL implements MissionFederationManager {
      */
     @Override
     public void insertResource(Metadata metadata, byte[] content, NavigableSet<Group> groups) {
+
+    	if (metadata == null) {
+    		return;
+		}
 
         if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
 
@@ -554,6 +558,132 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			logger.error("exception federating enterprise sync update resource", e);
 		}
 	}
+	
+	@Override
+	public void setExpiration(String missionName, Long expiration, NavigableSet<Group> groups) {
+		
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		
+		try {
+			MissionExpiration missionExpiration = new MissionExpiration();
+			missionExpiration.setMissionName(missionName);
+			missionExpiration.setMissionExpiration(expiration);
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("federated setExpiration " + missionName + ", expiration" + expiration);
+			}
+
+			try {
+				fedMgr.submitMissionFederateROL(malrc.setMissionExpirationToROL(missionExpiration), groups, missionName);
+			} catch (Exception e) {
+				logger.warn("remote exception sending ROL", e);
+			}
+
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending mission setExpiration federated ROL", e);
+			}
+		}
+	}
+	
+	@Override
+	public void addMissionLayer(MissionUpdateDetailsForMissionLayer missionUpdateDetailsForMissionLayer, NavigableSet<Group> groups) {
+		
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		
+		try {
+			
+			fedMgr.submitMissionFederateROL(malrc.addMissionLayerToROL(missionUpdateDetailsForMissionLayer), groups, missionUpdateDetailsForMissionLayer.getMission().getName());
+
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending addMissionLayer federated ROL", e);
+			}
+		}
+	}
+	
+	@Override
+	public void deleteMissionLayer(MissionUpdateDetailsForMissionLayer missionUpdateDetailsForMissionLayer, NavigableSet<Group> groups) {
+
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		 
+		try {
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("intercepted deleteMissionLayer: {}", missionUpdateDetailsForMissionLayer.getLayerUid());
+			}
+
+			fedMgr.submitMissionFederateROL(malrc.deleteMissionLayerToROL(missionUpdateDetailsForMissionLayer), groups, missionUpdateDetailsForMissionLayer.getMission().getName());
+			
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending deleteMissionLayer federated ROL", e);
+			}
+		}	
+		
+	}
+	
+	@Override
+	public void addMapLayerToMission(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer, NavigableSet<Group> groups) {
+		
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		
+		try { 
+			
+			fedMgr.submitMissionFederateROL(malrc.addMapLayerToMissionToROL(missionUpdateDetailsForMapLayer), groups, missionUpdateDetailsForMapLayer.getMission().getName());
+			
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending addMapLayer federated ROL", e);
+			}
+		}
+		
+	}
+	
+	@Override
+	public void updateMapLayer(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer, NavigableSet<Group> groups) {
+		
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		
+		try {
+			
+			fedMgr.submitMissionFederateROL(malrc.updateMapLayerToROL(missionUpdateDetailsForMapLayer), groups, missionUpdateDetailsForMapLayer.getMission().getName());
+			
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending updateMapLayer federated ROL", e);
+			}
+		}
+	}
+	
+	@Override
+	public void removeMapLayerFromMission(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer, NavigableSet<Group> groups) {
+		
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		
+		try { 
+			
+			fedMgr.submitMissionFederateROL(malrc.removeMapLayerFromMissionToROL(missionUpdateDetailsForMapLayer), groups, missionUpdateDetailsForMapLayer.getMission().getName());
+			
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending updateMapLayer federated ROL", e);
+			}
+		}
+		
+	}
 
 	private boolean isBlockedFileEnabled() {
 		String fileExt = coreConfig.getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
@@ -581,4 +711,5 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			return false;
 		}
 	}
+
 }

@@ -31,6 +31,40 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
     private Map<String, Object> additionalData;
 
     private static final Logger logger = LoggerFactory.getLogger(FederationPolicyGraphImpl.class);
+    
+    public final class FederationPolicyReachabilityHolder {
+    	public Set<Federate> federates = new HashSet<>();
+    	
+    	public Set<FederateEdge> edges = new HashSet<>();
+
+    	private Map<FederationNode, FederateEdge> destinationToFederateEdge = new HashMap<>();
+    	public Map<FederationNode, FederateEdge> getDestinationToFederateEdgeMappings() {
+    		return destinationToFederateEdge;
+    	}
+    
+    	private Map<FederationNode, Set<FederateEdge>> destinationToFederateGroupEdges = new HashMap<>();
+    	public Map<FederationNode, Set<FederateEdge>> getDestinationToFederateGroupEdgeMappings() {
+    		return destinationToFederateGroupEdges;
+    	}
+    	
+    	public void addDestinationEdgeMapping(FederationNode dest, FederateEdge edge) {
+    		FederationNode edgeSource = getNode(edge.getSourceIdentity().getFedId());
+    		if (edgeSource instanceof FederateOutgoing || edgeSource instanceof Federate) {
+    			destinationToFederateEdge.put(dest, edge);
+    		}
+    		
+    		if (edgeSource instanceof FederateGroup) {
+    			if (!destinationToFederateGroupEdges.containsKey(dest)) {
+        			destinationToFederateGroupEdges.put(dest, new HashSet<>());
+        		}
+        		destinationToFederateGroupEdges.get(dest).add(edge);
+    		}
+    	}
+    	
+    	public void addDestinationEdgeMapping(FederationNode dest, Set<FederateEdge> edges) {
+    		edges.forEach(edge -> addDestinationEdgeMapping(dest, edge));
+    	}
+    }
 
     @Override
     public String getName() {
@@ -49,21 +83,37 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
     }
 
     @Override
-    public Set<Federate> allReachableFederates(FederationNode source) throws FederationException {
+    public FederationPolicyReachabilityHolder allReachableFederates(FederationNode source) throws FederationException {
         Set<FederationNode> unvisitedNodes = new HashSet<>();
         unvisitedNodes.addAll(nodeMap.values());
         return findReachableFederates(source, unvisitedNodes);
     }
 
     @Override
-    public Set<Federate> allReachableFederates(String sourceUid) throws FederationException {
+    public FederationPolicyReachabilityHolder allReachableFederates(String sourceUid) throws FederationException {
         FederationNode federationNode = getNode(sourceUid);
         if (federationNode == null) {
             throw new FederationException("The passed sourceID " + sourceUid + " was not found in the policy graph.");
         }
         return allReachableFederates(federationNode);
     }
+    
+    @Override
+    public Set<Federate> allReceivableFederates(FederationNode source) throws FederationException {
+        Set<FederationNode> unvisitedNodes = new HashSet<>();
+        unvisitedNodes.addAll(nodeMap.values());
+        return findReceivableFederates(source, unvisitedNodes);
+    }
 
+	@Override
+    public Set<Federate> allReceivableFederates(String sourceUid) throws FederationException {
+        FederationNode federationNode = getNode(sourceUid);
+        if (federationNode == null) {
+            throw new FederationException("The passed sourceID " + sourceUid + " was not found in the policy graph.");
+        }
+        return allReceivableFederates(federationNode);
+    }
+    
     @Override
     public List<FederationFilter> getFiltersAlongPath(String s, String s1) {
         return null;
@@ -193,7 +243,9 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
                     if (((Federate) source).getGroupIdentities().contains(groupIdentity)) {
                         FederateGroup group = this.getGroup(groupIdentity);
                         if (group.isInterconnected()) {
-                            federateEdge = new FederateEdge(source.getFederateIdentity(), destination.getFederateIdentity(), group.getFilterExpression());
+                        	// interconnected connections will be forced to share all groups
+                            federateEdge = new FederateEdge(source.getFederateIdentity(), destination.getFederateIdentity(), group.getFilterExpression(), 
+                            		new HashSet<String>(), new HashSet<String>(), FederateEdge.GroupFilterType.ALL);
                             return federateEdge;
                         }
                     }
@@ -213,10 +265,9 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
             throw new FederationException("The source of this federate edge is not contained in the policy graph:"
                     + federateEdge);
         } else if (isEdgeInGraph(federateEdge)) {
-            throw new FederationException("A edge with this source and destination already exists in the graph.");
+            logger.warn("An edge with this source and destination already exists in the graph: " + federateEdge);
+            return;
         }
-
-        
 
         edgeSet.add(federateEdge);
         nodeMap.get(federateEdge.getSourceIdentity()).addOutgoingEdge(federateEdge);
@@ -297,18 +348,20 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
 
         return edgePath;
     }
-
-    private Set<Federate> findReachableFederates(FederationNode source, Set<FederationNode> unvisitedNodes) throws FederationException {
-        Set<Federate> reachableFederates = new HashSet<>();
-        Set<FederateEdge> edgesFromNode = source.getOutgoingEdges();
+   
+    private FederationPolicyReachabilityHolder findReachableFederates(FederationNode source, Set<FederationNode> unvisitedNodes) throws FederationException {
+    	FederationPolicyReachabilityHolder reachability = new FederationPolicyReachabilityHolder();
         unvisitedNodes.remove(source);
                 
-        for (FederateEdge edge : edgesFromNode) {
+        for (FederateEdge edge : source.getOutgoingEdges()) {
             FederationNode destinationNode = nodeMap.get(edge.getDestinationIdentity());
             if (destinationNode instanceof FederateGroup) {
-                reachableFederates.addAll(((FederateGroup) destinationNode).getFederatesInGroup());
+            	Set<Federate> groupDestinations = ((FederateGroup) destinationNode).getFederatesInGroup();
+            	reachability.federates.addAll(groupDestinations);
+            	groupDestinations.forEach(dest -> reachability.addDestinationEdgeMapping(dest, edge));
             } else {
-                reachableFederates.add((Federate) destinationNode);
+            	reachability.federates.add((Federate) destinationNode);
+            	reachability.addDestinationEdgeMapping(destinationNode, edge);
             }
         }
 
@@ -318,15 +371,49 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
             for (FederateIdentity groupIdentity : sourceFederate.getGroupIdentities()) {
                 FederateGroup group = (FederateGroup) nodeMap.get(groupIdentity);
                 if (group.isInterconnected()) {
-                    reachableFederates.addAll(group.getFederatesInGroup());
+                	reachability.federates.addAll(group.getFederatesInGroup());
                 }
-                reachableFederates.addAll(allReachableFederates(group));
+                FederationPolicyReachabilityHolder groupsReachability = allReachableFederates(group);
+                reachability.federates.addAll(groupsReachability.federates);
+                groupsReachability.getDestinationToFederateGroupEdgeMappings().entrySet().forEach(entry -> {
+                	reachability.addDestinationEdgeMapping(entry.getKey(), entry.getValue());
+                });
             }
             // Remove source node in case it was added by a group add operation
-            reachableFederates.remove(sourceFederate);
+            reachability.federates.remove(sourceFederate);
         }
-        return reachableFederates;
+        return reachability;
     }
+    
+    private Set<Federate> findReceivableFederates(FederationNode source, Set<FederationNode> unvisitedNodes) throws FederationException {
+        Set<Federate> receivableFederates = new HashSet<>();
+        unvisitedNodes.remove(source);
+                
+        for (FederateEdge edge : source.getIncomingEdges()) {
+            FederationNode receivingNode = nodeMap.get(edge.getSourceIdentity());
+            if (receivingNode instanceof FederateGroup) {
+                receivableFederates.addAll(((FederateGroup) receivingNode).getFederatesInGroup());
+            } else {
+                receivableFederates.add((Federate) receivingNode);
+            }
+        }
+
+        // Get all connections from any groups the Federate belongs to
+        if (source instanceof Federate) {
+            Federate sourceFederate = (Federate) source;
+            for (FederateIdentity groupIdentity : sourceFederate.getGroupIdentities()) {
+                FederateGroup group = (FederateGroup) nodeMap.get(groupIdentity);
+                if (group.isInterconnected()) {
+                    receivableFederates.addAll(group.getFederatesInGroup());
+                }
+                receivableFederates.addAll(allReceivableFederates(group));
+            }
+            // Remove source node in case it was added by a group add operation
+            receivableFederates.remove(sourceFederate);
+        }
+        return receivableFederates;
+    }
+    
 
     private boolean isEdgeInGraph(FederateEdge federateEdge) {
         FederationNode source = nodeMap.get(federateEdge.getSourceIdentity());

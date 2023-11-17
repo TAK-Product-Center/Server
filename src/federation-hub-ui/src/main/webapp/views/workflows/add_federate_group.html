@@ -1,8 +1,14 @@
+<link rel="stylesheet" href="../../styles/tablesorter/style.css" type="text/css" media="print, projection, screen" />
 <div class="modal-header">
     <div style="clear: both">
         <h3 class="modal-title" style="float: left">{{editorTitle}} {{roger_federation.type}}</h3>
         <h4 ng-if="editExisting" style="float: right">{{roger_federation.name}}</h4>
     </div>
+</div>
+
+<div class="modal-footer">
+    <button class="btn btn-primary" type="button" ng-click="modifyCa()">Remove CA's</button>
+    <button ng-if="editExisting" class="btn btn-primary" type="button" ng-click="showActiveConnections()">Show Active Connections</button>
 </div>
 
 <div class="modal-body" data-ng-init="initialize()">
