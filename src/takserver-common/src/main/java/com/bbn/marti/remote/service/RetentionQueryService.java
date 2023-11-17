@@ -5,6 +5,8 @@ import java.util.Map;
 
 import org.dom4j.Element;
 
+import com.bbn.marti.sync.model.Mission;
+
 public interface RetentionQueryService {
 
     void deleteMissionByExpiration(Long ttl);
@@ -17,4 +19,6 @@ public interface RetentionQueryService {
     boolean restoreMission(Map<String, byte[]> files, Map<String, String> properties, List<String> groups, String defaultRole, List<String> defaultPermissions);
 	void restoreCoT(String missionName, List<byte[]> files, List<String> groups);
 	void restoreContent(String missionName, byte[] file, Element missionContent, List<String> groups) throws Exception;
+    public List<Mission> getAllMissions(boolean passwordProtected, boolean defaultRole, String tool) throws Exception;
+
 }

@@ -24,7 +24,7 @@ services:
       - '9001:9001'
 
   takdb:
-    image: postgis/postgis:10-3.1
+    image: postgis/postgis:15-3.3
     networks:
       - taknet
     env_file:

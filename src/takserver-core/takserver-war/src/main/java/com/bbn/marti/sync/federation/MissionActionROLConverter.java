@@ -46,7 +46,8 @@ public class MissionActionROLConverter {
 		mc.setTool(mission.getTool());
 		mc.setBbox(mission.getBbox());
 		mc.setBoundingPolygon(mission.getBoundingPolygon());
-		
+		mc.setInviteOnly(mission.isInviteOnly());
+
 		if (mission.getParent() != null)
 			mc.setParentMissionId(mission.getParent().getId());
 		

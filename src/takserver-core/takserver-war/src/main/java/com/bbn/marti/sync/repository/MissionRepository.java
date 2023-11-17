@@ -15,13 +15,13 @@ import tak.server.cache.MissionCacheResolver;
 
 public interface MissionRepository extends JpaRepository<Mission, Long> {
 	
-	String missionAttributes = "select id, create_time, last_edited, name, creatoruid, groups, description, chatroom, base_layer, bbox, path, classification, tool, parent_mission_id, password_hash, default_role_id, expiration, bounding_polygon";
+	String missionAttributes = "select id, create_time, last_edited, name, creatoruid, groups, description, chatroom, base_layer, bbox, path, classification, tool, parent_mission_id, password_hash, default_role_id, expiration, bounding_polygon, invite_only ";
 
-    @Query(value = missionAttributes + " from mission where name = :name ", nativeQuery = true)
+    @Query(value = missionAttributes + " from mission where lower(name) = lower(:name) ", nativeQuery = true)
     Mission getByNameNoCache(@Param("name") String name);
 
     @Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER,  key="{#root.args[0] + '-byName'}", sync = true)
-    @Query(value = missionAttributes + " from mission where name = :name ", nativeQuery = true)
+    @Query(value = missionAttributes + " from mission where lower(name) = lower(:name) ", nativeQuery = true)
     Mission getByName(@Param("name") String name);
 
     Long findMissionIdByName(String name);
@@ -73,35 +73,40 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
     void deleteMission(@Param("id") Long missionId);
 
     @Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, key="{#root.methodName, #root.args[0]}")
-    @Query(value = "select uid from mission_uid mu inner join mission m on m.id = mu.mission_id where m.name = ?", nativeQuery = true)
+    @Query(value = "select uid from mission_uid mu inner join mission m on m.id = mu.mission_id where lower(m.name) = lower(?)", nativeQuery = true)
     List<String> getMissionUids(String missionName);
 
-    @Query(value = missionAttributes + " from mission where" +
+    @Query(value = missionAttributes + " from mission where invite_only = true and tool = :tool  " +
+            "and lower(name) in ( select lower(mission_name) from mission_invitation where invitee = :userName and type = 'username' ) " +
+            "and " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
+    List<Mission> getInviteOnlyMissions(@Param("userName") String userName,  @Param("tool") String tool, @Param("groupVector") String groupVector);
+
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
             "AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
     List<Mission> getAllMissions(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("groupVector") String groupVector);
 
-    @Query(value = missionAttributes + " from mission where" +
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
             "and tool = :tool AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
     List<Mission> getAllMissionsByTool(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("tool") String tool, @Param("groupVector") String groupVector);
 
-    @Query(value = missionAttributes + " from mission where" +
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
             "and tool in :tools AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
     List<Mission> getAllMissionsByTools(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("tools") List<String> tools, @Param("groupVector") String groupVector);
 
-    @Query(value = missionAttributes + " from mission where" +
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
             "AND " + RemoteUtil.GROUP_CLAUSE + " and create_time < (now() - (:ttl * INTERVAL '1 second'))" + " order by id desc ", nativeQuery = true)
     List<Mission> getAllMissionsByTtl(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole,
                                       @Param("groupVector") String groupVector, @Param("ttl") Integer ttl);
 
-    @Query(value = missionAttributes + " from mission where" +
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
             "and " + RemoteUtil.GROUP_CLAUSE +
@@ -109,71 +114,73 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
             " order by id desc ", nativeQuery = true)
     List<Mission> getAllMissionsByExpiration(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("groupVector") String groupVector, @Param("expiration") Long expiration);
 
-    @Query(value = "select name from mission where" +
+    @Query(value = "select name from mission where invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +
             "AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
     List<String> getMissionNames(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("groupVector") String groupVector);
 
-    @Query(value = "select name from mission where" +
+    @Query(value = "select name from mission where invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +
             "and tool = :tool AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
     List<String> getMissionNamesByTool(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("tool") String tool, @Param("groupVector") String groupVector);
 
-    @Query(value = "insert into mission (create_time, name, creatoruid, groups, description, chatroom, base_layer, bbox, path, classification, tool, password_hash, expiration, bounding_polygon) values (:createTime, :name, :creatorUid, "
-            + RemoteUtil.GROUP_VECTOR + ", :description, :chatRoom, :baseLayer, :bbox, :path, :classification, :tool, :passwordHash, :expiration, :boundingPolygon) returning id", nativeQuery = true)
+    @Query(value = "insert into mission (create_time, name, creatoruid, groups, description, chatroom, base_layer, bbox, path, classification, tool, password_hash, expiration, bounding_polygon, invite_only) values (:createTime, :name, :creatorUid, "
+            + RemoteUtil.GROUP_VECTOR + ", :description, :chatRoom, :baseLayer, :bbox, :path, :classification, :tool, :passwordHash, :expiration, :boundingPolygon, :inviteOnly) returning id", nativeQuery = true)
     Long create(@Param("createTime") Date createTime, @Param("name") String name, @Param("creatorUid") String creatorUid, @Param("groupVector")
-            String groupVector, @Param("description") String description, @Param("chatRoom") String chatRoom, @Param("baseLayer") String baseLayer, @Param("bbox") String bbox, @Param("path") String path, @Param("classification") String classification, @Param("tool") String tool, @Param("passwordHash") String passwordHash, @Param("expiration") Long expiration, @Param("boundingPolygon") String boundingPolygon);
+            String groupVector, @Param("description") String description, @Param("chatRoom") String chatRoom, @Param("baseLayer") String baseLayer, @Param("bbox") String bbox, @Param("path") String path, @Param("classification") String classification, @Param("tool") String tool, @Param("passwordHash") String passwordHash, @Param("expiration") Long expiration, @Param("boundingPolygon") String boundingPolygon, @Param("inviteOnly") Boolean inviteOnly);
 
-    @Query(value = "insert into mission (create_time, name, creatoruid, groups, description, chatroom, base_layer, bbox, path, classification, tool, password_hash, default_role_id, expiration, bounding_polygon) values (:createTime, :name, :creatorUid, "
-            + RemoteUtil.GROUP_VECTOR + ", :description, :chatRoom, :baseLayer, :bbox, :path, :classification, :tool, :passwordHash, :defaultRoleId, :expiration, :boundingPolygon) returning id", nativeQuery = true)
+    @Query(value = "insert into mission (create_time, name, creatoruid, groups, description, chatroom, base_layer, bbox, path, classification, tool, password_hash, default_role_id, expiration, bounding_polygon, invite_only) values (:createTime, :name, :creatorUid, "
+            + RemoteUtil.GROUP_VECTOR + ", :description, :chatRoom, :baseLayer, :bbox, :path, :classification, :tool, :passwordHash, :defaultRoleId, :expiration, :boundingPolygon, :inviteOnly) returning id", nativeQuery = true)
     Long create(@Param("createTime") Date createTime, @Param("name") String name, @Param("creatorUid") String creatorUid, @Param("groupVector")
             String groupVector, @Param("description") String description, @Param("chatRoom") String chatRoom,  @Param("baseLayer") String baseLayer, 
             @Param("bbox") String bbox, @Param("path") String path, @Param("classification") String classification, @Param("tool") String tool, 
-            @Param("passwordHash") String passwordHash, @Param("defaultRoleId") Long defaultRoleId, @Param("expiration") Long expiration, @Param("boundingPolygon") String boundingPolygon);
+            @Param("passwordHash") String passwordHash, @Param("defaultRoleId") Long defaultRoleId, @Param("expiration") Long expiration, @Param("boundingPolygon") String boundingPolygon, @Param("inviteOnly") Boolean inviteOnly);
 
-    @Query(value = "update mission set description = :description, chatroom = :chatRoom, base_layer = :baseLayer, bbox = :bbox, path = :path, classification = :classification, expiration = :expiration, bounding_polygon = :boundingPolygon where name = :name and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+    @Query(value = "update mission set description = :description, chatroom = :chatRoom, base_layer = :baseLayer, bbox = :bbox, path = :path, classification = :classification, expiration = :expiration, bounding_polygon = :boundingPolygon where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long update(@Param("name") String name, @Param("groupVector") String groupVector, @Param("description") String description,
                 @Param("chatRoom") String chatRoom, @Param("baseLayer") String baseLayer,  @Param("bbox") String bbox, @Param("path") String path, 
                 @Param("classification") String classification, @Param("expiration") Long expiration, @Param("boundingPolygon") String boundingPolygon);
 
-    @Query(value = "update mission set groups = cast(:groupVectorMission as bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + ")) where name = :name and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+    @Query(value = "update mission set groups = cast(:groupVectorMission as bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + ")) where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long updateGroups(@Param("name") String name, @Param("groupVector") String groupVector, @Param("groupVectorMission") String groupVectorMission);
 
-    @Query(value = "update mission set tool = :tool where name = :name and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+    @Query(value = "update mission set tool = :tool where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long updateTool(@Param("name") String name, @Param("groupVector") String groupVector, @Param("tool") String tool);
 
-    @Query(value = "update mission set parent_mission_id = ( select id from mission where name = :parentName ) where name = :name and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+    @Query(value = "update mission set parent_mission_id = ( select id from mission where lower(name) = lower(:parentName) ) where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long setParent(@Param("name") String name, @Param("parentName") String parentName, @Param("groupVector") String groupVector);
 
-    @Query(value = "update mission set parent_mission_id = null where name = :name and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+    @Query(value = "update mission set parent_mission_id = null where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long clearParent(@Param("name") String name, @Param("groupVector") String groupVector);
 
-    @Query(value = "select parent.name from mission parent, mission child where child.parent_mission_id = parent.id and child.name = :name", nativeQuery = true)
+    @Query(value = "select parent.name from mission parent, mission child where child.parent_mission_id = parent.id and lower(child.name) = lower(:name)", nativeQuery = true)
     String getParentName(@Param("name") String name);
 
-    @Query(value = "select child.name from mission parent, mission child where child.parent_mission_id = parent.id and parent.name = :name", nativeQuery = true)
+    @Query(value = "select child.name from mission parent, mission child where child.parent_mission_id = parent.id and lower(parent.name) = lower(:name)", nativeQuery = true)
     List<String> getChildNames(@Param("name") String name);
 
-    @Query(value = "update mission set password_hash = :passwordHash where name = :name and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+    @Query(value = "update mission set password_hash = :passwordHash where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long setPasswordHash(@Param("name") String name, @Param("passwordHash") String password, @Param("groupVector") String groupVector);
 
-    @Query(value = "update mission set default_role_id = :defaultRoleId where name = :name and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+    @Query(value = "update mission set default_role_id = :defaultRoleId where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long setDefaultRoleId(@Param("name") String name, @Param("defaultRoleId") Long defaultRoleId, @Param("groupVector") String groupVector);
 
     @Query(value = "select name from mission, mission_resource where resource_hash = :resource_hash and id = mission_id", nativeQuery = true)
     List<String> getMissionNamesContainingHash(@Param("resource_hash") String resource_hash);
 
     static final String COP_QUERY = "select m.id, m.create_time, max(mc.servertime) as last_edited, m.name, m.creatoruid, m.groups, m.description, m.chatroom, m.base_layer, " +
-            "m.bbox, m.bounding_polygon, m.path, m.classification, m.tool, m.parent_mission_id, m.password_hash, m.default_role_id, m.expiration " +
+            "m.bbox, m.bounding_polygon, m.path, m.classification, m.tool, m.parent_mission_id, m.password_hash, m.default_role_id, m.expiration, m.invite_only " +
             "from mission m inner join mission_change mc on mc.mission_id = m.id " +
-            "where m.tool = :tool and " + RemoteUtil.GROUP_CLAUSE + " and (:path is null or path = :path) group by m.id order by m.id desc";
+            "where m.tool = :tool and " +
+            " ( invite_only = false or ( name in ( select mission_name from mission_invitation where invitee = :userName and type = 'username' ) ) ) and " +
+            RemoteUtil.GROUP_CLAUSE + " and (:path is null or path = :path) group by m.id order by m.id desc";
     @Query(value = COP_QUERY, nativeQuery = true)
-    List<Mission> getAllCopMissions(@Param("groupVector") String groupVector, @Param("path") String path, @Param("tool") String tool);
+    List<Mission> getAllCopMissions(@Param("groupVector") String groupVector, @Param("path") String path, @Param("tool") String tool, @Param("userName") String userName);
 
     @Query(value = COP_QUERY + " offset :offset rows fetch next :size rows only", nativeQuery = true)
-    List<Mission> getAllCopMissionsWithPaging(@Param("groupVector") String groupVector, @Param("path") String path, @Param("tool") String tool, @Param("offset") Integer offset, @Param("size") Integer size);
+    List<Mission> getAllCopMissionsWithPaging(@Param("groupVector") String groupVector, @Param("path") String path, @Param("tool") String tool, @Param("userName") String userName, @Param("offset") Integer offset, @Param("size") Integer size);
 
     @Query(value = "select count(*) from public.mission where tool = :tool", nativeQuery= true)
     Long getMissionCountByTool(@Param("tool") String tool);

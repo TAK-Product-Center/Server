@@ -34,19 +34,19 @@ public class UdpServerBinder extends AbstractServerBinder {
 	private final static Logger log = Logger.getLogger(UdpServerBinder.class);
 
     /**
-    * Returns a UDP data listener. Will bind to the given port, and push any accepted data into a channel handler that 
+    * Returns a UDP data listener. Will bind to the given port, and push any accepted data into a channel handler that
     * has no active connection, but contains a record of where the traffic came from (the source ip/port that were
-    * given when the packet was unloaded). 
+    * given when the packet was unloaded).
     *
-    * @note the network interface and the inet address group are ignored
-    */      
+    * The network interface and the inet address group are ignored
+    */
     public final static BinderFactory udpBinderFactory = new BinderFactory() {
         public ServerBinder instance(
             int port,
             OrderedExecutor boundExecutor,
-            StreamInstantiator streamInstantiator, 
+            StreamInstantiator streamInstantiator,
             List<NetworkInterface> interfs,
-            InetAddress group) 
+            InetAddress group)
         {
             return new UdpServerBinder()
                 .withPort(port)
@@ -58,7 +58,7 @@ public class UdpServerBinder extends AbstractServerBinder {
     protected DatagramChannel doBind() throws IOException {
         // instantiate datagram server channel
         DatagramChannel serverChannel = null;
-        
+
         try {
             // Force IPV4 (INET) since it is left up to the platform otherwise
             serverChannel = DatagramChannel.open(StandardProtocolFamily.INET);
@@ -69,7 +69,7 @@ public class UdpServerBinder extends AbstractServerBinder {
         } catch (IOException e) {
             // drop resources on error
             NetUtils.guardedClose(serverChannel);
-            
+
             // throw error at the binder
             throw e;
         }
@@ -82,17 +82,17 @@ public class UdpServerBinder extends AbstractServerBinder {
 		Assertion.notNull(server);
 
         DatagramChannel serverChannel = doBind();
-		
+
         if (serverChannel != null) {
             // build handler for server datagram channel
             ChannelHandler serverHandler = new UdpServerChannelHandler()
             	.withChannel(serverChannel)
                 .withExecutor(boundExecutor())
             	.withServer(server); // one COULD put an ordered view here, that would limit inputs from a specific udp input
-            
+
             // build chain around handler
             instantiator().instantiate(serverHandler);
-            
+
             // wrap and register with the server
             return new ChannelWrapper()
             	.withChannel(serverChannel)
@@ -102,7 +102,7 @@ public class UdpServerBinder extends AbstractServerBinder {
             return null;
         }
 	}
-    
+
 	@Override
     public String toString() {
         return new String("UDP local port: " + port());

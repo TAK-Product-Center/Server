@@ -36,9 +36,9 @@ import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.google.common.base.Strings;
 
 /**
- * 
+ *
  * In the context of a worker thread, execute a database query asynchronously and sends the results to the specified IP address.
- * 
+ *
  *
  */
 public class CotQueryWorker implements Runnable {
@@ -49,12 +49,11 @@ public class CotQueryWorker implements Runnable {
 
     public static final String SRID = "4326";
     private static final int MAXIMUM_DATAGRAM_BYTES = 65507;
-   
+
     private static final Logger logger = LoggerFactory.getLogger(CotQueryWorker.class);
 
     /**
-     * The full monty: 
-     * @param context
+     * The full monty:
      * @param destination
      * @param port
      * @param protocol
@@ -65,8 +64,8 @@ public class CotQueryWorker implements Runnable {
      * @param images
      * @param replayMode
      */
-    public CotQueryWorker(String destination, 
-            int port, 
+    public CotQueryWorker(String destination,
+            int port,
             DeliveryProtocol protocol,
             String sqlPredicate,
             List<Object> sqlParameters,
@@ -117,7 +116,7 @@ public class CotQueryWorker implements Runnable {
         try {
             timeMarker = System.currentTimeMillis();
             numberOfResults = countCotEvents(sqlPredicate, sqlParameters, latestOnly);
-            logger.debug("Counted " + numberOfResults + " results in " 
+            logger.debug("Counted " + numberOfResults + " results in "
                     + (System.currentTimeMillis() - timeMarker) + " ms." );
             if (resultLimit != null) {
                 numberOfResults = Math.min(resultLimit, numberOfResults);
@@ -211,26 +210,26 @@ public class CotQueryWorker implements Runnable {
 
             cotSearch.updateStatus(CotSearchStatus.SENDING, "", new Date(), true);
         }
-        
+
         if (logger.isDebugEnabled()) {
         	logger.debug("CoT query results to send to " + protocol + " endpoint: " + results);
         }
-        
+
         for (CotEventWrapper event : results) {
-            try {	
+            try {
                 if (replayMode) {
                     long currentServerTime = event.receivedTime;
                     long delayMilliseconds = (long)((currentServerTime - lastServerTime) / replaySpeed);
                     logger.debug("delaying " + delayMilliseconds + " milliseconds.");
                     if (delayMilliseconds > 0) {
-                        try {		
+                        try {
                             Thread.sleep(delayMilliseconds);
                         } catch (InterruptedException ex) {
                             logger.warn("Interrupted while sending results in replay mode: message timing may be incorrect");
                         }
                     }
                     lastServerTime = currentServerTime;
-                } 
+                }
 
                 switch(protocol) {
                 case TCP:
@@ -243,7 +242,7 @@ public class CotQueryWorker implements Runnable {
                 case UDP:
                     if (datagramSocket == null) {
                         destination = InetAddress.getByName(host);
-                        datagramSocket = new DatagramSocket(); 
+                        datagramSocket = new DatagramSocket();
                     }
                     byte[] payload = event.content.getBytes();
                     if (payload.length > MAXIMUM_DATAGRAM_BYTES) {
@@ -351,7 +350,7 @@ public class CotQueryWorker implements Runnable {
 
     /**
      * Retrieves the CoT events from the persistence layer and returns them as Strings.
-     * 
+     *
      * @param predicate Parameterized query predicate specifying which events to retrieve
      * @param constraints Values for the query parameters
      * @param latestByUid if <code>true</code>, return only the latest event for each UID
@@ -364,7 +363,7 @@ public class CotQueryWorker implements Runnable {
      */
     private List<CotEventWrapper> getCotEvents(String predicate, List<Object> constraints, boolean latestByUid, Integer limit, ImageOption imageOption) throws SQLException, NamingException {
         List<CotEventWrapper> events = new LinkedList<CotEventWrapper>();
-        
+
         StringBuilder queryBuilder = new StringBuilder();
         queryBuilder.append("SELECT *, ST_AsText(");
         queryBuilder.append(Column.event_pt.toString());
@@ -423,10 +422,10 @@ public class CotQueryWorker implements Runnable {
         					events.add(new CotEventWrapper(cotString, receivedTime.getTime(), primaryKey));
         				}
         			} catch (Exception ex) {
-        				logger.error("Error parsing query result: " + ex.getMessage(), ex);	
+        				logger.error("Error parsing query result: " + ex.getMessage(), ex);
         			}
         		}
-        	} 
+        	}
         }
         logger.debug("Found " + events.size() + " results.");
         return events;

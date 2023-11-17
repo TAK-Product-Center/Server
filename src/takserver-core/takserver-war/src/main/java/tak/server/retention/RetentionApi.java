@@ -13,12 +13,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.support.CronSequenceGenerator;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import tak.server.Constants;
 
 import com.bbn.marti.cot.search.model.ApiResponse;
@@ -28,12 +29,12 @@ import com.bbn.marti.remote.service.MissionArchiveManager;
 import com.bbn.marti.remote.service.RetentionPolicyConfig;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.service.MissionService;
-
+@RestController
 public class RetentionApi extends BaseRestController {
 
     private static final Logger logger = LoggerFactory.getLogger(RetentionApi.class);
 
-    @Autowired(required = false)
+    @Autowired
     private RetentionPolicyConfig retentionPolicyConfig;
     
     @Autowired
@@ -119,7 +120,7 @@ public class RetentionApi extends BaseRestController {
         if (logger.isDebugEnabled()) {
             logger.debug(" setRetentionSchedule called " + cronexp);
         }
-        if (! CronSequenceGenerator.isValidExpression(cronexp) && !cronexp.equals("-")) {
+        if (! CronExpression.isValidExpression(cronexp) && !cronexp.equals("-")) {
             if (logger.isErrorEnabled()) {
                 logger.error(" Invalid cron expression " + cronexp + " schedule not changed");
             }

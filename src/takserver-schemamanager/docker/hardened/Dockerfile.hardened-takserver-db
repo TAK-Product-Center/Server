@@ -1,7 +1,7 @@
 ## Environment variables outside image context. These will be available until the first FROM statement.
 ARG BASE_REGISTRY=registry1.dso.mil
-ARG BASE_DEPLOY_IMAGE=ironbank/opensource/postgres/postgresql10
-ARG BASE_DEPLOY_TAG=10.17
+ARG BASE_DEPLOY_IMAGE=ironbank/opensource/postgres/postgresql
+ARG BASE_DEPLOY_TAG=15.1
 
 ####################################################################################################
 
@@ -30,8 +30,8 @@ RUN rpm --import /opt/signatures/* \
     && dnf -y upgrade --nodocs \
     && dnf -y install --nodocs \
         java-11-openjdk \
-        postgis24_10 \
-        && sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/pgsql-10/share/postgresql.conf.sample \
+        postgis33_15 \
+        && sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/pgsql-15/share/postgresql.conf.sample \
     && dnf clean all \
     && rm -rf /var/cache/dnf
 
@@ -49,7 +49,7 @@ RUN chown -R postgres:0 /var/lib/postgresql && \
 ENV POSTGRES_HOST_AUTH_METHOD=trust
 
 #runs in takserver-setup-db.sh but fails because of permissions. running as root to prevent error
-RUN chkconfig --level 345 postgresql-10 on
+RUN chkconfig --level 345 postgresql-15 on
 
 RUN usermod -a -G root postgres
 USER postgres:0

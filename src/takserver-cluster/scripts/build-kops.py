@@ -185,8 +185,8 @@ def setupDBParameterGroups():
 	except botocore.exceptions.ClientError as e:
 		create_db_param_group_res = boto3.client('rds', region_name=TAK_CLUSTER_REGION).create_db_parameter_group(
 		    DBParameterGroupName='takserver-rds-pg',
-		    DBParameterGroupFamily='postgres10',
-		    Description='Takserver RDS parameter group for postgres10'
+		    DBParameterGroupFamily='postgres15',
+		    Description='Takserver RDS parameter group for postgres15'
 		)
 
 		print('\nCreating RDS Parameter Group')

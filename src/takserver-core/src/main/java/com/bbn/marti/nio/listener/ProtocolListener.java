@@ -16,22 +16,22 @@ public interface ProtocolListener<T> {
 	 * @param protocol The source datatype parser/deparser
 	 */
 	public void onConnect(ChannelHandler handler, Protocol<T> protocol);
-	
+
 	/**
 	 * Called when data is received by transport
 	 * @param data The data received
-	 * @param transport The transport over which data was received
+	 * @param handler The handler over which data was received
 	 * @param protocol The protocol over which data was received
 	 */
 	public void onDataReceived(T data, ChannelHandler handler, Protocol<T> protocol);
-	
+
 	/**
 	 * Called with the handler is closed
 	 *
 	 * onInboundClose marks the end of the read stream -- once this is called,
-	 * we can expect no more data from the given handler. 
+	 * we can expect no more data from the given handler.
 	 *
-	 * onOutboundClose signals that the protocol/handler will no longer 
+	 * onOutboundClose signals that the protocol/handler will no longer
 	 * accept outbound data. Writing to the protocol after this call has been
 	 * received may produce a runtime exception
 	 *

@@ -35,7 +35,7 @@ public class NioGrpcChannelHandler extends NioNettyTlsServerHandler {
     }
     
     public void submitTakMessage(TakMessage message) {
-    	CotEventContainer cotEventContainer = StreamingProtoBufHelper.getInstance().proto2cot(message);
+    	CotEventContainer cotEventContainer = StreamingProtoBufHelper.proto2cot(message);
     		
     	if (isNotDOSLimited(cotEventContainer) && isNotReadLimited(cotEventContainer)) {
 			if (isDataFeedInput()) {
@@ -94,7 +94,7 @@ public class NioGrpcChannelHandler extends NioNettyTlsServerHandler {
     
     private void setWriter() {
         writer = (data) -> {
-        	stream.onNext(StreamingProtoBufHelper.getInstance().cot2protoBuf(data));
+        	stream.onNext(StreamingProtoBufHelper.cot2protoBuf(data));
         };
     }
     

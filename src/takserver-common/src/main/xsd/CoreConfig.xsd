@@ -264,6 +264,9 @@
             <xs:attribute name="cacheOffHeapMaxSizeBytes" type="xs:long" default="-1"/>
             <xs:attribute name="cacheOffHeapInitialSizeBytes" type="xs:long" default="-1"/>
             <xs:attribute name="cacheOffHeapDefaultPercentage" type="xs:float" default="0.44"/>
+            <xs:attribute name="cacheOffHeapEvictionThreshold" type="xs:float" default="-1.0"/>
+            <xs:attribute name="cacheLastTouchedExpiryMinutes" type="xs:int" default="-1"/>
+            <xs:attribute name="enableCacheGroup" type="xs:boolean" default="true" />
             <xs:attribute name="enableCacheWarmer" type="xs:boolean" default="false"/>
             <xs:attribute name="ignitePoolSize" type="xs:int" default="-1"/>
             <xs:attribute name="cacheCotInRepository" type="xs:boolean" default="false"/> 
@@ -497,9 +500,10 @@
       <xs:attribute name="truststoreFile" type="xs:string" use="required"/>
       <xs:attribute name="truststorePass" type="xs:string" use="required"/>
       <xs:attribute name="context" type="xs:string" default="TLSv1.2"/>
+      <xs:attribute name="ciphers" type="xs:string" />
       <xs:attribute name="keymanager" type="xs:string" use="required"/>
-      <xs:attribute name="allow128cipher" type="xs:boolean" default="true"/>
-      <xs:attribute name="allowNonSuiteB" type="xs:boolean" default="true"/>
+      <xs:attribute name="allow128cipher" type="xs:boolean" default="false"/>
+      <xs:attribute name="allowNonSuiteB" type="xs:boolean" default="false"/>
       <xs:attribute name="enableOCSP" type="xs:boolean" default="false"/>
       <xs:attribute name="responderUrl" type="xs:string" />
     </xs:complexType>
@@ -527,12 +531,21 @@
             <xs:attribute name="refreshTokenValidity" type="xs:int"/>
           </xs:complexType>
         </xs:element>
-        <xs:element name="authServer" minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="authServer" minOccurs="0" maxOccurs="1">
           <xs:complexType>
             <xs:annotation>
-              <xs:documentation>Authorization server public key used to validated tokens</xs:documentation>
+              <xs:documentation>OAuth authorization server</xs:documentation>
             </xs:annotation>
-            <xs:attribute name="issuer" type="xs:string"/>
+            <xs:attribute name="name" type="xs:string"  use="required"/>
+            <xs:attribute name="issuer" type="xs:string" use="required"/>
+            <xs:attribute name="clientId" type="xs:string" use="required"/>
+            <xs:attribute name="secret" type="xs:string" use="required"/>
+            <xs:attribute name="redirectUri" type="xs:string" use="required"/>
+            <xs:attribute name="scope" type="xs:string"/>
+            <xs:attribute name="authEndpoint" type="xs:string" use="required"/>
+            <xs:attribute name="tokenEndpoint" type="xs:string" use="required"/>
+            <xs:attribute name="tokenName" type="xs:string" default="access_token"/>
+            <xs:attribute name="trustAllCerts" type="xs:boolean" default="false"/>
           </xs:complexType>
         </xs:element>
       </xs:sequence>
@@ -897,6 +910,20 @@
                     <xs:documentation>Name of a local group whose traffic will be shared with the specified federate.</xs:documentation>
                   </xs:annotation>
                 </xs:element>
+                <xs:element name="missionFederateDefault" type="xs:boolean" minOccurs="0" maxOccurs="1" default="true">
+                  <xs:annotation>
+                    <xs:documentation>This value will be applied for new missions as well as missions whose federation value are not specifically set in the mission lists</xs:documentation>
+                  </xs:annotation>
+                </xs:element>
+                <xs:element name="mission" minOccurs="0" maxOccurs="unbounded">
+                  <xs:annotation>
+                    <xs:documentation>Enable/Disable federation on a per-mission basis for this federate.</xs:documentation>
+                  </xs:annotation>
+                  <xs:complexType>
+                    <xs:attribute name="name" type="xs:string" use="required" />
+                    <xs:attribute name="enabled" type="xs:boolean" use="required" />
+                  </xs:complexType>
+                </xs:element>
               </xs:sequence>
               <xs:attribute name="id" type="xs:string" use="required">
                 <xs:annotation>
@@ -932,7 +959,7 @@
                 <xs:annotation>
                   <xs:documentation>If true, remote groups are automatically mapped to local groups for this federate.</xs:documentation>
                 </xs:annotation>
-              </xs:attribute>
+              </xs:attribute>		
             </xs:complexType>
           </xs:element>
         </xs:sequence>
@@ -1161,10 +1188,13 @@
 			use="optional" />
 		<xs:attribute name="archiveOnly" type="xs:boolean"
 			default="false" />
-		<xs:attribute name="coreVersion" type="xs:int"
-			default="2" />
+		<xs:attribute name="coreVersion" type="xs:int" default="2" />
+		<xs:attribute name="syncCacheRetentionSeconds" type="xs:int" default="3600" />
+		<xs:attribute name="maxMessageReadSizeBytes" type="xs:int" default="2048"/>
 		<xs:attribute name="coreVersion2TlsVersions"
 			type="xs:string" use="optional" default="TLSv1.2,TLSv1.3" />
+		<xs:attribute name="federated" type="xs:boolean"
+            default="true" />
 	</xs:complexType>
 	
 	<xs:complexType name="dataFeed">
@@ -1176,7 +1206,7 @@
                 <xs:element name="tag" block="extension" minOccurs="0" maxOccurs="unbounded" type="xs:string"/>
                 <xs:element name="sync" type="xs:boolean" />
             </xs:sequence>
-            <xs:attribute name="syncCacheRetentionSeconds" type="xs:int" default="3600" />
+
         </xs:extension>
        </xs:complexContent>
     </xs:complexType>

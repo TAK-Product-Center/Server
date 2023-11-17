@@ -7,6 +7,12 @@ buildscript {
 apply plugin: 'nebula.ospackage'
 apply from: "../utils/utils.gradle"
 
+
+ext {
+    takdbpkgname = 'takserver-database'
+
+}
+
 // Get CoreConfig.example.xml
 task copyCoreConfigExampleOnly(type: Copy) {
     from project(':takserver-core').file('example/')
@@ -14,8 +20,7 @@ task copyCoreConfigExampleOnly(type: Copy) {
     into "$buildDir/takArtifacts"
 }
 
-def modified_preinstall_script = _preinstall_script + '\n' + """
-
+def modified_preinstall_script = _preinstall_script + '\n' + '''\
 if [ -f "/opt/tak/CoreConfig.example.xml" ]; then
   echo '/opt/tak/CoreConfig.example.xml exists!'
   cp /opt/tak/CoreConfig.example.xml /opt/tak/CoreConfig_temp_backup.example.xml
@@ -23,7 +28,42 @@ else
   echo '/opt/tak/CoreConfig.example.xml does not exist'
 fi
 
-"""
+echo "Checking for previous installs of the database"
+#NOTE: the new version director might not exist so we check against the base directory
+PGDATA_NEW=/var/lib/pgsql
+PGDATA_OLD=""
+# Assume (uh-oh.. wish there was a better determination) latest version is the new one and the version just below
+# is the previous version
+if [ -x /usr/pgsql-10/bin/postgresql-10-setup ]; then
+     PGDATA_OLD=/var/lib/pgsql/10/data
+elif [ -x /usr/pgsql-9.6/bin/initdb ]; then
+     PGDATA_OLD=/var/lib/pgsql/9.6/data
+elif [ -x /usr/pgsql-9.5/bin/initdb ]; then
+     PGDATA_OLD=/var/lib/pgsql/9.5/data
+elif [ -x /usr/pgsql-9.4/bin/initdb ]; then
+     PGDATA_OLD=/var/lib/pgsql/9.4/data
+elif [ -x /usr/pgsql-9.3/bin/initdb ]; then
+     PGDATA_OLD=/var/lib/pgsql/9.3/data
+elif [ -x /usr/pgsql-9.2/bin/initdb ]; then
+     PGDATA_OLD=/var/lib/pgsql/9.2/data
+fi
+
+if [ ! -z "$PGDATA_OLD" ]; then
+echo "Previous version found. Checking disk space requirements"  
+  PGDATA_OLD_SIZE=`du -s -m $PGDATA_OLD | cut -f 1`
+  # The division by one is to convert to an integer for comparison
+  PGDATA_REQ_SIZE=`echo "$PGDATA_OLD_SIZE * 1.5/1" | bc`
+  echo "Upgrade will require $PGDATA_REQ_SIZE MB free in partition with new Postgresql version"
+  PGDATA_NEW_AVAIL=`df -m $PGDATA_NEW | grep -v Available | tr -s ' ' | cut -f 4 -d ' '`
+  echo "There are $PGDATA_NEW_AVAIL MB available in partition with new Postgresql version"
+  if [ "$PGDATA_NEW_AVAIL" -gt "$PGDATA_REQ_SIZE" ]; then
+    echo "Disk space available is greater than required space. Upgrade of the database can proceed."
+  else
+    echo "Disk space available is less than required space for upgrade of the database.  Exiting..."
+    exit 1
+  fi
+fi
+'''
 
 //println "modified_preinstall_script:"
 //println modified_preinstall_script
@@ -47,8 +87,9 @@ cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
 rm -rf /opt/tak/certs-tmp
 
 # rename old tomcat if it exists
-mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED &>/dev/null
-
+if [ -f "/opt/tak/apache-tomcat" ]; then
+    mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED >/dev/null 2>&1
+fi
 # setup a default DB password
 sh /opt/tak/db-utils/setupDefaultPassword.sh
 
@@ -60,11 +101,8 @@ Distribution Statement A: Approved for public release; distribution is unlimited
 
 ----
 
-Configure or upgrade your TAK Server database:
- 
-To configure for the first time: sudo /opt/tak/db-utils/takserver-setup-db.sh
- 
-To upgrade an existing db: sudo java -jar /opt/tak/db-utils/SchemaManager.jar upgrade
+echo "Configure or upgrade your TAK Server database:" 
+echo "Run the following: sudo /opt/tak/db-utils/takserver-setup-db.sh" 
 
 EOF
 ''' + '''
@@ -83,11 +121,10 @@ fi
 '''
 
 ospackage {
-    packageName = 'takserver-database'
+    packageName = takdbpkgname
     version = takversion
     release = takreleaserpm
     os = LINUX
-    arch = _arch
     user = _user
     permissionGroup = _permission_group
     packageGroup = _package_group
@@ -123,14 +160,19 @@ prePackage.dependsOn copyLicense
 
 
 buildRpm.dependsOn prePackage
+buildRpm.dependsOn copyRpmDbScript
 
 buildRpm {
     requires('java-11-openjdk-devel')
-    requires('postgis30_10')
-    requires('postgis30_10-utils')
-    requires('postgresql10-server')
-    requires('postgresql10-contrib')
+    requires('postgis33_15')
+    requires('postgis33_15-utils')
+    requires('postgresql15-server')
+    requires('postgresql15-contrib')
 }
 
 // TODO: add deb package dependencies here
-buildDeb { }
+buildDeb {
+  requires('openjdk-11-jdk')
+  requires('postgresql-15')
+  requires('postgresql-15-postgis-3')
+}

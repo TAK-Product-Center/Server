@@ -16,6 +16,7 @@ import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
@@ -325,12 +326,24 @@ public class TakFigClient implements Serializable {
 				logger.warn("exception initializing trust store", e);
 			}
 
-
-			channel = openFigConnection(outgoing.getAddress(), outgoing.getPort(), GrpcSslContexts.configure(SslContextBuilder.forClient(), SslProvider.OPENSSL)  // this ensures that we are using OpenSSL, not JRE SSL
-					.protocols("TLSv1.2","TLSv1.3")
+			SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(SslContextBuilder.forClient(), SslProvider.OPENSSL)  // this ensures that we are using OpenSSL, not JRE SSL
 					.keyManager(keyMgrFactory)
-					.trustManager(trustMgrFactory)
-					.build());
+					.trustManager(trustMgrFactory);
+
+			String context = "TLSv1.2,TLSv1.3";
+
+			String ciphers = figTls.getCiphers();
+			if (!Strings.isNullOrEmpty(ciphers)) {
+				sslContextBuilder = sslContextBuilder.ciphers(Arrays.asList(ciphers.split(",")));
+				// only set context from config if cipher is also present
+				if (!Strings.isNullOrEmpty(figTls.getContext())) {
+					context = figTls.getContext();
+				}
+			}
+
+			channel = openFigConnection(outgoing.getAddress(), outgoing.getPort(),
+					sslContextBuilder.protocols(Arrays.asList(context.split(","))).build());
+
 		} catch (Exception e) {
 			logger.error("exception setting up TLS config", e);
 		}
@@ -604,7 +617,10 @@ public class TakFigClient implements Serializable {
 								cot.setContext(Constants.GROUPS_KEY, groups);
 							}
 
-							//                            cot.setContextValue(RepositoryService.ARCHIVE_EVENT_KEY, config.isArchive()); // TODO: make archive configurable per FIG federate
+							if (!getFederate().isArchive()) {
+								cot.setContextValue(Constants.ARCHIVE_EVENT_KEY, Boolean.FALSE);
+							}
+
 						} else {
 							if (logger.isDebugEnabled()) {
 								logger.debug("user not found for federate subscription for federated message");
@@ -683,7 +699,15 @@ public class TakFigClient implements Serializable {
 			public void onError(Throwable t) {
 				String rootCauseMsg = FederationUtils.getHumanReadableErrorMsg(t);
 				if (logger.isDebugEnabled()) {
-					logger.debug("received error notification from server" + " cause " + rootCauseMsg);
+					logger.debug("received error notification from server" + " cause " + rootCauseMsg, t);
+
+					if (t instanceof io.grpc.StatusRuntimeException) {
+						io.grpc.StatusRuntimeException tg = (io.grpc.StatusRuntimeException) t;
+						Status s = tg.getStatus();
+						if (logger.isDebugEnabled()) {
+							logger.debug("status: " + s + " " + s.getDescription());
+						}
+					}
 				}
 				status.setLastError(rootCauseMsg);
 				SubscriptionStore.getInstanceFederatedSubscriptionManager().updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
@@ -823,7 +847,7 @@ public class TakFigClient implements Serializable {
 								try {
 									// send out data feeds to federate
 									if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
-										List<ROL> feedMessages = mdm.getDataFeedEvents();
+										List<ROL> feedMessages = mdm.getDataFeedEventsForFederatedDataFeedOnly();
 										
 										AtomicLong delayMs = new AtomicLong(100L);										
 										for (final ROL feedMessage : feedMessages) {

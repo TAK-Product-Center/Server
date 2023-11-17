@@ -17,7 +17,7 @@ docker build --build-arg PUBLIC_KEY="`cat ~/.ssh/keys/id_rsa.pub`" --tag takserv
  The purpose of this file is to initialize services that are not available when constructing the docker container 
  (UNIX and network sockets specifically don't work).
  
- If the directory `/usr/pgsql-10/takdata` does not exist, it will utilize the scripts from the extracted RPM to set up 
+ If the directory `/usr/pgsql-15/takdata` does not exist, it will utilize the scripts from the extracted RPM to set up 
  the database for use.
  
  It will then start the database using that directory and start up an SSH server.

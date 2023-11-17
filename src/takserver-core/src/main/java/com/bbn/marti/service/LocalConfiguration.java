@@ -306,7 +306,8 @@ public class LocalConfiguration {
 								(offheapSize == null ? configuration.getBuffer().getQueue().getCacheOffHeapInitialSizeBytes() : offheapSize),
 								(offheapSize == null ? configuration.getBuffer().getQueue().getCacheOffHeapMaxSizeBytes() : offheapSize),
 								ignitePoolSize,
-								configuration.getBuffer().getQueue().isEnableCachePersistence()));
+								configuration.getBuffer().getQueue().isEnableCachePersistence(),
+								configuration.getBuffer().getQueue().getCacheOffHeapEvictionThreshold()));
 
 	}
 

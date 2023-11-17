@@ -22,8 +22,6 @@ import com.bbn.marti.test.shared.data.templates.ImmutableConnectionsTemplate_471
 
 /**
  * Used to modify the server's inputs through an online remote interface. Will not work if there is no server to connect to.
- *
- * @command
  */
 public class OnlineInputModule implements ServerAppModuleInterface {
 
@@ -72,7 +70,6 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 	 * @param port     The port to add
 	 * @param name     The getConsistentUniqueReadableIdentifier of the input
 	 * @return The result of the add attempt
-	 * @command
 	 */
 	@Command(description = "Adds a network input with the specified getConsistentUniqueReadableIdentifier, protocol, and port to the server.")
 	public NetworkInputAddResult add(@NotNull ProtocolProfiles protocol, @NotNull String port, @NotNull String name) {
@@ -94,17 +91,16 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 
 	/**
 	 * Adds a predefined input to the server. The following can be parsed from the predefined input names:
-	 * <p/>
+	 * <p>
 	 * The format of the input names is "&lt;getConsistentUniqueReadableIdentifier&gt;&lt;groups&gt;&lt;anonEnabled&gt;"
-	 * <p/>
+	 * <p>
 	 * The getConsistentUniqueReadableIdentifier is a general identifier for input and specifies the protocol in use.
 	 * The groups indicate the group identifiers it belongs to. Each number represents a group it belongs to with the format "group#".
 	 * The anonEnabled indicates if anon is specifically enabled or disabled. If it is not there, the default behavior is applied.
-	 * <p/>
+	 * <p>
 	 * For example, streamtcp_67t would be a streaming tcp connection belonging to the groups "group6" and "group7" with anon enabled
 	 *
 	 * @param input The predefined input to add
-	 * @command
 	 */
 	@Command(description = "Adds a predefined input to the server. The getConsistentUniqueReadableIdentifier formatting is as follows: " +
 			"\n\t<getConsistentUniqueReadableIdentifier><groups><anonEnabled>" +
@@ -119,7 +115,7 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 	public void add(AbstractConnection networkInput) {
 		inputManager.createInput(networkInput.getConfigInput());
 	}
-	
+
 	public void addDataFeed(AbstractConnection networkInput) {
 		inputManager.createDataFeed(networkInput.getConfigDataFeed());
 	}
@@ -128,7 +124,6 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 	 * Removes a predefined input from the server
 	 *
 	 * @param input The input to remove
-	 * @command
 	 */
 	@Command
 	public void remove(BaseConnections input) {
@@ -137,8 +132,6 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 
 	/**
 	 * Prints out the predefined inputs that can be added using the {@link #add(BaseConnections)} command.
-	 *
-	 * @command
 	 */
 	@Command(description = "Prints out the predefined inputs that can be added through this tool.")
 	public void listPredefinedInputs() {
@@ -151,18 +144,16 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 	 * Removes the input with the specified getConsistentUniqueReadableIdentifier
 	 *
 	 * @param name The getConsistentUniqueReadableIdentifier of the input to remove
-	 * @command
 	 */
 	@Command(description = "Removes the input with the specified getConsistentUniqueReadableIdentifier.")
 	public void remove(String name) {
 		inputManager.deleteInput(name);
 	}
-	
+
 	/**
 	 * Removes the dataFeed with the specified getConsistentUniqueReadableIdentifier
 	 *
 	 * @param name The getConsistentUniqueReadableIdentifier of the data feed to remove
-	 * @command
 	 */
 	@Command(description = "Removes the data feed with the specified getConsistentUniqueReadableIdentifier.")
 	public void removeDataFeed(String name) {
@@ -177,7 +168,6 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 	 * Gets the list of currently enabled inputs
 	 *
 	 * @return The list of inputs
-	 * @command
 	 */
 	@Command(description = "Gets a list of the currently enabled inputs.")
 	public String getList() {

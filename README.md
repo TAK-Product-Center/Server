@@ -1,7 +1,7 @@
 # TAK Server Development
 *Requires Java 11*
 
-* Linux / MacOS is recommended for development. If using Windows, replace "gradlew" with "gradlew.bat" in commands below.
+* Linux or MacOS is recommended for development. If using Windows, replace "gradlew" with "gradlew.bat" in commands below. An x86-64 architecture CPU is required to build from source, including on MacOS. M1 or M2 Apple silicon is not supported.
 
 Links:
  * [Test Execution](src/takserver-takcl-core/docs/testing.md)
@@ -33,7 +33,7 @@ docker run -it -d --rm --name TakserverServer0DB \
     --env POSTGRES_HOST_AUTH_METHOD=trust \
     --env POSTGRES_USER=martiuser \
     --env POSTGRES_DB=cot \
-    -p 5432 postgis/postgis:10-3.1
+    -p 5432 postgis/postgis:15-3.3
 
 echo SQL SERVER IP: `docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' TakserverServer0DB`
 ```
@@ -48,7 +48,9 @@ Setup Local Database. If the postgis container was used, only the last two lines
 ```
 
 Configure Local CoreConfig and Certs
-```cd takserver-core/example```
+```
+cd takserver-core/example
+```
 
 This is the CoreConfig that takserver war will look for when running from the takserver-core/example directory. From this point, just follow the instructions at takserver/src/docs/TAK_Server_Configuration_Guide.pdf to set up the CoreConfig and Certs. Make sure that the CoreConfig now points to the directory where the certs were generated locally.
 
@@ -113,16 +115,24 @@ java -Xmx<value> -Dspring.profiles.active=messaging -jar ../build/libs/takserver
 ```
 
 turn down log level of all logs:
-```java -jar takserver.war $@ --logging.level.root=ERROR```
+```
+java -jar takserver.war $@ --logging.level.root=ERROR
+```
 
 turn down log level for subscriptions:
-```java -jar takserver.war $@ --logging.level.com.bbn.marti.service.Subscription=ERROR```
+```
+java -jar takserver.war $@ --logging.level.com.bbn.marti.service.Subscription=ERROR
+```
 
 turn off logs just for subscriptions:
-```java -jar takserver.war $@ --logging.level.com.bbn.marti.service.Subscription=OFF```
+```
+java -jar takserver.war $@ --logging.level.com.bbn.marti.service.Subscription=OFF
+```
 
 entirely disable most logging:
-```java -jar takserver.war $@ --logging.level.root=OFF```
+```
+java -jar takserver.war $@ --logging.level.root=OFF
+```
 
 The default log level for most things is INFO. Possible levels are INFO, WARN, ERROR, OFF (in order of decreasing log frequency)
 
@@ -134,6 +144,13 @@ These levels can be applied globally with this option
 i.e.
 
 ```--logging.level.root=ERROR```
+
+The TAK Server log files can be found in the _logs_ subdirectory:
+
+1. _takserver-messaging.log_ - Execution-level information about the messaging process, including client connection events, error messages and warnings.
+2. _takserver-api.log_ - Execution-level information about the API process, including error messages and warnings.
+3. _takserver-messaging-console.log_ - Java Virtual Machine (JVM) informational messages and errors, for the messaging process.
+4. _takserver-api-console.log_ - Java Virtual Machine (JVM) informational messages and errors, for the API process.
 
 ## Swagger
 https://localhost:8443/swagger-ui.html

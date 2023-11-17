@@ -2,9 +2,8 @@ package tak.server.retention.config;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.TimeZone;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -13,15 +12,16 @@ import org.apache.ignite.services.Service;
 import org.apache.ignite.services.ServiceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.support.CronSequenceGenerator;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
+import tak.server.retention.SpringContextBeanForRetention;
 import tak.server.retention.scheduler.ExpirationTaskService;
 import tak.server.retention.scheduler.SingleTaskSchedulerService;
 
 import com.bbn.marti.remote.service.RetentionPolicyConfig;
 
 public class DistributedRetentionPolicyConfig implements RetentionPolicyConfig, Service {
+	private static final long serialVersionUID = 5712154890398469473L;
 
     private static final Logger logger = LoggerFactory.getLogger(DistributedRetentionPolicyConfig.class);
 
@@ -29,39 +29,41 @@ public class DistributedRetentionPolicyConfig implements RetentionPolicyConfig, 
 
     private static final String RETENTION_SERVICE = "conf/retention/retention-service.yml";
 
-    @Autowired
-    CronConfig cronConfig;
+    private CronConfig cronConfig() {
+    	return SpringContextBeanForRetention.getSpringContext().getBean(CronConfig.class);
+    }
 
-    @Autowired
-    RetentionPolicy retentionPolicy;
+    private RetentionPolicy retentionPolicy() {
+    	return SpringContextBeanForRetention.getSpringContext().getBean(RetentionPolicy.class);
+    }
 
-    @Autowired
-    SingleTaskSchedulerService retentionTaskService;
+    private SingleTaskSchedulerService retentionTaskService() {
+    	return SpringContextBeanForRetention.getSpringContext().getBean(SingleTaskSchedulerService.class);
+    }
 
-    @Autowired
-    ExpirationTaskService expirationTaskService;
+    private ExpirationTaskService expirationTaskService() {
+    	return SpringContextBeanForRetention.getSpringContext().getBean(ExpirationTaskService.class);
+    }
 
     public Map<String, Integer> updateRetentionPolicyMap(Map<String, Integer> policyMap) {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
         try {
             File file = new File(RETENTION_POLICY);
-            logger.info(" writing to app.home " + file.getAbsolutePath() );
-            Map<String, Integer> map = retentionPolicy.getDataRetentionMap();
+            Map<String, Integer> map = retentionPolicy().getDataRetentionMap();
             map.putAll(policyMap);
 
             // make a copy of the object for writing
             mapper.writeValue(file, new RetentionPolicy(map));
-            logger.info("writing new schedule " + file.getAbsolutePath());
+            logger.info("writing new policy " + policyMap);
         } catch (IOException e) {
-            logger.error(" Exception saving retention policy for " + policyMap.toString());
+            logger.error(" Exception saving retention policy for " + policyMap);
         }
-        return retentionPolicy.getDataRetentionMap();
+        return retentionPolicy().getDataRetentionMap();
     }
 
     @Override
     public Map<String, Integer> getRetentionPolicyMap() {
-        logger.info(" get retention policy map " + retentionPolicy.getDataRetentionMap());
-        return retentionPolicy.getDataRetentionMap();
+        return retentionPolicy().getDataRetentionMap();
     }
 
     @Override
@@ -73,13 +75,14 @@ public class DistributedRetentionPolicyConfig implements RetentionPolicyConfig, 
         if (logger.isDebugEnabled()) {
             logger.debug(" what is the cron express " + cronExpression);
         }
-        if (! CronSequenceGenerator.isValidExpression(cronExpression) && !cronExpression.equals("-")) {
+        if (! CronExpression.isValidExpression(cronExpression) && !cronExpression.equals("-")) {
             logger.error(" Invalid cron expression " + cronExpression + " schedule not changed");
             return null;
         }
         if (!cronExpression.equals("-")) {
-            CronSequenceGenerator generator = new CronSequenceGenerator(cronExpression, TimeZone.getTimeZone("EDT"));
-            Date nextRunDate = generator.next(new Date());
+            CronExpression generator = CronExpression.parse(cronExpression);
+
+            LocalDateTime nextRunDate = generator.next(LocalDateTime.now());
 
             logger.info(" what is the current next run time " + nextRunDate);
         }
@@ -88,7 +91,7 @@ public class DistributedRetentionPolicyConfig implements RetentionPolicyConfig, 
 
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
         try {
-            cronConfig.setCronExpression(cronExpression);
+            cronConfig().setCronExpression(cronExpression);
             File file = new File(RETENTION_SERVICE);
 
             // make a copy to write
@@ -96,26 +99,26 @@ public class DistributedRetentionPolicyConfig implements RetentionPolicyConfig, 
             newCronConfig.setCronExpression(cronExpression);
             mapper.writeValue(file, newCronConfig);
             if (logger.isDebugEnabled()){
-                logger.debug("writing new schedule " + file.getAbsolutePath());
+                logger.debug("writing new service schedule " + file.getAbsolutePath());
             }
             setNewSchedule(cronExpression);
         } catch (IOException e) {
             logger.error(" Exception saving retention service schedule for " + cronExpression);
         }
-        return cronConfig.getCronExpression();
+        return cronConfig().getCronExpression();
     }
 
 
     public void setNewSchedule(String cronExpression) {
-        retentionTaskService.scheduleRetentionServiceTask(cronExpression);
+        retentionTaskService().scheduleRetentionServiceTask(cronExpression);
 
         if (cronExpression.equals("-")) {
             logger.info("the new cron trigger is \"-\" and the next execution time is never");
             return;
         }
         CronTrigger cronTrigger = new CronTrigger(cronExpression);
-        CronSequenceGenerator generator = new CronSequenceGenerator(cronExpression);
-        Date nextRunDate = generator.next(new Date());
+        CronExpression generator = CronExpression.parse(cronExpression);
+        LocalDateTime nextRunDate = generator.next(LocalDateTime.now());
         logger.info( "what is the new cron trigger"  + cronTrigger.getExpression() + " what is the next execution time " + nextRunDate);
 
     }
@@ -125,10 +128,10 @@ public class DistributedRetentionPolicyConfig implements RetentionPolicyConfig, 
 
         logger.info(" setting mission expiration for " + taskName + " expiration in seconds" + seconds);
 
-        expirationTaskService.cancelFutureScheduledTask(taskName);
+        expirationTaskService().cancelFutureScheduledTask(taskName);
         if (seconds != null && seconds > -1) {
             logger.info(" set mission task " + taskName + " seconds " + seconds);
-            expirationTaskService.scheduleMissionExpiryTask(taskName, seconds);
+            expirationTaskService().scheduleMissionExpiryTask(taskName, seconds);
         }
     }
 
@@ -136,10 +139,10 @@ public class DistributedRetentionPolicyConfig implements RetentionPolicyConfig, 
     public void setMissionPackageExpiryTask(String taskName, Long seconds) {
         logger.info(" setting mission package expiration for " + taskName + " expiration in seconds" + seconds);
 
-        expirationTaskService.cancelFutureScheduledTask(taskName);
+        expirationTaskService().cancelFutureScheduledTask(taskName);
         if (seconds != null && seconds > -1) {
             logger.info(" set mission package task " + taskName + " seconds " + seconds);
-            expirationTaskService.scheduleMissionPackageExpiryTask(taskName, seconds);
+            expirationTaskService().scheduleMissionPackageExpiryTask(taskName, seconds);
         }
     }
 
@@ -147,16 +150,16 @@ public class DistributedRetentionPolicyConfig implements RetentionPolicyConfig, 
     public void setResourceExpiryTask(String taskName, Long seconds) {
         logger.info(" setting resource expiration for " + taskName + " expiration in seconds" + seconds);
 
-        expirationTaskService.cancelFutureScheduledTask(taskName);
+        expirationTaskService().cancelFutureScheduledTask(taskName);
         if (seconds != null && seconds > -1) {
             logger.info(" set resource task " + taskName + " seconds " + seconds);
-            expirationTaskService.scheduleResourceExpiryTask(taskName, seconds);
+            expirationTaskService().scheduleResourceExpiryTask(taskName, seconds);
         }
     }
 
     @Override
     public String getRetentionServiceSchedule() {
-        return cronConfig.getCronExpression();
+        return cronConfig().getCronExpression();
     }
 
     @Override

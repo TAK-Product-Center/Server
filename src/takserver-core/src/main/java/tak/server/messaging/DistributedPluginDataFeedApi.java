@@ -59,11 +59,11 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 	}
 
 	@Override
-	public PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> groupNames) {
+	public PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> groupNames, boolean federated) {
 
 		try {
 
-			logger.info("Calling create() method in DistributedPluginDataFeedApi, uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, groupNames: {}", uuid, name, tags, archive, sync, groupNames);
+			logger.info("Calling create() method in DistributedPluginDataFeedApi, uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, groupNames: {}, federated: {}", uuid, name, tags, archive, sync, groupNames, federated);
 
 			PluginDatafeedCacheHelper pluginDatafeedCacheHelper = pluginDatafeedCacheHelper();
 			GroupManager groupManager = groupManager();
@@ -104,6 +104,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 					dataFeed.setCoreVersion2TlsVersions("");
 					dataFeed.setSync(sync);
 					dataFeed.getFiltergroup().addAll(groupNames);
+					dataFeed.setFederated(federated);
 
 					MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
 							.modifyInput(name, dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
@@ -114,7 +115,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 
 				dataFeedId = dataFeedRepository.updateDataFeedWithGroupVector(uuid, name, DataFeedType.Plugin.ordinal(),
 						AuthType.ANONYMOUS.toString(), 0, false, "Plugin",
-						"", "", archive, false, false ,0, "", sync, 3600, groupVector);
+						"", "", archive, false, false ,0, "", sync, 3600, groupVector, federated);
 
 				logger.info("Updated datafeed uuid {}, row id", uuid, dataFeedId);
 
@@ -142,7 +143,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 				}
 
 				// update cache
-				PluginDataFeed re = new PluginDataFeed(uuid, name, tags, archive, sync, groupNames);
+				PluginDataFeed re = new PluginDataFeed(uuid, name, tags, archive, sync, groupNames, federated);
 				List<PluginDataFeed> pluginDataFeeds = new ArrayList<PluginDataFeed>();
 				pluginDataFeeds.add(re);
 				pluginDatafeedCacheHelper.cachePluginDatafeed(uuid, pluginDataFeeds);
@@ -177,6 +178,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 					dataFeed.setCoreVersion2TlsVersions("");
 					dataFeed.setSync(sync);
 					dataFeed.getFiltergroup().addAll(groupNames);
+					dataFeed.setFederated(federated);
 
 					MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
 							.createDataFeed(dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
@@ -187,7 +189,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 
 				dataFeedId = dataFeedRepository.addDataFeed(uuid, name, DataFeedType.Plugin.ordinal(),
 						AuthType.ANONYMOUS.toString(), 0, false, "Plugin",
-						"", "", archive, false, false ,0, "", sync, 3600, groupVector);
+						"", "", archive, false, false ,0, "", sync, 3600, groupVector, federated);
 
 				logger.info("Added datafeed uuid {}, row id", uuid, dataFeedId);
 
@@ -215,7 +217,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 				}
 
 				// update cache
-				PluginDataFeed re = new PluginDataFeed(uuid, name, tags, archive, sync, groupNames);
+				PluginDataFeed re = new PluginDataFeed(uuid, name, tags, archive, sync, groupNames, federated);
 				List<PluginDataFeed> pluginDataFeeds = new ArrayList<PluginDataFeed>();
 				pluginDataFeeds.add(re);
 				pluginDatafeedCacheHelper.cachePluginDatafeed(uuid, pluginDataFeeds);
@@ -235,22 +237,28 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 			throw e;
 		}
 	}
+	
+	@Override
+	public PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> groupNames) {
+		
+		return create(uuid, name, tags, archive, sync, groupNames, true);
+	
+	}
 
 	@Override
 	public PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync) {
 
-		return create(uuid, name, tags, archive, sync, Arrays.asList(Constants.ANON_GROUP));
+		return create(uuid, name, tags, archive, sync, Arrays.asList(Constants.ANON_GROUP), true);
 
 	}
-
 
 	@Override
 	public PluginDataFeed create(String uuid, String name, List<String> tags) {
 
 		return create(uuid, name, tags, true, false);
 
-	}
-
+	}	
+	
 	@Override
 	public void delete(String uuid, List<String> groupNames) {
 

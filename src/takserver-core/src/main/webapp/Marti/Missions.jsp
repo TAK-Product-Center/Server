@@ -41,12 +41,18 @@
             cache : false,
             contentType : false,
             processData : false,
+            success: function (response){
+                location.reload();
+            },
             error : function(stat, err) {
-                $.jnotify("Error deleting", "error");
+                if (stat.responseJSON !== null && stat.responseJSON.message != ""){
+                    $.jnotify("Error: " + stat.responseJSON.message, "error", 3000); 
+                } else{
+                    $.jnotify("Error deleting", "error", 3000);
+                }
             }
         });
 
-        location.reload();
     }
 
     function getSelected() {

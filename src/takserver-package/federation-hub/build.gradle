@@ -15,6 +15,13 @@ task copyFedHubReadme(type: Copy) {
     rename 'README_fedhub.md', 'README.md'
 }
 
+// Copy Docker README.
+task copyFedHubDockerReadme(type: Copy) {
+    from getRootProject().file('docs')
+    include 'README_fedhub_docker.md'
+    into "$buildDir/artifacts/docs"
+}
+
 // Copy configs.
 task copyFedHubConfigs(type: Copy) {
     from getRootProject().subprojects.collect { "${it.projectDir}/src/main/resources" }
@@ -52,35 +59,49 @@ def preinstall_script_federation_hub = '''\
 mkdir -p /opt/tak/federation-hub
 
 # Stop the federation hub if it is still running.
+set +e
 pkill -9 -f federation-hub-broker.jar
 pkill -9 -f federation-hub-policy.jar
 pkill -9 -f federation-hub-ui.war
+set -e
 
 if service --status-all | grep -Fq 'federation-hub'; then
   systemctl stop federation-hub
 fi
 
 # Add tak user if it doesn't already exist.
-id -u tak &> /dev/null
-if [ $? -ne 0 ] ; then
-    # User id 1491 is arbitrary.
+set +e
+uid=`id -u tak 2>/dev/null`
+set -e
+if [ -z "$uid" ] ; then
+    # User id 1491 is arbitrary
     useradd tak -r -u 1491 --no-create-home -d /opt/tak
 fi
 
 # try to backup configs
-if [ -d "/opt/tak/federation-hub/configs" ] 
-then
-    mkdir /opt/tak/federation-hub/backup-configs
-    mv /opt/tak/federation-hub/configs/* /opt/tak/federation-hub/backup-configs/
+if [ -d "/opt/tak/federation-hub/configs" ] ; then
+    echo "Backing up /opt/tak/federation-hub/configs to /opt/tak/federation-hub/backup-configs"
+    mkdir -p /opt/tak/federation-hub/backup-configs
+    cp -fr /opt/tak/federation-hub/configs/* /opt/tak/federation-hub/backup-configs/
 fi
 '''
 
 // RPM post-install script.
 def postinstall_script_federation_hub = '''\
+chown tak:tak /opt/tak
+
+# try to backup configs
+if [ ! -d "/opt/tak/federation-hub/configs" ] ; then
+    mkdir -p /opt/tak/federation-hub/configs
+    cp -fR /opt/tak/federation-hub/default-configs/* /opt/tak/federation-hub/configs/
+fi
+
+chown -fR tak:tak /opt/tak/federation-hub/configs
 
 # Set permissions on configuration files and scripts.
-chmod 644 /opt/tak/federation-hub/configs/*.xml
+chmod 644 /opt/tak/federation-hub/configs/*.xml 
 chmod 644 /opt/tak/federation-hub/configs/*.yml
+
 chmod 544 /opt/tak/federation-hub/scripts/*.sh
 chmod u+w /opt/tak/federation-hub/scripts/*.sh
 
@@ -108,8 +129,13 @@ chown tak:tak /opt/tak/federation-hub/logs
 chmod 755 /opt/tak/federation-hub/logs
 
 # Change ownership of configuration files.
-chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
-chown -fR tak:tak /opt/tak/webcontent
+if [ -f /opt/tak/CoreConfig.xml ] ; then
+    chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
+fi
+
+if [ -d "/opt/tak/webcontent" ] ; then
+  chown -fR tak:tak /opt/tak/webcontent
+fi
 
 cat <<- "EOF"
 
@@ -136,40 +162,25 @@ Follow the instructions in the Installation section of the configuration guide t
 EOF
 '''
 
-def postTrans_script_federation_hub = '''\
-
-mkdir /opt/tak/federation-hub/configs
-chown tak:tak /opt/tak/federation-hub/configs
-
-# try to backup configs
-if [ -d "/opt/tak/federation-hub/backup-configs" ] 
-then
-   mv /opt/tak/federation-hub/backup-configs/* /opt/tak/federation-hub/configs/
-else
-    mv /opt/tak/federation-hub/default-configs/* /opt/tak/federation-hub/configs/
-fi
-
-rm -r /opt/tak/federation-hub/default-configs/
-rm -r /opt/tak/federation-hub/backup-configs/
-'''
-
 // RPM post-uninstall script.
 def postuninstall_script_federation_hub = '''\
 case "$1" in
- 0)
+ 0|remove)
         # Delete user if TAK server is not running.
-        service --status-all | grep -Fq 'takserver-messaging' || service --status-all | grep -Fq 'takserver-api'
-        if [[ $? -ne 0 ]]; then
+        if [ `service --status-all | grep -Fc 'takserver-messaging'` -eq 0 ] && \
+           [ `service --status-all | grep -Fc 'takserver-api'` -eq 0 ]
+        then
+            echo "Deleting tak user"
             userdel tak
         fi
-        systemctl stop federation-hub &>/dev/null
-        systemctl disable federation-hub &>/dev/null
+        systemctl stop federation-hub >/dev/null 2>&1
+        systemctl disable federation-hub >/dev/null 2>&1
         rm /etc/init.d/federation-hub-broker
         rm /etc/init.d/federation-hub-policy
         rm /etc/init.d/federation-hub-ui
         rm /etc/init.d/federation-hub
         ;;
- 1)
+ 1|upgrade)
         # This is an upgrade, do nothing.
         :
         ;;
@@ -181,7 +192,6 @@ ospackage {
     version = takversion
     release = takreleaserpm
     os = 'LINUX'
-    arch = 'noarch'
     user = 'tak'
     permissionGroup = 'tak'
     packageGroup = 'Applications/Internet'
@@ -198,7 +208,6 @@ with or without a co-located TAK server.
     preInstall preinstall_script_federation_hub
     postInstall postinstall_script_federation_hub
     postUninstall postuninstall_script_federation_hub
-    postTrans postTrans_script_federation_hub
 
     from ("$buildDir/artifacts") {
         exclude 'configs/'
@@ -220,6 +229,7 @@ prePackage.dependsOn ':federation-hub-policy:build'
 prePackage.dependsOn ':federation-hub-ui:bootWar'
 prePackage.dependsOn ':federation-hub-ui:shadowJar'
 prePackage.dependsOn copyFedHubReadme
+prePackage.dependsOn copyFedHubDockerReadme
 prePackage.dependsOn copyFedHubConfigs
 prePackage.dependsOn copyFedHubJars
 prePackage.dependsOn copyFedHubScripts
@@ -234,5 +244,52 @@ buildRpm {
     requires('java-11-openjdk-devel')
 }
 
-// TODO: add deb package dependencies here
-buildDeb { }
+buildDeb {
+  requires('openjdk-11-jdk')
+}
+
+def copyFedhubVersionFileDef() { return copySpec {
+    from 'build/takArtifacts/version.txt'
+}}
+def copyFedhubResourcesDef() { return copySpec {
+    from 'build/artifacts'
+}}
+def copyFedhubDockerDef() { return copySpec {
+    from project(':federation-common').file('docker/')
+}}
+def copyFedhubDockerScriptDef() { return copySpec {
+    from project(':federation-common').file('scripts/configureInDocker.sh')
+}}
+def copyCertsSetupDef() { return copySpec {
+    from project(':takserver-core').file('scripts/certs')
+}}
+def copyDocsToTopLevelDef() { return copySpec {
+    from 'build/artifacts/docs'
+}}
+
+task createFedhubDockerLogDir() {
+    mkdir "build/artifacts/logs"
+}
+
+def copyFedhubVersionFile = copyFedhubVersionFileDef()
+def copyFedhubResources = copyFedhubResourcesDef()
+def copyFedhubDocker = copyFedhubDockerDef()
+def copyFedhubDockerScript = copyFedhubDockerScriptDef()
+def copyCertsSetup = copyCertsSetupDef()
+def copyDocsToTopLevel = copyDocsToTopLevelDef()
+
+task constructFedhubDockerZip(type: Zip) {
+    dependsOn createVersionFile
+    dependsOn createFedhubDockerLogDir
+    archiveName 'fedhub-docker-' + version + '.zip'
+    duplicatesStrategy 'fail'
+    destinationDir(file("$buildDir/distributions"))
+    into('fedhub-docker-' + version)
+
+    with copyFedhubVersionFile.into('tak')
+    with copyFedhubResources.into('tak/federation-hub')
+    with copyFedhubDockerScript.into('tak/federation-hub/scripts')
+    with copyFedhubDocker.into('docker')
+    with copyCertsSetup.into('tak/certs')
+    with copyDocsToTopLevel.into('./')
+}

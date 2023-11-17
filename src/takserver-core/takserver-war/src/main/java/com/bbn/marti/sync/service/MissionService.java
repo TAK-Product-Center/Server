@@ -25,7 +25,7 @@ import org.springframework.jdbc.core.ResultSetExtractor;
  */
 public interface MissionService {
 	
-    Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom, String baseLayer, String bbox, String path, String classification, String tool, String passwordHash, MissionRole defaultRole, Long expiration, String boundingPolygon);
+    Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom, String baseLayer, String bbox, String path, String classification, String tool, String passwordHash, MissionRole defaultRole, Long expiration, String boundingPolygon, Boolean inviteOnly);
     
     Mission getMission(String missionName, boolean hydrateDetails);
 
@@ -37,7 +37,7 @@ public interface MissionService {
 
     List<Mission> getAllMissions(boolean passwordProtected, boolean defaultRole, String tool, NavigableSet<Group> groups);
 
-    List<Mission> getAllCopsMissions(String tool, NavigableSet<Group> groups, String path, Integer page, Integer size);
+    List<Mission> getAllCopsMissions(String tool, String userName, NavigableSet<Group> groups, String path, Integer page, Integer size);
     
     Long getMissionCount(String tool);
 
@@ -68,6 +68,8 @@ public interface MissionService {
     Set<MissionInvitation> getAllMissionInvitationsForClient(String clientUid, String groupVector);
 
     List<MissionInvitation> getMissionInvitations(String missionName);
+
+    List<Mission> getInviteOnlyMissions(String userName, String tool, NavigableSet<Group> groups);
 
     MissionSubscription missionSubscribe(String missionName, String clientUid, String groupVector);
 
@@ -139,6 +141,8 @@ public interface MissionService {
     LogEntry addUpdateLogEntry(LogEntry entry, Date created, String groupVector);
 
     String generateToken(String uid, String missionName, MissionTokenUtils.TokenType tokenType, long expirationMillis);
+
+    MissionRole getRoleFromTypeAndInvitee(String missionName, String type, String invitee);
 
     MissionRole getRoleFromToken(Mission mission, MissionTokenUtils.TokenType[] validTokenTypes, HttpServletRequest request);
 

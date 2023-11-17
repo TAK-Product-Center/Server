@@ -130,7 +130,7 @@ public class DataFeedFederationAspect {
     		meta.setAuthType(dataFeed.getAuth().toString());
     		meta.setTags(dataFeedService.getDataFeedTagsById(dataFeed.getId()));
     		meta.setSyncCacheRetentionSeconds(dataFeed.getSyncCacheRetentionSeconds());
-    		   
+    		
     		// use mfm if available (api), otherwise use fed manager (messaging)
     		if (mfm != null) {
     			mfm.updateDataFeed(meta, commonUtil.getAllInOutGroups());
@@ -273,7 +273,7 @@ public class DataFeedFederationAspect {
     		meta.setAuthType(dataFeed.getAuth().toString());
     		meta.setSyncCacheRetentionSeconds(dataFeed.getSyncCacheRetentionSeconds());
         	meta.setTags(new ArrayList<>());
-        	
+
     		// use mfm if available (api), otherwise use fed manager (messaging)
     		if (mfm != null) {
     			mfm.updateDataFeed(meta, commonUtil.getAllInOutGroups());

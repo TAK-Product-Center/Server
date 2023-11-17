@@ -1,110 +1,116 @@
 <?xml version = "1.0"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
-    <xs:complexType name="templates">
-        <xs:sequence>
-            <xs:element name="template" type="checklist" minOccurs="0" maxOccurs="unbounded"/>
-        </xs:sequence>
-    </xs:complexType>
+	<xs:complexType name="templates">
+		<xs:sequence>
+			<xs:element name="template" type="checklist" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
 
-    <xs:complexType name="checklist">
-        <xs:sequence>
-            <xs:element name="checklistDetails" type="checklistDetails" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="checklistColumns" type="checklistColumns" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="checklistTasks" type="checklistTasks" minOccurs="1" maxOccurs="1"/>
-        </xs:sequence>
-    </xs:complexType>
+	<xs:complexType name="checklist">
+		<xs:sequence>
+			<xs:element name="checklistDetails" type="checklistDetails" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="checklistColumns" type="checklistColumns" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="checklistTasks" type="checklistTasks" minOccurs="1" maxOccurs="1"/>
+		</xs:sequence>
+	</xs:complexType>
 
-    <xs:complexType name="checklistStatus">
-        <xs:sequence>
-            <xs:element name="statusCount" type="statusCount" minOccurs="1" maxOccurs="unbounded"/>
-        </xs:sequence>
-        <xs:attribute name="checklistUid" type="xs:string"/>
-        <xs:attribute name="checklistName" type="xs:string"/>
-    </xs:complexType>
+	<xs:complexType name="checklistStatus">
+		<xs:sequence>
+			<xs:element name="statusCount" type="statusCount" minOccurs="1" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attribute name="checklistUid" type="xs:string"/>
+		<xs:attribute name="checklistName" type="xs:string"/>
+	</xs:complexType>
 
-    <xs:complexType name="statusCount">
-        <xs:attribute name="status" type="checklistTaskStatus"/>
-        <xs:attribute name="count" type="xs:int"/>
-    </xs:complexType>
+	<xs:complexType name="statusCount">
+		<xs:attribute name="status" type="checklistTaskStatus"/>
+		<xs:attribute name="count" type="xs:int"/>
+	</xs:complexType>
 
-    <xs:complexType name="missions">
-        <xs:sequence>
-            <xs:element name="mission" type="xs:string" minOccurs="1" maxOccurs="unbounded"/>
-        </xs:sequence>
-    </xs:complexType>
+	<xs:complexType name="missions">
+		<xs:sequence>
+			<xs:element name="mission" type="xs:string" minOccurs="1" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
 
-    <xs:complexType name="checklistDetails">
-        <xs:sequence>
-            <xs:element name="name" type="xs:string" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="uid" type="xs:string" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="description" type="xs:string" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="startTime" type="xs:string" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="templateName" type="xs:string" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="creatorUid" type="xs:string" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="creatorCallsign" type="xs:string" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="missions" type="missions" minOccurs="1" maxOccurs="1"/>
-        </xs:sequence>
-    </xs:complexType>
+	<xs:complexType name="checklistDetails">
+		<xs:sequence>
+			<xs:element name="name" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="uid" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="description" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="startTime" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="templateName" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="creatorUid" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="creatorCallsign" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="missions" type="missions" minOccurs="1" maxOccurs="1"/>
+		</xs:sequence>
+	</xs:complexType>
 
-    <xs:complexType name="checklistColumn">
-        <xs:sequence>
-            <xs:element name="columnName" type="xs:string" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="columnType" type="checklistColumnType" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="columnWidth" type="xs:int" minOccurs="1" maxOccurs="1"/>
+	<xs:complexType name="checklistColumn">
+		<xs:sequence>
+			<xs:element name="columnName" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="columnType" type="checklistColumnType" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="columnWidth" type="xs:int" minOccurs="1" maxOccurs="1"/>
             <xs:element name="columnBgColor" type="xs:string" minOccurs="1" maxOccurs="1"/>
             <xs:element name="columnTextColor" type="xs:string" minOccurs="1" maxOccurs="1"/>
             <xs:element name="columnEditable" type="xs:boolean" minOccurs="1" maxOccurs="1"/>
-        </xs:sequence>
-    </xs:complexType>
+			<xs:element name="columnItems" type="columnItemsList" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
 
-    <xs:complexType name="checklistColumns">
-        <xs:sequence>
-            <xs:element name="checklistColumn" type="checklistColumn" minOccurs="1" maxOccurs="unbounded"/>
-        </xs:sequence>
-    </xs:complexType>
+	<xs:complexType name="checklistColumns">
+		<xs:sequence>
+			<xs:element name="checklistColumn" type="checklistColumn" minOccurs="1" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
 
-    <xs:complexType name="checklistTasks">
-        <xs:sequence>
-            <xs:element name="checklistTask" type="checklistTask" minOccurs="1" maxOccurs="unbounded"/>
-        </xs:sequence>
-    </xs:complexType>
+	<xs:simpleType name="columnItemsList">
+		<xs:restriction base="xs:string" />
+	</xs:simpleType>
 
-    <xs:simpleType name="checklistColumnType">
-        <xs:restriction base="xs:string">
-            <xs:enumeration value="ShortString"/>
-            <xs:enumeration value="LongString"/>
-            <xs:enumeration value="Integer"/>
-            <xs:enumeration value="ActualTime"/>
-            <xs:enumeration value="RelativeTime"/>
-        </xs:restriction>
-    </xs:simpleType>
+	<xs:complexType name="checklistTasks">
+		<xs:sequence>
+			<xs:element name="checklistTask" type="checklistTask" minOccurs="1" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
 
-    <xs:complexType name="checklistTask">
-        <xs:sequence>
-            <xs:element name="lineBreak" type="xs:boolean" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="bgColor" type="xs:string" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="number" type="xs:int" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="uid" type="xs:string" minOccurs="1" maxOccurs="1"/>
-            <xs:element name="value" type="xs:string" minOccurs="1" maxOccurs="unbounded"/>
-            <xs:element name="status" type="checklistTaskStatus" minOccurs="0" maxOccurs="1"/>
-            <xs:element name="customStatus" type="xs:string" minOccurs="0" maxOccurs="1"/>
-            <xs:element name="completeBy" type="xs:string" minOccurs="0" maxOccurs="1"/>
-            <xs:element name="completeDTG" type="xs:string" minOccurs="0" maxOccurs="1"/>
-            <xs:element name="notes" type="xs:string" minOccurs="0" maxOccurs="1"/>
-            <xs:element name="dueRelativeTime" type="xs:string" minOccurs="0" maxOccurs="1"/>
-            <xs:element name="dueDTG" type="xs:string" minOccurs="0" maxOccurs="1"/>
-            <xs:element name="lineBreakText" type="xs:string" minOccurs="0"/>
-        </xs:sequence>
-    </xs:complexType>
+	<xs:simpleType name="checklistColumnType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="ShortString"/>
+			<xs:enumeration value="LongString"/>
+			<xs:enumeration value="Integer"/>
+			<xs:enumeration value="ActualTime"/>
+			<xs:enumeration value="RelativeTime"/>
+			<xs:enumeration value="List"/>
+		</xs:restriction>
+	</xs:simpleType>
 
-    <xs:simpleType name="checklistTaskStatus">
-        <xs:restriction base="xs:string">
-            <xs:enumeration value="Pending"/>
-            <xs:enumeration value="Complete"/>
-            <xs:enumeration value="Complete (late)"/>
-            <xs:enumeration value="Late"/>
-        </xs:restriction>
-    </xs:simpleType>
+	<xs:complexType name="checklistTask">
+		<xs:sequence>
+			<xs:element name="lineBreak" type="xs:boolean" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="bgColor" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="number" type="xs:int" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="uid" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="value" type="xs:string" minOccurs="1" maxOccurs="unbounded"/>
+			<xs:element name="status" type="checklistTaskStatus" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="customStatus" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="completeBy" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="completeDTG" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="notes" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="dueRelativeTime" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="dueDTG" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="lineBreakText" type="xs:string" minOccurs="0"/>
+		</xs:sequence>
+	</xs:complexType>
+
+	<xs:simpleType name="checklistTaskStatus">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="Pending"/>
+			<xs:enumeration value="Complete"/>
+			<xs:enumeration value="Complete (late)"/>
+			<xs:enumeration value="Late"/>
+		</xs:restriction>
+	</xs:simpleType>
 
 </xs:schema>

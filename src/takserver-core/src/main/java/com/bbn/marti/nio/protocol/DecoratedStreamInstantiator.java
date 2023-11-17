@@ -20,17 +20,17 @@ import com.google.common.base.Joiner;
 *
 * Specifically, given a channel handler, this partially-instantiated factory will (*synchronously*):
 *
-* - construct a ChannelListener/Protocol<T> instance using the given ProtocolInstantiator<T>, and link it
+* - construct a ChannelListener/Protocol{@literal <}T{@literal >} instance using the given ProtocolInstantiator{@literal <}T{@literal >}, and link it
 * to the ChannelHandler (see ChannelHandler.listener).
 *
-* - construct a list of ProtocolListener<T> instances using the given ChannelHandler, Protocol<T> pair, and
-* store them into the Protocol<T>. 
-* @note the ordering of ProtocolListenerInstantiator<T> defines the (possibly flatMapped) ordering of ProtocolListener<T>
+* - construct a list of ProtocolListener{@literal <}T{@literal >} instances using the given ChannelHandler, Protocol{@literal <}T{@literal >} pair, and
+* store them into the Protocol{@literal <}T{@literal >}.
+* The ordering of ProtocolListenerInstantiator{@literal <}T{@literal >} defines the (possibly flatMapped) ordering of ProtocolListener{@literal <}T{@literal >}
 *
 * - return
 *
-* @note if a Protocol<T> is null or throws an exception, the callee is responsible for handling a runtime exception,
-* while if a ProtocolListener<T> is null or throws an exception, it is not included in the stream processing chain (TODO: justify this asymmetry)
+* If a Protocol{@literal <}T{@literal >} is null or throws an exception, the callee is responsible for handling a runtime exception,
+* while if a ProtocolListener{@literal <}T{@literal >} is null or throws an exception, it is not included in the stream processing chain (TODO: justify this asymmetry)
 */
 public class DecoratedStreamInstantiator<T> implements StreamInstantiator {
     private final static Logger log = Logger.getLogger(DecoratedStreamInstantiator.class);
@@ -38,38 +38,38 @@ public class DecoratedStreamInstantiator<T> implements StreamInstantiator {
 	private ProtocolInstantiator<T> protocolInstantiator; // factory used to convert ChannelHandler -> Protocol<T>
 	private LinkedBlockingQueue<ProtocolListenerInstantiator<T>> listenerInstantiators; // factories used for instantiating ProtocolListener<T>s from the ChannelHandler/Protocol<T> pair
     private String listenerInstantiatorsStr = ""; // cached string representation of the protocol listeners, for fast toString conversion
-    
+
 	public DecoratedStreamInstantiator<T> withProtocolInstantiator(ProtocolInstantiator<T> protocolInstantiator) {
         Assertion.notNull(protocolInstantiator);
-        
+
 		this.protocolInstantiator = protocolInstantiator;
 		return this;
 	}
-	
+
 	public DecoratedStreamInstantiator<T> withProtocolListenerInstantiators(LinkedBlockingQueue<ProtocolListenerInstantiator<T>> listenerInstantiators) {
         Assertion.notNull(listenerInstantiators);
         Assertion.areNotNull(listenerInstantiators);
-        
+
 		this.listenerInstantiators = listenerInstantiators;
-        
+
         updateListenerStr();
-        
+
 		return this;
 	}
-    
+
     /**
     * Stores the current, joined list of ListenerInstantiators.toString
     */
     private void updateListenerStr() {
         this.listenerInstantiatorsStr = Joiner.on(", ").join(this.listenerInstantiators);
     }
-	
+
 	/**
 	* Build all the parts with the instantiators, link together
 	*/
 	public void instantiate(ChannelHandler handler) {
         log.trace(this + " building stream for " + handler);
-    
+
 		// build channel listener / protocol and set value in the channel handler
 		Protocol<T> protocol = instantiateProtocol(handler, protocolInstantiator);
 
@@ -81,19 +81,17 @@ public class DecoratedStreamInstantiator<T> implements StreamInstantiator {
 
         log.trace(this + " built stream for " + handler);
 	}
-    
+
     /**
-    * Instantiates the given Protocol<T> using the given handler, and attaches the ChannelListener
+    * Instantiates the given Protocol{@literal <}T{@literal >} using the given handler, and attaches the ChannelListener
     * to the handler
     *
-    * Returns the Protocol<T>
-    *
-    * @throws an AssertionException if the protocol is null
+    * Returns the Protocol{@literal <}T{@literal >}
     *
     */
     public static <T> Protocol<T> instantiateProtocol(ChannelHandler handler, ProtocolInstantiator<T> protocolInstantiator) {
         Protocol<T> protocol = null;
-        
+
         try {
             protocol = protocolInstantiator.newInstance(handler);
         } catch (Exception e) {
@@ -101,24 +99,24 @@ public class DecoratedStreamInstantiator<T> implements StreamInstantiator {
         }
 
         Assertion.notNull(protocol);
-        
+
         handler.listener(protocol);
-        
+
         return protocol;
     }
-    
+
     public static <T> void attachListeners(Protocol<T> target, List<ProtocolListener<T>> listeners) {
         for (ProtocolListener<T> listener : listeners) {
             target.addProtocolListener(listener);
         }
     }
-	
+
 	/**
 	* For each protocol listener instantiator, call new instance, guardedly, and aggregate the results into a list
 	*/
 	public static <T> List<ProtocolListener<T>> instantiateListeners(ChannelHandler handler, Protocol<T> protocol, LinkedBlockingQueue<ProtocolListenerInstantiator<T>> instantiators) {
 		List<ProtocolListener<T>> listeners = new ArrayList<ProtocolListener<T>>(instantiators.size());
-		
+
 		for (ProtocolListenerInstantiator<T> instantiator : instantiators) {
             try {
     			ProtocolListener<T> listener = instantiator.newInstance(handler, protocol);
@@ -130,10 +128,10 @@ public class DecoratedStreamInstantiator<T> implements StreamInstantiator {
                 log.warn(String.format("Error instantiating protocol listener for handler/protocol pair -- handler: %s, protocol: %s", handler, protocol), e);
             }
 		}
-		
+
 		return listeners;
 	}
-    
+
     public String toString() {
         return String.format("%s --> {%s}", this.protocolInstantiator, this.listenerInstantiatorsStr);
     }

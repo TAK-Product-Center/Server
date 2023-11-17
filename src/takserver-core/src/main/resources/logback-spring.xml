@@ -102,6 +102,7 @@
     <logger name="org.springframework.core" level="OFF" />
     <logger name="org.apache.tomcat.util.net" level="OFF" />
     <logger name="metrics-logger" level="INFO" />
+    <logger name="org.springframework.security.core.SpringSecurityCoreVersion" level="OFF" />
     <!--  the audit log logs at debug level, so filter at that level just for the audit log logger -->
     <logger name="data-access-log" level="OFF" />
     <appender name="esapi_log" class="ch.qos.logback.core.rolling.RollingFileAppender">

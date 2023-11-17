@@ -27,6 +27,8 @@ public class ImmutableServerProfiles extends AbstractServerProfile {
 	public static final ImmutableServerProfiles SERVER_0;
 	public static final ImmutableServerProfiles SERVER_1;
 	public static final ImmutableServerProfiles SERVER_2;
+	public static final ImmutableServerProfiles FEDHUB_0;
+	public static final ImmutableServerProfiles FEDHUB_1;
 	public static final ImmutableServerProfiles SERVER_CLI;
 	public static final ImmutableServerProfiles DEFAULT_LOCAL_SERVER;
 
@@ -37,7 +39,9 @@ public class ImmutableServerProfiles extends AbstractServerProfile {
 		SERVER_0 = new ImmutableServerProfiles("SERVER_0", "s0", "127.0.0.1", 47500, 9, 47100, 9, portCounter++, portCounter++, 8443, portCounter++, portCounter++, portCounter++, TAKCLCore.TakclOption.Server0DbHost.getStringOrNull()); // Used for generated tests
 		SERVER_1 = new ImmutableServerProfiles("SERVER_1", "s1", "127.0.0.1", 17610, 9, 18610, 9, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, TAKCLCore.TakclOption.Server1DbHost.getStringOrNull()); // Used for generated tests
 		SERVER_2 = new ImmutableServerProfiles("SERVER_2", "s2", "127.0.0.1", 17620, 9, 18620, 9, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, TAKCLCore.TakclOption.Server2DbHost.getStringOrNull()); // Used for generated tests
-		SERVER_CLI = new ImmutableServerProfiles("SERVER_CLI", "sCLI", "127.0.0.1", 17640, 9, 17600, 9, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, null); // Used for CLI tools
+		FEDHUB_0 = new ImmutableServerProfiles("FEDHUB_0", "f0", "127.0.0.1", 17630, 9, 18630, 9, portCounter++, portCounter++, -1, -1, -1, -1, ""); // Used for generated tests
+		FEDHUB_1 = new ImmutableServerProfiles("FEDHUB_1", "f1", "127.0.0.1", 17640, 9, 18640, 9, portCounter++, portCounter++, -1, -1, -1, -1, ""); // Used for generated tests
+		SERVER_CLI = new ImmutableServerProfiles("SERVER_CLI", "sCLI", "127.0.0.1", 17650, 9, 18650, 9, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, portCounter++, null); // Used for CLI tools
 		DEFAULT_LOCAL_SERVER = new ImmutableServerProfiles("DEFAULT_LOCAL_SERVER", "sD", "127.0.0.1", 47500, 100, 47100, 100, 9000, 9001, 8446, 8443, 8444, 8000, null) {
 			public String getUserAuthFilePath() {
 				Configuration config = Util.getCoreConfig();

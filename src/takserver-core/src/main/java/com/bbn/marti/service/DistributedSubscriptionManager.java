@@ -40,13 +40,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Handler;
 
 import org.apache.ignite.events.DiscoveryEvent;
 import org.apache.ignite.events.EventType;
 import org.apache.ignite.lang.IgnitePredicate;
 import org.apache.ignite.services.ServiceContext;
-import org.apache.naming.HandlerRef;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.DocumentHelper;
@@ -80,7 +78,6 @@ import com.bbn.marti.nio.protocol.Protocol;
 import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
 import com.bbn.marti.nio.server.NioServer;
 import com.bbn.marti.nio.websockets.NioWebSocketHandler;
-import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.RemoteSubscriptionMetrics;
 import com.bbn.marti.remote.SubscriptionManagerLite;
@@ -107,14 +104,15 @@ import com.bbn.marti.util.Tuple;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.bbn.metrics.dto.MetricSubscription;
-import com.bbn.security.web.MartiValidator;
 import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 
 import io.micrometer.core.instrument.Metrics;
+import tak.server.CommonConstants;
 import tak.server.Constants;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotEventContainer;
@@ -122,6 +120,7 @@ import tak.server.federation.FederateSubscription;
 import tak.server.federation.FigFederateSubscription;
 import tak.server.ignite.IgniteHolder;
 import tak.server.ignite.cache.IgniteCacheHolder;
+import tak.server.messaging.MessageConverter;
 
 public class DistributedSubscriptionManager implements SubscriptionManager, org.apache.ignite.services.Service {
 	
@@ -1918,6 +1917,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
             changeMessage.setContext(Constants.TOPICS_KEY, explicitTopics);
 
         }
+
+		sendToPlugins(changeMessage);
 	}
 
     @Override
@@ -2002,13 +2003,15 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
     			}
     		}
     	}
-    	
+
+		sendToPlugins(message);
+
     	if (!websocketHits.isEmpty()) {
 			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, message);
 		}
 	}
 
-	public void sendMissionInvite(String missionName, String[] uids, String authorUid, String tool, String token, String roleXml) {		
+	public void sendMissionInvite(String missionName, String[] uids, String authorUid, String tool, String token, String roleXml) {
 		if (logger.isDebugEnabled()) {
 			logger.debug("send mission invites for mission " + missionName);
 		}
@@ -2052,6 +2055,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		if (!websocketHits.isEmpty()) {
 			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, inviteMessage);
 		}
+
+		sendToPlugins(inviteMessage);
 	}
 	
 	@Override
@@ -2086,8 +2091,24 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			} else {
 				sub.submit(roleChangeMessage);
 			}
+
+			sendToPlugins(roleChangeMessage);
+
 		} catch (Exception e) {
 			logger.warn("exception sending mission role change message " + e.getMessage(), e);
+		}
+	}
+
+	private void sendToPlugins(CotEventContainer message) {
+		try {
+			byte[] rawMessage = MessageConverter.cotToDataMessage(new CotEventContainer(message, true,
+							ImmutableSet.of(Constants.SOURCE_TRANSPORT_KEY, Constants.SOURCE_PROTOCOL_KEY, Constants.USER_KEY)),
+					true, MessagingDependencyInjectionProxy.getInstance().serverInfo().getServerId());
+			IgniteHolder.getInstance().getIgnite().message().send(CommonConstants.PLUGIN_SUBSCRIBE_TOPIC, rawMessage);
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception in sendToPlugins", e);
+			}
 		}
 	}
 

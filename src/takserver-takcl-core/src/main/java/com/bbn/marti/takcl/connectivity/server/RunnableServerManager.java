@@ -157,6 +157,7 @@ public class RunnableServerManager {
 
 			File certTargetDir = new File(serverRootDir + "/certs/files");
 			FileUtils.forceMkdir(certTargetDir);
+			Files.copy(conf.getCoreConfigExamplePath(), Paths.get(serverRootDir, "CoreConfig.xml"));
 			Files.copy(Paths.get(TAKCLConfigModule.getInstance().getCertificateFilepath(newServerIdentifier.getConsistentUniqueReadableIdentifier(), "jks")), Paths.get(serverRootDir, "certs/files/takserver.jks"));
 			Files.copy(Paths.get(TAKCLConfigModule.getInstance().getTruststoreJKSFilepath()), Paths.get(serverRootDir, "certs/files/truststore-root.jks"));
 			Files.copy(Paths.get(TAKCLConfigModule.getInstance().getTruststoreJKSFilepath()), Paths.get(serverRootDir, "certs/files/fed-truststore.jks"));

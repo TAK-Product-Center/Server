@@ -19,6 +19,7 @@ public class MissionMetadata extends Parameters {
     private long parentMissionId;
     private long defaultRoleId;
     private long expiration;
+    private boolean inviteOnly;
     
     
     public String getName() {
@@ -105,6 +106,13 @@ public class MissionMetadata extends Parameters {
 	public void setBaseLayer(String baseLayer) {
 		this.baseLayer = baseLayer;
 	}
+	public boolean getInviteOnly() {
+		return inviteOnly;
+	}
+	public void setInviteOnly(boolean inviteOnly) {
+		this.inviteOnly = inviteOnly;
+	}
+
 	@Override
 	public String toString() {
 		return "MissionMetadata [name=" + name + ", creatorUid=" + creatorUid + ", description=" + description

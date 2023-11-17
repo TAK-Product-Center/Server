@@ -29,9 +29,9 @@ public class MissionCacheResolver implements CacheResolver {
     @Override
     public Collection<? extends Cache> resolveCaches(CacheOperationInvocationContext<?> context) {
         try {
-			String cacheName = ((String) context.getArgs()[0]).toLowerCase();
+			String cacheName = ((String) context.getArgs()[0]);
             List<Cache> caches = new CopyOnWriteArrayList<>();
-            caches.add(cacheManager.getCache(cacheName));
+            caches.add(cacheManager.getCache(cacheName.toLowerCase()));
 
             if ((CacheOperation)context.getOperation() instanceof CacheEvictOperation) {
                 caches.add(cacheManager.getCache(Constants.ALL_MISSION_CACHE));

@@ -1,4 +1,4 @@
-FROM openjdk:11-jdk-stretch
+FROM openjdk:11-jdk-bullseye
 COPY takserver-schemamanager/SchemaManager.jar ./
 COPY takserver-schemamanager/generic-cluster-database-configuration.sh ./
 COPY CoreConfig.xml opt/tak/CoreConfig.xml

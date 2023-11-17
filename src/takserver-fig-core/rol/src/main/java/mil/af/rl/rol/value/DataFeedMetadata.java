@@ -108,6 +108,7 @@ public class DataFeedMetadata extends Parameters {
 	public void setSyncCacheRetentionSeconds(int syncCacheRetentionSeconds) {
 		this.syncCacheRetentionSeconds = syncCacheRetentionSeconds;
 	}
+	
 	@Override
 	public String toString() {
 		return "DataFeedMetadata [type=" + type + ", missionName=" + missionName + ", missionFeedUid=" + missionFeedUid
@@ -116,4 +117,5 @@ public class DataFeedMetadata extends Parameters {
 				+ enableLatestSA + ", archiveOnly=" + archiveOnly + ", feedName=" + feedName + ", authType=" + authType
 				+ ", syncCacheRetentionSeconds=" + syncCacheRetentionSeconds + ", tags=" + tags + "]";
 	}
+
 }

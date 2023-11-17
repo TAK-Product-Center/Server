@@ -286,6 +286,7 @@ public class SchemaManager {
                 logger.debug(sql);
                 deleteStatement.execute(sql);
             }
+            
             flyway.clean();
             logger.debug("Database '" + database + "' has been cleaned.");
             // Rebuild the metadata table
@@ -323,7 +324,7 @@ public class SchemaManager {
         config.setPassword(commonOptions.password);
         dataSource = new HikariDataSource(config);
 
-        flyway = Flyway.configure().dataSource(dataSource).table("schema_version").load();
+        flyway = Flyway.configure().cleanDisabled(false).dataSource(dataSource).table("schema_version").load();
         return true;
     }
 

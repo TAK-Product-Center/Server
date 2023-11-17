@@ -154,6 +154,7 @@
 			  <sec:intercept-url pattern="/Marti/api/retention/service/schedule/**" access="ROLE_ADMIN" />
 			  <sec:intercept-url pattern="/Marti/api/retention/**" access="ROLE_ADMIN" />
 
+			  <sec:intercept-url pattern="/Marti/api/token/access" access="ROLE_ANONYMOUS" />
 			  <sec:intercept-url pattern="/Marti/api/token/**" access="ROLE_ADMIN" />
 			  <sec:intercept-url pattern="/Marti/api/token/**" method="DELETE" access="ROLE_ADMIN" />
 
@@ -271,7 +272,7 @@
               <sec:intercept-url pattern="/Marti/footer.jsp" access="ROLE_NON_ADMIN_UI"/>
               <sec:intercept-url pattern="/Marti/images/*" access="ROLE_NON_ADMIN_UI"/>
               <sec:intercept-url pattern="/Marti/jquery/**" access="ROLE_NON_ADMIN_UI, ROLE_NO_CLIENT_CERT"/>
-              <sec:intercept-url pattern="/Marti/lib/**" access="ROLE_NON_ADMIN_UI"/>
+              <sec:intercept-url pattern="/Marti/lib/**" access="ROLE_NON_ADMIN_UI, ROLE_NO_CLIENT_CERT"/>
               <sec:intercept-url pattern="/Marti/mil-std-2525b/*" access="ROLE_NON_ADMIN_UI"/>
               <sec:intercept-url pattern="/Marti/icons/*" access="ROLE_NON_ADMIN_UI"/>
 

@@ -39,40 +39,40 @@ import com.bbn.marti.util.spring.SpringContextBeanForApi;
 * The nio server is a single thread that can be started and stopped. On start, the registered binders (an interface that allows for users
 * to specify initial instances of server/client connects) are called, and their channels are registered with the selector. The main thread
 * then listens on the selector, which is triggered whenever a registered channel receives a signal, or whenever wakeup is called by another
-* thread. This wakeup mechanism is used here to signal the arrival of a selector change request, which can be processed in the absence of 
+* thread. This wakeup mechanism is used here to signal the arrival of a selector change request, which can be processed in the absence of
 * any waiting IO events.
 *
 * Application-side users interact with the server (see Server interface) by submitting registration or interestOp modifications, and by implementing a ChannelHandler.
 * These registration/interestOp modifications either register/deregister a channel handler from the server's calls, or change
 * the set of calls that a handler can receivecalls. A handler receives a call for each IO event that the server receives from the selector
 * for the corresponding channel.
-* 
+*
 * Any client can submit a selector change request, which returns an asynchronous future containing either the submitted channel handler, upon
 * success, or an exception, upon failure.
 *
 * When an IOEvent is received for a specific channel, the server calls into the handler to notify: the handler should (quickly) process
 * the IO event such that the selector will not be retriggered for that particular event, and spin off any tasks necessary to fully process the data
-* received. This handler call type returns a flag indicating whether or not the handler should be resubscribed to the IOEvent category it just received. 
+* received. This handler call type returns a flag indicating whether or not the handler should be resubscribed to the IOEvent category it just received.
 *
-* The bit-flag format and logic of the InterestOp integer is hidden by means of the typed IOEvent enumeration. Each 
+* The bit-flag format and logic of the InterestOp integer is hidden by means of the typed IOEvent enumeration. Each
 * IOEvent enumeration (READ, WRITE, ACCEPT, CONNECT) corresponds to a single high bit in some integer bit vector, which is tightly coupled
 * in the enumeration definition. A subscription to multiple IOEvent is encapsulated with an EnumSet. Conversion to and from the bit vector
 * is done on the client thread (in the channel wrapper) to avoid computation on the selector thread while avoiding cumbersome and easily mangled
 * bitwise operations.
 *
-* Client handler and binder writers are responsible for ensuring a few details. All handler implementations should be resilient to spurious calls for IOEvent 
+* Client handler and binder writers are responsible for ensuring a few details. All handler implementations should be resilient to spurious calls for IOEvent
 * handling: it cannot be guaranteed that asynchronous calls to unsubscribe or close will be honored before the server calls in.
 *
-* All channels that are passed to the server, either through a binder or through the channel registration method, should have their channels 
+* All channels that are passed to the server, either through a binder or through the channel registration method, should have their channels
 * configured to nonblocking upon instantiation.
 *
 */
 public class NioServer implements Server, Runnable, Serializable {
-	
+
 	private static final long serialVersionUID = -6983711481588072641L;
-	
+
 	private static NioServer instance;
-	
+
 	public static NioServer getInstance() {
 		if (instance == null) {
 			synchronized (NioServer.class) {
@@ -81,12 +81,12 @@ public class NioServer implements Server, Runnable, Serializable {
 				}
 			}
 		}
-		
+
 		return instance;
 	}
 
 	private final static Logger log = Logger.getLogger(NioServer.class);
-    
+
 	private Selector selector = null;		// selector for listening for nio events
 	private Thread serverThread = null;		// thread pointer for a current, running server
 	private Queue<AbstractSelectorChange> selectorChanges; // queue for storing application-side requests for IO subscription changes until the main thread can process them
@@ -102,7 +102,7 @@ public class NioServer implements Server, Runnable, Serializable {
     }
 
 //	/**
-//	* Selector change submission guard: if the nio server is dead (and not processing any 
+//	* Selector change submission guard: if the nio server is dead (and not processing any
 //	* connections, any change request will immediately throw an exception on submission.
 //	*/
 //	private boolean serverIsDead() {
@@ -113,15 +113,15 @@ public class NioServer implements Server, Runnable, Serializable {
 	* Enqueues the change if the server is awake, or sets an exception if the server is not
 	*
 	* This method is not enitrely race free with respect to the server being alive/dead, ie, at the moment
-	* the server is shut down, it is possible for a submitting thread to enqueue a change that is not 
+	* the server is shut down, it is possible for a submitting thread to enqueue a change that is not
 	* set to except by the server shutdown method (which excepts all pending changes)
 	*/
 	private boolean wakeupOrExceptChange(AbstractSelectorChange change) {
 		if (!selectorChanges.offer(change)) {
-			if(log.isWarnEnabled()) {				
+			if(log.isWarnEnabled()) {
 				log.warn("Server received change submitted to dead server " + change.toString());
 			}
-		
+
 			// server is dead or the change was not accepted into the queue
 			change.future.setException(new IllegalStateException("Server is not running, or server queue did not accept change"));
 			return false;
@@ -208,7 +208,7 @@ public class NioServer implements Server, Runnable, Serializable {
 
         return change.future;
     }
-    
+
     public AsyncFuture<ChannelHandler> removeIterestOps(SelectableChannel channel, EnumSet<IOEvent> events) {
         Assertion.areNotNull(channel, events, "None of the arguments passed to the remove interest call can be null");
 
@@ -218,9 +218,9 @@ public class NioServer implements Server, Runnable, Serializable {
 
         return change.future;
     }
-		
+
 	/**
-	* Method for attempting to open a new selector for this server. 
+	* Method for attempting to open a new selector for this server.
 	*/
 	private void openSelector() throws IOException {
         if (this.selector != null && this.selector.isOpen())
@@ -232,7 +232,7 @@ public class NioServer implements Server, Runnable, Serializable {
             throw new IOException(
                 "Error opening selector",
                 e);
-        }        
+        }
 	}
 
     /**
@@ -270,12 +270,11 @@ public class NioServer implements Server, Runnable, Serializable {
             }
         }
     }
-    
+
     /**
     *
     * @param binder
     * @param name
-    * @param connectionId Iff set, this will be propagated to client connections as their connectionId
     * @throws IOException
     */
    public void bind(@NotNull ServerBinder binder, @NotNull String name) throws IOException {
@@ -356,7 +355,7 @@ public class NioServer implements Server, Runnable, Serializable {
 	* Starts listening and processing incoming traffic. Asserts that no thread
 	* is running already, and that the selector is open (ie, bind has been called)
     *
-    * @note not thread-safe
+    * Not thread-safe
 	*/
 	public void listen() {
 		Assertion.condition(this.serverThread == null || !this.serverThread.isAlive(), "Server is already listening");
@@ -364,28 +363,28 @@ public class NioServer implements Server, Runnable, Serializable {
 
 		try {
 			long mem = Runtime.getRuntime().maxMemory();
-			
+
 			log.info("max memory (bytes): " + mem);
 
 		} catch (Throwable t) {
 			log.error("exeception getting memory available", t);
 		}
-		
+
 		log.info("Server started");
-		
+
 		this.serverThread = new Thread(this, "NIO Server");
 		this.serverThread.start();
 	}
-    
+
     /**
     * Interrupts the current thread if it is running, and then (synchronously) joins it.
     */
     public void stop() {
         Assertion.condition(this.serverThread != null && this.serverThread.isAlive(), "Server is not running");
-        
+
         // interrupt thread (which interrupts the selector). Thread itself detects shutdown, checking once per loop cycle
         serverThread.interrupt();
-        
+
         try {
             serverThread.join();
         } catch (InterruptedException e) {
@@ -394,8 +393,8 @@ public class NioServer implements Server, Runnable, Serializable {
             // void out thread pointer
             serverThread = null;
         }
-    }    
-    
+    }
+
  	/**
 	* Called by the server thread when an interrupt is detected. Iterates over all channels
 	* in the selector and closes them, and then closes the selector.
@@ -403,12 +402,12 @@ public class NioServer implements Server, Runnable, Serializable {
 	private void shutdown() {
 		log.info("Server shutting down");
 
-		// close all of the channels registered with the selector				
+		// close all of the channels registered with the selector
 		closeAllChannels();
 
 		// shut down the actual selector
 		closeSelector();
-		
+
 		// remove and except all pending selector changes
 		closePendingChanges();
 	}
@@ -440,7 +439,7 @@ public class NioServer implements Server, Runnable, Serializable {
             // drop the reference to it
             selector = null;
         }
-    }   
+    }
 
 	private void closePendingChanges() {
 		AbstractSelectorChange change;
@@ -486,11 +485,11 @@ public class NioServer implements Server, Runnable, Serializable {
                 } catch (Exception e) {
                     log.error("Server encountered exception shutting down", e);
                 }
-                 
+
                 // jump out
                 return;
             }
-        
+
             try {
                 // process key set
                 processKeySet();
@@ -514,7 +513,7 @@ public class NioServer implements Server, Runnable, Serializable {
 	*/
 	private void processSelectorChanges() {
 //        log.trace("processing selector modifications");
-    
+
 		AbstractSelectorChange change;
 		while ((change = selectorChanges.poll()) != null) {
 		    try {
@@ -531,29 +530,29 @@ public class NioServer implements Server, Runnable, Serializable {
 	*/
 	private void processKeySet() {
 //        log.trace("processing key set");
-        
+
 		Iterator<SelectionKey> iter = selector.selectedKeys().iterator();
 		while (iter.hasNext()) {
 			SelectionKey key = iter.next();
 			// remove key from the select key set -- otherwise, it stays in the triggered set
 			iter.remove();
-			
+
 			if (!key.isValid()) {
-				// don't have anything to handle	
+				// don't have anything to handle
 				if(log.isTraceEnabled()) {
 					log.trace("Server skipping over invalid key");
 				}
 				continue;
 			}
-			
-			
+
+
 
 			final SelectableChannel channel = key.channel();
 			final ChannelHandler handler = (ChannelHandler) key.attachment();
 
 			IOEvent event = null;
 			boolean staySubscribed = false; // intial assumption of false assures desubscription if an exception is thrown (they get closed anyhow)
-			
+
 			try {
 				if (key.isReadable()) {
 					event = IOEvent.READ;
@@ -569,7 +568,7 @@ public class NioServer implements Server, Runnable, Serializable {
 					staySubscribed = handler.handleConnect(channel, this);
 				} else {
 					// jump out, have nothing to do
-					if(log.isWarnEnabled()) {						
+					if(log.isWarnEnabled()) {
 						log.warn("Encountered active key with nothing to do");
 					}
 					continue;
@@ -597,7 +596,7 @@ public class NioServer implements Server, Runnable, Serializable {
         return "Nio Server instance (synchronous io strategy)";
     }
 
-    
+
 }
 
 

@@ -8,7 +8,7 @@ import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 
 /**
-* A codec that handles network -> application, and application -> network traffic conversion.
+* A codec that handles network -{@literal >} application, and application -{@literal >} network traffic conversion.
 *
 * Codecs are guaranteed that:
 *
@@ -21,14 +21,14 @@ import com.bbn.marti.util.concurrent.future.AsyncFuture;
 * passed to decode when more data arrives
 *
 * -- the order of any data emitted from encode/decode will be kept in the same
-* order w.r.t. a happens-before relation of encode/decode calls. (within an encode, or a 
+* order w.r.t. a happens-before relation of encode/decode calls. (within an encode, or a
 * decode, scope. encode and decode are themselves disjoint.)
 *
 * Codecs must guarantee that:
 *
-* -- within the scope of a single decode call, all progress that can be made on the 
-* given data *is* made. ie, if a codec does not process all of the data passed to 
-* a decode call, then an arbitrary number of decode calls with that remaining data 
+* -- within the scope of a single decode call, all progress that can be made on the
+* given data *is* made. ie, if a codec does not process all of the data passed to
+* a decode call, then an arbitrary number of decode calls with that remaining data
 * will always emit the empty buffer, and will always the passed in buffer marked
 * as completely unread
 *
@@ -47,24 +47,24 @@ public interface ByteCodec {
     *
     *
     * The Pipeline expects that, until the returned future is triggered:
-    * 
+    *
     * -- no read traffic is propagated beyond the given codec, ie. a decode
     * call does not produce a nonempty ByteBuffer (Pipelines can handle
     * a future being triggered *during* a read call)
     */
-    AsyncFuture<ByteCodec> onConnect();	
+    AsyncFuture<ByteCodec> onConnect();
 
     /**
 	* Receives incoming, network side traffic and decodes it into another byte buffer
     *
-    * A synchronous call from the callee pipeline, ie. no side effects are expected to take place outside 
+    * A synchronous call from the callee pipeline, ie. no side effects are expected to take place outside
     * the scope of this call
     *
     * Pipeline implementors guarantee that this call will not be made until the onConnect call has
     * returned
 	*/
 	ByteBuffer decode(ByteBuffer buffer);
-	
+
 	/**
 	* Receives outgoing, application side traffic and encodes it into another byte buffer
     *
@@ -81,7 +81,7 @@ public interface ByteCodec {
     * After this call, encode calls may be placed, but can be discarded.
 	*/
 	void onInboundClose();
-    
+
     /**
     * Outbound close is propagated in an application-to-network order
     *
@@ -90,8 +90,8 @@ public interface ByteCodec {
     * After this calls, decode calls may be placed, and should be serviced.
     */
 	void onOutboundClose();
-	
+
 	void setConnectionInfo(ConnectionInfo connectionInfo);
-	
+
 	ConnectionInfo getConnectionInfo();
 }

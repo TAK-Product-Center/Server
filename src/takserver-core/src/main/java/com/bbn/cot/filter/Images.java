@@ -24,15 +24,15 @@ import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.Tuple;
 
 /**
- * This has been changed innto a static class of 
+ * This has been changed innto a static class of
  * non-mutating processing utilies for images. See the ImageProcessingFilter
- * and ImageFormattingFilter for detachment of the xml-encoded image from the 
+ * and ImageFormattingFilter for detachment of the xml-encoded image from the
  * cot message, and then reattachment for different formats.
  *
- * The main change here is that ImageData is now tightly coupled with 
+ * The main change here is that ImageData is now tightly coupled with
  * the element that generates it. Upon construction, the ImageData object holds
- * canonical versions of the byte arrays (full and thumb), as well as the XML 
- * element that generated those. The XML element is copy constructed from the 
+ * canonical versions of the byte arrays (full and thumb), as well as the XML
+ * element that generated those. The XML element is copy constructed from the
  * provided one. For presentation, the processing methods will generate a new
  * Image Element from the ImageData object, according to the given format. For
  * URL annotations, the ImageData object is partially copied, with the byte
@@ -48,13 +48,13 @@ import com.bbn.marti.util.Tuple;
  */
 public class Images {
 	public static final ImagePref DEFAULT_IMAGE_PREF = ImagePref.THUMBNAIL;
-	
+
 	// XPath values
 	public static final String DETAIL_PATH = "/event/detail";
 	public static final String IMAGE_PATH = "/event/detail/image";
 	public static final String IMAGE_ELEMENT_NAME = "image";
 	public static final String IMAGE_FORMAT = "jpg";
-	
+
 	private static final Logger log = Logger.getLogger(Images.class);
 
 	/**
@@ -69,13 +69,13 @@ public class Images {
 		private byte[] thumbnail = null;
 		private Element imageElem = null;
 		private Integer primaryKey = null;
-		
+
 		// Fluent setter
 		public ImageData encodedImage(String text) {
 			this.encodedImage = text;
 			return this;
 		}
-		
+
 		public String encodedImage() {
 			return this.encodedImage;
 		}
@@ -96,7 +96,7 @@ public class Images {
 			this.thumbnail = thumbnail;
 			return this;
 		}
-		
+
 		// get thumb bytes
 		public byte[] thumbBytes() {
 			return this.thumbnail;
@@ -107,13 +107,13 @@ public class Images {
 			this.imageElem = imageElement;
 			return this;
 		}
-		
+
 		// returns a reference to the mutable element held by this data wrapper
 		// users should copy before modifying, as changes will be reflected internally
 		public Element element() {
 			return this.imageElem;
 		}
-		
+
 		// fluent setter for the db primary key
 		public ImageData primaryKey(Integer primaryKey) {
 			this.primaryKey = primaryKey;
@@ -138,13 +138,13 @@ public class Images {
 		// preexisting code
 		public byte[] getFullResImage() { return fullResImg; }
 		public byte[] getThumbnail() { return thumbnail; }
-		public Element getElement() { 
+		public Element getElement() {
 			Assertion.notNull(imageElem);
-			return imageElem; 
+			return imageElem;
 		}
-		public Integer getPrimaryKey() { 
+		public Integer getPrimaryKey() {
 			Assertion.notNull(primaryKey);
-			return primaryKey; 
+			return primaryKey;
 		}
 	}
 
@@ -172,12 +172,12 @@ public class Images {
 			ByteArrayOutputStream thumbStream = new ByteArrayOutputStream();
 			ImageIO.write(thumbImg, IMAGE_FORMAT, thumbStream);
 
-			// create copy (obtuse logic with temporarily stripping out the text, we want to avoid potentially allocating 
+			// create copy (obtuse logic with temporarily stripping out the text, we want to avoid potentially allocating
 			// another text node with the encoded image data copied, though this might not be the case)
 			imageElem.setText("");
 			Element clonedElem = imageElem.createCopy();
 			imageElem.setText(rawDataString);
-			
+
 			// create ImageData wrapper
 			imageData = new ImageData()
 				.encodedImage(rawDataString)
@@ -188,7 +188,7 @@ public class Images {
 		} catch (Exception e) {
 			log.warn("  Image Conversion error: " + e.getMessage(), e);
 		}
-		
+
 		return imageData;
 	}
 
@@ -222,7 +222,7 @@ public class Images {
 				// DEBUG line
 				Assertion.fail();
 		}
-		
+
 		return newImageElem;
 	}
 
@@ -273,18 +273,18 @@ public class Images {
 				log.error("Error reading image element text: couldn't parse to an integer");
 			}
 		}
-				
+
 		return primaryKey;
 	}
 
 	/**
 	* Tries to parse a group of images for a specific cot message from the database.
-	* 
-	* The imageMap is an *ordered map* (insertion ordering) primary key (image database) -> full/thumb byte arrays,
+	*
+	* The imageMap is an *ordered map* (insertion ordering) primary key (image database) -{@literal >} full/thumb byte arrays,
 	* and the imageElems list is the list of image elements in the order as retrieved by the database, where the image
 	* element text should contain the matching image data primary key.
-	* 
-	* This method attempts to pair image elements with the image data by parsing the image element text and looking 
+	*
+	* This method attempts to pair image elements with the image data by parsing the image element text and looking
 	* in the image map. If no element exists, we default to the zipped ordering
 	*/
 	public static List<ImageData> parseDatabaseFormat(Map<Integer,ImageData> imageMap, List<Element> imageElems) {
@@ -311,7 +311,7 @@ public class Images {
 			dataList.add(toAssociate
 				.element(imageElem.createCopy())
 			);
-			
+
 			// remove the element from the xml tree -- will not affect list membership w/dom4j
 			imageElem.detach();
 		}

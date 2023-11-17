@@ -171,6 +171,7 @@ class PyTAKStreamingProto:
 
 
     async def send_self_sa(self, writer):
+        self.location = (random.uniform(-90, 90), random.uniform(-180, 180))
         self_sa_message = CotProtoMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]))
         self_sa_message.add_callsign_detail(group_name="Red", platform="PyTAKStreamingProto")
         writer.write(self_sa_message.serialize())

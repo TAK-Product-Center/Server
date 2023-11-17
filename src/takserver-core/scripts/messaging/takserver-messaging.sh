@@ -1,4 +1,4 @@
- #!/bin/sh
+#!/bin/sh
 rm -rf ./tmp/
 
 . ./setenv.sh

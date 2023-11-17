@@ -38,6 +38,7 @@ public class MissionRole implements Serializable, Comparable<MissionRole> {
 	protected Long id;
 	protected Role role;
 	protected Set<MissionPermission> permissions;
+	private boolean usingMissionDefault;
 
 	public MissionRole() {
 		permissions = new ConcurrentSkipListSet<>();
@@ -89,6 +90,12 @@ public class MissionRole implements Serializable, Comparable<MissionRole> {
 	@JsonIgnore
 	@XmlElement(name = "permissions")
 	public MissionPermissions getMissionPermissionsXml() { return new MissionPermissions(permissions); }
+
+	@Transient
+	@JsonIgnore
+	@XmlTransient
+	public boolean isUsingMissionDefault() { return  usingMissionDefault; }
+	public void setUsingMissionDefault(boolean usingMissionDefault) { this.usingMissionDefault = usingMissionDefault; }
 
 	@Transient
 	public Set<String> getPermissions() {

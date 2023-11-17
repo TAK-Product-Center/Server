@@ -62,6 +62,7 @@ import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.cot.filter.GeospatialEventFilter;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
+import com.bbn.marti.config.Federation.Federate.Mission;
 import com.bbn.marti.config.Federation.FederationOutgoing;
 import com.bbn.marti.config.Federation.FederationServer.FederationPort;
 import com.bbn.marti.config.Filter;
@@ -2064,6 +2065,12 @@ public class DistributedFederationManager implements FederationManager, Service 
 		
 		submitFederateROL(rol, groups, null);
 	}
+	
+	@Override
+	public void submitMissionFederateROL(final ROL rol, final NavigableSet<Group> groups, String missionName) {
+		
+		submitMissionFederateROL(rol, groups, null, missionName);
+	}
 
 	@Override
 	public void submitFederateROL(ROL rol, final NavigableSet<Group> groups, String fileHash) {
@@ -2194,6 +2201,152 @@ public class DistributedFederationManager implements FederationManager, Service 
 			Metrics.counter(Constants.METRIC_FEDERATE_ROL_SKIP).increment();
 		}
 	}
+	
+	@Override
+	public void submitMissionFederateROL(ROL rol, final NavigableSet<Group> groups, String fileHash, String missionName) {
+		try {
+			// Federate this ROL message if there is a reachability relationship
+			Resources.federationROLExecutor.execute(new Runnable() {
+				@Override
+				public void run() {
+					if (logger.isDebugEnabled()) {
+						logger.debug("Federated ROL: " + rol.getProgram() + " groups: " + groups);
+					}
+					
+					ROL finalRol = rol;
+					
+					// Populate the file contents here in messaging if no content provided. Avoids serializing file over ignite
+					try {
+						if (rol.getPayloadList().isEmpty() && !Strings.isNullOrEmpty(fileHash)) {
+							
+					        String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
+							
+							// use the file hash to load the file from db / cache
+							byte[] fileBytes = MessagingDependencyInjectionProxy.getInstance().esyncService().getContentByHash(fileHash, groupVector);
+							
+							if (logger.isDebugEnabled()) {
+								if (fileBytes == null) {
+									logger.debug("null bytes for file " + fileHash);
+								} else {
+								
+								logger.debug("fetched " + fileBytes.length + " for hash " + fileHash);
+								
+								}
+							}
+							
+							BinaryBlob filePayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(fileBytes))).build();
+
+							ROL.Builder rolBuilder = rol.toBuilder();
+							
+							rolBuilder.addPayload(filePayload);
+							
+							if (logger.isDebugEnabled()) {
+								logger.debug("Added file payload size " + fileBytes.length + " bytes to rol");
+							}
+							
+							finalRol = rolBuilder.build();
+							
+						}
+					} catch (Exception e) {
+						if (logger.isWarnEnabled()) {
+							logger.warn("exception fetching file for federation from data layer", e);
+						}
+					}
+					
+					try {
+
+						for (FederateSubscription destFed : SubscriptionStore.getInstanceFederatedSubscriptionManager().getFederateSubscriptions()) {
+
+							if (CommonGroupDirectedReachability.getInstance().isReachable(groups, destFed.getUser())) {
+
+								Federate federate = null;
+								if (destFed instanceof FigServerFederateSubscription) {
+									federate = getFederate(((FigFederateSubscription) destFed).getFederate().getId());
+								} else if (destFed instanceof FigFederateSubscription) {
+									federate = ((FigFederateSubscription) destFed).getFigClient().getFederate();
+								}
+
+								if (federate == null) {
+									if (logger.isDebugEnabled()) {
+										logger.debug("unable to add federate groups to ROL, federate is null ");
+									}
+									continue;
+								}
+								
+								// Decide whether to send this mission to the federate
+								boolean isFederateThisMission = (federate.isMissionFederateDefault() != null)?federate.isMissionFederateDefault(): true; 
+
+								for (Mission missionFederateConfig: federate.getMission()) {
+									if (missionFederateConfig.getName().equals(missionName)) {
+										isFederateThisMission = missionFederateConfig.isEnabled();
+										break;	
+									}
+								}
+								if (!isFederateThisMission) {
+									if (logger.isDebugEnabled()) {
+										logger.debug("Not sending mission {} to federate {}", missionName, federate.getName());
+									}
+									continue;
+								}
+
+								ROL.Builder builder = finalRol.toBuilder();
+
+								if (federate.isFederatedGroupMapping()) {
+									Set<String> outGroups = GroupFederationUtil.getInstance().filterFedOutboundGroups(
+											federate.getOutboundGroup(), groups, federate.getId());
+									builder.addAllFederateGroups(outGroups);
+								}
+
+								ROL rolWithGroups = builder.build();
+
+								if (destFed instanceof FigServerFederateSubscription) {
+									if (logger.isDebugEnabled()) {
+										logger.debug("for FigServerFederateSubscription - sending federated ROL "
+												+ rolWithGroups.getProgram() + " from groups " + groups + " to " + destFed.getUser());
+									}
+									((FigServerFederateSubscription) destFed).lazyGetROLClientStream().send(rolWithGroups);
+
+									trackSendChangesEventForFederate(((FigServerFederateSubscription) destFed).getFederate().getId(), ((FigServerFederateSubscription) destFed).getFederate().getName(), true);
+									
+									try {
+							        	Metrics.counter(Constants.METRIC_FED_ROL_MESSAGE_READ_COUNT, "takserver", "messaging").increment();
+							        } catch (Exception ex) {
+							        	if (logger.isDebugEnabled()) {
+							        		logger.debug("error recording fed message read metric", ex);
+							        	}
+							        }
+
+								} else if (destFed instanceof FigFederateSubscription) {
+									if (logger.isDebugEnabled()) {
+										logger.debug("for FigFederateSubscription - sending federated ROL " + rolWithGroups.getProgram()
+										+ " from groups " + groups + " to " + destFed.getUser());
+									}
+									((FigFederateSubscription) destFed).getFigClient().getRolCall().sendMessage(rolWithGroups);
+
+									trackSendChangesEventForFederate(((FigFederateSubscription) destFed).getFederate().getId(), ((FigFederateSubscription) destFed).getFederate().getName(), false);
+									
+									try {
+							        	Metrics.counter(Constants.METRIC_FED_ROL_MESSAGE_WRITE_COUNT, "takserver", "messaging").increment();
+							        } catch (Exception ex) {
+							        	if (logger.isDebugEnabled()) {
+							        		logger.debug("error recording fed message write metric", ex);
+							        	}
+							        }
+								}
+							}
+						}
+					} catch (Exception e) {
+						if (logger.isWarnEnabled()) {
+							logger.warn("exception federating mission change", e);
+						}
+					}
+				}
+			});
+		} catch (RejectedExecutionException ree) {
+			// count how often full queue has blocked ROL send
+			Metrics.counter(Constants.METRIC_FEDERATE_ROL_SKIP).increment();
+		}
+	}
 
 	@Override
 	public void reconfigureFederation() {
@@ -2250,5 +2403,22 @@ public class DistributedFederationManager implements FederationManager, Service 
 				logger.debug("exception tracking federate disconnect", e);
 			}
 		}
+	}
+
+	@Override
+	public void updateFederateMissionSettings(String federateUID, boolean missionFederateDefault, List<Mission> federateMissions) {
+		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		
+		List<Federate> federates = fedConfig.getFederate();
+
+		for (Federate f : federates) {
+			if (f.getId().compareTo(federateUID) == 0) {
+				f.setMissionFederateDefault(missionFederateDefault);
+				f.getMission().clear();
+				f.getMission().addAll(federateMissions);
+				break;
+			}
+		}
+		coreConfig.setAndSaveFederation(fedConfig);
 	}
 }

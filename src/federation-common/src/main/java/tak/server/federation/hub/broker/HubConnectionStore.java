@@ -26,6 +26,7 @@ public class HubConnectionStore {
     private final Map<String, SSLSession> sessionMap =  new ConcurrentHashMap<>();
     private final Map<String, ConnectionInfo> connectionInfos = new ConcurrentHashMap<>();
     
+    
     public Collection<ConnectionInfo> getConnectionInfos() {
     	return connectionInfos.values();
     }

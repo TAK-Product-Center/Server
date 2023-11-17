@@ -64,6 +64,12 @@ else
   CONFIG=../config.cfg
 fi
 
+openssl list -providers 2>&1 | grep "\(invalid command\|unknown option\)" >/dev/null
+if [ $? -ne 0 ] ; then
+  echo "Using legacy provider"
+  LEGACY_PROVIDER="-legacy"
+fi
+
 SUBJ=$SUBJBASE"CN=$SNAME"
 echo "Making a $1 cert for " $SUBJ
 openssl req -new -newkey rsa:2048 -sha256 -keyout "${SNAME}".key -passout pass:$PASS -out "${SNAME}".csr -subj "$SUBJ" 
@@ -79,14 +85,14 @@ cat ca-trusted.pem >> "${SNAME}"-trusted.pem
 
 # now make pkcs12 and jks keystore files
 if [[ "$1" == "server" ||  "$1" == "client" ]]; then
-  openssl pkcs12 -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}".p12 -name "${SNAME}" -CAfile ca.pem -passin pass:${PASS} -passout pass:${PASS}
+  openssl pkcs12 ${LEGACY_PROVIDER} -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}".p12 -name "${SNAME}" -CAfile ca.pem -passin pass:${PASS} -passout pass:${PASS}
   keytool -importkeystore -deststorepass "${PASS}" -destkeypass "${PASS}" -destkeystore "${SNAME}".jks -srckeystore "${SNAME}".p12 -srcstoretype PKCS12 -srcstorepass "${PASS}" -alias "${SNAME}"
 else # a CA
-  openssl pkcs12 -export -in "${SNAME}"-trusted.pem -out truststore-"${SNAME}".p12 -nokeys -passout pass:${CAPASS}
+  openssl pkcs12 ${LEGACY_PROVIDER} -export -in "${SNAME}"-trusted.pem -out truststore-"${SNAME}".p12 -nokeys -passout pass:${CAPASS}
   keytool -import -trustcacerts -file "${SNAME}".pem -keystore truststore-"${SNAME}".jks -storepass "${CAPASS}" -noprompt
 
   # include a CA signing keystore; NOT FOR DISTRIBUTION TO CLIENTS
-  openssl pkcs12 -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}"-signing.p12 -name "${SNAME}" -passin pass:${PASS} -passout pass:${PASS}
+  openssl pkcs12 ${LEGACY_PROVIDER} -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}"-signing.p12 -name "${SNAME}" -passin pass:${PASS} -passout pass:${PASS}
   keytool -importkeystore -deststorepass "${PASS}" -destkeypass "${PASS}" -destkeystore "${SNAME}"-signing.jks -srckeystore "${SNAME}"-signing.p12 -srcstoretype PKCS12 -srcstorepass "${PASS}" -alias "${SNAME}"
 
   ## create empty crl 

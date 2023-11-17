@@ -23,7 +23,7 @@ import com.google.common.base.Joiner;
 /**
 * A server binder for opening and binding a multicast udp server datagram to a given port/group ip-addr/interface
 *
-* TODO: implement logic for rejoining the group and checking on the membership key (ie, does it expire or fail validation when 
+* TODO: implement logic for rejoining the group and checking on the membership key (ie, does it expire or fail validation when
 * we leave the multicast group)
 */
 public class MulticastServerBinder extends UdpServerBinder {
@@ -33,15 +33,15 @@ public class MulticastServerBinder extends UdpServerBinder {
     * Returns a Multicast UDP data listener. Will bind to the given port, and push any accepted data into a channel handler
     * that has ... (see above for UDP server binder)
     *
-    * @note the network interface and the inet address group are *not* ignored
+    * The network interface and the inet address group are *not* ignored
     */
     public final static BinderFactory mudpBinderFactory = new BinderFactory() {
         public ServerBinder instance(
             int port,
             OrderedExecutor boundExecutor,
-            StreamInstantiator streamInstantiator, 
+            StreamInstantiator streamInstantiator,
             List<NetworkInterface> interfs,
-            InetAddress group) 
+            InetAddress group)
         {
             return new MulticastServerBinder()
                 .withInterfaces(interfs)
@@ -52,7 +52,7 @@ public class MulticastServerBinder extends UdpServerBinder {
         }
     };
 
-            	
+
 	private InetAddress group; // the address of the multicast group we're joining
 	private final List<NetworkInterface> interfs = new LinkedList<NetworkInterface>(); // the list of network interfaces that we're going to try and join the group on
 
@@ -63,7 +63,7 @@ public class MulticastServerBinder extends UdpServerBinder {
 		this.group = group;
 		return this;
 	}
-	
+
 	public final MulticastServerBinder withInterface(NetworkInterface interf) {
 		Assertion.notNull(interf);
 
@@ -76,13 +76,13 @@ public class MulticastServerBinder extends UdpServerBinder {
 		} catch (Exception e) {
 			log.error("Error encountered trying to determine multicast properties of network interface -- excluding from multicast list: " + interf, e);
 		}
-		
+
 		return this;
 	}
-	
+
 	public MulticastServerBinder withInterfaces(List<NetworkInterface> interfs) {
 		Assertion.notNull(interfs);
-		
+
 		for (NetworkInterface interf : interfs) {
 			withInterface(interf);
 		}
@@ -92,7 +92,7 @@ public class MulticastServerBinder extends UdpServerBinder {
 
 	/**
 	* Either returns the list of user-specified network interfaces for
-	* multicast, if nonempty, or the list of all network interfaces that support 
+	* multicast, if nonempty, or the list of all network interfaces that support
 	* multicast, if empty.
 	*/
 	private List<NetworkInterface> interfsOrAllMulticastInterfs() {
@@ -106,19 +106,19 @@ public class MulticastServerBinder extends UdpServerBinder {
     @Override
     protected DatagramChannel doBind() throws IOException {
         DatagramChannel serverChannel = super.doBind();
-        
+
         if (serverChannel != null) {
             // TODO: do something with the membership keys
             List<MembershipKey> joinedKeys = joinInterfaces(serverChannel);
         }
-        
+
         return serverChannel;
     }
 
     private List<MembershipKey> joinInterfaces(DatagramChannel serverChannel) throws IOException {
         List<NetworkInterface> toJoin = interfsOrAllMulticastInterfs();
         List<MembershipKey> joinedKeys = new LinkedList<MembershipKey>();
-        
+
         if (!toJoin.isEmpty()) {
             for (NetworkInterface interf : toJoin) {
                 try {
@@ -128,14 +128,14 @@ public class MulticastServerBinder extends UdpServerBinder {
                     log.warn(String.format("%s encountered io exception encountered trying to join %s", this, interf));
                 }
             }
-            
+
             if (joinedKeys.isEmpty()) {
                 throw new IOException(this + " could not join any network interfaces that support multicast");
             }
         } else {
             log.warn(this + " has no available network interfaces that support multicast");
         }
-        
+
         return joinedKeys;
     }
 

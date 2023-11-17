@@ -51,10 +51,6 @@ public class RequestHolderFilterBean extends GenericFilterBean {
 		HttpServletRequest req = (HttpServletRequest) servletRequest;
 		HttpServletResponse resp = (HttpServletResponse) servletResponse;
 
-		if (servletRequest.getLocalPort() != 8080) {
-			resp.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
-		}
-
 		if (config.getRemoteConfiguration().getNetwork().isAllowAllOrigins()) {
 			resp.setHeader("Access-Control-Allow-Origin", "*");
 			resp.setHeader("Access-Control-Allow-Headers", "*");

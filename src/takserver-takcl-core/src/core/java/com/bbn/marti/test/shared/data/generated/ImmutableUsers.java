@@ -1369,6 +1369,8 @@ public class ImmutableUsers extends AbstractUser {
 	public static final ImmutableUsers sCLI_udp_anonuser_t_B = new ImmutableUsers("sCLI_udp_anonuser_t_B", BaseUsers.anonuser, true, "sCLI_udp");
 	public static final ImmutableUsers s0_anonmissionuser = new ImmutableUsers("s0_anonmissionuser", BaseUsers.s0_anonmissionuser, true, "s0_authstcp");
 	public static final ImmutableUsers s0_anonmissionuseA = new ImmutableUsers("s0_anonmissionuserA", BaseUsers.s0_anonmissionuserA, true, "s0_authstcp");
+	public static final ImmutableUsers s0_stcp_anonuser_t_plugin1 = new ImmutableUsers("s0_stcp_anonuser_t_plugin1", BaseUsers.anonuser, true, "s0_stcp");
+
 	////////////////////////// BD6A4745-76B4-42DD-AE35-5C2251DD6301
 	// End Generated Users
 	//////////////////////////

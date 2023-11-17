@@ -23,7 +23,7 @@ public class MissionInvitation implements Serializable, Comparable<MissionInvita
     private static final long serialVersionUID = 68934983535979L;
 
     public enum Type {
-        clientUid, callsign, username, group, team
+        clientUid, callsign, userName, group, team
     }
 
     protected static final Logger logger = LoggerFactory.getLogger(MissionInvitation.class);

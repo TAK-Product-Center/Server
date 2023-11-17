@@ -105,3 +105,10 @@ services.factory('MissionListService', function($resource) {
 	'query': {method: "GET", isArray: false}
     })
 });
+
+// services.factory('FederateMissionsUpdateService', function($resource) {
+// 	return $resource('/Marti/api/federatemissions/:federateId', {}, {
+// 		'update': {method: "PUT", isArray: true}
+// 	});
+// });
+

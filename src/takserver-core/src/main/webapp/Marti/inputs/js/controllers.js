@@ -352,12 +352,14 @@ inputManagerControllers.controller('DataFeedCreationCtrl',
 					$scope.dataFeed.tags = '';
 					$scope.dataFeed.auth = 'X_509';
 					$scope.dataFeed.protocol = 'tls';
+					$scope.dataFeed.syncCacheRetentionSeconds = "3600";
 					$scope.dataFeed.archive = 'true';
 					$scope.dataFeed.anongroup = 'false';
 					$scope.dataFeed.archiveOnly = 'false';
 					$scope.dataFeed.coreVersion = "2";
 					$scope.dataFeed.protocol = 'tls';
 					$scope.dataFeed.sync = 'false';
+					$scope.dataFeed.federated = 'true';
 					$scope.inputNameDuplicate = false;
 					$scope.serviceReportedMessages = false;
 					$scope.messages = [];
@@ -426,6 +428,7 @@ inputManagerControllers.controller('DataFeedModificationCtrl', ['$scope', '$loca
 					$scope.dataFeed = apiResponse.data;
 					$scope.hideArchive = false;
 					$scope.hideArchiveOnly = false;
+					$scope.hideFederated = false;
 					var protocol = apiResponse.data.protocol.toLowerCase();
 					$scope.hideFilterGroupList = (apiResponse.data.auth.toLowerCase() != 'anonymous');
 				},

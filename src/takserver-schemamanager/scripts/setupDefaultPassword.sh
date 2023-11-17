@@ -4,7 +4,7 @@ if [ -f "/opt/tak/CoreConfig.xml" ]; then
 else 
   curPassword=$(echo $(grep -m 1 "<connection" /opt/tak/CoreConfig.example.xml)  | sed 's/.*password="//; s/".*//')
   if [ -z "$curPassword" ]; then
-  	curPassword=($(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9'))
+  	curPassword=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9')
   fi
 fi
 

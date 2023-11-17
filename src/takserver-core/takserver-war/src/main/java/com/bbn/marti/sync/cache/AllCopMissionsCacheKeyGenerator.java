@@ -13,7 +13,7 @@ public class AllCopMissionsCacheKeyGenerator implements KeyGenerator {
 	  
     public Object generate(Object target, Method method, Object... params) {
     	
-    	if (!(params[1] instanceof NavigableSet<?>)) {
+    	if (!(params[2] instanceof NavigableSet<?>)) {
     		throw new IllegalArgumentException("can't construct cache key for all mission - invalid group collection type");
     	}
     	
@@ -25,26 +25,30 @@ public class AllCopMissionsCacheKeyGenerator implements KeyGenerator {
 		keyBuilder.append("_");
 		keyBuilder.append(String.valueOf(params[0]));
 
+		// username
+		keyBuilder.append("_");
+		keyBuilder.append(String.valueOf(params[1]));
+
 		// groups
-		NavigableSet<Group> groups = ((NavigableSet<Group>)params[1]);
+		NavigableSet<Group> groups = ((NavigableSet<Group>)params[2]);
 		String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
 		keyBuilder.append("_");
 		keyBuilder.append(groupVector);
 
 		// path
-		if (params[2] != null) {
+		if (params[3] != null) {
 			keyBuilder.append("_");
 			keyBuilder.append((String) params[2]);
 		}
 
 		// page
-		if (params[3] != null) {
+		if (params[4] != null) {
 			keyBuilder.append("_");
 			keyBuilder.append((String.valueOf(params[3])));
 		}
 
 		//size
-		if (params[4] != null) {
+		if (params[5] != null) {
 			keyBuilder.append("_");
 			keyBuilder.append((String.valueOf(params[4])));
 		}

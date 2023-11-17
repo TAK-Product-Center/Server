@@ -7,6 +7,10 @@ compileJava {
     options.forkOptions.executable = 'javac'
 }
 
+javadoc {
+  exclude 'com/bbn/tak/tls/**'
+}
+
 dependencies {
 
   providedCompile group: 'javax.servlet', name: 'javax.servlet-api', version: servlet_api_version
@@ -14,15 +18,18 @@ dependencies {
   providedCompile group: 'org.apache.tomcat', name: 'tomcat-catalina', version: tomcat_version
 
   // swagger
-  compile group: 'org.springdoc', name: 'springdoc-openapi-ui', version: springdoc_version
-
+  // compile group: 'org.springdoc', name: 'springdoc-openapi-ui', version: springdoc_version
+  compile ("org.springdoc:springdoc-openapi-ui:$springdoc_version") {
+  	  // Added to exclude dom4j 1.6.1, a transitive dependency
+  	  exclude group: 'dom4j', module: 'dom4j'
+  }
   compile(project(':takserver-common'))
-  
+
   // cloudwatch metrics
   compile group: 'io.awspring.cloud', name: 'spring-cloud-starter-aws', version: spring_cloud_starter_version
   compile group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_cloudwatch_version
   compile group: 'io.micrometer', name: 'micrometer-core'
-  
+
   compile group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
   compile group: 'org.dom4j', name: 'dom4j', version: dom4j_version
   compile group: 'org.owasp.antisamy', name: 'antisamy', version: antisamy_version
@@ -32,6 +39,7 @@ dependencies {
   compile group: 'org.apache.commons', name: 'commons-collections4', version: commons_collections_version
   compile group: 'commons-fileupload', name: 'commons-fileupload', version: commons_fileupload_version
   compile group: 'commons-io', name: 'commons-io', version: commons_io_version
+  compile group: 'commons-validator', name: 'commons-validator', version: commons_validator_version
   compile group: 'org.apache.commons', name: 'commons-pool2', version: commons_pool_version
   compile group: 'org.owasp.esapi', name: 'esapi', version: esapi_version
   compile group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
@@ -56,10 +64,10 @@ dependencies {
   compile group: 'javax.ws.rs', name: 'jsr311-api', version: jsr311_version
   compile group: 'org.slf4j', name: 'jul-to-slf4j', version: slf4j_version
   compile group: 'org.gnu.inet', name: 'libidn', version: libidn_version
-  
+
   // required for audit log custom logging filter
   compile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
-    
+
   compile group: 'net.sourceforge.nekohtml', name: 'nekohtml', version: neko_version
   compile group: 'org.postgresql', name: 'postgresql', version: postgres_version
   compile group: 'org.ocpsoft.prettytime', name: 'prettytime', version: prettytime_version
@@ -88,21 +96,31 @@ dependencies {
   compile group: 'org.springframework.security', name: 'spring-security-jwt', version: spring_security_jwt_version
   compile group: 'org.springframework.security.oauth', name: 'spring-security-oauth2', version: spring_security_oauth_version
   compile group: 'org.springframework.security.oauth.boot', name: 'spring-security-oauth2-autoconfigure', version: spring_security_oauth2_autoconfigure_version
-  compile group: 'org.igniterealtime', name: 'tinder', version: tinder_version
+  // compile group: 'org.igniterealtime', name: 'tinder', version: tinder_version
+  compile ("org.igniterealtime:tinder:$tinder_version") {
+  	  // Added to exclude dom4j 1.6.1, a transitive dependency
+  	  exclude group: 'dom4j', module: 'dom4j'
+  }
   compile group: 'gov.nasa', name: 'worldwind', version: worldwind_version
   compile group: 'xerces', name: 'xercesImpl', version: xerces_version
   compile group: 'xpp3', name: 'xpp3_min', version: xpp3_version
   compile group: 'com.sun.xml.ws', name: 'jaxws-rt', version: jaxwsrt_version
   compile group: 'org.json', name: 'json', version: json_org_version
   compile group: 'io.jsonwebtoken', name: 'jjwt', version: jsonwebtoken_version
-  compile group: 'org.igniterealtime.whack', name: 'core', version: whack_version
+  //compile group: 'org.igniterealtime.whack', name: 'core', version: whack_version
+  compile ("org.igniterealtime.whack:core:$whack_version") {
+  	  // Added to exclude dom4j 1.6.1, a transitive dependency
+  	  exclude group: 'dom4j', module: 'dom4j'
+  }
+
   compile group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
 
 
   compile 'javax.xml.bind:jaxb-api:' + jaxb_api_version
   compile('javax.activation:activation:1.1')
   compile('org.glassfish.jaxb:jaxb-runtime:' + jaxb_api_version)
-  
+
   compile name: 'JavaAPIforKml-2.2.2'
+  compile group: 'com.squareup.okhttp3', name: 'okhttp', version: okhttp3_version
 }
 

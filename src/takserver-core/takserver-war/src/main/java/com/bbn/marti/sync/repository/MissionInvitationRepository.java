@@ -12,6 +12,7 @@ public interface MissionInvitationRepository extends JpaRepository<MissionInvita
 
     List<MissionInvitation> findAllByMissionNameIgnoreCase(String missionName);
     MissionInvitation findByToken(String token);
+    MissionInvitation findByMissionNameAndTypeAndInvitee(String missionName, String type, String invitee);
 
     @Query(value = "select mi.id, mi.mission_name, mi.invitee, mi.type, mi.creator_uid, mi.create_time, mi.token, mi.role_id  " +
             "from mission m inner join mission_invitation mi on m.name = mi.mission_name " +

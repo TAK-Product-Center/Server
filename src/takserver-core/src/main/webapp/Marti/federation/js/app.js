@@ -48,6 +48,10 @@ app.config(['$routeProvider',
 			templateUrl: 'partials/federateGroups.html',
 			controller: 'FederateGroupsCtrl'
 		    }).
+		    when('/editFederateMissions/:id', {
+            templateUrl: 'partials/federateMissions.html',
+            controller: 'FederateMissionsCtrl'
+            }).
 		    when('/listFederateContacts/:id', {
 			templateUrl: 'partials/federateContacts.html',
 			controller: 'FederateContactsListCtrl'

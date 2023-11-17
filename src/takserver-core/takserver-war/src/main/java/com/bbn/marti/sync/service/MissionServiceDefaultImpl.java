@@ -36,6 +36,7 @@ import javax.sql.DataSource;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.validator.routines.EmailValidator;
 import org.dom4j.DocumentException;
 import org.jetbrains.annotations.NotNull;
 import org.locationtech.jts.geom.Polygon;
@@ -66,6 +67,7 @@ import org.w3c.dom.NodeList;
 
 import com.bbn.marti.config.GeospatialFilter;
 import com.bbn.marti.dao.kml.JDBCCachingKMLDao;
+import com.bbn.marti.email.EmailClient;
 import com.bbn.marti.jwt.JwtUtils;
 import com.bbn.marti.logging.AuditLogUtil;
 import com.bbn.marti.maplayer.MapLayerService;
@@ -85,7 +87,6 @@ import com.bbn.marti.remote.groups.ConnectionType;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
-import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.sync.MissionChangeType;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.util.DateUtil;
@@ -208,23 +209,23 @@ public class MissionServiceDefaultImpl implements MissionService {
 	private final CoTCacheHelper cotCacheHelper;
 
 	private final MissionCacheHelper missionCacheHelper;
-	
+
 	private final Logger changeLogger = LoggerFactory.getLogger(Constants.CHANGE_LOGGER);
 
 	@Autowired
 	private AsyncTaskExecutor asyncExecutor;
 
 	private static MissionService missionService;
-	
+
 	@Autowired
 	@Qualifier(Constants.TAKMESSAGE_MAPPER)
 	private ObjectMapper mapper;
-	
+
 	@Autowired
 	DataFeedCotService dataFeedCotService;
 
 	private final ThreadLocal<CotParser> cotParser = new ThreadLocal<>();
-	
+
 	public MissionServiceDefaultImpl(
 			DataSource dataSource,
 			MissionRepository missionRepository,
@@ -318,7 +319,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 				resultSetExtractor);
 	}
 
-	@Override 
+	@Override
 	public CotEventContainer getLatestCotEventContainerForUid(String uid, String groupVector) {
 
 		try {
@@ -443,11 +444,11 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	@Override
 	public List<CotElement> getLatestCotForUids(Set<String> uids, String groupVector) {
-		
+
 		List<CotElement> cotElements = new ArrayList<>();
-		
+
 		for (CotCacheWrapper wrapper : cotCacheHelper.getLatestCotWrappersForUids(uids, groupVector, false)) {
-			
+
 			CotElement element = wrapper.getCotElement();
 
 			if (element != null) {
@@ -578,6 +579,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 		// Get mission uids, then the latest CoT for each
 		List<CotElement> cot = getLatestCotForUids(uids, groupVector);
+		@SuppressWarnings("rawtypes")
 		Iterator it = cot.iterator();
 		while (it.hasNext()) {
 			CotElement cotElement = (CotElement)it.next();
@@ -617,7 +619,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	@Override
 	public Mission hydrate(Mission mission, boolean hydrateDetails) {
-		
+
 		long start = System.currentTimeMillis();
 
 		if (cacheLogger.isTraceEnabled()) {
@@ -648,7 +650,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 				resourceMap.put(resource.getHash(), resource);
 			}
 		}
-		
+
 		Metrics.timer("method-exec-timer-hydrateMission-hashes", "takserver", "MissionService").record(Duration.ofMillis(System.currentTimeMillis() - start));
 
 		long startUids = System.currentTimeMillis();
@@ -660,11 +662,11 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 			cotWrappers.forEach((wrapper) -> uidDetailsMap.put(wrapper.getUid(), wrapper.getUidDetails()));
 		}
-		
+
 		Metrics.timer("method-exec-timer-hydrateMission-uids", "takserver", "MissionService").record(Duration.ofMillis(System.currentTimeMillis() - startUids));
 
 		long startChanges = System.currentTimeMillis();
-		
+
 		// get the latest mission change for each item in the mission
 		List<MissionChange> changes = null;
 		if (mission.getUids().size() > 0 && mission.getContents().size() > 0) {
@@ -680,7 +682,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		} else {
 			return mission;
 		}
-		
+
 		Metrics.timer("method-exec-timer-hydrateMission-getChanges", "takserver", "MissionService").record(Duration.ofMillis(System.currentTimeMillis() - startChanges));
 
 
@@ -692,7 +694,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 			uidKeywordMap = keywordMap.get("uid");
 			contentKeywordMap = keywordMap.get("resource");
 		}
-		
+
 		long startProcessChanges = System.currentTimeMillis();
 
 		for (MissionChange change : changes) { // iteration
@@ -740,7 +742,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		mission.getResourceAdds().addAll(resourceAdds);
 
 		long startFinish = System.currentTimeMillis();
-		
+
 		Metrics.timer("method-exec-timer-hydrateMission-finish", "takserver", "MissionService").record(Duration.ofMillis(System.currentTimeMillis() - startFinish));
 
 		if (cacheLogger.isTraceEnabled()) {
@@ -757,7 +759,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 	public Map<Integer, List<String>> cachedMissionHydrate(String missionName, Set<Resource> resources) {
 		return hydrate(resources);
 	}
-	
+
 	public Map<Integer, List<String>> hydrate(Set<Resource> resources) {
 		try {
 			List<Integer> resourceIds = new LinkedList<>();
@@ -1064,12 +1066,48 @@ public class MissionServiceDefaultImpl implements MissionService {
 					}
 					break;
 				}
-				case username: {
+				case userName: {
+
 					RemoteSubscription subscription = subscriptionManager
 							.getSubscriptionByUsersDisplayName(missionInvitation.getInvitee());
 					if (subscription != null) {
-						contactUids = new String[] { subscription.clientUid };
+						// notify the user directly if they are online
+						contactUids = new String[]{subscription.clientUid};
 					}
+
+					try {
+						// notify this user via email if the username is an email address and email is configured
+						if (EmailValidator.getInstance().isValid(missionInvitation.getInvitee()) &&
+								coreConfig.getRemoteConfiguration().getEmail() != null) {
+
+							StringBuilder builder = new StringBuilder(
+									"You have been invited to the following mission");
+							builder.append("\n\nName: ");
+							builder.append(mission.getName());
+
+							if (!Strings.isNullOrEmpty(mission.getDescription())) {
+								builder.append("\nDescription: ");
+								builder.append(mission.getDescription());
+							}
+
+							if (!Strings.isNullOrEmpty(coreConfig.getRemoteConfiguration()
+									.getNetwork().getTakServerHost())) {
+								builder.append("\nServer: ");
+								builder.append(coreConfig.getRemoteConfiguration()
+										.getNetwork().getTakServerHost());
+							}
+
+							builder.append("\nRole: ");
+							builder.append(missionInvitation.getRole().getRole().name());
+
+							EmailClient.sendEmail(
+									coreConfig.getRemoteConfiguration().getEmail(), "Mission Invitation",
+									builder.toString(), missionInvitation.getInvitee(), null, null);
+						}
+					} catch (Exception e) {
+						logger.error("exception sending mission notification", e);
+					}
+
 					break;
 				}
 				case group: {
@@ -1111,7 +1149,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 		// validate existence of mission
 		Mission mission = getMissionService().getMissionByNameCheckGroups(missionName, groupVector);
-		
+
 		validateMission(mission, missionName);
 
 		MapSqlParameterSource namedParameters = new MapSqlParameterSource();
@@ -1145,21 +1183,12 @@ public class MissionServiceDefaultImpl implements MissionService {
 				// add any invitations for the associated streaming channel callsign
 				missionInvitations.addAll(missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
 						subscription.callsign, MissionInvitation.Type.callsign.name(), groupVector));
-
-				// add invitations for the streaming channel user
-				User user = subscription.getUser();
-				if (user.getConnectionType() == ConnectionType.CORE) {
-					missionInvitations.addAll(missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
-							user.getDisplayName(), MissionInvitation.Type.username.name(), groupVector));
-				}
-
-				// add invitations for user's groups
-				NavigableSet<Group> groups = groupManager.getGroups(user);
-				for (Group group : groups) {
-					missionInvitations.addAll(missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
-							group.getName(), MissionInvitation.Type.group.name(), groupVector));
-				}
 			}
+
+			// add any invitations for the authenticated username
+			String username = SecurityContextHolder.getContext().getAuthentication().getName();
+			missionInvitations.addAll(missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
+					username, MissionInvitation.Type.userName.name(), groupVector));
 
 			return missionInvitations;
 
@@ -1220,7 +1249,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 				missionSubscriptionRepository.subscribe(missionId, clientUid, new Date(), subscriptionUid, token, role.getId(), username);
 
 			} else {
-				if (missionSubscription.getRole() != null && missionSubscription.getRole().compareTo(role) != 0) {
+				if (!role.isUsingMissionDefault() && missionSubscription.getRole() != null && missionSubscription.getRole().compareTo(role) != 0) {
 					if (logger.isDebugEnabled()) {
 						logger.debug("updating subscription role");
 					}
@@ -2190,7 +2219,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
 	public Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom,
 								 String baseLayer, String bbox, String path, String classification, String tool, String passwordHash,
-								 MissionRole defaultRole, Long expiration, String boundingPolygon) {
+								 MissionRole defaultRole, Long expiration, String boundingPolygon, Boolean inviteOnly) {
 
 		if (logger.isDebugEnabled()) {
 			logger.debug("create mission " + name + " " + tool + " " + creatorUid);
@@ -2231,9 +2260,9 @@ public class MissionServiceDefaultImpl implements MissionService {
 				expirationValue = expiration;
 			}
 			if (defaultRole == null) {
-				id = missionRepository.create(new Date(), trimName(name), creatorUid, groupVector, description, chatRoom, baseLayer, bbox, path, classification, tool, passwordHash, expirationValue, boundingPolygon);
+				id = missionRepository.create(new Date(), trimName(name), creatorUid, groupVector, description, chatRoom, baseLayer, bbox, path, classification, tool, passwordHash, expirationValue, boundingPolygon, inviteOnly);
 			} else {
-				id = missionRepository.create(new Date(), trimName(name), creatorUid, groupVector, description, chatRoom, baseLayer, bbox, path, classification, tool, passwordHash, defaultRole.getId(), expirationValue, boundingPolygon);
+				id = missionRepository.create(new Date(), trimName(name), creatorUid, groupVector, description, chatRoom, baseLayer, bbox, path, classification, tool, passwordHash, defaultRole.getId(), expirationValue, boundingPolygon, inviteOnly);
 			}
 			
 			if (logger.isDebugEnabled()) {
@@ -2281,7 +2310,6 @@ public class MissionServiceDefaultImpl implements MissionService {
 		}
 
 		name = name.trim();
-		name = name.toLowerCase();
 
 		return name;
 	}
@@ -2311,22 +2339,26 @@ public class MissionServiceDefaultImpl implements MissionService {
 			logger.debug("checking isDeleted " + missionName);
 		}
 
-		Set<MissionChange> changes = getAllSquashedChangesForMission(trimName(missionName));
-		for (MissionChange change : changes) {
-			if (change.getType() == MissionChangeType.DELETE_MISSION) {
-				if (logger.isDebugEnabled()) {
-					logger.debug("mission " + missionName + " is deleted");
-				}
-				return true;
-			}
-		}
+		MissionChangeType changeType = missionChangeRepository.getLatestChangeTypeForMission(missionName);
 
 		if (logger.isDebugEnabled()) {
-			logger.debug("mission " + missionName + " is not deleted.");
+			logger.debug("last change type for mission " + missionName + ": " + changeType);
+		}
+		
+		// mission doesn't exist, and never did
+		if (changeType == null) {
+			return false;
+		}
+		
+		// mission was deleted
+		if (changeType.equals(MissionChangeType.DELETE_MISSION)) {
+			return true;
 		}
 
+		// mission currently exists
 		return false;
 	}
+
 
 	@Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, key="{#root.methodName, #root.args[0]}")
 	private Set<MissionChange> getAllSquashedChangesForMission(String missionName) {
@@ -2433,16 +2465,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		if (tool == null) {
 			missions = missionRepository.getAllMissions(passwordProtected, defaultRole, groupVector);
 		} else {
-			if (tool.equalsIgnoreCase("public") &&
-					coreConfig.getRemoteConfiguration().getVbm() != null &&
-					coreConfig.getRemoteConfiguration().getVbm().isEnabled() &&
-					coreConfig.getRemoteConfiguration().getVbm().isReturnCopsWithPublicMissions()) {
-				missions = missionRepository.getAllMissionsByTools(passwordProtected, defaultRole,
-						Arrays.asList(tool, coreConfig.getRemoteConfiguration().getNetwork().getMissionCopTool()),
-						groupVector);
-			} else {
-				missions = missionRepository.getAllMissionsByTool(passwordProtected, defaultRole, tool, groupVector);
-			}
+			missions = missionRepository.getAllMissionsByTool(passwordProtected, defaultRole, tool, groupVector);
 		}
 
 		for (Mission mission : missions) {
@@ -2460,8 +2483,27 @@ public class MissionServiceDefaultImpl implements MissionService {
 	}
 
 	@Override
+	@Cacheable(value = Constants.ALL_MISSION_CACHE, keyGenerator = "inviteOnlyMissionsCacheKeyGenerator", sync = true)
+	public List<Mission> getInviteOnlyMissions(String userName, String tool, NavigableSet<Group> groups) {
+
+		String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
+
+		List<Mission> missions = missionRepository.getInviteOnlyMissions(userName, tool, groupVector);
+
+		for (Mission mission : missions) {
+
+			hydrate(mission, false);
+
+			mission.setGroups(RemoteUtil.getInstance().getGroupNamesForBitVectorString(
+					mission.getGroupVector(), groups));
+		}
+
+		return missions;
+	}
+
+	@Override
 	@Cacheable(value = Constants.ALL_COPS_MISSION_CACHE, keyGenerator = "allCopsMissionsCacheKeyGenerator", sync = true)
-	public List<Mission> getAllCopsMissions(String tool, NavigableSet<Group> groups, String path, Integer offset, Integer size)  {
+	public List<Mission> getAllCopsMissions(String tool, String userName, NavigableSet<Group> groups, String path, Integer offset, Integer size)  {
 
 		if (logger.isDebugEnabled()) {
 			logger.debug("mission service getAllMissions cache miss");
@@ -2472,9 +2514,9 @@ public class MissionServiceDefaultImpl implements MissionService {
 		List<Mission> missions;
 
 		if (offset != null && size != null) {
-			missions = missionRepository.getAllCopMissionsWithPaging(groupVector, path, tool, offset, size);
+			missions = missionRepository.getAllCopMissionsWithPaging(groupVector, path, tool, userName, offset, size);
 		} else {
-			missions = missionRepository.getAllCopMissions(groupVector, path, tool);
+			missions = missionRepository.getAllCopMissions(groupVector, path, tool, userName);
 		}
 
 		for (Mission mission : missions) {
@@ -2524,10 +2566,18 @@ public class MissionServiceDefaultImpl implements MissionService {
 	@Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER)
 	public Set<MissionChange> getMissionChanges(String missionName, String groupVector,
 			Long secago, Date start, Date end, boolean squashed) {
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("MissionServiceDefaultImpl get mission changes for: " + missionName);
+		}
 
 		try {
 			if (Strings.isNullOrEmpty(missionName)) {
 				throw new IllegalArgumentException("empty 'name' path parameter");
+			}
+			
+			if (logger.isDebugEnabled()) {
+				logger.debug("getting mission changes for mission " + missionName);
 			}
 
 			Mission mission = getMissionService().getMissionByNameCheckGroups(trimName(missionName), groupVector);
@@ -2541,8 +2591,18 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 			Set<MissionChange> changes;
 			if (squashed) {
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("squashed changes query: " + MissionChangeRepository.MISSION_CHANGES);
+				}
+				
 				changes = missionChangeRepository.squashedChangesForMission(trimName(missionName), start, end);
 			} else {
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("squashed changes query: " + MissionChangeRepository.MISSION_CHANGES_FULL_HISTORY);
+				}
+				
 				changes = missionChangeRepository.changesForMission(trimName(missionName), start, end);
 			}
 
@@ -2797,6 +2857,21 @@ public class MissionServiceDefaultImpl implements MissionService {
 	}
 
 	@Override
+	public MissionRole getRoleFromTypeAndInvitee(String missionName, String type, String invitee) {
+		MissionInvitation invitation = missionInvitationRepository.
+				findByMissionNameAndTypeAndInvitee(missionName, type, invitee);
+
+		if (invitation == null) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("no invite found for {} {} {}", missionName, type, invitee);
+			}
+			return null;
+		}
+
+		return invitation.getRole();
+	}
+
+	@Override
 	public MissionRole getRoleFromToken(
 			Mission mission, MissionTokenUtils.TokenType[] validTokenTypes, HttpServletRequest request) {
 		try {
@@ -2918,6 +2993,11 @@ public class MissionServiceDefaultImpl implements MissionService {
 	@Override
 	public MissionRole getRoleForRequest(Mission mission, HttpServletRequest request) {
 		try {
+			
+			if (logger.isDebugEnabled()) {
+				logger.debug("getRoleForRequest " + (mission == null ? "null" : mission.getName()));
+			}
+			
 			// check to see if there was a token submitted with the request
 			MissionRole role = getRoleFromToken(
 					mission, new MissionTokenUtils.TokenType[] {
@@ -2925,6 +3005,11 @@ public class MissionServiceDefaultImpl implements MissionService {
 							MissionTokenUtils.TokenType.SUBSCRIPTION
 					}, request);
 			if (role != null) {
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("request had token: " + role);
+				}
+				
 				return role;
 			}
 
@@ -2938,11 +3023,11 @@ public class MissionServiceDefaultImpl implements MissionService {
 					logger.debug("getRoleForRequest granting admin MISSION_OWNER for : " + request.getServletPath());
 				}
 
-				return missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_OWNER);
+				return missionRoleRepository.getRoleByOrdinalId(MissionRole.Role.MISSION_OWNER.ordinal());
 			}
 
-			// Password protected missions require a token, so bail if we haven't found a role yet
-			if (mission.isPasswordProtected()) {
+			// Missions that require a token, so bail if we haven't found a role yet
+			if (mission.isPasswordProtected() || mission.isInviteOnly()) {
 				logger.error("getRoleForRequest failed to get role for password protected mission! : "
 						+ request.getServletPath());
 				return null;
@@ -3076,14 +3161,19 @@ public class MissionServiceDefaultImpl implements MissionService {
 	@Override
 	public MissionRole getDefaultRole(Mission mission) {
 		try {
+			MissionRole defaultMissionRole;
+
 			if (mission.getDefaultRole() != null) {
-				return mission.getDefaultRole();
+				defaultMissionRole = mission.getDefaultRole();
+			} else {
+				defaultMissionRole = missionRoleRepository.findFirstByRole(MissionRole.defaultRole);
 			}
 
-			MissionRole defaultMissionRole = missionRoleRepository.findFirstByRole(MissionRole.defaultRole);
 			if (defaultMissionRole == null) {
 				logger.error("missionRoleRepository unable to find defaultRole!");
 			}
+
+			defaultMissionRole.setUsingMissionDefault(true);
 
 			return defaultMissionRole;
 
@@ -3131,7 +3221,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 				} else {
 					if (!Strings.isNullOrEmpty(next.getUsername())) {
 						missionInvite(mission.getName(), next.getUsername(),
-								MissionInvitation.Type.username, role, creatorUid, groupVector);
+								MissionInvitation.Type.userName, role, creatorUid, groupVector);
 					} else if (!Strings.isNullOrEmpty(next.getClientUid())) {
 						missionInvite(mission.getName(), next.getClientUid(),
 								MissionInvitation.Type.clientUid, role, creatorUid, groupVector);
@@ -3202,9 +3292,9 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	@Override
 	public void deleteMissionByTtl(Integer ttl) {
-		if (ttl == null ) {
+		if (ttl == null || ttl <=-1) {
 			if (logger.isDebugEnabled()) {
-				logger.debug(" ttl is null query ignored ");
+				logger.debug(" bad ttl, query ignored " + ttl);
 			}
 			return;
 		}
@@ -3458,8 +3548,6 @@ public class MissionServiceDefaultImpl implements MissionService {
 		try {
 			if (!coreConfig.getRemoteConfiguration().getVbm().isEnabled()) return;
 			
-			NavigableSet<Group> groups = groupManager.groupVectorToGroupSet(mission.getGroupVector());
-
 			Polygon polygon = null;
 			GeospatialFilter.BoundingBox boundingBox = null;
 			// use polygon over bbox
@@ -3504,6 +3592,14 @@ public class MissionServiceDefaultImpl implements MissionService {
 					long staleSeconds = 365 * 24 * 60 * 60;
 					Timestamp staleTs = new Timestamp(staleSeconds);
 					feedEvent.setStale(staleTs == null ? "" : DateUtil.toCotTime(staleTs.getTime()));
+
+					@SuppressWarnings("unchecked")
+					NavigableSet<Group> groups = (NavigableSet<Group>)feedEvent.getContext(Constants.GROUPS_KEY);
+					if (groups == null || groups.isEmpty()) {
+						logger.error("sendLatestFeedEvents found cached feedEvent with no groups");
+						groups = groupManager.groupVectorToGroupSet(mission.getGroupVector());
+					}
+
 					// send the event to the COP subscriber
 					submission.submitCot(feedEvent, clientUidList, new ArrayList<String>(), groups, false, true);
 

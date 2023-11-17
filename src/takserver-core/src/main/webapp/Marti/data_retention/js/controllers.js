@@ -70,6 +70,7 @@ dataRetentionControllers.controller('ViewPoliciesCtrl', [
                             ttl_number = ttl / (YEAR * 24 * 3600);
                             ttl_type = "years";
                         }
+                        ttl_number = Math.round(ttl_number);
                         $scope.policy_map[data_type] = {
                             'ttl': ttl,
                             'ttl_type': ttl_type,

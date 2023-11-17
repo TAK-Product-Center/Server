@@ -509,11 +509,11 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 
 		Exception bottomOfExceptionChain = spelunkToBottomOfExceptionChain(cause);
 		if (bottomOfExceptionChain != null && bottomOfExceptionChain instanceof CertificateExpiredException) {
-			log.error(String.format("Connection rejected for expired client certificate: %s, %s, %s.",
-					getCertificateName(cause), bottomOfExceptionChain.getMessage()));
+			log.error(String.format("Connection rejected for expired client certificate: %s, %s, %s",
+					getCertificateName(cause), bottomOfExceptionChain.getMessage(), additionalInfo.toString()));
 		} else if (bottomOfExceptionChain != null && bottomOfExceptionChain instanceof CertificateRevokedException) {
-			log.error(String.format("Connection rejected for revoked client certificate: %s, %s.",
-					getCertificateName(cause), bottomOfExceptionChain.getMessage()));
+			log.error(String.format("Connection rejected for revoked client certificate: %s, %s, %s",
+					getCertificateName(cause), bottomOfExceptionChain.getMessage(), additionalInfo.toString()));
 		} else {
 			// get certificate info if available
 			SslHandler sslhandler = (SslHandler) ctx.channel().pipeline().get("ssl");

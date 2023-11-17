@@ -44,16 +44,8 @@ fi
 DB_INIT=""
 # Ensure PostgreSQL is initialized.
 
-if [ -x /usr/pgsql-10/bin/postgresql-10-setup ]; then
-    DB_INIT="/usr/pgsql-10/bin/postgresql-10-setup initdb"
-elif [ -x /usr/bin/postgresql-setup ]; then
-    DB_INIT="/usr/bin/postgresql-setup initdb"
-elif [ -x /usr/pgsql-9.4/bin/initdb ]; then
-    DB_INIT="service postgresql-9.4 initdb"
-elif [ -x /usr/pgsql-9.5/bin/initdb ]; then
-    DB_INIT="service postgresql-9.5 initdb"
-elif [ -x /usr/pgsql-9.6/bin/initdb ]; then
-    DB_INIT="service postgresql-9.6 initdb"
+if [ -x /usr/pgsql-15/bin/postgresql-15-setup ]; then
+    DB_INIT="/usr/pgsql-15/bin/postgresql-15-setup initdb"
 else
     echo "WARNING: Unable to automatically initialize PostgreSQL database."
 fi
@@ -70,33 +62,9 @@ fi
 # Figure out where the system keeps the PostgreSQL data
 
 if [ -z ${PGDATA+x} ]; then
-   if [ -d /var/lib/pgsql/10/data ]; then
-        export PGDATA=/var/lib/pgsql/10/data
-        POSTGRES_CMD="service postgresql-10 restart"
-   elif [ -x /usr/bin/systemctl ]; then
-       export PGDATA=`/usr/bin/systemctl show postgresql.service -p Environment | sed 's/.*PGDATA\=\([a-zA-Z0-9]*\)/\1/'`
-       POSTGRES_CMD="/bin/systemctl restart postgresql.service"
-   elif [ -d /var/lib/pgsql/10/data ]; then
-        export PGDATA=/var/lib/pgsql/10/data
-        POSTGRES_CMD="service postgresql-10 restart"
-   elif [ -d /var/lib/pgsql/9.6/data ]; then
-       export PGDATA=/var/lib/pgsql/9.6/data
-       POSTGRES_CMD="service postgresql-9.6 restart"
-   elif [ -d /var/lib/pgsql/9.5/data ]; then
-       export PGDATA=/var/lib/pgsql/9.5/data
-       POSTGRES_CMD="service postgresql-9.5 restart"
-   elif [ -d /var/lib/pgsql/9.4/data ]; then
-       export PGDATA=/var/lib/pgsql/9.4/data
-       POSTGRES_CMD="service postgresql-9.4 restart"
-   elif [ -d /var/lib/pgsql/9.3/data ]; then
-       export PGDATA=/var/lib/pgdsql/9.3/data
-       POSTGRES_CMD="service postgresql-9.3 restart"
-   elif [ -d /var/lib/pgsql/9.2/data ]; then
-       export PGDATA=/var/lib/pgsql/9.2/data
-       POSTGRES_CMD="service postgresql-9.2 restart"
-   elif [ -d /var/lib/pgsql/data ]; then
-       export PGDATA=/var/lib/pgdata/data
-       POSTGRES_CMD="service postgresql restart"
+   if [ -d /var/lib/pgsql/15/data ]; then
+        export PGDATA=/var/lib/pgsql/15/data
+        POSTGRES_CMD="service postgresql-15 restart"
    else
        echo "PGDATA not set and unable to find PostgreSQL data directory automatically."
        echo "Please set PGDATA and re-run this script."
@@ -212,16 +180,8 @@ if [ ! -x /usr/bin/systemctl ]; then
 fi
 
 # Set PostgreSQL to run automatically at boot time
-if [ -d /var/lib/pgsql/10/data ]; then
-    START_INIT="chkconfig --level 345 postgresql-10 on"
-elif [ -x /usr/bin/systemctl ]; then
-    /usr/bin/systemctl enable postgresql.service
-elif [ -d /var/lib/pgsql/9.4/data ]; then
-    START_INIT="chkconfig --level 345 postgresql-9.4 on"
-elif [ -d /var/lib/pgsql/9.5/data ]; then
-    START_INIT="chkconfig --level 345 postgresql-9.5 on"
-elif [ -d /var/lib/pgsql/9.6/data ]; then
-    START_INIT="chkconfig --level 345 postgresql-9.6 on"
+if [ -d /var/lib/pgsql/15/data ]; then
+    START_INIT="chkconfig --level 345 postgresql-15 on"
 else
   echo "ERROR: unable to detect postgres version to start on boot"
   exit 1

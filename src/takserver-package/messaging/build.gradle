@@ -10,6 +10,8 @@ apply from: "../utils/utils.gradle"
 // rpm postinstall script
 def postinstall_script_messaging = '''\
 
+chown tak:tak /opt/tak
+
 chmod 644 /opt/tak/logging-restrictsize.xml
 chmod 544 /opt/tak/*.bat
 chmod 544 /opt/tak/*.sh
@@ -32,7 +34,9 @@ chmod 755 /opt/tak/utils
 mkdir -p /opt/tak/logs
 chown tak:tak /opt/tak/logs
 chmod 755 /opt/tak/logs
-chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
+if [ -f "/opt/tak/CoreConfig.xml" ]; then
+    chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
+fi
 mkdir -p /opt/tak/iconsets
 chown -fR tak:tak /opt/tak/iconsets
 mkdir -p /opt/tak/webcontent
@@ -47,7 +51,14 @@ cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
 rm -rf /opt/tak/certs-tmp
 
 # rename old tomcat if it exists
-mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED &>/dev/null
+if [ -f "/opt/tak/apache-tomcat" ]; then
+    mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED >/dev/null 2>&1
+fi
+
+# extract takserver.war on Debian based installs
+if [ -f /etc/debian_version ]; then
+    sh /opt/tak/setup-for-extracted-war.sh
+fi
 
 echo "IMPORTANT: If you are going to use a database, make sure you copy the generated database password from /opt/tak/CoreConfig.example.xml on the database machine to your CoreConfig on this machine"
 echo "Create login credentials for local adminstrative access to the configuration interface:"
@@ -65,7 +76,6 @@ ospackage {
     version = takversion
     release = takreleaserpm
     os = LINUX
-    arch = _arch
     user = _user
     permissionGroup = _permission_group
     packageGroup = _package_group
@@ -108,6 +118,9 @@ buildRpm {
 }
 
 // TODO: add deb package dependencies here
-buildDeb { }
+buildDeb {
+  requires('openjdk-11-jdk')
+  requires('openssl')
+}
 
 

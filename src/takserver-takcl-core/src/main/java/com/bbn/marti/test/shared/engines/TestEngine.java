@@ -311,6 +311,14 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		verificationEngine.attemptSendFromUserAndVerify(sendingUser, targetUsers);
 		stateEngine.attemptSendFromUserAndVerify(sendingUser, targetUsers);
 	}
+	
+	@Override
+	public void verifyReceivedMessageSentFromPlugin(@NotNull AbstractUser sendingPlugin, @NotNull AbstractUser... receivedUsers) {
+		TestLogger.executeEngineCommand("verifyReceivedMessageSentFromPlugin");
+		actionEngine.verifyReceivedMessageSentFromPlugin(sendingPlugin, receivedUsers);
+		verificationEngine.verifyReceivedMessageSentFromPlugin(sendingPlugin, receivedUsers);
+		stateEngine.verifyReceivedMessageSentFromPlugin(sendingPlugin, receivedUsers);
+	}
 
 	@Override
 	public void attemptSendFromUserAndVerify(@NotNull AbstractUser sendingUser, @NotNull String missionName) {

@@ -86,10 +86,12 @@ dependencies {
   compile group: 'org.springframework', name: 'spring-context'
 //  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-jdbc'
 //  compile group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
-  
+
   compile group: 'org.postgresql', name: 'postgresql', version: postgres_version
-  
-  testCompile group: 'junit', name: 'junit', version: junit_version
+
+  compile group: 'org.hibernate', name: 'hibernate-spatial', version: hibernate_version
+
+    testCompile group: 'junit', name: 'junit', version: junit_version
   testCompile group: 'org.mockito', name: 'mockito-core', version: mockito_version
   testCompile("org.springframework.boot:spring-boot-starter-test") {
     exclude group: "com.vaadin.external.google", module:"android-json"

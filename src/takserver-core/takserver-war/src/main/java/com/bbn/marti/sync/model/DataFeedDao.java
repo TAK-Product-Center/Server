@@ -39,6 +39,8 @@ public class DataFeedDao implements Serializable, Comparable<DataFeedDao> {
 	protected String coreVersion2TlsVersions;
 	protected int type;
 	protected int syncCacheRetentionSeconds = 3600;
+	protected boolean federated;
+    protected String groupVector;
 	
 	public com.bbn.marti.config.DataFeed toInput() {
 		com.bbn.marti.config.DataFeed datafeed = new com.bbn.marti.config.DataFeed();
@@ -59,6 +61,7 @@ public class DataFeedDao implements Serializable, Comparable<DataFeedDao> {
     	datafeed.setType(DataFeedType.values()[type].toString());
     	datafeed.setUuid(uuid);
     	datafeed.setSyncCacheRetentionSeconds(syncCacheRetentionSeconds);
+    	datafeed.setFederated(federated);
 		
 		return datafeed;
 	}
@@ -136,7 +139,7 @@ public class DataFeedDao implements Serializable, Comparable<DataFeedDao> {
     public void setProtocol(String protocol) {
     	this.protocol = protocol;
     }
-    
+
     @Column(name = "feed_group", unique = false, nullable = true, columnDefinition="string")
     public String getFeedGroup() {
     	return feedGroup;
@@ -217,6 +220,24 @@ public class DataFeedDao implements Serializable, Comparable<DataFeedDao> {
 	public void setSyncCacheRetentionSeconds(int syncCacheRetentionSeconds) {
 		this.syncCacheRetentionSeconds = syncCacheRetentionSeconds;
 	}
+	
+    @Column(name = "federated", unique = false, nullable = true, columnDefinition="boolean")
+    public boolean getFederated() {
+    	return federated;
+    }
+    
+    public void setFederated(boolean federated) {
+    	this.federated = federated;
+    }
+
+    @Column(name = "groups", columnDefinition = "bit varying")
+    public String getGroupVector() {
+        return groupVector;
+    }
+
+    public void setGroupVector(String groupVector) {
+        this.groupVector = groupVector;
+    }
 
 	@Override
 	public int compareTo(DataFeedDao that) {

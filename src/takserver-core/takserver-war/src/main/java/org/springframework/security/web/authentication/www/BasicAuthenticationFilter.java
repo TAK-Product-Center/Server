@@ -60,7 +60,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p>
  * If authentication fails and <code>ignoreFailure</code> is <code>false</code> (the
  * default), an {@link AuthenticationEntryPoint} implementation is called (unless the
- * <tt>ignoreFailure</tt> property is set to <tt>true</tt>). Usually this should be
+ * {@literal <}tt{@literal >}ignoreFailure{@literal <}/tt{@literal >} property is set to {@literal <}tt{@literal >}true{@literal <}/tt{@literal >}). Usually this should be
  * {@link BasicAuthenticationEntryPoint}, which will prompt the user to authenticate again
  * via BASIC authentication.
  *
@@ -77,10 +77,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * remember-me mechanism.
  *
  * @author Ben Alex
- * 
- * Customizations to this class to disallow BASIC authentication for HTTPS requests  
- * 
- * 
+ *
+ * Customizations to this class to disallow BASIC authentication for HTTPS requests
+ *
+ *
  */
 public class BasicAuthenticationFilter extends OncePerRequestFilter {
 
@@ -93,11 +93,11 @@ public class BasicAuthenticationFilter extends OncePerRequestFilter {
 	private RememberMeServices rememberMeServices = new NullRememberMeServices();
 	private boolean ignoreFailure = false;
 	private String credentialsCharset = "UTF-8";
-	
+
 	// This is defined in security-context.xml
     @Resource(name="httpsBasicPaths")
     private List<String> httpsAndBasicPaths;
-    
+
     // This is defined in security-context.xml
     @Resource(name="httpsOnlyPathPrefixes")
     private List<String> httpsOnlyPathPrefixes;
@@ -152,12 +152,12 @@ public class BasicAuthenticationFilter extends OncePerRequestFilter {
 			HttpServletResponse response, FilterChain chain)
 					throws IOException, ServletException {
 		final boolean debug = this.logger.isDebugEnabled();
-		
+
 		// begin change
-		
+
 		String scheme = request.getScheme();
         this.logger.debug("request scheme: " + scheme + " filter chain type: " + chain.getClass().getName());
-        
+
         if (scheme != null && scheme.toLowerCase(Locale.ENGLISH).equals("https")) {
             logger.debug("https request - skipping HTTP BASIC filter step, proceeding with filter chain");
 

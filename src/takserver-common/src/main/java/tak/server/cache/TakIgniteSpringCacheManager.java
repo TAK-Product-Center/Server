@@ -5,6 +5,9 @@ import java.lang.reflect.Field;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
+import javax.cache.expiry.Duration;
+import javax.cache.expiry.TouchedExpiryPolicy;
 
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
@@ -80,7 +83,11 @@ public class TakIgniteSpringCacheManager extends SpringCacheManager {
 		if (cache == null) {
 
 			CacheConfiguration<Object, Object> cacheConfig = new CacheConfiguration<>(name);
-			
+
+			if (config.getRemoteConfiguration().getBuffer().getQueue().isEnableCacheGroup()) {
+				cacheConfig.setGroupName("takserver-cache-group");
+			}
+
 			if (config.getRemoteConfiguration().getNetwork().isCloudwatchEnable()) {
 				cacheConfig.setStatisticsEnabled(true);
 			}
@@ -116,6 +123,11 @@ public class TakIgniteSpringCacheManager extends SpringCacheManager {
 				}
 			}
 
+			int cacheLastTouchedExpiryMinutes = config.getRemoteConfiguration().getBuffer().getQueue().getCacheLastTouchedExpiryMinutes();
+			if (cacheLastTouchedExpiryMinutes != -1) {
+				cacheConfig.setExpiryPolicyFactory(
+						TouchedExpiryPolicy.factoryOf(new Duration(TimeUnit.MINUTES, cacheLastTouchedExpiryMinutes)));
+			}
 
 			// near cache defaults to off but can be configured
 			if (!messagingProfileActive && config.getRemoteConfiguration().getBuffer().getQueue().getNearCacheMaxSize() > 0) {

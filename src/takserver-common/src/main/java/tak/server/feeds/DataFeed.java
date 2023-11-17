@@ -57,6 +57,8 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 		
 	private int syncCacheRetentionSeconds = 3600;
 	
+	private boolean federated;
+	
 	private DataFeed() {}
 	
 	public DataFeed(String uuid, String name, DataFeedType type, List<String> tags) {
@@ -82,7 +84,8 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 		this.coreVersion = datafeed.getCoreVersion();
 		this.coreVersion2TlsVersions = datafeed.getCoreVersion2TlsVersions();
 		this.filterGroups = datafeed.getFiltergroup();
-		this.syncCacheRetentionSeconds = datafeed.getSyncCacheRetentionSeconds();		
+		this.syncCacheRetentionSeconds = datafeed.getSyncCacheRetentionSeconds();
+		this.federated = datafeed.isFederated();
 		
 		if (datafeed.getPort() == 0) {
 			this.port = null;
@@ -239,14 +242,22 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 		this.syncCacheRetentionSeconds = syncCacheRetentionSeconds;
 	}
 
+	public boolean isFederated() {
+		return federated;
+	}
+
+	public void setFederated(boolean federated) {
+		this.federated = federated;
+	}
+	
 	@Override
 	public String toString() {
 		return "DataFeed [uuid=" + uuid + ", name=" + name + ", type=" + type + ", tags=" + tags + ", auth=" + auth
 				+ ", port=" + port + ", authRequired=" + authRequired + ", protocol=" + protocol + ", group=" + group
 				+ ", iface=" + iface + ", archive=" + archive + ", anongroup=" + anongroup + ", archiveOnly="
 				+ archiveOnly + ", sync=" + sync + ", coreVersion=" + coreVersion + ", coreVersion2TlsVersions="
-				+ coreVersion2TlsVersions + ", filterGroups=" + filterGroups + ", latestSACacheSeconds="
-				+ syncCacheRetentionSeconds + "]";
+				+ coreVersion2TlsVersions + ", filterGroups=" + filterGroups + ", syncCacheRetentionSeconds="
+				+ syncCacheRetentionSeconds + ", federated=" + federated + "]";
 	}
 
 	@Override

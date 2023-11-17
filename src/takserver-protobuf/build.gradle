@@ -9,18 +9,28 @@ buildscript {
 }
 
 dependencies {
-
+  compile group: 'io.perfmark', name: 'perfmark-api', version: perfmark_api_version
+  
   compile group: 'javax.annotation', name: 'javax.annotation-api', version: annotation_api_version
 
-
   // gRPC
-  compile group: 'io.grpc', name: 'grpc-netty', version: grpc_version
-  compile group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
-  compile group: 'io.grpc', name: 'grpc-stub', version: grpc_version
+  compile (group: 'io.grpc', name: 'grpc-netty', version: grpc_version) {
+    exclude group: 'io.perfmark', module: 'perfmark-api'
+}
+  compile (group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version) {
+    exclude group: 'io.perfmark', module: 'perfmark-api'
+}
+  compile (group: 'io.grpc', name: 'grpc-stub', version: grpc_version) {
+    exclude group: 'io.perfmark', module: 'perfmark-api'
+}
 
   // Google's OpenSSL variant
   // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
-  compile 'io.netty:netty-tcnative-boringssl-static:' + netty_tcnative_version
+  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
+  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
+  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
+  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
+  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
 
   compile 'javax.activation:activation:' + javax_activation_version
 
@@ -52,12 +62,18 @@ protobuf {
 apply plugin: 'idea'
 apply plugin: 'eclipse'
 
-idea {
-  module {
-    // Not using generatedSourceDirs because of
-    // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
-    sourceDirs += file("${projectDir}/build/generated/source/proto/main/java");
-    sourceDirs += file("${projectDir}/build/generated/source/proto/main/grpc");
+// This should be fixed in  Gradle 7.2 according to 
+// https://github.com/gradle/gradle/issues/4505, but that's a larger task than 
+// A five minute work-around.
+if ("$System.env.TAK_GRADLE_CI_MODE" != "true") {
+  println("NOT USING CI")
+  idea {
+    module {
+      // Not using generatedSourceDirs because of
+      // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
+      sourceDirs += file("${projectDir}/build/generated/source/proto/main/java");
+      sourceDirs += file("${projectDir}/build/generated/source/proto/main/grpc");
+    }
   }
 }
 

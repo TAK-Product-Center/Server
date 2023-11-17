@@ -60,11 +60,11 @@ public class IgniteConfigurationHolder {
 	
 	public IgniteConfiguration getIgniteConfiguration(String igniteProfile, String igniteHost, boolean isCluster, boolean isKubernetes, boolean isEmbedded, boolean isMulticastDiscovery, @Nullable Integer nonMulticastDiscoveryPort,
             @Nullable Integer nonMulticastDiscoveryPortCount, Integer communicationPort, Integer communicationPortCount, int maxQueue, long workerTimeoutMilliseconds, long dataRegionInitialSize, long dataRegionMaxSize) {
-		return getIgniteConfiguration(igniteProfile, igniteHost, isCluster, isKubernetes, isEmbedded, isMulticastDiscovery, nonMulticastDiscoveryPort, nonMulticastDiscoveryPortCount, communicationPort, communicationPortCount, maxQueue, workerTimeoutMilliseconds, dataRegionInitialSize, dataRegionMaxSize, -1, false);
+		return getIgniteConfiguration(igniteProfile, igniteHost, isCluster, isKubernetes, isEmbedded, isMulticastDiscovery, nonMulticastDiscoveryPort, nonMulticastDiscoveryPortCount, communicationPort, communicationPortCount, maxQueue, workerTimeoutMilliseconds, dataRegionInitialSize, dataRegionMaxSize, -1, false, -1.f);
 	}
 
 	public IgniteConfiguration getIgniteConfiguration(String igniteProfile, String igniteHost, boolean isCluster, boolean isKubernetes, boolean isEmbedded, boolean isMulticastDiscovery, @Nullable Integer nonMulticastDiscoveryPort,
-	                                                  @Nullable Integer nonMulticastDiscoveryPortCount, Integer communicationPort, Integer communicationPortCount, int maxQueue, long workerTimeoutMilliseconds, long dataRegionInitialSize, long dataRegionMaxSize, int poolSize, boolean enablePersistence) {
+	                                                  @Nullable Integer nonMulticastDiscoveryPortCount, Integer communicationPort, Integer communicationPortCount, int maxQueue, long workerTimeoutMilliseconds, long dataRegionInitialSize, long dataRegionMaxSize, int poolSize, boolean enablePersistence, double evictionThreashold) {
 		
 		if (isCluster) {
 			IgniteConfiguration clusterConf = new IgniteConfiguration();
@@ -167,6 +167,10 @@ public class IgniteConfigurationHolder {
 				DataRegionConfiguration takserverStorageRegion = new DataRegionConfiguration();
 				takserverStorageRegion.setName("takserver-cache-region");
 				takserverStorageRegion.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU); // cache eviction policy
+
+				if (evictionThreashold != -1.f) {
+					takserverStorageRegion.setEvictionThreshold(evictionThreashold);
+				}
 				
 				// try to allocate off-heap memory as soon as possible, to head off any memory issues
 				takserverStorageRegion.setInitialSize(dataRegionInitialSize);

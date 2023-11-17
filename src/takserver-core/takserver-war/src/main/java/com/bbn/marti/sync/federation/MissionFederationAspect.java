@@ -72,7 +72,8 @@ public class MissionFederationAspect {
     		meta.setChatRoom(mission.getChatRoom());
     		meta.setTool(mission.getTool());
     		meta.setBbox(mission.getBbox());
-    		meta.setBoundingPolygon(mission.getBoundingPolygon()); 		
+    		meta.setBoundingPolygon(mission.getBoundingPolygon());
+    		meta.setInviteOnly(mission.isInviteOnly());
     		meta.setPasswordHash(mission.getPasswordHash());
     		meta.setPath(mission.getPath());
     		meta.setClassification(mission.getClassification());
@@ -161,8 +162,6 @@ public class MissionFederationAspect {
     		
     		NavigableSet<Group> groups = gm.groupVectorToGroupSet(missionFeed.getMission().getGroupVector());
     		
-    		
-    		
     		DataFeedMetadata meta = new DataFeedMetadata();
     		meta.setMissionName(missionFeed.getMission().getName());
     		meta.setFilterBbox(missionFeed.getFilterBbox());
@@ -176,7 +175,7 @@ public class MissionFederationAspect {
     		meta.setFeedName(dataFeed.getName());
     		meta.setAuthType(dataFeed.getAuth().toString());
     		meta.setTags(dataFeed.getTag());
-   
+    		   
     		// federated mission feed creation
     		mfm.createMissionFeed(missionFeed.getMission(), meta, groups);
 

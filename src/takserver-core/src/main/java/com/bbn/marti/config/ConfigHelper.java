@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Class used to do miscellaneous tasks to the generated Configuration file such as load default objects or check
  * content values
- * <p/>
+ * <p>
  * Created on 8/31/15.
  */
 public class ConfigHelper {

@@ -120,7 +120,7 @@ java -jar -Xmx${MESSAGING_MAX_HEAP}m -Dspring.profiles.active=messaging takserve
 MESSAGING_PID=$!
 java -jar -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api -Dkeystore.pkcs12.legacy takserver.war &
 API_PID=$!
-java -jar -Xmx${PLUGIN_MANAGER_MAX_HEAP}m takserver-pm.jar &
+java -jar -Xmx${PLUGIN_MANAGER_MAX_HEAP}m -Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/ takserver-pm.jar &
 PM_PID=$!
 
 sleep 16

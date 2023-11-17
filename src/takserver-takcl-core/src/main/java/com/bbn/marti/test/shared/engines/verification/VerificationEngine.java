@@ -1,6 +1,7 @@
 package com.bbn.marti.test.shared.engines.verification;
 
 import com.bbn.marti.takcl.TestExceptions;
+import com.bbn.marti.takcl.TestLogger;
 import com.bbn.marti.takcl.connectivity.missions.MissionModels;
 import com.bbn.marti.test.shared.TestConnectivityState;
 import com.bbn.marti.test.shared.data.GroupProfiles;
@@ -288,6 +289,7 @@ public class VerificationEngine implements EngineInterface {
 
 				for (UserState userState : StateEngine.data.getUserStates()) {
 					// TODO Missions: Add Mission flow verification within EngineHelper. Include mission, check recipients, ad to outcomes
+					System.out.println("\t --- setUserExpectations userState.getProfile(): "+ userState.getProfile()+ ", userState.getConnectivityState(): " + userState.getConnectivityState());
 					data.setUserExpectations(userState.getProfile(), outcomeMap.get(userState.getProfile()), userState.getConnectivityState());
 				}
 
@@ -298,8 +300,38 @@ public class VerificationEngine implements EngineInterface {
 				if (label.equals("")) {
 					label = "Sent";
 				}
+				
+				System.out.println("--- VerificationEngine attemptSendFromUserAndVerify label: "+ label);
+
 				data.validateAllUserExpectations(label);
 			}
+		}
+		data.engineIterationDataClear();
+	}
+	
+	@Override
+	public void verifyReceivedMessageSentFromPlugin(@NotNull AbstractUser sendingPlugin, @NotNull AbstractUser... receivedUsers) {
+		
+		System.out.println("--- VerificationEngine verifyReceivedMessageSentFromPlugin, sendingPlugin: "+ sendingPlugin);
+		if (sendingPlugin.doValidation()) {
+
+			TreeSet<AbstractUser> expectedSenders = new TreeSet<>();
+			expectedSenders.add(sendingPlugin);
+			
+			for (AbstractUser receivedUser : receivedUsers) {
+				if (StateEngine.data.getUserState(receivedUser.getDynamicName()) != null) {
+					System.out.println("\t --- setUserExpectations receivedUser: " + receivedUser);
+					data.setUserExpectations(receivedUser, expectedSenders, StateEngine.data.getUserState(receivedUser.getDynamicName()).getConnectivityState());
+				}else {
+					System.out.println("\t --- StateEngine.data.getUserState(receivedUser.getDynamicName() is null. Thus, setUserExpectations to ConnectedAuthenticatedIfNecessary");
+					data.setUserExpectations(receivedUser, expectedSenders, TestConnectivityState.ConnectedAuthenticatedIfNecessary);
+				}
+			}
+
+			String label = "Received";
+			
+			data.validateAllUserExpectations(label);
+			
 		}
 		data.engineIterationDataClear();
 	}
