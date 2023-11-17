@@ -83,20 +83,27 @@ ln -s "${TR}/data/logs" "${TR}/logs"
 cd ${CR}
 
 if [[ ! -f "${CR}/files/root-ca.pem" ]];then
-	CAPASS=${CA_PASS} bash makeRootCa.sh --ca-name "${CA_NAME}"
+	CAPASS=${CA_PASS} bash /opt/tak/certs/makeRootCa.sh --ca-name "${CA_NAME}"
 else
 	echo Using existing root CA.
 fi
 
+if [[ ! -f "${CR}/files/intermediate-signing.jks" ]];then
+  echo "Making new signing certificate."
+  export CAPASS=${CA_PASS}
+  yes | /opt/tak/certs/makeCert.sh ca intermediate
+else
+  echo "Using existing intermediate CA certificate."
+fi
 
 if [[ ! -f "${CR}/files/takserver.pem" ]];then
-	CAPASS=${CA_PASS} PASS="${TAKSERVER_CERT_PASS}" bash makeCert.sh server takserver
+	CAPASS=${CA_PASS} PASS="${TAKSERVER_CERT_PASS}" bash /opt/tak/certs/makeCert.sh server takserver
 else
 	echo Using existing takserver certificate.
 fi
 
 if [[ ! -f "${CR}/files/${ADMIN_CERT_NAME}.pem" ]];then
-	CAPASS=${CA_PASS} PASS="${ADMIN_CERT_PASS}" bash makeCert.sh client "${ADMIN_CERT_NAME}"
+	CAPASS=${CA_PASS} PASS="${ADMIN_CERT_PASS}" bash /opt/tak/certs/makeCert.sh client "${ADMIN_CERT_NAME}"
 else
 	echo Using existing ${ADMIN_CERT_NAME} certificate.
 fi

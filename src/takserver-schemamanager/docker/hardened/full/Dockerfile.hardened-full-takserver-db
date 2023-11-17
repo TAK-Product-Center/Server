@@ -29,7 +29,8 @@ RUN rpm --import /opt/signatures/* \
     && dnf -qy module disable postgresql \
     && dnf -y upgrade --nodocs \
     && dnf -y install --nodocs \
-        java-11-openjdk \
+        java-17-openjdk \
+        netcat \
         postgis33_15 \
         postgis33_15-utils \
         pgpool-II \
@@ -43,9 +44,6 @@ RUN chown -R postgres:postgres /var/lib/postgresql && \
     chown -R postgres:postgres /var/run/postgresql && \
     chmod -R 770 /var/run/postgresql
 
-#runs in takserver-setup-db.sh but fails because of permissions. running as root to prevent error
-RUN chkconfig --level 345 postgresql-15 on
-
 COPY --chown=postgres:postgres tak /opt/tak
 
 RUN chmod u=rwx /opt/tak \
@@ -53,7 +51,7 @@ RUN chmod u=rwx /opt/tak \
 	&& find /opt/tak/ -type f -name "*.*" -exec chmod u=rw {} \; \
 	&& find /opt/tak/ -type f -name "*.sh" -exec chmod u=rx {} \;
 
-# HEALTHCHECK --start-period=120s --interval=30s --timeout=30s --retries=10 CMD opt/tak/health/takserver-db/health_check.sh || exit 1
+HEALTHCHECK --start-period=120s --interval=30s --timeout=30s --retries=10 CMD /opt/tak/health/takserver-db/health_check.sh || exit 1
 
 # Default startup executable. Can include elements of 'docker run' command as parameters.
 ENTRYPOINT ["/opt/tak/db-utils/full/configureInDocker.sh"]

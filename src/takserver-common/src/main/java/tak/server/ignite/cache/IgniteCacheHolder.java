@@ -13,10 +13,23 @@ import tak.server.ignite.IgniteHolder;
 
 public final class IgniteCacheHolder {
 	
-	private static IgniteCache<String, RemoteSubscription>  igniteSubscriptionClientUidTrackerCache = null;
 	private static IgniteCache<String, RemoteSubscription>  igniteSubscriptionUidTrackerCache = null;
+	private static IgniteCache<String, RemoteSubscription>  igniteSubscriptionClientUidTrackerCache = null;
+
 	private static IgniteCache<String, String>  iginteUserOutboundGroupCache = null;
 	private static IgniteCache<String, String>  iginteUserInboundGroupCache = null;
+	
+	public static void cacheRemoteSubscription(RemoteSubscription sub) {
+		sub.prepareForSerialization();
+		
+		getIgniteSubscriptionUidTackerCache().put(sub.uid, sub);
+		getIgniteSubscriptionClientUidTackerCache().put(sub.clientUid, sub);
+	}
+	
+	public static void removeCachedRemoteSubscription(RemoteSubscription sub) {
+		getIgniteSubscriptionUidTackerCache().remove(sub.uid);
+		getIgniteSubscriptionClientUidTackerCache().remove(sub.clientUid);
+	}
 	
 	public static IgniteCache<String, RemoteSubscription> getIgniteSubscriptionUidTackerCache() {
     	if (igniteSubscriptionUidTrackerCache == null) {
@@ -29,7 +42,7 @@ public final class IgniteCacheHolder {
 		
 		return igniteSubscriptionUidTrackerCache;
 	}
-    
+	
 	public static IgniteCache<String, RemoteSubscription> getIgniteSubscriptionClientUidTackerCache() {
     	if (igniteSubscriptionClientUidTrackerCache == null) {
     		initGroupCaches();

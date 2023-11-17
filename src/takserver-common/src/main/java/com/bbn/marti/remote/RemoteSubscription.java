@@ -67,7 +67,7 @@ public class RemoteSubscription implements Serializable {
     // the User object associated with this subscription, if there is one
     @JsonIgnore protected User user;
 
-    @QuerySqlField @JsonIgnore protected String connectionId;
+    @QuerySqlField(index = true) @JsonIgnore protected String connectionId;
     @QuerySqlField @JsonIgnore protected String username;
     @JsonIgnore protected String dn;
 

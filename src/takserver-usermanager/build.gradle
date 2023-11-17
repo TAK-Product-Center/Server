@@ -109,6 +109,7 @@ task integrationTest(type: Test) {
 
 dependencies {
     implementation project(':takserver-takcl-core')
+    implementation project(':takserver-common')
     implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
     implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
     implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version

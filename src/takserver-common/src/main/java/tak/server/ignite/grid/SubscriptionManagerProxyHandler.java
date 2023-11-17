@@ -10,17 +10,20 @@ import com.bbn.marti.remote.SubscriptionManagerLite;
 
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.cache.IgniteCacheHolder;
 
-public class SubscriptionManagerProxyHandler extends IgniteProxyHandler {
+public class SubscriptionManagerProxyHandler {
+	
+	private CoreConfig coreConfig;
 	
 	public SubscriptionManagerProxyHandler(CoreConfig coreConfig) {
-		super(coreConfig);
+		this.coreConfig = coreConfig;
 	}
 
 	public SubscriptionManagerLite getSubscriptionManagerForClientUid(String uid) {
 		if (coreConfig.getRemoteConfiguration().getCluster().isEnabled()) {
 			return getSubscriptionManager(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(IgniteHolder.getInstance().getIgnite())
-					.forNodeId(getIgniteSubscriptionClientUidTackerCache().get(uid).originNode));
+					.forNodeId(IgniteCacheHolder.getIgniteSubscriptionClientUidTackerCache().get(uid).originNode));
 		} else {
 			return getSubscriptionManager(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(IgniteHolder.getInstance().getIgnite()));
 		}
@@ -29,7 +32,7 @@ public class SubscriptionManagerProxyHandler extends IgniteProxyHandler {
 	public SubscriptionManagerLite getSubscriptionManagerForSubscriptionUid(String uid) {
 		if (coreConfig.getRemoteConfiguration().getCluster().isEnabled()) {
 			return getSubscriptionManager(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(IgniteHolder.getInstance().getIgnite())
-					.forNodeId(getIgniteSubscriptionUidTackerCache().get(uid).originNode));
+					.forNodeId(IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().get(uid).originNode));
 		} else {
 			return getSubscriptionManager(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(IgniteHolder.getInstance().getIgnite()));
 		}

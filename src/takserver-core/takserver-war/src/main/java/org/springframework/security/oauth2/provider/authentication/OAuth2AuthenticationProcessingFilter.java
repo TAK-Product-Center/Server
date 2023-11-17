@@ -173,8 +173,11 @@ public class OAuth2AuthenticationProcessingFilter implements Filter, Initializin
             response.setHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
                     OAuth2AccessToken.ACCESS_TOKEN, null, 0, true).toString());
 
+            response.setHeader("Pragma", "no-cache");
+            response.setHeader("Cache-Control", "must-revalidate, max-age=0, no-cache, no-store");
+            response.setDateHeader("Expires", 0);
             response.setHeader("Location", "/login/refresh");
-            response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
+            response.setStatus(HttpServletResponse.SC_MOVED_TEMPORARILY);
             return;
         }
         catch (OAuth2Exception failed) {

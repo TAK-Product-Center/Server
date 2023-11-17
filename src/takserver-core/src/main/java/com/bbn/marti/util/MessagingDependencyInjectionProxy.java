@@ -3,6 +3,7 @@
 package com.bbn.marti.util;
 
 import com.bbn.marti.network.PluginDataFeedJdbc;
+import com.bbn.marti.nio.netty.NioNettyBuilder;
 import com.bbn.marti.remote.util.RemoteUtil;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +32,7 @@ import com.bbn.marti.sync.repository.MissionSubscriptionRepository;
 import com.bbn.marti.sync.service.MissionService;
 
 import tak.server.Constants;
-import tak.server.cache.PluginDatafeedCacheHelper;
+import tak.server.cache.DatafeedCacheHelper;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotEventContainer;
 import tak.server.messaging.Messenger;
@@ -238,6 +239,20 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		}
 
 		return fileAuthenticator;
+	}
+
+	private NioNettyBuilder nioNettyBuilder = null;
+
+	public NioNettyBuilder nioNettyBuilder() {
+		if (nioNettyBuilder == null) {
+			synchronized (this) {
+				if (nioNettyBuilder == null) {
+					nioNettyBuilder = springContext.getBean(NioNettyBuilder.class);
+				}
+			}
+		}
+
+		return nioNettyBuilder;
 	}
 	
 	private Messenger<CotEventContainer> cotMessenger = null;
@@ -454,13 +469,13 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return missionRoleRepository;
 	}
 
-	private PluginDatafeedCacheHelper pluginDatafeedCacheHelper = null;
+	private DatafeedCacheHelper pluginDatafeedCacheHelper = null;
 
-	public PluginDatafeedCacheHelper pluginDatafeedCacheHelper() {
+	public DatafeedCacheHelper pluginDatafeedCacheHelper() {
 		if (pluginDatafeedCacheHelper == null) {
 			synchronized (this) {
 				if (pluginDatafeedCacheHelper == null) {
-					pluginDatafeedCacheHelper = springContext.getBean(PluginDatafeedCacheHelper.class);
+					pluginDatafeedCacheHelper = springContext.getBean(DatafeedCacheHelper.class);
 				}
 			}
 		}

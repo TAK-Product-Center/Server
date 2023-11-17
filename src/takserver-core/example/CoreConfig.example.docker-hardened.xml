@@ -157,7 +157,7 @@
         </certificateConfig>
         <TAKServerCAConfig
             keystore="JKS"
-            keystoreFile="certs/files/intermediate-ca-signing.jks"
+            keystoreFile="certs/files/intermediate-signing.jks"
             keystorePass="atakatak"
             validityDays="30"
             signatureAlg="SHA256WithRSA" />

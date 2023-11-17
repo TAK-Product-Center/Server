@@ -26,7 +26,7 @@ message Message {
     string feedUuid = 9;
 
     string connectionId = 10;
-    
+
     // optional sequence of binary payloads
     repeated gov.tak.cop.proto.v1.BinaryPayload bloads = 11;
 }

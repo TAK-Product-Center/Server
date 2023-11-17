@@ -14,6 +14,7 @@ import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.groups.Authenticator;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.User;
+import com.bbn.marti.remote.groups.UserClassification;
 
 /*
  *
@@ -29,7 +30,10 @@ public class InMemoryGroupStore implements GroupStore, Serializable {
     // track groups by user
     protected final ConcurrentMap<User, NavigableSet<Group>> userGroupMap;
 
-    // master group superset (track groups by name and direction)
+	// track classification by user
+	protected final ConcurrentMap<User, UserClassification> userClassificationMap;
+
+	// master group superset (track groups by name and direction)
     protected final ConcurrentMap<String, Group> groups;
 
     // track users by connectionId
@@ -48,6 +52,7 @@ public class InMemoryGroupStore implements GroupStore, Serializable {
     	}
 
         userGroupMap = new ConcurrentHashMap<>();
+    	userClassificationMap = new ConcurrentHashMap<>();
         groups = new ConcurrentHashMap<>();
         connectionIdUserMap = new ConcurrentHashMap<>();
         userSubscriptionMap = new ConcurrentHashMap<>();
@@ -60,6 +65,11 @@ public class InMemoryGroupStore implements GroupStore, Serializable {
     @Override
 	public ConcurrentMap<User, NavigableSet<Group>> getUserGroupMap() {
 		return userGroupMap;
+	}
+
+	@Override
+	public ConcurrentMap<User, UserClassification> getUserClassificationMap() {
+    	return userClassificationMap;
 	}
 
 	/* (non-Javadoc)

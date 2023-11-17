@@ -158,9 +158,9 @@ public class MissionFederationAspect {
     		
     		DataFeedMetadata meta = new DataFeedMetadata();
     		meta.setMissionName(missionFeed.getMission().getName());
-    		meta.setFilterBbox(missionFeed.getFilterBbox());
+    		meta.setFilterPolygon(missionFeed.getFilterPolygon());
     		meta.setFilterCallsign(missionFeed.getFilterCallsign());
-    		meta.setFilterType(missionFeed.getFilterType());
+    		meta.setFilterCotTypes(missionFeed.getFilterCotTypes());
     		meta.setDataFeedUid(missionFeed.getDataFeedUid());
     		meta.setMissionFeedUid(missionFeed.getUid());
     		meta.setArchive(dataFeed.isArchive());

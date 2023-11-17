@@ -2,32 +2,24 @@ package com.bbn.marti.sync.federation;
 
 import java.rmi.RemoteException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.NavigableSet;
 
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
-import org.aspectj.lang.reflect.CodeSignature;
-import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Configurable;
 
-import com.atakmap.Tak.ROL;
 import com.bbn.marti.feeds.DataFeedService;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationManager;
-import com.bbn.marti.remote.groups.Group;
-import com.bbn.marti.remote.groups.GroupManager;
-import com.bbn.marti.sync.model.DataFeedDao;
 import com.bbn.marti.util.CommonUtil;
 
 import mil.af.rl.rol.value.DataFeedMetadata;
 import tak.server.feeds.DataFeed.DataFeedType;
+import tak.server.feeds.DataFeedDTO;
 
 @Aspect
 @Configurable
@@ -71,7 +63,7 @@ public class DataFeedFederationAspect {
     			return;
     		}
     		
-    		DataFeedDao dataFeed = dataFeedService.getDataFeedById(res);
+    		DataFeedDTO dataFeed = dataFeedService.getDataFeedById(res);
     		
     		DataFeedMetadata meta = new DataFeedMetadata();
     		meta.setDataFeedUid(dataFeed.getUUID());
@@ -119,7 +111,7 @@ public class DataFeedFederationAspect {
     			return;
     		}
     		
-    		DataFeedDao dataFeed = dataFeedService.getDataFeedById(res);
+    		DataFeedDTO dataFeed = dataFeedService.getDataFeedById(res);
     		
     		DataFeedMetadata meta = new DataFeedMetadata();
     		meta.setDataFeedUid(dataFeed.getUUID());
@@ -157,7 +149,7 @@ public class DataFeedFederationAspect {
     		}
     		
     		Long id = (Long) jp.getArgs()[0];
-        	DataFeedDao dataFeed = dataFeedService.getDataFeedById(id);
+        	DataFeedDTO dataFeed = dataFeedService.getDataFeedById(id);
         	
         	DataFeedMetadata meta = new DataFeedMetadata();
         	meta.setDataFeedUid(dataFeed.getUUID());
@@ -194,7 +186,7 @@ public class DataFeedFederationAspect {
     			return;
     		}
     		String name = (String) jp.getArgs()[0];
-        	DataFeedDao dataFeed = dataFeedService.getDataFeedByName(name);
+        	DataFeedDTO dataFeed = dataFeedService.getDataFeedByName(name);
         	doDeleteDataFeed(jp, dataFeed);
     	} catch (Exception e) {
     		if (logger.isDebugEnabled()) {
@@ -216,7 +208,7 @@ public class DataFeedFederationAspect {
     		}
     		
     		Long id = (Long) jp.getArgs()[0];
-        	DataFeedDao dataFeed = dataFeedService.getDataFeedById(id);
+        	DataFeedDTO dataFeed = dataFeedService.getDataFeedById(id);
         	doDeleteDataFeed(jp, dataFeed);
     	} catch (Exception e) {
     		if (logger.isDebugEnabled()) {
@@ -225,7 +217,7 @@ public class DataFeedFederationAspect {
 		}
     }
        
-    private void doDeleteDataFeed(JoinPoint jp, DataFeedDao dataFeed) {    	
+    private void doDeleteDataFeed(JoinPoint jp, DataFeedDTO dataFeed) {    	
     	try {
     		if (dataFeed.getType() == DataFeedType.Federation.ordinal()) return;
     		
@@ -260,7 +252,7 @@ public class DataFeedFederationAspect {
     		}
     		
     		Long id = (Long) jp.getArgs()[0];
-        	DataFeedDao dataFeed = dataFeedService.getDataFeedById(id);
+        	DataFeedDTO dataFeed = dataFeedService.getDataFeedById(id);
         	
         	if (dataFeed.getType() == DataFeedType.Federation.ordinal()) return;
         	
@@ -290,7 +282,7 @@ public class DataFeedFederationAspect {
     // a federate data feed is a data feed that was received over a federate link
     // we do not want to federate back changes made to a federate feed. this will cause: 
     // 1. a loop and 2. connected federates the ability alter the source data feed
-    public boolean federatedDataFeed(DataFeedDao dataFeed) {
+    public boolean federatedDataFeed(DataFeedDTO dataFeed) {
     	return dataFeed.getType() == DataFeedType.Federation.ordinal();
     }
     

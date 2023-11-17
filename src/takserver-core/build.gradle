@@ -129,9 +129,6 @@ war {
     enabled = false
 }
 
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
-
 dependencies {
 
   implementation group: 'io.netty', name: 'netty-handler', version: netty_handler_version
@@ -249,7 +246,6 @@ dependencies {
     // apache ignite (cache and distributed service grid)
   testImplementation group: 'org.apache.ignite', name: 'ignite-indexing', version: ignite_version
   testImplementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
-  testImplementation group: 'org.apache.ignite', name: 'ignite-log4j', version: ignite_version
   testImplementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
 
 

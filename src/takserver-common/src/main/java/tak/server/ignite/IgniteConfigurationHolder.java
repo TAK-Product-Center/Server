@@ -8,6 +8,7 @@ import java.util.Collections;
 
 import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.IgniteLogger;
+import org.apache.ignite.configuration.ClientConnectorConfiguration;
 import org.apache.ignite.configuration.DataPageEvictionMode;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
@@ -60,11 +61,14 @@ public class IgniteConfigurationHolder {
 	
 	public IgniteConfiguration getIgniteConfiguration(String igniteProfile, String igniteHost, boolean isCluster, boolean isKubernetes, boolean isEmbedded, boolean isMulticastDiscovery, @Nullable Integer nonMulticastDiscoveryPort,
             @Nullable Integer nonMulticastDiscoveryPortCount, Integer communicationPort, Integer communicationPortCount, int maxQueue, long workerTimeoutMilliseconds, long dataRegionInitialSize, long dataRegionMaxSize) {
-		return getIgniteConfiguration(igniteProfile, igniteHost, isCluster, isKubernetes, isEmbedded, isMulticastDiscovery, nonMulticastDiscoveryPort, nonMulticastDiscoveryPortCount, communicationPort, communicationPortCount, maxQueue, workerTimeoutMilliseconds, dataRegionInitialSize, dataRegionMaxSize, -1, false, -1.f);
+		return getIgniteConfiguration(igniteProfile, igniteHost, isCluster, isKubernetes, isEmbedded, isMulticastDiscovery, nonMulticastDiscoveryPort, nonMulticastDiscoveryPortCount, communicationPort, communicationPortCount, 
+				maxQueue, workerTimeoutMilliseconds, dataRegionInitialSize, dataRegionMaxSize, -1, false, -1.f, false, false, -1, false, -1, -1, -1);
 	}
 
 	public IgniteConfiguration getIgniteConfiguration(String igniteProfile, String igniteHost, boolean isCluster, boolean isKubernetes, boolean isEmbedded, boolean isMulticastDiscovery, @Nullable Integer nonMulticastDiscoveryPort,
-	                                                  @Nullable Integer nonMulticastDiscoveryPortCount, Integer communicationPort, Integer communicationPortCount, int maxQueue, long workerTimeoutMilliseconds, long dataRegionInitialSize, long dataRegionMaxSize, int poolSize, boolean enablePersistence, double evictionThreashold) {
+	                                                  @Nullable Integer nonMulticastDiscoveryPortCount, Integer communicationPort, Integer communicationPortCount, int maxQueue, long workerTimeoutMilliseconds, long dataRegionInitialSize, long dataRegionMaxSize, int poolSize, boolean enablePersistence, double evictionThreashold,
+	                                                  boolean ignitePoolSizeUseDefaultsForApi, boolean igniteDefaultSpiConnectionsPerNode, int igniteExplicitSpiConnectionsPerNode, boolean apiServiceIgniteServer,
+	                                                  long spiConnectionTimeoutMs, long clientConnectionTimeoutMs, long failureDetectionTimeoutMs) {
 		
 		if (isCluster) {
 			IgniteConfiguration clusterConf = new IgniteConfiguration();
@@ -128,9 +132,7 @@ public class IgniteConfigurationHolder {
 				String address = igniteHost + ":" + nonMulticastDiscoveryPort + ".." + (nonMulticastDiscoveryPort + nonMulticastDiscoveryPortCount); 
 				ipFinder.setAddresses(Arrays.asList(address));
 				
-				if (logger.isTraceEnabled()) {
-					logger.trace("ignite grid discovery address: " + address);
-				}
+				logger.trace("ignite grid discovery address: {}", address);
 
 				spi.setIpFinder(ipFinder);
 
@@ -143,22 +145,52 @@ public class IgniteConfigurationHolder {
 			}
 			
 			standaloneConf.setDiscoverySpi(spi);
+			TcpCommunicationSpi tcpSpiConf = new TcpCommunicationSpi();
+			tcpSpiConf.setLocalPort(communicationPort);
+			tcpSpiConf.setLocalPortRange(communicationPortCount);
+			tcpSpiConf.setLocalAddress(igniteHost);
+			tcpSpiConf.setMessageQueueLimit(maxQueue);
 			
-			TcpCommunicationSpi comms = new TcpCommunicationSpi();
-			comms.setLocalPort(communicationPort);
-			comms.setLocalPortRange(communicationPortCount);
-			comms.setLocalAddress(igniteHost);
-			comms.setMessageQueueLimit(maxQueue);
-			
-			standaloneConf.setCommunicationSpi(comms);
+			if (spiConnectionTimeoutMs > -1) {
+				tcpSpiConf.setConnectTimeout(spiConnectionTimeoutMs); // milliseconds
+			}
 
-			standaloneConf.setClientMode(!isEmbedded);
+            standaloneConf.setLocalHost(igniteHost);
+
+            if (igniteDefaultSpiConnectionsPerNode) {
+				// use default
+			} else if (igniteExplicitSpiConnectionsPerNode < 1) {
+				// autodetect to num CPU cores
+				tcpSpiConf.setConnectionsPerNode(Runtime.getRuntime().availableProcessors());
+			} else {
+				tcpSpiConf.setConnectionsPerNode(igniteExplicitSpiConnectionsPerNode);
+			}
+			
+			// Using System.out due to log init race
+			System.out.println("Ignite SPI connections per node: " + tcpSpiConf.getConnectionsPerNode());
+			
+			standaloneConf.setCommunicationSpi(tcpSpiConf);
+			
+			// If this process is the API micro-service, optionally run in ignite embedded server mode. In standalone, messaging service is always an ignite server. Plugin manager and retention service are always ignite clients. 
+			if (apiServiceIgniteServer) {
+				standaloneConf.setClientMode(false);
+			} else {
+				standaloneConf.setClientMode(!isEmbedded);
+			}
 			standaloneConf.setIgniteInstanceName(Constants.IGNITE_INSTANCE_NAME);
 
 			standaloneConf.setUserAttributes(Collections.singletonMap(Constants.TAK_PROFILE_KEY, igniteProfile));
 			
-//			standaloneConf.setSystemWorkerBlockedTimeout(workerTimeoutMilliseconds);
 			standaloneConf.setFailureHandler(new NoOpFailureHandler());
+			
+			if (clientConnectionTimeoutMs > -1) {
+				standaloneConf.setClientFailureDetectionTimeout(clientConnectionTimeoutMs);
+			}
+			
+			if (failureDetectionTimeoutMs > -1) {
+				standaloneConf.setFailureDetectionTimeout(failureDetectionTimeoutMs);
+				standaloneConf.setSystemWorkerBlockedTimeout(failureDetectionTimeoutMs);
+			}
 			
 			if (isEmbedded) {
 
@@ -172,15 +204,13 @@ public class IgniteConfigurationHolder {
 					takserverStorageRegion.setEvictionThreshold(evictionThreashold);
 				}
 				
-				// try to allocate off-heap memory as soon as possible, to head off any memory issues
 				takserverStorageRegion.setInitialSize(dataRegionInitialSize);
 				takserverStorageRegion.setMaxSize(dataRegionMaxSize);
 				
 				if (enablePersistence) {
 					takserverStorageRegion.setPersistenceEnabled(true);
 				}
-				
-
+			
 				storageConfig.setDefaultDataRegionConfiguration(takserverStorageRegion);
 				
 				if (enablePersistence) {
@@ -193,7 +223,15 @@ public class IgniteConfigurationHolder {
 				}
 
 				standaloneConf.setDataStorageConfiguration(storageConfig);
-				
+			} else { // client mode - API process
+				ClientConnectorConfiguration ccc = standaloneConf.getClientConnectorConfiguration();
+
+				if (poolSize > ccc.getThreadPoolSize()) {
+					ccc.setThreadPoolSize(poolSize);
+				}
+			}
+
+			if (!isEmbedded && !ignitePoolSizeUseDefaultsForApi) {
 				if (poolSize > 0) {
 					// ignite thread pools
 					standaloneConf.setSystemThreadPoolSize(poolSize + 1);

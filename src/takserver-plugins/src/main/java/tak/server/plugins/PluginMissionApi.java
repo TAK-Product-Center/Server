@@ -44,7 +44,7 @@ public interface PluginMissionApi {
 
 	Mission getParent(String parentName) throws Exception;
 	
-	void addFeed(String missionName, String creatorUid, String dataFeedUid, String filterBbox, String filterType, String filterCallsign);
+	void addFeed(String missionName, String creatorUid, String dataFeedUid, String filterBbox, List<String> filterCotTypes, String filterCallsign);
 
 	void removeFeed(String missionName, String feedUid, String creatorUid);
 

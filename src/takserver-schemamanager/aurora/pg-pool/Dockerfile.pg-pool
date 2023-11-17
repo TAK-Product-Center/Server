@@ -1,4 +1,4 @@
-FROM openjdk:11-jdk-bullseye
+FROM eclipse-temurin:17-jammy
 ARG URL_WRITER
 ARG URL_READER
 ARG DB_USER

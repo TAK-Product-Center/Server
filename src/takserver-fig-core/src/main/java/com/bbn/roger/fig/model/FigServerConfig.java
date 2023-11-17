@@ -25,6 +25,8 @@ public class FigServerConfig {
     private String truststoreType = "JKS"; // JKS is the default truststore type
     private String truststoreFile = "";
     private String truststorePassword;
+    private String context;
+    private String ciphers;
     private boolean useCaGroups = false;
     private String syncCachePath = ""; // location on filesystem where enterprise sync / mission package files will be cached
     private boolean nonManagedFederates = false;
@@ -125,6 +127,18 @@ public class FigServerConfig {
     }
     public void setTruststorePass(String truststorePassword) {
         this.truststorePassword = truststorePassword;
+    }
+    public String getContext() {
+        return context;
+    }
+    public void setContext(String context) {
+        this.context = context;
+    }
+    public String getCiphers() {
+        return ciphers;
+    }
+    public void setCiphers(String ciphers) {
+        this.ciphers = ciphers;
     }
     public boolean isUseCaGroups() {
         return useCaGroups;

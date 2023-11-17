@@ -335,10 +335,10 @@ public class MissionDisruptionManager {
 									DataFeedMetadata createFeedMeta = new DataFeedMetadata();
 
 									createFeedMeta.setDataFeedUid(createdMissionFeed.getDataFeedUid());
-									createFeedMeta.setFilterBbox(createdMissionFeed.getFilterBbox());
+									createFeedMeta.setFilterPolygon(createdMissionFeed.getFilterPolygon());
 									createFeedMeta.setFilterCallsign(createdMissionFeed.getFilterCallsign());
-									createFeedMeta.setFilterType(createdMissionFeed.getFilterType());
-
+									createFeedMeta.setFilterCotTypes(createdMissionFeed.getFilterCotTypes());
+									
 									createFeedMeta.setMissionFeedUid(change.getMissionFeedUid());
 									createFeedMeta.setMissionName(change.getMissionName());
 									

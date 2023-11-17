@@ -13,6 +13,7 @@ angular
         'ngAnimate',
         'ngCookies',
         'ngResource',
+        'ngStorage',
         'ngMessages',
         'ngFileSaver',
         'ui.router',
@@ -1091,6 +1092,7 @@ angular
     .config(function (JSONFormatterConfigProvider) {
         JSONFormatterConfigProvider.hoverPreviewEnabled = true;
     })
+
 //
 //.run(function($rootScope, $state, AUTH_EVENTS, ACCESS_EVENTS, growl, AuthenticationService) {
 //

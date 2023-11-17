@@ -22,11 +22,15 @@ public class GeospatialEventFilter implements CotFilter {
 
     private static final List<String> noFilterTypes = Arrays.asList(
                 "b-a-o-tbl",    // NineOneOne
-                "b-a-o-can",     // Cancel
-                "b-a-g",         // GeoFenceBreach
-                "b-a-o-pan",     // RingTheBell
-                "b-a-o-opn");    // TroopsInContact
-
+                "b-a-o-can",    // Cancel
+                "b-a-g",        // GeoFenceBreach
+                "b-a-o-pan",    // RingTheBell
+                "b-a-o-opn",    // TroopsInContact
+                "b-t-f",        // Chat
+                "b-t-f-d",      // Chat delivery receipt
+                "b-t-f-r",      // Chat read receipt
+                "b-t-f-p",      // Chat pending receipt
+                "b-t-f-s");     // Chat delivery failure
 
     public GeospatialEventFilter(GeospatialFilter filter) {
         this.filter = filter;

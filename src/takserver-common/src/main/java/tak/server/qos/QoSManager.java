@@ -11,7 +11,11 @@ public interface QoSManager {
 		
 	void setReadLimiterEnabled(boolean enable);
 	
+	void setReadRules(List<RateLimitRule> rateLimitRule);
+	
 	void setDeliveryLimiterEnabled(boolean enable);
+	
+	void setDeliveryRules(List<RateLimitRule> rateLimitRule);
 	
 	void setDOSLimiterEnabled(boolean enable);
 	

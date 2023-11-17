@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
@@ -23,6 +24,7 @@ import org.springframework.security.core.userdetails.UserDetailsByNameServiceWra
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import com.bbn.marti.config.Network.Connector;
+import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.exception.TakException;
 import com.beust.jcommander.internal.Lists;
 import com.google.common.base.Strings;
@@ -36,6 +38,9 @@ import com.google.common.base.Strings;
 public class RolePortUserServiceWrapper extends UserDetailsByNameServiceWrapper {
 
     private static final Logger logger = LoggerFactory.getLogger(RolePortUserServiceWrapper.class);
+
+    @Autowired
+    CoreConfig config;
 
     // This is defined in security-context.xml
     @Resource(name="httpsBasicPaths")
@@ -86,25 +91,8 @@ public class RolePortUserServiceWrapper extends UserDetailsByNameServiceWrapper 
         	logger.debug("port in HTTP request: " + requestPort + " portRoleMap " + portRoleMap);
         }
 
-//        // Get Configuration on the requestPort
-//        boolean portHasWebtakEnabled = false;
-//        List<Connector> connectors = DistributedConfiguration.getInstance().getNetwork().getConnector();
-//        Connector configConnectorOnTheRequestedPort = null;
-//        for (Connector connector : connectors) {
-//            if (requestPort.equals(String.valueOf(connector.getPort()))) {
-//                configConnectorOnTheRequestedPort = connector;
-//                break;
-//            }
-//        }
-//        if (configConnectorOnTheRequestedPort == null) {
-//            throw new SecurityException("Connection is not allowed");
-//        }
-//        if (configConnectorOnTheRequestedPort.isEnableWebtak()) {
-//            portHasWebtakEnabled = true;
-//        }
-        
-        if (portRoleMap.containsKey(requestPort)) { 
-            
+        if (portRoleMap.containsKey(requestPort)) {
+
             String role = portRoleMap.get(requestPort);
             
             if (logger.isDebugEnabled()) {
@@ -112,7 +100,30 @@ public class RolePortUserServiceWrapper extends UserDetailsByNameServiceWrapper 
             }
             
             // special case for port-based role assignment. Assign only the role specified.
-            return new SimpleRoleUserDetails(role);
+            SimpleRoleUserDetails roleUserDetails = new SimpleRoleUserDetails(role);
+
+            try {
+                // Get Configuration on the requestPort
+                List<Connector> connectors = config.getRemoteConfiguration().getNetwork().getConnector();
+                Connector configConnectorOnTheRequestedPort = null;
+                for (Connector connector : connectors) {
+                    if (requestPort.equals(String.valueOf(connector.getPort()))) {
+                        configConnectorOnTheRequestedPort = connector;
+                        break;
+                    }
+                }
+
+                if (configConnectorOnTheRequestedPort != null &&
+                        (configConnectorOnTheRequestedPort.isEnableWebtak()
+                                || configConnectorOnTheRequestedPort.isEnableNonAdminUI()
+                                || configConnectorOnTheRequestedPort.isEnableNonAdminUI())) {
+                    roleUserDetails.getAuthorities().add(new SimpleGrantedAuthority("ROLE_ALLOW_LOGIN"));
+                }
+            } catch (Exception e) {
+                logger.error("exception determining ROLE_ALLOW_LOGIN access", e);
+            }
+
+            return roleUserDetails;
         } else {
         	if (logger.isDebugEnabled()) {
         		logger.debug("portRoleMap does not contain port " + requestPort);

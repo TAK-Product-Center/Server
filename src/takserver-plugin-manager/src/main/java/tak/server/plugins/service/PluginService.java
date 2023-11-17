@@ -6,13 +6,11 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import javax.sql.DataSource;
-
-import com.bbn.marti.config.Tls;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.cache.spring.SpringCacheManager;
 import org.apache.ignite.configuration.CacheConfiguration;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -26,18 +24,28 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 
 import com.bbn.cluster.ClusterGroupDefinition;
+import com.bbn.marti.config.Cluster;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.ServerInfo;
 import com.zaxxer.hikari.HikariDataSource;
 
 import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
-import com.bbn.marti.config.Cluster;
 import tak.server.Constants;
 import tak.server.PluginManager;
 import tak.server.PluginRegistry;
+import tak.server.cache.TakIgniteSpringCacheManager;
 import tak.server.ignite.IgniteConfigurationHolder;
 import tak.server.messaging.Messenger;
-import tak.server.plugins.*;
+import tak.server.plugins.PluginApi;
+import tak.server.plugins.PluginCoreConfigApi;
+import tak.server.plugins.PluginDataFeedApi;
+import tak.server.plugins.PluginFileApi;
+import tak.server.plugins.PluginFileApiImpl;
+import tak.server.plugins.PluginManagerConstants;
+import tak.server.plugins.PluginMissionApi;
+import tak.server.plugins.PluginSelfStopApi;
+import tak.server.plugins.PluginStarter;
+import tak.server.plugins.SystemInfoApi;
 import tak.server.plugins.datalayer.PluginFileApiJDBC;
 import tak.server.plugins.manager.loader.PluginLoader;
 import tak.server.plugins.messaging.MessageConverter;
@@ -45,8 +53,7 @@ import tak.server.plugins.messaging.PluginClusterMessenger;
 import tak.server.plugins.messaging.PluginMessenger;
 import tak.server.plugins.util.PluginManagerDependencyInjectionProxy;
 import tak.server.util.DataSourceUtils;
-import tak.server.cache.TakIgniteSpringCacheManager;
-import org.apache.ignite.cache.spring.SpringCacheManager;
+import tak.server.util.JavaVersionChecker;
 
 
 @SpringBootApplication(exclude = {
@@ -61,6 +68,7 @@ public class PluginService implements CommandLineRunner {
 	private static final Logger logger = LoggerFactory.getLogger(PluginService.class);
 	
 	public static void main(String[] args) {
+		JavaVersionChecker.check();
 		SpringApplication application = new SpringApplication(PluginService.class);
 		
 		boolean isK8Cluster = Arrays.stream(System.getProperties().getProperty("spring.profiles.active", "").split(","))
@@ -77,7 +85,8 @@ public class PluginService implements CommandLineRunner {
 			application.setAdditionalProfiles(profiles.toArray(new String[0]));
 		}
 		
-		ignite =  Ignition.getOrStart(IgniteConfigurationHolder.getInstance().getIgniteConfiguration(PluginManagerConstants.PLUGIN_MANAGER_IGNITE_PROFILE, "127.0.0.1", isCluster, isK8Cluster, false, false, 47500, 100, 47100, 100, 512, 600000, 52428800, 52428800));
+		ignite =  Ignition.getOrStart(IgniteConfigurationHolder.getInstance().getIgniteConfiguration
+				(PluginManagerConstants.PLUGIN_MANAGER_IGNITE_PROFILE, "127.0.0.1", isCluster, isK8Cluster, false, false, 47500, 100, 47100, 100, 512, 600000, 52428800, 52428800, -1, false, -1.f, false, false, -1, false, 300000, 300000, 600000));
 		
 		if (ignite == null) {
 			System.exit(1);
@@ -85,7 +94,8 @@ public class PluginService implements CommandLineRunner {
 
 		// start sping boot app
 		application.run(args);
-    }
+		JavaVersionChecker.check(logger);
+	}
 	
 	@Override
 	public void run(String... args) throws Exception { }

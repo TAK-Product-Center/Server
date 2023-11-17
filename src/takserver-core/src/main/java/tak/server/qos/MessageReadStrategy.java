@@ -2,6 +2,8 @@ package tak.server.qos;
 
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -10,6 +12,7 @@ import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 
 import com.bbn.marti.config.RateLimitRule;
+import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
@@ -48,6 +51,30 @@ public class MessageReadStrategy extends MessageBaseStrategy<CotEventContainer> 
 		enabled.set(config.getRemoteConfiguration().getFilter().getQos().getReadRateLimiter().isEnabled());
         
         isInit.set(true);
+	}
+	
+	@EventListener({QosRefreshedEvent.class})
+	private void refreshQosRead() {
+		rateLimits = new HashMap<>();
+		rateThresholds = new LinkedList<>();
+		
+		// populate rate limit table
+		// this table is used for rapid lookup of rate limits when client counts change
+		for (RateLimitRule rule : config.getRemoteConfiguration().getFilter().getQos().getReadRateLimiter().getRateLimitRule()) {
+			rateLimits.put(rule.getClientThresholdCount(), rule.getReportingRateLimitSeconds());
+			rateThresholds.add(rule.getClientThresholdCount());
+			
+			if (rule.getReportingRateLimitSeconds() > maxRate) {
+				maxRate = rule.getReportingRateLimitSeconds();
+			}
+		}
+
+		// sort rate threshold in descending order, because we will use the first rate that matches client count
+		rateThresholds.sort(Collections.reverseOrder());
+		if (enabled.get() && metrics != null && metrics.getMetrics() != null) {
+			changeRateLimitIfRequired((int) metrics.getMetrics().getNumClients());
+		}
+
 	}
 	
 	@Override

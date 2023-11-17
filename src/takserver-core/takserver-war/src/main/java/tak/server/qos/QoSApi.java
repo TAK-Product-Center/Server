@@ -2,8 +2,11 @@
 package tak.server.qos;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map.Entry;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +26,8 @@ import tak.server.ignite.MessagingIgniteBroker;
 
 @RestController
 public class QoSApi extends BaseRestController {
+	
+		private static final Logger logger = LoggerFactory.getLogger(QoSApi.class);
 
 	    @Autowired
 	    private QoSManager qosManager; 
@@ -33,9 +38,21 @@ public class QoSApi extends BaseRestController {
 	    			 Constants.DISTRIBUTED_QOS_MANAGER, QoSManager.class);
 	    }
 	    
+	    @RequestMapping(value = "/qos/delivery/set", method = RequestMethod.PUT)
+	    public void setDelivery(@RequestBody List<RateLimitRule> rateLimitRule) {
+	    	MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((QoSManager) service).setDeliveryRules(rateLimitRule),
+	    			 Constants.DISTRIBUTED_QOS_MANAGER, QoSManager.class);
+	    }
+	    
 	    @RequestMapping(value = "/qos/read/enable", method = RequestMethod.PUT)
 	    public void enableRead(@RequestBody boolean enable) {
 	    	 MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((QoSManager) service).setReadLimiterEnabled(enable),
+	    			 Constants.DISTRIBUTED_QOS_MANAGER, QoSManager.class);
+	    }
+	    
+	    @RequestMapping(value = "/qos/read/set", method = RequestMethod.PUT)
+	    public void setRead(@RequestBody List<RateLimitRule> rateLimitRule) {
+	    	MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((QoSManager) service).setReadRules(rateLimitRule),
 	    			 Constants.DISTRIBUTED_QOS_MANAGER, QoSManager.class);
 	    }
 	    

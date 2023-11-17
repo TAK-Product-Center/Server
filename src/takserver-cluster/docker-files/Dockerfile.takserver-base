@@ -1,4 +1,4 @@
-FROM openjdk:11-jdk-bullseye
+FROM eclipse-temurin:17-jammy
 COPY takserver-core/takserver-core*.war takserver.war
 COPY takserver-usermanager/UserManager.jar .
 COPY CoreConfig.xml .

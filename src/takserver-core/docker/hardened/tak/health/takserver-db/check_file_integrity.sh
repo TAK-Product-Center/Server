@@ -2,10 +2,10 @@
 
 CHECKSUM_CMD=sha256sum
 # A list of files which should be checked.
-LIST_FILE=opt/tak/health/takserver-db/critical_file_list.txt
+LIST_FILE=/opt/tak/health/takserver-db/critical_file_list.txt
 # The file with the checksum outputs from sha256sum.
-CHECKSUM_FILE=opt/tak/health/takserver-db/critical_file_checksums.txt
-EMPTY_FILE=opt/tak/health/takserver-db/empty.txt
+CHECKSUM_FILE=/opt/tak/health/takserver-db/critical_file_checksums.txt
+EMPTY_FILE=/opt/tak/health/takserver-db/empty.txt
 
 # If the checksum file already exist, then just verify the checkssums.
 if [ -r $CHECKSUM_FILE ]; then
@@ -44,7 +44,7 @@ elif [ -r $LIST_FILE ]; then
     if [ $count -eq 0 ]; then
         if [ ! -f $EMPTY_FILE ]; then
             touch $EMPTY_FILE
-            echo WARNING: No file checked for integrity. Please verify the list of files in opt/tak/health/takserver-db/critical_file_list.txt.
+            echo WARNING: No file checked for integrity. Please verify the list of files in /opt/tak/health/takserver-db/critical_file_list.txt.
         fi
         rm -f $CHECKSUM_FILE
     else

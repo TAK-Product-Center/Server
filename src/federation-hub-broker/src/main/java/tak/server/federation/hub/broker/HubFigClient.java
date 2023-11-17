@@ -60,6 +60,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import tak.server.federation.Federate;
+import tak.server.federation.FederateEdge;
 import tak.server.federation.FederateIdentity;
 import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.GuardedStreamHolder;
@@ -468,15 +469,17 @@ public class HubFigClient implements Serializable {
             }
 
             // Send cached contact messages, iff there is a federated edge between the two federates.
-            if (otherClientNode != null &&
-                    fpg.getEdge(otherClientNode, clientNode) != null) {
+            FederateEdge edge = fpg.getEdge(otherClientNode, clientNode);
+            if (otherClientNode != null && edge != null) {
                 for (FederatedEvent event : otherClient.getCache()) {
-                	eventStreamHolder.send(event);
-                    if (logger.isDebugEnabled()) {
-                        logger.debug("Sending v2 cached " + event +
-                            " from " + otherClientNode.getFederateIdentity().getFedId() +
-                            " to " + clientNode.getFederateIdentity().getFedId());
-                    }
+                	if(FederationHubBrokerService.isDestinationReachableByGroupFilter(edge, event.getFederateGroupsList())) {
+	                	eventStreamHolder.send(event);
+	                    if (logger.isDebugEnabled()) {
+	                        logger.debug("Sending v2 cached " + event +
+	                            " from " + otherClientNode.getFederateIdentity().getFedId() +
+	                            " to " + clientNode.getFederateIdentity().getFedId());
+	                    }
+                	}
                 }
             }
         }

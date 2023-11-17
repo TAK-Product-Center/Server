@@ -109,13 +109,13 @@ buildRpm.dependsOn prePackage
 buildDeb.dependsOn prePackage
 
 buildRpm {
-    requires('java-11-openjdk-devel')
+    requires('java-17-openjdk-devel')
     requires('openssl')
 }
 
 // TODO: add deb package dependencies here
 buildDeb {
-  requires('openjdk-11-jdk')
+  requires('openjdk-17-jdk')
   requires('openssl')
 }
 

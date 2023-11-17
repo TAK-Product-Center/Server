@@ -1,7 +1,7 @@
 ## Environment variables outside image context. These will be available until the first FROM statement.
 ARG BASE_REGISTRY=registry1.dso.mil
-ARG BASE_DEPLOY_IMAGE=ironbank/redhat/openjdk/openjdk11
-ARG BASE_DEPLOY_TAG=1.11
+ARG BASE_DEPLOY_IMAGE=ironbank/redhat/openjdk/openjdk17
+ARG BASE_DEPLOY_TAG=1.17
 
 ####################################################################################################
 

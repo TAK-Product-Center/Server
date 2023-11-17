@@ -144,6 +144,20 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                 groupNames = (ArrayList<String>) claims.get(groupsClaim);
             }
 
+            // set user's classification if included in the token
+            String country = (String) claims.get("country");
+            ArrayList<String> classification = (ArrayList<String>) claims.get("classification");
+            if (country != null && classification != null) {
+
+                ArrayList<String> accms = (ArrayList<String>) claims.get("accms");
+                ArrayList<String> sciControls = (ArrayList<String>) claims.get("sciControls");
+
+                UserClassification userClassification = new UserClassification(
+                        country, classification, accms, sciControls);
+
+                groupManager.setClassificationForUser(user, userClassification);
+            }
+
             if (groupNames != null) {
 
                 Set<String> groupNameSet = LdapAuthenticator.applyGroupPrefixFilter(

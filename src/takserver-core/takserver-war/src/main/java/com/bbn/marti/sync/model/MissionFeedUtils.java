@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 
+import tak.server.feeds.DataFeedDTO;
+
 public class MissionFeedUtils {
 
     protected static final Logger logger = LoggerFactory.getLogger(MissionFeedUtils.class);
@@ -32,7 +34,7 @@ public class MissionFeedUtils {
     	if (missionService() == null) {
     		logger.error("missionService is null");
     	}
-        DataFeedDao dataFeedDao = missionService().getDataFeed(missionFeed.getDataFeedUid());
+        DataFeedDTO dataFeedDao = missionService().getDataFeed(missionFeed.getDataFeedUid());
         if (dataFeedDao != null) {
             return dataFeedDao.getName();
         }

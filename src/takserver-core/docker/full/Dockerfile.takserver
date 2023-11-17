@@ -1,4 +1,4 @@
-FROM openjdk:11-jdk-bullseye
+FROM eclipse-temurin:17-jammy
 RUN apt update && apt-get install -y emacs-nox net-tools netcat vim nmon python3-lxml
 
 COPY tak /opt/tak

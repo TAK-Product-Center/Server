@@ -11,8 +11,8 @@ public class DataFeedMetadata extends Parameters {
 	private String missionName = "";
     private String missionFeedUid = "";
     private String dataFeedUid = "";
-    private String filterBbox = "";
-    private String filterType = "";
+    private String filterPolygon = "";
+    private List<String> filterCotTypes = new ArrayList<>();
     private String filterCallsign = "";
    
     private boolean archive = false;
@@ -48,17 +48,17 @@ public class DataFeedMetadata extends Parameters {
 	public void setDataFeedUid(String dataFeedUid) {
 		this.dataFeedUid = dataFeedUid;
 	}
-	public String getFilterBbox() {
-		return filterBbox;
+	public String getFilterPolygon() {
+		return filterPolygon;
 	}
-	public void setFilterBbox(String filterBbox) {
-		this.filterBbox = filterBbox;
+	public void setFilterPolygon(String filterPolygon) {
+		this.filterPolygon = filterPolygon;
 	}
-	public String getFilterType() {
-		return filterType;
+	public List<String> getFilterCotTypes() {
+		return filterCotTypes;
 	}
-	public void setFilterType(String filterType) {
-		this.filterType = filterType;
+	public void setFilterCotTypes(List<String> filterCotTypes) {
+		this.filterCotTypes = filterCotTypes;
 	}
 	public String getFilterCallsign() {
 		return filterCallsign;
@@ -108,14 +108,13 @@ public class DataFeedMetadata extends Parameters {
 	public void setSyncCacheRetentionSeconds(int syncCacheRetentionSeconds) {
 		this.syncCacheRetentionSeconds = syncCacheRetentionSeconds;
 	}
-	
 	@Override
 	public String toString() {
 		return "DataFeedMetadata [type=" + type + ", missionName=" + missionName + ", missionFeedUid=" + missionFeedUid
-				+ ", dataFeedUid=" + dataFeedUid + ", filterBbox=" + filterBbox + ", filterType=" + filterType
+				+ ", dataFeedUid=" + dataFeedUid + ", filterPolygon=" + filterPolygon + ", filterCotTypes=" + filterCotTypes
 				+ ", filterCallsign=" + filterCallsign + ", archive=" + archive + ", sync=" + sync + ", enableLatestSA="
 				+ enableLatestSA + ", archiveOnly=" + archiveOnly + ", feedName=" + feedName + ", authType=" + authType
 				+ ", syncCacheRetentionSeconds=" + syncCacheRetentionSeconds + ", tags=" + tags + "]";
-	}
+	}	
 
 }

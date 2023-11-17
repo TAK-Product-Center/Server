@@ -43,7 +43,7 @@ public class PluginConfiguration {
             sourceFile.getParentFile().mkdirs();
             try {
                 sourceFile.createNewFile();
-            } catch (IOException e) {
+            } catch (IOException | StackOverflowError e) {
                 logger.error(e.getMessage());
             }
         }

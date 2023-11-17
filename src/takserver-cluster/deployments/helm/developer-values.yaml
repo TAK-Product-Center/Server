@@ -78,7 +78,7 @@ postgresql:
   image:
     registry: docker.io
     repository: postgis/postgis
-    tag: 10-3.1
+    tag: 15-3.3
   configurationConfigMap: postgres-configuration
   postgresqlDatabase: cot
 
@@ -89,13 +89,13 @@ global:
 
 ignite:
   image:
-    tag: 2.13.0
+    tag: 2.15.0-jdk11
   serviceAccount:
     name: takserver-ignite
 
 nats-operator:
   image:
-    tag: 0.7.2
+    tag: 0.8.3
   cluster:
     auth:
       enabled: false

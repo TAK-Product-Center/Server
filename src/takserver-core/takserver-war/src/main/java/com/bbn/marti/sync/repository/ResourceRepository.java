@@ -21,6 +21,7 @@ public interface ResourceRepository extends JpaRepository<Resource, Integer> {
 
     List<Resource> findByHash(String hash);
     List<Resource> findByUid(String uid);
+    Page<Resource> findByNameIgnoreCaseContaining(String name, Pageable page);
 
     @Query(value = "update resource set groups = cast(:groupVectorResource as bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + ")) where hash = :hash and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long updateGroups(@Param("hash") String hash, @Param("groupVector") String groupVector, @Param("groupVectorResource") String groupVectorResource);

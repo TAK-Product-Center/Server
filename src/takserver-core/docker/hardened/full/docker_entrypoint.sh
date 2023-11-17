@@ -66,6 +66,14 @@ if [[ -z "$(ls -A "${CERTDIR}/files")" ]];then
      echo "Using existing root CA."
   fi
 
+  if [[ ! -f "${CERTDIR}/files/intermediate-signing.jks" ]];then
+      echo "Making new signing certificate."
+      export CAPASS=${CA_PASS}
+      yes | ${CERTDIR}/makeCert.sh ca intermediate
+  else
+      echo "Using existing intermediate CA certificate."
+  fi
+
   if [[ ! -f "${CERTDIR}/files/takserver.pem" ]];then
      echo "Making new takserver certificate."
       export CAPASS=${CA_PASS}
@@ -92,37 +100,48 @@ if [[ -z "$(ls -A "${CERTDIR}/files")" ]];then
   sed -i 's#keystore="JKS" keystoreFile="/opt/tak/certs/files/takserver.jks" keystorePass="atakatak"#keystore="JKS" keystoreFile="/opt/tak/certs/files/takserver.jks" keystorePass="'"$TAKSERVER_CERT_PASS"'"#' ${EXCONFIGFILE}
   sed -i 's#truststore="JKS" truststoreFile="/opt/tak/certs/files/truststore-root.jks" truststorePass="atakatak"#truststore="JKS" truststoreFile="/opt/tak/certs/files/truststore-root.jks" truststorePass="'"$CA_PASS"'"#' ${EXCONFIGFILE}
 
-  # Wait for PGSQL init
-  sleep 30
+   # Wait for PGSQL init
+   echo "Waiting for postgres and pgpool..."
+   while ! nc -z takdb_one 9999; do
+      sleep 1
+   done
+   echo "PostgreSQL and PGPool started"
 
-  cd ${TAKDIR}
-  . ./setenv.sh
+   cd ${TAKDIR}
+   . ./setenv.sh
 
-  echo "Starting the Server in order to add the ADMIN user."
-  java -jar -Xmx${MESSAGING_MAX_HEAP}m -Dspring.profiles.active=messaging takserver.war &
-  MESSAGING_PID=$!
-  java -jar -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api -Dkeystore.pkcs12.legacy takserver.war &
-  API_PID=$!
+   echo "Starting the Server in order to add the ADMIN user."
+   java -jar -Xmx${MESSAGING_MAX_HEAP}m -Dspring.profiles.active=messaging takserver.war &
+   MESSAGING_PID=$!
+   java -jar -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api -Dkeystore.pkcs12.legacy takserver.war &
+   API_PID=$!
 
-  sleep 8
-  echo  -e "\033[33;5mWAITING FOR THE SERVER TO START UP BEFORE ADDING THE ADMIN USER...\033[0m"
+   sleep 8
+   echo  -e "\033[33;5mWAITING FOR THE SERVER TO START UP BEFORE ADDING THE ADMIN USER...\033[0m"
 
-  echo "Waiting to allow the server to start up"
-  sleep 60
-  TAKCL_CORECONFIG_PATH="${CONFIGFILE}"
-  echo "Adding ADMIN certs"
-  java -jar ${TAKDIR}/utils/UserManager.jar certmod -A "${CERTDIR}/files/${ADMIN_CERT_NAME}.pem"
-  echo "ADMIN user added..."
+   echo "Waiting to allow the server to start up"
+   sleep 60
+   TAKCL_CORECONFIG_PATH="${CONFIGFILE}"
+   echo "Adding ADMIN certs"
+   java -jar ${TAKDIR}/utils/UserManager.jar certmod -A "${CERTDIR}/files/${ADMIN_CERT_NAME}.pem"
+   echo "ADMIN user added..."
 
-  echo "Stopping the Server in preparation for loading the new ADMIN user."
-  kill $MESSAGING_PID
-  kill $API_PID
+   echo "Stopping the Server in preparation for loading the new ADMIN user."
+   kill $MESSAGING_PID
+   kill $API_PID
 
-  echo "Waiting for the processes to stop..."
-  sleep 60
+   echo "Waiting for the processes to stop..."
+   sleep 60
 else
-    echo "${CERTDIR}/files directory already exists.  Using existing certificates."
+   echo "${CERTDIR}/files directory already exists.  Using existing certificates."
 fi
+
+# Wait for PGSQL init
+echo "Waiting for postgres and pgpool..."
+while ! nc -z takdb_one 9999; do
+    sleep 1
+done
+echo "PostgreSQL and PGPool started"
 
 echo "Starting TAK Server ..."
 cd ${TAKDIR}
@@ -134,4 +153,6 @@ API_PID=$!
 java -jar -Xmx${PLUGIN_MANAGER_MAX_HEAP}m -Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/ takserver-pm.jar &
 PM_PID=$!
 
-sleep infinity
+# Doing a wait is cleaner than using sleep and will simply exit as soon the PluginManager
+# process completes.   No need to "kill" the process.
+wait $PM_PID

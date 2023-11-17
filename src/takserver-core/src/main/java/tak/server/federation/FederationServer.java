@@ -288,6 +288,8 @@ public class FederationServer {
 			serverConfig.setKeystorePassword(fedServerConfig.getTls().getKeystorePass());
 			serverConfig.setTruststoreFile(fedServerConfig.getTls().getTruststoreFile());
 			serverConfig.setTruststorePass(fedServerConfig.getTls().getTruststorePass());
+			serverConfig.setContext(fedServerConfig.getTls().getContext());
+			serverConfig.setCiphers(fedServerConfig.getTls().getCiphers());
 			serverConfig.setSkipGateway(true); // eliminate this
 			serverConfig.setMaxMessageSizeBytes(fedConfig().getFederationServer().getMaxMessageSizeBytes()); // put in coreconfig
 			serverConfig.setMetricsLogIntervalSeconds(60); // put in coreconfig
@@ -330,6 +332,8 @@ public class FederationServer {
 	    serverConfig.setKeystorePassword(fedServerConfig.getTls().getKeystorePass());
 	    serverConfig.setTruststoreFile(fedServerConfig.getTls().getTruststoreFile());
 	    serverConfig.setTruststorePass(fedServerConfig.getTls().getTruststorePass());
+		serverConfig.setContext(fedServerConfig.getTls().getContext());
+		serverConfig.setCiphers(fedServerConfig.getTls().getCiphers());
 	    serverConfig.setSkipGateway(true); // eliminate this
 	    serverConfig.setMaxMessageSizeBytes(134217728); // put in coreconfig
 	    serverConfig.setMetricsLogIntervalSeconds(60); // put in coreconfig

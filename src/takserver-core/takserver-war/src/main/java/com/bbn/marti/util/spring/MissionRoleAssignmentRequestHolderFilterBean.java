@@ -53,6 +53,11 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 		HttpServletRequest req = (HttpServletRequest) servletRequest;
 		HttpServletResponse resp = (HttpServletResponse) servletResponse;
 
+		if (servletRequest.getLocalPort() != 8080
+				&& config.getRemoteConfiguration().getNetwork().isEnableHSTS()) {
+			resp.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
+		}
+
 		if (config.getRemoteConfiguration().getNetwork().isAllowAllOrigins()) {
 			resp.setHeader("Access-Control-Allow-Origin", "*");
 			resp.setHeader("Access-Control-Allow-Headers", "*");
@@ -151,6 +156,13 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 						requestBean.setMissionRole(role);
 
 						req.setAttribute(MissionRole.class.getName(), role);
+
+						if (config.getRemoteConfiguration().getVbm().isEnabled()) {
+							if (!missionService.validateAccess(mission, req)) {
+								((HttpServletResponse) servletResponse).setStatus(HttpServletResponse.SC_NOT_FOUND);
+								return;
+							}
+						}
 
 					} catch (NotFoundException nfe) {
 						if (logger.isDebugEnabled()) {

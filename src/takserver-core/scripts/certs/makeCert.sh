@@ -79,7 +79,12 @@ fi
 
 SUBJ=$SUBJBASE"CN=$SNAME"
 echo "Making a $1 cert for " $SUBJ
-openssl req -new -newkey rsa:2048 -sha256 -keyout "${SNAME}".key -passout pass:$PASS -out "${SNAME}".csr -subj "$SUBJ" 
+if [[ "$1" == "ca" ]]; then
+  # Have to use the password {CAPASS} instead of {PASS} since the original CA can be replaced by this new CA at the end
+  openssl req -new -newkey rsa:2048 -sha256 -keyout "${SNAME}".key -passout pass:${CAPASS} -out "${SNAME}".csr -subj "$SUBJ" 
+else
+  openssl req -new -newkey rsa:2048 -sha256 -keyout "${SNAME}".key -passout pass:${PASS} -out "${SNAME}".csr -subj "$SUBJ" 
+fi
 openssl x509 -sha256 -req -days 730 -in "${SNAME}".csr -CA ca.pem -CAkey ca-do-not-share.key -out "${SNAME}".pem -set_serial ${RANDOM} -passin pass:${CAPASS} -extensions $EXT -extfile $CONFIG
 
 if [[ "$1" == "ca" ]]; then
@@ -100,17 +105,17 @@ if [[ "$1" == "server" ||  "$1" == "client" || "$1" == "dbclient" ]]; then
   openssl pkcs12 ${LEGACY_PROVIDER} -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}".p12 -name "${SNAME}" -CAfile ca.pem -passin pass:${PASS} -passout pass:${PASS}
   keytool -importkeystore -deststorepass "${PASS}" -destkeypass "${PASS}" -destkeystore "${SNAME}".jks -srckeystore "${SNAME}".p12 -srcstoretype PKCS12 -srcstorepass "${PASS}" -alias "${SNAME}"
 else # a CA
+
   openssl pkcs12 ${LEGACY_PROVIDER} -export -in "${SNAME}"-trusted.pem -out truststore-"${SNAME}".p12 -nokeys -passout pass:${CAPASS}
   keytool -import -trustcacerts -file "${SNAME}".pem -keystore truststore-"${SNAME}".jks -storepass "${CAPASS}" -noprompt
 
   # include a CA signing keystore; NOT FOR DISTRIBUTION TO CLIENTS
-  openssl pkcs12 ${LEGACY_PROVIDER} -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}"-signing.p12 -name "${SNAME}" -passin pass:${PASS} -passout pass:${PASS}
-  keytool -importkeystore -deststorepass "${PASS}" -destkeypass "${PASS}" -destkeystore "${SNAME}"-signing.jks -srckeystore "${SNAME}"-signing.p12 -srcstoretype PKCS12 -srcstorepass "${PASS}" -alias "${SNAME}"
+  openssl pkcs12 ${LEGACY_PROVIDER} -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}"-signing.p12 -name "${SNAME}" -passin pass:${CAPASS} -passout pass:${CAPASS}
+  keytool -importkeystore -deststorepass "${CAPASS}" -destkeypass "${CAPASS}" -destkeystore "${SNAME}"-signing.jks -srckeystore "${SNAME}"-signing.p12 -srcstoretype PKCS12 -srcstorepass "${CAPASS}" -alias "${SNAME}"
 
   ## create empty crl 
-  KEYPASS="-key $CAPASS"
-  openssl ca -config ../config.cfg -gencrl -keyfile "${SNAME}".key $KEYPASS -cert "${SNAME}".pem -out "${SNAME}".crl
-  
+  openssl ca -config ../config.cfg -gencrl -keyfile "${SNAME}".key -key ${CAPASS} -cert "${SNAME}".pem -out "${SNAME}".crl
+
   echo "Do you want me to move files around so that future server and client certificates are signed by this new CA? [y/n]"
   read MVREQ
   if [[ "$MVREQ" == "y" || "$MVREQ" == "Y" ]]; then

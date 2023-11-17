@@ -55,7 +55,7 @@
       <bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter" />
     </property>
     <property name="packagesToScan" value="com.bbn.marti.model.kml, com.bbn.marti.sync.model, com.bbn.tak.tls, com.bbn.marti.device.profile.model,
-              com.bbn.marti.maplayer.model, com.bbn.user.registration.model, com.bbn.marti.video"/>
+              com.bbn.marti.maplayer.model, com.bbn.user.registration.model, com.bbn.marti.video, tak.server.feeds"/>
   </bean>
  
   <bean class="org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor"/>
@@ -67,7 +67,7 @@
   </bean>
   
   <jpa:repositories base-package="com.bbn.marti.dao.kml, com.bbn.marti.sync.repository, com.bbn.tak.tls.repository, com.bbn.marti.device.profile.repository,
-com.bbn.marti.maplayer.repository, com.bbn.user.registration.repository, com.bbn.marti.video" />
+com.bbn.marti.maplayer.repository, com.bbn.user.registration.repository, com.bbn.marti.video, tak.server.feeds" />
   
    <!-- Object/	ML Marshaller/Unmarshaller for Iconsets -->
    <bean id="jaxb2Marshaller" class="org.springframework.oxm.jaxb.Jaxb2Marshaller" scope="prototype" >
@@ -83,11 +83,4 @@ com.bbn.marti.maplayer.repository, com.bbn.user.registration.repository, com.bbn
             </list>
         </property>
     </bean>
-    
-  
-    
-    <!--  async task executor and scheduler for iconset loader and HTTP CoT search -->
-<!--     <task:annotation-driven executor="executor" scheduler="scheduler"/> -->
-<!--    <task:executor id="executor" pool-size="6"/>
-    <task:scheduler id="scheduler" pool-size="6"/> -->
 </beans>

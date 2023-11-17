@@ -156,12 +156,11 @@ prePackage.dependsOn copyDocs
 prePackage.dependsOn copyLicense
 
 buildRpm.dependsOn prePackage
-buildRpm.dependsOn copyRpmDbScript
 
 buildDeb.dependsOn prePackage
 
 buildRpm {
-    requires('java-11-openjdk-devel')
+    requires('java-17-openjdk-devel')
     requires('postgis33_15')
     requires('postgis33_15-utils')
     requires('postgresql15-server')
@@ -169,11 +168,10 @@ buildRpm {
 }
 
 buildDeb.dependsOn prePackage
-buildDeb.dependsOn copyRpmDbScript
 
 // TODO: add deb package dependencies here
 buildDeb {
-  requires('openjdk-11-jdk')
+  requires('openjdk-17-jdk')
   requires('postgresql-15')
   requires('postgresql-15-postgis-3')
 }

@@ -28,8 +28,10 @@ export TAK_DB_USERNAME=martiuser
 # Master password for RDS
 export TAK_DB_PASSWORD=
 
-# RDS DB Instance Size (db.t2.micro is smallest) (see: https://aws.amazon.com/rds/instance-types/)
-export TAK_DB_SIZE=db.m4.16xlarge
+# RDS DB Instance Size
+# Size details: https://aws.amazon.com/rds/instance-types/
+# Postgres compatibility: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.html
+export TAK_DB_SIZE=db.m5.16xlarge
 
 # RDS DB Initial Storage
 export TAK_DB_ALLOCATED_STORAGE=500

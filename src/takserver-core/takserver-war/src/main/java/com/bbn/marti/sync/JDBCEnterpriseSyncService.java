@@ -1,4 +1,3 @@
-
 package com.bbn.marti.sync;
 
 import java.io.ByteArrayInputStream;
@@ -29,6 +28,8 @@ import java.util.SimpleTimeZone;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -72,10 +73,10 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	org.slf4j.Logger logger = LoggerFactory.getLogger(JDBCEnterpriseSyncService.class);
 
 	@Autowired
-	private JDBCQueryAuditLogHelper wrapper;
+	private JDBCQueryAuditLogHelper queryHelper;
 
 	@Autowired
-	private DataSource ds;
+	private DataSource dataSource;
 
 	@Autowired
 	private CacheManager cacheManager;
@@ -87,11 +88,17 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	private CommonUtil commonUtil;
 
 	private Cluster clusterConfig;
+	
+	@Autowired
+	private RemoteUtil remoteUtil;
 
 	private boolean esyncEnableCache = false;
 
 	@Autowired(required = false)
 	private RetentionPolicyConfig retentionPolicyConfig;
+	
+	@Autowired
+	private EnterpriseSyncCacheHelper enterpriseSyncCacheHelper; 
 
 	@EventListener({ContextRefreshedEvent.class})
 	public void init() throws RemoteException {
@@ -100,13 +107,16 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		// 0 means false, disable esync cache
 		if (coreConfig.getRemoteConfiguration().getNetwork().getEsyncEnableCache() == 0) {
 			esyncEnableCache = false;
+			logger.info("file cache explicity disabled.");
 		} else if (coreConfig.getRemoteConfiguration().getNetwork().getEsyncEnableCache() > 0) {
 			// positive value means true, enable cache
 			esyncEnableCache = true;
+			logger.info("file cache explicity enabled.");
 		} else {
 			// autodetect based on number of processors
-			if (Runtime.getRuntime().availableProcessors() > 4) {
+			if (Runtime.getRuntime().availableProcessors() > 1) {
 				esyncEnableCache = true;
+				logger.info("multicore CPU detected. File cache enabled.");
 			}
 		}
 	}
@@ -252,7 +262,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		String sql = "DELETE FROM " + RESOURCE_TABLE + " r WHERE " + Column.hash.toString() + "=?"
 				+ RemoteUtil.getInstance().getGroupAndClause();  // only allow delete where there is common group membership
 
-		try (Connection connection = ds.getConnection(); PreparedStatement statement = wrapper.prepareStatement(sql, connection)) {
+		try (Connection connection = dataSource.getConnection(); PreparedStatement statement = queryHelper.prepareStatement(sql, connection)) {
 			if (log.isLoggable(Level.FINE)) {
 				log.fine("Deleting resource hash =" + StringUtils.normalizeSpace(hash));
 			}
@@ -289,7 +299,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		String sql = "DELETE FROM " + RESOURCE_TABLE + " r WHERE " + Column.id.toString() + "=?"
 				+ RemoteUtil.getInstance().getGroupAndClause(); // only allow delete where there is common group membership
 
-		try (Connection connection = ds.getConnection(); PreparedStatement statement = wrapper.prepareStatement(sql, connection)) {
+		try (Connection connection = dataSource.getConnection(); PreparedStatement statement = queryHelper.prepareStatement(sql, connection)) {
 			for (Integer key : primaryKeys) {
 				log.fine("Deleting resource id=" + key);
 				statement.setInt(1, key);
@@ -438,7 +448,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 			queryBuilder.append(");");
 
-			try (Connection connection = ds.getConnection(); PreparedStatement statement = connection.prepareStatement(queryBuilder.toString(), Statement.RETURN_GENERATED_KEYS)) {
+			try (Connection connection = dataSource.getConnection(); PreparedStatement statement = connection.prepareStatement(queryBuilder.toString(), Statement.RETURN_GENERATED_KEYS)) {
 
 				// bind input stream to database
 				if (logger.isDebugEnabled()) {
@@ -480,7 +490,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 							statement.setNull(columnIndex, java.sql.Types.ARRAY);
 						} else {
 							statement.setArray(columnIndex,
-									wrapper.createArrayOf("varchar", (String[])toStore.value, connection));
+									queryHelper.createArrayOf("varchar", (String[])toStore.value, connection));
 						}
 						break;
 					case timestamp:
@@ -526,7 +536,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 				columnIndex++;
 				statement.setString(columnIndex, groupVector);
 
-				wrapper.auditLog(queryBuilder.toString());
+				queryHelper.auditLog(queryBuilder.toString());
 
 				int insertResult = statement.executeUpdate();
 
@@ -536,7 +546,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 				Integer primaryKey = null;
 
-				try (ResultSet generatedKeys = wrapper.getGeneratedKeys(statement)) {
+				try (ResultSet generatedKeys = queryHelper.getGeneratedKeys(statement)) {
 					generatedKeys.next();
 
 					primaryKey = new Integer(generatedKeys.getInt(1));
@@ -583,7 +593,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 					updateHashStatement.setInt(1, primaryKey);
 					updateHashStatement.execute();
 
-					try (ResultSet updateHashResult = wrapper.getGeneratedKeys(updateHashStatement)) {
+					try (ResultSet updateHashResult = queryHelper.getGeneratedKeys(updateHashStatement)) {
 						updateHashResult.next();
 
 						String hash = updateHashResult.getString(1);
@@ -692,7 +702,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 			queryBuilder.append(");");
 
-			try (Connection connection = ds.getConnection(); PreparedStatement statement = wrapper.prepareInsert(queryBuilder.toString(), connection)) {
+			try (Connection connection = dataSource.getConnection(); PreparedStatement statement = queryHelper.prepareInsert(queryBuilder.toString(), connection)) {
 
 				// bind input stream to database
 				log.fine("binding binary stream with content length " + contentLen + " to the database query");
@@ -731,7 +741,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 								statement.setNull(columnIndex, java.sql.Types.ARRAY);
 							} else {
 								statement.setArray(columnIndex,
-										wrapper.createArrayOf("varchar", (String[])toStore.value, connection));
+										queryHelper.createArrayOf("varchar", (String[])toStore.value, connection));
 							}
 							break;
 						case timestamp:
@@ -775,9 +785,9 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 				columnIndex++;
 				statement.setString(columnIndex, groupVector);
 
-				wrapper.doUpdate(statement);
+				queryHelper.doUpdate(statement);
 
-				try (ResultSet generatedKeys = wrapper.getGeneratedKeys(statement)) {
+				try (ResultSet generatedKeys = queryHelper.getGeneratedKeys(statement)) {
 					generatedKeys.next();
 					Integer primaryKey = new Integer(generatedKeys.getInt(1));
 					Timestamp submissionTime = generatedKeys.getTimestamp(11,
@@ -1140,7 +1150,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 			log.fine("resource search query: " + sqlQuery);
 
-			try (Connection connection = ds.getConnection(); PreparedStatement statement = wrapper.prepareStatement(sqlQuery.toString(), connection)) {
+			try (Connection connection = dataSource.getConnection(); PreparedStatement statement = queryHelper.prepareStatement(sqlQuery.toString(), connection)) {
 
 				int argCount = 1;
 
@@ -1163,7 +1173,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 				statement.setString(argCount, groupVector);
 
-				try (ResultSet queryResults = wrapper.doQuery(statement)) {
+				try (ResultSet queryResults = queryHelper.doQuery(statement)) {
 
 					int resultCount = 0;
 					while (queryResults.next()) {
@@ -1222,7 +1232,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		}
 
 		byte[] result = null;
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("SELECT " + Column.data.toString() + " FROM "
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement("SELECT " + Column.data.toString() + " FROM "
 				+ RESOURCE_TABLE + " r WHERE " + Column.uid.toString()
 				+ " = ? "
 				+ RemoteUtil.getInstance().getGroupAndClause()
@@ -1252,7 +1262,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 		byte[] result = null;
 		//		DbQueryWrapper wrapper = new DbQueryWrapper();
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("SELECT " + Column.data.toString() + " FROM "
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement("SELECT " + Column.data.toString() + " FROM "
 				+ RESOURCE_TABLE + " r WHERE " + Column.uid.toString()
 				+ " = ? "
 				+ " and " + Column.submissiontime.toString() + " <= ? "
@@ -1288,7 +1298,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		}
 
 		byte[] result = null;
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("SELECT " + Column.data.toString() + " FROM "
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement("SELECT " + Column.data.toString() + " FROM "
 				+ LATEST_RESOURCE_VIEW + " r WHERE " + Column.uid.toString()
 				+ " ~ ? "
 				+ " and tool = ? "
@@ -1323,68 +1333,29 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		if (Strings.isNullOrEmpty(groupVector)) {
 			throw new IllegalArgumentException("empty group vector");
 		}
-
-		String cacheKey = "getContentByHash_" + hash + "_" + groupVector;
-
-		Cache cache = null;
-
-		if (isCacheEsync()) {
-
-			cache = cacheManager.getCache(Constants.ENTERPRISE_SYNC_CACHE_NAME);
-
-			if (cache == null) {
-				throw new IllegalStateException("unable to get " + Constants.ENTERPRISE_SYNC_CACHE_NAME);
-			}
-
-			ValueWrapper resultWrapper = cache.get(cacheKey);
-
-			if (resultWrapper != null && resultWrapper.get() != null) {
-
-				if (resultWrapper.get() instanceof byte[]) {
-
-					// cache hit
-					return (byte[]) resultWrapper.get();
-
-				} else {
-					if (logger.isDebugEnabled()) {
-						logger.debug("getContentByHash invalid cache result type " + (resultWrapper.get() == null ? "null" : resultWrapper.get().getClass().getName()) + " (should be byte[])");
-					} else if (logger.isWarnEnabled()) {
-						logger.warn("getContentByHash invalid cache result type");
-					}
-				}
-			}
+		
+		FileWrapper file = enterpriseSyncCacheHelper.getFileByHash(hash);
+		
+		logger.debug("get file {} {} ", hash, (file == null || file.getContents() == null) ? "not found" : (file.getContents().length + " bytes"));
+		
+		// not found
+		if (file == null || file.getContents() == null) {
+			return null;
+		}
+		
+		if (Strings.isNullOrEmpty(file.getGroupVector())) {
+			throw new IllegalArgumentException("empty group vector in file for hash " + hash);
 		}
 
-		byte[] result = null;
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("SELECT " + Column.data.toString() + " FROM "
-				+ RESOURCE_TABLE + " r WHERE " + Column.hash.toString()
-				+ " = ? "
-				+ RemoteUtil.getInstance().getGroupAndClause()
-				+ "ORDER BY " + Column.submissiontime.toString() + ";", connection)) {
-			query.setString(1, hash.toLowerCase());
-			query.setString(2, groupVector);
-			log.fine("getContentByHash Executing SQL: " + query.toString());
-
-			log.fine("PersistenceStore principal: " + AuditLogUtil.getUsername());
-
-			try (ResultSet queryResults = query.executeQuery()) {
-				if (queryResults.next()) {
-					result = queryResults.getBytes(1);
-				} else {
-					logger.debug("getContentByHash no results");
-				}
-			}
-
-		} catch (Exception e) {
-			logger.error("exception executing getContentByHash query " + e.getMessage(), e);
+		if (!remoteUtil.isGroupVectorAllowed(groupVector, file.getGroupVector())) {
+			// not allowed
+			return null;
 		}
-		if (isCacheEsync() && result != null) {
-			// store in cache
-			cache.put(cacheKey, result);
-		}
-		return result;
+		
+		// found and allowed
+		return file.getContents();
 	}
-
+	
 	/**
 	 * Gets the content of an Enterprise Sync object. This searches the full resource table vs the latest resource
 	 * view. Latest resource is used to back the getContentByHash function and will only return a match for a hash
@@ -1401,7 +1372,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		}
 
 		byte[] result = null;
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("SELECT " + Column.data.toString() + " FROM "
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement("SELECT " + Column.data.toString() + " FROM "
 				+ RESOURCE_TABLE + " r WHERE " + Column.hash.toString()
 				+ " = ? "
 				+ RemoteUtil.getInstance().getGroupAndClause()
@@ -1441,7 +1412,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		}
 
 		List<Metadata> results = new LinkedList<Metadata>();
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("SELECT " + getResourceColumns()
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement("SELECT " + getResourceColumns()
 				+ " FROM " + RESOURCE_TABLE + " r WHERE "
 				+ Column.uid.toString() + " ~ ? "
 				+ RemoteUtil.getInstance().getGroupAndClause()
@@ -1474,7 +1445,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		}
 
 		List<Metadata> results = new LinkedList<Metadata>();
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("SELECT " + getResourceColumns()
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement("SELECT " + getResourceColumns()
 				+ " FROM " + RESOURCE_TABLE + " r WHERE "
 				+ Column.uid.toString() + " ~ ? "
 				+ " and tool = ? "
@@ -1509,7 +1480,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		}
 
 		Metadata result = null;
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("SELECT " + getResourceColumns()
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement("SELECT " + getResourceColumns()
 				+ " FROM " + LATEST_RESOURCE_VIEW + " WHERE "
 				+ Column.id.toString() + " = ?"
 				+ RemoteUtil.getInstance().getGroupAndClause(), connection)) {
@@ -1577,7 +1548,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		}
 
 		List<Metadata> results = new LinkedList<Metadata>();
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement("SELECT " + getResourceColumns()
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement("SELECT " + getResourceColumns()
 				+ " FROM " + RESOURCE_TABLE + " r WHERE "
 				+ Column.hash.toString() + " = ? "
 				+ RemoteUtil.getInstance().getGroupAndClause()
@@ -1626,7 +1597,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	public boolean updateMetadata(String hash, String metadataField, String metadataValue, String groupVector) throws
 			SQLException, NamingException, ValidationException {
 		boolean updated = false;
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper
 				.prepareStatement("update resource set " + metadataField + " = ? where hash = ?", connection)) {
 			query.setString(1, metadataValue);
 			query.setString(2, hash);
@@ -1652,10 +1623,10 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	public boolean updateMetadataKeywords(String hash, List<String> keywords) throws
 			SQLException, NamingException, ValidationException {
 		boolean updated = false;
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper
 				.prepareStatement("update resource set keywords = ? where hash = ?", connection)) {
 			query.setArray(1,
-					wrapper.createArrayOf("varchar", keywords.toArray(), connection));
+					queryHelper.createArrayOf("varchar", keywords.toArray(), connection));
 			query.setString(2, hash);
 			log.fine("Executing SQL: " + query.toString());
 			updated = query.executeUpdate() > 0;
@@ -1667,7 +1638,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	public boolean updateExpiration(String hash, Long expiration) throws
 			SQLException, NamingException {
 		boolean updated = false;
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper
 				.prepareStatement("update resource set expiration = ? where hash = ?", connection)) {
 			query.setLong(1, expiration);
 			query.setString(2, hash);
@@ -1687,4 +1658,5 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	private boolean isCacheEsync() {
 		return esyncEnableCache || (clusterConfig.isEnabled() && clusterConfig.isKubernetes());
 	}
+	
 }

@@ -5,12 +5,16 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.model.Mission;
+import com.bbn.marti.sync.model.Resource;
 
 import tak.server.cache.MissionCacheResolver;
 
@@ -79,15 +83,20 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
             + "delete from mission_resource_keyword cascade where mission_id = :id ;"
             + "delete from mission_layer cascade where mission_id = :id ;"
             + "delete from maplayer cascade where mission_id = :id ;"
+            + "delete from mission_feed cascade where mission_id = :id ;"
             + "delete from mission cascade where id = :id returning id;", nativeQuery = true)
     void deleteMission(@Param("id") Long missionId);
 
     @Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, key="{#root.methodName, #root.args[0]}")
     @Query(value = "select uid from mission_uid mu inner join mission m on m.id = mu.mission_id where lower(m.name) = lower(?)", nativeQuery = true)
     List<String> getMissionUids(String missionName);
+    
+    @Query(value = "select keyword from mission_keyword mk inner join mission m on m.id = mk.mission_id where lower(m.name) = lower(?)", nativeQuery = true)
+    List<String> getMissionKeywords(String missionName);
 
     @Query(value = missionAttributes + " from mission where invite_only = true and tool = :tool  " +
-            "and lower(name) in ( select lower(mission_name) from mission_invitation where invitee = :userName and type = 'username' ) " +
+            "and ( (lower(name) in ( select lower(mission_name) from mission_invitation where invitee = :userName and type = 'userName' )) or  " +
+            "      (id in ( select mission_id from mission_subscription where username = :userName )) )" +
             "and " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
     List<Mission> getInviteOnlyMissions(@Param("userName") String userName,  @Param("tool") String tool, @Param("groupVector") String groupVector);
 
@@ -97,12 +106,81 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
             "AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
     List<Mission> getAllMissions(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("groupVector") String groupVector);
 
+
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+            "AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc offset :offset limit :limit",
+            nativeQuery = true)
+    List<Mission> getAllMissions(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("groupVector") String groupVector, @Param("limit")  int limit, @Param("offset") int offset);
+
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+            "AND " + RemoteUtil.GROUP_CLAUSE,
+            countQuery = "select count (*) from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+            "AND " + RemoteUtil.GROUP_CLAUSE,
+            nativeQuery = true)
+    Page<Mission> getAllMissionsPage(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("groupVector") String groupVector, Pageable pageable);
+
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+            "and name like %:name% " +
+            "AND " + RemoteUtil.GROUP_CLAUSE,
+            countQuery = "select count (*) from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+            "and name like %:name% " +
+            "AND " + RemoteUtil.GROUP_CLAUSE,
+            nativeQuery = true)
+    Page<Mission> getAllMissionsByNamePage(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("groupVector") String groupVector, @Param("name") String name, Pageable pageable);
+    
     @Query(value = missionAttributes + " from mission where invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
             "and tool = :tool AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
     List<Mission> getAllMissionsByTool(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("tool") String tool, @Param("groupVector") String groupVector);
 
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+            "and tool = :tool AND " + RemoteUtil.GROUP_CLAUSE, 
+            countQuery = "select count (*) from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+            "and tool = :tool AND " + RemoteUtil.GROUP_CLAUSE,
+            nativeQuery = true)
+    Page<Mission> getAllMissionsByToolPage(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("tool") String tool, @Param("groupVector") String groupVector, Pageable pageable);
+
+    @Query(value = missionAttributes + " from mission inner join mission_uid on mission.id = mission_uid.mission_id " +
+    		"where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " + 
+            "and uid like %:uid% AND " + RemoteUtil.GROUP_CLAUSE,  
+            nativeQuery = true)
+    List<Mission> getAllMissionsByUidPage(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("uid") String uid, @Param("groupVector") String groupVector, Pageable pageable);
+    
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+            "and tool = :tool AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc offset :offset limit :limit", nativeQuery = true)
+    List<Mission> getAllMissionsByTool(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("tool") String tool, @Param("groupVector") String groupVector,  @Param("limit")  int limit, @Param("offset") int offset);
+
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) order by id desc " , nativeQuery = true)   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+    List<Mission> getAllMissionsNoGroupCheck(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole);
+
+    @Query(value = missionAttributes + " from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
+            "and tool = :tool order by id desc ", nativeQuery = true)
+    List<Mission> getAllMissionsByToolNoGroupCheck(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("tool") String tool);
+
+    
     @Query(value = missionAttributes + " from mission where invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
@@ -185,14 +263,13 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
     static final String COP_QUERY = "select m.id, m.create_time, max(mc.servertime) as last_edited, m.name, m.creatoruid, m.groups, m.description, m.chatroom, m.base_layer, " +
             "m.bbox, m.bounding_polygon, m.path, m.classification, m.tool, m.parent_mission_id, m.password_hash, m.default_role_id, m.expiration, m.invite_only, m.guid " +
             "from mission m inner join mission_change mc on mc.mission_id = m.id " +
-            "where m.tool = :tool and " +
-            " ( invite_only = false or ( name in ( select mission_name from mission_invitation where invitee = :userName and type = 'username' ) ) ) and " +
+            "where m.tool = :tool and invite_only = false and " +
             RemoteUtil.GROUP_CLAUSE + " and (:path is null or m.path = :path) group by m.id order by m.id desc";
     @Query(value = COP_QUERY, nativeQuery = true)
-    List<Mission> getAllCopMissions(@Param("groupVector") String groupVector, @Param("path") String path, @Param("tool") String tool, @Param("userName") String userName);
+    List<Mission> getAllCopMissions(@Param("groupVector") String groupVector, @Param("path") String path, @Param("tool") String tool);
 
     @Query(value = COP_QUERY + " offset :offset rows fetch next :size rows only", nativeQuery = true)
-    List<Mission> getAllCopMissionsWithPaging(@Param("groupVector") String groupVector, @Param("path") String path, @Param("tool") String tool, @Param("userName") String userName, @Param("offset") Integer offset, @Param("size") Integer size);
+    List<Mission> getAllCopMissionsWithPaging(@Param("groupVector") String groupVector, @Param("path") String path, @Param("tool") String tool, @Param("offset") Integer offset, @Param("size") Integer size);
 
     @Query(value = "select count(*) from public.mission where tool = :tool", nativeQuery= true)
     Long getMissionCountByTool(@Param("tool") String tool);
@@ -205,4 +282,11 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
     
     @Query(value = "select id from mission where lower(name) = lower(:missionName) order by id asc limit 1", nativeQuery = true)
     Long getLatestMissionIdForName(@Param("missionName") String missionName);
+    
+    @Query(value ="select count(*) from mission where invite_only = false and " +
+            "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
+            "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) ",
+            nativeQuery = true)
+    int countAllMissions(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole);
+
 }

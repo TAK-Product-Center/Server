@@ -50,6 +50,7 @@ import com.bbn.metrics.service.DatabaseMetricsService;
 import tak.server.CommonConstants;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
+import tak.server.cache.classification.ClassificationCacheHelper;
 import tak.server.cot.CotEventContainer;
 import tak.server.grid.ContactManagerProxyFactory;
 import tak.server.grid.CoreConfigProxyFactoryForAPI;
@@ -101,6 +102,11 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 	@Bean
 	ActiveGroupCacheHelper getActiveGroupCacheHelper() {
 		return new ActiveGroupCacheHelper();
+	}
+
+	@Bean
+	ClassificationCacheHelper getClassificationCacheHelper() {
+		return new ClassificationCacheHelper();
 	}
 
 	@Bean

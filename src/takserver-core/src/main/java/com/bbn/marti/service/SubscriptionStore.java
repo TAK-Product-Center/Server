@@ -142,12 +142,8 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	}
 	
 	private void updateSubscriptionCaches(Subscription subscription) {
-		
-		RemoteSubscription sub = new RemoteSubscription(subscription);
-		sub.prepareForSerialization();
-				
-		IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().put(subscription.uid, sub);
-		IgniteCacheHolder.getIgniteSubscriptionClientUidTackerCache().put(subscription.clientUid, sub);
+		RemoteSubscription sub = new RemoteSubscription(subscription);		
+		IgniteCacheHolder.cacheRemoteSubscription(sub);
 	}
 	
 	public Set<RemoteFile> getFileSet() {
@@ -188,6 +184,7 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 		
 		SqlFieldsQuery qry = new SqlFieldsQuery(sb.toString());
 		qry.setArgs(sort);
+		qry.setDistributedJoins(true);
 		
 		return qry;
 	}
@@ -231,8 +228,8 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	 */
 	public Subscription removeByUid(String uid) {
 		Subscription subscription = uidSubscriptionMap.remove(uid);
-		IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().remove(uid);
 		if (subscription != null) {
+			IgniteCacheHolder.removeCachedRemoteSubscription(subscription);
 			channelHandlerSubscriptionMap.remove(subscription.handler);
             InputMetric inputMetric = SubmissionService.getInstance().getMetricByPort(subscription.handler.localPort());
             if (inputMetric != null) {
@@ -266,7 +263,6 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 			clientUidToSubMap.entrySet().stream().forEach(e -> {
 				if (e.getValue().equals(subscription)) {
 					clientUidToSubMap.remove(e.getKey());
-					IgniteCacheHolder.getIgniteSubscriptionClientUidTackerCache().remove(e.getKey());
 				}
 			});
 			
@@ -275,7 +271,8 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 				logger.debug("exception removing subscription from clientUidToSubMap", e);
 			}
 		}
-		IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().remove(subscription.uid);
+		
+		IgniteCacheHolder.removeCachedRemoteSubscription(subscription);
 
 		return uidSubscriptionMap.remove(subscription.uid);
 	}	

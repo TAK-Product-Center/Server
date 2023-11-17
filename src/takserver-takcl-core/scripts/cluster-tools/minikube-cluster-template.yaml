@@ -1,0 +1,104 @@
+imagePullSecret: reg-cred
+certConfigMapName: cert-migration
+coreConfigMapName: core-config
+
+takserver:
+  ingress:
+    # Note, ingress resources require an ingress controller in the Kubernetes cluster.
+    # Note, ingress resources will require ssl passthrough enabled on the ingress controller.
+    enabled: true
+    api:
+      cert:
+        annotations:
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          nginx.ingress.kubernetes.io/secure-backends: "true"
+        host: "awellman.host"
+      federationTruststore:
+        annotations: {}
+        host: ""
+      https:
+        annotations: {}
+        host: ""
+    messaging:
+      streaming:
+        annotations: {}
+        host: ""
+      fedv1:
+        annotations: {}
+        host: ""
+      fedv2:
+        annotations: {}
+        host: ""
+  messaging:
+    image:
+      repository: LOCAL_REPO/takserver-cluster/takserver-messaging
+      tag: LOCAL_TAG
+    replicas: 1
+    resources:
+      requests:
+        cpu: 2
+        memory: 2Gi
+      limits:
+        cpu: 2
+        memory: 2Gi
+  api:
+    image:
+      repository: LOCAL_REPO/takserver-cluster/takserver-api
+      tag: LOCAL_TAG
+    replicas: 1
+    resources:
+      requests:
+        cpu: 2
+        memory: 2Gi
+      limits:
+        cpu: 2
+        memory: 2Gi
+  plugins:
+    enabled: false
+    image:
+      repository: LOCAL_REPO/takserver-cluster/takserver-plugins
+      tag: LOCAL_TAG
+    replicas: 1
+    resources:
+      requests:
+        cpu: 1
+      limits:
+        cpu: 1
+  takserverDatabaseSetup:
+    image:
+      repository: LOCAL_REPO/takserver-cluster/takserver-database-setup
+      tag: LOCAL_TAG
+  limits:
+    persistentVolumeClaims: '5'
+    requests:
+      storage: 20Gi
+    storage:
+      max: 20Gi
+      min: 1Gi
+postgresql:
+  enabled: false
+  image:
+    registry: docker.io
+    repository: postgis/postgis
+    tag: 15-3.3
+  configurationConfigMap: postgres-configuration
+  postgresqlDatabase: cot
+
+global:
+  postgresql:
+    postgresqlUsername: postgres
+    postgresqlPassword: postgres
+
+ignite:
+  image:
+    tag: 2.15.0-jdk11
+  serviceAccount:
+    name: takserver-ignite
+
+nats-operator:
+  image:
+    tag: 0.8.3
+  cluster:
+    auth:
+      enabled: false

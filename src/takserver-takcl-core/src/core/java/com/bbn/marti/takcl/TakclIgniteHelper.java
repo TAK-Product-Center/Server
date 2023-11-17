@@ -73,7 +73,8 @@ public class TakclIgniteHelper {
 
 		IgniteConfiguration igniteConfig = ich.getIgniteConfiguration(igniteProfile, igniteHost, isCluster, isKubernetes,
 				useEmbeddedIgnite, isIgniteMulticast, igniteNonMulticastDiscoveryPort, igniteNonMulticastDiscoveryPortCount,
-				igniteCommunicationPort, igniteCommunicationPortCount, igniteQueueCapacity, workerTimeoutMS, serverConfiguration.getBuffer().getQueue().getCacheOffHeapInitialSizeBytes(), serverConfiguration.getBuffer().getQueue().getCacheOffHeapMaxSizeBytes());
+				igniteCommunicationPort, igniteCommunicationPortCount, igniteQueueCapacity, workerTimeoutMS, serverConfiguration.getBuffer().getQueue().getCacheOffHeapInitialSizeBytes(), serverConfiguration.getBuffer().getQueue().getCacheOffHeapMaxSizeBytes(),
+				-1, false, -1.f, false, false, -1, true, -1, -1, -1);
 		igniteConfig.setGridLogger(new Slf4jLogger(TAKCLogging.getLogger("org.apache.ignite")));
 
 
@@ -148,19 +149,19 @@ public class TakclIgniteHelper {
 			if (userManager == null) {
 				ClusterGroup group;
 				// if a monolith server - monolith
-				if (ignite.cluster().forServers().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MONOLITH_PROFILE_NAME).nodes().size() > 0) {
+				if (ignite.cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MONOLITH_PROFILE_NAME).nodes().size() > 0) {
 					logger.trace("Loading Monolith Configuration");
 					group = ignite.cluster().forRemotes().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MONOLITH_PROFILE_NAME);
 				}
 				// if a messaging server - multiprocess
-				else if (ignite.cluster().forServers().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME).nodes().size() > 0) {
+				else if (ignite.cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME).nodes().size() > 0) {
 					logger.trace("Loading Multiprocess Configuration");
 					group = ignite.cluster().forRemotes().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME);
 				}
 				// else we must be in the cluster
 				else {
 					logger.trace("Loading Cluster Configuration");
-					group = ignite.cluster().forClients().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME);
+					group = ignite.cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME);
 				}
 
 				logger.debug("Creating new UserManager");
@@ -187,7 +188,7 @@ public class TakclIgniteHelper {
 				// else we must be in the cluster
 				else {
 					logger.trace("Loading Cluster Messaging Configuration");
-					group = ignite.cluster().forClients().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME);
+					group = ignite.cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME);
 				}
 				logger.debug("Creating new InputManager");
 				inputManager = ignite.services(group).serviceProxy(Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class, false);

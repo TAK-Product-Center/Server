@@ -258,8 +258,8 @@ public class RepositoryService extends BaseService {
 							+ "start, time, stale, detail, "
 							+ "access, qos, opex, "
 							+ "how, point_hae, point_ce, point_le, groups, "
-							+ "id, servertime) VALUES "
-							+ "(?,ST_GeometryFromText(?, 4326),?,?,?,?,?,?,?,?,?,?,?,?,(?)::bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + "), nextval('cot_router_seq'),?) ")) {
+							+ "id, servertime, caveat, releaseableto) VALUES "
+							+ "(?,ST_GeometryFromText(?, 4326),?,?,?,?,?,?,?,?,?,?,?,?,(?)::bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + "), nextval('cot_router_seq'),?,?,?) ")) {
 
 				// formats each cot message as we iterate over it
 				Iterable<CotEventContainer> imageFormattedEvents = Iterables.filter(events, imageFilter);
@@ -345,6 +345,7 @@ public class RepositoryService extends BaseService {
 	}
 
 	private void setCotQueryParams(PreparedStatement dataFeedInsert, CotEventContainer event) throws SQLException {
+
 		dataFeedInsert.setString(1, event.getUid());
 		dataFeedInsert.setString(2, "POINT(" + event.getLon() + " "
 				+ event.getLat() + ")");
@@ -379,6 +380,9 @@ public class RepositoryService extends BaseService {
 		}
 		dataFeedInsert.setTimestamp(16, new Timestamp(DatatypeConverter
 				.parseDateTime(serverTime).getTimeInMillis()), utcCalendar);
+
+		dataFeedInsert.setString(17, event.getCaveat());
+		dataFeedInsert.setString(18, event.getReleaseableTo());
 	}
 
 	// link the Cot UID to the data feed it came from
@@ -392,16 +396,16 @@ public class RepositoryService extends BaseService {
 					+ "start, time, stale, detail, "
 					+ "access, qos, opex, "
 					+ "how, point_hae, point_ce, point_le, groups, "
-					+ "id, servertime) VALUES "
+					+ "id, servertime, caveat, releaseableto) VALUES "
 					+ "(?,ST_GeometryFromText(?, 4326),?,?,?,?,?,?,?,?,?,?,?,?,(?)::bit("
-					+ RemoteUtil.GROUPS_BIT_VECTOR_LEN + "), nextval('cot_router_seq'),?) returning id)"
+					+ RemoteUtil.GROUPS_BIT_VECTOR_LEN + "), nextval('cot_router_seq'),?,?,?) returning id)"
 					+ " INSERT INTO data_feed_cot (cot_router_id, data_feed_id) VALUES ((SELECT id FROM inserted_row), (SELECT id FROM data_feed WHERE uuid = ?))")) {
 
 				for (CotEventContainer event : events) {
 					try {
 						setCotQueryParams(dataFeedInsert, event);
 
-						dataFeedInsert.setString(17, ((DataFeed) event.getContext(Constants.DATA_FEED_KEY)).getUuid());
+						dataFeedInsert.setString(19, ((DataFeed) event.getContext(Constants.DATA_FEED_KEY)).getUuid());
 
 						dataFeedInsert.execute();
 					} catch (Exception e) {
@@ -955,13 +959,6 @@ public class RepositoryService extends BaseService {
 			try (ResultSet rs = ps.executeQuery()) {
 
 				if (rs.next()) {
-
-					//					private String name;
-					//					private String creatorUid;
-					//					private String chatRoom;
-					//					private String tool;
-					//					private String description;
-
 					mm.setName(missionName);
 					mm.setCreatorUid(rs.getString(1));
 					mm.setChatRoom(rs.getString(2));

@@ -243,11 +243,11 @@ buildRpm.dependsOn prePackage
 buildDeb.dependsOn prePackage
 
 buildRpm {
-    requires('java-11-openjdk-devel')
+    requires('java-17-openjdk-devel')
 }
 
 buildDeb {
-  requires('openjdk-11-jdk')
+  requires('openjdk-17-jdk')
 }
 
 def copyFedhubVersionFileDef() { return copySpec {

@@ -4,12 +4,9 @@ import static java.util.Objects.requireNonNull;
 
 import java.io.IOException;
 import java.net.URI;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -18,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import javax.security.auth.Subject;
 
-import org.apache.commons.codec.binary.Hex;
+//import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -516,25 +513,6 @@ public class Message implements Comparable<Message> {
 		return result.toString();
 	}
 
-	/**
-	 * Returns a SHA-256 hash of the message payload
-	 */
-	public String printPayloadHash() {
-		if (this.payload == null) {
-			return null;
-		}
-		String result = null;
-		try {
-			MessageDigest hash  = MessageDigest.getInstance("SHA-256");
-			hash.update(this.payload.getBytes());
-			String lowercase = new String(Hex.encodeHex(hash.digest()));
-			result = lowercase.toUpperCase(Locale.getDefault());
-		} catch (NoSuchAlgorithmException e) {
-			System.err.println("Unable to generate message payload hash: " + e);
-		}
-		return result;
-	}
-
 	@Override
 	public String toString() {
 		StringBuilder sbuilder = new StringBuilder(100);
@@ -542,7 +520,6 @@ public class Message implements Comparable<Message> {
 		sbuilder.append("\n=== BEGIN Message ").append(getMessageID())
 		.append(NEWLINE_TAB).append(printIFPnodeID()).append(NEWLINE_TAB).append(printMetadata()).append(NEWLINE_TAB)
 		.append(payload.getClass().getName()).append('\n')
-		.append(printPayloadHash())
 		.append("\n=== END ===");
 		
 		return sbuilder.toString();

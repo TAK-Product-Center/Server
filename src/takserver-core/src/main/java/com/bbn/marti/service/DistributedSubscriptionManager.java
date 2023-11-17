@@ -234,21 +234,14 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	
 	private void schedulePeriodicSubscriptionCacheUpdates() {
 		Resources.metricsReportingPool.scheduleWithFixedDelay(() -> {
-			Map<String,RemoteSubscription> uidMap = new HashMap<>();
-			Map<String,RemoteSubscription> cuidMap = new HashMap<>();
 			subscriptionStore()
 				.getAllSubscriptions()
 				.stream()
 				.filter(sub -> sub.hasUpdate.getAndSet(false))
 				.forEach(sub -> {
 					RemoteSubscription rs = new RemoteSubscription(sub);
-					rs.prepareForSerialization();
-					uidMap.put(rs.uid, rs);
-					cuidMap.put(rs.clientUid, rs);
+					IgniteCacheHolder.cacheRemoteSubscription(rs);
 				});
-			
-			IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().putAll(uidMap);
-			IgniteCacheHolder.getIgniteSubscriptionClientUidTackerCache().putAll(cuidMap);
 		}, 5, 5, TimeUnit.SECONDS);
 	}
 
@@ -480,6 +473,12 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			        	logger.debug("reachable matches: " + reachableMatches);
 			        }
 			    }
+
+			    // send a delivery failure notification if the chat message recipient is offline
+			    if (reachableMatches.isEmpty() && c.getType().startsWith("b-t-f")) {
+			    	Subscription senderSub = getSubscription(sender);
+			    	messagingUtil().sendDeliveryFailure(senderSub.clientUid, c);
+				}
 
 			    return reachableMatches;
 			} catch (Exception e) {
@@ -743,15 +742,9 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
         	
         	Subscription destSubscription = destSubscriptionEntry.getValue();
       
-        	if (config().getRemoteConfiguration().getFederation() == null || !config().getRemoteConfiguration().getFederation().isIVoidMyWarrantyAndWantToForwardFederationTraffic()) {
+        	if (config().getRemoteConfiguration().getFederation() == null) {
         		if (zender instanceof FederateUser && destSubscription.getUser() instanceof FederateUser) {
         			continue;
-        		}
-        	}
-
-        	if (config().getRemoteConfiguration().getFederation() != null && config().getRemoteConfiguration().getFederation().isIVoidMyWarrantyAndWantToForwardFederationTraffic()) {
-        		if (logger.isDebugEnabled()) {
-        			logger.debug("iVoidMyWarranty");
         		}
         	}
 
@@ -1857,7 +1850,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 
 		if (config().getRepository().isEnable()) {
-			if (username != null) {
+			if (!Strings.isNullOrEmpty(username)) {
 				missionSubscriptionRepository().deleteByMissionNameAndClientUidAndUsername(missionName, clientUid, username);
 			} else {
 				missionSubscriptionRepository().deleteByMissionNameAndClientUid(missionName, clientUid);
@@ -2549,11 +2542,15 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	@Override
 	public void sendGroupsUpdatedMessage(String username, String clientUid) {
 		try {
+			Set<String> websocketHits = new ConcurrentSkipListSet<>();
+
 			List<User> users = getUsersByUsername(username);
 			if (users == null || users.size() == 0) {
 				logger.error("sendGroupsUpdatedMessage : User lookup failed for " + username);
 				return;
 			}
+
+			CotEventContainer groupChangeMessage = makeGroupChangeMessage();
 
 			for (User user : users) {
 				try {
@@ -2569,12 +2566,18 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 						continue;
 					}
 
-					CotEventContainer groupChangeMessage = makeGroupChangeMessage();
-					subscription.submit(groupChangeMessage);
+					if (subscription.isWebsocket.get() && subscription.getHandler() instanceof AbstractBroadcastingChannelHandler) {
+						websocketHits.add(((AbstractBroadcastingChannelHandler) subscription.getHandler()).getConnectionId());
+					} else {
+						subscription.submit(groupChangeMessage);
+					}
+
 				} catch (Exception e) {
 					logger.error("sendGroupsUpdatedMessage : exception sending to user : " + username, e);
 				}
 			}
+
+			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, groupChangeMessage, config().getNetwork().getServerId());
 
 		} catch (Exception e) {
 			logger.error("exception in sendGroupsUpdatedMessage!", e);

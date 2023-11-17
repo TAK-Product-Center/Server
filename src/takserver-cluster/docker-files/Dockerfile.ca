@@ -1,5 +1,5 @@
 # need java for keytool
-FROM openjdk:11-jdk-bullseye
+FROM eclipse-temurin:17-jammy
 COPY takserver-core/certs/* /
 ARG ARG_CA_NAME
 ENV CA_NAME=$ARG_CA_NAME

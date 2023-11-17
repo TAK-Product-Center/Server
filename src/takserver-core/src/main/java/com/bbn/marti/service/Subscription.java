@@ -89,10 +89,7 @@ public class Subscription extends RemoteSubscription {
 		
 		if (!this.team.equals(prevTeam) || !this.role.equals(prevRole) || !this.takv.equals(prevTakv)) {
 			RemoteSubscription rs = new RemoteSubscription(this);
-			rs.prepareForSerialization();
-
-			IgniteCacheHolder.getIgniteSubscriptionClientUidTackerCache().put(clientUid, rs);
-			IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().put(uid, rs);
+			IgniteCacheHolder.cacheRemoteSubscription(rs);
 		}
 	}
 

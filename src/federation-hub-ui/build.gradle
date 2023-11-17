@@ -54,14 +54,47 @@ configurations {
 }
 
 dependencies {
-  implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
-  implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
-  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-  implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
 
-  implementation project(':federation-common')
+  // this is pulled in via spring-boot-logging-starter, only including explicitly here in order to exclude log4j
+  api ("org.springframework.boot:spring-boot-starter-logging:$spring_boot_version") {
+    exclude group: 'org.apache.logging.log4j', module: 'log4j-to-slf4j'
+  }
+
+  implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
+  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+
+  api ("org.owasp.esapi:esapi:$esapi_version") {
+    // exclude log4j from esapi
+    exclude group: 'log4j', module: 'log4j'
+  }
+  
+  api group: 'io.jsonwebtoken', name: 'jjwt', version: jsonwebtoken_version
+  implementation group: 'com.googlecode.json-simple', name: 'json-simple', version: json_simple_version
+
+  implementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
+  implementation group: 'org.springframework.security', name: 'spring-security-config', version: spring_security_version
+  implementation group: 'org.springframework.security', name: 'spring-security-messaging', version: spring_security_version
+  implementation group: 'org.springframework.security', name: 'spring-security-web', version: spring_security_version
+
+  api group: 'org.springframework.security.oauth', name: 'spring-security-oauth2', version: spring_security_oauth_version
+  
+  implementation ("org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure:$spring_security_oauth2_autoconfigure_version") {
+    exclude group: 'log4j', module: 'log4j'
+    exclude group: 'org.apache.logging.log4j'
+    exclude group: 'org.slf4j', module: 'log4j-over-slf4j'
+  }
+
+  implementation(project(':federation-common')) {
+    exclude group: 'log4j', module: 'log4j'
+    exclude group: 'org.apache.logging.log4j'
+    exclude group: 'org.slf4j', module: 'log4j-over-slf4j'
+  }
 
   implementation group: 'com.h2database', name: 'h2', version: h2_version
+  
+  implementation group: 'io.jsonwebtoken', name: 'jjwt', version: '0.9.1'
+  implementation group: 'org.bouncycastle', name: 'bcpkix-jdk15on', version: '1.58'
+  
 
   // Apache Ignite (cache and distributed service grid).
   implementation group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_version
@@ -69,7 +102,12 @@ dependencies {
   implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
 
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
-  implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
+
+  implementation ("org.springframework.boot:spring-boot-loader:$spring_boot_version") {
+    exclude group: 'log4j', module: 'log4j'
+    exclude group: 'org.apache.logging.log4j', module: 'log4j-to-slf4j'
+  }
+  
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: spring_boot_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-jetty', version: spring_boot_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-security', version: spring_boot_version
@@ -82,6 +120,7 @@ dependencies {
   }
 
   implementation group: 'commons-fileupload', name: 'commons-fileupload', version: commons_fileupload_version
+  implementation group: 'com.squareup.okhttp3', name: 'okhttp', version: okhttp3_version
 
   testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
 }

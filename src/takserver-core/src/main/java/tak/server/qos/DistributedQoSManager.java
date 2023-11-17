@@ -51,6 +51,17 @@ public class DistributedQoSManager implements QoSManager, org.apache.ignite.serv
 		}
 		
 	}
+	
+	@Override
+	public void setReadRules(List<RateLimitRule> rateLimitRule) {
+		Qos qos = qosConf();
+		qos.getReadRateLimiter().getRateLimitRule().clear();
+		for (RateLimitRule rule : rateLimitRule) {
+			qos.getReadRateLimiter().getRateLimitRule().add(rule);
+		}
+		mdip().coreConfig().setAndSaveQos(qos);
+		mdip().eventPublisher().publishEvent(new QosRefreshedEvent(mdip().getSpringContext()));
+	}
 
 
 	@Override
@@ -64,6 +75,18 @@ public class DistributedQoSManager implements QoSManager, org.apache.ignite.serv
 			mdip().mds().disable();
 		}
 	}
+	
+	@Override
+	public void setDeliveryRules(List<RateLimitRule> rateLimitRule) {
+		Qos qos = qosConf();
+		qos.getDeliveryRateLimiter().getRateLimitRule().clear();
+		for (RateLimitRule rule : rateLimitRule) {
+			qos.getDeliveryRateLimiter().getRateLimitRule().add(rule);
+		}
+		mdip().coreConfig().setAndSaveQos(qos);
+		mdip().eventPublisher().publishEvent(new QosRefreshedEvent(mdip().getSpringContext()));
+	}
+	
 	
 	@Override
 	public void setDOSLimiterEnabled(boolean enable) {

@@ -1,6 +1,10 @@
 plugins {
     id "com.github.node-gradle.node" version "3.1.1"
 }
+
+jar {
+    enabled = false
+}
  
 apply plugin: 'base'
 apply plugin: "com.github.node-gradle.node"

@@ -10,13 +10,13 @@ import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.ResultSetExtractor;
 
 import com.bbn.marti.config.GeospatialFilter;
 import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.sync.MissionContent;
-import com.bbn.marti.sync.model.DataFeedDao;
 import com.bbn.marti.sync.model.ExternalMissionData;
 import com.bbn.marti.sync.model.LogEntry;
 import com.bbn.marti.sync.model.Mission;
@@ -34,6 +34,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import tak.server.cache.CotCacheWrapper;
 import tak.server.cot.CotElement;
 import tak.server.cot.CotEventContainer;
+import tak.server.feeds.DataFeedDTO;
 
 
 /*
@@ -45,6 +46,7 @@ import tak.server.cot.CotEventContainer;
 public interface MissionService {
 	
     Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom, String baseLayer, String bbox, String path, String classification, String tool, String passwordHash, MissionRole defaultRole, Long expiration, String boundingPolygon, Boolean inviteOnly);
+    
     Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom, String baseLayer, String bbox, String path, String classification, String tool, String passwordHash, MissionRole defaultRole, Long expiration, String boundingPolygon, Boolean inviteOnly, UUID guid);
     
     Mission getMission(String missionName, boolean hydrateDetails);
@@ -61,9 +63,13 @@ public interface MissionService {
     
 	Mission getMissionNoContentByGuid(UUID missionGuid, String groupVector);
 
-    List<Mission> getAllMissions(boolean passwordProtected, boolean defaultRole, String tool, NavigableSet<Group> groups);
+    List<Mission> validateAccess(List<Mission> missions, HttpServletRequest request);
 
-    List<Mission> getAllCopsMissions(String tool, String userName, NavigableSet<Group> groups, String path, Integer page, Integer size);
+    List<Mission> getAllMissions(boolean passwordProtected, boolean defaultRole, String tool, NavigableSet<Group> groups);
+    
+    List<Mission> getMissionsFiltered(boolean passwordProtected, boolean defaultRole, String tool, NavigableSet<Group> groups, int limit, int offset, String sort, Boolean ascending, String nameFilter, String uidFilter);
+
+    List<Mission> getAllCopsMissions(String tool, NavigableSet<Group> groups, String path, Integer page, Integer size);
     
     Long getMissionCount(String tool);
 
@@ -202,7 +208,7 @@ public interface MissionService {
 
     void setRoleByClientUidOrUsername(Long missionId, String clientUid, String username, Long roleId);
 
-    boolean setRole(Mission mission, String clientUid, String username, MissionRole role);
+    boolean setRole(Mission mission, String clientUid, String username, MissionRole role, String groupVector);
 
     void setSubscriptionUsername(Long missionId, String clientUid, String username);
 
@@ -247,11 +253,11 @@ public interface MissionService {
 
     MissionFeed getMissionFeed(String missionFeedUid);
 
-    DataFeedDao getDataFeed(String dataFeedUid);
-
-    MissionFeed addFeedToMission(String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterBbox, String filterType, String filterCallsign);
+    DataFeedDTO getDataFeed(String dataFeedUid);
     
-    MissionFeed addFeedToMission(String missionFeedUid, String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterBbox, String filterType, String filterCallsign);
+    MissionFeed addFeedToMission(String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterPolygon, List<String> filterCotTypes, String filterCallsign);
+    
+    MissionFeed addFeedToMission(String missionFeedUid, String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterPolygon, List<String> filterCotTypes, String filterCallsign);
 
 	void removeFeedFromMission(String missionName, String creatorUid, Mission mission, String missionFeedUid);
 
@@ -268,4 +274,14 @@ public interface MissionService {
     void sendLatestFeedEvents(Mission mission, MissionFeed missionFeed, List<String> clientUidList, String groupVector);
 
 	List<String> getMinimalMissionsJsonForDataFeed(String feed_uid) throws JsonProcessingException;
+	
+	int countAllMissions(boolean passwordProtected, boolean defaultRole, String tool);
+	
+    List<String> getMinimalMissionFeedsJsonForDataFeed(String dataFeedUid) throws JsonProcessingException;
+    
+	List<Mission> getAllMissionsCached(boolean passwordProtected, boolean defaultRole, String tool);
+
+	boolean validateAccess(Mission mission, HttpServletRequest request);
+
+    List<String> getAllCotForString(String uidSearch, String groupVector);
 }

@@ -235,7 +235,7 @@ public class OAuthApi {
 
     @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
     @RequestMapping(value = "/login/refresh", method = RequestMethod.GET)
-    public void handleRefresh(
+    public ModelAndView handleRefresh(
             HttpServletRequest request, HttpServletResponse response) {
         try {
             // get the auth server config
@@ -248,7 +248,7 @@ public class OAuthApi {
             if (Strings.isNullOrEmpty(refreshToken)) {
                 SecurityContextHolder.clearContext();
                 AuthCookieUtils.logout(request, response, null);
-                return;
+                return new ModelAndView(new InternalResourceView("/Marti/login/redirect.html"));
             }
 
             // build up the parameters for the token request
@@ -260,9 +260,12 @@ public class OAuthApi {
 
             processAuthServerRequest(requestBody, request, response);
 
+            return new ModelAndView(new InternalResourceView("/Marti/login/redirect.html"));
+
         } catch (Exception e) {
             logger.error("exception in handleRefresh", e);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return null;
         }
     }
 

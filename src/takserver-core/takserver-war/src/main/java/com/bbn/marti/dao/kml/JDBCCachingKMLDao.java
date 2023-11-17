@@ -709,10 +709,6 @@ public class JDBCCachingKMLDao implements KMLDao {
             Double longitude = results.getDouble(2);
             Double latitude = results.getDouble(3);
 
-            if(longitude == 0 && latitude == 0 && !(results.getString(5).equals("b-m-r"))) {
-                // filter out non-routes at 0,0
-                return null;
-            }
             cotElement.lat = latitude;
             cotElement.lon = longitude;
             cotElement.hae = Double.toString(results.getDouble(4));  // don't ask why

@@ -2,19 +2,24 @@ import './FileManager.css';
 import React, { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { DataGrid, GridToolbarContainer, gridPageSizeSelector, gridFilteredTopLevelRowCountSelector,
-    useGridRootProps, GridPagination, useGridSelector, useGridApiContext, GridCellModes} from '@mui/x-data-grid';
+    useGridRootProps, GridPagination, useGridSelector, useGridApiContext, GridCellModes, getGridStringOperators} from '@mui/x-data-grid';
 import DownloadIcon from '@mui/icons-material/Download';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
+import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SearchIcon from '@mui/icons-material/Search';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
-import { Button } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import { Button, IconButton } from '@mui/material';
 import TextField from '@mui/material/TextField';
 import moment from 'moment';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
+import InputLabel from '@mui/material/InputLabel';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import FormControl from '@mui/material/FormControl';
 import Typography from '@mui/material/Typography';
 import UploadFile from './UploadFile';
 import {useDropzone} from 'react-dropzone';
@@ -22,11 +27,37 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
 import Pagination from '@mui/material/Pagination';
+import InputAdornment from '@mui/material/InputAdornment';
 import Footer from './Footer';
+import { styled } from "@mui/material/styles";
+import Box from "@mui/material/Box";
 
 
 // Reset object needed for componets that access the selected row hook
 const emptyRow = {name: "", hash: ""};
+
+const StyledGridOverlay = styled("div")(({ theme }) => ({
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
+    overflow: "hidden",
+    pointerEvents: "none",
+    variant: "contained",
+  
+    // To make overlay elements interactive
+    position: "relative",
+    zIndex: 0,
+  }));
+  
+function CustomNoRowsOverlay() {
+return (
+    <StyledGridOverlay>
+    <Box sx={{zIndex: 0, pointerEvents: "none" }}>No Files</Box>
+    </StyledGridOverlay>
+);
+}
 
 // Structures for missions
 var allMissions = [];
@@ -57,7 +88,7 @@ return (
 }
 
 // Custom Pagination Controller for Grid
-function ActionPagination({ page, onPageChange, className }) {
+function ActionPagination({ page, onPageChange, className}) {
     const apiRef = useGridApiContext();
     const rootProps = useGridRootProps();
     const pageSize = useGridSelector(apiRef, gridPageSizeSelector);
@@ -80,16 +111,27 @@ function ActionPagination({ page, onPageChange, className }) {
     }, [searchPage])
 
     return (
+        <>
+        <Typography className={className} variant="body1" sx={{ml: 5}}>Go to Page: </Typography>
+        <TextField size="small"
+        value={searchPage.value}
+        onChange={(event) => {
+            setSearchPage({event: event, value: event.target.value});
+        }}
+        />
         <Pagination
         color="primary"
         className={className}
         count={pageCount}
         page={page + 1}
+        siblingCount={1}
+        boundaryCount={1}
         showFirstButton showLastButton
         onChange={(event, newPage) => {
             onPageChange(event, newPage - 1);
         }}
     />
+    </>
     );
 }
 
@@ -105,18 +147,21 @@ ActionPagination.propTypes = {
     /**
      * The zero-based index of the current page.
      */
-    page: PropTypes.number.isRequired,
+    page: PropTypes.number.isRequired
+
+
   };
 
 function CustomPagination(props) {
-    return <GridPagination ActionsComponent={ActionPagination} {...props} />;
+    return <GridPagination ActionsComponent={ActionPagination} {...props}/>;
 }
 
 // Custom Toolbar for data grid
-function FileManagerToolbar({rowsSelected, setMultiDeleteOpen, setUploadOpen, setFilter, 
-                             filterPackage, setFilterPackage,
-                            missions, setMissions, mission, setMission, copChecked, setCopChecked}) 
+function FileManagerToolbar({rowsSelected, setMultiDeleteOpen, open, setFilter, 
+                             filterPackage, setFilterPackage, missions, setMissions,
+                             mission, setMission, copChecked, setCopChecked, setNameMatch}) 
 {
+    const [searchText, setSearchText] = React.useState("");
     return (
         <GridToolbarContainer>
             <Typography variant="h5" className="FileManagerLabel">File Manager</Typography>
@@ -139,8 +184,11 @@ function FileManagerToolbar({rowsSelected, setMultiDeleteOpen, setUploadOpen, se
                     setFilterPackage(!filterPackage)
                 }}>{filterPackage ? "Remove Filters" : "Mission Package"} </Button>
             <Typography variant="body1" className="MissionFilter">Mission: </Typography>
-            <Select style={{width: 250, height: 25}}
+            <FormControl>
+            <InputLabel id="Missions-label">Mission Filter</InputLabel>
+            <Select style={{width: 250}}
                 value={mission}
+                labelId="Missions-label"
                 label="Mission"
                 onChange={
                     (e) => {
@@ -159,6 +207,7 @@ function FileManagerToolbar({rowsSelected, setMultiDeleteOpen, setUploadOpen, se
                 </MenuItem>
             ))}
             </Select>
+            </FormControl>
             <Switch
                 checked={copChecked}
                 onChange={
@@ -180,10 +229,28 @@ function FileManagerToolbar({rowsSelected, setMultiDeleteOpen, setUploadOpen, se
             />
             <Typography variant="body1" style={{ marginRight: 16 }}>Show Only COPs</Typography>
             <Button className="Toolbar" color='primary' startIcon={<FileUploadIcon />}
-            style={{ marginRight: 16 }} onClick={
-                (e) => {
-                    setUploadOpen(true);
-                }}>Upload</Button>
+            style={{ marginRight: 16 }} onClick={open}>Upload</Button>
+            <TextField
+                label="Filter By Filename"
+                value={searchText}
+                onChange={(event) => {
+                    setSearchText(event.target.value);
+                    setNameMatch("&name="+event.target.value)
+                  }
+                }
+                InputProps={{
+                    endAdornment: (
+                    <InputAdornment>
+                        <IconButton onClick={() => {
+                            setSearchText("")
+                            setNameMatch("")
+                        }} >
+                            {searchText === "" ? <SearchIcon/> : <CloseIcon/>}
+                        </IconButton>
+                    </InputAdornment>
+                    )
+                }}
+            />
             
         </GridToolbarContainer>
     );
@@ -191,7 +258,7 @@ function FileManagerToolbar({rowsSelected, setMultiDeleteOpen, setUploadOpen, se
 
 function FileManager() {
     // Dialog open hooks
-    const [open, setOpen] = React.useState(false);
+    const [deleteOpen, setDeleteOpen] = React.useState(false);
     const [multiDeleteOpen, setMultiDeleteOpen] = React.useState(false);
     const [uploadOpen, setUploadOpen] = React.useState(false);
     // Selected Row hooks
@@ -214,10 +281,14 @@ function FileManager() {
     // Hooks for filters
     const [filter, setFilter] = React.useState("");
     const [filterPackage, setFilterPackage] = React.useState(false);
+    const [nameMatch, setNameMatch] = React.useState("");
     const [missions, setMissions] = React.useState([]);
     const [mission, setMission] = React.useState([]);
     const [copChecked, setCopChecked] = React.useState(false);
     const [sort, setSort] = React.useState("");
+
+    // Grid Api Ref to make edit button work
+    const [cellModesModel, setCellModesModel] = React.useState({});
 
     const handleSortModelChange = (newModel) => {
         if(newModel.length === 0){
@@ -232,10 +303,48 @@ function FileManager() {
         }
     };
 
+    const handleFilterModelChange = (newModel) => {
+        if(newModel.items !== null && newModel.items.length === 0){
+          setNameMatch("");
+        } else {
+          // Model value can be null if set by user
+          if(newModel.items[0].value){
+            if (newModel.items[0].field === "name"){
+              setNameMatch("&name="+newModel.items[0].value)
+            }
+          } else {
+            setNameMatch("")
+          }
+        }
+        console.log(nameMatch)
+      };
+
+    const handleProcessRow = (params) => {
+        var keyword = ""
+        if(params.keywords !== "" || params.keywords !== "none"){
+            keyword = params.keywords
+        }
+        const data = "[ \"" + keyword + "\" ]";
+        console.log(params)
+        var url = '/Marti/api/sync/metadata/' + params.hash + '/keywords' 
+        console.log(url)
+        fetch(url, { 
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: data
+        }).then((function (res) {
+            if(!res.ok){
+                setSomethingDeleted(!deleted);
+                console.log(res);
+            }
+        }));
+        return(params);
+      };
+
 
     // Dropzone state management
     const [fileProp, setFileProp] = React.useState("");
-    const {getRootProps} = useDropzone({
+    const {getRootProps, getInputProps, open} = useDropzone({
         // Note how this callback is never invoked if drop occurs on the inner dropzone
         noClick: true,
         onDrop: files => { 
@@ -261,11 +370,13 @@ function FileManager() {
             });
       },[])
 
+    
+
     useEffect(() => {
         setLoading(true);
         const pageSize = paginationModel.pageSize
         const url = '/Marti/api/files/metadata?' + filter + '&page=' 
-        + page + '&limit=' + pageSize + sort
+        + page + '&limit=' + pageSize + sort + nameMatch
         // Grab the page first since we start on page 0
         fetch(url)
             .then(response => response.json())
@@ -297,13 +408,15 @@ function FileManager() {
                 setRowCount(data.data);
             });
         
-    }, [page, deleted, paginationModel, sort, filter]);
+    }, [page, deleted, paginationModel, sort, filter, nameMatch]);
+
+    const stringOperators = getGridStringOperators().filter((op => ['contains'].includes(op.value)));
 
     // Render definition for Data Grid
     const columns = [
         { field: 'id', headerName: 'ID', width: 1 },
         { field: 'hash', headerName: 'hash', width: 1 },
-        { field: 'name', headerName: 'Name', width: 330,
+        { field: 'name', headerName: 'Name', width: 330, filterOperators: stringOperators,
         renderCell: (params) => {
             return (
                 <div>
@@ -316,11 +429,48 @@ function FileManager() {
                 </div>
             );
           } },
-        { field: 'submitter', headerName: 'Submitter', width: 150, sortable: false },
-        { field: 'keywords', headerName: 'Keywords', width: 250, sortable: false },
-        { field: 'groups', headerName: 'Groups', width: 150, sortable: false },
-        { field: 'size', headerName: 'Size (Approx)', width: 120 },
-        { field: 'updateTime', headerName: 'Update Time', width: 180,
+        { field: 'submitter', headerName: 'Submitter', width: 150, sortable: false, filterable: false },
+        { field: 'keywords', headerName: 'Keywords', width: 250, sortable: false, editable: true, filterable: false,
+        cellClassName: 'KeywordsCell',
+        renderCell: (params) => {
+            return (
+                <>
+                {params.value.length > 25 ? 
+                    <>
+                    {params.value.substring(0,25) + "..."}
+                    <IconButton
+                    //apiRef.current.setCellMode(params.id, params.field, 'edit')
+                    onClick={() => { 
+                        setCellModesModel({
+                            ...cellModesModel,
+                            [params.id]: { ...cellModesModel[params.id], [params.field]: { mode: GridCellModes.Edit } },
+                        });
+                    }}>
+                        <EditIcon />
+                    </IconButton>
+                </>
+                :
+                <>
+                    {params.value} 
+                    <IconButton
+                    //apiRef.current.setCellMode(params.id, params.field, 'edit')
+                    onClick={() => { 
+                        setCellModesModel({
+                            ...cellModesModel,
+                            [params.id]: { ...cellModesModel[params.id], [params.field]: { mode: GridCellModes.Edit } },
+                        });
+                    }}>
+                        <EditIcon />
+                    </IconButton>
+                    </>
+                    
+                }
+                </>
+            ) 
+        }},
+        { field: 'groups', headerName: 'Groups', width: 150, sortable: false, filterable: false },
+        { field: 'size', headerName: 'Size (Approx)', width: 120, filterable: false },
+        { field: 'updateTime', headerName: 'Update Time', width: 180, filterable: false,
         renderCell: (params) => {
             return (
                 <TextField variant="standard"
@@ -331,8 +481,8 @@ function FileManager() {
                 />
             ) }
         },
-        { field: 'type', headerName: 'Type', width: 200, sortable: false },
-        { field: 'expiration', headerName: 'Expiration', width: 300, sortable: false,
+        { field: 'type', headerName: 'Type', width: 200, sortable: false, filterable: false },
+        { field: 'expiration', headerName: 'Expiration', width: 300, sortable: false, filterable: false,
         renderCell: (params) => {
             return (
                 <TextField
@@ -350,10 +500,10 @@ function FileManager() {
             );
           }
         },
-        { field: 'actions', headerName: 'Actions', width: 150, sortable: false, 
+        { field: 'actions', headerName: 'Actions', width: 150, sortable: false, filterable: false,
         renderCell: (params) => {
             return (
-                <DeleteButton setOpen={setOpen} row={params.row} 
+                <DeleteButton setOpen={setDeleteOpen} row={params.row} 
                 setRow={setRow} value={params.value} />
         );
         }}
@@ -377,7 +527,7 @@ function FileManager() {
 
     // Used in Dialog
     const handleClose = () => {
-        setOpen(false);
+        setDeleteOpen(false);
         setMultiDeleteOpen(false);
         setRow(emptyRow);
     };
@@ -412,6 +562,13 @@ function FileManager() {
         <header className="DataTable">
         <DataGrid
             rows={rows}
+            sx={{'.MuiDataGrid-cell--textLeft':{
+                    justifyContent: 'space-between'
+                 },
+                 '.MuiDataGrid-overlayWrapper':{
+                    zIndex: 0
+                 }
+            }}
             columns={columns}
             columnVisibilityModel={{
                 id: false,
@@ -435,33 +592,44 @@ function FileManager() {
                 setPage(pgModel.page)
                 }
             }
-            onSelectionModelChange={(ids) => {
+            onRowSelectionModelChange={(ids) => {
                 const selectedRowData = ids.map((id) => 
                     rows.find((row) => row.id === id
                 ));
+                console.log(selectedRowData)
                 setRowsSelected(selectedRowData);
             }}
             components={{
                 Toolbar: FileManagerToolbar,
                 Pagination: CustomPagination,
+                noRowsOverlay: CustomNoRowsOverlay,
+                NoResultsOverlay: CustomNoRowsOverlay,
             }}
-            componentsProps={{ toolbar: {rowsSelected, setMultiDeleteOpen, setUploadOpen, setFilter, 
+            componentsProps={{ 
+              toolbar: {rowsSelected, setMultiDeleteOpen, open, setFilter, 
                 filterPackage, setFilterPackage,missions, setMissions, mission, 
-                setMission, copChecked, setCopChecked}}}
+                setMission, copChecked, setCopChecked, setNameMatch}}}
             rowsSelected={rowsSelected}
             setMultiDeleteOpen={setMultiDeleteOpen}
-            setFilter={setFilter}
+            filterMode="server"
+            onFilterModelChange={handleFilterModelChange}
             setSomethingDeleted={setSomethingDeleted}
             deleted={deleted}
             loading={loading}
             sortingMode="server"
             onSortModelChange={handleSortModelChange}
+            disableSelectionOnClick
+            cellModesModel={cellModesModel}
+            onCellModesModelChange={(model) => setCellModesModel(model)}
+            experimentalFeatures={{ newEditingApi: true }}
+            processRowUpdate={handleProcessRow}
+            onProcessRowUpdateError={() => {}}
             />
         </header>
         <UploadFile openHook={uploadOpen} setOpenHook={setUploadOpen}
                     deleted={deleted} setDeleted={setSomethingDeleted}
                     fileProp={fileProp} setFileProp={setFileProp}/>
-        <Dialog open={open} onClose={handleClose} >
+        <Dialog open={deleteOpen} onClose={handleClose} >
             <DialogTitle id="alert-dialog-title">
             {"Delete File " + rowToDelete.name + "?"}
             </DialogTitle>

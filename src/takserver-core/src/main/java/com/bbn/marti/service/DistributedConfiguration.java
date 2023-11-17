@@ -313,7 +313,7 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     }
 
     @Override
-    public void saveChangesAndUpdateCache() {
+    public synchronized void saveChangesAndUpdateCache() {
     	updateCache();
     	saveChanges();
     }

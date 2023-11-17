@@ -191,7 +191,9 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                 // contains the channels ext key usage attribute (using Challenge Password OID)
                 if (DistributedConfiguration.getInstance().getAuth().isX509UseGroupCache()) {
                     try {
-                        useGroupCache = user.getCert().getExtendedKeyUsage().contains("1.2.840.113549.1.9.7");
+                        useGroupCache =
+                                user.getCert().getExtendedKeyUsage().contains("1.2.840.113549.1.9.7") ||
+                                !DistributedConfiguration.getInstance().getAuth().isX509UseGroupCacheRequiresExtKeyUsage();
                     } catch (CertificateParsingException cpe) {
                         logger.error("exception getting cert's extendedKeyUsage", cpe);
                     }

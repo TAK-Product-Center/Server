@@ -48,6 +48,16 @@ public interface GroupManager {
     void addUserToGroup(User user, Group group);
 
     /*
+     * Sets a max classification for the user
+     */
+    void setClassificationForUser(User user, UserClassification userClassification);
+
+    /*
+     * Gets the classification info for the user
+     */
+    UserClassification getClassificationForUser(User user);
+
+    /*
      * Add user, creating if it doesn't exist.
      */
     void addUser(User user);
@@ -66,6 +76,11 @@ public interface GroupManager {
      * Get all groups by connection id
      */
     NavigableSet<Group> getGroupsByConnectionId(String connectionId);
+
+    /*
+     * Get classification by connection id
+     */
+    UserClassification getUserClassificationByConnectionId(String connectionId);
 
     /*
      * Get cached group vector by connection id

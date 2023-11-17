@@ -13,13 +13,13 @@ dependencies:
       - takserver-backend
       - postgresql
   - name: ignite
-    version: "1.2.2"
-    repository: "https://charts.helm.sh/stable"
+    version: "1.2.3"
+    repository: "file://./third-party/ignite"
     tags:
       - takserver-backend
       - ignite
   - name: nats-operator
-    version: "0.7.4"
+    version: "0.8.3"
     repository: "https://nats-io.github.io/k8s/helm/charts/"
     tags:
       - takserver-backend

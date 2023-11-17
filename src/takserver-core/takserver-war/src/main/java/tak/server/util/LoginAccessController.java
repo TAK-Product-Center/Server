@@ -11,8 +11,8 @@ import org.springframework.web.servlet.view.InternalResourceView;
 @Controller
 public class LoginAccessController {
 
-	@PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
-	@RequestMapping(value = "/login", method = RequestMethod.GET)
+	@PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT') and hasRole('ROLE_ALLOW_LOGIN')")
+	@RequestMapping(value = "/login")
 	public ModelAndView getLoginPage() {
 		return new ModelAndView(new InternalResourceView("/Marti/login/index.html"));
 	}

@@ -242,7 +242,7 @@ buildRpm.dependsOn prePackage
 buildDeb.dependsOn prePackage
 
 buildRpm {
-    requires('java-11-openjdk-devel')
+    requires('java-17-openjdk-devel')
     obsoletes('takserver-launcher')
     obsoletes('takserver-messaging')
     obsoletes('takserver-api')
@@ -250,10 +250,9 @@ buildRpm {
 
 // TODO: add deb package dependencies here
 buildDeb {
-  requires('openjdk-11-jdk')
+  requires('openjdk-17-jdk')
   obsoletes('takserver-launcher')
   obsoletes('takserver-messaging')
   obsoletes('takserver-api')
 }
-
 

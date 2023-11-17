@@ -95,12 +95,27 @@
       <xs:attribute name="takServerHost" type="xs:string"/>
       <xs:attribute name="useLinuxEpoll" type="xs:boolean" default="true"/>
       <xs:attribute name="allowAllOrigins" type="xs:boolean" default="false"/>
+      <xs:attribute name="enableHSTS" type="xs:boolean" default="true"/>
       <xs:attribute name="esyncEnableCache" type="xs:int" default="-1"/>
       <xs:attribute name="esyncEnableCotFilter" type="xs:boolean" default="false"/>
       <xs:attribute name="esyncCotFilter" type="xs:string" />
       <xs:attribute name="version" type="xs:string" default=""/>
       <xs:attribute name="webCiphers" type="xs:string" default=""/>
-      <xs:attribute name="tomcatMaxPool" type="xs:int" default="-1"/>
+      <xs:attribute name="tomcatPoolIdleToMax" type="xs:boolean" default="true">
+        <xs:annotation>
+          <xs:documentation>Set tomcat idle threads to configured max.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="tomcatMaxPool" type="xs:int" default="-1">
+       <xs:annotation>
+          <xs:documentation>Explicity set the size for Tomcat service thread pool. multiplier for autodetected ignite thread pool size. The optimal value varies based on system capabilities (CPU core count).</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="tomcatPoolMultiplier" type="xs:int" default="32">
+        <xs:annotation>
+          <xs:documentation>Set the multiplier for autodetected ignite thread pool size. The optimal value varies based on system capabilities (CPU core count).</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
       <xs:attribute name="cloudwatchNamespace" type="xs:string" default="takserver"/>
       <xs:attribute name="cloudwatchMetricsBatchSize" type="xs:int" default="20"/>
       <xs:attribute name="cloudwatchEnable" type="xs:boolean" default="false"/>
@@ -108,6 +123,7 @@
       <xs:attribute name="missionCopTool" type="xs:string" default="vbm"/>
       <xs:attribute name="pingTimeoutSeconds" type="xs:int"/>
       <xs:attribute name="pingTimeoutCheckIntervalSeconds" type="xs:int" default="60"/>
+      <xs:attribute name="alwaysArchiveMissionCot" type="xs:boolean" default="false"/>
     </xs:complexType>
   </xs:element>
 
@@ -190,6 +206,7 @@
       <xs:attribute name="x509groupsDefaultRDN" type="xs:boolean" default="false"/>
       <xs:attribute name="x509addAnonymous" type="xs:boolean" default="false"/>
       <xs:attribute name="x509useGroupCache" type="xs:boolean" default="false"/>
+      <xs:attribute name="x509useGroupCacheRequiresExtKeyUsage" type="xs:boolean" default="true"/>
       <xs:attribute name="x509checkRevocation" type="xs:boolean" default="false"/>
       <xs:attribute name="x509tokenAuth" type="xs:boolean" default="false"/>
     </xs:complexType>
@@ -253,8 +270,8 @@
             <xs:attribute name="websocketMaxBinaryMessageBufferSize" type="xs:int" default="65536"/>
             <xs:attribute name="websocketMaxSessionIdleTimeout" type="xs:long" default="-1"/>
             <xs:attribute name="websocketSendTimeoutMs" type="xs:int" default="5000"/>
-            <xs:attribute name="missionUidLimit" type="xs:int" default="512"/>
-            <xs:attribute name="missionContentLimit" type="xs:int" default="512"/>
+            <xs:attribute name="missionUidLimit" type="xs:int" default="8192"/>
+            <xs:attribute name="missionContentLimit" type="xs:int" default="4096"/>
             <xs:attribute name="nearCacheMaxSize" type="xs:int" default="0"/>
             <xs:attribute name="cotCacheMaxSize" type="xs:int" default="0"/>
             <xs:attribute name="cotCacheBatchSize" type="xs:int" default="-1"/>
@@ -263,16 +280,83 @@
             <xs:attribute name="springCacheBatchSize" type="xs:int" default="-1"/>
             <xs:attribute name="springCacheMaxMemorySize" type="xs:int" default="-1"/>
             <xs:attribute name="springCacheSizeScalingFactor" type="xs:int" default="8"/>
-            <xs:attribute name="onHeapEnabled" type="xs:boolean" default="true"/>
-            <xs:attribute name="cacheOffHeapMaxSizeBytes" type="xs:long" default="-1"/>
-            <xs:attribute name="cacheOffHeapInitialSizeBytes" type="xs:long" default="-1"/>
-            <xs:attribute name="cacheOffHeapDefaultPercentage" type="xs:float" default="0.44"/>
-            <xs:attribute name="cacheOffHeapEvictionThreshold" type="xs:float" default="-1.0"/>
-            <xs:attribute name="cacheLastTouchedExpiryMinutes" type="xs:int" default="-1"/>
+            <xs:attribute name="onHeapEnabled" type="xs:boolean" default="false"/>
+            <xs:attribute name="cacheOffHeapMaxSizeBytes" type="xs:long" default="-1">
+             <xs:annotation>
+              <xs:documentation>Explicity set the off-heap cache max size (bytes). -1 means autodetect.</xs:documentation>
+             </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="cacheOffHeapInitialSizeBytes" type="xs:long" default="-1">
+              <xs:annotation>
+                <xs:documentation>Explicity set the off-heap cache initial size (bytes). -1 means autodetect</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="cacheOffHeapPercentageMax" type="xs:float" default="0.99">
+              <xs:annotation>
+                <xs:documentation>Set the autodetected off-heap cache max size as factor of messaging process Xmx (bytes).</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="cacheOffHeapPercentageInitial" type="xs:float" default="0.29">
+              <xs:annotation>
+                <xs:documentation>Set the autodetected off-heap cache initial size as factor of messaging process Xmx (bytes).</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="cacheOffHeapEvictionThreshold" type="xs:float" default="0.7"/>
+            <xs:attribute name="cacheLastTouchedExpiryMinutes" type="xs:int" default="10"/>
             <xs:attribute name="enableCacheGroup" type="xs:boolean" default="true" />
+            <xs:attribute name="enableCacheGroupPerName" type="xs:boolean" default="false" />
             <xs:attribute name="enableCacheWarmer" type="xs:boolean" default="false"/>
             <xs:attribute name="ignitePoolSize" type="xs:int" default="-1"/>
+            <xs:attribute name="ignitePoolSizeMultiplier" type="xs:int" default="16">
+              <xs:annotation>
+                <xs:documentation>Set the multiplier for autodetected ignite thread pool size. The optimal value varies based on system capabilities (CPU core count).</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            
+            <xs:attribute name="igniteApiServerMode" type="xs:boolean" default="true">
+              <xs:annotation>
+                <xs:documentation>Run API micro-service in Ignite embedded server mode. If disabled, run in client mode.</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            
+            <xs:attribute name="ignitePoolSizeUseDefaultsForApi" type="xs:boolean" default="false">
+              <xs:annotation>
+                <xs:documentation>Use default ignite pool size for API process.</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            
+            <xs:attribute name="igniteDefaultSpiConnectionsPerNode" type="xs:boolean" default="false">
+              <xs:annotation>
+                <xs:documentation>Use default ignite settings for TCP SPI connections.</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            
+            <xs:attribute name="igniteExplicitSpiConnectionsPerNode" type="xs:int" default="-1">
+              <xs:annotation>
+                <xs:documentation>Explicitly set internal ignite option for TCP SPI connections. -1 means autodetect.</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            
+            <xs:attribute name="igniteFailureDetectionTimeoutSeconds" type="xs:long" default="600">
+              <xs:annotation>
+                <xs:documentation>Ignite critical thread blocked detection timeout.</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            
+            <xs:attribute name="igniteClientConnectionTimeoutSeconds" type="xs:long" default="300">
+              <xs:annotation>
+                <xs:documentation>Ignite client connection timeout.</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            
+            <xs:attribute name="igniteConnectionTimeoutSeconds" type="xs:long" default="300">
+              <xs:annotation>
+                <xs:documentation>Ignite connection timeout.</xs:documentation>
+              </xs:annotation>
+            </xs:attribute> 
+            
             <xs:attribute name="cacheCotInRepository" type="xs:boolean" default="false"/> 
+            
             <xs:attribute name="enableCachePersistence" type="xs:boolean" default="false"/> 
             <xs:attribute name="messageTimestampCacheSizeItems" type="xs:long" default="-1"/> 
             <xs:attribute name="enableStoreForwardChat" type="xs:boolean" default="false"/>
@@ -282,6 +366,13 @@
             <xs:attribute name="contactCacheUpdateRateLimitSeconds" type="xs:long" default="5"/>
             <xs:attribute name="contactCacheRecencyLimitSeconds" type="xs:long" default="86400"/>
             <xs:attribute name="pluginDatafeedCacheSeconds" type="xs:int" default="300"/>
+            
+            <xs:attribute name="caffeineFileCacheSeconds" type="xs:int" default="120">
+              <xs:annotation>
+                <xs:documentation>Cache TTL for caffeine file cache (if enabled). Default 120 seconds.</xs:documentation>
+              </xs:annotation>
+            </xs:attribute>
+            
            </xs:complexType>
         </xs:element>
       </xs:all>
@@ -505,6 +596,7 @@
       <xs:attribute name="truststoreFile" type="xs:string" use="required"/>
       <xs:attribute name="truststorePass" type="xs:string" use="required"/>
       <xs:attribute name="context" type="xs:string" default="TLSv1.2"/>
+      <xs:attribute name="ciphers" type="xs:string" />
       <xs:attribute name="keymanager" type="xs:string" use="required"/>
       <xs:attribute name="enableOCSP" type="xs:boolean" default="false"/>
       <xs:attribute name="responderUrl" type="xs:string" />
@@ -564,6 +656,7 @@
         </xs:element>
       </xs:sequence>
       <xs:attribute name="oauthAddAnonymous" type="xs:boolean" default="false"/>
+      <xs:attribute name="useTakServerLoginPage" type="xs:boolean" default="false"/>
       <xs:attribute name="readOnlyGroup" type="xs:string" use="optional"/>
       <xs:attribute name="readGroupSuffix" type="xs:string" default="_READ"/>
       <xs:attribute name="writeGroupSuffix" type="xs:string" default="_WRITE"/>
@@ -1027,7 +1120,6 @@
           <xs:documentation>Allows users who are very careful to turn off a safety feature that prevents misconfiguration.</xs:documentation>
         </xs:annotation>
       </xs:attribute>
-      <xs:attribute name="iVoidMyWarrantyAndWantToForwardFederationTraffic" type="xs:boolean" default="false" />
       <xs:attribute name="allowFederatedDelete" type="xs:boolean" default="false" />
       <xs:attribute name="allowMissionFederation" type="xs:boolean" default="true" />
       <xs:attribute name="allowDataFeedFederation" type="xs:boolean" default="true" />
@@ -1279,6 +1371,10 @@
       <xs:attribute name="disableSASharing" type="xs:boolean" default="true"/>
       <xs:attribute name="disableChatSharing" type="xs:boolean" default="false"/>
       <xs:attribute name="returnCopsWithPublicMissions" type="xs:boolean" default="true"/>
+      <xs:attribute name="ismUrl" type="xs:string"/>
+      <xs:attribute name="ismConnectTimeoutSeconds" type="xs:long" default="-1"/>
+      <xs:attribute name="ismReadTimeoutSeconds" type="xs:long" default="-1"/>
+      <xs:attribute name="ismStrictEnforcing" type="xs:boolean" default="false"/>
     </xs:complexType>
   </xs:element>
 

@@ -45,7 +45,6 @@ public class DataSourceUtils {
 	            logger.error("error connecting to database", ee);
 	        }
 	    }
-	    logger.info("Max Connection: {}", max_connections);
 
         // this will set a min of 200 connections for 4 cpus (c5.xlarge) to 1045 for 96
         // cpus (c5.24xlarge) (max is 1045 regardless)
@@ -57,15 +56,8 @@ public class DataSourceUtils {
             numDbConnections = repository.getNumDbConnections();
         }
         
-        if (logger.isDebugEnabled()) {
-            logger.debug("There are: " + Runtime.getRuntime().availableProcessors()
-                    + " cpus currently available; The max connections is: " + max_connections
-                    + " and the computed connection pool size is: " + numDbConnections);
-        }
-        
-        if (logger.isDebugEnabled()) {
-            logger.debug("We are setting up a connection pool of size: " + numDbConnections);
-        }
+        logger.info(Runtime.getRuntime().availableProcessors() + " CPU cores detected. Postgres server maximum allowed connections value is " + max_connections
+                    + ". The computed connection pool size is: " + numDbConnections);
 
         HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setUsername(coreDbConnection.getUsername());

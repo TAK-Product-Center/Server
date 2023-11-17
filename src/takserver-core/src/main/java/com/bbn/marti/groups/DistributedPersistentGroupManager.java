@@ -42,6 +42,7 @@ import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
+import com.bbn.marti.remote.groups.UserClassification;
 import com.bbn.marti.remote.LdapUser;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
@@ -254,7 +255,17 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         	logger.debug("add user " + user.getId() + " to " + group);
         }
     }
-    
+
+    @Override
+    public void setClassificationForUser(User user, UserClassification userClassification) {
+        groupStore().getUserClassificationMap().put(user, userClassification);
+    }
+
+    @Override
+    public UserClassification getClassificationForUser(User user) {
+        return groupStore().getUserClassificationMap().get(user);
+    }
+
     /*
      * Get / save the group from the cache / DB hierarchy
      * 
@@ -380,7 +391,12 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
 
         return  results;
     }
-    
+
+    @Override
+    public UserClassification getUserClassificationByConnectionId(String connectionId) {
+        return getClassificationForUser(getUserByConnectionId(connectionId));
+    }
+
     @Override
     public String getCachedOutboundGroupVectorByConnectionId(String connectionId) {
         return IgniteCacheHolder.getIgniteUserOutboundGroupCache().get(connectionId);

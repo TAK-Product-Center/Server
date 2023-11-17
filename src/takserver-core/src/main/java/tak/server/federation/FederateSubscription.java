@@ -61,8 +61,10 @@ public class FederateSubscription extends Subscription {
     	
 		totalSubmitted.incrementAndGet();
         
-        if (!isVoidWarranty() && toSend.hasContextKey(GroupFederationUtil.FEDERATE_ID_KEY)) {
-            logger.debug("not federating federated message");
+        if (toSend.hasContextKey(GroupFederationUtil.FEDERATE_ID_KEY)) {
+        	if (logger.isDebugEnabled())
+        		logger.debug("not federating federated message");
+        	
             return;
         }
         
@@ -313,10 +315,6 @@ public class FederateSubscription extends Subscription {
                 logger.warn("mission package announce CoT invalid - detail/fileshare element not present");
             }
         }});
-    }
-    
-    protected boolean isVoidWarranty() {
-      return config.getFederation() != null && config.getFederation().isIVoidMyWarrantyAndWantToForwardFederationTraffic();
     }
     
     protected Configuration getConfiguration() {

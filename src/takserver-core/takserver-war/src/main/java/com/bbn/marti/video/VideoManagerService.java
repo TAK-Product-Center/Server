@@ -51,93 +51,94 @@ public class VideoManagerService {
 		
 	public boolean addFeed(Feed feed, String groupVector, Validator validator) {
 
-    	boolean status = false;
-    	
-    	try {
+		boolean status = false;
 
-   	    	JAXBContext jaxbContext = JAXBContext.newInstance(Feed.class);
-	        Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
-	        StringWriter sw = new StringWriter();
-        	jaxbMarshaller.marshal(feed, sw);
-        	String xml = sw.toString();    		
-    		
-		//
-		// is the feed (URL/alias) in the database already?
-		//
-		try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement(
+		try {
+
+			JAXBContext jaxbContext = JAXBContext.newInstance(Feed.class);
+			Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
+			StringWriter sw = new StringWriter();
+			jaxbMarshaller.marshal(feed, sw);
+			String xml = sw.toString();    		
+
+			//
+			// is the feed (URL/alias) in the database already?
+			//
+			try (Connection connection = ds.getConnection(); PreparedStatement query = wrapper.prepareStatement(
 					"select * from video_connections where uuid = ? " +
-					" and deleted=false and ( groups is null or " + RemoteUtil.getInstance().getGroupClause() + ")",
-				connection)) {
-			query.setString(1, feed.getUuid());
-			query.setString(2, groupVector);
-			logger.debug(query.toString());
-        	ResultSet results =  query.executeQuery();        	
-        	boolean found = results.next();
-    		results.close();
-    		query.close();
-    		
-    		//
-    		// add the feed if not found
-    		//
-    		if (!found) {
-            			
-            	try {
-        			validator.getValidInput("feed", xml, 
-        					MartiValidatorConstants.Regex.XmlBlackList.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
-        			Feed.Type type = feed.getType();
-        			if (type != null) {
-						validator.getValidInput("feed type", type.toString(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+							" and deleted=false and ( groups is null or " + RemoteUtil.getInstance().getGroupClause() + ")",
+							connection)) {
+				query.setString(1, feed.getUuid());
+				query.setString(2, groupVector);
+				
+				logger.debug("video connection query {}", query);
+
+				boolean found = false;
+
+				try (ResultSet results =  query.executeQuery()) {        	
+					found = results.next();
+				}
+
+				//
+				// add the feed if not found
+				//
+				if (!found) {
+
+					try {
+						validator.getValidInput("feed", xml, 
+								MartiValidatorConstants.Regex.XmlBlackList.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
+						Feed.Type type = feed.getType();
+						if (type != null) {
+							validator.getValidInput("feed type", type.toString(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+						}
+						validator.getValidInput("feed alias", feed.getAlias(), MartiValidatorConstants.Regex.MartiSafeStringWithQuestion.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+						validator.getValidInput("feed fov", feed.getFov(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+						validator.getValidInput("feed heading", feed.getHeading(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+						validator.getValidInput("feed range", feed.getRange(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+						validator.getValidInput("feed uuid", feed.getUuid(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+					} catch (ValidationException e) {
+						logger.error("Exception!", e);	    	
+						return false;
+					}            	
+
+					try (PreparedStatement foundQuery = wrapper.prepareStatement("insert into video_connections (" +
+							"owner, type, alias, " +
+							"latitude, longitude, fov, heading, range, uuid, xml, groups)  " +
+							"values (?,?,?,?,?,?,?,?,?,?,?" + RemoteUtil.getInstance().getGroupType() +") ", connection)) {
+
+						foundQuery.setString(1, AuditLogUtil.getUsername());
+						foundQuery.setString(2, feed.getType() != null ? feed.getType().toString() : "VIDEO");
+						foundQuery.setString(3, feed.getAlias());
+						foundQuery.setString(4, feed.getLatitude());
+						foundQuery.setString(5, feed.getLongitude());
+						foundQuery.setString(6, feed.getFov());
+						foundQuery.setString(7, feed.getHeading());
+						foundQuery.setString(8, feed.getRange());
+						foundQuery.setString(9, feed.getUuid());
+						foundQuery.setString(10, xml);
+						foundQuery.setString(11, groupVector);
+						logger.debug("vid connection found query {}", query);
+
+						foundQuery.executeUpdate();
 					}
-        			validator.getValidInput("feed alias", feed.getAlias(), MartiValidatorConstants.Regex.MartiSafeStringWithQuestion.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
-        			validator.getValidInput("feed fov", feed.getFov(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
-        			validator.getValidInput("feed heading", feed.getHeading(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
-        			validator.getValidInput("feed range", feed.getRange(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
-        			validator.getValidInput("feed uuid", feed.getUuid(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
-        	    } catch (ValidationException e) {
-        	        logger.error("Exception!", e);	    	
-        	        return false;
-        	    }            	
-            	
-	    		try (PreparedStatement quer = wrapper.prepareStatement("insert into video_connections (" +
-		    			"owner, type, alias, " +
-		    			"latitude, longitude, fov, heading, range, uuid, xml, groups)  " +
-		    			"values (?,?,?,?,?,?,?,?,?,?,?" + RemoteUtil.getInstance().getGroupType() +") ", connection)) {
-            	
-	    		quer.setString(1, AuditLogUtil.getUsername());
-	    		quer.setString(2, feed.getType() != null ? feed.getType().toString() : "VIDEO");
-	    		quer.setString(3, feed.getAlias());
-	    		quer.setString(4, feed.getLatitude());
-	    		quer.setString(5, feed.getLongitude());
-	    		quer.setString(6, feed.getFov());
-	    		quer.setString(7, feed.getHeading());
-	    		quer.setString(8, feed.getRange());
-	    		quer.setString(9, feed.getUuid());
-				quer.setString(10, xml);
-				quer.setString(11, groupVector);
-				logger.debug(query.toString());
-            			            				    		
-	    		quer.executeUpdate();
-	    		}
-    			        	
-	        	status = true;
-	        	
-    		} else {
-    			status = updateFeed(feed, groupVector, validator);
-    		}
-		}
-        	
-	    } catch (NamingException | SQLException e) {
-	    	status = false;
-	        logger.error("Exception!", e);
-	    } catch (JAXBException e) {
-	    	status = false;
-	        logger.error("Exception!", e);
-	    } finally { }
-    	
-    	return status;
+
+					return true;
+
+				} 
+			}
+
+		} catch (Exception e) {
+			logger.error("Exception!", e);
+			return false;
+		} 
+
+		// update case - so let db resources in try-catch above be released
+		// do the update
+		return updateFeed(feed, groupVector, validator);
 	}
 	
-	public boolean updateFeed(Feed feed, String groupVector, Validator validator) {
+	// Adding this synchronization because of update deadlocks that occur at the database here
+	public synchronized boolean updateFeed(Feed feed, String groupVector, Validator validator) {
 
     	boolean status = false;
     	
@@ -175,19 +176,16 @@ public class VideoManagerService {
     		query.setString(12, feed.getUuid());
 			query.setString(13, groupVector);
 
-			logger.debug(query.toString());
-        			            				    		
-    		query.executeUpdate();
-        	query.close();      
+			logger.debug("video feed update query {}", query);
+        	
+			query.executeUpdate();
+			
         	status = true;
         	
-	    } catch (NamingException | SQLException e) {
+	    } catch (NamingException | SQLException | JAXBException e) {
 	    	status = false;
-	        logger.error("Exception!", e);
-	    } catch (JAXBException e) {
-	    	status = false;
-	        logger.error("Exception!", e);
-	    }
+	        logger.error("Exception executing connection update query", e);
+	    } 
     	
     	return status;
 	}

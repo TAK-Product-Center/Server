@@ -172,8 +172,6 @@ public class LocalConfiguration {
 			// Let's check...
 			try {
 
-				Files.copy(Paths.get(CONFIG_FILE), Paths.get(CONFIG_FILE + "-preLatestUpdate"));
-
 				File xmlFile = new File(CONFIG_FILE);
 				SAXReader reader = new SAXReader();
 				Document doc = reader.read(xmlFile);
@@ -200,8 +198,6 @@ public class LocalConfiguration {
 					throw new RuntimeException(ue);
 				}
 				
-				
-
 				// It still didn't like the file. No idea what happened...
 			
 			} catch (DocumentException | JAXBException | IOException e0) {
@@ -264,8 +260,7 @@ public class LocalConfiguration {
 
 		Cluster clusterConf = configuration.getCluster();
 
-		boolean useEmbeddedIgnite = monolithProfileActive || messagingProfileActive
-				|| configuration.getBuffer().isEmbeddedIgnite();
+		boolean useEmbeddedIgnite = monolithProfileActive || messagingProfileActive || configuration.getBuffer().isEmbeddedIgnite();
 
 		String igniteProfile = "";
 		if (monolithProfileActive)
@@ -274,25 +269,54 @@ public class LocalConfiguration {
 			igniteProfile = Constants.API_PROFILE_NAME;
 		else if (messagingProfileActive)
 			igniteProfile = Constants.MESSAGING_PROFILE_NAME;
+
+		long offHeapInitialSizeBytes;
+		long offHeapMaxSizeBytes;
 		
-		Long offheapSize = null;
+		// Note - using System.out here instead of logger due to logger init race
+		if (configuration.getBuffer().getQueue().getCacheOffHeapMaxSizeBytes() == -1) {
+			System.out.println("messaging process Xmx (bytes) " + Runtime.getRuntime().maxMemory());
+			
+			// this RAM calculation is a rough estimate based on JVM maxMemory(). Use explicit size (CoreConfig cacheOffHeapMaxSizeBytes to be exact).
+			offHeapMaxSizeBytes = (long) (Runtime.getRuntime().maxMemory() * configuration.getBuffer().getQueue().getCacheOffHeapPercentageMax());
+			System.out.println("cache computed offheap max size " + offHeapMaxSizeBytes + " bytes");
+		} else {
+			offHeapMaxSizeBytes = configuration.getBuffer().getQueue().getCacheOffHeapMaxSizeBytes();
+			System.out.println("cache explicit offheap max size " + offHeapMaxSizeBytes + " bytes");
+		}
 		
 		if (configuration.getBuffer().getQueue().getCacheOffHeapInitialSizeBytes() == -1) {
-			offheapSize = (long) (Runtime.getRuntime().maxMemory() * configuration.getBuffer().getQueue().getCacheOffHeapDefaultPercentage());
+			// this RAM calculation is a rough estimate based on JVM maxMemory(). Use explicit size (CoreConfig cacheOffHeapMaxSizeBytes to be exact).
+			offHeapInitialSizeBytes = (long) (Runtime.getRuntime().maxMemory() * configuration.getBuffer().getQueue().getCacheOffHeapPercentageInitial());
+			System.out.println("cache computed offheap initial size " + offHeapInitialSizeBytes + " bytes");
+		} else {
+			offHeapInitialSizeBytes = configuration.getBuffer().getQueue().getCacheOffHeapInitialSizeBytes();
+			System.out.println("cache computed offheap initial offheap max size " + offHeapMaxSizeBytes + " bytes");
 		}
-		
-		if (offheapSize != null) {
-			logger.info("computed offheap size: " + offheapSize);
-		}
+
+		System.out.println("cache offheap initial size " + offHeapInitialSizeBytes + " bytes");
 		
 		int ignitePoolSize = configuration.getBuffer().getQueue().getIgnitePoolSize();
+		
 		
 		// set ignite pool size based on processor count
 		if (ignitePoolSize < 1) {
 			
-			ignitePoolSize = Runtime.getRuntime().availableProcessors();
+			ignitePoolSize = Runtime.getRuntime().availableProcessors() * configuration.getBuffer().getQueue().getIgnitePoolSizeMultiplier();
+			
+			if (ignitePoolSize > 1024) { // ignite hard limit on pool size
+				ignitePoolSize = 1024;
+			}
 		}
+		
+		System.out.println("ignite thread pool size: " + ignitePoolSize);
 
+		boolean isIgniteApiServerMode = false;
+		
+		if (isApiProfileActive() && configuration.getBuffer().getQueue().isIgniteApiServerMode()) {
+			isIgniteApiServerMode = true;
+		}
+		
 		IgniteConfigurationHolder.getInstance()
 				.setConfiguration(IgniteConfigurationHolder.getInstance()
 						.getIgniteConfiguration(igniteProfile, configuration.getBuffer().getIgniteHost(),clusterConf.isEnabled(), clusterConf.isKubernetes(),
@@ -303,12 +327,18 @@ public class LocalConfiguration {
 								configuration.getBuffer().getIgniteCommunicationPortCount(),
 								configuration.getBuffer().getQueue().getCapacity(),
 								configuration.getBuffer().getIgniteWorkerTimeoutMilliseconds(),
-								(offheapSize == null ? configuration.getBuffer().getQueue().getCacheOffHeapInitialSizeBytes() : offheapSize),
-								(offheapSize == null ? configuration.getBuffer().getQueue().getCacheOffHeapMaxSizeBytes() : offheapSize),
+								offHeapInitialSizeBytes,
+								offHeapMaxSizeBytes,
 								ignitePoolSize,
 								configuration.getBuffer().getQueue().isEnableCachePersistence(),
-								configuration.getBuffer().getQueue().getCacheOffHeapEvictionThreshold()));
-
+								configuration.getBuffer().getQueue().getCacheOffHeapEvictionThreshold(),
+								configuration.getBuffer().getQueue().isIgnitePoolSizeUseDefaultsForApi(),
+								configuration.getBuffer().getQueue().isIgniteDefaultSpiConnectionsPerNode(),
+								configuration.getBuffer().getQueue().getIgniteExplicitSpiConnectionsPerNode(),
+								isIgniteApiServerMode,
+								configuration.getBuffer().getQueue().getIgniteFailureDetectionTimeoutSeconds() * 1000, // to ms
+								configuration.getBuffer().getQueue().getIgniteClientConnectionTimeoutSeconds() * 1000, // to ms
+								configuration.getBuffer().getQueue().getIgniteConnectionTimeoutSeconds() * 1000)); // to ms
 	}
 
 	public boolean setDefaults() {
