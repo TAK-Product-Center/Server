@@ -30,23 +30,13 @@ import tak.server.proto.StreamingProtoBufHelper;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509ExtendedTrustManager;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
-import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -353,43 +343,6 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 				super.send(data);
 			}
 		}
-		
-		private static TrustManager[] trustAllCerts = new TrustManager[]{
-				new X509ExtendedTrustManager () {
-			         @Override
-			         public void checkClientTrusted (X509Certificate [] chain, String authType, Socket socket) {
-
-			         }
-
-			         @Override
-			         public void checkServerTrusted (X509Certificate [] chain, String authType, Socket socket) {
-
-			         }
-
-			         @Override
-			         public void checkClientTrusted (X509Certificate [] chain, String authType, SSLEngine engine) {
-
-			         }
-
-			         @Override
-			         public void checkServerTrusted (X509Certificate [] chain, String authType, SSLEngine engine) {
-
-			         }
-
-			         @Override
-			         public java.security.cert.X509Certificate [] getAcceptedIssuers () {
-			        	 return new java.security.cert.X509Certificate[]{};
-			         }
-
-			         @Override
-			         public void checkClientTrusted (X509Certificate [] certs, String authType) {
-			         }
-
-			         @Override
-			         public void checkServerTrusted (X509Certificate [] certs, String authType) {
-			         }
-			      }
-        };
 
 		private ByteBuffer convertStringToProtoBufBuffer(String xml) {
 			ByteBuffer buffer;
@@ -437,15 +390,12 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 			SSLHelper.TakClientSslContext tcsc = new SSLHelper.TakClientSslContext(user);
 			SessionIdFetcher sif = new SessionIdFetcher(tcsc, baseUrl);
 			String cookie = sif.getSessionId();
-			SSLContext websocketSslContext = SSLContext.getInstance("TLSv1.2");
-			// Initalize ssl context with trusting trust manager
-			websocketSslContext.init(tcsc.getKeyManagerFactory().getKeyManagers(), trustAllCerts, null);
 
 			Map<String, String> headers = new HashMap<>();
 			headers.put("Cookie", cookie);
 			TakWebsocketClient client = new TakWebsocketClient(new URI(baseUrl + TAKPROTO_PATH), headers, responseListener, dl);
 			client.setTcpNoDelay(true);
-			client.setSocketFactory(websocketSslContext.getSocketFactory());
+			client.setSocketFactory(tcsc.getSslSocketFactory());
 			try {
 				client.connectBlocking();
 			} catch (InterruptedException e) {

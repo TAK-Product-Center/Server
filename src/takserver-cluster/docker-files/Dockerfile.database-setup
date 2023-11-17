@@ -1,4 +1,4 @@
-FROM openjdk:11-jdk-bullseye
+FROM eclipse-temurin:17-jammy
 COPY takserver-schemamanager/SchemaManager.jar ./
 COPY takserver-schemamanager/generic-cluster-database-configuration.sh ./
 COPY CoreConfig.xml opt/tak/CoreConfig.xml

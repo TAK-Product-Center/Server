@@ -125,8 +125,16 @@ public abstract class MessageBaseStrategy<T> implements MessageStrategy<T> {
 					if (currentRateLimit.get() > 0) {
 						cache(true);
 					}
-				}  else {
-
+				}  else if (rateLimits.get(threshold) != currentRateLimit.get()){
+					int rateLimit = rateLimits.get(threshold);
+					logger.info("Applying new rate limit of " + rateLimit + " seconds for client threshold of " + threshold);
+					currentRateLimit.set(rateLimit);
+					
+					if (currentRateLimit.get() > 0) {
+						cache(true);
+					}
+					
+				} else {
 					logger.info("Reporting rate limit of " + currentRateLimit.get() + " seconds already applied (unchanged)");
 				}
 

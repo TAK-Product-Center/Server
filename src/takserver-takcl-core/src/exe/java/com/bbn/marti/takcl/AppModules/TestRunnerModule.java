@@ -8,6 +8,7 @@ import com.bbn.marti.takcl.config.common.TakclRunMode;
 import com.bbn.marti.test.shared.AbstractSingleServerTestClass;
 import com.bbn.marti.test.shared.AbstractTestClass;
 import com.bbn.marti.tests.*;
+import com.bbn.marti.tests.federationmissions.FederationEnterpriseFileSync;
 import com.bbn.marti.tests.missions.*;
 import com.cloudbees.junit.runner.App;
 import org.apache.commons.io.IOUtils;
@@ -69,6 +70,7 @@ public class TestRunnerModule implements AppModuleInterface {
 			MissionFileSync.class,
 			MissionUserCustomRolesTests.class,
 			MissionUserDefaultRolesTests.class,
+			FederationEnterpriseFileSync.class,
 			UserManagementTests.class,
 			FedHubTests.class
 //			SimpleTests.class

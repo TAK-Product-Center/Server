@@ -128,8 +128,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	private static final long serialVersionUID = -8858646520017672442L;
 	private static final String OUTGOING_DELETED_FROM_UI = "Outgoing deleted from UI";
 
-	public DistributedFederationManager(NioNettyBuilder nettyBuilder, Ignite ignite, CoreConfig coreConfig) {
-		this.nettyBuilder = nettyBuilder;
+	public DistributedFederationManager(Ignite ignite, CoreConfig coreConfig) {
 		this.coreConfig = DistributedConfiguration.getInstance();
 
 		if (logger.isDebugEnabled()) {
@@ -137,13 +136,21 @@ public class DistributedFederationManager implements FederationManager, Service 
 		}
 	}
 
-	private NioNettyBuilder nettyBuilder;
+	private static AtomicBoolean outgoingsInitiated = new AtomicBoolean();
+
+	private static final Logger logger = LoggerFactory.getLogger(DistributedFederationManager.class);
+
+	private static DistributedFederationManager instance = null;
+
+	private static final String SSL_TRUSTSTORE_KEY = "fed-ssl-truststore";
 
 	private CoreConfig coreConfig;
 
 	private final AtomicReference<Messenger<CotEventContainer>> cotMessenger = new AtomicReference<>();
 
-	private static AtomicBoolean outgoingsInitiated = new AtomicBoolean();
+	private final AtomicInteger counter = new AtomicInteger();
+
+	private ContinuousQuery<String, SSLConfig> continuousTrustStoreQuery = new ContinuousQuery<>();
 	
 	@SuppressWarnings("unchecked")
 	private Messenger<CotEventContainer> messenger() {
@@ -162,14 +169,9 @@ public class DistributedFederationManager implements FederationManager, Service 
 		return MessagingDependencyInjectionProxy.getInstance().groupManager();
 	}
 
-	private static DistributedFederationManager instance = null;
-
-	private final AtomicInteger counter = new AtomicInteger();
-
-	private static final String SSL_TRUSTSTORE_KEY = "fed-ssl-truststore";
-
-    private ContinuousQuery<String, SSLConfig> continuousTrustStoreQuery = new ContinuousQuery<>();
-
+	private NioNettyBuilder nioNettyBuilder() {
+		return MessagingDependencyInjectionProxy.getInstance().nioNettyBuilder();
+	}
 
 	public static DistributedFederationManager getInstance() {
 		if (instance == null) {
@@ -213,6 +215,68 @@ public class DistributedFederationManager implements FederationManager, Service 
      	 });
 
 		getSSLCache().query(continuousTrustStoreQuery);
+	}
+
+	@Override
+	public void execute(ServiceContext ctx) throws Exception {
+		if (logger.isDebugEnabled()) {
+			logger.debug("execute method DistributedFederationManager");
+		}
+	}
+
+	// number of milliseconds that, without any activity, qualify a federate
+	// connection as a zombie that should be forcibly disregarded
+	public static final long FED_ZOMBIE_TIMEOUT = 30000;
+
+	@Override
+	public int incrementAndGetCounter() {
+
+		int result = counter.incrementAndGet();
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("counter incremented: " + result);
+		}
+
+		return result;
+	}
+
+	// start or restart the federation server
+	private void startListening() {
+		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+
+		if (fedConfig.getFederationServer().getFederationPort().isEmpty()) { // this will update old CoreConfig to the new format
+			if (logger.isDebugEnabled()) {
+				logger.debug("updating Federation Config to new format.");
+			}
+			int port = fedConfig.getFederationServer().getPort();
+			String tlsVersion = fedConfig.getFederationServer().getTls().getContext();
+			FederationPort p = new FederationPort();
+			p.setPort(port);
+			p.setTlsVersion(tlsVersion);
+			fedConfig.getFederationServer().getFederationPort().add(p);
+
+			try {
+				coreConfig.setAndSaveFederation(fedConfig);
+			} catch (Exception e) {
+				logger.warn("exception trying to update CoreConfig.xml to new format." + e.getMessage(), e);
+			}
+		}
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("Configuring federation server");
+		}
+		
+		nioNettyBuilder().buildFederationServer();
+	}
+
+
+	@EventListener({ ContextRefreshedEvent.class })
+	private void onContextRefreshed() {
+		// This occurs in WebSocketTest
+		if (coreConfig == null || coreConfig.getRemoteConfiguration() == null
+				|| coreConfig.getRemoteConfiguration().getFederation() == null) {
+			return;
+		}
 
 		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
 
@@ -243,70 +307,6 @@ public class DistributedFederationManager implements FederationManager, Service 
 			}
 		} catch (Exception e) {
 			logger.warn("FAIL" + e);
-		}
-	}
-
-	@Override
-	public void execute(ServiceContext ctx) throws Exception {
-		if (logger.isDebugEnabled()) {
-			logger.debug("execute method DistributedFederationManager");
-		}
-	}
-
-	// number of milliseconds that, without any activity, qualify a federate
-	// connection as a zombie that should be forcibly disregarded
-	public static final long FED_ZOMBIE_TIMEOUT = 30000;
-
-	@Override
-	public int incrementAndGetCounter() {
-
-		int result = counter.incrementAndGet();
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("counter incremented: " + result);
-		}
-
-		return result;
-	}
-
-	private static final Logger logger = LoggerFactory.getLogger(DistributedFederationManager.class);
-
-	// start or restart the federation server
-	private void startListening() {
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
-
-		if (fedConfig.getFederationServer().getFederationPort().isEmpty()) { // this will update old CoreConfig to the new format
-			if (logger.isDebugEnabled()) {
-				logger.debug("updating Federation Config to new format.");
-			}
-			int port = fedConfig.getFederationServer().getPort();
-			String tlsVersion = fedConfig.getFederationServer().getTls().getContext();
-			FederationPort p = new FederationPort();
-			p.setPort(port);
-			p.setTlsVersion(tlsVersion);
-			fedConfig.getFederationServer().getFederationPort().add(p);
-
-			try {
-				coreConfig.setAndSaveFederation(fedConfig);
-			} catch (Exception e) {
-				logger.warn("exception trying to update CoreConfig.xml to new format." + e.getMessage(), e);
-			}
-		}
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("Configuring federation server");
-		}
-		
-		nettyBuilder.buildFederationServer();
-	}
-
-
-	@EventListener({ ContextRefreshedEvent.class })
-	private void onContextRefreshed() {
-		// This occurs in WebSocketTest
-		if (coreConfig == null || coreConfig.getRemoteConfiguration() == null
-				|| coreConfig.getRemoteConfiguration().getFederation() == null) {
-			return;
 		}
 
 		if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
@@ -416,6 +416,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 						// if the orphaned node is null - no other node has handled this event - so lets do it here.
 						if (handlingNodeId == null) {
 
+							// TODO: check usage of forClients() below - is this only for cluster?
 							DistributedConfiguration.getInstance()
 								.getRemoteConfiguration()
 								.getFederation()
@@ -461,7 +462,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 		} else if (outgoing.getProtocolVersion() == Constants.STANDARD_FEDERATION) {
 			status.setConnectionStatusValue(ConnectionStatusValue.CONNECTING);
 			try {
-				nettyBuilder.buildFederationClient(outgoing, status);
+				nioNettyBuilder().buildFederationClient(outgoing, status);
 				return true;
 			} catch (Exception e) {
 				if (logger.isDebugEnabled()) {

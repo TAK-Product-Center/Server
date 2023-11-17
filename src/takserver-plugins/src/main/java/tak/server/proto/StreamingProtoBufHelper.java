@@ -122,18 +122,17 @@ public class StreamingProtoBufHelper {
                      cotEventBuilder.setStaleTime(DateUtil.millisFromCotTimeStr(stale.getText()));
                  }
             }
-            
-            Date submitTime = cot.getSubmissionTime();
-            long submitMillis;
-            if (submitTime != null && (submitMillis = submitTime.getTime()) > 0) {
-            	cotEventBuilder.setSubmissionTime(submitMillis);
-            } 
-            
-            long creationTime = cot.getCreationTime();
-            if (creationTime > 0) {
-            	cotEventBuilder.setCreationTime(creationTime);
-            } 
-            
+
+            Attribute caveat = root.attribute("caveat");
+            if (caveat != null) {
+                cotEventBuilder.setCaveat(caveat.getText());
+            }
+
+            Attribute releaseableTo = root.attribute("releaseableTo");
+            if (releaseableTo != null) {
+                cotEventBuilder.setReleaseableTo(releaseableTo.getText());
+            }
+
             Attribute opex = root.attribute("opex");
             if (opex != null) {
                 cotEventBuilder.setOpex(opex.getText());
@@ -406,6 +405,18 @@ public class StreamingProtoBufHelper {
 
             TakMessage.Builder takMessageBuilder = TakMessage.newBuilder();
             takMessageBuilder.setCotEvent(cotEvent);
+
+            Date submitTime = cot.getSubmissionTime();
+            long submitMillis;
+            if (submitTime != null && (submitMillis = submitTime.getTime()) > 0) {
+                takMessageBuilder.setSubmissionTime(submitMillis);
+            }
+
+            long creationTime = cot.getCreationTime();
+            if (creationTime > 0) {
+                takMessageBuilder.setCreationTime(creationTime);
+            }
+
             TakMessage takMessage = takMessageBuilder.build();
 
             return takMessage;
@@ -439,7 +450,17 @@ public class StreamingProtoBufHelper {
                     .addAttribute("time", DateUtil.toCotTime(cotEvent.getSendTime()))
                     .addAttribute("start", DateUtil.toCotTime(cotEvent.getStartTime()))
                     .addAttribute("stale", DateUtil.toCotTime(cotEvent.getStaleTime()));
-            
+
+            String caveat = cotEvent.getCaveat();
+            if (caveat != null && caveat.length() > 0) {
+                eventElement.addAttribute("caveat", caveat);
+            }
+
+            String releaseableTo = cotEvent.getReleaseableTo();
+            if (releaseableTo != null && releaseableTo.length() > 0) {
+                eventElement.addAttribute("releaseableTo", releaseableTo);
+            }
+
             String opex = cotEvent.getOpex();
             if (opex != null && opex.length() > 0) {
                 eventElement.addAttribute("opex", opex);
@@ -580,16 +601,12 @@ public class StreamingProtoBufHelper {
             cotEventContainer.setTimeLong(cotEvent.getSendTime());
             cotEventContainer.setStartLong(cotEvent.getStartTime());
             cotEventContainer.setStaleLong(cotEvent.getStaleTime());
-            
-            if (cotEvent.getSubmissionTime() > 0) {
-            	cotEventContainer.setSubmissionTime(new Date(cotEvent.getSubmissionTime()));
+            if (takMessage.getSubmissionTime() > 0) {
+                cotEventContainer.setSubmissionTime(new Date(takMessage.getSubmissionTime()));
             }
-            
-            
-            if (cotEvent.getCreationTime() > 0) {
-            	cotEventContainer.setCreationTime(cotEvent.getCreationTime());
+            if (takMessage.getCreationTime() > 0) {
+                cotEventContainer.setCreationTime(takMessage.getCreationTime());
             }
-                        
             cotEventContainer.setLatDouble(cotEvent.getLat());
             cotEventContainer.setLonDouble(cotEvent.getLon());
             cotEventContainer.setHaeDouble(cotEvent.getHae());

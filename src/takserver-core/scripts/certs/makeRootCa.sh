@@ -50,6 +50,9 @@ KEYPASS="-key $CAPASS"
 
 touch crl_index.txt
 touch crl_index.txt.attr
+if ! $(grep -q unique_subject crl_index.txt.attr); then
+  echo "unique_subject = no" >> crl_index.txt.attr
+fi
 
 openssl ca -config ../config.cfg -gencrl -keyfile ca-do-not-share.key $KEYPASS -cert ca.pem -out ca.crl
 

@@ -137,7 +137,6 @@ dependencies {
 	    exclude group: 'ch.qos.logback', module: 'logback-classic'
 	    exclude group: 'org.slf4j'
 	    exclude group: 'log4j', module: 'log4j'
-		exclude group: 'org.apache.ignite', module: 'ignite-log4j'
   	}
 
     coreImplementation (project(':takserver-fig-core')) {
@@ -150,7 +149,6 @@ dependencies {
 	    exclude group: 'ch.qos.logback', module: 'logback-classic'
 	    exclude group: 'org.slf4j'
 	    exclude group: 'log4j', module: 'log4j'
-		exclude group: 'org.apache.ignite', module: 'ignite-log4j'
   	}
 
     coreImplementation group: 'commons-io', name: 'commons-io', version: commons_io_version
@@ -182,7 +180,6 @@ dependencies {
 	    exclude group: 'ch.qos.logback', module: 'logback-classic'
 	    exclude group: 'org.slf4j'
 	    exclude group: 'log4j', module: 'log4j'
-		exclude group: 'org.apache.ignite', module: 'ignite-log4j'
   	}
 
 	implementation (project(':takserver-fig-core')) {
@@ -195,7 +192,6 @@ dependencies {
 	    exclude group: 'ch.qos.logback', module: 'logback-classic'
 	    exclude group: 'org.slf4j'
 	    exclude group: 'log4j', module: 'log4j'
-		exclude group: 'org.apache.ignite', module: 'ignite-log4j'
   	}
 
 	implementation group: 'commons-io', name: 'commons-io', version: commons_io_version
@@ -223,7 +219,7 @@ dependencies {
     implementation group: 'com.squareup.retrofit2', name: 'converter-scalars', version: '2.9.0'
 	// Keep the logging-interceptor in sync with the retrofit dependencies!
 	implementation group: 'com.squareup.okhttp3', name: 'logging-interceptor', version: '3.14.9'
-	implementation group: 'org.java-websocket', name: 'Java-WebSocket', version: java_websocket_version
+	implementation group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.4.0'
     implementation group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
 
     implementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version

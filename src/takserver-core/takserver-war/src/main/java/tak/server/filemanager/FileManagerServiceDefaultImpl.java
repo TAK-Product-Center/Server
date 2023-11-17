@@ -24,6 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 
 import com.bbn.marti.remote.util.ConcurrentMultiHashMap;
+import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.model.Resource;
 import com.beust.jcommander.internal.Lists;
 import com.google.common.collect.Multimap;
@@ -74,10 +75,83 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 		});
 	}
 	 
-	public List<Resource> getMissionPackageResources(int limit, int offset, String sort, Boolean ascending){
+	public List<Resource> getMissionPackageResources(int limit, int offset, String sort, Boolean ascending, String name, String groupVector){
 		String sql = "select hash, name, octet_length(data), submitter, groups, submissiontime, mimetype, expiration, uid "
-				   + "from resource where 'missionpackage' = ANY(keywords) ";
+				   + "from resource where 'missionpackage' = ANY(keywords) AND " + RemoteUtil.getInstance().getGroupClause();
 		List<Object> params = new ArrayList<>();
+		params.add(groupVector);
+		if(!name.isBlank()) {
+			sql = sql + "and name like ? ";
+			params.add("%"+name+"%");
+		}
+		// If Limit is 0, do not page
+		if (limit == 0) {
+			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+				sql = sql + "order by " + getResourceColumnName(sort) + " ";
+				if(ascending) {
+					sql = sql + "asc ";
+				} else {
+					sql = sql + "desc ";
+				}
+			}
+		} else {
+			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+				sql = sql + "order by " + getResourceColumnName(sort) + " ";
+				if(ascending) {
+					sql = sql + "asc ";
+				} else {
+					sql = sql + "desc ";
+				}
+			}
+			// Add offset and limit at the end of statement
+			sql = sql + "offset ? limit ?";
+			params.add(offset);
+			params.add(limit);
+		}
+		return getAndParseResourceQuery(sql, params.toArray());
+	}
+	
+	public List<Resource> findAllFiles(int limit, int offset, String sort, Boolean ascending, String groupVector){
+		String sql = "select hash, name, octet_length(data), submitter, groups, submissiontime, mimetype, expiration, uid "
+				   + "from resource where " + RemoteUtil.getInstance().getGroupClause();;
+		List<Object> params = new ArrayList<>();
+		params.add(groupVector);
+		// If Limit is 0, do not page
+		if (limit == 0) {
+			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+				sql = sql + "order by " + getResourceColumnName(sort) + " ";
+				if(ascending) {
+					sql = sql + "asc ";
+				} else {
+					sql = sql + "desc ";
+				}
+			}
+		} else {
+			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+				sql = sql + "order by " + getResourceColumnName(sort) + " ";
+				if(ascending) {
+					sql = sql + "asc ";
+				} else {
+					sql = sql + "desc ";
+				}
+			}
+			// Add offset and limit at the end of statement
+			sql = sql + "offset ? limit ?";
+			params.add(offset);
+			params.add(limit);
+		}
+		return getAndParseResourceQuery(sql, params.toArray());
+	}
+	
+	public List<Resource> findByName(int limit, int offset, String sort, Boolean ascending, String name, String groupVector){
+		String sql = "select hash, name, octet_length(data), submitter, groups, submissiontime, mimetype, expiration, uid "
+				   + "from resource where " + RemoteUtil.getInstance().getGroupClause();;
+		List<Object> params = new ArrayList<>();
+		params.add(groupVector);
+		if(!name.isBlank()) {
+			sql = sql + "and name like ? ";
+			params.add("%"+name+"%");
+		}
 		// If Limit is 0, do not page
 		if (limit == 0) {
 			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
@@ -107,12 +181,17 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 	
 
 	@Override
-	public List<Resource> getResourcesByMission(String mission, int limit, int offset, String sort, Boolean ascending) {
+	public List<Resource> getResourcesByMission(String mission, int limit, int offset, String sort, Boolean ascending, String name, String groupVector) {
 		String sql = "select r.hash, r.name, octet_length(data), r.submitter, r.groups, r.submissiontime, r.mimetype, r.expiration, r.uid "
 				   + "from resource r inner join mission_resource mr on r.id = mr.resource_id "
-				   + "inner join mission mi on mr.mission_id = mi.id where mi.name = ? ";
+				   + "inner join mission mi on mr.mission_id = mi.id where mi.name = ? AND " + RemoteUtil.getInstance().getGroupClause("r");;
 		List<Object> params = new ArrayList<>();
 		params.add(mission);
+		params.add(groupVector);
+		if(!name.isBlank()) {
+			sql = sql + "and r.name like ? ";
+			params.add("%"+name+"%");
+		}
 		// If Limit is 0, do not page
 		if (limit == 0) {
 			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {

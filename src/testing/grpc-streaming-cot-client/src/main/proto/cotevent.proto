@@ -21,6 +21,8 @@ message CotEvent {
     string access = 2;             // optional
     string qos = 3;                // optional
     string opex = 4;               // optional
+    string caveat = 16;            // optional
+    string releaseableTo = 17;     // optional
 
     string uid = 5;                // <event uid="x">
     uint64 sendTime = 6;           // <event time="x"> converted to timeMs
@@ -39,9 +41,5 @@ message CotEvent {
     // This is optional - if omitted, then the cot message
     // had no data under <detail>
     Detail detail = 15;
-
-    uint64 submissionTime = 16;
-    uint64 creationTime = 17;
-
 }
 

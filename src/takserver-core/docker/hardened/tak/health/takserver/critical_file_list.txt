@@ -1,13 +1,10 @@
 /opt/tak/TAKAConfig.xsd
-/opt/tak/CoreConfig.xsd
 /opt/tak/TAKCLConfig.xsd
-/opt/tak/CoreConfig.xml
 /opt/tak/validateConfig.sh
 /opt/tak/db-utils/configureInDocker.sh
 /opt/tak/db-utils/configure.sh
 /opt/tak/configureInDocker.sh
 /opt/tak/certs/config.cfg
-/opt/tak/certs/files/config-takserver.cfg
 /opt/tak/configure.sh
 /usr/share/crypto-policies/back-ends/LEGACY/java.config
 /usr/share/crypto-policies/back-ends/LEGACY/opensslcnf.config

@@ -100,6 +100,7 @@ public class Constants {
 
 	// distributed cache / messaging names (ignite)
 	public static final String ALL_MISSION_CACHE = "allMissionCache";
+	public static final String INVITE_ONLY_MISSION_CACHE = "inviteOnlyMissionCache";
 	public static final String ALL_COPS_MISSION_CACHE = "allCopsMissionCache";
 	public static final String MISSION_ROLE_CACHE = "missionRoleCache";
 	public static final String MISSION_SUBSCRIPTION_CACHE = "missionSubscriptionCache";
@@ -110,6 +111,7 @@ public class Constants {
 	public static final String SUBSCRIPTION_CACHE_NAME = "subscription-cache";
 	public static final String CONTACTS_CACHE = "contacts-cache";
 	public static final String ACTIVE_GROUPS_CACHE = "active-groups-cache";
+	public static final String CLASSIFICATION_CACHE = "classification-cache";
 	public static final String FEDERATION_OUTGOING_CACHE = "federation-outgoing-cache";
 	public static final String IGNITE_SUBSCRIPTION_UID_TRACKER_CACHE = "ignite-subscription-uid-tacker-cache";
 	public static final String IGNITE_SUBSCRIPTION_CLIENTUID_TRACKER_CACHE = "ignite-subscription-clientuid-tacker-cache";

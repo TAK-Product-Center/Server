@@ -27,7 +27,7 @@ public class EnterpriseFileSync extends AbstractConfigurationA {
 
 	@Test(timeout = SHORT_TIMEOUT)
 	public void c_downloadFile() {
-		engine.fileDownload(admin, dataAUploadFileHash);
+		engine.fileDownload(existingMember, dataAUploadFileHash);
 	}
 
 	@Test(timeout = SHORT_TIMEOUT)
@@ -37,7 +37,7 @@ public class EnterpriseFileSync extends AbstractConfigurationA {
 
 	@Test(timeout = SHORT_TIMEOUT)
 	public void e_downloadDeletedFile() {
-		engine.fileDownload(admin, dataAUploadFileHash);
+		engine.fileDownload(existingMember, dataAUploadFileHash);
 	}
 
 	@Test(timeout=SHORT_TIMEOUT)

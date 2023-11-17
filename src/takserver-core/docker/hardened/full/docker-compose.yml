@@ -12,15 +12,15 @@ services:
       - '../takdata/logs:/opt/tak/logs'
       - '../takdata/certs:/opt/tak/certs/files'
     entrypoint: /opt/tak/docker_entrypoint.sh
+#    stop_signal: SIGINT
+    stop_grace_period: 30s
     networks:
       - taknet
     ports:
-      - '8080:8080'
+      - '8089:8089'
       - '8443:8443'
       - '8444:8444'
       - '8446:8446'
-      - '8087:8087'
-      - '8088:8088'
       - '9000:9000'
       - '9001:9001'
     depends_on:
@@ -31,6 +31,10 @@ services:
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.hardened-full-takserver-db
+#    stop_signal: SIGINT
+#    stdin_open: true
+#    tty: true
+    stop_grace_period: 30s
     networks:
       - taknet
     ports:
@@ -44,6 +48,10 @@ services:
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.hardened-full-takserver-db
+#    stop_signal: SIGINT
+#    stdin_open: true
+#    tty: true
+    stop_grace_period: 30s
     networks:
       - taknet
     ports:

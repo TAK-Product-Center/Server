@@ -57,8 +57,82 @@ allprojects {
 //  apply plugin: 'pmd'
 
 
-  sourceCompatibility = 1.8
-  targetCompatibility = 1.8
+  sourceCompatibility = 17
+  targetCompatibility = 17
+
+
+// The java opens values. These must be managed in takserver-core/scripts/setenv.sh in addition to here!
+ext.java_internal_opens = [
+    // Compile/test takserver required opens
+    'java.base/sun.security.pkcs',
+    'java.base/sun.security.pkcs10',
+    'java.base/sun.security.util',
+    'java.base/sun.security.x509',
+    'java.base/sun.security.tools.keytool',
+
+    // Ignite required opens as per https://github.com/apache/ignite/blob/master/bin/include/jvmdefaults.sh
+    'java.base/jdk.internal.misc',
+    'java.base/sun.nio.ch',
+    'java.management/com.sun.jmx.mbeanserver',
+    'jdk.internal.jvmstat/sun.jvmstat.monitor',
+    'java.base/sun.reflect.generics.reflectiveObjects',
+    'jdk.management/com.sun.management.internal',
+    'java.base/java.io',
+    'java.base/java.nio',
+    'java.base/java.util',
+    'java.base/java.util.concurrent',
+    'java.base/java.util.concurrent.locks',
+    'java.base/java.util.concurrent.atomic',
+    'java.base/java.lang',
+    'java.base/java.lang.invoke',
+    'java.base/java.math',
+    'java.sql/java.sql',
+
+    // Confirmed runtime requires
+    'java.base/javax.net.ssl',
+	'java.base/java.net',
+
+    // Runtime requires and misc found from previous jdk17 upgrade attempt
+    // One was needed, so I'll just include them all instead of trial-and-error it
+    'jdk.unsupported/sun.misc',
+    'java.base/java.lang.ref',
+    'java.base/java.lang.reflect',
+    'java.base/java.security',
+    'java.base/java.security.ssl',
+    'java.base/java.security.cert',
+    'java.base/sun.security.rsa',
+    'java.base/sun.security.ssl',
+    'java.base/sun.security.x500',
+    'java.base/sun.security.pkcs12',
+    'java.base/sun.security.provider',
+    'java.base/javax.security.auth.x500'
+    ]
+
+ext.common_java_args = ext.java_internal_opens.collect { '--add-opens=' + it + '=ALL-UNNAMED' }
+//// 'exports' is not a typo. As per javac, "warning: [options] --add-opens has no effect at compile time"
+ext.common_javac_args = ext.java_internal_opens.collect { '--add-exports=' + it + '=ALL-UNNAMED' }
+ext.common_manifest = ['Add-Opens': ext.java_internal_opens.join(' ')]
+
+  // Apply compiler exports and opens
+  tasks.withType(JavaCompile.class).configureEach {
+    options.compilerArgs += common_javac_args
+  }
+
+
+  // Apply test exports and opens
+  tasks.withType(Test.class).configureEach {
+    jvmArgs += common_java_args
+  }
+
+  // Apply Jar (which BootJar and ShadowJar extends) exports and opens manifest entries
+  tasks.withType(Jar.class).configureEach {
+    manifest.attributes.putAll(common_manifest)
+  }
+
+  // Apply War (which BootWar extends) exports and opens manifest entries
+  tasks.withType(War.class).configureEach {
+    manifest.attributes.putAll(common_manifest)
+  }
 
 // alternate way to set target
 // https://github.com/gradle/gradle/issues/2510

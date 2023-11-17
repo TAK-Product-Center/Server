@@ -45,7 +45,6 @@ import com.bbn.marti.GetServerTimeServlet;
 import com.bbn.marti.KmlMasterSaServlet;
 import com.bbn.marti.LatestKMLServlet;
 import com.bbn.marti.MissionKMLServlet;
-import com.bbn.marti.oauth.OAuthApi;
 import com.bbn.marti.ResubscribeServlet;
 import com.bbn.marti.TracksKMLServlet;
 import com.bbn.marti.citrap.CITrapReportAPI;
@@ -82,6 +81,7 @@ import com.bbn.marti.network.LDAPApi;
 import com.bbn.marti.network.SecurityAuthenticationApi;
 import com.bbn.marti.network.SubmissionApi;
 import com.bbn.marti.network.UIDSearchApi;
+import com.bbn.marti.oauth.OAuthApi;
 import com.bbn.marti.oauth.TokenApi;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationConfigInterface;
@@ -97,6 +97,7 @@ import com.bbn.marti.service.FederationHttpConnectorManager;
 import com.bbn.marti.service.RepositoryService;
 import com.bbn.marti.sync.ContentServlet;
 import com.bbn.marti.sync.DeleteServlet;
+import com.bbn.marti.sync.EnterpriseSyncCacheHelper;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.FileList;
 import com.bbn.marti.sync.JDBCEnterpriseSyncService;
@@ -165,11 +166,16 @@ import tak.server.filemanager.FileManagerServiceDefaultImpl;
 import tak.server.grid.MissionArchiveManagerProxyFactory;
 import tak.server.grid.PluginManagerProxyFactory;
 import tak.server.grid.RetentionPolicyConfigProxyFactory;
-import tak.server.plugins.*;
+import tak.server.plugins.PluginCoreConfigApi;
+import tak.server.plugins.PluginDataApi;
+import tak.server.plugins.PluginFileApi;
+import tak.server.plugins.PluginManagerApi;
+import tak.server.plugins.PluginMissionApi;
 import tak.server.qos.QoSApi;
 import tak.server.qos.QoSManager;
 import tak.server.retention.RetentionApi;
 import tak.server.system.ApiDependencyProxy;
+import tak.server.util.ErrorController;
 import tak.server.util.ExecutorSource;
 import tak.server.util.LoginAccessController;
 
@@ -257,6 +263,7 @@ public class ApiConfiguration implements WebMvcConfigurer {
 		ServletRegistrationBean<ContentServlet> bean = new ServletRegistrationBean<>(
 				new ContentServlet(), compatServletPath + "/sync/content/*");
 		bean.setLoadOnStartup(1);
+		bean.setAsyncSupported(true);
 		return bean;
 	}
 
@@ -266,6 +273,7 @@ public class ApiConfiguration implements WebMvcConfigurer {
 				new UploadServlet(), compatServletPath + "/sync/upload/*");
 		bean.setLoadOnStartup(1);
 		bean.setMultipartConfig(multipartConfigElement());
+		bean.setAsyncSupported(true);
 		return bean;
 	}
 
@@ -887,6 +895,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Bean
 	public LoginAccessController loginAcccessController() {
 		return new LoginAccessController();
+	}
+
+	@Bean
+	public ErrorController ErrorController() {
+		return new ErrorController();
 	}
 
 	@Bean

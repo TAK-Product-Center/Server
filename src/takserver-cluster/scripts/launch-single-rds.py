@@ -18,7 +18,7 @@ parser.add_argument("--core-config", help="Absolute path to CoreConfig.xml. defa
 parser.add_argument("--schema-manager", help="Absolute path to SchemaManager. default is '/opt/tak/db-utils/SchemaManager.jar", default="/opt/tak/db-utils/SchemaManager.jar")
 parser.add_argument("--storage-size", help="Initial size in GB of the database", required=False, default='100')
 parser.add_argument("--storage-size-max", help="Max size in GB of the database", required=False, default='500')
-parser.add_argument("--instance-type", help="RDS instance type. See: https://aws.amazon.com/rds/instance-types/", required=False, default='db.m4.large')
+parser.add_argument("--instance-type", help="RDS instance type. See: https://aws.amazon.com/rds/instance-types/", required=False, default='db.m5.large')
 parser.add_argument('--publicly-accessible', help="Should DB be reachable outside of VPC", action='store_true')
 parser.add_argument('--delete', help="If the Database should be delete instead of created", action='store_true')
 parser.add_argument("--vpc-id", help="Id of the VPC the database should be launched into. Will only be reachable in this VPC unless --publicly-accessible", required=True)
@@ -59,21 +59,21 @@ def printJson(j) :
 
 def setupDBParameterGroups():
 	try:
-		find_db_param_group_res = boto3.client('rds', region_name=TAK_REGION).describe_db_parameter_groups(DBParameterGroupName='takserver-rds-pg')
+		find_db_param_group_res = boto3.client('rds', region_name=TAK_REGION).describe_db_parameter_groups(DBParameterGroupName='takserver-rds-pg15')
 		printJson(find_db_param_group_res)
 		print('\nParameter Group Exists')
 	except botocore.exceptions.ClientError as e:
 		create_db_param_group_res = boto3.client('rds', region_name=TAK_REGION).create_db_parameter_group(
-		    DBParameterGroupName='takserver-rds-pg',
-		    DBParameterGroupFamily='postgres10',
-		    Description='Takserver RDS parameter group for postgres10'
+		    DBParameterGroupName='takserver-rds-pg15',
+		    DBParameterGroupFamily='postgres15',
+		    Description='Takserver RDS parameter group for postgres15'
 		)
 
 		print('\nCreating RDS Parameter Group')
 		printJson(create_db_param_group_res)
 
 		modify_db_param_group_res = boto3.client('rds', region_name=TAK_REGION).modify_db_parameter_group(
-		    DBParameterGroupName='takserver-rds-pg',
+		    DBParameterGroupName='takserver-rds-pg15',
 		    Parameters=[
 		        {
 		            'ParameterName': 'max_connections',
@@ -200,7 +200,7 @@ def setupRDS():
 				        describeSecurityGroups()
 				    ],
 				    EngineVersion='10.20',
-				    DBParameterGroupName='takserver-rds-pg',
+				    DBParameterGroupName='takserver-rds-pg15',
 				    PubliclyAccessible=TAK_DB_PUBLIC
 				))
 				printJson(create_db_instance_res)

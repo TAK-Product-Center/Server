@@ -580,7 +580,10 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             String email = userId;
             userId = getUsernameByEmail(email);
             if (userId == null) {
-                throw new IllegalArgumentException("getUsernameByEmail lookup failed for : " + email);
+                if (logger.isDebugEnabled()) {
+                    logger.debug("getUsernameByEmail lookup failed for : " + email);
+                }
+                return new ConcurrentHashMap<>();
             }
         }
 

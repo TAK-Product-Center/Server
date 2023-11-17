@@ -21,6 +21,7 @@ public class GeomUtils {
 		
 		try {
 			Coordinate[] polygonPoints = Arrays.stream(polyString.split(","))
+					.map(p->p.trim())
 					.map(p->p.split(" "))
 					.map(latlon-> new double[] {Double.valueOf(latlon[0]), Double.valueOf(latlon[1])})
 					.map(latlon-> new Coordinate(latlon[1], latlon[0])) // flip lat lon so that its x,y instead of y,x

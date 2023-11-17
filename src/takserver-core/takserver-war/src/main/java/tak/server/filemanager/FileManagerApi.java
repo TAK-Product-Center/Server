@@ -99,6 +99,7 @@ public class FileManagerApi extends BaseRestController {
 	         @RequestParam(value = "limit", defaultValue = "-1") int limit,
 	         @RequestParam(value = "mission", defaultValue = "") String mission,
 	         @RequestParam(value = "missionPackage", defaultValue = "false") Boolean missionPackage,
+	         @RequestParam(value = "name", defaultValue = "") String name,
 	         @RequestParam(value = "sort", defaultValue = "") String sort,
 	         @RequestParam(value = "ascending", defaultValue = "true") Boolean ascending) throws RemoteException {
 		 
@@ -123,59 +124,48 @@ public class FileManagerApi extends BaseRestController {
 			 List<Resource> files = null;
 			 if(mission.isBlank() && !missionPackage) {
 				 if(page == -1 || limit == -1) {
-					 if(sort.isBlank()) {
-						 files = resourceRepository.findAll();
-					 } else {
-						 if(ascending) {
-							 files = resourceRepository.findAll(Sort.by(resourceSort).ascending());
-						 } else {
-							 files = resourceRepository.findAll(Sort.by(resourceSort).descending());
-						 }
-					 }
+				 	if(name.isBlank()) {
+				 		files = fileManagerService.findAllFiles(0, 0, resourceSort, ascending, groupVector);
+				 	} else {
+				 		files = fileManagerService.findByName(0, 0, resourceSort, ascending, name, groupVector);
+				 	}
 				 } else {
-					 Pageable pageRequest = null;
-					 if(sort.isBlank()) {
-						 pageRequest = PageRequest.of(page, limit);
+					 if(name.isBlank()) {
+						 files = fileManagerService.findAllFiles(limit, (page * limit), resourceSort, ascending, groupVector);
 					 } else {
-						 if(ascending) {
-							 pageRequest = PageRequest.of(page, limit, Sort.by(resourceSort).ascending());
-						 } else {
-							 pageRequest = PageRequest.of(page, limit, Sort.by(resourceSort).descending());
-						 }
+						 files = fileManagerService.findByName(limit, (page * limit), resourceSort, ascending, name, groupVector);
 					 }
-					 files = resourceRepository.findAll(pageRequest).getContent();
 				 }
 			 } else if (mission.isBlank() && missionPackage) {
 				 if(page == -1 || limit == -1) {
 					 if(sort.isBlank()) {
-						 files = fileManagerService.getMissionPackageResources(0, 0, "", true);
+						 files = fileManagerService.getMissionPackageResources(0, 0, "", true, name, groupVector);
 					 } else {
-						 files = fileManagerService.getMissionPackageResources(0, 0, resourceSort, ascending);
+						 files = fileManagerService.getMissionPackageResources(0, 0, resourceSort, ascending, name, groupVector);
 					 }
 				 }else {
 					 if(sort.isBlank()) {
-						 files = fileManagerService.getMissionPackageResources(limit, (page * limit), "", true);
+						 files = fileManagerService.getMissionPackageResources(limit, (page * limit), "", true, name, groupVector);
 					 } else {
-						 files = fileManagerService.getMissionPackageResources(limit, (page * limit), resourceSort, ascending);
+						 files = fileManagerService.getMissionPackageResources(limit, (page * limit), resourceSort, ascending, name, groupVector);
 					 }
 				 }
 			 }	else{
 				 if(page == -1 || limit == -1) {
 					 if(sort.isBlank()) {
-						 files = fileManagerService.getResourcesByMission(mission, 0, 0,"", true);
+						 files = fileManagerService.getResourcesByMission(mission, 0, 0,"", true, name, groupVector);
 					 } else {
-						 files = fileManagerService.getResourcesByMission(mission, 0, 0, resourceSort, ascending);
+						 files = fileManagerService.getResourcesByMission(mission, 0, 0, resourceSort, ascending, name, groupVector);
 					 }
 				 }else {
 					 if(sort.isBlank()) {
-						 files = fileManagerService.getResourcesByMission(mission, limit, (page * limit), "", true);
+						 files = fileManagerService.getResourcesByMission(mission, limit, (page * limit), "", true, name, groupVector);
 					 } else {
-						 files = fileManagerService.getResourcesByMission(mission, limit, (page * limit), resourceSort	, ascending);
+						 files = fileManagerService.getResourcesByMission(mission, limit, (page * limit), resourceSort, ascending, name, groupVector);
 					 }
 				 }
 			 }
 			 for (Resource file: files) {
-				 
 				 entry = buildResourceEntry(file, groups);
 				
 				fileJson.add(entry);
@@ -229,7 +219,7 @@ public class FileManagerApi extends BaseRestController {
 			 List<Metadata> metadataList = persistenceStore.getMetadataByHash(hash, groupVector);
 			 ByteArrayResource resource = new ByteArrayResource(array);
 			 MediaType mediaType = MediaType.parseMediaType(metadataList.get(0).getFirstSafely(Field.MIMEType));
-			 String fileName = metadataList.get(0).getFirstSafely(Field.Name) + "." + mediaType.getSubtype();
+			 String fileName = metadataList.get(0).getFirstSafely(Field.Name);
 			 
 		     return ResponseEntity.ok()
 		            .contentType(mediaType)
@@ -457,7 +447,7 @@ public class FileManagerApi extends BaseRestController {
 					resource.getGroupVector(), groups));
 			
 			NavigableSet<String> groupsArray = resource.getGroups();
-			if(keywordsArray != null) {
+			if(groupsArray != null) {
 				 String groupString = String.join(",", groupsArray);
 				 entry.put("Groups",groupString);
 			 } else {

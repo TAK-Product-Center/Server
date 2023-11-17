@@ -1,33 +1,61 @@
 package tak.server.federation.hub.ui;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.owasp.esapi.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.RequestEntity;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.view.InternalResourceView;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.google.common.base.Strings;
 
 import tak.server.federation.FederateGroup;
 import tak.server.federation.FederationException;
@@ -42,6 +70,9 @@ import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
 import tak.server.federation.hub.ui.graph.FederationPolicyModel;
 import tak.server.federation.hub.ui.graph.FilterUtils;
 import tak.server.federation.hub.ui.graph.GroupCell;
+import tak.server.federation.hub.ui.jwt.AuthRequest;
+import tak.server.federation.hub.ui.jwt.AuthResponse;
+import tak.server.federation.hub.ui.keycloak.AuthCookieUtils;
 
 @RequestMapping("/")
 public class FederationHubUIService {
@@ -53,11 +84,162 @@ public class FederationHubUIService {
     private String activePolicyName = null;
     private Map<String, FederationPolicyModel> cachedPolicies = new HashMap<>();
 
+    private Validator validator = new MartiValidator();
+    
     @Autowired
     private FederationHubPolicyManager fedHubPolicyManager;
 
     @Autowired
     private FederationHubBroker fedHubBroker;
+    
+    @Autowired AuthenticationManager authManager;
+	
+    @Autowired JwtTokenUtil jwtUtil;
+    
+    @Autowired
+    FederationHubUIConfig fedHubConfig;
+    
+    @RequestMapping(value = "/login", method = RequestMethod.GET)
+	public ModelAndView getLoginPage() {
+		return new ModelAndView(new InternalResourceView("/login/index.html"));
+	}
+
+    @RequestMapping(value = "/login/authserver", method = RequestMethod.GET)
+    public ResponseEntity<String>  getAuthServerName() {
+        
+        if (fedHubConfig.isAllowOauth()) {
+        	return new ResponseEntity<>("{\"data\":\"" + fedHubConfig.getKeycloakServerName() + "\"}", new HttpHeaders(), HttpStatus.OK);
+        } else {
+        	return new ResponseEntity<>(null, new HttpHeaders(), HttpStatus.NOT_FOUND);
+        }
+    }
+    
+    @RequestMapping(value = "/login/auth", method = RequestMethod.GET)
+    public void handleAuthRequest(HttpServletResponse response) {
+        try {
+            // get the auth server config
+            if (!fedHubConfig.isAllowOauth() || 
+            		Strings.isNullOrEmpty(fedHubConfig.getKeycloakAuthEndpoint()) || 
+            		 Strings.isNullOrEmpty(fedHubConfig.getKeycloakTokenEndpoint()) || 
+            		 Strings.isNullOrEmpty(fedHubConfig.getKeycloakrRedirectUri())) {
+            	throw  new IllegalStateException("missing auth server config");
+            }
+
+            // create a random state value to track the auth request
+            SecureRandom secureRandom = new SecureRandom();
+            byte[] code = new byte[32];
+            secureRandom.nextBytes(code);
+            String state = Base64.getUrlEncoder().withoutPadding().encodeToString(code);
+
+            // attach the state to a cookie that we will validate in the redirect
+            response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
+                    "state", state, -1, false).toString());
+
+            // build the auth url
+            UriComponentsBuilder uriComponentBuilder =
+                    UriComponentsBuilder.fromHttpUrl(fedHubConfig.getKeycloakAuthEndpoint())
+                            .queryParam("response_type", "code")
+                            .queryParam("client_id", fedHubConfig.getKeycloakClientId())
+                            .queryParam("redirect_uri", fedHubConfig.getKeycloakrRedirectUri())
+                            .queryParam("state", sha256(state));
+
+//            // add the scope if provided
+//            if (authServer.getScope() != null) {
+//                uriComponentBuilder = uriComponentBuilder
+//                        .queryParam("scope", authServer.getScope());
+//            }
+
+            // send the redirect
+            response.sendRedirect(uriComponentBuilder.toUriString());
+
+        } catch (Exception e) {
+            logger.error("exception in handleAuth", e);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    @RequestMapping(value = "/login/redirect", method = RequestMethod.GET)
+    public ModelAndView handleRedirect(
+            @RequestParam(value = "code", required = true) String code,
+            @RequestParam(value = "state", required = true) String state,
+            @CookieValue(value = "state", required = true) String stateCookie,
+            HttpServletRequest request, HttpServletResponse response) {
+        try {
+            // validate the inputs
+            validator.getValidInput(
+                    FederationHubUIService.class.getName(), code,
+                    MartiValidator.Regex.MartiSafeString.name(),
+                    2047, false);
+            validator.getValidInput(
+            		FederationHubUIService.class.getName(), state,
+                    MartiValidator.Regex.MartiSafeString.name(),
+                    2047, false);
+            validator.getValidInput(
+            		FederationHubUIService.class.getName(), stateCookie,
+                    MartiValidator.Regex.MartiSafeString.name(),
+                    2047, false);
+
+            // validate the request state
+            if (!sha256(stateCookie).equals(state)) {
+                throw new IllegalStateException("state did not match request!");
+            }
+
+            // clean up the state cookie
+            response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
+                    "state", stateCookie, 0, false).toString());
+
+            // build up the parameters for the token request
+            MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<String, String>();
+            requestBody.add("grant_type", "authorization_code");
+            requestBody.add("code", code);
+            requestBody.add("client_id", fedHubConfig.getKeycloakClientId());
+            requestBody.add("client_secret", fedHubConfig.getKeycloakSecret());
+            requestBody.add("redirect_uri", fedHubConfig.getKeycloakrRedirectUri());
+
+            jwtUtil.processAuthServerRequest(requestBody, request, response);
+
+            return new ModelAndView(new InternalResourceView("/login/redirect.html"));
+
+        } catch (Exception e) {
+            logger.error("exception in handleRedirect", e);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            return null;
+        }
+    }
+		
+    // TODO use this if we ever support plain username + password auth from a db or file
+    @PostMapping("/oauth/token")
+    public ResponseEntity<?> login(@RequestBody AuthRequest request) {
+        try {
+            Authentication authentication = authManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+            );
+             
+            User user = (User) authentication.getPrincipal();
+            String accessToken = jwtUtil.generateAccessToken(request.getUsername());
+            AuthResponse authResponse = new AuthResponse(user.getUsername(), accessToken);
+            
+            ResponseCookie.ResponseCookieBuilder responseCookieBuilder = ResponseCookie
+                    .from("hubState", authResponse.getAccessToken())
+                    .secure(true)
+                    .httpOnly(true)
+                    .path("/")
+                    .maxAge(86400);
+            
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.set(HttpHeaders.SET_COOKIE, responseCookieBuilder.build().toString());
+                         
+            return ResponseEntity.ok().headers(responseHeaders).body(authResponse);
+             
+        } catch (BadCredentialsException ex) {
+        	logger.error("Bad credentials", ex);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        catch (Exception e) {
+        	logger.error("Error with login",e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+    }
 
 
     @RequestMapping(value = "/home", method = RequestMethod.GET)
@@ -189,7 +371,7 @@ public class FederationHubUIService {
     }
 
     @RequestMapping(value = "/fig/getKnownCaGroups", method = RequestMethod.GET)
-    public ResponseEntity<List<GroupHolder>> getKnownCaGroups() {	    	
+    public ResponseEntity<List<GroupHolder>> getKnownCaGroups(HttpServletRequest request) {	
         if (isUpdateActiveFederation()) {
             return new ResponseEntity<>(
                 federateGroupsToGroupHolders(fedHubPolicyManager.getCaGroups()),
@@ -271,6 +453,12 @@ public class FederationHubUIService {
     		logger.error("error with deleteGroupCa", e);
     		return new ResponseEntity<>(new HttpHeaders(), HttpStatus.BAD_REQUEST);
 		}
+    }
+    
+    private String sha256(String input) throws UnsupportedEncodingException, NoSuchAlgorithmException {
+        byte[] bytes = input.getBytes("US-ASCII");
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(md.digest(bytes));
     }
     
     private boolean isUpdateActiveFederation() {

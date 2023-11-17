@@ -13,5 +13,9 @@ message TakMessage {
 
     // Optional - if omitted, no event data in this message
     CotEvent cotEvent = 2;
+
+    uint64 submissionTime = 3;
+    uint64 creationTime = 4;
+
 }
 

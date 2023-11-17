@@ -1,4 +1,12 @@
+
+buildscript {
+  dependencies {
+    classpath "org.openapitools:openapi-generator-gradle-plugin:6.6.0"
+  }
+}
+
 apply plugin: 'war'
+apply plugin: 'org.openapi.generator'
 
 // these options are needed due to use of interal JDK crypto implementation, such as sun.security.pkcs10.PKCS10
 compileJava {
@@ -124,3 +132,27 @@ dependencies {
   implementation group: 'com.squareup.okhttp3', name: 'okhttp', version: okhttp3_version
 }
 
+sourceSets {
+  main {
+    java {
+      srcDir("$buildDir/generated/ism/api/src/main/java")
+    }
+  }
+}
+
+openApiGenerate {
+  generatorName = "java"
+  inputSpec = "$projectDir/src/main/java/com/bbn/marti/classification/service/ism-lib.json".toString()
+  outputDir = "$buildDir/generated/ism/api".toString()
+  apiPackage = "org.ism.api"
+  invokerPackage = "org.ism.invoker"
+  modelPackage = "org.ism.model"
+  configOptions = [
+          dateLibrary: "java8",
+          annotationLibrary: "none",
+          library: "resttemplate",
+          openApiNullable : "false"
+  ]
+}
+
+compileJava.dependsOn tasks.openApiGenerate

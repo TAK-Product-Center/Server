@@ -5,9 +5,8 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.bbn.marti.nio.protocol.connections.StreamingProtoBufProtocol;
-import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
 
-import gov.tak.cop.proto.v1.Binarypayload;
+import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 import tak.server.ignite.IgniteHolder;
@@ -34,14 +33,14 @@ public class WebsocketMessagingBroker {
 
 			IgniteHolder.getInstance()
 					.getIgnite()
-					.message(IgniteHolder.getInstance().getIgnite().cluster().forClients().forAttribute(Constants.TAK_PROFILE_KEY, Constants.API_PROFILE_NAME))
+					.message(IgniteHolder.getInstance().getIgnite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.API_PROFILE_NAME))
 					.send("websocket-payload-write-listener", new WebsocketMessageTransporter(websocketConnectionIds, message.array(), data.getUid(), data.getType()));
 		} else {
 			ByteBuffer message = StreamingProtoBufProtocol.convertCotToProtoBufBytes(data);
 
 			IgniteHolder.getInstance()
 					.getIgnite()
-					.message(IgniteHolder.getInstance().getIgnite().cluster().forClients().forAttribute(Constants.TAK_PROFILE_KEY, Constants.API_PROFILE_NAME))
+					.message(IgniteHolder.getInstance().getIgnite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.API_PROFILE_NAME))
 					.send("websocket-write-listener", new WebsocketMessageTransporter(websocketConnectionIds, message.array(), data.getUid(), data.getType()));
 		}
 	}

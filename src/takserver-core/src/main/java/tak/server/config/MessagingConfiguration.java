@@ -105,10 +105,11 @@ import io.awspring.cloud.autoconfigure.context.properties.AwsS3ResourceLoaderPro
 import io.awspring.cloud.autoconfigure.metrics.CloudWatchExportAutoConfiguration;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
+import tak.server.cache.classification.ClassificationCacheHelper;
 import tak.server.cache.DataFeedCotCacheHelper;
 import tak.server.cache.MissionCacheResolver;
 import tak.server.cache.MissionLayerCacheResolver;
-import tak.server.cache.PluginDatafeedCacheHelper;
+import tak.server.cache.DatafeedCacheHelper;
 import tak.server.cluster.DistributedInjectionService;
 import tak.server.cluster.DistributedInputManager;
 import tak.server.cluster.DistributedSecurityManager;
@@ -176,13 +177,12 @@ public class MessagingConfiguration {
 	@Order(Ordered.LOWEST_PRECEDENCE)
 	@Bean
 	public DistributedFederationManager distributedFederationManager(
-			NioNettyBuilder nettyBuilder,
 			Ignite ignite,
 			CoreConfig coreConfig,
 			CoreConfigProxyFactoryForMessaging coreConfigProxy,
 			DistributedConfiguration distConf,
 			FederationEventRepository federationEventRepository) throws RemoteException {
-		DistributedFederationManager distributedFederationManager = new DistributedFederationManager(nettyBuilder, ignite, coreConfig);
+		DistributedFederationManager distributedFederationManager = new DistributedFederationManager(ignite, coreConfig);
 		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_FEDERATION_MANAGER, distributedFederationManager);
 		return distributedFederationManager;
 	}
@@ -305,6 +305,11 @@ public class MessagingConfiguration {
 	@Bean
 	ActiveGroupCacheHelper getActiveGroupCacheHelper() {
 		return new ActiveGroupCacheHelper();
+	}
+
+	@Bean
+	ClassificationCacheHelper getClassificationCacheHelper() {
+		return new ClassificationCacheHelper();
 	}
 
 	@Bean
@@ -567,8 +572,8 @@ public class MessagingConfiguration {
 	}
 	
 	@Bean
-	public PluginDatafeedCacheHelper pluginDatafeedCacheHelper() {
-		return new PluginDatafeedCacheHelper();
+	public DatafeedCacheHelper pluginDatafeedCacheHelper() {
+		return new DatafeedCacheHelper();
 	}
 
 	@Bean

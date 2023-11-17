@@ -614,7 +614,7 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 	}
 	
 	@Override
-	public void addFeed(String missionName, String creatorUid, String dataFeedUid, String filterBbox, String filterType, String filterCallsign) {
+	public void addFeed(String missionName, String creatorUid, String dataFeedUid, String filterPolygon, List<String> filterCotTypes, String filterCallsign) {
 
 		MissionService missionService = missionService();
 
@@ -628,7 +628,7 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 			throw new NotFoundException("Mission not found");
 		}
 		try {
-			missionService.addFeedToMission(mission.getName(), creatorUid, mission, dataFeedUid, filterBbox, filterType, filterCallsign);
+			missionService.addFeedToMission(mission.getName(), creatorUid, mission, dataFeedUid, filterPolygon, filterCotTypes, filterCallsign);
     	} catch (Exception e) {
     		logger.error("exception in addFeed!", e);
     		throw e;

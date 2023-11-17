@@ -10,24 +10,25 @@ import org.apache.ignite.services.ServiceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.bbn.marti.config.AuthType;
+import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.network.PluginDataFeedJdbc;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.service.InputManager;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.sync.model.DataFeedDao;
 import com.bbn.marti.sync.repository.DataFeedRepository;
-import com.bbn.marti.config.AuthType;
-import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 
 import tak.server.Constants;
-import tak.server.cache.PluginDatafeedCacheHelper;
+import tak.server.cache.DatafeedCacheHelper;
+import tak.server.feeds.DataFeedDTO;
 import tak.server.feeds.DataFeed.DataFeedType;
 import tak.server.ignite.MessagingIgniteBroker;
 import tak.server.plugins.PluginDataFeed;
 import tak.server.plugins.PluginDataFeedApi;
+import tak.server.plugins.PredicateDataFeed;
 
 public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apache.ignite.services.Service {
 
@@ -46,7 +47,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 		return MessagingDependencyInjectionProxy.getInstance().pluginDataFeedJdbc();
 	}
 
-	private PluginDatafeedCacheHelper pluginDatafeedCacheHelper() {
+	private DatafeedCacheHelper pluginDatafeedCacheHelper() {
 		return MessagingDependencyInjectionProxy.getInstance().pluginDatafeedCacheHelper();
 	}
 
@@ -65,7 +66,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 
 			logger.info("Calling create() method in DistributedPluginDataFeedApi, uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, groupNames: {}, federated: {}, binaryPayloadWebsocketOnly: {}", uuid, name, tags, archive, sync, groupNames, federated, binaryPayloadWebsocketOnly);
 
-			PluginDatafeedCacheHelper pluginDatafeedCacheHelper = pluginDatafeedCacheHelper();
+			DatafeedCacheHelper pluginDatafeedCacheHelper = pluginDatafeedCacheHelper();
 			GroupManager groupManager = groupManager();
 			RemoteUtil remoteUtil = remoteUtil();
 			DataFeedRepository dataFeedRepository = dataFeedRepository();
@@ -116,7 +117,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 
 				dataFeedId = dataFeedRepository.updateDataFeedWithGroupVector(uuid, name, DataFeedType.Plugin.ordinal(),
 						AuthType.ANONYMOUS.toString(), 0, false, "Plugin",
-						"", "", archive, false, false ,0, "", sync, 3600, groupVector, federated, binaryPayloadWebsocketOnly);
+						"", "", archive, false, false ,0, "", sync, 3600, groupVector, federated, binaryPayloadWebsocketOnly, null, null, null, null);
 
 				logger.info("Updated datafeed uuid {}, row id", uuid, dataFeedId);
 
@@ -149,7 +150,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 				pluginDataFeeds.add(re);
 				pluginDatafeedCacheHelper.cachePluginDatafeed(uuid, pluginDataFeeds);
 
-				pluginDatafeedCacheHelper.invalidate(PluginDatafeedCacheHelper.ALL_PLUGIN_DATAFEED_KEY);
+				pluginDatafeedCacheHelper.invalidate(DatafeedCacheHelper.ALL_PLUGIN_DATAFEED_KEY);
 
 				return re;
 
@@ -191,7 +192,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 
 				dataFeedId = dataFeedRepository.addDataFeed(uuid, name, DataFeedType.Plugin.ordinal(),
 						AuthType.ANONYMOUS.toString(), 0, false, "Plugin",
-						"", "", archive, false, false ,0, "", sync, 3600, groupVector, federated, binaryPayloadWebsocketOnly);
+						"", "", archive, false, false ,0, "", sync, 3600, groupVector, federated, binaryPayloadWebsocketOnly, null, null, null, null);
 
 				logger.info("Added datafeed uuid {}, row id", uuid, dataFeedId);
 
@@ -224,7 +225,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 				pluginDataFeeds.add(re);
 				pluginDatafeedCacheHelper.cachePluginDatafeed(uuid, pluginDataFeeds);
 
-				pluginDatafeedCacheHelper.invalidate(PluginDatafeedCacheHelper.ALL_PLUGIN_DATAFEED_KEY);
+				pluginDatafeedCacheHelper.invalidate(DatafeedCacheHelper.ALL_PLUGIN_DATAFEED_KEY);
 
 				return re;
 			}
@@ -272,7 +273,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 	public void delete(String uuid, List<String> groupNames) {
 
 		try {
-			PluginDatafeedCacheHelper pluginDatafeedCacheHelper = pluginDatafeedCacheHelper();
+			DatafeedCacheHelper pluginDatafeedCacheHelper = pluginDatafeedCacheHelper();
 			GroupManager groupManager = groupManager();
 			RemoteUtil remoteUtil = remoteUtil();
 
@@ -283,7 +284,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 			String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
 
 
-			List<DataFeedDao> dataFeedDaos = dataFeedRepository.getDataFeedByUUID(uuid);
+			List<DataFeedDTO> dataFeedDaos = dataFeedRepository.getDataFeedByUUID(uuid);
 
 			if (dataFeedDaos.size() == 0) {
 				logger.warn("There is no datafeed with uuid {} to delete", uuid);
@@ -304,7 +305,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 				logger.error("Exception deleting data feed from config file.", e);
 			}
 
-			for (DataFeedDao dataFeedDao : dataFeedDaos) {
+			for (DataFeedDTO dataFeedDao : dataFeedDaos) {
 
 				logger.info("Removing all tags for datafeed row id {}", dataFeedDao.getId());
 				try {
@@ -329,7 +330,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 			// update cache
 			pluginDatafeedCacheHelper.cachePluginDatafeed(uuid, new ArrayList<PluginDataFeed>());
 
-			pluginDatafeedCacheHelper.invalidate(PluginDatafeedCacheHelper.ALL_PLUGIN_DATAFEED_KEY);
+			pluginDatafeedCacheHelper.invalidate(DatafeedCacheHelper.ALL_PLUGIN_DATAFEED_KEY);
 
 		} catch (TakException e) {
 			if (logger.isDebugEnabled()) {
@@ -347,8 +348,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 
 		try {
 
-			logger.info("Calling getAllPluginDataFeeds() in DistributedPluginDataFeedApi");
-			PluginDatafeedCacheHelper pluginDatafeedCacheHelper = pluginDatafeedCacheHelper();
+			DatafeedCacheHelper pluginDatafeedCacheHelper = pluginDatafeedCacheHelper();
 
 			List<PluginDataFeed> allPluginDatafeeds = pluginDatafeedCacheHelper.getAllPluginDatafeeds();
 
@@ -403,6 +403,11 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 		if (logger.isDebugEnabled()) {
 			logger.debug("execute method " + getClass().getSimpleName());
 		}
+	}
+
+	@Override
+	public PredicateDataFeed createPredicateFeed(String uuid, String name, List<String> tags) {
+		return new PredicateDataFeed();
 	}
 
 }

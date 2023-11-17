@@ -28,12 +28,16 @@ sourceSets {
   }
 }
 dependencies {
-  implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
-  implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
-  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-  implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
 
-  implementation project(':federation-common')
+
+  implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
+  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+
+  implementation(project(':federation-common')) {
+    exclude group: 'log4j', module: 'log4j'
+    exclude group: 'org.apache.logging.log4j'
+    exclude group: 'org.slf4j', module: 'log4j-over-slf4j'
+  }
 
   implementation group: 'com.h2database', name: 'h2', version: h2_version
 
@@ -52,7 +56,12 @@ dependencies {
   implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
   implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
 
-  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
+  // exclude from actuator
+  implementation ("org.springframework.boot:spring-boot-starter-actuator:$spring_boot_version") {
+    exclude group: 'org.apache.logging.log4j'
+    exclude group: 'org.slf4j', module: 'log4j-over-slf4j'
+  }
+
   implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
   implementation group: 'org.springframework', name: 'spring-context'
 

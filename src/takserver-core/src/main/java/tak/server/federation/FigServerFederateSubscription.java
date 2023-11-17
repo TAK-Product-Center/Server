@@ -105,7 +105,7 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 			return;
 		}
 
-		if (!isVoidWarranty() && toSend.hasContextKey(GroupFederationUtil.FEDERATE_ID_KEY)) {
+		if (toSend.hasContextKey(GroupFederationUtil.FEDERATE_ID_KEY)) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("not federating federated message");
 			}

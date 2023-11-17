@@ -25,9 +25,11 @@ import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.SubscriptionStore;
-import com.bbn.marti.sync.model.DataFeedDao;
 import com.bbn.marti.sync.model.MinimalMission;
+import com.bbn.marti.sync.model.MinimalMissionFeed;
+import com.bbn.marti.sync.model.MissionFeed;
 import com.bbn.marti.sync.service.DistributedDataFeedCotService;
+import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.GeomUtils;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
@@ -40,6 +42,7 @@ import com.google.common.base.Strings;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 import tak.server.federation.FigFederateSubscription;
+import tak.server.feeds.DataFeedDTO;
 
 /*
  *  
@@ -123,7 +126,7 @@ public class DataFeedFilter {
 				}
 				
 				List<MinimalMission> feedMissions = new ArrayList<>();
-
+				
 				// get missions associated with this data feed
 				// deserialize the mission from JSON to address pokey binary marshaller
 				try {
@@ -148,7 +151,7 @@ public class DataFeedFilter {
 				boolean vbmMatch = feedMissions.stream().anyMatch(m -> DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool().equals(m.getTool().toLowerCase()));
 				if (vbmMatch && isMissionDataFeedFederation()) {
 					
-					DataFeedDao dataFeedDao = dataFeedService.getDataFeedByUid(dataFeed.getUuid());
+					DataFeedDTO dataFeedDao = dataFeedService.getDataFeedByUid(dataFeed.getUuid());
 					
 					if (dataFeedDao.getFederated()) { // whether or not to federate per datafeed
 
@@ -179,14 +182,29 @@ public class DataFeedFilter {
 					}
 				}
 				
-				handleVbmMissions(cot, feedMissions);
+				List<MinimalMissionFeed> missionFeeds = new ArrayList<>();
+
+				try {
+					for (String missionFeedJson : MessagingDependencyInjectionProxy.getInstance().missionService().getMinimalMissionFeedsJsonForDataFeed(dataFeedUuid)) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("missionFeedJson: {}", missionFeedJson);
+
+						}
+						MinimalMissionFeed mf = mapper.readValue(missionFeedJson, MinimalMissionFeed.class);
+						missionFeeds.add(mf);
+					}
+				} catch (JsonProcessingException e) {
+					throw new TakException(e);
+				}
+				
+				handleVbmMissions(cot, feedMissions, missionFeeds);
 			}
 		}
 	}
 	
 	public void filterFederatedDataFeed(CotEventContainer cot) {
 		String dataFeedUuid = (String) cot.getContextValue(Constants.DATA_FEED_UUID_KEY);
-		DataFeedDao dataFeed = dataFeedService.getDataFeedByUid(dataFeedUuid);
+		DataFeedDTO dataFeed = dataFeedService.getDataFeedByUid(dataFeedUuid);
 
 		// submit data feed message for in memory caching			
 		DistributedDataFeedCotService.getInstance().cacheDataFeedEvent(dataFeed.toInput(), cot);
@@ -224,22 +242,42 @@ public class DataFeedFilter {
 				if (logger.isDebugEnabled()) {
 					logger.debug("deserialized {} minimalMissions", feedMissions.size());
 				}
+				
+				List<MinimalMissionFeed> missionFeeds = new ArrayList<>();
+
+				try {
+					for (String missionFeedJson : MessagingDependencyInjectionProxy.getInstance().missionService().getMinimalMissionFeedsJsonForDataFeed(dataFeedUuid)) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("missionFeedJson: {}", missionFeedJson);
+
+						}
+						MinimalMissionFeed mf = mapper.readValue(missionFeedJson, MinimalMissionFeed.class);
+						missionFeeds.add(mf);
+					}
+				} catch (JsonProcessingException e) {
+					throw new TakException(e);
+				}
  
-				handleVbmMissions(cot, feedMissions);
+				handleVbmMissions(cot, feedMissions, missionFeeds);
 			}
 		}
 	}
 
 	// this method will stop the cot message from propagating to all clients through brokering by adding the EXPLICIT_FEED_UID_KEY key.
 	// (this key will force explicit brokering rather than implicit)		
-	private void handleVbmMissions(CotEventContainer cot, List<MinimalMission> feedMissions) {
+	private void handleVbmMissions(CotEventContainer cot, List<MinimalMission> feedMissions, List<MinimalMissionFeed> missionFeeds) {
 
+		if (logger.isDebugEnabled()) {
+			logger.debug("feedMissions.size: {}", feedMissions.size());
+			logger.debug("missionFeeds.size: {}", missionFeeds.size());
+		}	
+		
 		// figure out which missions should filter CoT based on bounding box
-		List<MinimalMission> feedMissionsInCotBbox = new ArrayList<>();		
+		List<String> feedMissionNamesInCotBbox = new ArrayList<>();		
 		for (MinimalMission mission : feedMissions) {
 			// no bbox, allow mission				
 			if (Strings.isNullOrEmpty(mission.getBbox()) && Strings.isNullOrEmpty(mission.getBoundingPolygon())) {
-				feedMissionsInCotBbox.add(mission);
+				feedMissionNamesInCotBbox.add(mission.getName());
 			} 
 			// use polygon over bbox					
 			else if (!Strings.isNullOrEmpty(mission.getBoundingPolygon())) {
@@ -251,7 +289,7 @@ public class DataFeedFilter {
 			        
 					// if we received back non null, cot passed the filter
 					if (GeomUtils.polygonContainsCoordinate(polygon, latitude, longitude)) {
-						feedMissionsInCotBbox.add(mission);
+						feedMissionNamesInCotBbox.add(mission.getName());
 					} 
 				}
 			} 
@@ -266,23 +304,100 @@ public class DataFeedFilter {
 					CotEventContainer c = gef.filter(cot);
 					// if we received back non null, cot passed the filter
 					if (c != null) {
-						feedMissionsInCotBbox.add(mission);
+						feedMissionNamesInCotBbox.add(mission.getName());
 					} 
 				}
 			}
 		}
 		
+		if (logger.isDebugEnabled()) {
+			logger.debug("feedMissionNamesInCotBbox.size: {}", feedMissionNamesInCotBbox.size());
+		}	
+		
+		// Filter as specified in MissionFeed
+		List<String> missionNamesAfterFiltering = new ArrayList<>(); 
+		for (MinimalMissionFeed missionFeed: missionFeeds) {
+			if (!feedMissionNamesInCotBbox.contains(missionFeed.getMissionName())) {
+				continue; 
+			}
+			
+			// Filter by cotTypes
+			boolean isMatchCotTypes = false;
+			if (missionFeed.getFilterCotTypes() == null || missionFeed.getFilterCotTypes().isEmpty()) { // no filter by cot type
+				isMatchCotTypes = true;
+			} else {
+				for (String filterCotType: missionFeed.getFilterCotTypes()) {
+					isMatchCotTypes = isCotTypeMatch(cot.getType(), filterCotType);
+					if (isMatchCotTypes) {
+						break;
+					}
+				}
+			}
+			if (!isMatchCotTypes) {
+				continue;
+			}
+			
+			// Filter by polygon
+			boolean isMatchPolygon = false;
+			if (Strings.isNullOrEmpty(missionFeed.getFilterPolygon())) { // no filter by Polygon
+				isMatchPolygon = true;
+			} else {
+				Polygon polygon = GeomUtils.postgisBoundingPolygonToPolygon(missionFeed.getFilterPolygon());
+				// valid bounding box
+				if (polygon != null) {
+					double latitude = Double.parseDouble(cot.getLat());
+			        double longitude = Double.parseDouble(cot.getLon());
+			        
+					// if we received back non null, cot passed the filter
+					if (GeomUtils.polygonContainsCoordinate(polygon, latitude, longitude)) {
+						isMatchPolygon = true;
+					} 
+				} else {
+					logger.error("missionFeed filterPolygon is invalid: {}", missionFeed.getFilterPolygon());
+					isMatchPolygon = true; // not filter out the cot message if the polygon filter is invalid.
+				}
+			}
+			
+			if (isMatchPolygon) {
+				missionNamesAfterFiltering.add(missionFeed.getMissionName());
+			}
+		}
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("missionNamesAfterFiltering.size: {}", missionNamesAfterFiltering.size());
+		}
+		
 		// Collect all the mission subscriber uids for valid feed missions
-		List<String> feedMissionClients = feedMissionsInCotBbox
+		List<String> feedMissionClients = missionNamesAfterFiltering
 			.stream()
-			.map(mission -> mission.getName())
 			.map(missionName -> SubscriptionStore.getInstance().getLocalUidsByMission(missionName)) 
 			.flatMap(clientUids -> clientUids.stream())
 			.distinct()
 			.collect(Collectors.toList());
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("feedMissionClients.size: {}", feedMissionClients.size());
+		}
 				
 		// by adding explicit UIDs, this CoT event will go into explicit brokering rather than implicit				
 		cot.setContextValue(StreamingEndpointRewriteFilter.EXPLICIT_FEED_UID_KEY, feedMissionClients);
+	}
+	
+	public static boolean isCotTypeMatch(String cotType, String filterCotType) {
+		// exact match
+		if (cotType.equalsIgnoreCase(filterCotType)) { 
+			return true;
+		}
+		// deal with wild card case (only support 1 wild card)
+		if (filterCotType.contains("*")) {
+			int index = filterCotType.indexOf("*");
+			String prefix = filterCotType.substring(0, index);
+			String suffix = filterCotType.substring(index + 1);
+			if (cotType.startsWith(prefix) && cotType.endsWith(suffix)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	// compute bbox from string and cache it for instant lookup next time
@@ -321,4 +436,5 @@ public class DataFeedFilter {
 		return DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowMissionFederation()
 				&& DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation();
 	}
+
 }

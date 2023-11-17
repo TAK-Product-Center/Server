@@ -2,7 +2,9 @@ package com.bbn.marti.remote.exception;
 
 public class ForbiddenException extends TakException {
 
-    public ForbiddenException() {
+	private static final long serialVersionUID = 4635248532828804800L;
+
+	public ForbiddenException() {
         super();
     }
 

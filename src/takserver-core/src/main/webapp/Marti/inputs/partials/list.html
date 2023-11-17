@@ -219,6 +219,8 @@
 					Active Client Threshold <b>{{activeDeliveryThreshold < 1 ? 'none' : activeDeliveryThreshold}}</b>&nbsp;&nbsp;
 					Active Rate Limit <b>{{activeDeliveryRateLimit < 1 ? 'no limit' : activeDeliveryRateLimit}}</b>
 				</div>
+				<button ng-disabled="deliveryTableApiSent" data-ng-click="addRowDeliveryTable()">Add Row</button>
+				<button ng-disabled="deliveryTableApiSent" data-ng-click="deleteRowDeliveryTable()">Remove Row</button>
 				<table style="border: 2px solid black;" id="qosDeliveryConfig" class="qostable">
 					<thead>
 						<tr>
@@ -228,17 +230,22 @@
 					</thead>
 					<tbody>
 						<tr data-ng-repeat="rule in deliveryRateRules">
-							<td data-ng-bind="rule.clientThresholdCount"></td>
-							<td>{{rule.reportingRateLimitSeconds  === -1 ? 'no limit' : rule.reportingRateLimitSeconds}}</td>
+							<td><input type="number" data-ng-model="rule.clientThresholdCount"></td>
+							<td>
+								<input type="number" data-ng-model="rule.reportingRateLimitSeconds" >
+							</td>
 						</tr>
 					</tbody>
 				</table>
-
+				<button ng-disabled="deliveryTableApiSent" data-ng-click="saveDeliveryRateLimiter()">Save Table Changes</button>
+				<br><br>
 				<b>Enable Dynamic Reporting Rate Limiting (reads)&nbsp;</b><input type="checkbox" data-ng-model="readEnabled" data-ng-change="toggleReadEnabled()"/>
 				<div>
 					Active Client Threshold <b>{{activeReadThreshold < 1 ? 'none' : activeReadThreshold}}</b>&nbsp;&nbsp;
 					Active Rate Limit <b>{{activeReadRateLimit < 1 ? 'no limit' : activeReadRateLimit}}</b>
 				</div>
+				<button ng-disabled="deliveryTableApiSent" data-ng-click="addRowReadTable()">Add Row</button>
+				<button ng-disabled="deliveryTableApiSent" data-ng-click="deleteRowReadTable()">Remove Row</button>
 				<table style="border: 2px solid black;" id="qosReadConfig" class="qostable">
 					<thead>
 						<tr>
@@ -248,11 +255,13 @@
 					</thead>
 					<tbody>
 						<tr data-ng-repeat="rule in readRateRules">
-							<td data-ng-bind="rule.clientThresholdCount"></td>
-							<td>{{rule.reportingRateLimitSeconds  === -1 ? 'no limit' : rule.reportingRateLimitSeconds}}</td>
+							<td><input type="number" data-ng-model="rule.clientThresholdCount"></td>
+							<td><input type="number" data-ng-model="rule.reportingRateLimitSeconds"></td>
 						</tr>
 					</tbody>
 				</table>
+				<button ng-disabled="readTableApiSent" data-ng-click="saveReadRateLimiter()">Save Table Changes</button>
+				<br><br>
 
 				<b>Enable Dynamic DOS Protection&nbsp;</b><input type="checkbox" data-ng-model="dosEnabled" data-ng-change="toggleDOSEnabled()"/>
 				<div>

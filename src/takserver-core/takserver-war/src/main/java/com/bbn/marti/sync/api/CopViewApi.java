@@ -77,13 +77,17 @@ public class CopViewApi extends BaseRestController {
 
 		NavigableSet<Group> groups = martiUtil.getGroupsFromRequest(request);
 
-		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
+		List<Mission> missions = missionService.getAllCopsMissions(getDefaultMcsTool(), groups, path, offset, size);
 
-		List<Mission> missions = missionService.getAllCopsMissions(getDefaultMcsTool(), username, groups, path, offset, size);
+		// include any COPs the current user was invited to
+		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
+		missions.addAll(missionService.getInviteOnlyMissions(username, getDefaultMcsTool(), groups));
+
+		final List<Mission> results = missionService.validateAccess(missions, request);
 
 		return () -> {
 
-			return new ApiResponse<List<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), missions);
+			return new ApiResponse<List<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), results);
 		};
 	}
 

@@ -190,10 +190,6 @@
 	  	      <!-- default error path -->
 	  	      <sec:intercept-url pattern="/Marti/error/**" access="ROLE_ANONYMOUS, ROLE_NO_CLIENT_CERT, ROLE_FEDERATE"/>
 	  	      <sec:intercept-url pattern="/error" access="ROLE_ANONYMOUS, ROLE_NO_CLIENT_CERT, ROLE_FEDERATE"/>
-	  	      <sec:intercept-url pattern="/Marti/error.jsp" access="ROLE_NON_ADMIN_UI, ROLE_NO_CLIENT_CERT, ROLE_FEDERATE"/>
-	  	      <sec:intercept-url pattern="/Marti/CoreConnectionError.jsp" access="ROLE_NON_ADMIN_UI, ROLE_NO_CLIENT_CERT, ROLE_FEDERATE"/>
-	  	      <sec:intercept-url pattern="/CoreConnectionError.jsp" access="ROLE_NON_ADMIN_UI, ROLE_NO_CLIENT_CERT, ROLE_FEDERATE"/>
-			  <sec:intercept-url pattern="/error-401.html"  access="ROLE_NO_CLIENT_CERT" />
 
 			  <!-- properties API -->
 	  	      <sec:intercept-url pattern="/Marti/api/properties/**" method="DELETE" access="ROLE_ANONYMOUS" />

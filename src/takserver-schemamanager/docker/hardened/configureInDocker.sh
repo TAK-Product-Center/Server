@@ -12,9 +12,12 @@ while true; do
 		 echo "postgres server is not ready"
 		 continue;
 		fi
+		echo "postgres server is ready"
 
-		cp /opt/tak/db-utils/pg_hba.conf $PGDATA/pg_hba.conf
-		chmod 600 $PGDATA/pg_hba.conf
+		echo "Installing TAKServer's version of PostgreSQL access-control policy."
+		PGHBA=$(psql -AXqtc "SHOW hba_file")
+		cp /opt/tak/db-utils/pg_hba.conf $PGHBA
+		chmod 600 $PGHBA
 		pg_ctl reload -D $PGDATA
 
 		cd /opt/tak/db-utils

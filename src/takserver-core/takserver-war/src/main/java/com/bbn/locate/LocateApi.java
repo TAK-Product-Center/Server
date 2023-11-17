@@ -125,9 +125,12 @@ public class LocateApi {
             if (locateConfig.isAddToMission()) {
                 String missionName = locateConfig.getMission().toLowerCase();
 
-                // create the mission and make sure that the we're subscribed
-                missionService.createMission(missionName, creatorUid, groupVector, null,
-                        null, null, null, null, null,"public", null, null, null, null, false);
+                if (missionService.getMission(missionName, false) == null) {
+                    // create the mission and make sure that the we're subscribed
+                    missionService.createMission(missionName, creatorUid, groupVector, null,
+                            null, null, null, null, null, "public", null, null, null, null, false);
+                }
+
                 missionService.missionSubscribe(missionName, creatorUid, groupVector);
 
                 // submit the marker to the mission

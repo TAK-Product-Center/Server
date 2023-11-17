@@ -16,6 +16,7 @@ import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
@@ -333,12 +334,24 @@ public class TakFigClient implements Serializable {
 				logger.warn("exception initializing trust store", e);
 			}
 
-
-			channel = openFigConnection(outgoing.getAddress(), outgoing.getPort(), GrpcSslContexts.configure(SslContextBuilder.forClient(), SslProvider.OPENSSL)  // this ensures that we are using OpenSSL, not JRE SSL
-					.protocols("TLSv1.2","TLSv1.3")
+			SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(SslContextBuilder.forClient(), SslProvider.OPENSSL)  // this ensures that we are using OpenSSL, not JRE SSL
 					.keyManager(keyMgrFactory)
-					.trustManager(trustMgrFactory)
-					.build());
+					.trustManager(trustMgrFactory);
+
+			String context = "TLSv1.2,TLSv1.3";
+
+			String ciphers = figTls.getCiphers();
+			if (!Strings.isNullOrEmpty(ciphers)) {
+				sslContextBuilder = sslContextBuilder.ciphers(Arrays.asList(ciphers.split(",")));
+				// only set context from config if cipher is also present
+				if (!Strings.isNullOrEmpty(figTls.getContext())) {
+					context = figTls.getContext();
+				}
+			}
+
+			channel = openFigConnection(outgoing.getAddress(), outgoing.getPort(),
+					sslContextBuilder.protocols(Arrays.asList(context.split(","))).build());
+
 		} catch (Exception e) {
 			logger.error("exception setting up TLS config", e);
 		}

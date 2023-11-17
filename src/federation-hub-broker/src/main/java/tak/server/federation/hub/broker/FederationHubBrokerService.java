@@ -1097,15 +1097,17 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                     }
 
                     // Send cached contact messages, iff there is a federated edge between the two federates.
-                    if (otherClientNode != null &&
-                            fpg.getEdge(otherClientNode, clientNode) != null) {
+                    FederateEdge edge = fpg.getEdge(otherClientNode, clientNode);
+                    if (otherClientNode != null && edge != null) {
                         for (FederatedEvent event : otherClient.getCache()) {
-                            streamHolder.send(event);
-                            if (logger.isDebugEnabled()) {
-                                logger.debug("Sending v2 cached " + event +
-                                    " from " + otherClientNode.getFederateIdentity().getFedId() +
-                                    " to " + clientNode.getFederateIdentity().getFedId());
-                            }
+                        	if (isDestinationReachableByGroupFilter(edge, event.getFederateGroupsList())) {
+	                            streamHolder.send(event);
+	                            if (logger.isDebugEnabled()) {
+	                                logger.debug("Sending v2 cached " + event +
+	                                    " from " + otherClientNode.getFederateIdentity().getFedId() +
+	                                    " to " + clientNode.getFederateIdentity().getFedId());
+	                            }
+                        	}
                         }
                     }
                 }
@@ -1454,7 +1456,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
         });
     }
     
-    private boolean isDestinationReachableByGroupFilter(FederateEdge edge, List<String> groups) {
+    public static boolean isDestinationReachableByGroupFilter(FederateEdge edge, List<String> groups) {
     	// if no groups are attached, and the group filtering isn't set to
     	// allow all messages through, drop the message
     	if (groups == null || groups.isEmpty()) {

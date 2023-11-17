@@ -24,3 +24,8 @@
   .MissionFilter{
     padding-right: 10px;
   }
+
+  .KeywordsCell{
+    justify-content: space-between;
+  }
+  

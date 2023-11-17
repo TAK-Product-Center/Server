@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-LOG_FILE=opt/tak/health/takserver-db/health_check.log
+LOG_FILE=/opt/tak/health/takserver-db/health_check.log
 if [ ! -f $LOG_FILE ]; then
     touch $LOG_FILE
 fi
@@ -11,10 +11,10 @@ pg_isready -U postgres
 if [ "$?" != "0" ]; then
     echo "ERROR: Health check command \"pg_isready -U postgres\" failed." >> $LOG_FILE
     exit 1
-fi    
+fi
 
 # Do the file integrity check.
-opt/tak/health/takserver-db/check_file_integrity.sh >> $LOG_FILE
+/opt/tak/health/takserver-db/check_file_integrity.sh >> $LOG_FILE
 exit $?
 
 

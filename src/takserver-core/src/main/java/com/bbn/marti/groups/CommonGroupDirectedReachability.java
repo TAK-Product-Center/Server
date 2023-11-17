@@ -30,7 +30,6 @@ public class CommonGroupDirectedReachability implements Reachability<User>, Seri
 	private static final long serialVersionUID = -4520635157040006791L;
 	
 	private static final Logger logger = LoggerFactory.getLogger(CommonGroupDirectedReachability.class);
-	public static String forwardFederationConfigKey = "iVoidMyWarrantyAndWantToForwardFederationTraffic";
 
 	private final GroupManager groupManager;
 
@@ -73,11 +72,8 @@ public class CommonGroupDirectedReachability implements Reachability<User>, Seri
 			return false;
 		}
 
-		// don't allow reachability between federates, unless they've read enough to know
-		// the secret config
-		if(DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation() != null &&
-				DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().
-				isIVoidMyWarrantyAndWantToForwardFederationTraffic() == false) {
+		// don't allow reachability between federates
+		if(DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation() != null) {
 			if (src.getClass().equals(FederateUser.class) && dest.getClass().equals(FederateUser.class)) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("federate " + src + " can't reach federate" + dest);

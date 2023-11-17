@@ -1,0 +1,938 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "AppController_getSuccess",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/can-access": {
+      "post": {
+        "operationId": "IsmController_canAccess",
+        "summary": "Verify a user can access all portion marks provided",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CanAccessDto"
+              },
+              "examples": {
+                "Validate User With Classification": {
+                  "value": {
+                    "markings": [
+                      "U",
+                      "U//FOUO",
+                      "TS//NF",
+                      "S//REL USA, FVEY"
+                    ],
+                    "user": {
+                      "classifications": [
+                        "U",
+                        "C",
+                        "S"
+                      ],
+                      "country": "USA"
+                    }
+                  }
+                },
+                "Validate User With ACCMs": {
+                  "value": {
+                    "markings": [
+                      "S//NF//ACCM-HAPPY FROG"
+                    ],
+                    "user": {
+                      "accms": [
+                        "BAD WEASEL"
+                      ],
+                      "country": "USA"
+                    }
+                  }
+                },
+                "Validate User With Country of Origin": {
+                  "value": {
+                    "markings": [
+                      "C//REL USA, FVEY",
+                      "C//NF"
+                    ],
+                    "user": {
+                      "country": "GBR"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A boolean value for each marking stating whether or not the user has access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parse": {
+      "get": {
+        "operationId": "IsmController_parseMarking",
+        "summary": "Parse a classification string",
+        "parameters": [
+          {
+            "name": "fgiExpand",
+            "required": false,
+            "in": "query",
+            "example": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "fgiCombine",
+            "required": false,
+            "in": "query",
+            "example": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "format",
+            "required": true,
+            "in": "query",
+            "example": "pm",
+            "schema": {
+              "enum": [
+                "bl",
+                "pm"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "enforceProgramNicknames",
+            "required": false,
+            "in": "query",
+            "example": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "classification",
+            "required": true,
+            "in": "query",
+            "example": "S//NF",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "camelCaseKeys",
+            "required": false,
+            "in": "query",
+            "example": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The classification serialized, deserialized, and validated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rollup": {
+      "post": {
+        "operationId": "IsmController_rollupMarkings",
+        "summary": "Rollup an array of classification strings to a banner line or portion mark",
+        "parameters": [
+          {
+            "name": "expandable",
+            "required": false,
+            "in": "query",
+            "example": "NATO,FAKE",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "fgiExpand",
+            "required": false,
+            "in": "query",
+            "example": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "fgiCombine",
+            "required": false,
+            "in": "query",
+            "example": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "format",
+            "required": true,
+            "in": "query",
+            "example": "pm",
+            "schema": {
+              "enum": [
+                "bl",
+                "pm"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "enforceProgramNicknames",
+            "required": false,
+            "in": "query",
+            "example": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "camelCaseKeys",
+            "required": false,
+            "in": "query",
+            "example": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              },
+              "examples": {
+                "ACCMs": {
+                  "value": [
+                    "S//ACCM-HAPPY FROG",
+                    "C//ACCM",
+                    "C//ACCM-SAD-TOAD"
+                  ]
+                },
+                "Expandable Tetragraphs": {
+                  "value": [
+                    "C//REL USA, GBR",
+                    "S//REL USA, NATO",
+                    "C//REL USA, AUS, GBR"
+                  ]
+                },
+                "REL TO": {
+                  "value": [
+                    "S//REL USA, GBR",
+                    "U",
+                    "S//REL USA, GBR, JPN"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The rolled up banner marking serialized, deserialized, and validated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "info": {
+    "title": "ISM Service",
+    "description": "A service for normalizing the interaction with classification markings",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "3-letter country code",
+            "enum": [
+              "USA",
+              "AUS",
+              "CAN",
+              "GBR",
+              "NZL",
+              "ABW",
+              "AFG",
+              "AGO",
+              "AIA",
+              "ALA",
+              "ALB",
+              "AND",
+              "ARE",
+              "ARG",
+              "ARM",
+              "ASM",
+              "ATA",
+              "ATF",
+              "ATG",
+              "AUT",
+              "AZE",
+              "BDI",
+              "BEL",
+              "BEN",
+              "BES",
+              "BFA",
+              "BGD",
+              "BGR",
+              "BHR",
+              "BHS",
+              "BIH",
+              "BLM",
+              "BLR",
+              "BLZ",
+              "BMU",
+              "BOL",
+              "BRA",
+              "BRB",
+              "BRN",
+              "BTN",
+              "BVT",
+              "BWA",
+              "CAF",
+              "CCK",
+              "CHE",
+              "CHL",
+              "CHN",
+              "CIV",
+              "CMR",
+              "COD",
+              "COG",
+              "COK",
+              "COL",
+              "COM",
+              "CPV",
+              "CRI",
+              "CUB",
+              "CUW",
+              "CXR",
+              "CYM",
+              "CYP",
+              "CZE",
+              "DEU",
+              "DJI",
+              "DMA",
+              "DNK",
+              "DOM",
+              "DZA",
+              "ECU",
+              "EGY",
+              "ERI",
+              "ESH",
+              "ESP",
+              "EST",
+              "ETH",
+              "FIN",
+              "FJI",
+              "FLK",
+              "FRA",
+              "FRO",
+              "FSM",
+              "GAB",
+              "GEO",
+              "GGY",
+              "GHA",
+              "GIB",
+              "GIN",
+              "GLP",
+              "GMB",
+              "GNB",
+              "GNQ",
+              "GRC",
+              "GRD",
+              "GRL",
+              "GTM",
+              "GUF",
+              "GUM",
+              "GUY",
+              "HKG",
+              "HMD",
+              "HND",
+              "HRV",
+              "HTI",
+              "HUN",
+              "IDN",
+              "IMN",
+              "IND",
+              "IOT",
+              "IRL",
+              "IRN",
+              "IRQ",
+              "ISL",
+              "ISR",
+              "ITA",
+              "JAM",
+              "JEY",
+              "JOR",
+              "JPN",
+              "KAZ",
+              "KEN",
+              "KGZ",
+              "KHM",
+              "KIR",
+              "KNA",
+              "KOR",
+              "KWT",
+              "LAO",
+              "LBN",
+              "LBR",
+              "LBY",
+              "LCA",
+              "LIE",
+              "LKA",
+              "LSO",
+              "LTU",
+              "LUX",
+              "LVA",
+              "MAC",
+              "MAF",
+              "MAR",
+              "MCO",
+              "MDA",
+              "MDG",
+              "MDV",
+              "MEX",
+              "MHL",
+              "MKD",
+              "MLI",
+              "MLT",
+              "MMR",
+              "MNE",
+              "MNG",
+              "MNP",
+              "MOZ",
+              "MRT",
+              "MSR",
+              "MTQ",
+              "MUS",
+              "MWI",
+              "MYS",
+              "MYT",
+              "NAM",
+              "NCL",
+              "NER",
+              "NFK",
+              "NGA",
+              "NIC",
+              "NIU",
+              "NLD",
+              "NOR",
+              "NPL",
+              "NRU",
+              "OMN",
+              "PAK",
+              "PAN",
+              "PCN",
+              "PER",
+              "PHL",
+              "PLW",
+              "PNG",
+              "POL",
+              "PRI",
+              "PRK",
+              "PRT",
+              "PRY",
+              "PSE",
+              "PYF",
+              "QAT",
+              "REU",
+              "ROU",
+              "RUS",
+              "RWA",
+              "SAU",
+              "SDN",
+              "SEN",
+              "SGP",
+              "SGS",
+              "SHN",
+              "SJM",
+              "SLB",
+              "SLE",
+              "SLV",
+              "SMR",
+              "SOM",
+              "SPM",
+              "SRB",
+              "SSD",
+              "STP",
+              "SUR",
+              "SVK",
+              "SVN",
+              "SWE",
+              "SWZ",
+              "SXM",
+              "SYC",
+              "SYR",
+              "TCA",
+              "TCD",
+              "TGO",
+              "THA",
+              "TJK",
+              "TKL",
+              "TKM",
+              "TLS",
+              "TON",
+              "TTO",
+              "TUN",
+              "TUR",
+              "TUV",
+              "TWN",
+              "TZA",
+              "UGA",
+              "UKR",
+              "UMI",
+              "URY",
+              "UZB",
+              "VAT",
+              "VCT",
+              "VEN",
+              "VGB",
+              "VIR",
+              "VNM",
+              "VUT",
+              "WLF",
+              "WSM",
+              "XKS",
+              "YEM",
+              "ZAF",
+              "ZMB",
+              "ZWE"
+            ]
+          },
+          "accms": {
+            "description": "ACCM nicknames accessible to user",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "classifications": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "TS",
+                "S",
+                "C",
+                "R",
+                "U"
+              ]
+            }
+          },
+          "sciControls": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "SIG",
+                "SI",
+                "HCSP",
+                "TK"
+              ]
+            }
+          }
+        },
+        "required": [
+          "country",
+          "accms",
+          "classifications",
+          "sciControls"
+        ]
+      },
+      "CanAccessDto": {
+        "type": "object",
+        "properties": {
+          "markings": {
+            "description": "Array of classification strings",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "markings",
+          "user"
+        ]
+      },
+      "UClassificationConfig": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Allows configuration to be defined but not applied"
+          },
+          "nato": {
+            "type": "boolean",
+            "description": "Are NATO markings available at this classification level"
+          },
+          "bl": {
+            "type": "string",
+            "description": "Banner line version",
+            "enum": [
+              "UNCLASSIFIED"
+            ]
+          },
+          "pm": {
+            "type": "string",
+            "description": "Portion mark version",
+            "enum": [
+              "U"
+            ]
+          }
+        },
+        "required": [
+          "active",
+          "nato",
+          "bl",
+          "pm"
+        ]
+      },
+      "RClassificationConfig": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Allows configuration to be defined but not applied"
+          },
+          "nato": {
+            "type": "boolean",
+            "description": "Are NATO markings available at this classification level"
+          },
+          "bl": {
+            "type": "string",
+            "description": "Banner line version",
+            "enum": [
+              "RESTRICTED"
+            ]
+          },
+          "pm": {
+            "type": "string",
+            "description": "Portion mark version",
+            "enum": [
+              "R"
+            ]
+          }
+        },
+        "required": [
+          "active",
+          "nato",
+          "bl",
+          "pm"
+        ]
+      },
+      "CClassificationConfig": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Allows configuration to be defined but not applied"
+          },
+          "nato": {
+            "type": "boolean",
+            "description": "Are NATO markings available at this classification level"
+          },
+          "bl": {
+            "type": "string",
+            "description": "Banner line version",
+            "enum": [
+              "CONFIDENTIAL"
+            ]
+          },
+          "pm": {
+            "type": "string",
+            "description": "Portion mark version",
+            "enum": [
+              "C"
+            ]
+          }
+        },
+        "required": [
+          "active",
+          "nato",
+          "bl",
+          "pm"
+        ]
+      },
+      "SClassificationConfig": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Allows configuration to be defined but not applied"
+          },
+          "nato": {
+            "type": "boolean",
+            "description": "Are NATO markings available at this classification level"
+          },
+          "bl": {
+            "type": "string",
+            "description": "Banner line version",
+            "enum": [
+              "SECRET"
+            ]
+          },
+          "pm": {
+            "type": "string",
+            "description": "Portion mark version",
+            "enum": [
+              "S"
+            ]
+          }
+        },
+        "required": [
+          "active",
+          "nato",
+          "bl",
+          "pm"
+        ]
+      },
+      "TSClassificationConfig": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Allows configuration to be defined but not applied"
+          },
+          "nato": {
+            "type": "boolean",
+            "description": "Are NATO markings available at this classification level"
+          },
+          "bl": {
+            "type": "string",
+            "description": "Banner line version",
+            "enum": [
+              "TOP SECRET"
+            ]
+          },
+          "pm": {
+            "type": "string",
+            "description": "Portion mark version",
+            "enum": [
+              "TS"
+            ]
+          }
+        },
+        "required": [
+          "active",
+          "nato",
+          "bl",
+          "pm"
+        ]
+      },
+      "NetworkClassificationConfig": {
+        "type": "object",
+        "properties": {
+          "U": {
+            "$ref": "#/components/schemas/UClassificationConfig"
+          },
+          "R": {
+            "$ref": "#/components/schemas/RClassificationConfig"
+          },
+          "C": {
+            "$ref": "#/components/schemas/CClassificationConfig"
+          },
+          "S": {
+            "$ref": "#/components/schemas/SClassificationConfig"
+          },
+          "TS": {
+            "$ref": "#/components/schemas/TSClassificationConfig"
+          }
+        }
+      },
+      "NetworkMetadata": {
+        "type": "object",
+        "properties": {
+          "classification": {
+            "description": "Classification configuration for the network",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NetworkClassificationConfig"
+              }
+            ]
+          },
+          "programnicknames": {
+            "description": "ACCMs supported by the network",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "classification",
+          "programnicknames"
+        ]
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "$ref": "#/components/schemas/NetworkMetadata"
+          }
+        },
+        "required": [
+          "network"
+        ]
+      },
+      "CanAccessResponse": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "result": {
+            "type": "boolean",
+            "description": "Whether or not the user can access the provided classification markings"
+          }
+        },
+        "required": [
+          "meta",
+          "result"
+        ]
+      },
+      "ISMObj": {
+        "type": "object",
+        "properties": {
+          "classification": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scicontrols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "disseminationcontrols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "releasableto": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "programnicknames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nonicmarkings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fgisourceopen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fgisourceprotected": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ownerproducer": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "classification",
+          "ownerproducer"
+        ]
+      },
+      "MarkingResponse": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "Is the rolled-up marking valid?"
+          },
+          "marking": {
+            "type": "string",
+            "description": "Resulting marking from rolling up portion marks"
+          },
+          "data": {
+            "description": "Deserialized marking from rolling up portion marks",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ISMObj"
+              }
+            ]
+          }
+        },
+        "required": [
+          "valid",
+          "marking",
+          "data"
+        ]
+      }
+    }
+  }
+}

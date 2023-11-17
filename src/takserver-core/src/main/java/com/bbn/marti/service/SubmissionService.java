@@ -126,7 +126,6 @@ import com.bbn.marti.remote.groups.NetworkInputAddResult;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.sync.model.DataFeedDao;
 import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.util.FixedSizeBlockingQueue;
 import com.bbn.marti.util.MessageConversionUtil;
@@ -141,12 +140,13 @@ import io.micrometer.core.instrument.Metrics;
 import tak.server.CommonConstants;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
-import tak.server.cache.PluginDatafeedCacheHelper;
+import tak.server.cache.DatafeedCacheHelper;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotElement;
 import tak.server.cot.CotEventContainer;
 import tak.server.cot.CotParser;
 import tak.server.federation.DistributedFederationManager;
+import tak.server.feeds.DataFeedDTO;
 import tak.server.feeds.DataFeed.DataFeedType;
 import tak.server.feeds.DataFeedStatsHelper;
 import tak.server.ignite.IgniteHolder;
@@ -177,6 +177,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     // makes all points added to missions visible to __ANON__
     private boolean postMissionEventsAsPublic = false;
+
+	private boolean alwaysArchiveMissionCot = false;
 
     private DistributedConfiguration config;
 
@@ -219,7 +221,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     private DataFeedRepository dataFeedRepository;
     
 	@Autowired
-	private PluginDatafeedCacheHelper pluginDatafeedCacheHelper;
+	private DatafeedCacheHelper pluginDatafeedCacheHelper;
     
 	public static SubmissionService getInstance() {
 		if (instance == null) {
@@ -321,6 +323,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         postMissionEventsAsPublic = config.getAuth() != null && config.getAuth().getLdap() != null &&
                 config.getAuth().getLdap().isPostMissionEventsAsPublic();
+
+        alwaysArchiveMissionCot = config.getNetwork().isAlwaysArchiveMissionCot();
 
         List<Input> inputs = config.getNetwork().getInput();
 
@@ -429,11 +433,13 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 					if (logger.isDebugEnabled()) {
 						logger.debug("Updating the DataFeed in the repository.");
 					}
+					
+					// TODO: update to support predicate feeds if necessary (may not be because the messages don't flow thru the server
 					dataFeedId = dataFeedRepository.updateDataFeed(feed.getUuid(), feed.getName(), feedType.ordinal(),
 							feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
 							feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
 							feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
-							feed.isSync(), feed.getSyncCacheRetentionSeconds(), feed.isFederated(), feed.isBinaryPayloadWebsocketOnly());
+							feed.isSync(), feed.getSyncCacheRetentionSeconds(), feed.isFederated(), feed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
 
 					if (feed.getTag().size() > 0) {
 						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
@@ -452,7 +458,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 								feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
 								feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
 								feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
-								feed.isSync(), feed.getSyncCacheRetentionSeconds(), groupVector, feed.isFederated(), feed.isBinaryPayloadWebsocketOnly());
+								feed.isSync(), feed.getSyncCacheRetentionSeconds(), groupVector, feed.isFederated(), feed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
 
 						if (feed.getTag().size() > 0) {
 							dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
@@ -668,7 +674,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 										if (logger.isDebugEnabled()) {
 											logger.debug("Not in cache. Check if DataFeed is in the Repository.");
 										}
-            							List<DataFeedDao> dataFeedInfo = dataFeedRepository.getDataFeedByUUID(m.getFeedUuid());
+            							List<DataFeedDTO> dataFeedInfo = dataFeedRepository.getDataFeedByUUID(m.getFeedUuid());
                     					if (dataFeedInfo.size() == 0) {
                     						
                     						// update cache with empty result
@@ -1263,12 +1269,22 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         NavigableSet<Group> groups = groupManager.getGroups(uzer);
 
                         if (groups != null) {
-                            if (postMissionEventsAsPublic && data.getDocument().selectNodes(
-                                    "/event/detail/marti/dest[@mission]").size() > 0) {
-                                //make a copy of the group set so we don't modify the actual user
-                                groups = new ConcurrentSkipListSet<>(groups);
-                                groups.add(groupManager.getGroup("__ANON__", Direction.IN));
-                            }
+
+                        	if (postMissionEventsAsPublic || alwaysArchiveMissionCot) {
+								if (data.getDocument().selectNodes(
+										"/event/detail/marti/dest[@mission]").size() > 0) {
+
+									if (postMissionEventsAsPublic) {
+										//make a copy of the group set so we don't modify the actual user
+										groups = new ConcurrentSkipListSet<>(groups);
+										groups.add(groupManager.getGroup("__ANON__", Direction.IN));
+									}
+
+									if (alwaysArchiveMissionCot) {
+										data.setContext(Constants.ARCHIVE_EVENT_KEY, Boolean.TRUE);
+									}
+								}
+							}
 
                             // Only put IN groups in the message - out groups do not matter here
                             data.setContext(Constants.GROUPS_KEY, gfu.filterGroupDirection(Direction.IN, groups));

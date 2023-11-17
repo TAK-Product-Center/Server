@@ -40,7 +40,6 @@ import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayerType;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.Metadata;
-import com.bbn.marti.sync.model.DataFeedDao;
 import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionRole;
 import com.bbn.marti.sync.model.MissionRole.Role;
@@ -55,6 +54,7 @@ import mil.af.rl.rol.RolLexer;
 import mil.af.rl.rol.RolParser;
 import mil.af.rl.rol.value.DataFeedMetadata;
 import mil.af.rl.rol.value.MissionMetadata;
+import tak.server.feeds.DataFeedDTO;
 import tak.server.feeds.DataFeed.DataFeedType;
 
 public class FederationROLHandler {
@@ -437,11 +437,11 @@ public class FederationROLHandler {
 				String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
 					
 				// add a federated data feed to the data feeds table if it doesn't exist
-				List<DataFeedDao> datafeeds = dataFeedRepository.getDataFeedByUUID(meta.getDataFeedUid());
+				List<DataFeedDTO> datafeeds = dataFeedRepository.getDataFeedByUUID(meta.getDataFeedUid());
 				if (datafeeds == null || datafeeds.size() == 0) {
 					long dataFeedId = dataFeedRepository.addDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
 							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, meta.isSync(), 
-							meta.getSyncCacheRetentionSeconds(), groupVector, true, false);
+							meta.getSyncCacheRetentionSeconds(), groupVector, true, false, null, null, null, null);
 					
 					if (meta.getTags() != null && meta.getTags().size() > 0)
 						dataFeedRepository.addDataFeedTags(dataFeedId, meta.getTags());
@@ -455,8 +455,8 @@ public class FederationROLHandler {
 				// check mission exists before making feed					
 				if (mission != null) {
 					// create mission feed association
-					missionService.addFeedToMission(meta.getMissionFeedUid(), meta.getMissionName(), "", mission, meta.getDataFeedUid(), meta.getFilterBbox(), 
-							meta.getFilterType(), meta.getFilterCallsign());
+					missionService.addFeedToMission(meta.getMissionFeedUid(), meta.getMissionName(), "", mission, meta.getDataFeedUid(), meta.getFilterPolygon(), 
+							meta.getFilterCotTypes(), meta.getFilterCallsign());
 				}
 			}
 		}
@@ -472,17 +472,19 @@ public class FederationROLHandler {
 				String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
 					
 				// add a federated data feed to the data feeds table, or update if it exists
-				List<DataFeedDao> datafeeds = dataFeedRepository.getDataFeedByUUID(meta.getDataFeedUid());
+				List<DataFeedDTO> datafeeds = dataFeedRepository.getDataFeedByUUID(meta.getDataFeedUid());
 				if (datafeeds == null || datafeeds.size() == 0) {
 					long dataFeedId = dataFeedRepository.addDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
 							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, meta.isSync(), 
-							meta.getSyncCacheRetentionSeconds(), groupVector, true, false);
+							meta.getSyncCacheRetentionSeconds(), groupVector, true, false, null, null, null, null);
 					dataFeedRepository.addDataFeedTags(dataFeedId, meta.getTags());
 				} else {
-					DataFeedDao dataFeed = datafeeds.get(0);
+					DataFeedDTO dataFeed = datafeeds.get(0);
+					
+					// TODO: update this to support predicate data feeds
 					dataFeedRepository.updateDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
 							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, 
-							meta.isSync(), meta.getSyncCacheRetentionSeconds(), true, false);
+							meta.isSync(), meta.getSyncCacheRetentionSeconds(), true, false, null, null, null, null);
 					
 					dataFeedRepository.removeAllDataFeedTagsById(dataFeed.getId());
 					
@@ -515,8 +517,8 @@ public class FederationROLHandler {
 				// if there isnt a mission in the delete, remove the data feed completely
 				else {
 					// get data feed
-					List<DataFeedDao> datafeeds = dataFeedRepository.getDataFeedByUUID(meta.getDataFeedUid());
-					DataFeedDao dataFeed = datafeeds.get(0);
+					List<DataFeedDTO> datafeeds = dataFeedRepository.getDataFeedByUUID(meta.getDataFeedUid());
+					DataFeedDTO dataFeed = datafeeds.get(0);
 					// delete any mission associations
 					missionService.getMissionsForDataFeed(meta.getDataFeedUid()).forEach(m -> missionService.removeFeedFromMission(m.getName(), "", m, meta.getMissionFeedUid()));
 					// remove all tags

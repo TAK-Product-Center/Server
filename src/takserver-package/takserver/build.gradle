@@ -231,7 +231,7 @@ buildRpm.dependsOn prePackage
 buildDeb.dependsOn prePackage
 
 buildRpm {
-    requires('java-11-openjdk-devel')
+    requires('java-17-openjdk-devel')
     requires('postgis33_15')
     requires('postgis33_15-utils')
     requires('postgresql15-server')
@@ -241,7 +241,7 @@ buildRpm {
 
 // can add deb package dependencies here
 buildDeb {
-  requires('openjdk-11-jdk')
+  requires('openjdk-17-jdk')
   requires('postgresql-15')
   requires('postgresql-15-postgis-3')
   requires('openssl')

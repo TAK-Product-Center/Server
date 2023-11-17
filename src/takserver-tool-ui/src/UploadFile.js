@@ -15,12 +15,12 @@ import OutlinedInput from '@mui/material/OutlinedInput';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Chip from '@mui/material/Chip';
-import InputLabel from '@mui/material/InputLabel';
 import Switch from '@mui/material/Switch';
 import Collapse from '@mui/material/Collapse';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import Typography from '@mui/material/Typography';
+import InputLabel from '@mui/material/InputLabel';
 
 // Constants to use throughout the component
 const ITEM_HEIGHT = 48;
@@ -38,7 +38,7 @@ const MenuProps = {
 var allMissions = [];
 var copMissions = [];
 
-function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFileProp}) {
+function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFileProp, selectedMission}) {
   // Hooks
     const [missions, setMissions] = React.useState([]);
     const [checked, setChecked] = React.useState([]);
@@ -58,7 +58,15 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
     }
 
     useEffect(() => {
-      fetch('/Marti/api/missions')
+      var selectArray = []
+      if(selectedMission != null){
+        selectArray.push(selectedMission)
+        setChecked(selectArray)
+      }
+    },[selectedMission])
+
+    useEffect(() => {
+      fetch('/Marti/api/missions?passwordProtected=true&defaultRole=true')
           .then(response => response.json())
           .then(data => {
               var missionList = [];
@@ -71,7 +79,7 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
               });
               setMissions(missionList);
           });
-    },[])
+    },[openHook])
 
     async function handleUploadAndClose()  {
       submitForm();
@@ -93,7 +101,6 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
     const handleClose = () => {
       setOpenHook(false);
       clearData();
-      setDeleted(!deleted);
       setCopChecked(false);
     };
 
@@ -102,7 +109,11 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
     }
 
     function clearData(){
-      setChecked([]);
+      if(selectedMission != null){
+        setChecked([selectedMission])
+      } else {
+        setChecked([]);
+      }
       setFileProp("");
       setResourceName("");
       setDownloadPath("");
@@ -131,7 +142,6 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
         if (res.ok) {
           res.json().then(data => {
             const missionsLength = checked.length;
-            console.log(data);
               for (var i = 0; i < missionsLength; i++) {
                 addMissionContents(data.Hash,checked[i], data.SubmissionUser);
               }
@@ -147,9 +157,7 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
     // Called when user adds file to mission on upload
     function addMissionContents(hash, mission, creatorUid) {
       const data = "{ \"hashes\":[ \"" + hash + "\" ] }";
-      console.log(data)
       var url = '/Marti/api/missions/' + mission + '/contents?creatorUid=' + creatorUid
-      console.log(url)
       fetch(url, { 
         method: 'PUT',
         headers: {'Content-Type':'application/json'},
@@ -158,6 +166,10 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
         if(!res.ok){
           console.log(res);
           }
+        if(res.ok){
+          console.log("Upload successful")
+          setDeleted(!deleted)
+        }
       }));
     }
 

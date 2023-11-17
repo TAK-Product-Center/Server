@@ -15,6 +15,11 @@ public interface PluginDataFeedApi {
 
 	PluginDataFeed create(String uuid, String name, List<String> tags);
 	
+	PredicateDataFeed createPredicateFeed(String uuid, String name, List<String> tags);
+
+	
+	
+	
 	void delete(String uuid, List<String> groups);
 
 	Collection<PluginDataFeed> getAllPluginDataFeeds();

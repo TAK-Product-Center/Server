@@ -242,6 +242,13 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 		return getRootAttribute("qos");
 	}
 
+	public String getCaveat() {
+		return getRootAttribute("caveat");
+	}
+	public String getReleaseableTo() {
+		return getRootAttribute("releaseableTo");
+	}
+
 	private String getRootAttribute(String attribute) {
 		return doc.getRootElement().attributeValue(attribute);
 	}

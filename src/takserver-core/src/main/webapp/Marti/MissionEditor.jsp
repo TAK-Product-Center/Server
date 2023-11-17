@@ -68,6 +68,8 @@
                     }
                 }
 
+                url += "&allowGroupChange=true";
+
                 $.ajax({
                     url  : url,
                     type : 'PUT',

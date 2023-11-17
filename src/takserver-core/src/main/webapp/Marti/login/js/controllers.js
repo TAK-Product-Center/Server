@@ -24,7 +24,7 @@ loginControllers.controller('loginController', ['$scope', '$location', 'loginSer
             window.location = "/login/auth";
         }
 
-        $scope.onSubmit = async function (){
+        $scope.onSubmit = async function() {
             var xhr = new XMLHttpRequest();
             var url = "/oauth/token?grant_type=password" +
                 "&username=" + encodeURIComponent(username.value) +
@@ -33,7 +33,7 @@ loginControllers.controller('loginController', ['$scope', '$location', 'loginSer
             xhr.open("POST", url, true);
             xhr.onload = function() {
                 if (xhr.status == 200) {
-                    window.location = document.referrer
+                    window.location = "/";
                 } else {
                     $scope.showError = true;
                     $scope.$apply();

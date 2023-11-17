@@ -15,7 +15,7 @@
 
 run_schema_manager () {
   echo "Applying the TAKServer specific schema changes for the TAK Server version..."
-  if [ IS_DOCKER ]; then
+  if [ "$IS_DOCKER" = true ]; then
      java -jar SchemaManager.jar upgrade
   elif [ -e /opt/tak/db-utils/SchemaManager.jar ]; then
      java -jar /opt/tak/db-utils/SchemaManager.jar upgrade
@@ -25,6 +25,8 @@ run_schema_manager () {
   fi
   echo "Database updated with SchemaManager.jar"
 }
+
+echo "TAK Server DB Setup"
 
 username='martiuser'
 password=""
@@ -223,6 +225,18 @@ if [ "$IS_DOCKER" = false ]; then
 fi
 
 if [ ! -z "$PGBIN_OLD" ]; then
+  martiuser_exists=`su postgres -c "psql postgres -AXqtc \"SELECT 1 FROM pg_roles WHERE rolname='martiuser'\""`
+  if [ $? -eq 0 ] && [ "$martiuser_exists" = "1" ]; then
+       echo "Postgres user \"martiuser\" exists."
+       if $(su - postgres -c "psql -U postgres cot -c ''"); then
+            echo "pg15 db initalized, refusing to migrate pg10 db. Running schemamanager"
+            run_schema_manager
+            exit 0
+       fi
+  else
+       echo "martiuser does not exist, pg15 db not initalized"
+  fi
+
   echo "***** Upgrade needed *****"
   if [ "$PRE_POSTGRES_10" = true ]; then
      echo "Upgrading from a version prior to TAK 1.3.11 (Postgresql 10) is not tested and guaranteed to work!"
@@ -238,7 +252,14 @@ if [ ! -z "$PGBIN_OLD" ]; then
   su - postgres -c "$PGBIN_OLD/pg_ctl -D $PGDATA_OLD stop"
   su - postgres -c "$PGBIN_NEW/pg_ctl -D $PGDATA_NEW stop"
   echo "Performing upgrade of data from $PGDATA_OLD directory to $PDDATA_NEW directory..."
+  echo "NOTE: If you are upgrading a large DB, this could take a significant amount of time.  Make sure your invoke "
+  echo "via a tty session so the script can output to the console or set the remote session timeout very large to ensure"
+  echo "the upgrade completes before reaching the timeout to avoid losing the session in the middle of the upgrade. "
   su - postgres -c "$PGBIN_NEW/pg_upgrade --old-bindir=$PGBIN_OLD --new-bindir=$PGBIN_NEW --old-datadir=$PGDATA_OLD --new-datadir=$PGDATA_NEW"
+  if [ $? -ne 0 ]; then
+       echo "Database upgrade failed. Stopping to prevent data loss"
+       exit 1
+    fi
 fi
 
 if [ ! -d $PGDATA ]; then
@@ -246,30 +267,44 @@ if [ ! -d $PGDATA ]; then
   exit 1
 fi
 
+# Verify and add en_US.UTF-8 locale on Debian based installations
+if ! $(locale -a | grep -iq en_US.UTF8); then 
+  if [ -e /etc/locale.gen ]; then
+    echo "Adding en_US.UTF-8 locale"
+    sudo sed -i -e"s/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g" /etc/locale.gen
+    sudo locale-gen
+  fi
+fi
+
+# Start PG services to allow identification of data directory and config files
+echo "(Re)starting PostgreSQL service."
+$POSTGRES_POST_CMD
 
 # Install our version of pg_hba.conf
 echo "Installing TAKServer's version of PostgreSQL access-control policy."
+PGHBA=$(su - postgres -c "psql -AXqtc 'SHOW hba_file'")
 # Back up pg_hba.conf
 BACKUP_SUFFIX=`date --rfc-3339='seconds' | sed 's/ /-/'`
-HBA_BACKUP=$PGDATA/pg_hba.conf.backup-$BACKUP_SUFFIX
+HBA_BACKUP=$PGHBA.backup-$BACKUP_SUFFIX
 if [ -e /opt/tak/db-utils/pg_hba.conf ] || [ -e pg_hba.conf ]; then
-  if [ -e $PGDATA/pg_hba.conf ]; then
-    mv $PGDATA/pg_hba.conf $HBA_BACKUP
+  if [ -e $PGHBA ]; then
+    mv $PGHBA $HBA_BACKUP
     echo "Copied existing PostgreSQL access-control policy to $HBA_BACKUP."
   fi
 
    # for docker install
-  if [ IS_DOCKER ]; then
-    cp pg_hba.conf $PGDATA
+  if [ "$IS_DOCKER" = true ]; then
+    echo "Docker db install"
+    cp pg_hba.conf $PGHBA
   else
     # for RPM install
-    echo "RPM db install"
-      cp /opt/tak/db-utils/pg_hba.conf $PGDATA
+    echo "RPM/DEB db install"
+    cp /opt/tak/db-utils/pg_hba.conf $PGHBA
   fi
 
-  chown postgres:postgres $PGDATA/pg_hba.conf
-  chmod 600 $PGDATA/pg_hba.conf
-  echo "Installed TAKServer's PostgreSQL access-control policy to $PGDATA/pg_hba.conf."
+  chown postgres:postgres $PGHBA
+  chmod 600 $PGHBA
+  echo "Installed TAKServer's PostgreSQL access-control policy to $PGHBA."
   echo "Restarting PostgreSQL service."
   $POSTGRES_POST_CMD
 else
@@ -277,25 +312,33 @@ else
   exit 1
 fi
 
-CONF_BACKUP=$PGDATA/postgresql.conf.backup-$BACKUP_SUFFIX
+PGCONFIG=$(su - postgres -c "psql -AXqtc 'SHOW config_file'")
+CONF_BACKUP=$PGCONFIG.backup-$BACKUP_SUFFIX
 if [ -e /opt/tak/db-utils/postgresql.conf ] || [ -e postgresql.conf ];  then
-  if [ -e $PGDATA/postgresql.conf ]; then
-    mv $PGDATA/postgresql.conf $CONF_BACKUP
+  PGIDENT=$(su - postgres -c "psql -AXqtc 'SHOW ident_file'")
+
+  if [ -e $PGCONFIG ]; then
+    mv $PGCONFIG $CONF_BACKUP
     echo "Copied existing PostgreSQL configuration to $CONF_BACKUP."
   fi
 
    # for docker install
-  if [ IS_DOCKER ]; then
-    cp postgresql.conf $PGDATA
+  if [ "$IS_DOCKER" = true ]; then
+    cp postgresql.conf $PGCONFIG
   else
     # for RPM install
-    echo "RPM db install"
-      cp /opt/tak/db-utils/postgresql.conf $PGDATA
+    echo "RPM/DEB db install"
+    cp /opt/tak/db-utils/postgresql.conf $PGCONFIG
   fi
 
-  chown postgres:postgres $PGDATA/postgresql.conf
-  chmod 600 $PGDATA/postgresql.conf
-  echo "Installed TAKServer's PostgreSQL configuration to $PGDATA/postgresql.conf."
+  # multi distro compatibility
+  sed -i -e"s|^[# ]*data_directory[ ]*=.*$|data_directory = '$PGDATA'|" $PGCONFIG
+  sed -i -e"s|^[# ]*hba_file[ ]*=.*$|hba_file = '$PGHBA'|" $PGCONFIG
+  sed -i -e"s|^[# ]*ident_file[ ]*=.*$|ident_file = '$PGIDENT'|" $PGCONFIG
+
+  chown postgres:postgres $PGCONFIG
+  chmod 600 $PGCONFIG
+  echo "Installed TAKServer's PostgreSQL configuration to $PGCONFIG."
   echo "Restarting PostgreSQL service."
   $POSTGRES_POST_CMD
 fi

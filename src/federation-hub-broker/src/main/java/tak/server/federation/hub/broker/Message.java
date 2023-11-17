@@ -10,7 +10,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -154,24 +153,6 @@ public class Message {
         return result.toString();
     }
 
-    /* Returns a SHA-256 hash of the message payload. */
-    private String getPayloadHashStr() {
-        if (this.payload == null) {
-            return null;
-        }
-
-        String result = null;
-        try {
-            MessageDigest hash = MessageDigest.getInstance("SHA-256");
-            hash.update(this.payload.getBytes());
-            String lowercase = new String(Hex.encodeHex(hash.digest()));
-            result = lowercase.toUpperCase(Locale.getDefault());
-        } catch (NoSuchAlgorithmException e) {
-            logger.error("Unable to generate message payload hash", e);
-        }
-        return result;
-    }
-
     private static final String NEWLINE_TAB = "\n\t";
 
     @Override
@@ -183,7 +164,6 @@ public class Message {
         .append(NEWLINE_TAB).append(getMetadataStr()).append(NEWLINE_TAB)
         .append("\n\n===\n\nPAYLOAD: (").append(payload.getBytes().length).append(" bytes)\ntype: ")
         .append(payload.getClass().getName()).append('\n')
-        .append(getPayloadHashStr())
         .append("\n=== END ===");
 
         return sbuilder.toString();

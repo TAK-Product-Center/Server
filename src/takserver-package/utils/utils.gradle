@@ -11,13 +11,6 @@ task copyDbScripts(type: Copy) {
 	into "$buildDir/takArtifacts/db-utils"
 }
 
-// Copy db-utils scripts
-task copyRpmDbScript(type: Copy) {
-	from project(':takserver-schemamanager').file('scripts/setup-rpm-db.sh')
-	into "$buildDir/distributions"
-	filter { line -> line.replaceAll("db_rpm=", "db_rpm=\"${takdbpkgname}-${takversion}-${takreleaserpm}.noarch.rpm\"")}
-}
-
 // Gather all wars into this build
 task copyWars(type: Copy) {
 	dependsOn(':takserver-core:bootWar')
@@ -485,6 +478,7 @@ task constructHardenedDockerZip(type: Zip) {
 
 	// Include the hardened docker-specific files
 	from(project(':takserver-core').file('docker/hardened')) {
+		exclude('full')
 		rename('(Dockerfile.ca)', 'docker/$1')
 		rename('(Dockerfile.hardened-takserver)', 'docker/$1')
 		rename('(README_hardened_docker.md)', 'docker/$1')
@@ -496,6 +490,7 @@ task constructHardenedDockerZip(type: Zip) {
 
 	// Include the hardened schemamanager-specific files
 	from(project(':takserver-schemamanager').file('docker/hardened')) {
+		exclude('full')
 		rename('(configureInDocker.sh)', 'tak/db-utils/$1')
 		rename('(takserver-setup-db.sh)', 'tak/db-utils/$1')
 		rename('(Dockerfile.hardened-takserver-db)', 'docker/$1')

@@ -104,18 +104,6 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
     });
   };
 
-  $scope.deleteSemanticSubscription = function(request) {
-    bootbox.confirm("Are you sure you want to delete the semantic subscription (" + request.name + ")?", function(confirm) {
-      if (confirm) {
-        var index = $rootScope.workflow.semanticRequests.indexOf(request);
-        if (index > -1) {
-          $rootScope.workflow.semanticRequests.splice(index, 1);
-          $scope.$apply();
-        }
-      }
-    });
-  };
-
   $scope.displayTemplateContainer = function() {
     var modalInstance = $uibModal.open({
       templateUrl: "views/workflows/display_template_container.html",

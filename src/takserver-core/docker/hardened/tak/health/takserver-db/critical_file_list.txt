@@ -2,9 +2,6 @@
 /opt/tak/configure.sh
 /opt/tak/configureInDocker.sh
 /opt/tak/db-utils/configure.sh
-/opt/tak/db-utils/configureInDocker.sh
-/opt/tak/CoreConfig.xml
-/opt/tak/CoreConfig.xsd
 /opt/tak/TAKAConfig.xsd
 /opt/tak/TAKCLConfig.xsd
 /opt/tak/docs/TAK_Server_Configuration_Guide.pdf

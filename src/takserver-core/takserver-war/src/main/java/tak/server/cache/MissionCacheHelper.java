@@ -1,11 +1,13 @@
 package tak.server.cache;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.ignite.IgniteCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Lazy;
 
@@ -27,6 +29,8 @@ public class MissionCacheHelper {
 
 	@Autowired
 	private MissionRepository missionRepository;
+	
+	private static final AtomicBoolean isInvalidateAllMissionCache = new AtomicBoolean(false);
 
 	private static final Logger logger = LoggerFactory.getLogger(MissionCacheHelper.class);
 
@@ -271,8 +275,41 @@ public class MissionCacheHelper {
 
 		return "[missionguid_" + guid + "_" + (hydrateDetails ? "true, hydrated" : "false") + "]";
 	}
+	
+	public void clearAllMissionAndCopsCache() {
 
-	public void clearAllMissionCache() {
-		getCache(Constants.ALL_MISSION_CACHE).clear();
+		// don't allow concurrent clears of these caches.
+		if (isInvalidateAllMissionCache.compareAndSet(false, true)) {
+			try {
+				
+				try {
+					Cache allMissionCache = cacheManager.getCache(Constants.ALL_MISSION_CACHE);
+
+					if (allMissionCache != null) {
+						allMissionCache.invalidate();
+					}
+				} catch (Exception e) {
+					logger.error("error clearing all mission cache.", e);
+				}
+
+				try {
+					Cache allCopsCache = cacheManager.getCache(Constants.ALL_COPS_MISSION_CACHE);
+
+					if (allCopsCache != null) {
+						allCopsCache.invalidate();
+					}
+				} catch (Exception e) {
+					logger.error("error clearing all mission cache.", e);
+				}
+				
+				logger.debug("cleared all mission cache and all cops cache.");
+			} catch (Exception e) {
+				logger.error("error clearing all mission cache and all cops cache.", e);
+			} finally {
+				isInvalidateAllMissionCache.set(false);
+			}
+		}
+
+		return;
 	}
 }

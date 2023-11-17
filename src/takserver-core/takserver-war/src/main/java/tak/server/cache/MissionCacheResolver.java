@@ -14,8 +14,6 @@ import org.springframework.cache.interceptor.CacheOperation;
 import org.springframework.cache.interceptor.CacheOperationInvocationContext;
 import org.springframework.cache.interceptor.CacheResolver;
 
-import tak.server.Constants;
-
 public class MissionCacheResolver implements CacheResolver {
 
     public static final String MISSION_CACHE_RESOLVER = "missionCacheResolver";
@@ -34,10 +32,7 @@ public class MissionCacheResolver implements CacheResolver {
             caches.add(cacheManager.getCache(cacheName.toLowerCase()));
 
             if ((CacheOperation)context.getOperation() instanceof CacheEvictOperation) {
-                caches.add(cacheManager.getCache(Constants.ALL_MISSION_CACHE));
-                caches.add(cacheManager.getCache(Constants.ALL_COPS_MISSION_CACHE));
-                caches.add(cacheManager.getCache(cacheName + MissionLayerCacheResolver.SUFFIX));
-//                caches.add(cacheManager.getCache(cacheName + MissionChangeCacheResolver.SUFFIX));
+                caches.add(cacheManager.getCache(cacheName + MissionLayerCacheResolver.SUFFIX));	
             }
 
             return caches;

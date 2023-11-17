@@ -21,6 +21,20 @@ public class FederationHubUIConfig {
     private String authUsers = AUTH_USER_FILE_DEFAULT;
 
     private Integer port = 9100;
+    
+    private boolean allowOauth  = false;
+    private Integer oauthPort;
+    private String keycloakServerName;
+    private String keycloakDerLocation;
+    private String keycloakClientId;
+    private String keycloakSecret;
+    private String keycloakrRedirectUri;
+    private String keycloakAuthEndpoint;
+    private String keycloakTokenEndpoint;
+    private String keycloakClaimName;
+    private String keycloakAdminClaimValue;
+    private String keycloakAccessTokenName = "access_token";
+    private String keycloakRefreshTokenName = "refresh_token";
 
     public String getKeystoreType() {
         return keystoreType;
@@ -83,27 +97,96 @@ public class FederationHubUIConfig {
         this.port = port;
     }
 
-    @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("FederationHubUIConfig [keystoreType=");
-        builder.append(keystoreType);
-        builder.append(", keystoreFile=");
-        builder.append(keystoreFile);
-        builder.append(", keystorePassword=");
-        builder.append(keystorePassword);
-        builder.append(", truststoreType=");
-        builder.append(truststoreType);
-        builder.append(", truststoreFile=");
-        builder.append(truststoreFile);
-        builder.append(", truststorePassword=");
-        builder.append(truststorePassword);
-        builder.append(", keyAlias=");
-        builder.append(keyAlias);
-        builder.append(", port=");
-        builder.append(port);
-        builder.append("]");
+    public Integer getOauthPort() {
+		return oauthPort;
+	}
+	public void setOauthPort(Integer oauthPort) {
+		this.oauthPort = oauthPort;
+	}
+	public String getKeycloakServerName() {
+		return keycloakServerName;
+	}
+	public void setKeycloakServerName(String keycloakServerName) {
+		this.keycloakServerName = keycloakServerName;
+	}
+	public String getKeycloakDerLocation() {
+		return keycloakDerLocation;
+	}
+	public void setKeycloakDerLocation(String keycloakDerLocation) {
+		this.keycloakDerLocation = keycloakDerLocation;
+	}
+	public String getKeycloakClientId() {
+		return keycloakClientId;
+	}
+	public void setKeycloakClientId(String keycloakClientId) {
+		this.keycloakClientId = keycloakClientId;
+	}
+	public String getKeycloakSecret() {
+		return keycloakSecret;
+	}
+	public void setKeycloakSecret(String keycloakSecret) {
+		this.keycloakSecret = keycloakSecret;
+	}
+	public String getKeycloakrRedirectUri() {
+		return keycloakrRedirectUri;
+	}
+	public void setKeycloakrRedirectUri(String keycloakrRedirectUri) {
+		this.keycloakrRedirectUri = keycloakrRedirectUri;
+	}
+	public String getKeycloakAuthEndpoint() {
+		return keycloakAuthEndpoint;
+	}
+	public void setKeycloakAuthEndpoint(String keycloakAuthEndpoint) {
+		this.keycloakAuthEndpoint = keycloakAuthEndpoint;
+	}
+	public String getKeycloakTokenEndpoint() {
+		return keycloakTokenEndpoint;
+	}
+	public void setKeycloakTokenEndpoint(String keycloakTokenEndpoint) {
+		this.keycloakTokenEndpoint = keycloakTokenEndpoint;
+	}
+	public boolean isAllowOauth() {
+		return allowOauth;
+	}
+	public void setAllowOauth(boolean allowOauth) {
+		this.allowOauth = allowOauth;
+	}
+	public String getKeycloakAccessTokenName() {
+		return keycloakAccessTokenName;
+	}
+	public void setKeycloakAccessTokenName(String keycloakAccessTokenName) {
+		this.keycloakAccessTokenName = keycloakAccessTokenName;
+	}
+	public String getKeycloakRefreshTokenName() {
+		return keycloakRefreshTokenName;
+	}
+	public void setKeycloakRefreshTokenName(String keycloakRefreshTokenName) {
+		this.keycloakRefreshTokenName = keycloakRefreshTokenName;
+	}
+	public String getKeycloakClaimName() {
+		return keycloakClaimName;
+	}
+	public void setKeycloakClaimName(String keycloakClaimName) {
+		this.keycloakClaimName = keycloakClaimName;
+	}
 
-        return builder.toString();
-    }
+	public String getKeycloakAdminClaimValue() {
+		return keycloakAdminClaimValue;
+	}
+	public void setKeycloakAdminClaimValue(String keycloakAdminClaimValue) {
+		this.keycloakAdminClaimValue = keycloakAdminClaimValue;
+	}
+	@Override
+	public String toString() {
+		return "FederationHubUIConfig [keystoreType=" + keystoreType + ", keystoreFile=" + keystoreFile
+				+ ", keystorePassword=" + keystorePassword + ", truststoreType=" + truststoreType + ", truststoreFile="
+				+ truststoreFile + ", keyAlias=" + keyAlias + ", authUsers=" + authUsers + ", port=" + port
+				+ ", allowOauth=" + allowOauth + ", oauthPort=" + oauthPort + ", keycloakServerName="
+				+ keycloakServerName + ", keycloakDerLocation=" + keycloakDerLocation + ", keycloakClientId="
+				+ keycloakClientId + ", keycloakSecret=" + keycloakSecret + ", keycloakrRedirectUri="
+				+ keycloakrRedirectUri + ", keycloakAuthEndpoint=" + keycloakAuthEndpoint + ", keycloakTokenEndpoint="
+				+ keycloakTokenEndpoint + ", keycloakAccessTokenName=" + keycloakAccessTokenName
+				+ ", keycloakRefreshTokenName=" + keycloakRefreshTokenName + ", keycloakClaimName=" + keycloakClaimName
+				+ ", keycloakAdminClaimValue=" + keycloakAdminClaimValue + "]";
+	}
 }

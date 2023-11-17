@@ -108,7 +108,7 @@ public class DataFeedStats implements Serializable
         return dataFeedMsgAvgBytesPerSec;
     }
 
-    @java.lang.Override
+    @Override
     public java.lang.String toString() {
         final java.lang.StringBuilder sb = new java.lang.StringBuilder("DataFeedStats{");
         sb.append("dataFeedUUID='").append(dataFeedUUID).append('\'');

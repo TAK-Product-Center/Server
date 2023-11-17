@@ -23,6 +23,9 @@ cd "$DIR"
 
 touch crl_index.txt
 touch crl_index.txt.attr
+if ! $(grep -q unique_subject crl_index.txt.attr); then
+  echo "unique_subject = no" >> crl_index.txt.attr
+fi
 
 ## if you have a custom password  for your CA key, edit this, or comment it
 ## out to have the openssl commands below prompt you for the password:

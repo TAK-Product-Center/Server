@@ -38,7 +38,9 @@ public class LocalQueryService {
 
     public int deleteCotByTtl(@NotNull Integer ttl) {
 
-        String deleteQuery = "delete from cot_router where cot_type != 'b-t-f' and servertime" + DELETE_BY_TTL;
+        String deleteQuery = "delete from cot_router using cot_router cr left outer join mission_uid mu on mu.uid=cr.uid " +
+                "where cot_router.id = cr.id and mu.uid is null and cot_router.cot_type != 'b-t-f' and cot_router.servertime" + DELETE_BY_TTL;
+
         int count = 0;
         if (ttl == null) {
             logger.info(" delete cot by time to live is null, nothing to do");
@@ -72,7 +74,8 @@ public class LocalQueryService {
 
     public int deleteFilesByTtl(@NotNull Integer ttl) {
 
-        String deleteQuery = "delete from resource where submissiontime" + DELETE_BY_TTL;
+        String deleteQuery = "delete from resource using resource r left outer join mission_resource mr on mr.resource_id=r.id " +
+                "where resource.id = r.id and mr.resource_id is null and resource.submissiontime" + DELETE_BY_TTL;
         int count = 0;
 
         if (ttl == null) {

@@ -38,6 +38,9 @@ import static com.bbn.marti.tests.Assert.SampleObjects;
  */
 public class VerificationEngine implements EngineInterface {
 
+	private static final int ReturnCodeSuccess = 200;
+	private static final int ReturnCodeUnauthorized = 403;
+
 	public static VerificationData data = VerificationData.instance;
 
 
@@ -442,7 +445,7 @@ public class VerificationEngine implements EngineInterface {
 		// TODO: Consider data that has already been added will be given an existing hash?
 		ActionEngine.ActionClient client = ActionEngine.data.getState(user);
 		ResponseWrapper rawResponse = client.getCallResponse();
-		EnterpriseSyncUploadResponse response = Assert.getEnterpriseSyncUploadResponse(200, rawResponse);
+		EnterpriseSyncUploadResponse response = Assert.getEnterpriseSyncUploadResponse(ReturnCodeSuccess, rawResponse);
 		String hash = response.Hash;
 		client.stateEngineData = hash;
 		Assert.assertNotNull("Response hash is null!", hash);
@@ -452,7 +455,7 @@ public class VerificationEngine implements EngineInterface {
 	@Override
 	public void fileDelete(@NotNull AbstractUser user, @NotNull String hash) {
 		ResponseWrapper rawResponse = ActionEngine.data.getState(user).getCallResponse();
-		Assert.assertCallReturnCode(200, rawResponse);
+		Assert.assertCallReturnCode(ReturnCodeSuccess, rawResponse);
 	}
 
 	@Override
@@ -463,7 +466,7 @@ public class VerificationEngine implements EngineInterface {
 			Assert.assertCallReturnCode(404, rawResponse);
 
 		} else {
-			byte[] responseBody = Assert.getByteResponseData(200, rawResponse);
+			byte[] responseBody = Assert.getByteResponseData(ReturnCodeSuccess, rawResponse);
 			byte[] expectedContents = StateEngine.data.getEnterpriseSyncData(hash);
 			Assert.assertEquals("The received data is longer than the expected data!", responseBody.length, expectedContents.length);
 			Assert.assertArrayEquals("Data arrays do not match!", responseBody, expectedContents);
@@ -494,7 +497,7 @@ public class VerificationEngine implements EngineInterface {
 
 		if (StateEngine.data.userHasMissionPermission(user, missionName, permission)) {
 			client.stateEngineData_userHadPermissions = true;
-			Mission returnedMission = Assert.getSingleApiSetVerificationData(200, SampleObjects.Mission, rawResponse);
+			Mission returnedMission = Assert.getSingleApiSetVerificationData(ReturnCodeSuccess, SampleObjects.Mission, rawResponse);
 
 			client.stateEngineData = returnedMission;
 
@@ -507,7 +510,7 @@ public class VerificationEngine implements EngineInterface {
 			// TODO Missions: Account for muiltiple types of mission contents
 			// TODO Missions: Add verification aganist previous data?
 
-			Mission retrievedMission = Assert.getSingleApiSetResponseData(200, SampleObjects.Mission, validationResponse);
+			Mission retrievedMission = Assert.getSingleApiSetResponseData(ReturnCodeSuccess, SampleObjects.Mission, validationResponse);
 
 			HashMap<Pattern, Object> exceptions = null;
 			if (TestExceptions.MISSION_IGNORE_GROUPS_MISSING_IN_ADD_REMOVE_RESPONSES || TestExceptions.MISSION_IGNORE_ADD_RESOURCE_RESPONSE_MISSING_UID_OJBECTS) {
@@ -523,7 +526,7 @@ public class VerificationEngine implements EngineInterface {
 
 		} else {
 			client.stateEngineData_userHadPermissions = false;
-			Assert.assertCallReturnCode(405, rawResponse);
+			Assert.assertCallReturnCode(ReturnCodeUnauthorized, rawResponse);
 		}
 	}
 
@@ -535,7 +538,7 @@ public class VerificationEngine implements EngineInterface {
 
 		if (StateEngine.data.userHasMissionPermission(user, missionName, permission)) {
 			client.stateEngineData_userHadPermissions = true;
-			Mission returnedMission = Assert.getSingleApiSetResponseData(200, SampleObjects.Mission, rawResponse);
+			Mission returnedMission = Assert.getSingleApiSetResponseData(ReturnCodeSuccess, SampleObjects.Mission, rawResponse);
 			TreeSet<MissionContentDataContainer> contentsList = returnedMission.getContents();
 
 			if (contentsList != null && contentsList.size() > 0) {
@@ -546,7 +549,7 @@ public class VerificationEngine implements EngineInterface {
 			}
 		} else {
 			client.stateEngineData_userHadPermissions = false;
-			Assert.assertCallReturnCode(405, rawResponse);
+			Assert.assertCallReturnCode(ReturnCodeUnauthorized, rawResponse);
 		}
 	}
 
@@ -582,7 +585,7 @@ public class VerificationEngine implements EngineInterface {
 			Assert.assertEquals("Expected 404 response code since the user is not a mission member!", 404, rawResponse.responseCode);
 
 		} else {
-			Set<Mission> missions = Assert.getApiSetResponseData(200, SampleObjects.Mission, rawResponse);
+			Set<Mission> missions = Assert.getApiSetResponseData(ReturnCodeSuccess, SampleObjects.Mission, rawResponse);
 			TreeMap<String, Mission> missionMap = new TreeMap<>();
 			for (Mission mission : missions) {
 				missionMap.put(mission.getUniqueStableName(), mission);
@@ -751,7 +754,7 @@ public class VerificationEngine implements EngineInterface {
 			client.stateEngineData_userHadPermissions = true;
 
 			// Update vs create
-			int expectedResult = StateEngine.data.hasMissionState(missionName) ? 200 : 201;
+			int expectedResult = StateEngine.data.hasMissionState(missionName) ? ReturnCodeSuccess : 201;
 			Mission ownerCreatedMission = Assert.getSingleApiSetResponseData(expectedResult, SampleObjects.Mission, rawResponse);
 			client.stateEngineData = ownerCreatedMission;
 
@@ -792,7 +795,7 @@ public class VerificationEngine implements EngineInterface {
 		if (StateEngine.data.userHasMissionPermission(user, missionName, permission)) {
 			client.stateEngineData_userHadPermissions = true;
 
-			Mission returnedMission = Assert.getSingleApiSetResponseData(200, SampleObjects.Mission, rawResponse);
+			Mission returnedMission = Assert.getSingleApiSetResponseData(ReturnCodeSuccess, SampleObjects.Mission, rawResponse);
 
 			Assert.assertNotNull("The mission deletion did not return the deleted mission!", returnedMission);
 			Assert.assertNull("The client was able to retrieve the mission after deleting it!", verificationResponse.body);
@@ -813,7 +816,7 @@ public class VerificationEngine implements EngineInterface {
 		if (StateEngine.data.userHasMissionPermission(user, missionName, permission)) {
 			client.stateEngineData_userHadPermissions = true;
 
-			Mission returnedMission = Assert.getSingleApiSetResponseData(200, SampleObjects.Mission, rawResponse);
+			Mission returnedMission = Assert.getSingleApiSetResponseData(ReturnCodeSuccess, SampleObjects.Mission, rawResponse);
 			Assert.assertNotNull("The mission deletion did not return the deleted mission!", returnedMission);
 			Assert.assertNull("The client was able to retrieve the mission after deleting it!", verificationResponse.body);
 		} else {
@@ -833,8 +836,8 @@ public class VerificationEngine implements EngineInterface {
 		if (StateEngine.data.userHasMissionPermission(apiUser, missionName, permission) && !StateEngine.data.missionDefaultRoleInUse(missionName)) {
 			client.stateEngineData_userHadPermissions = true;
 
-			Assert.assertCallReturnCode(200, rawResponse);
-			Set<SubscriptionData> subscriptions = Assert.getApiSetVerificationData(200, SampleObjects.ReceivedSubscriptionData, client.getVerificationCallResponse());
+			Assert.assertCallReturnCode(ReturnCodeSuccess, rawResponse);
+			Set<SubscriptionData> subscriptions = Assert.getApiSetVerificationData(ReturnCodeSuccess, SampleObjects.ReceivedSubscriptionData, client.getVerificationCallResponse());
 			Optional<SubscriptionData> optSub = subscriptions.stream().filter(x -> user.getCotUid().equals(x.getClientUid())).findAny();
 			Assert.assertTrue("The user role could not be found in the verification data!", optSub.isPresent());
 			SubscriptionData sub = optSub.get();
@@ -850,7 +853,7 @@ public class VerificationEngine implements EngineInterface {
 			if (StateEngine.data.missionDefaultRoleInUse(missionName)) {
 				Assert.assertCallReturnCode(400, rawResponse);
 			} else {
-				Assert.assertCallReturnCode(405, rawResponse);
+				Assert.assertCallReturnCode(ReturnCodeUnauthorized, rawResponse);
 			}
 		}
 	}
@@ -867,7 +870,7 @@ public class VerificationEngine implements EngineInterface {
 		} else if (StateEngine.data.userHasMissionPermission(user, missionName, permission)) {
 			client.stateEngineData_userHadPermissions = true;
 
-			List<MissionChange> actual = Assert.getApiListResponseData(200, SampleObjects.MissionChange, rawResponse);
+			List<MissionChange> actual = Assert.getApiListResponseData(ReturnCodeSuccess, SampleObjects.MissionChange, rawResponse);
 			HashMap<Pattern, Object> exceptions = new HashMap<>();
 			// Cannot predict the server time
 			exceptions.put(MISSIONCHANGE_SERVERTIME_PATTERN, EXCEPTION_NOT_NULL);
@@ -901,7 +904,7 @@ public class VerificationEngine implements EngineInterface {
 
 
 //		ResponseWrapper wrapper = client.getVerificationCallResponse();
-			Set<Mission> data = Assert.getApiSetResponseData(200, SampleObjects.Mission, rawResponse);
+			Set<Mission> data = Assert.getApiSetResponseData(ReturnCodeSuccess, SampleObjects.Mission, rawResponse);
 //		TreeSet<MissionChange> missionChanges = data.getMissionChanges();
 			Assert.assertNotNull("No set of missions returned!", data);
 			Optional<Mission> match = data.stream().filter(x -> missionName.equals(x.getUniqueStableName())).findAny();
@@ -910,7 +913,7 @@ public class VerificationEngine implements EngineInterface {
 			Assert.assertEquals("Provided keyword lists do not match!", mission.getKeywords(), new TreeSet<>(Arrays.asList(keywords)));
 		} else {
 			client.stateEngineData_userHadPermissions = false;
-			Assert.assertCallReturnCode(405, rawResponse);
+			Assert.assertCallReturnCode(ReturnCodeUnauthorized, rawResponse);
 		}
 	}
 
@@ -927,8 +930,8 @@ public class VerificationEngine implements EngineInterface {
 			client.stateEngineData_userHadPermissions = true;
 
 
-			Assert.assertCallReturnCode(200, rawResponse);
-			Mission verificationMission = Assert.getSingleApiSetVerificationData(200, SampleObjects.Mission, verificationResponse);
+			Assert.assertCallReturnCode(ReturnCodeSuccess, rawResponse);
+			Mission verificationMission = Assert.getSingleApiSetVerificationData(ReturnCodeSuccess, SampleObjects.Mission, verificationResponse);
 			Assert.assertEmpty("Mission still has keywords after they have been cleared!", verificationMission.getKeywords());
 
 
@@ -939,7 +942,7 @@ public class VerificationEngine implements EngineInterface {
 //		System.err.println("TODO: Add further mission clear keywords verification!");
 		} else {
 			client.stateEngineData_userHadPermissions = false;
-			Assert.assertCallReturnCode(405, rawResponse);
+			Assert.assertCallReturnCode(ReturnCodeUnauthorized, rawResponse);
 		}
 	}
 
@@ -955,13 +958,13 @@ public class VerificationEngine implements EngineInterface {
 			client.stateEngineData_userHadPermissions = true;
 
 
-			Assert.assertCallReturnCode(200, rawResponse);
-			Mission verificationMission = Assert.getSingleApiSetVerificationData(200, SampleObjects.Mission, verificationResponse);
+			Assert.assertCallReturnCode(ReturnCodeSuccess, rawResponse);
+			Mission verificationMission = Assert.getSingleApiSetVerificationData(ReturnCodeSuccess, SampleObjects.Mission, verificationResponse);
 			Assert.assertTrue("The mission does not appear to be password protected!", verificationMission.isPasswordProtected());
 			client.stateEngineData = verificationMission;
 		} else {
 			client.stateEngineData_userHadPermissions = false;
-			Assert.assertCallReturnCode(405, rawResponse);
+			Assert.assertCallReturnCode(ReturnCodeUnauthorized, rawResponse);
 		}
 	}
 }

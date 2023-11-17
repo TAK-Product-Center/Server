@@ -30,7 +30,7 @@
         <!-- <connector port="8451" _name="https" enableAdminUI="true" enableWebtak="false" /> -->
         <!-- <connector port="8452" _name="https" enableAdminUI="false" enableWebtak="true" /> -->
         <!-- <connector port="8453" _name="https" enableAdminUI="false" enableWebtak="false" enableNonAdminUI="false"/> -->
-        
+
 		<connector port="8444" useFederationTruststore="true" _name="fed_https"/>
 		<!-- <connector port="8446" clientAuth="false" _name="cert_https" enableWebtak="false"/> -->
 		<connector port="8446" clientAuth="false" _name="cert_https"/>
@@ -50,20 +50,20 @@
 		<!-- Example ActiveDirectory -->
 
 		<!--NOTE!! In the example below, GroupBaseDN should be specified relative to the naming context provided in the url attribute below -->
-		<!-- 
+		<!--
 		<ldap
 			url="ldap://hostname.bbn.com/dc=XXX,dc=bbn,dc=com"
 			userstring="DOMAIN\{username}"
 			updateinterval="60"
 			groupprefix=""
 			style="AD"
-        	ldapSecurityType="simple" 
-        	serviceAccountDN="cn=fred001,cn=Users,cn=Partition1,dc=XYZ,dc=COM" 
-        	serviceAccountCredential="XXXXXX" 
-        	groupObjectClass="group" 
+        	ldapSecurityType="simple"
+        	serviceAccountDN="cn=fred001,cn=Users,cn=Partition1,dc=XYZ,dc=COM"
+        	serviceAccountCredential="XXXXXX"
+        	groupObjectClass="group"
         	groupBaseRDN="CN=Groups"/>
 		/>
-		
+
 		-->
 	        <File location="UserAuthenticationFile.xml"/>
 	</auth>
@@ -77,14 +77,14 @@
 	<repository enable="true" numDbConnections="200" primaryKeyBatchSize="500" insertionBatchSize="500">
 	  <connection url="jdbc:postgresql://127.0.0.1:5432/cot" username="martiuser" password="" />
 	  <!-- <connection url="jdbc:postgresql://127.0.0.1:5432/cot" username="martiuser"
-	              sslEnabled="true" sslMode="verify-ca" 
-	              sslCert="certs/files/martiuser.pem" sslKey="certs/files/martiuser.key.pk8" 
+	              sslEnabled="true" sslMode="verify-ca"
+	              sslCert="certs/files/martiuser.pem" sslKey="certs/files/martiuser.key.pk8"
 	              sslRootCert="certs/files/ca.pem"/> -->
 	</repository>
 
 	<repeater enable="true" periodMillis="3000" staleDelayMillis="15000">
 	    <!-- Examples -->
-		<repeatableType initiate-test="/event/detail/emergency[@type='911 Alert']" cancel-test="/event/detail/emergency[@cancel='true']" _name="911"/> 
+		<repeatableType initiate-test="/event/detail/emergency[@type='911 Alert']" cancel-test="/event/detail/emergency[@cancel='true']" _name="911"/>
 		<repeatableType initiate-test="/event/detail/emergency[@type='Ring The Bell']" cancel-test="/event/detail/emergency[@cancel='true']" _name="RingTheBell"/>
 		<repeatableType initiate-test="/event/detail/emergency[@type='Geo-fence Breached']" cancel-test="/event/detail/emergency[@cancel='true']" _name="GeoFenceBreach"/>
 		<repeatableType initiate-test="/event/detail/emergency[@type='Troops In Contact']" cancel-test="/event/detail/emergency[@cancel='true']" _name="TroopsInContact"/>
@@ -111,38 +111,38 @@
 	</buffer>
 
 	<security>
-		<tls context="TLSv1.2" 
+		<tls context="TLSv1.2"
 			keymanager="SunX509"
-			keystore="JKS" keystoreFile="certs/files/takserver.jks" keystorePass="atakatak" 
+			keystore="JKS" keystoreFile="certs/files/takserver.jks" keystorePass="atakatak"
 			truststore="JKS" truststoreFile="certs/files/truststore-root.jks" truststorePass="atakatak">
 		 <!-- <crl _name="TAKServer CA" crlFile="certs/files/ca.crl"/>  -->
-		    
+
 		</tls>
-		
+
 		 <!-- previous locations of keystore and truststore -->
-		 <!-- 
-		 <tls context="TLSv1.2" 
+		 <!--
+		 <tls context="TLSv1.2"
 			keymanager="SunX509"
-			keystore="JKS" keystoreFile="certs/TAKServer.jks" keystorePass="atakatak" 
+			keystore="JKS" keystoreFile="certs/TAKServer.jks" keystorePass="atakatak"
 			truststore="JKS" truststoreFile="certs/truststore.jks" truststorePass="atakatak">
 		</tls>
 		-->
-		
+
 	</security>
-	
+
 	<federation>
 	  <federation-server port="9000" v1enabled="false" v2port="9001" v2enabled="true">
-	    <tls context="TLSv1.2" 
+	    <tls context="TLSv1.2"
 		 keymanager="SunX509"
-		 keystore="JKS" keystoreFile="certs/files/takserver.jks" keystorePass="atakatak" 
+		 keystore="JKS" keystoreFile="certs/files/takserver.jks" keystorePass="atakatak"
 		 truststore="JKS" truststoreFile="certs/files/fed-truststore.jks" truststorePass="atakatak"/>
 	  </federation-server>
 	</federation>
  <!-- previous locations of federate keystore and truststore -->
- <!-- 
- <tls context="TLSv1.2" 
+ <!--
+ <tls context="TLSv1.2"
 		 keymanager="SunX509"
-		 keystore="JKS" keystoreFile="certs/TAKServer.jks" keystorePass="atakatak" 
+		 keystore="JKS" keystoreFile="certs/TAKServer.jks" keystorePass="atakatak"
 		 truststore="JKS" truststoreFile="certs/fed-truststore.jks" truststorePass="atakatak"/>
  -->
 
@@ -155,22 +155,22 @@
 			<nameEntry name="OU" value="Test Org Unit Name"/>
 		</nameEntries>
 	</certificateConfig>
-	<TAKServerCAConfig 
-		keystore="JKS" 
-		keystoreFile="certs/files/intermediate-ca-signing.jks"
-		keystorePass="atakatak" 
-		validityDays="30" 
+	<TAKServerCAConfig
+		keystore="JKS"
+		keystoreFile="certs/files/intermediate-signing.jks"
+		keystorePass="atakatak"
+		validityDays="30"
 		signatureAlg="SHA256WithRSA" />
-	<MicrosoftCAConfig 
-		username="{MS CA Username}" 
+	<MicrosoftCAConfig
+		username="{MS CA Username}"
 		password="{MS CA Password}"
 		truststore="/opt/tak/certs/files/keystore.jks"
 		truststorePass="atakatak"
-		svcUrl="https://{server}/{CA name}_CES_UsernamePassword/service.svc" 
+		svcUrl="https://{server}/{CA name}_CES_UsernamePassword/service.svc"
 		templateName="Copy of User"/>
 </certificateSigning>
 
 -->
     <vbm enabled="false" />
- 
+
 </Configuration>
