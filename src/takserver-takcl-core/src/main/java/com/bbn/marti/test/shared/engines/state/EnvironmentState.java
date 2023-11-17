@@ -195,7 +195,9 @@ public class EnvironmentState {
 
 	protected synchronized void updateKnownCallsignAndUidState() {
 		for (UserState recipientState : getUserStates()) {
+
 			AbstractUser recipientUser = recipientState.getProfile();
+
 			ActionEngine.ActionClient recipientClientState = ActionEngine.data.getState(recipientUser);
 
 			TreeSet<String> senderUids = recipientClientState.getReceivedSenderUids();
@@ -268,7 +270,12 @@ public class EnvironmentState {
 	}
 
 	protected synchronized void updateState() {
+		System.out.println("--- ActionEngine.data.getAllClients().size: " + ActionEngine.data.getAllClients().size());
+
 		for (ActionEngine.ActionClient client : ActionEngine.data.getAllClients()) {
+			
+			System.out.println("\t--- EnvironmentState updateState client: " + client + ". Will updateConnectivityState userstate to: "+client.getConnectivityState());
+
 			UserState user = getState(client.getProfile());
 			user.updateLatestSA(client.getLatestSA());
 

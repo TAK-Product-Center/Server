@@ -107,7 +107,7 @@ public class SingleProtobufOrCotProtocol extends AbstractBroadcastingProtocol<Co
 
             if (firstByte == StreamingProtoBufHelper.MAGIC) {
 
-                int version = StreamingProtoBufHelper.getInstance().readVarint(buffer);
+                int version = StreamingProtoBufHelper.readVarint(buffer);
                 if (Integer.toString(version).compareTo(StreamingProtoBufHelper.TAK_PROTO_VERSION) != 0) {
                     log.error("Failed to find supported protocol version ! : " + version);
                     return null;
@@ -123,7 +123,7 @@ public class SingleProtobufOrCotProtocol extends AbstractBroadcastingProtocol<Co
 
                 // parse the protobuf
                 Takmessage.TakMessage takMessage = Takmessage.TakMessage.parseFrom(eventBytes);
-                cotEventContainer = StreamingProtoBufHelper.getInstance().proto2cot(takMessage);
+                cotEventContainer = StreamingProtoBufHelper.proto2cot(takMessage);
 
             } else if (firstByte == 0x3C) {
 

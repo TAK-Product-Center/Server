@@ -34,8 +34,8 @@ public class AbstractFederationTests extends AbstractTestClass {
 			throw new RuntimeException(e);
 		}
 		// Federate things tend to take a little longer to propagate...
-		engine.setSleepMultiplier(3.0);
-		engine.setSendValidationDelayMultiplier(10);
+		engine.setSleepMultiplier(4.0);
+		engine.setSendValidationDelayMultiplier(20);
 	}
 
 	public void executeBasicFederationTest(boolean useV1Federation, boolean useV2Federation, String sessionIdentifier) {
@@ -70,7 +70,12 @@ public class AbstractFederationTests extends AbstractTestClass {
 			e.printStackTrace(System.err);
 			Assert.fail(e.getMessage());
 		} finally {
-			engine.stopServers(testServers);
+			try {
+				engine.stopServers(testServers);
+			} catch (Exception e) {
+				System.err.println(e.getMessage());
+				e.printStackTrace(System.err);
+			}
 		}
 	}
 
@@ -126,7 +131,12 @@ public class AbstractFederationTests extends AbstractTestClass {
 			e.printStackTrace(System.err);
 			Assert.fail(e.getMessage());
 		} finally {
-			engine.stopServers(testServers);
+			try {
+				engine.stopServers(testServers);
+			} catch (Exception e) {
+				System.err.println(e.getMessage());
+				e.printStackTrace(System.err);
+			}
 		}
 	}
 
@@ -205,7 +215,12 @@ public class AbstractFederationTests extends AbstractTestClass {
 			e.printStackTrace(System.err);
 			Assert.fail(e.getMessage());
 		} finally {
-			engine.stopServers(testServers);
+			try {
+				engine.stopServers(testServers);
+			} catch (Exception e) {
+				System.err.println(e.getMessage());
+				e.printStackTrace(System.err);
+			}
 		}
 	}
 
@@ -267,7 +282,12 @@ public class AbstractFederationTests extends AbstractTestClass {
 			e.printStackTrace(System.err);
 			Assert.fail(e.getMessage());
 		} finally {
-			engine.stopServers(testServers);
+			try {
+				engine.stopServers(testServers);
+			} catch (Exception e) {
+				System.err.println(e.getMessage());
+				e.printStackTrace(System.err);
+			}
 		}
 	}
 

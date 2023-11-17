@@ -24,11 +24,11 @@ import tak.server.cot.CotParser;
 /**
  * Cursor-on-Target (CoT) protocol that re-uses a socket instead of opening and closing it between each message.
  *
- * In the network -> application direction, we decode a series of CoT messages laid head-to-tail, without any
+ * In the network -{@literal >} application direction, we decode a series of CoT messages laid head-to-tail, without any
  * headers or delimiters that might indicate message boundaries and potentially make our parsing methodology
  * far more efficient. Such is life.
  *
- * In the application -> network direction, we encode a single message to its byte representation and pass
+ * In the application -{@literal >} network direction, we encode a single message to its byte representation and pass
  * it onward, to the channel handler.
  *
  */
@@ -160,7 +160,7 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 		// void out parser and builder
 		this.messageStringBuffer = null;
 		this.parser = null;
-		
+
 		if (log.isTraceEnabled()) {
 			log.trace(String.format(
 					"%s received network close signal -- handler: %s",
@@ -193,7 +193,7 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 		// notify listeners
 		super.broadcastOutboundClose(handler);
 	}
-	
+
 	/**
 	 * A static function that appends the given data to an existing
 	 * buffer, and checks to see if any new messages can be parsed with
@@ -268,7 +268,7 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 	}
 
 	/**
-	 * @note DO NOT put the channel handler in the string -- typically prints out its listener as
+	 * DO NOT put the channel handler in the string -- typically prints out its listener as
 	 * part of its toString method
 	 */
 	@Override

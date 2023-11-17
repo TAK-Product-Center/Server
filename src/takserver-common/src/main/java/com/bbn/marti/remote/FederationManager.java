@@ -41,6 +41,7 @@ public interface FederationManager {
 	void removeFederateInboundGroupsMap(@NotNull String federateUID, @NotNull String remoteGroup, @NotNull String localGroup);
 	void removeInboundGroupFromCA(@NotNull String caID, @NotNull Set<String> localGroupNames);
 	void removeOutboundGroupFromCA(@NotNull String caID, @NotNull Set<String> localGroupNames);
+	void updateFederateMissionSettings(@NotNull String federateUID, @NotNull boolean missionFederateDefault, @NotNull List<Federation.Federate.Mission> federateMissions);
 
 	// Get outgoing config object by address and port
 	List<FederationOutgoing> getOutgoingConnections(@NotNull String address, int port);
@@ -74,10 +75,12 @@ public interface FederationManager {
 	// Send ROL to messaging process, to be federated subject to group filtering.
 	// Attach outbound groups to the ROL for federates using group mapping
 	void submitFederateROL(ROL rol, NavigableSet<Group> groups);
+	void submitMissionFederateROL(ROL rol, NavigableSet<Group> groups, String missionName);
 	
 	// Send ROL to messaging process, to be federated subject to group filtering.
-		// Attach outbound groups to the ROL for federates using group mapping
+	// Attach outbound groups to the ROL for federates using group mapping
 	void submitFederateROL(ROL rol, NavigableSet<Group> groups, String fileHash);
+	void submitMissionFederateROL(ROL rol, NavigableSet<Group> groups, String fileHash, String missionName);
 
 	void reconfigureFederation();
 

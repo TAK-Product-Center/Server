@@ -151,8 +151,8 @@ public class JwtUtils {
                 return null;
             }
 
-            if (oAuth.getAuthServer() == null || oAuth.getAuthServer().size() == 0) {
-                logger.error("No auth servers configured");
+            if (oAuth.getAuthServer() == null) {
+                logger.error("No auth server configured");
                 return null;
             }
 
@@ -160,16 +160,15 @@ public class JwtUtils {
             // iterate across our configured authorization servers and add their issuer public keys
             //
             List<RSAPublicKey> rsaPublicKeys = new ArrayList<>();
-            for (Oauth.AuthServer authServer : oAuth.getAuthServer()) {
-                byte[] keyBytes = Files.readAllBytes(Paths.get(authServer.getIssuer()));
-                X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
-                KeyFactory kf = KeyFactory.getInstance("RSA");
-                rsaPublicKeys.add((RSAPublicKey) kf.generatePublic(spec));
-            }
+            Oauth.AuthServer authServer = oAuth.getAuthServer();
+            byte[] keyBytes = Files.readAllBytes(Paths.get(authServer.getIssuer()));
+            X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            rsaPublicKeys.add((RSAPublicKey) kf.generatePublic(spec));
 
             return rsaPublicKeys;
         } catch (Exception e) {
-            logger.error("exception in getExternalVerifiers!");
+            logger.error("exception in getExternalVerifiers!", e);
             return  null;
         }
     }

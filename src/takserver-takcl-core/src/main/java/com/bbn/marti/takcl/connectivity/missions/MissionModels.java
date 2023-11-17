@@ -32,7 +32,7 @@ public class MissionModels {
 
 	/**
 	 * Converts a list of values to a displayable list of key-value pairs with unicode.
-	 * The conversion by the JUnit xml to things like "&apos;" was making things incredibly unreadable in raw xml...
+	 * The conversion by the JUnit xml to things like {@literal "&apos;"} was making things incredibly unreadable in raw xml...
 	 * @param keyValuePairs
 	 * @return
 	 */

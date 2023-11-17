@@ -37,6 +37,11 @@ sourceSets {
     }
 }
 
+javadoc {
+	exclude "com/bbn/marti/takcl/connectivity/server/**"
+	source = sourceSets.main.allJava
+}
+
 task cursedJar(type: ShadowJar) {
     classifier = 'exe'
     from sourceSets.cursedtak.output
@@ -89,7 +94,7 @@ dependencies {
     compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
     compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
     compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-    
+
     coreCompile (project(':takserver-common')) {
 	    exclude group: 'ch.qos.logback', module: 'logback-classic'
 	    exclude group: 'org.slf4j'
@@ -101,6 +106,13 @@ dependencies {
 	    exclude group: 'ch.qos.logback', module: 'logback-classic'
 	    exclude group: 'org.slf4j'
 	    exclude group: 'log4j', module: 'log4j'
+  	}
+  	
+  	coreCompile (project(':federation-common')) {
+	    exclude group: 'ch.qos.logback', module: 'logback-classic'
+	    exclude group: 'org.slf4j'
+	    exclude group: 'log4j', module: 'log4j'
+		exclude group: 'org.apache.ignite', module: 'ignite-log4j'
   	}
 
     coreCompile group: 'commons-io', name: 'commons-io', version: commons_io_version
@@ -140,6 +152,12 @@ dependencies {
 	    exclude group: 'log4j', module: 'log4j'
   	}
 
+  	compile (project(':federation-common')) {
+	    exclude group: 'ch.qos.logback', module: 'logback-classic'
+	    exclude group: 'org.slf4j'
+	    exclude group: 'log4j', module: 'log4j'
+		exclude group: 'org.apache.ignite', module: 'ignite-log4j'
+  	}
 
     compile group: 'commons-io', name: 'commons-io', version: commons_io_version
 
@@ -302,4 +320,63 @@ task devDeployAux(type: GradleBuild) {
 			rename("takserver-plugin-manager-${version}.jar", "takserver-pm.jar")
 		}
 	}
+}
+
+task devDeployFedHub(type: GradleBuild) {
+       group = 'TAKServer'
+       description = 'Rebuilds and copies federation hub into their appropriate location in takserver-package/build/takArtifacts'
+       buildName = 'devDeployFedHub'
+       dependsOn(
+                       ':federation-hub-broker:clean',
+                       ':federation-hub-ui:clean',
+                       ':federation-hub-policy:clean',
+       )
+       doFirst {
+               tasks = [
+                               ':federation-hub-policy:bootJar',
+                               ':federation-hub-broker:bootJar',
+                               ':federation-hub-ui:bootWar',
+                               ':federation-hub-ui:shadowJar'
+               ]
+       }
+       doLast {
+               copy {
+                       into("${rootDir}/takserver-package/build/takArtifacts/federation-hub/configs")
+                       from "${rootDir}/federation-hub-broker/src/main/resources/federation-hub-broker.yml"
+               }
+               copy {
+                       into("${rootDir}/takserver-package/build/takArtifacts/federation-hub/configs")
+                       from "${rootDir}/federation-hub-ui/src/main/resources/federation-hub-ui.yml"
+               }
+
+               copy {
+                       into("${rootDir}/takserver-package/build/takArtifacts/federation-hub/configs")
+                       from "${rootDir}/federation-hub-broker/src/main/resources/logback-broker.xml"
+               }
+               copy {
+                       into("${rootDir}/takserver-package/build/takArtifacts/federation-hub/configs")
+                       from "${rootDir}/federation-hub-policy/src/main/resources/logback-policy.xml"
+               }
+
+               copy {
+                       into("${rootDir}/takserver-package/build/takArtifacts")
+                       from "${rootDir}/federation-hub-policy/build/libs/federation-hub-policy-${version}.jar"
+                       rename("federation-hub-policy-${version}.jar", "federation-hub/federation-hub-policy.jar")
+               }
+               copy {
+                       into("${rootDir}/takserver-package/build/takArtifacts")
+                       from "${rootDir}/federation-hub-broker/build/libs/federation-hub-broker-${version}.jar"
+                       rename("federation-hub-broker-${version}.jar", "federation-hub/federation-hub-broker.jar")
+               }
+               copy {
+                       into("${rootDir}/takserver-package/build/takArtifacts")
+                       from "${rootDir}/federation-hub-ui/build/libs/federation-hub-ui-${version}.war"
+                       rename("federation-hub-ui-${version}.war", "federation-hub/federation-hub-ui.war")
+               }
+               copy {
+                       into("${rootDir}/takserver-package/build/takArtifacts")
+                       from "${rootDir}/federation-hub-ui/build/libs/federation-hub-manager-${version}.jar"
+                       rename("federation-hub-manager-${version}.jar", "federation-hub/federation-hub-manager.jar")
+               }
+       }
 }

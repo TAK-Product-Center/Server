@@ -4,6 +4,8 @@ import com.bbn.marti.takcl.TestExceptions;
 import com.bbn.marti.takcl.TestLogger;
 import com.bbn.marti.test.shared.CotGenerator;
 import com.bbn.marti.test.shared.TestConnectivityState;
+import com.bbn.marti.test.shared.data.generated.ImmutableUsers;
+import com.bbn.marti.test.shared.data.templates.ImmutableUsersTemplate_47FA2889;
 import com.bbn.marti.test.shared.data.users.AbstractUser;
 import com.bbn.marti.test.shared.engines.ActionEngine;
 import com.bbn.marti.test.shared.engines.state.StateEngine;
@@ -80,8 +82,13 @@ public class UserExpectationValidator {
 //    }
 
 	public boolean validateExpectations(@NotNull String justification, boolean failIfUnmet) {
+				
 		String errorString = "";
 		ActionEngine.ActionClient client = ActionEngine.data.getState(state.getProfile());
+		System.out.println("--- Call validateExpectations with justification: " + justification +", state.getProfile():" + state.getProfile());
+		
+		System.out.println("--- transientUserData.getProfile: " + transientUserData.getProfile());
+		transientUserData.getExpectedSenders().forEach(s ->{System.out.println("\t--- ExpectedSender:"+s.getDynamicName());});
 
 		if (client.getConnectivityState() != transientUserData.getExpectedConnectivityState()) {
 			if (transientUserData.getExpectedConnectivityState() == TestConnectivityState.Disconnected) {
@@ -89,6 +96,7 @@ public class UserExpectationValidator {
 			} else {
 				errorString += toString() + " expected to be connected but was disconnected!";
 			}
+			
 		} else {
 			if (client.getConnectivityState() == TestConnectivityState.Disconnected &&
 					state.getConnectivityState() != TestConnectivityState.Disconnected) {
@@ -105,6 +113,7 @@ public class UserExpectationValidator {
 
 				} else if (state.getConnectivityState() == TestConnectivityState.ConnectedUnauthenticated) {
 					TestLogger.logUserAuthenticated(toString(), justification);
+
 				}
 			}
 		}
@@ -114,8 +123,11 @@ public class UserExpectationValidator {
 		Map<String, Integer> shouldntHaveSentMap = new HashMap<>();
 
 		List<AbstractUser> expectedSenders = new ArrayList<>(transientUserData.getExpectedSenders());
+		System.out.println("--- expectedSenders.size():" + expectedSenders.size());
+		expectedSenders.forEach(expectedSender ->{System.out.println("\t--- expectedSender:" + expectedSender);});
 
 		List<String> receivedMessages = ActionEngine.data.getState(state.getProfile()).getRecievedMessages();
+		System.out.println("--- receivedMessages.size():" + receivedMessages.size());
 
 		// Go through all the received messages
 		for (String msg : receivedMessages) {
@@ -130,10 +142,17 @@ public class UserExpectationValidator {
 			}
 			String uid = CotGenerator.parseClientUID(msg);
 			String endpoint = CotGenerator.parseEndpoint(msg);
+			
+			System.out.println("--- \tReceived msg. Parsed uid: " + uid + ", endpoint: "+ endpoint);
 
-			// If validation shouldn't be done, ignore the user's messages
-			AbstractUser sendingUser = StateEngine.data.getUserState(endpoint == null ? uid : endpoint).getProfile();
-
+			AbstractUser sendingUser = null;
+			if (StateEngine.data.getUserState(endpoint == null ? uid : endpoint) == null) {
+				System.out.println("--- Could not find the UserState with the uid/endpoint in StateEngine.data. Assume it comes from a plugin");
+				sendingUser = ImmutableUsers.s0_stcp_anonuser_t_plugin1;
+			}else {
+				// If validation shouldn't be done, ignore the user's messages
+				sendingUser = StateEngine.data.getUserState(endpoint == null ? uid : endpoint).getProfile();
+			}
 
 			String sendingUserDisplayString = sendingUser.getDynamicName();
 
@@ -143,7 +162,6 @@ public class UserExpectationValidator {
 				if (expectedSenders.contains(sendingUser)) {
 					if (expectedDidSendMap.containsKey(sendingUserDisplayString)) {
 						expectedDidSendMap.put(sendingUserDisplayString, expectedDidSendMap.get(sendingUserDisplayString) + 1);
-
 					} else {
 						expectedDidSendMap.put(sendingUserDisplayString, 1);
 					}
@@ -170,9 +188,10 @@ public class UserExpectationValidator {
 				shouldHaveSentMap.put(sendingUserDisplayString, 1);
 			}
 		}
-
+		
 		// Go through all the users that did send, comparing the actual and expected send count if necessary to determine the error
 		for (String sender : expectedDidSendMap.keySet()) {
+
 			if (shouldHaveSentMap.containsKey(sender)) {
 				int totalSendCount = expectedDidSendMap.get(sender) + shouldHaveSentMap.get(sender);
 				String error = sender + " >-" + expectedDidSendMap.get(sender) + "!=" + totalSendCount + "-> " + state.getProfile().getDynamicName() + " - Justification: " + justification;
@@ -193,6 +212,15 @@ public class UserExpectationValidator {
 				TestLogger.logUserSend(sender, expectedDidSendMap.get(sender), state.getProfile().getDynamicName(), justification);
 			}
 		}
+		
+		System.out.println("--- expectedDidSendMap.size():" + expectedDidSendMap.size());
+		expectedDidSendMap.forEach((k,v) ->{System.out.println("\t--- expectedDidSendMap: key:" + k + ", value: " + v);});
+
+		System.out.println("--- shouldHaveSentMap.size():" + shouldHaveSentMap.size());
+		shouldHaveSentMap.forEach((k,v) ->{System.out.println("\t--- shouldHaveSentMap: key:" + k + ", value: " + v);});
+		
+		System.out.println("--- shouldntHaveSentMap.size():" + shouldntHaveSentMap.size());
+		shouldntHaveSentMap.forEach((k,v) ->{System.out.println("\t--- shouldntHaveSentMap: key:" + k + ", value: " + v);});
 
 		// Process the senders that should have sent but didn't
 		for (String sender : shouldHaveSentMap.keySet()) {
@@ -217,6 +245,7 @@ public class UserExpectationValidator {
 //            }
 //        }
 //
+		System.out.println("--- errorString: " + errorString);
 		if (errorString != null && !errorString.isEmpty()) {
 			if (failIfUnmet) {
 				if (FAILURE_DELAY_TIME != null) {

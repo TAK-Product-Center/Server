@@ -1,15 +1,22 @@
 package com.bbn.marti.takcl.connectivity.server;
 
-import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+
+import org.jetbrains.annotations.NotNull;
+
+import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 
 public class LocalRunnableServer extends AbstractRunnableServer {
 
@@ -81,16 +88,18 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 			));
 
 			command.addAll(JDK_JAVA_OPTIONS);
-			if (definition.modeFlag != null) {
-				command.add(definition.modeFlag);
+			
+			if (definition.jvmFlags != null) {
+				command.addAll(definition.jvmFlags);
 			}
-
+			
 			if (enableRemoteDebug) {
 				command.add(REMOTE_DEBUG_ARGS);
 			}
 
-			command.addAll(Arrays.asList("-jar", "-Xmx2000m", "-XX:+HeapDumpOnOutOfMemoryError", definition.jarName));
-			command.addAll(LOGGING_ARGUMENTS);
+			command.addAll(Arrays.asList("-Xmx2000m", "-XX:+HeapDumpOnOutOfMemoryError", "-jar", definition.jarName));
+			if (!definition.jarName.toLowerCase().contains("federation"))
+				command.addAll(LOGGING_ARGUMENTS);
 
 			// Build the process
 			ProcessBuilder processBuilder = new ProcessBuilder(command);
@@ -112,7 +121,7 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 			for (Map.Entry<String, String> entry : environmentVariables.entrySet()) {
 				envVarLines.add(entry.getKey() + "='" + entry.getValue() + "'");
 			}
-
+						
 			try {
 				System.out.println(
 						"Starting TAKServer in directory\n\t'" + processBuilder.directory().getAbsolutePath() +
@@ -163,7 +172,9 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 				new LocalServerProcessContainer(ServerProcessDefinition.MessagingService),
 				new LocalServerProcessContainer(ServerProcessDefinition.ApiService),
 				new LocalServerProcessContainer(ServerProcessDefinition.PluginManager),
-				new LocalServerProcessContainer(ServerProcessDefinition.RetentionService)
+				new LocalServerProcessContainer(ServerProcessDefinition.RetentionService),
+				new LocalServerProcessContainer(ServerProcessDefinition.FederationHubPolicy),
+				new LocalServerProcessContainer(ServerProcessDefinition.FederationHubBroker)
 		));
 	}
 
@@ -247,7 +258,26 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 			throw new RuntimeException(e);
 		}
 
-		processes.stream().filter(LocalServerProcessContainer::isEnabled).forEach(b -> b.start(enableRemoteDebug));
+		Map<LocalServerProcessContainer, Exception> processExceptions = new HashMap<>();
+		processes.stream().filter(LocalServerProcessContainer::isEnabled).forEach(b -> {
+			try {
+				b.start(enableRemoteDebug);
+			} catch (Exception e) {
+				processExceptions.put(b, e);
+			}
+		});
+
+		if (!processExceptions.isEmpty()) {
+			Exception e = null;
+			for (LocalServerProcessContainer container : processExceptions.keySet()) {
+				System.err.println("Error starting up process \"" + container.getIdentifier() + "\"!");
+				e = processExceptions.get(container);
+				System.err.println(e.getMessage());
+				e.printStackTrace(System.err);
+			}
+			// Throw something to disrupt the tests
+			throw new RuntimeException(e);
+		}
 	}
 
 	@Override

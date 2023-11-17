@@ -1,4 +1,4 @@
-FROM openjdk:11-jdk-stretch
+FROM openjdk:11-jdk-bullseye
 COPY takserver-core/takserver-core*.war takserver.war
 COPY takserver-usermanager/UserManager.jar .
 COPY CoreConfig.xml .

@@ -14,6 +14,7 @@ import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -76,7 +77,9 @@ public class CopViewApi extends BaseRestController {
 
 		NavigableSet<Group> groups = martiUtil.getGroupsFromRequest(request);
 
-		List<Mission> missions = missionService.getAllCopsMissions(getDefaultMcsTool(), groups, path, offset, size);
+		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
+		List<Mission> missions = missionService.getAllCopsMissions(getDefaultMcsTool(), username, groups, path, offset, size);
 
 		return () -> {
 

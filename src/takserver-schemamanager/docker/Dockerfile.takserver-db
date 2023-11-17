@@ -1,10 +1,6 @@
-FROM postgres:10.17
-# this is slow - updates all packages
-RUN apt-get update && apt install -y postgresql-10-postgis-2.4
+FROM postgres:15.1
 
-# install openjdk 11
-RUN echo 'deb http://ftp.debian.org/debian stretch-backports main' > /etc/apt/sources.list.d/pgdg.list && \
-	apt update && \
-	apt-get -y -t stretch-backports install openjdk-11-jdk
+# this is slow - updates all packages
+RUN apt-get update && apt install -y postgresql-15-postgis-3 openjdk-11-jdk
 
 ENTRYPOINT ["/opt/tak/db-utils/configureInDocker.sh"]

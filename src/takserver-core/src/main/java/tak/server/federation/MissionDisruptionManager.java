@@ -213,7 +213,6 @@ public class MissionDisruptionManager {
 			List<Mission> fedMissions = new ArrayList<>();
 			
 			if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions()) {
-				missionService.getAllMissions(true, true, null, outboundGroups);
 				fedMissions.addAll(missionService.getAllMissions(true, true, "public", outboundGroups));
 				// only federating public, but make an exception for cops if vbm is enabled
 				if (DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
@@ -226,7 +225,23 @@ public class MissionDisruptionManager {
 
 			// get mission changes as ROL
 			for (Mission fedMission : fedMissions) {
+				
+				// Decide whether to send this mission to the federate
+				boolean isFederateThisMission = (federate.isMissionFederateDefault() != null)?federate.isMissionFederateDefault(): true; 
 
+				for (com.bbn.marti.config.Federation.Federate.Mission missionFederateConfig: federate.getMission()) {
+					if (missionFederateConfig.getName().equals(fedMission.getName())) {
+						isFederateThisMission = missionFederateConfig.isEnabled();
+						break;	
+					}
+				}
+				if (!isFederateThisMission) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("MissionDisruptionManager: Not sending mission {} to federate {}", fedMission.getName(), federate.getName());
+					}
+					continue;
+				}
+				
 			    long missionRecencyMillis = missionRecencySeconds.getOrDefault(fedMission.getName(), recencySecs) * 1000;
 			    long maxMissionRecencyMillis;
 			    if (missionRecencyMillis < 0) {
@@ -312,24 +327,28 @@ public class MissionDisruptionManager {
 				    					.filter(df -> df.getUuid().equals(createdMissionFeed.getDataFeedUid()))
 				    					.findFirst().orElse(null);
 								
-								DataFeedMetadata createFeedMeta = new DataFeedMetadata();
+								if (dataFeed != null && dataFeed.isFederated()) {
+									
+									DataFeedMetadata createFeedMeta = new DataFeedMetadata();
 
-								createFeedMeta.setDataFeedUid(createdMissionFeed.getDataFeedUid());
-								createFeedMeta.setFilterBbox(createdMissionFeed.getFilterBbox());
-								createFeedMeta.setFilterCallsign(createdMissionFeed.getFilterCallsign());
-								createFeedMeta.setFilterType(createdMissionFeed.getFilterType());
+									createFeedMeta.setDataFeedUid(createdMissionFeed.getDataFeedUid());
+									createFeedMeta.setFilterBbox(createdMissionFeed.getFilterBbox());
+									createFeedMeta.setFilterCallsign(createdMissionFeed.getFilterCallsign());
+									createFeedMeta.setFilterType(createdMissionFeed.getFilterType());
 
-								createFeedMeta.setMissionFeedUid(change.getMissionFeedUid());
-								createFeedMeta.setMissionName(change.getMissionName());
+									createFeedMeta.setMissionFeedUid(change.getMissionFeedUid());
+									createFeedMeta.setMissionName(change.getMissionName());
+									
+									createFeedMeta.setArchive(dataFeed.isArchive());
+									createFeedMeta.setArchiveOnly(dataFeed.isArchiveOnly());
+									createFeedMeta.setSync(dataFeed.isSync());
+									createFeedMeta.setFeedName(dataFeed.getName());
+									createFeedMeta.setAuthType(dataFeed.getAuth().toString());
+									createFeedMeta.setTags(dataFeed.getTag());
+
+									changeROL = malrc.createDataFeedToROL(createFeedMeta);
+								}
 								
-								createFeedMeta.setArchive(dataFeed.isArchive());
-								createFeedMeta.setArchiveOnly(dataFeed.isArchiveOnly());
-								createFeedMeta.setSync(dataFeed.isSync());
-								createFeedMeta.setFeedName(dataFeed.getName());
-								createFeedMeta.setAuthType(dataFeed.getAuth().toString());
-								createFeedMeta.setTags(dataFeed.getTag());
-
-								changeROL = malrc.createDataFeedToROL(createFeedMeta);
 							}
 						}
 						break;
@@ -337,12 +356,25 @@ public class MissionDisruptionManager {
 					case DELETE_DATA_FEED: {
 						if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
 							MissionFeed deleteMissionFeed = missionService.getMissionFeed(change.getMissionFeedUid());
+							
 							if (deleteMissionFeed != null) {
-								DataFeedMetadata deleteFeedMeta = new DataFeedMetadata();
-								deleteFeedMeta.setMissionFeedUid(change.getMissionFeedUid());
-								deleteFeedMeta.setMissionName(change.getMissionName());
-								deleteFeedMeta.setDataFeedUid(deleteMissionFeed.getDataFeedUid());
-								changeROL = malrc.deleteDataFeedToROL(deleteFeedMeta);
+								DataFeed dataFeed = DistributedConfiguration.getInstance()
+										.getRemoteConfiguration()
+				    					.getNetwork()
+				    					.getDatafeed()
+				    					.stream()
+				    					.filter(df -> df.getUuid().equals(deleteMissionFeed.getDataFeedUid()))
+				    					.findFirst().orElse(null);
+								
+								if (dataFeed != null && dataFeed.isFederated()) {
+									DataFeedMetadata deleteFeedMeta = new DataFeedMetadata();
+									deleteFeedMeta.setMissionFeedUid(change.getMissionFeedUid());
+									deleteFeedMeta.setMissionName(change.getMissionName());
+									deleteFeedMeta.setDataFeedUid(deleteMissionFeed.getDataFeedUid());
+									
+									changeROL = malrc.deleteDataFeedToROL(deleteFeedMeta);
+								}
+								
 							}
 						}
 						break;
@@ -376,7 +408,7 @@ public class MissionDisruptionManager {
 		return rols;
 	}
 	
-	public List<ROL> getDataFeedEvents() {
+	public List<ROL> getDataFeedEventsForFederatedDataFeedOnly() {
 		List<ROL> rols = new CopyOnWriteArrayList<>();
 		
 		DistributedConfiguration.getInstance()
@@ -386,16 +418,20 @@ public class MissionDisruptionManager {
 				.stream()
 				.forEach(dataFeed -> {
 					try {
-						DataFeedMetadata createFeedMeta = new DataFeedMetadata();
-						createFeedMeta.setDataFeedUid(dataFeed.getUuid());
-						createFeedMeta.setArchive(dataFeed.isArchive());
-						createFeedMeta.setArchiveOnly(dataFeed.isArchiveOnly());
-						createFeedMeta.setSync(dataFeed.isSync());
-						createFeedMeta.setFeedName(dataFeed.getName());
-						createFeedMeta.setAuthType(dataFeed.getAuth().toString());
-						createFeedMeta.setTags(dataFeed.getTag());
 						
-						rols.add(malrc.updateDataFeedToROL(createFeedMeta));
+						if (dataFeed.isFederated()) {
+							DataFeedMetadata createFeedMeta = new DataFeedMetadata();
+							createFeedMeta.setDataFeedUid(dataFeed.getUuid());
+							createFeedMeta.setArchive(dataFeed.isArchive());
+							createFeedMeta.setArchiveOnly(dataFeed.isArchiveOnly());
+							createFeedMeta.setSync(dataFeed.isSync());
+							createFeedMeta.setFeedName(dataFeed.getName());
+							createFeedMeta.setAuthType(dataFeed.getAuth().toString());
+							createFeedMeta.setTags(dataFeed.getTag());
+							
+							rols.add(malrc.updateDataFeedToROL(createFeedMeta));
+						}
+						
 					} catch (JsonProcessingException e) {
 						if (logger.isDebugEnabled()) {
 							logger.debug("exception in federate data feed event", e);

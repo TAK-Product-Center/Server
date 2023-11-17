@@ -1,0 +1,94 @@
+<style type="text/css">
+  
+  .error {
+    color:red;
+    vertical-align:top;
+  }
+
+  table {
+    border-collapse: separate;
+    border-spacing: 15px
+    border: 2px solid black;
+  }
+  
+  .secondColumn {
+    text-align: center;
+  }
+  
+  td, th {
+    height: 30px;
+    padding: 10px;
+    border: 1px solid black;
+  }
+
+</style>
+
+<div>
+  <h3>Federate Mission Settings </h3>
+
+  <p>Federate name: <b>{{federateName}}</b></p>
+  
+  <p>Note that the below settings are only applicable when Allow Mission Federation is enabled globally</p>
+
+  <div data-ng-show="serviceReportedMessages">
+    <ul>
+        <li class="error" data-ng-repeat="message in messages">{{message}}</li>
+    </ul>
+  </div>
+  
+  <form name="federateMissionsForm" novalidate data-ng-submit="federateMissionsForm.$valid && saveFederateMissions()">
+    <label for="mission_federate_default"> Default value</label>
+    <select id="mission_federate_default" data-ng-model="mission_federate_default">
+        <option data-ng-value="{{ true }}"> True </option>
+        <option data-ng-value="{{ false }}"> False </option>
+    </select>
+    <i>This value will be applied for new missions as well as missions whose value are not specifically set on the table below</i>
+    <p> </p>
+    <input type="checkbox" id="vbm_filter_checkbox" name="vbm_filter_checkbox" data-ng-model="vbm_filter_checkbox"> <label for="vbm_filter_checkbox"> Show VBM missions only </label><br>
+    <table>
+        <tr>
+            <th> Mission </th>
+            <th class="secondColumn"> Enabled </th>
+            <th class="secondColumn"> Tool </th>
+        </tr>
+        <!--
+        <tr>
+            <td> Mission 12345 </td>
+            <td class="secondColumn">   
+                <select name="car1" id="car1">
+                    <option value="true">True</option>
+                    <option value="false">False</option>
+                </select>
+            </td>
+            <td> public </td>
+        </tr>
+        <tr>
+            <td> Mission 12345 adsf adsfadsf af asdf </td>
+            <td class="secondColumn">
+                <select name="car2" id="car2">
+                    <option value="true">True</option>
+                    <option value="false">False</option>
+                </select>
+            </td>
+            <td> vbm </td>
+        </tr>
+        -->
+        <tr data-ng-repeat="mission in missions | filter: vbm_filter_func " >
+            <td> {{mission.name}} </td>
+            <td class="secondColumn">
+                <select id="select_{{mission.name}}" data-ng-model="mission.enabled">
+                    <option data-ng-value="{{ true }}"> True </option>
+                    <option data-ng-value="{{ false }}"> False </option>
+                </select>
+            </td>
+            <td> {{mission.tool}} </td>
+        </tr>
+        
+    </table>
+
+    </br>
+   <input type="button" data-ng-click="cancel()" value="Cancel" />&nbsp;
+   <input type="submit" value="Save" data-ng-disabled="submitInProgress" />
+       
+  </form>
+</div>

@@ -145,13 +145,18 @@
                     type : 'POST',
                     data : formData,
                     contentType : 'application/x-www-form-urlencoded',
-                })
-                    .done(function() {
+                    success: function (response) {
                         window.location = "Missions.jsp";
-                    })
-                    .fail(function() {
-                        $.jnotify("Failed to send invitations", "error");
-                    });
+                    },
+                    error : function(stat, err) {
+                        if (stat.responseJSON !== null && stat.responseJSON.message != ""){
+                            $.jnotify("Error: " + stat.responseJSON.message, "error", 3000); 
+                        } else{
+                            $.jnotify("Failed to send invitations", "error", 3000);
+                        }
+                    }
+                });
+                 
             });
 
         });

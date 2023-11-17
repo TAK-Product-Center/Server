@@ -10,12 +10,12 @@ SSHD_PATH=`which /usr/sbin/sshd`
 set -e
 
 if [[ "${DATA_EXISTS}" == "" ]];then
-	sudo -u postgres /usr/pgsql-10/bin/initdb $SQL_DATA
+	sudo -u postgres /usr/pgsql-15/bin/initdb $SQL_DATA
 fi
 
 if [[ "${SQL_RUNNING}" == "" ]];then
 	echo STARTING PSQL
-	sudo -u postgres /usr/pgsql-10/bin/pg_ctl -D $SQL_DATA start
+	sudo -u postgres /usr/pgsql-15/bin/pg_ctl -D $SQL_DATA start
 fi
 
 echo STARTING SSHD

@@ -74,6 +74,7 @@ import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Dropfilter;
 import com.bbn.marti.config.Federation.FederationServer;
 import com.bbn.marti.config.Filter;
+import com.bbn.marti.config.GeospatialFilter;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.config.MicrosoftCAConfig;
 import com.bbn.marti.config.NameEntries;
@@ -245,7 +246,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     "t-b-a",
                     "t-b-c",
                     "t-b-q",
-                    "t-x-c-t",
+					"t-x-c-f",
+					"t-x-c-t",
                     "t-x-c-t-r",
                     "t-x-takp-q",
                     "t-x-c-m",
@@ -416,7 +418,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 							feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
 							feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
 							feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
-							feed.isSync(), feed.getSyncCacheRetentionSeconds());
+							feed.isSync(), feed.getSyncCacheRetentionSeconds(), feed.isFederated());
 
 					if (feed.getTag().size() > 0) {
 						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
@@ -432,7 +434,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 								feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
 								feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
 								feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
-								feed.isSync(), feed.getSyncCacheRetentionSeconds(), groupVector);
+								feed.isSync(), feed.getSyncCacheRetentionSeconds(), groupVector, feed.isFederated());
 
 						if (feed.getTag().size() > 0) {
 							dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
@@ -626,10 +628,16 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         					
                     					} else {
                     						List<String> tags = dataFeedRepository.getDataFeedTagsById(dataFeedInfo.get(0).getId());
-                    						
+
+                    						Set<String> groupNames = RemoteUtil.getInstance().getGroupNamesForBitVectorString(
+                    								dataFeedInfo.get(0).getGroupVector(), groupManager.getAllGroups());
+
                     						// update cache
                     						List<tak.server.plugins.PluginDataFeed> pluginDatafeeds = new ArrayList<>();
-                    						tak.server.plugins.PluginDataFeed pluginDataFeed = new tak.server.plugins.PluginDataFeed(m.getFeedUuid(), dataFeedInfo.get(0).getName(), tags, dataFeedInfo.get(0).getArchive(), dataFeedInfo.get(0).isSync());
+                    						tak.server.plugins.PluginDataFeed pluginDataFeed = new tak.server.plugins.PluginDataFeed(
+                    								m.getFeedUuid(), dataFeedInfo.get(0).getName(), tags, dataFeedInfo.get(0).getArchive(),
+													dataFeedInfo.get(0).isSync(),  new ArrayList<String>(groupNames), dataFeedInfo.get(0).getFederated());
+                    						
                     						pluginDatafeeds.add(pluginDataFeed);
                         					pluginDatafeedCacheHelper.cachePluginDatafeed(m.getFeedUuid(), pluginDatafeeds);
                     						
@@ -639,13 +647,16 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         					dataFeed.getTag().addAll(tags); 
                         					dataFeed.setArchive(dataFeedInfo.get(0).getArchive());
                         					dataFeed.setSync(dataFeedInfo.get(0).isSync());
-                        					if (logger.isDebugEnabled()) {
-                        						logger.debug("Retrieve Datafeed info from dataFeedRepository: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync());
+											dataFeed.getFiltergroup().addAll(groupNames);
+                    						dataFeed.setFederated(dataFeedInfo.get(0).getFederated());
+
+											if (logger.isDebugEnabled()) {
+                            					logger.debug("Retrieve Datafeed info from dataFeedRepository: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, federated: {}, filtergroup: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync(), dataFeed.isFederated(), dataFeed.getFiltergroup());
                         					}
-                        				
+                        					
                         					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
 
-                        					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+											MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
 											InputMetric inputMetric = getInputMetric(dataFeed.getName());
 											if (inputMetric != null) {
 												inputMetric.getMessagesReceived().incrementAndGet();
@@ -668,14 +679,16 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         					dataFeed.getTag().addAll(cacheResult.get(0).getTags());
                         					dataFeed.setArchive(cacheResult.get(0).isArchive());
                         					dataFeed.setSync(cacheResult.get(0).isSync());
-                        					
-                        					if (logger.isDebugEnabled()) {
-                        						logger.debug("Retrieve Datafeed info from cache: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync());
+											dataFeed.getFiltergroup().addAll(cacheResult.get(0).getFilterGroups());
+                        					dataFeed.setFederated(cacheResult.get(0).isFederated());
+
+											if (logger.isDebugEnabled()) {
+												logger.debug("Retrieve Datafeed info from cache: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, federated: {}, filtergroup: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync(), dataFeed.isFederated(), dataFeed.getFiltergroup());
                         					}
                         				
                         					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
 
-                        					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+											MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
 											InputMetric inputMetric = getInputMetric(dataFeed.getName());
 											if (inputMetric != null) {
 												inputMetric.getMessagesReceived().incrementAndGet();
@@ -1642,7 +1655,10 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             case "t-b":
                 processSubscriptionMessage(c);
                 break;
-            case "t-b-q":
+			case "t-x-c-f":
+				processFilterMessage(c);
+				break;
+			case "t-b-q":
                 logger.info("ignoring durable messaging (t-b-q) control message");
                 break;
             case "t-x-c-t":
@@ -1686,22 +1702,6 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             return;
         }
 
-        GeospatialEventFilter geospatialEventFilter = null;
-        Node filterNode = subNode.selectSingleNode("*[local-name() = 'filter']");
-        if (filterNode != null) {
-            try {
-                JAXBContext jaxbContext = JAXBContext.newInstance(Filter.class);
-                Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
-                StringReader sr = new StringReader(filterNode.asXML());
-                Filter filter = (Filter) unmarshaller.unmarshal(sr);
-                if (filter != null) {
-                    geospatialEventFilter = new GeospatialEventFilter(filter.getGeospatialFilter());
-                }
-            } catch (JAXBException e) {
-                logger.error("Exception reading filter from subscription! " + e.getMessage());
-            }
-        }
-
         TransportCotEvent transportType = TransportCotEvent.findByID(tokens[0]);
         Tuple<ChannelHandler, Protocol<CotEventContainer>> handlerAndProtocol = null;
         Subscription subscription = null;
@@ -1718,7 +1718,6 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     		logger.debug("updating subscription: " + subscription);
                     	}
                         subscription.xpath = xpath;
-                        subscription.geospatialEventFilter = geospatialEventFilter;
                     } else {
                         logger.warn("can't update a subscription that doesn't exist");
                     }
@@ -1763,6 +1762,34 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     user);
         }
     }
+
+	private void processFilterMessage(CotEventContainer msg) {
+		try {
+			GeospatialEventFilter filter = null;
+
+			List<Node> bboxNodes = msg.getDocument().selectNodes(
+					"/event/detail/subscription/geospatialFilter/boundingBox");
+			if (bboxNodes != null && !bboxNodes.isEmpty()) {
+				GeospatialFilter geospatialFilter = new GeospatialFilter();
+				for (Node bboxNode : bboxNodes) {
+					GeospatialFilter.BoundingBox boundingBox = new GeospatialFilter.BoundingBox();
+					boundingBox.setMinLongitude(Double.valueOf(bboxNode.valueOf("@minLongitude")));
+					boundingBox.setMinLatitude(Double.valueOf(bboxNode.valueOf("@minLatitude")));
+					boundingBox.setMaxLongitude(Double.valueOf(bboxNode.valueOf("@maxLongitude")));
+					boundingBox.setMaxLatitude(Double.valueOf(bboxNode.valueOf("@maxLatitude")));
+					geospatialFilter.getBoundingBox().add(boundingBox);
+				}
+				filter = new GeospatialEventFilter(geospatialFilter);
+			}
+
+			ChannelHandler handler = msg.getContext(Constants.SOURCE_TRANSPORT_KEY, ChannelHandler.class);
+			Subscription subscription = subscriptionStore.getByHandler(handler);
+			subscription.geospatialEventFilter = filter;
+
+		} catch (Exception e) {
+			logger.error("Exception in processFilterMessage!", e);
+		}
+	}
 
     private void processMetricsMessage(CotEventContainer msg) {
         try {
@@ -2099,7 +2126,6 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     	}
 
     	synchronized (configLock) {
-
     		try {
     			Input currentState = config.getInputByName(inputName);
 
@@ -2146,8 +2172,12 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     			}
 
     			// Modify the archive flags
-    			if (currentState.isArchive() != modifiedInput.isArchive() || currentState.isArchiveOnly() != modifiedInput.isArchiveOnly()) {
+    			if (currentState.isArchive() != modifiedInput.isArchive() || currentState.isArchiveOnly() != modifiedInput.isArchiveOnly() || currentState.isFederated() != modifiedInput.isFederated() || currentState.getSyncCacheRetentionSeconds() != modifiedInput.getSyncCacheRetentionSeconds()) {
     				// Modify the archive flag
+			    logger.info("current arch, arch_only, federated: " + currentState.isArchive() + "," + currentState.isArchiveOnly() +
+					"," + currentState.isFederated());
+			    logger.info("modified arch, arch_only, federated: " + modifiedInput.isArchive() + "," + modifiedInput.isArchiveOnly() +
+					"," + modifiedInput.isFederated());
     				if (currentState.isArchive() != modifiedInput.isArchive()) {
     					result = config.setArchiveFlagNoSave(inputName, modifiedInput.isArchive());
     					if (result != ConnectionModifyResult.SUCCESS) {
@@ -2162,13 +2192,33 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                             return result;
                         }
     				}
+    				
+    				// Modify federated flag
+      				if (currentState.isFederated() != modifiedInput.isFederated()) {
+      					result = config.setFederatedFlagNoSave(inputName, modifiedInput.isFederated());
+    					if (result != ConnectionModifyResult.SUCCESS) {
+                            return result;
+                        }
+    				}
 
+				// Modify syncCacheRetentionSeconds value
+
+				if (currentState.getSyncCacheRetentionSeconds() !=
+				    modifiedInput.getSyncCacheRetentionSeconds())
+				    {
+					result = config.setSyncCacheRetentionSeconds(inputName, modifiedInput.getSyncCacheRetentionSeconds());
+					if(result != ConnectionModifyResult.SUCCESS)
+					    {
+						return result;
+					    }
+				    }
+    				
 					// Save the flag changes;
     				updateProtocolListeners(config.getInputByName(inputName));
     				nettyBuilder.modifyServerInput(modifiedInput);
     				config.saveChangesAndUpdateCache();
     			}
-
+    			
     			// Modify data feed attributes
 				if (modifiedInput instanceof DataFeed && currentState instanceof DataFeed) {
 					DataFeed modifiedDataFeed = (DataFeed) modifiedInput;

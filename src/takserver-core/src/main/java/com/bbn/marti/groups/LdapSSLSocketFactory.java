@@ -1,5 +1,6 @@
 package com.bbn.marti.groups;
 
+import com.bbn.marti.config.Tls;
 import com.bbn.marti.service.DistributedConfiguration;
 import javax.net.SocketFactory;
 import javax.net.ssl.SSLContext;
@@ -61,7 +62,8 @@ public class LdapSSLSocketFactory extends SSLSocketFactory {
             KeyStore keyStore = KeyStore.getInstance(truststore);
             keyStore.load(new FileInputStream(truststoreFile), truststorePass.toCharArray());
             trustManagerFactory.init(keyStore);
-            SSLContext sslContext = SSLContext.getInstance("TLS");
+            Tls tlsConfig = config.getRemoteConfiguration().getSecurity().getTls();
+            SSLContext sslContext = SSLContext.getInstance(tlsConfig.getContext());
             sslContext.init(null, trustManagerFactory.getTrustManagers(), new java.security.SecureRandom());
 
             // save the socket factory from the context

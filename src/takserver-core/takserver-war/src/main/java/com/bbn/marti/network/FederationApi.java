@@ -420,8 +420,11 @@ public class FederationApi extends BaseRestController {
 	}
 
 	@RequestMapping(value = "/federategroupsmap/{federateId}", method = RequestMethod.POST)
-	public ResponseEntity<ApiResponse<String>> addFederateGroupMap(@PathVariable("federateId") String federateId, String remoteGroup, String localGroup) {
+	public ResponseEntity<ApiResponse<String>> addFederateGroupMap(@PathVariable("federateId") String federateId, @RequestParam("remoteGroup") String remoteGroup, @RequestParam("localGroup") String localGroup) {
 
+		if (logger.isDebugEnabled()) {
+			logger.debug("Received POST request addFederateGroupMap for federateId {}", federateId);
+		}
 		ResponseEntity<ApiResponse<String>> result = null;
 
 		List<String> errors = null;
@@ -1314,5 +1317,33 @@ public class FederationApi extends BaseRestController {
 		fedEventRepository.clearFederationEvents();
 		
 		logger.info("Federation events cleared");
+	}
+	
+	@RequestMapping(value = "/federatemissions/{federateId}", method = RequestMethod.PUT)
+	public ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>> updateFederateMissions(@PathVariable String federateId, @RequestBody FederateMissionPerConnectionSettings federateMissionPerConnectionSettings) {
+
+		ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>> result = null;
+
+		logger.trace("RMI federationInterface: " + federationInterface);
+		List<String> errors = new ArrayList<String>();
+
+		try {
+			federationInterface.updateFederateMissionSettings(federateId, federateMissionPerConnectionSettings.isMissionFederateDefault(), federateMissionPerConnectionSettings.getMissions());
+
+			result = new ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>>(new ApiResponse<FederateMissionPerConnectionSettings>(Constants.API_VERSION,
+					FederateMissionPerConnectionSettings.class.getName(), federateMissionPerConnectionSettings), HttpStatus.OK);
+			
+		} catch (Exception e) {
+			logger.error("Exception updating federate details.", e);
+			errors.add(e.getMessage());
+		}
+
+		if (result == null) {
+			//This would be an error condition (not an empty input list or bad request)
+			result = new ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>>(new ApiResponse<FederateMissionPerConnectionSettings>(Constants.API_VERSION,
+					String.class.getName(), null, errors), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
 	}
 }

@@ -56,8 +56,8 @@ import com.bbn.marti.remote.exception.NotFoundException;
  * By default, the filter chain will proceed when an authentication attempt fails in order
  * to allow other authentication mechanisms to process the request. To reject the
  * credentials immediately, set the
- * <tt>continueFilterChainOnUnsuccessfulAuthentication</tt> flag to false. The exception
- * raised by the <tt>AuthenticationManager</tt> will the be re-thrown. Note that this will
+ * {@literal <}tt{@literal >}continueFilterChainOnUnsuccessfulAuthentication{@literal <}/tt{@literal >} flag to false. The exception
+ * raised by the {@literal <}tt{@literal >}AuthenticationManager{@literal <}/tt{@literal >} will the be re-thrown. Note that this will
  * not affect cases where the principal returned by {@link #getPreAuthenticatedPrincipal}
  * is null, when the chain will still proceed as normal.
  *
@@ -104,7 +104,7 @@ public abstract class AbstractPreAuthenticatedProcessingFilter extends GenericFi
 			logger.debug("Checking secure context token: "
 					+ SecurityContextHolder.getContext().getAuthentication());
 		}
-		
+
 //		if (SecurityContextHolder.getContext() != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 //			throw new NotFoundException("username password auth not permitted");
 //		}
@@ -306,7 +306,7 @@ public abstract class AbstractPreAuthenticatedProcessingFilter extends GenericFi
 
 	/**
 	 * If set, the pre-authenticated principal will be checked on each request and
-	 * compared against the name of the current <tt>Authentication</tt> object. A check to
+	 * compared against the name of the current {@literal <}tt{@literal >}Authentication{@literal <}/tt{@literal >} object. A check to
 	 * determine if {@link Authentication#getPrincipal()} is equal to the principal will
 	 * also be performed. If a change is detected, the user will be reauthenticated.
 	 *
@@ -317,12 +317,12 @@ public abstract class AbstractPreAuthenticatedProcessingFilter extends GenericFi
 	}
 
 	/**
-	 * If <tt>checkForPrincipalChanges</tt> is set, and a change of principal is detected,
+	 * If {@literal <}tt{@literal >}checkForPrincipalChanges{@literal <}/tt{@literal >} is set, and a change of principal is detected,
 	 * determines whether any existing session should be invalidated before proceeding to
 	 * authenticate the new principal.
 	 *
-	 * @param invalidateSessionOnPrincipalChange <tt>false</tt> to retain the existing
-	 * session. Defaults to <tt>true</tt>.
+	 * @param invalidateSessionOnPrincipalChange {@literal <}tt{@literal >}false{@literal <}/tt{@literal >} to retain the existing
+	 * session. Defaults to {@literal <}tt{@literal >}true{@literal <}/tt{@literal >}.
 	 */
 	public void setInvalidateSessionOnPrincipalChange(
 			boolean invalidateSessionOnPrincipalChange) {

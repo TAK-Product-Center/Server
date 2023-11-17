@@ -98,16 +98,21 @@ public class TestConfiguration {
 		}
 
 		boolean server0Available = testDb(ImmutableServerProfiles.SERVER_0);
-		if (server0Available) {
-			dbAvailable = true;
-		} else {
-			// If not available and the host is not defined, assume Unavailable is ok
-			if (server0DBHost == null) {
-				dbAvailable = false;
+		
+		if (TestConfiguration.getInstance().dbEnabled) {
+			if (server0Available) {
+				dbAvailable = true;
 			} else {
-				// Otherwise, it should have been available, so throw an exception
-				throw new RuntimeException("Cannot connect to the defined postgresql server '" + this.server0DBHost + "'!");
+				// If not available and the host is not defined, assume Unavailable is ok
+				if (server0DBHost == null) {
+					dbAvailable = false;
+				} else {
+					// Otherwise, it should have been available, so throw an exception
+					throw new RuntimeException("Cannot connect to the defined postgresql server '" + this.server0DBHost + "'!");
+				}
 			}
+		} else {
+			dbAvailable = false;
 		}
 
 		if (dbAvailable) {

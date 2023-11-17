@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.annotations.VisibleForTesting;
 
 import io.grpc.Attributes;
+import io.grpc.ChannelLogger;
 import io.grpc.Grpc;
 import io.grpc.InternalChannelz.Security;
 import io.grpc.InternalChannelz.Tls;
@@ -33,10 +34,18 @@ import io.grpc.netty.InternalWriteBufferingAndExceptionHandlerUtils;
 import io.grpc.netty.ProtocolNegotiationEvent;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.ssl.OpenSslSessionContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.util.AsciiString;
+
+import javax.net.ssl.SSLSessionContext;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.annotations.VisibleForTesting;
 
 /*
  *
@@ -134,10 +143,11 @@ public class FigProtocolNegotiator {
         **/
         @Override
         public ChannelHandler newHandler(GrpcHttp2ConnectionHandler grpcHandler) {
-
             ChannelHandler gnh = InternalProtocolNegotiators.grpcNegotiationHandler(grpcHandler);
-            ChannelHandler figClientTLSNegotiatedHandler = new FigClientBufferUntilTlsNegotiatedHandler(gnh, sslContext, host, port);
-            ChannelHandler activeHandler = InternalProtocolNegotiators.waitUntilActiveHandler(figClientTLSNegotiatedHandler);
+            ChannelHandler figClientTLSNegotiatedHandler = new FigClientBufferUntilTlsNegotiatedHandler(gnh, sslContext, host, port,
+                    grpcHandler.getNegotiationLogger());
+            ChannelHandler activeHandler = InternalProtocolNegotiators.waitUntilActiveHandler(figClientTLSNegotiatedHandler,
+                    grpcHandler.getNegotiationLogger());
             return activeHandler;
 
         }
@@ -156,8 +166,8 @@ public class FigProtocolNegotiator {
         String host;
         int port;
 
-        FigClientBufferUntilTlsNegotiatedHandler(ChannelHandler next, SslContext sslContext, String host, int port) {
-            super(next);
+        FigClientBufferUntilTlsNegotiatedHandler(ChannelHandler next, SslContext sslContext, String host, int port, ChannelLogger logger) {
+            super(next, logger);
             this.sslContext = sslContext;
             this.host = host;
             this.port = port;
@@ -189,6 +199,16 @@ public class FigProtocolNegotiator {
                         if (logger.isDebugEnabled()) {
                             logger.debug("FIG: gGRPC Netty HTTP/2 TLS negotiation succeeded.");
                         }
+
+//                        SSLSessionContext sessionContext = sslContext.sessionContext();
+//                        if (sessionContext instanceof OpenSslSessionContext) {
+//                            logger.debug("Disabling cache");
+//                            OpenSslSessionContext ossc = (OpenSslSessionContext) sessionContext;
+//                            ossc.setSessionCacheEnabled(false);
+//                            logger.debug("Cache disabled");
+//                        } else {
+//                            logger.info("Cannot disable cache");
+//                        }
 
                         // validate as we go
                         SSLSession sslSession = checkNotNull(checkNotNull(checkNotNull(handler).engine(), "FIG Netty handler SSLEngine").getSession(), "FIG server SSL Session");

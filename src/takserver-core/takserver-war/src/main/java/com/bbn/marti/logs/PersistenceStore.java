@@ -165,7 +165,7 @@ public class PersistenceStore {
 		return uniques;
 	}
 
-	public List<Log> getLogs(String query, boolean metrics, boolean includeLogContents, boolean onlyCallstacks) {
+	public List<Log> getLogs(String query, Boolean metrics, boolean includeLogContents, boolean onlyCallstacks) {
 
 		List<Log> logs = new ArrayList<Log>();
 		try 	{
@@ -176,17 +176,28 @@ public class PersistenceStore {
 			}
 
 			sql +=	"filename, time " +
-					" from error_logs where filename ";
-			if (!metrics) {
-				sql += " not ";
+					" from error_logs ";
+
+			if (metrics != null) {
+				sql += "where filename ";
+				if (!metrics) {
+					sql += " not ";
+				}
+				sql += " like 'metric%'";
 			}
-			sql += " like 'metric%'";
 
 			boolean hasQuery = query != null && query.length() != 0;
 			if (hasQuery) {
 				validator.getValidInput("feed", query, 
 						MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.LONG_STRING_CHARS, true);
-				sql += " and ( ";
+
+				if (metrics == null) {
+					sql += " where ";
+				} else {
+					sql += " and ";
+				}
+
+				sql += "  ( ";
 				sql += " uid like ? or ";
 				sql += " callsign like ? or ";
 				sql += " platform like ? or ";

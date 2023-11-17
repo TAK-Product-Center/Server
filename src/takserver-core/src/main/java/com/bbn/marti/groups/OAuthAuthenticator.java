@@ -113,9 +113,12 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                 if (oAuth2AccessToken == null || oAuth2AccessToken.isExpired()) {
                     throw new OAuth2Exception("defaultTokenServices.readAccessToken failed!");
                 }
-            } else {
+            } else if (claims.get("email") != null) {
                 // For jwt's from keycloak, get the username from the email claim
                 username = (String) claims.get("email");
+            } else {
+                // For other trusted tokens, assign a random username if we don't have an attribute mapping
+                username = UUID.randomUUID().toString();
             }
 
             if (user instanceof AuthenticatedUser) {

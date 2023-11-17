@@ -13,11 +13,11 @@ import com.bbn.marti.util.concurrent.future.AsyncFuture;
  */
 public interface Protocol<T> extends ChannelListener {
 	/**
-	* Writes the given data to the transport, returning an 
-	* asynchronous integer that will be set with the number of 
+	* Writes the given data to the transport, returning an
+	* asynchronous integer that will be set with the number of
 	* bytes written out to the wire on account of the given data
-	* 
-	* If the data could not be sent, the async integer may be 
+	*
+	* If the data could not be sent, the async integer may be
 	* triggered with an exceptional status (see AsyncCallback onFailure)
 	*/
 	public AsyncFuture<Integer> write(T data, ChannelHandler handler);
@@ -25,7 +25,7 @@ public interface Protocol<T> extends ChannelListener {
 	/**
 	* add/removes the given protocol listener from this protocol
 	*
-	* @note Should not be called from the same thread context as a 
+	* Should not be called from the same thread context as a
 	* protocol listener on_ call originating from this protocol.
 	* May deadlock due to lock read/write non-reentrancy in some implementations.
 	*/

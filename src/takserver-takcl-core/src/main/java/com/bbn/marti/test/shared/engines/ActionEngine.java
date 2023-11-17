@@ -23,6 +23,7 @@ import com.bbn.marti.test.shared.data.users.AbstractUser;
 import com.bbn.marti.test.shared.data.users.MutableUser;
 import com.bbn.marti.test.shared.engines.state.StateEngine;
 import com.bbn.marti.test.shared.engines.state.UserState;
+
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.DocumentHelper;
@@ -41,9 +42,11 @@ import java.util.stream.Collectors;
 
 import static com.bbn.marti.takcl.connectivity.missions.MissionModels.*;
 
+import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
+
 /**
  * Used to synchronize actions performed in relation to the server (both online and offline)
- * <p/>
+ * <p>
  * Created on 10/9/15.
  */
 public class ActionEngine implements EngineInterface {
@@ -186,7 +189,7 @@ public class ActionEngine implements EngineInterface {
 ////        String getLatestSA();
 ////        List<String> getRecievedMessages();
 ////        AbstractUser getProfile();
-//        
+//
 //        boolean isConnected();
 //    }
 
@@ -432,6 +435,7 @@ public class ActionEngine implements EngineInterface {
 		sendingClient.sentCotMessage = sendMessage;
 
 		sendingClient.sendMessage(sendMessage);
+		System.out.println("--- ActionEngine: attemptSendFromUserAndVerify sendMessage: "+ sendMessage.asXML());
 
 		String message = sendingClient + " attempted to send a message" +
 				(senderIdentification == UserIdentificationData.UID_AND_CALLSIGN ? " with UID and Callsign " :
@@ -464,8 +468,18 @@ public class ActionEngine implements EngineInterface {
 			message += ".";
 		}
 
-		System.out.println(message);
+		System.out.println("--- ActionEngine: attemptSendFromUserAndVerify message: "+ message);
 
+		sleep(SLEEP_TIME_SEND_MESSAGE);
+	}
+	
+	@Override
+	public void verifyReceivedMessageSentFromPlugin(@NotNull AbstractUser sendingPlugin, @NotNull AbstractUser... receivedUsers) {
+		data.engineIterationDataClear();
+		for (AbstractUser receivedUser: receivedUsers) {
+			ActionClient sendingClient = data.getClient(receivedUser);
+			System.out.println("--- Initiate ActionClient: " + sendingClient);
+		}
 		sleep(SLEEP_TIME_SEND_MESSAGE);
 	}
 
@@ -562,6 +576,12 @@ public class ActionEngine implements EngineInterface {
 		AbstractRunnableServer serverInstance = getRunnableInstanceAndBuildIfnecessary(server);
 		serverInstance.enablePluginManagerProcess(enablePluginManager);
 		serverInstance.enableRetentionProcess(enableRetentionService);
+		
+		// if the server profile is detected as fedhub then: messaging, api, retention and plugins will be automatically disabled
+		if (server.getConsistentUniqueReadableIdentifier().contains("FEDHUB")) {
+			serverInstance.enableFederationHubProcess();
+		}
+		
 		serverInstance.startServer(sessionIdentifier, SLEEP_TIME_SERVER_START, true);
 	}
 
@@ -753,11 +773,12 @@ public class ActionEngine implements EngineInterface {
 	public synchronized void offlineAddUsersAndConnectionsIfNecessary(@NotNull AbstractUser... users) {
 		data.engineIterationDataClear();
 		for (AbstractUser user : users) {
+			System.out.println("--- ActionEngine offlineAddUsersAndConnectionsIfNecessary user: " + user);
 
 			AbstractRunnableServer server = getRunnableInstanceAndBuildIfnecessary(user.getServer());
+
 			OfflineConfigModule offlineConfigModule = server.getOfflineConfigModule();
 			AbstractConnection connection = user.getConnection();
-
 
 			offlineConfigModule.addConnectionIfNecessary(connection);
 
@@ -803,6 +824,7 @@ public class ActionEngine implements EngineInterface {
 		} else if (client.isConnected()) {
 			System.err.println("User " + client.toString() + " is already connected!");
 		} else {
+			System.out.println("--- ActionEngine connectClientAndSendData: client: "+ client+", xmlData:"+ xmlData );
 			client.connect(doAuthIfNecessary, xmlData);
 		}
 

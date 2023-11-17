@@ -62,7 +62,7 @@ public class FlowTagFilter implements CotFilter {
 	*
 	* Intended to modify this message so that this server's broker will OK the message.
 	*
-	* @note This method mutates the container's contained xml.
+	* This method mutates the container's contained xml.
 	* @return Flag indicating whether the message was modified.
 	*/
 	public boolean unfilter(CotEventContainer c) {
@@ -74,7 +74,7 @@ public class FlowTagFilter implements CotFilter {
 	*
 	* Intended to modify the message so that any federation route will be successful.
 	*
-	* @throw ClassCastException if the message's flow tag Nodes are not all of type element
+	* @throws ClassCastException if the message's flow tag Nodes are not all of type element
 	* @return The list of server Ids that were removed from the document. Empty if nothing was removed.
 	*/
 	public List<String> unfilterAll(CotEventContainer c) {
@@ -97,7 +97,7 @@ public class FlowTagFilter implements CotFilter {
 	/**
 	* Removes the flow tag filter for the given server id.
 	*
-	* @note In the case that the given xpath is malformed due to a flawed serverId, the error is caught, and false is returned.
+	* In the case that the given xpath is malformed due to a flawed serverId, the error is caught, and false is returned.
 	*
 	* @return whether an attribute with the given serverId name was actually removed ie, whether the xpath /event/detail/_flow-tags_/@serverId existed
 	*/

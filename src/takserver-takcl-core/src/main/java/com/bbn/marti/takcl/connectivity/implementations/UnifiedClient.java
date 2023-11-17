@@ -16,7 +16,7 @@ import java.util.HashSet;
 
 /**
  * Useless client
- * <p/>
+ * <p>
  * Created on 11/13/15.
  */
 public class UnifiedClient implements ConnectingInterface, SendingInterface, ReceivingInterface {

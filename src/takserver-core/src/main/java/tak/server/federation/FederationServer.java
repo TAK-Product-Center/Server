@@ -129,6 +129,8 @@ import io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.micrometer.core.instrument.Metrics;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.netty.util.internal.logging.Slf4JLoggerFactory;
 import mil.af.rl.rol.FederationProcessor;
 import mil.af.rl.rol.MissionRolVisitor;
 import mil.af.rl.rol.Resource;
@@ -241,6 +243,8 @@ public class FederationServer {
 	@EventListener({ContextRefreshedEvent.class})
 	private void init() {
 		fedServer = this;
+		
+		InternalLoggerFactory.setDefaultFactory(Slf4JLoggerFactory.INSTANCE);
 
 		try {
 			// if the federation truststore is pointing to the root truststore - undo it and set to fed truststore.
@@ -283,6 +287,8 @@ public class FederationServer {
 			serverConfig.setKeystorePassword(fedServerConfig.getTls().getKeystorePass());
 			serverConfig.setTruststoreFile(fedServerConfig.getTls().getTruststoreFile());
 			serverConfig.setTruststorePass(fedServerConfig.getTls().getTruststorePass());
+			serverConfig.setContext(fedServerConfig.getTls().getContext());
+			serverConfig.setCiphers(fedServerConfig.getTls().getCiphers());
 			serverConfig.setSkipGateway(true); // eliminate this
 			serverConfig.setMaxMessageSizeBytes(fedConfig().getFederationServer().getMaxMessageSizeBytes()); // put in coreconfig
 			serverConfig.setMetricsLogIntervalSeconds(60); // put in coreconfig
@@ -325,6 +331,8 @@ public class FederationServer {
 	    serverConfig.setKeystorePassword(fedServerConfig.getTls().getKeystorePass());
 	    serverConfig.setTruststoreFile(fedServerConfig.getTls().getTruststoreFile());
 	    serverConfig.setTruststorePass(fedServerConfig.getTls().getTruststorePass());
+		serverConfig.setContext(fedServerConfig.getTls().getContext());
+		serverConfig.setCiphers(fedServerConfig.getTls().getCiphers());
 	    serverConfig.setSkipGateway(true); // eliminate this
 	    serverConfig.setMaxMessageSizeBytes(134217728); // put in coreconfig
 	    serverConfig.setMetricsLogIntervalSeconds(60); // put in coreconfig
@@ -369,7 +377,7 @@ public class FederationServer {
 			}
 
 			NettyServerBuilder serverBuilder = NettyServerBuilder.forPort(config.getPort())
-					.maxMessageSize(config.getMaxMessageSizeBytes()) // max message size. If not specified, defaults to 4MB
+					.maxInboundMessageSize(config.getMaxMessageSizeBytes()) // max message size. If not specified, defaults to 4MB
 					.sslContext(sslConfig.getSslContext())
 					.executor(Resources.federationGrpcExecutor)
 					.workerEventLoopGroup(Resources.federationGrpcWorkerEventLoopGroup)
@@ -696,7 +704,7 @@ public class FederationServer {
 				try {
 					// send out data feeds to federate
 					if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
-						List<ROL> feedMessages = mdm.getDataFeedEvents();
+						List<ROL> feedMessages = mdm.getDataFeedEventsForFederatedDataFeedOnly();
 						
 						AtomicLong delayMs = new AtomicLong(100L);										
 						for (final ROL feedMessage : feedMessages) {
@@ -1358,7 +1366,7 @@ public class FederationServer {
 
 				@Override
 				public void onError(Throwable t) {
-
+					logger.error("error in clientFederateGroupsStream", t);
 				}
 
 				@Override
@@ -1853,7 +1861,10 @@ public class FederationServer {
 						cot.setContext(Constants.GROUPS_KEY, groups);
 					}
 
-					//                            cot.setContextValue(RepositoryService.ARCHIVE_EVENT_KEY, config.isArchive()); // TODO: make archive configurable per FIG federate
+					if (!federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())).isArchive()) {
+						cot.setContextValue(Constants.ARCHIVE_EVENT_KEY, Boolean.FALSE);
+					}
+
 				} else {
 					if (logger.isDebugEnabled()) {
 						logger.debug("user not found for federate subscription for FIG message");

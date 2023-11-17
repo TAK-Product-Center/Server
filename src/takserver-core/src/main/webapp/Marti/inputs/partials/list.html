@@ -80,10 +80,12 @@
 						<th>TLS</th>
 						<th>Group</th>
 						<th>Interface</th>
+						<th>Sync Cache Retention(s)</th>
 						<th>Archive</th>
 						<th>Filter Groups</th>
 						<th>Anonymous Group</th>
 						<th>Archive Only</th>
+						<th>Federated</th>
 						<th>Reads Received</th>
 						<th>Messages Received</th>
 						<th>Number Connected</th>
@@ -107,10 +109,12 @@
 							? x.input.coreVersion2TlsVersions : secConfig.tlsVersion) : ''}}</td>
 						<td data-ng-bind="x.input.group"></td>
 						<td data-ng-bind="x.input.iface"></td>
+						<td data-ng-bind="x.input.syncCacheRetentionSeconds"></td>
 						<td data-ng-bind="x.input.archive"></td>
 						<td data-ng-bind="x.input.filtergroup"></td>
 						<td data-ng-bind="x.input.anongroup"></td>
 						<td data-ng-bind="x.input.archiveOnly"></td>
+						<td data-ng-bind="x.input.federated"></td>
 						<td data-ng-bind="x.readsReceived"></td>
 						<td data-ng-bind="x.messagesReceived"></td>
 						<td data-ng-bind="x.numClients"></td>
@@ -137,6 +141,7 @@
 						<th>Tags</th>
 						<th>Archive</th>
 						<th>Filter Groups</th>
+						<th>Federated</th>
 						<th>Messages Received</th>
 						<th>Bytes Received</th>
 						<th>&nbsp;</th>
@@ -152,6 +157,7 @@
 						<td data-ng-bind="x.input.tag"></td>
 						<td data-ng-bind="x.input.archive"></td>
 						<td data-ng-bind="x.input.filtergroup"></td>
+						<td data-ng-bind="x.input.federated"></td>
 						<td data-ng-bind="x.messagesReceived"></td>
 						<td data-ng-bind="x.bytesRecieved"></td>
 						<td><a href="" data-ng-click="deleteDataFeed(x.input.name)">Delete</a></td>

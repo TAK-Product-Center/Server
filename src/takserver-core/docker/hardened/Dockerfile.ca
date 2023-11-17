@@ -1,5 +1,5 @@
 # need java for keytool
-FROM openjdk:11-jdk-stretch
+FROM openjdk:11-jdk-bullseye
 RUN apt update && \
 	apt install -y apt-utils && \
     apt install -y openssl && \

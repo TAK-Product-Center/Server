@@ -32,7 +32,7 @@ public class MetadataConstants {
 	public static final String ParentMessageID = "parentMessageID";
 	/**
 	 * supports multi-layer children by recursively keeping parent's parent (or parent's parent's parent's, etc) metadata in this field.
-	 * Currently expected to be a Map<String,Object>, which will only work for in-process plugins
+	 * Currently expected to be a Map{@literal <}String,Object{@literal >}, which will only work for in-process plugins
 	 */
 	public static final String ParentMetadata = "parentMetadata";
 	public static final String NumChildrenCreated = "numChildrenCreated";
@@ -48,7 +48,7 @@ public class MetadataConstants {
 	public static final String NumSendAttempts = "numSendAttempts";
 
 	public static final String HttpRequestURI = "http request uri";
-	
+
 	/** Expected to be a String[] */
 	public static final String HttpHeaders = "http_headers";
 	public static final String SingleShotMessage = "single_shot_message";

@@ -88,10 +88,8 @@ public class ClassificationApi extends BaseRestController {
     		throw new Exception("Classification not found");
     	}
     	classificationRepository.unlinkAllCaveats(dbClassification.getId());
-		logger.info( "~~~ unlinkAllCaveats for classification_id {}", dbClassification.getId() );
 
     	classificationRepository.deleteClassificationOnly(dbClassification.getId());
-		logger.info( "~~~ deleteClassificationOnly for classification_id {}", dbClassification.getId() );
 
         return new ApiResponse<Long>(Constants.API_VERSION,
         		Long.class.getSimpleName(), 0L);

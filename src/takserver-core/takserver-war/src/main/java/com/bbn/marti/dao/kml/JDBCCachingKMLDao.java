@@ -726,7 +726,7 @@ public class JDBCCachingKMLDao implements KMLDao {
                 validateTiming = System.nanoTime();
                 cotElement.uid = validator.getValidInput(servletContextPath, results.getString(1), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
                 cotElement.cottype = validator.getValidInput(servletContextPath, results.getString(5), "CotType", MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
-                cotElement.detailtext = validator.getValidInput(servletContextPath, results.getString(8), "XmlBlackList", MartiValidatorConstants.LONG_STRING_CHARS, true);
+                cotElement.detailtext = validator.getValidInput(servletContextPath, results.getString(8), "XmlBlackListWordOnly", MartiValidatorConstants.LONG_STRING_CHARS, true);
                 cotElement.how = validator.getValidInput(servletContextPath, results.getString(10), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
                 validateTiming = System.nanoTime() - validateTiming;
             }
@@ -776,7 +776,7 @@ public class JDBCCachingKMLDao implements KMLDao {
                 validateTiming = System.nanoTime();
                 cotElement.uid = validator.getValidInput(servletContextPath, cotElement.uid, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
                 cotElement.cottype = validator.getValidInput(servletContextPath, cotElement.cottype, "CotType", MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
-                cotElement.detailtext = validator.getValidInput(servletContextPath, cotElement.detailtext, "XmlBlackList", MartiValidatorConstants.LONG_STRING_CHARS, true);
+                cotElement.detailtext = validator.getValidInput(servletContextPath, cotElement.detailtext, "XmlBlackListWordOnly", MartiValidatorConstants.LONG_STRING_CHARS, true);
                 validateTiming = System.nanoTime() - validateTiming;
             }
 
@@ -896,7 +896,7 @@ public class JDBCCachingKMLDao implements KMLDao {
                 validateTiming = System.nanoTime();
                 cotElement.uid = validator.getValidInput(servletContextPath, cotElement.uid, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
                 cotElement.cottype = validator.getValidInput(servletContextPath, cotElement.cottype, "CotType", MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
-                cotElement.detailtext = validator.getValidInput(servletContextPath, cotElement.detailtext, "XmlBlackList", MartiValidatorConstants.LONG_STRING_CHARS, true);
+                cotElement.detailtext = validator.getValidInput(servletContextPath, cotElement.detailtext, "XmlBlackListWordOnly", MartiValidatorConstants.LONG_STRING_CHARS, true);
                 validateTiming = System.nanoTime() - validateTiming;
             }
 

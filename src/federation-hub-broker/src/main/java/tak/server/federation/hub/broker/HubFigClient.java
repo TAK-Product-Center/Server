@@ -65,7 +65,6 @@ import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.GuardedStreamHolder;
 import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
 import tak.server.federation.hub.broker.events.HubClientDisconnectEvent;
-import tak.server.federation.hub.broker.events.UpdatePolicy;
 import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
 
 /*
@@ -185,26 +184,6 @@ public class HubFigClient implements Serializable {
 					@Override
 					public void onCompleted() {}
 				});
-
-		asyncFederatedChannel.clientROLStream(
-				Subscription.newBuilder().setFilter("")
-						.setIdentity(Identity.newBuilder().setName(fedName).setUid(clientUid).build()).build(),
-				new StreamObserver<ROL>() {
-
-					@Override
-					public void onNext(ROL value) {
-						FederationHubBrokerService.getInstance().parseRol(value, fedName);
-					}
-
-					@Override
-					public void onError(Throwable t) {
-						logger.error("ROL Stream Error: ", t);
-						processDisconnect();
-					}
-
-					@Override
-					public void onCompleted() {}
-				});
 		
 		asyncFederatedChannel.serverFederateGroupsStream(
 				Subscription.newBuilder().setFilter("")
@@ -243,6 +222,8 @@ public class HubFigClient implements Serializable {
 					@Override
 					public void onCompleted() {}
 				});
+		
+		final AtomicBoolean initROLStream = new AtomicBoolean(false);
 
 		healthScheduler = scheduler.scheduleWithFixedDelay(() -> {
 			ClientHealth clientHealth = ClientHealth.newBuilder().setStatus(ClientHealth.ServingStatus.SERVING).build();
@@ -263,6 +244,31 @@ public class HubFigClient implements Serializable {
 						processDisconnect();
 						throw new RuntimeException("Not Healthy");
 					}
+					
+					if (initROLStream.compareAndSet(false, true)) {
+						// open the client ROL stream only after getting a health check back. This will trigger transmission of federated mission changes.
+						// Subscription / Stream to receive ROL messages from server
+						asyncFederatedChannel.clientROLStream(
+								Subscription.newBuilder().setFilter("")
+										.setIdentity(Identity.newBuilder().setName(fedName).setUid(clientUid).build()).build(),
+								new StreamObserver<ROL>() {
+
+									@Override
+									public void onNext(ROL value) {
+										FederationHubBrokerService.getInstance().parseRol(value, fedName);
+									}
+
+									@Override
+									public void onError(Throwable t) {
+										logger.error("ROL Stream Error: ", t);
+										processDisconnect();
+									}
+
+									@Override
+									public void onCompleted() {}
+								});
+					}
+
 				}
 
 				@Override
@@ -311,12 +317,11 @@ public class HubFigClient implements Serializable {
 								}
 							}
 							
-							FederationPolicyGraph fpg = FederationHubDependencyInjectionProxy.getInstance().fedHubPolicyManager().getPolicyGraph();
+							FederationPolicyGraph fpg = FederationHubBrokerService.getInstance().getFederationPolicyGraph();
 							requireNonNull(fpg, "federation policy graph object");
 
-							Federate clientNode = FederationHubDependencyInjectionProxy.getInstance()
-									.fedHubPolicyManager()
-									.getPolicyGraph()
+							Federate clientNode = FederationHubBrokerService.getInstance()
+									.getFederationPolicyGraph()
 									.getFederate(new FederateIdentity(fedName));
 							
 							requireNonNull(clientNode, "federation policy node for newly connected client");
@@ -335,13 +340,14 @@ public class HubFigClient implements Serializable {
 	}
 
 	private void setupGroupStreamSender() {
-		groupsCall = channel.newCall(
-				io.grpc.MethodDescriptor.create(MethodDescriptor.MethodType.CLIENT_STREAMING,
-						generateFullMethodName("com.atakmap.FederatedChannel", "ClientFederateGroupsStream"),
-						io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.FederateGroups.getDefaultInstance()),
-						io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance())),
-				asyncFederatedChannel.getCallOptions());
-
+		MethodDescriptor<FederateGroups, Subscription> methodDescripton = MethodDescriptor.<FederateGroups, Subscription>newBuilder()
+				.setType(MethodDescriptor.MethodType.CLIENT_STREAMING)
+				.setFullMethodName(generateFullMethodName("com.atakmap.FederatedChannel", "ClientFederateGroupsStream"))
+				.setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.FederateGroups.getDefaultInstance()))
+				.setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance()))
+				.build();
+		
+		groupsCall = channel.newCall(methodDescripton, asyncFederatedChannel.getCallOptions());
 		// use listener to respect flow control, and send messages to the server when it
 		// is ready
 		groupsCall.start(new ClientCall.Listener<Subscription>() {
@@ -350,6 +356,7 @@ public class HubFigClient implements Serializable {
 			public void onMessage(Subscription response) {
 				// Notify gRPC to receive one additional response.
 				groupsCall.request(1);
+				
 			}
 
 			@Override
@@ -371,14 +378,38 @@ public class HubFigClient implements Serializable {
             );
 		FederationHubDependencyInjectionProxy.getInstance().hubConnectionStore().addGroupStream(fedName, groupStreamHolder);
 	}
+	
+	private void setServerSubscriptionForConnection() {
+		if (eventStreamHolder != null && serverSubscription != null) {
+			eventStreamHolder.setSubscription(serverSubscription);
+			
+			List<ConnectionInfo> existingConnectionsFromRemoteServer = FederationHubDependencyInjectionProxy.getInstance()
+				.hubConnectionStore()
+				.getConnectionInfos()
+				.stream()
+				.filter(i -> i.getRemoteServerId().equals(serverSubscription.getIdentity().getServerId()))
+				.collect(Collectors.toList());
+			
+			// if we already have a connection to/from this server, don't allow another. force close without reconnect.
+			if (existingConnectionsFromRemoteServer.size() > 0) {
+					logger.info("Error: Connection to/from " + fedName +  " already exists. Disallowing duplicate");
+				processDisconnectWithoutRetry();
+			} else {
+				FederationHubDependencyInjectionProxy.getInstance().hubConnectionStore().addConnectionInfo(fedName, info);
+			}
+			logger.info("Outgoing connection for {} established ", fedName);
+		}
+	}
 
 	public void setupEventStreamSender() {
-		clientCall = channel.newCall(
-				io.grpc.MethodDescriptor.create(io.grpc.MethodDescriptor.MethodType.CLIENT_STREAMING,
-						generateFullMethodName("com.atakmap.FederatedChannel", "ServerEventStream"),
-						io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.FederatedEvent.getDefaultInstance()),
-						io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance())),
-				asyncFederatedChannel.getCallOptions());
+		MethodDescriptor<FederatedEvent, Subscription> methodDescripton = MethodDescriptor.<FederatedEvent, Subscription>newBuilder()
+				.setType(MethodDescriptor.MethodType.CLIENT_STREAMING)
+				.setFullMethodName(generateFullMethodName("com.atakmap.FederatedChannel", "ServerEventStream"))
+				.setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.FederatedEvent.getDefaultInstance()))
+				.setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance()))
+				.build();
+		
+		clientCall = channel.newCall(methodDescripton, asyncFederatedChannel.getCallOptions());
 
 		// use listener to respect flow control, and send messages to the server when it
 		// is ready
@@ -387,25 +418,7 @@ public class HubFigClient implements Serializable {
 			@Override
 			public void onMessage(Subscription response) {
 				serverSubscription = response;
-				if (eventStreamHolder != null) {
-					eventStreamHolder.setSubscription(serverSubscription);
-					
-					List<ConnectionInfo> existingConnectionsFromRemoteServer = FederationHubDependencyInjectionProxy.getInstance()
-						.hubConnectionStore()
-						.getConnectionInfos()
-						.stream()
-						.filter(i -> i.getRemoteServerId().equals(serverSubscription.getIdentity().getServerId()))
-						.collect(Collectors.toList());
-					
-					// if we already have a connection to/from this server, don't allow another. force close without reconnect.
-					if (existingConnectionsFromRemoteServer.size() > 0) {
-     					logger.info("Error: Connection to/from " + fedName +  " already exists. Disallowing duplicate");
-						processDisconnectWithoutRetry();
-					} else {
-						FederationHubDependencyInjectionProxy.getInstance().hubConnectionStore().addConnectionInfo(fedName, info);
-					}
-					logger.info("Outgoing connection for {} established ", fedName);
-				}
+				setServerSubscriptionForConnection();
 				// Notify gRPC to receive one additional response.
 				clientCall.request(1);
 			}
@@ -428,14 +441,12 @@ public class HubFigClient implements Serializable {
                 }, true
             );
 		
-		if (serverSubscription != null) {
-			eventStreamHolder.setSubscription(serverSubscription);
-		}
+		setServerSubscriptionForConnection();
 		
 		eventStreamHolder.send(FederatedEvent.newBuilder().build());
 		FederationHubDependencyInjectionProxy.getInstance().hubConnectionStore().addClientStreamHolder(fedName, eventStreamHolder);
 		
-		FederationPolicyGraph fpg = FederationHubDependencyInjectionProxy.getInstance().fedHubPolicyManager().getPolicyGraph();                        
+		FederationPolicyGraph fpg = FederationHubBrokerService.getInstance().getFederationPolicyGraph();                        
         String fedId = eventStreamHolder.getFederateIdentity().getFedId();
         Federate clientNode = fpg.getFederate(fedId);
 		
@@ -466,14 +477,15 @@ public class HubFigClient implements Serializable {
 	}
 
 	public void setupRolStreamSender() {
-		// open a channel to the FIG server for the purpose of sending ROL messages
-		rolCall = channel.newCall(io.grpc.MethodDescriptor.create(io.grpc.MethodDescriptor.MethodType.CLIENT_STREAMING,
-								generateFullMethodName("com.atakmap.FederatedChannel", "ServerROLStream"),
-								io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.ROL.getDefaultInstance()),
-								io.grpc.protobuf.ProtoUtils
-										.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance())),
-						asyncFederatedChannel.getCallOptions());
-
+		MethodDescriptor<ROL, Subscription> methodDescripton = MethodDescriptor.<ROL, Subscription>newBuilder()
+				.setType(MethodDescriptor.MethodType.CLIENT_STREAMING)
+				.setFullMethodName(generateFullMethodName("com.atakmap.FederatedChannel", "ServerROLStream"))
+				.setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.ROL.getDefaultInstance()))
+				.setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance()))
+				.build();
+		
+		rolCall = channel.newCall(methodDescripton, asyncFederatedChannel.getCallOptions());
+		
 		rolCall.start(new ClientCall.Listener<Subscription>() {
 
 			@Override

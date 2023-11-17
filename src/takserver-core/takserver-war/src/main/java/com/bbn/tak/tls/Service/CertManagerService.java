@@ -201,13 +201,16 @@ public class CertManagerService {
                     throw new TakException("MicrosoftCAConfig not found in CoreConfig!");
                 }
 
+                Tls tlsConfig = coreConfig.getRemoteConfiguration().getSecurity().getTls();
+
                 X509Certificate[] certs = WSTEPClient.submitCSR(tempCsr,
                         microsoftCAConfig.getTemplateName(),
                         microsoftCAConfig.getSvcUrl(),
                         microsoftCAConfig.getUsername(),
                         microsoftCAConfig.getPassword(),
                         microsoftCAConfig.getTruststore(),
-                        microsoftCAConfig.getTruststorePass());
+                        microsoftCAConfig.getTruststorePass(),
+                        tlsConfig.getContext());
 
                 if (certs == null || certs.length < 2) {
                     throw new TakException("WSTEPClient.submitCSR failed!");

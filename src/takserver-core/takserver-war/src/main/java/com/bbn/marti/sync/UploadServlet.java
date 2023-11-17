@@ -323,7 +323,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 			// if plugin classname is set, notify the plugin with the file upload event. The notification event will include the Metadata object and will not include the full byte[] payload.
 			if (toStore.getPluginClassName() != null) {
 				
-				logger.info("~~~ Notifying the plugin {} with file upload event", toStore.getPluginClassName());
+				logger.info("Notifying the plugin {} with file upload event", toStore.getPluginClassName());
 				pluginManager.onFileUpload(toStore.getPluginClassName(), toStore);
 
 			} 

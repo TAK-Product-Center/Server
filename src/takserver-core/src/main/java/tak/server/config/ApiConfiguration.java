@@ -44,6 +44,7 @@ import com.bbn.marti.GetServerTimeServlet;
 import com.bbn.marti.KmlMasterSaServlet;
 import com.bbn.marti.LatestKMLServlet;
 import com.bbn.marti.MissionKMLServlet;
+import com.bbn.marti.oauth.OAuthApi;
 import com.bbn.marti.ResubscribeServlet;
 import com.bbn.marti.TracksKMLServlet;
 import com.bbn.marti.citrap.CITrapReportAPI;
@@ -80,7 +81,7 @@ import com.bbn.marti.network.LDAPApi;
 import com.bbn.marti.network.SecurityAuthenticationApi;
 import com.bbn.marti.network.SubmissionApi;
 import com.bbn.marti.network.UIDSearchApi;
-import com.bbn.marti.oauth.admin.TokenApi;
+import com.bbn.marti.oauth.TokenApi;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationConfigInterface;
 import com.bbn.marti.remote.groups.FileUserManagementInterface;
@@ -873,6 +874,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Bean
 	public LoginAccessController loginAcccessController() {
 		return new LoginAccessController();
+	}
+
+	@Bean
+	public OAuthApi OAuthApi() {
+		return new OAuthApi();
 	}
 	
 	@Bean

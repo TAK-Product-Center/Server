@@ -60,7 +60,9 @@ public class SSLHelper {
 			"SERVER_0",
 			"SERVER_1",
 			"SERVER_2",
-			"SERVER_3"
+			"SERVER_3",
+			"FEDHUB_0",
+			"FEDHUB_1"
 	);
 
 	private static final List<String> caFiles = List.of(

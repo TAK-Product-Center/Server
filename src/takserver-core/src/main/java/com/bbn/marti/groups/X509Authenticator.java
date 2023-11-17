@@ -443,7 +443,13 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
             activeGroupCacheHelper.setActiveGroupsForUser(username, activeGroups);
 
             // notify the user that their cache has been updated
-            DistributedSubscriptionManager.getInstance().sendGroupsUpdatedMessage(username, null);
+            try {
+                DistributedSubscriptionManager.getInstance().sendGroupsUpdatedMessage(username, null);
+            } catch (Exception e) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("exception calling sendGroupsUpdatedMessage!", e);
+                }
+            }
         }
 
         // remove any inactive cache entries prior to push the groups to the user

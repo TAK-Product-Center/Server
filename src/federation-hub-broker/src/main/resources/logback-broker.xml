@@ -1,4 +1,9 @@
 <configuration scan="true" scanPeriod="30 seconds">
+ 	<springProfile name="!duplicatelogs">
+    	<turboFilter class="ch.qos.logback.classic.turbo.DuplicateMessageFilter">
+        	<AllowedRepetitions>1</AllowedRepetitions>
+    	</turboFilter>
+    </springProfile>
     <appender name="federation_hub_broker_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>/opt/tak/federation-hub/logs/federation-hub-broker.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">

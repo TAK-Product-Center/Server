@@ -91,6 +91,20 @@
 			<td>&nbsp;</td>
   		</tr>
 
+		<tr>
+			<td class="rowHeader"><label for="syncCacheRetentionSeconds">Sync Cache Retention</label></td>
+			<td class="rowValue">
+  				<input type="text" data-ng-model="dataFeed.syncCacheRetentionSeconds" name="syncCacheRetentionSeconds" data-ng-maxlength="15" data-ng-minlength="1" data-ng-pattern="/^[0-9]+$/"/>
+  				<br/><span class="inlineHelp">Provide sync cache retention time in seconds.</span>
+  			</td>
+  			<td class="error">
+  				<span data-ng-show="dataFeedForm.$submitted || dataFeedForm.syncCacheRetentionSeconds.$touched">
+  					<span data-ng-show="dataFeedForm.syncCacheRetentionSeconds.$error.pattern">Must be a number in seconds</span>
+  				</span>
+  			</td>
+			<td>&nbsp;</td>
+  		</tr>
+
 		<tr data-ng-hide="hideSync">
 			<td class="rowHeader"><label for="sync">Sync</label></td>
 			<td class="rowValue">
@@ -98,6 +112,14 @@
 				</select>
 			</td>
 		</tr>
+		
+		<tr data-ng-hide="hideFederated">
+            <td class="rowHeader"><label for="federated">Federated</label></td>
+            <td class="rowValue">
+                <select name="federated" data-ng-model="dataFeed.federated" required data-ng-options="boolToStr(item) for item in [true, false]">
+                </select>
+            </td>
+        </tr>
 
 		<tr>
 			<td style="padding:10px;" align="right">

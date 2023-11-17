@@ -1,3 +1,7 @@
+//import se.bjurr.violations.gradle.plugin.ViolationsTask
+//import com.github.jk1.license.render.InventoryHtmlReportRenderer
+//import com.github.jk1.license.render.XmlReportRenderer
+
 buildscript {
 
   repositories {
@@ -9,12 +13,13 @@ buildscript {
 
   dependencies {
     classpath 'org.ajoberstar:grgit:1.7.2'
+//    classpath 'gradle.plugin.se.bjurr.violations:violations-gradle-plugin:1.52.2'
+//    classpath 'com.github.jk1:gradle-license-report:1.17'
   }
 }
 
 apply plugin: 'eclipse'
 apply plugin: 'idea'
-
 apply from: 'gradle/license.gradle', to: project
 
 ext {
@@ -35,7 +40,7 @@ ext {
   takreleaserpm = takrel1 + takrel2
 
   def (tvmaj, tvmin) = tv.tokenize('.')
-  
+
   verMajor = tvmaj
   verMinor = tvmin
   verPatch = takrel2
@@ -49,6 +54,8 @@ allprojects {
   apply plugin: 'java'
   apply plugin: 'eclipse'
   apply plugin: 'idea'
+//  apply plugin: 'pmd'
+
 
   sourceCompatibility = 1.8
   targetCompatibility = 1.8
@@ -94,13 +101,54 @@ subprojects {
     dependencies {
       classpath 'com.github.jengelman.gradle.plugins:shadow:' + gradle_shadow_version
 	  classpath 'gradle.plugin.org.openrepose:gradle-jaxb-plugin:2.5.0'
+//      classpath 'gradle.plugin.se.bjurr.violations:violations-gradle-plugin:1.52.2'
+//      classpath 'com.github.jk1:gradle-license-report:1.17'
     }
   }
 
-  clean {
-    delete 'bin/'
-  }
+//  apply plugin: 'se.bjurr.violations.violations-gradle-plugin' // Normalizes quality reports for Gitlab CI
+//  apply plugin: 'pmd'
+//  // Define a new task to merge quality reports and convert them into a format GitLab can consume
+//  tasks.create('violations', ViolationsTask) {
+//    maxReporterColumnWidth = 0 // 0 means "no limit"
+//    maxRuleColumnWidth = 60
+//    maxSeverityColumnWidth = 0
+//    maxLineColumnWidth = 0
+//    maxMessageColumnWidth = 50
+//    codeClimateFile = new File(project.buildDir.path + '/code-climate-file.json')
+//    // Will create a CodeClimate JSON report.
+//    violations = [
+//            ["PMD", buildDir.path, ".*/pmd/.*\\.xml\$", "pmd"]
+//    ]
+//  }
+//  pmd {
+//    ignoreFailures = true
+//    toolVersion = '6.47.0'
+//    ruleSetFiles = files("${rootDir}/.quality/config/pmd-ruleset.xml")
+//    // Note: The ruleSets array is explicitly set to empty to avoid using the default configuration.
+//    ruleSets = []
+//  }
+//
+//  apply plugin: 'com.github.jk1.dependency-license-report'
+//  licenseReport {
+//    // Don't include artifacts of project's own group in the report
+//    excludeOwnGroup = true
+//
+//    // Don't exclude bom dependencies.
+//    // If set to true, then all boms will be excluded from the report
+//    excludeBoms = false
+//
+//    // Set custom report renderer, implementing ReportRenderer.
+//    // Yes, you can write your own to support any format necessary.
+//    renderers = [new XmlReportRenderer()]
+//    renderers = [new InventoryHtmlReportRenderer()]
+//
+//    // This is for the allowed-licenses-file in checkLicense Task
+//    // Accepts File, URL or String path to local or remote file
+//    allowedLicensesFile = new File("${rootDir}/.licenses/config/allowed-licenses.json")
+//  }
+//
+//  clean {
+//    delete 'bin/'
+//  }
 }
-
-
-

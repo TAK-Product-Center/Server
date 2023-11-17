@@ -43,11 +43,14 @@ public class FederationHubServer implements CommandLineRunner {
     private static String configFile;
 
     public static void main(String[] args) {
+    	
         if (args.length > 1) {
             System.err.println("Usage: java -jar federation-hub-broker.jar [CONFIG_FILE_PATH]");
             return;
         } else if (args.length == 1) {
             configFile = args[0];
+        } else if (!Strings.isNullOrEmpty(System.getProperty("FEDERATION_HUB_BROKER_CONFIG"))) {
+        	configFile = System.getProperties().getProperty("FEDERATION_HUB_BROKER_CONFIG");
         } else {
             configFile = DEFAULT_CONFIG_FILE;
         }
@@ -118,8 +121,8 @@ public class FederationHubServer implements CommandLineRunner {
     
     @Bean
     @Order(Ordered.LOWEST_PRECEDENCE)
-    public FederationHubBrokerService FederationHubBrokerService(SSLConfig getSslConfig, FederationHubServerConfig fedHubConfig, FederationHubPolicyManager fedHubPolicyManager, HubConnectionStore hubConnectionStore) {
-    	return new FederationHubBrokerService(getSslConfig, fedHubConfig, fedHubPolicyManager, hubConnectionStore);
+    public FederationHubBrokerService FederationHubBrokerService(Ignite ignite, SSLConfig getSslConfig, FederationHubServerConfig fedHubConfig, FederationHubPolicyManager fedHubPolicyManager, HubConnectionStore hubConnectionStore) {
+    	return new FederationHubBrokerService(ignite, getSslConfig, fedHubConfig, fedHubPolicyManager, hubConnectionStore);
     }
     
     private FederationHubServerConfig loadConfig(String configFile)

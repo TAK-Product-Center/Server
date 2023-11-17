@@ -91,6 +91,7 @@ import com.bbn.marti.service.kml.KMLServiceImpl;
 import com.bbn.marti.service.kml.KmlIconStrategyJaxb;
 import com.bbn.marti.sync.cache.AllCopMissionsCacheKeyGenerator;
 import com.bbn.marti.sync.cache.AllMissionsCacheKeyGenerator;
+import com.bbn.marti.sync.cache.InviteOnlyMissionCacheKeyGenerator;
 import com.bbn.marti.sync.cache.MethodNameMultiStringArgCacheKeyGenerator;
 import com.bbn.marti.sync.model.MissionChange;
 import com.bbn.marti.sync.model.MissionFeed;
@@ -514,6 +515,11 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
     public KeyGenerator allCopsMissionsCacheKeyGenerator() {
         return new AllCopMissionsCacheKeyGenerator();
     }
+
+	@Bean
+	public KeyGenerator inviteOnlyMissionsCacheKeyGenerator() {
+		return new InviteOnlyMissionCacheKeyGenerator();
+	}
 
 	@Bean
     public KeyGenerator methodNameMultiStringArgCacheKeyGenerator() {

@@ -146,12 +146,24 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 		return mission;
 		
 	}
-	
+
+	@Override
+	public Mission createMission(String name, String creatorUid, String[] groupNames,
+		 String description, String chatRoom, String baseLayer, String bbox,
+		 List<String> boundingPolygonParam, String path, String classification, String tool,
+		 String password, String roleParam, Long expiration, byte[] missionPackage) throws Exception {
+
+		return createMission(name, creatorUid, groupNames,
+				description, chatRoom, baseLayer, bbox,
+				boundingPolygonParam, path, classification, tool,
+				password, roleParam, expiration, false, missionPackage);
+	}
+
 	@Override
 	public Mission createMission(String name, String creatorUid, String[] groupNames,
 			String description, String chatRoom, String baseLayer, String bbox,
 			List<String> boundingPolygonParam, String path, String classification, String tool,
-			String password, String roleParam, Long expiration, byte[] missionPackage) throws Exception {
+			String password, String roleParam, Long expiration, Boolean inviteOnly, byte[] missionPackage) throws Exception {
 
 		if (Strings.isNullOrEmpty(name)) {
 			throw new IllegalArgumentException("Mission name cannot be empty or null");
@@ -287,10 +299,10 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 			if (expiration != null) {
 				mission = missionService.createMission(name, creatorUid, groupVectorMission, description, chatRoom,
 						baseLayer, bbox, path, classification, tool, passwordHash, defaultRole, expiration,
-						boundingPolygon);
+						boundingPolygon, inviteOnly);
 			} else {
 				mission = missionService.createMission(name, creatorUid, groupVectorMission, description, chatRoom,
-						baseLayer, bbox, path, classification, tool, passwordHash, defaultRole, -1L, boundingPolygon);
+						baseLayer, bbox, path, classification, tool, passwordHash, defaultRole, -1L, boundingPolygon, inviteOnly);
 			}
 
 			MissionRole ownerRole = missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_OWNER);

@@ -8,7 +8,9 @@ TAKCL_SERVER_LOG_LEVEL_OVERRIDES="com.bbn=TRACE tak=TRACE"
 REDEPLOY_TAKCL=false
 
 # Rebuild and redeploy the UserManager, SchemaManager, PluginManager, and RetentionService
-REDEPLOY_AUXILLARY=false
+REDEPLOY_AUXILLARY=true
+
+REDEPLOY_FEDHUB=true
 
 ping() {
 	set -e
@@ -33,7 +35,7 @@ postgresql_running() {
 }
 
 if [[ ! -d "takserver-takcl-core" ]];then
-	echo Please start the script from the src directory like './takserver-takcl-core/testrunner.sh'!
+	echo Please start the script from the src directory like './takserver-takcl-core/scripts/testrunner.sh'!
 	exit 1
 fi
 
@@ -45,7 +47,7 @@ POSTGRES_USER=martiuser
 POSTGRES_DB=cot
 POSTGRES_PORT=5432
 
-if [[ ! -f "${ARTIFACT_SRC}/takserver.war" ]] || [[ ! -f "${ARTIFACT_SRC}/takserver-pm.jar" ]] || [[ ! -f "${ARTIFACT_SRC}/takserver-retention.jar" ]];then
+if [[ ! -f "${ARTIFACT_SRC}/takserver.war" ]];then
 	echo Please build the project with './gradlew clean buildDocker buildRpm' to populate the tak root source! Future executions will automatically update takserver.war but require setting variables at the top of this script to true for everything else!
 	exit 1
 fi
@@ -86,6 +88,12 @@ if [[ "${1}" == "run" ]];then
 		echo OPEN SCRIPT AND set REDEPLOY_AUXILLARY=true TO BUILD PLUGIN MANAGER, RETENTION SERVICE, AND SCHEMA MANAGER!
 	fi
 
+	if [[ "${REDEPLOY_FEDHUB}" == "true" ]];then
+		GRADLE_ARGS="${GRADLE_ARGS} takserver-takcl-core:devDeployFedHub"
+	else
+		echo OPEN SCRIPT AND set REDEPLOY_FEDHUB=true TO BUILD FEDHUB!
+	fi
+
 	if [[ "${REDEPLOY_TAKCL}" == "true" ]];then
 		GRADLE_ARGS="${GRADLE_ARGS} takserver-takcl-core:devDeployTakcl"
 	fi
@@ -122,6 +130,8 @@ else
 		fi
 
 		# Create a new one, get the IP, and set it as a test parameter
+		# The postgis/postgis docker repo on dockerhub is a community version unlike the ones used in our containers.
+		# Update to point to a new version if using a new version for all the Docker containers.
 		echo Setting up CoT Databases...
 		if [[ "`docker ps | grep ${SERVER0_DOCKER_DB_IDENTIFIER}`" == "" ]];then
 			docker run -it -d --rm --name ${SERVER0_DOCKER_DB_IDENTIFIER} \
@@ -129,7 +139,7 @@ else
 				--env POSTGRES_HOST_AUTH_METHOD=trust \
 				--env POSTGRES_USER=${POSTGRES_USER} \
 				--env POSTGRES_DB=${POSTGRES_DB} \
-				-p ${POSTGRES_PORT}:${POSTGRES_PORT} postgis/postgis:10-3.1
+				-p ${POSTGRES_PORT}:${POSTGRES_PORT} postgis/postgis:15-3.3
 		fi
 
 		# Get instance details and set them as necessary

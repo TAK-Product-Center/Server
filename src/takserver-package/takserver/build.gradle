@@ -19,6 +19,8 @@ def postinstall_script_takserver = '''\
 
 export tak_full_version=''' + takversion + '''-''' + takrelease + '''
 
+chown tak:tak /opt/tak
+
 chmod 644 /opt/tak/logging-restrictsize.xml
 chmod 544 /opt/tak/*.bat
 chmod 544 /opt/tak/*.sh
@@ -83,7 +85,9 @@ fi
 
 if [ ! -d "/opt/tak/mission-archive" ]; then
     mkdir -p /opt/tak/mission-archive
-    cp /opt/tak/retention/mission-store.yml /opt/tak/mission-archive/
+    if [ -f "/opt/tak/retention/mission-store.yml" ]; then
+        cp /opt/tak/retention/mission-store.yml /opt/tak/mission-archive/
+    fi
 fi
 
 chown -fR tak:tak /opt/tak/conf
@@ -105,7 +109,9 @@ chmod 755 /opt/tak/utils
 mkdir -p /opt/tak/logs
 chown tak:tak /opt/tak/logs
 chmod 755 /opt/tak/logs
-chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
+if [ -f "/opt/tak/CoreConfig.xml" ]; then
+    chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
+fi
 mkdir -p /opt/tak/iconsets
 chown -fR tak:tak /opt/tak/iconsets
 mkdir -p /opt/tak/webcontent/webtak-plugins/plugins
@@ -123,7 +129,14 @@ cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
 rm -rf /opt/tak/certs-tmp
 
 # rename old tomcat if it exists
-mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED &>/dev/null
+if [ -f "/opt/tak/apache-tomcat" ]; then
+    mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED >/dev/null 2>&1
+fi
+
+# extract takserver.war on Debian based installs
+if [ -f /etc/debian_version ]; then
+    sh /opt/tak/setup-for-extracted-war.sh
+fi
 
 cat <<- "EOF"
 
@@ -167,10 +180,9 @@ if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
     mv /opt/tak/db-utils/clear-old-data.sql.bak /opt/tak/db-utils/clear-old-data.sql
 fi
 
-
 echo "Configure or upgrade your TAK Server database:" 
-echo "To configure for the first time: sudo /opt/tak/db-utils/takserver-setup-db.sh" 
-echo "To upgrade an existing db: sudo java -jar /opt/tak/db-utils/SchemaManager.jar upgrade"
+echo "Run the following: sudo /opt/tak/db-utils/takserver-setup-db.sh" 
+
 '''
 
 ospackage {
@@ -178,7 +190,6 @@ ospackage {
     version = takversion
     release = takreleaserpm
     os = LINUX
-    arch = _arch
     user = _user
     permissionGroup = _permission_group
     packageGroup = _package_group
@@ -231,14 +242,19 @@ buildDeb.dependsOn prePackage
 
 buildRpm {
     requires('java-11-openjdk-devel')
-    requires('postgis30_10')
-    requires('postgis30_10-utils')
-    requires('postgresql10-server')
-    requires('postgresql10-contrib')
+    requires('postgis33_15')
+    requires('postgis33_15-utils')
+    requires('postgresql15-server')
+    requires('postgresql15-contrib')
     requires('openssl')
 }
 
 // can add deb package dependencies here
-buildDeb { }
+buildDeb {
+  requires('openjdk-11-jdk')
+  requires('postgresql-15')
+  requires('postgresql-15-postgis-3')
+  requires('openssl')
+}
 
 

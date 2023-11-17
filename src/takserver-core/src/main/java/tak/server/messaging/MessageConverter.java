@@ -72,8 +72,6 @@ public class MessageConverter {
 	@Autowired
 	private ServerInfo serverInfo;
 
-	private StreamingProtoBufHelper cotProtoConverter = new StreamingProtoBufHelper();
-
 	private static final Logger logger = LoggerFactory.getLogger(MessageConverter.class);
 	
 	// Convert CotEventContainer to proto encoding
@@ -81,8 +79,12 @@ public class MessageConverter {
 		return cotToDataMessage(message, false);
 	}
 
-	// Convert CotEventContainer to proto encoding
 	public byte[] cotToDataMessage(CotEventContainer message, boolean padEmptyGroups) {
+		return cotToDataMessage(message, padEmptyGroups, serverInfo.getServerId());
+	}
+
+	// Convert CotEventContainer to proto encoding
+	public static byte[] cotToDataMessage(CotEventContainer message, boolean padEmptyGroups, String serverId) {
 
 		Message.Builder mb = Message.newBuilder();
 
@@ -112,9 +114,9 @@ public class MessageConverter {
 
 		groups.forEach((group) -> mb.addGroups(group.getName()));
 
-		mb.setSource(serverInfo.getServerId());
+		mb.setSource(serverId);
 
-		mb.setPayload(cotProtoConverter.cot2protoBuf(message));
+		mb.setPayload(StreamingProtoBufHelper.cot2protoBuf(message));
 
 		String clientId = (String)message.getContext().get(Constants.CLIENT_UID_KEY);
 		if (clientId != null) {
@@ -174,7 +176,7 @@ public class MessageConverter {
 	
 	// Convert MissionAnnouncement announcement message to CoT
 	public CotEventContainer getCotFromMissionAnnouncement(MissionAnnouncement missionannouncement) {
-		return cotProtoConverter.proto2cot(missionannouncement.getPayload());
+		return StreamingProtoBufHelper.proto2cot(missionannouncement.getPayload());
 	}
 	
 	// Convert ClusterMissionAnnouncementDetail to proto encoding
@@ -204,7 +206,7 @@ public class MessageConverter {
 		}
 
 		mb.setMissionAnnouncementType(detail.missionAnnouncementType);
-		mb.setPayload(cotProtoConverter.cot2protoBuf(detail.cot));
+		mb.setPayload(StreamingProtoBufHelper.cot2protoBuf(detail.cot));
 
 		return mb.build().toByteArray();		
 	}
@@ -237,7 +239,7 @@ public class MessageConverter {
 
 		TakMessage takMessage = m.getPayload();
 
-		CotEventContainer cot = cotProtoConverter.proto2cot(takMessage);
+		CotEventContainer cot = StreamingProtoBufHelper.proto2cot(takMessage);
 
 		NavigableSet<Group> takGroups = new ConcurrentSkipListSet<>();
 

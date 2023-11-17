@@ -10,21 +10,26 @@ apply from: "utils/utils.gradle"
 ext {
     // rpm preinstall script
     _preinstall_script = '''\
+set +e
 # stop TAK Server if it is running (including older versions)
-pkill -9 -f takserver.jar &>/dev/null
-pkill -9 -f takserver.war &>/dev/null
-pkill -9 -f takserver-web.war &>/dev/null
-pkill -9 -f TAKServer.jar &>/dev/null
-pkill -9 -f takserver-pm.jar &>/dev/null
-pkill -9 -f takserver-retention.jar &>/dev/null 
-pkill -9 -f apache-tomcat &>/dev/null
-systemctl stop takserver &>/dev/null
+pkill -9 -f takserver.jar >/dev/null 2>&1
+pkill -9 -f takserver.war >/dev/null 2>&1
+pkill -9 -f takserver-web.war >/dev/null 2>&1
+pkill -9 -f TAKServer.jar >/dev/null 2>&1
+pkill -9 -f takserver-pm.jar >/dev/null 2>&1
+pkill -9 -f takserver-retention.jar >/dev/null 2>&1
+pkill -9 -f apache-tomcat >/dev/null 2>&1
+systemctl stop takserver >/dev/null 2>&1
+set -e
 
 mkdir -p /opt/tak
-id -u tak &> /dev/null
-if [ $? -ne 0 ] ; then
-# User id 1491 is arbitrary
-useradd tak -r -u 1491 --no-create-home -d /opt/tak
+
+set +e
+uid=`id -u tak 2>/dev/null`
+set -e
+if [ -z "$uid" ] ; then
+    # User id 1491 is arbitrary
+    useradd tak -r -u 1491 --no-create-home -d /opt/tak
 fi
 
 if [ -f /opt/tak/db-utils/clear-old-data.sql ] ; then
@@ -38,17 +43,17 @@ cp /opt/tak/certs/config.cfg /opt/tak/certs-tmp/. 2>/dev/null || :
     // rpm post uninstall script
     _postuninstall_script = '''\
 case "$1" in
- 0)
+ 0|remove)
         # uninstall
+        echo "Deleting tak user"
         userdel tak
         ;;
- 1)
+ 1|upgrade)
         # this is an upgrade, do nothing
         :
         ;;
 esac
 '''
-    _arch = 'noarch'
     _user = 'tak'
     _permission_group = 'tak'
     _package_group = 'Applications/Internet'
@@ -69,6 +74,8 @@ TAK devices on non-multicast networks.
 def postinstall_script = '''\
 
 export tak_full_version=''' + takversion + '''-''' + takrelease + '''
+
+chown tak:tak /opt/tak
 
 chmod 644 /opt/tak/logging-restrictsize.xml
 chmod 544 /opt/tak/*.bat
@@ -92,7 +99,9 @@ chmod 755 /opt/tak/utils
 mkdir -p /opt/tak/logs
 chown tak:tak /opt/tak/logs
 chmod 755 /opt/tak/logs
-chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
+if [ -f "/opt/tak/CoreConfig.xml" ]; then
+    chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
+fi
 mkdir -p /opt/tak/iconsets
 chown -fR tak:tak /opt/tak/iconsets
 mkdir -p /opt/tak/webcontent/webtak-plugins/plugins
@@ -110,7 +119,9 @@ cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
 rm -rf /opt/tak/certs-tmp
 
 # rename old tomcat if it exists
-mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED &>/dev/null
+if [ -f "/opt/tak/apache-tomcat" ]; then
+    mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED >/dev/null 2>&1
+fi
 
 # setup a default DB password
 sh /opt/tak/db-utils/setupDefaultPassword.sh
@@ -120,16 +131,20 @@ if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
     mv /opt/tak/db-utils/clear-old-data.sql.bak /opt/tak/db-utils/clear-old-data.sql
 fi
 
+# extract takserver.war on Debian based installs
+if [ -f /etc/debian_version ]; then
+    sh /opt/tak/setup-for-extracted-war.sh
+fi
+
 echo "Configure or upgrade your TAK Server database:" 
-echo "To configure for the first time: sudo /opt/tak/db-utils/takserver-setup-db.sh" 
-echo "To upgrade an existing db: sudo java -jar /opt/tak/db-utils/SchemaManager.jar upgrade"
+echo "Run the following: sudo /opt/tak/db-utils/takserver-setup-db.sh" 
 echo "Create login credentials for local adminstrative access to the configuration interface:"
 echo "sudo java -jar /opt/tak/utils/UserManager.jar usermod -A -p <password> <username>"
 echo "For secure operation, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates."
 echo "Using Firefox or Chrome on this computer, browse to this address to verify keystore and truststore configuration:"
 echo "http://localhost:8080" 
 echo "Login with the administrative credentials specified above."
-echo "Follow the instructions in the Installation section of the configuration guide to complete the setup process." 
+echo "Follow the rest of the instructions in the Installation section of the configuration guide to complete the setup process." 
 '''
 
 ospackage {
@@ -137,7 +152,6 @@ ospackage {
  version = takversion
  release = takreleaserpm
  os = LINUX
- arch = _arch
  user = _user
  permissionGroup = _permission_group
  packageGroup = _package_group
@@ -181,14 +195,18 @@ buildDeb.dependsOn prePackage
 
 buildRpm {
   requires('java-11-openjdk-devel')
-  requires('postgis30_10')
-  requires('postgis30_10-utils')
-  requires('postgresql10-server')
-  requires('postgresql10-contrib')
+  requires('postgis33_15')
+  requires('postgis33_15-utils')
+  requires('postgresql15-server')
+  requires('postgresql15-contrib')
 }
 
 // NB can configure deb package generation here
-buildDeb { }
+buildDeb {
+  requires('openjdk-11-jdk')
+  requires('postgresql-15')
+  requires('postgresql-15-postgis-3')
+}
 
 task bundleRpm(type: Zip) {
     archiveName 'takserver-bundle-' + takversion + '-' + takrelease + branch + '.zip'
@@ -211,7 +229,7 @@ task bundleRpmCoreDb(type: Zip) {
 }
 
 task bundlePublishArtifacts(type: Copy) {
-   dependsOn('database:buildRpm', 'federation-hub:buildRpm', 'takserver:buildRpm', 'launcher:buildRpm', 'buildDocker', 'buildHardenedDocker', 'createCIVersionArtifacts', ':takserver-cluster:buildCluster')
+   dependsOn('database:buildRpm', 'federation-hub:buildRpm', 'takserver:buildRpm', 'launcher:buildRpm', 'database:buildDeb', 'federation-hub:buildDeb', 'takserver:buildDeb', 'launcher:buildDeb', 'buildDocker', 'buildHardenedDocker', 'createCIVersionArtifacts', ':takserver-cluster:buildCluster')
 
     def rpmv = "${takversion}-${takreleaserpm}"
     def zipv = "${takversion}-${takrelease}"
@@ -219,38 +237,42 @@ task bundlePublishArtifacts(type: Copy) {
             "takserver/build/takArtifacts/docs/TAK_Server_Configuration_Guide.pdf",
             "takserver/build/distributions/takserver-${rpmv}.noarch.rpm",
             "takserver/build/distributions/takserver-docker-${zipv}.zip",
+            "takserver/build/distributions/takserver-docker-full-${zipv}.zip",
             "takserver/build/distributions/takserver-docker-hardened-${zipv}.zip",
+            "takserver/build/distributions/takserver-docker-hardened-full-${zipv}.zip",
             "launcher/build/distributions/takserver-core-${rpmv}.noarch.rpm",
             "database/build/distributions/takserver-database-${rpmv}.noarch.rpm",
+            "database/build/distributions/setup-rpm-db.sh",
             "${rootDir}/takserver-cluster/build/distributions/takserver-cluster-${zipv}.zip",
-            "federation-hub/build/distributions/takserver-fed-hub-${rpmv}.noarch.rpm"
+            "federation-hub/build/distributions/takserver-fed-hub-${rpmv}.noarch.rpm",
 //            "API/build/distributions/takserver-api-${tail}",
 //            "build/distributions/takserver-combined-${tail}",
 //            "messaging/build/distributions/takserver-messaging-${tail}",
+            "takserver/build/distributions/takserver_${rpmv}_all.deb",
+            "launcher/build/distributions/takserver-core_${rpmv}_all.deb",
+            "database/build/distributions/takserver-database_${rpmv}_all.deb",
+            "federation-hub/build/distributions/takserver-fed-hub_${rpmv}_all.deb"
     )
     into "${rootDir}/UNSIGNED/${version}/"
 }
 
+task buildFedhubDocker(type: GradleBuild) {
+  group = 'TAKServer'
+  description = 'Builds takserver-fedhub-' + takversion + '-' + takreleaserpm + '.zip'
+  buildName = 'buildFedhubDocker'
+  tasks = [
+    'federation-hub:buildRpm',
+    'constructFedhubDockerZip'
+  ]
+}
 
-task buildDocker(type: GradleBuild) { 
+task buildDocker(type: GradleBuild) {
   group = 'TAKServer'
   description = 'Builds takserver-docker-' + takversion + '-' + takreleaserpm + '.zip'
   buildName = 'buildDocker'
   tasks = [
     'prePackage',
-    'copyTakserverDockerFiles',
-    'copySchemaManagerFiles',
-    'copyPluginsScripts',
-    'copyPluginsJar',
-    'copyRetentionConfigs',
-    'copyRetentionMissionStoreDir',
-    'copyRetentionScripts',
-    'copyRetentionJar',
-    'createVersionFile',
-    'createLogDir',
-    'createPluginsLibDir',
-	'createWebtakPluginsDir',
-    'zipTakserverDocker'
+    'constructDockerZip'
   ]
 }
 
@@ -260,21 +282,7 @@ task buildHardenedDocker(type: GradleBuild) {
   buildName = 'buildHardenedDocker'
   tasks = [
     'prePackage',
-    'copyHardenedTakserverDockerFiles',
-    'copyHardenedSchemaManagerFiles',
-    'copyPluginsScripts',
-    'copyPluginsJar',
-    'copyRetentionConfigs',
-    'copyRetentionMissionStoreDir',
-    'copyRetentionScripts',
-    'copyRetentionJar',
-    'copyHealthCheckScripts',
-    'copyDockerSecurityFiles',
-    'createVersionFile',
-    'createLogDir',
-    'createPluginsLibDir',
-    'createWebtakPluginsDir',
-    'zipHardenedTakserverDocker'
+    'constructHardenedDockerZip',
   ]
 }
 
@@ -284,17 +292,28 @@ task buildFullDocker(type: GradleBuild) {
   buildName = 'buildFullDocker'
   tasks = [
     'prePackage',
-    'copyFullTakserverDockerFiles',
-    'copySchemaManagerFullFiles',
-    'copyPluginsScripts',
-    'copyPluginsJar',
-    'copyRetentionConfigs',
-    'copyRetentionMissionStoreDir',
-    'copyRetentionScripts',
-    'copyRetentionJar',
-    'createVersionFile',
-    'createLogDir',
-    'createPluginsLibDir',
-    'zipFullTakserverDocker'
+    'constructFullDockerZip'
   ]
+}
+
+
+task buildHardenedFullDocker(type: GradleBuild) {
+    group = 'TAKServer'
+    description = 'Builds takserver-docker-hardened-full-' + takversion + '-' + takreleaserpm + '.zip'
+    buildName = 'buildHardenedFullDocker'
+    tasks = [
+            'prePackage',
+            'copyHardenedFullTakserverDockerFiles',
+            'copyHardenedSchemaManagerFiles',
+            'copyPluginsScripts',
+            'copyPluginsJar',
+            'copyRetentionConfigs',
+            'copyRetentionMissionStoreDir',
+            'copyRetentionScripts',
+            'copyRetentionJar',
+            'createVersionFile',
+            'createLogDir',
+            'createPluginsLibDir',
+            'zipHardenedFullTakserverDocker'
+    ]
 }

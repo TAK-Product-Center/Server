@@ -60,6 +60,7 @@ public class TestRunnerModule implements AppModuleInterface {
 			GeneralTests.class,
 			InputTests.class,
 			StartupTests.class,
+			PluginStartupTests.class,
 			StreamingDataFeedsTests.class,
 			PointToPointTests.class,
 			SubscriptionTests.class,
@@ -71,7 +72,8 @@ public class TestRunnerModule implements AppModuleInterface {
 			MissionFileSync.class,
 			MissionUserCustomRolesTests.class,
 			MissionUserDefaultRolesTests.class,
-			UserManagementTests.class
+			UserManagementTests.class,
+			FedHubTests.class
 //			SimpleTests.class
 	};
 

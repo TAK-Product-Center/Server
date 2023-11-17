@@ -1,3 +1,4 @@
+
 package com.bbn.marti.sync.model;
 
 import java.io.Serializable;
@@ -115,6 +116,7 @@ public class Mission implements Serializable, Comparable<Mission> {
     protected MissionRole defaultRole;
     protected MissionRole ownerRole;
     protected String token;
+    protected Boolean inviteOnly;
 
     protected Set<MissionChange> missionChanges;
     protected List<LogEntry> logs;
@@ -172,6 +174,7 @@ public class Mission implements Serializable, Comparable<Mission> {
         defaultRole = other.defaultRole;
         ownerRole = other.ownerRole;
         token = other.token;
+        inviteOnly = other.inviteOnly;
         missionChanges = other.missionChanges;
         logs = other.logs;
         expiration = other.expiration;
@@ -434,6 +437,16 @@ public class Mission implements Serializable, Comparable<Mission> {
     public String getToken() { return token; }
 
     public void setToken(String token) { this.token = token; }
+
+    @Column(name = "invite_only", unique = false, nullable = true)
+    public Boolean isInviteOnly() {
+        return inviteOnly;
+    }
+
+    public void setInviteOnly(Boolean inviteOnly) {
+        this.inviteOnly = inviteOnly;
+    }
+
     @Transient
     public MissionRole getOwnerRole() { return ownerRole; }
 

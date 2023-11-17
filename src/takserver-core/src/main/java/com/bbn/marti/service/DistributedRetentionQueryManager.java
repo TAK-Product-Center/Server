@@ -3,6 +3,7 @@ package com.bbn.marti.service;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -22,6 +23,7 @@ import com.bbn.marti.remote.service.RetentionQueryService;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.Metadata;
+import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionRole;
 import com.bbn.marti.sync.model.MissionRole.Role;
 import com.bbn.marti.sync.service.MissionService;
@@ -56,8 +58,9 @@ public class DistributedRetentionQueryManager implements RetentionQueryService, 
 			}
 
 			if (expiration == null || expiration.longValue() < 0) {
-				logger.error(" bad argument, delete MissionByExpiration is ignored expiration:  " + expiration);
-				throw new IllegalArgumentException("invalid expiration: " + expiration);
+				if (logger.isWarnEnabled()) {
+					logger.warn(" bad argument, delete MissionByExpiration is ignored expiration:  " + expiration);
+				}
 			}
 
 			if (logger.isInfoEnabled()) {
@@ -87,8 +90,10 @@ public class DistributedRetentionQueryManager implements RetentionQueryService, 
 			}
 
 			if (ttl.intValue() < 0) {
-				logger.error(" bad argument, delete MissionByTtl is ignored ttl:  " + ttl);
-				throw new IllegalArgumentException("invalid expiration: " + ttl);
+				if (logger.isWarnEnabled()) {
+					logger.warn(" bad argument, delete MissionByTtl is ignored ttl:  " + ttl);
+				}
+				return;
 			}
 
 			if (logger.isInfoEnabled()) {
@@ -180,7 +185,7 @@ public class DistributedRetentionQueryManager implements RetentionQueryService, 
 
 		missionService().createMission(properties.get("mission_name"), properties.get("creatorUid"), groupVector,
 				properties.get("description"), properties.get("chatroom"), properties.get("baseLayer"),
-				properties.get("bbox"), properties.get("path"), properties.get("classification"), properties.get("tool"), properties.get("password_hash"), missionRole, expiration, properties.get("bounding_polygon"));
+				properties.get("bbox"), properties.get("path"), properties.get("classification"), properties.get("tool"), properties.get("password_hash"), missionRole, expiration, properties.get("bounding_polygon"), Boolean.valueOf(properties.get("invite_only")));
 
 		return true;
 	}
@@ -264,4 +269,20 @@ public class DistributedRetentionQueryManager implements RetentionQueryService, 
 
 		missionService().addMissionContent(missionName, mc, missionContent.attributeValue("creatorUid"), groupVector);
 	}
+
+	@Override
+	public List<Mission> getAllMissions(boolean passwordProtected, boolean defaultRole, String tool)
+			throws Exception {
+
+		if (logger.isDebugEnabled()) {
+			logger.debug(" getAllMissions service called");
+		}
+
+		NavigableSet<Group> allGroups = (NavigableSet<Group>) groupManager.getAllGroups();
+
+		MissionService missionService = missionService();
+		List<Mission> missions = missionService.getAllMissions(passwordProtected, defaultRole, tool, allGroups);
+		return missions;
+	}
+
 }

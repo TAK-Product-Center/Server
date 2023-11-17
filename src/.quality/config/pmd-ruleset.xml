@@ -1,0 +1,110 @@
+<?xml version="1.0"?>
+
+<ruleset name="Custom Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>
+        My custom rules
+    </description>
+    <rule ref="category/java/bestpractices.xml">
+        <exclude name="UnusedPrivateMethod"/>
+    </rule>
+    <rule ref="category/java/design.xml">
+        <exclude name="LoosePackageCoupling"/>
+        <exclude name="ExcessiveImports"/>
+        <exclude name="TooManyFields"/>
+        <exclude name="TooManyMethods"/>
+        <exclude name="LawOfDemeter"/>
+        <exclude name="NcssCount"/>
+        <exclude name="CyclomaticComplexity"/>
+        <exclude name="NPathComplexity"/>
+    </rule>
+    <rule ref="category/java/errorprone.xml">
+        <exclude name="SimpleDateFormatNeedsLocale"/>
+        <exclude name="MissingSerialVersionUID"/>
+        <exclude name="BeanMembersShouldSerialize"/>
+        <exclude name="UseLocaleWithCaseConversions"/>
+        <exclude name="UseLocaleWithCaseConversions"/>
+
+    </rule>
+    <rule ref="category/java/performance.xml"/>
+    <rule ref="category/java/security.xml"/>
+
+    <!-- The next three rules replace the functionality of the naming/VariableNamingConventions rule.  We want to
+        allow "logger" as a special case of static final.  The other two rules are re-implementations of
+        functionality from the builtin rule in XPath since we disabled it, but we want them to be run. -->
+
+    <rule name="StaticFieldsUpperCaseExceptLogger"
+          language="java"
+          message="Variables that are final and static should be in all caps."
+          class="net.sourceforge.pmd.lang.rule.XPathRule">
+        <description>
+            Static final fields should have names in all upper case
+        </description>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+        //FieldDeclaration[@Static='true' and @Final='true']/VariableDeclarator/VariableDeclaratorId[upper-case(@Name) != @Name and @Name != 'logger']
+                    ]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+                private static final String lower = "foo"; // don't do this!
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="VariableNamesStartWithLowerCaseLetter"
+          language="java"
+          message="Variables should start with a lowercase character"
+          class="net.sourceforge.pmd.lang.rule.XPathRule">
+        <description>
+            Normal variables should start with lower case letters
+        </description>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+        //VariableDeclaratorId[lower-case(substring(@Name,1,1))!=substring(@Name,1,1)]/../..[@Static='false' and @Final='false']
+                    ]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+                public void foo() {
+                    int XYZ; // Don't do this
+                }
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="VariableNamesShouldNotContainUnderscore"
+          language="java"
+          message="Variables that are not final should not contain underscores"
+          class="net.sourceforge.pmd.lang.rule.XPathRule">
+        <description>
+            Non-final variables should not have underscores in the name
+        </description>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+        //VariableDeclaratorId[contains(@Name,'_')]/../..[@Final='false']
+                    ]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+                public void foo() {
+                    int a_value; // Don't do this
+                }
+            ]]>
+        </example>
+    </rule>
+</ruleset>

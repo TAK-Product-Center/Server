@@ -57,11 +57,11 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
 
     @Override
     public Set<Federate> allReachableFederates(String sourceUid) throws FederationException {
-        FederationNode FederationNode = getNode(sourceUid);
-        if (FederationNode == null) {
+        FederationNode federationNode = getNode(sourceUid);
+        if (federationNode == null) {
             throw new FederationException("The passed sourceID " + sourceUid + " was not found in the policy graph.");
         }
-        return allReachableFederates(FederationNode);
+        return allReachableFederates(federationNode);
     }
 
     @Override
@@ -224,7 +224,7 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
     }
 
     @Override
-    public List<FederationFilter> getFiltersAlongPath(FederationNode FederationNode, FederationNode FederationNode1) {
+    public List<FederationFilter> getFiltersAlongPath(FederationNode federationNode, FederationNode federationNode1) {
         return null;
     }
 
@@ -327,10 +327,6 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
         }
         return reachableFederates;
     }
-
-//    private boolean isNodeInGraph(FederationNode FederationNode) {
-//        return (nodeMap.containsKey(FederationNode.getFederateIdentity()));
-//    }
 
     private boolean isEdgeInGraph(FederateEdge federateEdge) {
         FederationNode source = nodeMap.get(federateEdge.getSourceIdentity());

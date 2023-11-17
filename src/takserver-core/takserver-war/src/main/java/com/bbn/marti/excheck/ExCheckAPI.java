@@ -181,10 +181,12 @@ public class ExCheckAPI extends BaseRestController {
     @RequestMapping(value = "/excheck/checklist", method = RequestMethod.POST)
     ResponseEntity createChecklist(
             @RequestParam(value = "clientUid", required = true) String clientUid,
-            @RequestBody Checklist checklist,
+            @RequestBody String checklistXml,
             @RequestParam(value = "defaultRole", required = false) MissionRole.Role defaultRole,
             HttpServletRequest request,
             HttpServletResponse response) throws RemoteException, IOException {
+
+        Checklist checklist = exCheckService.checklistFromXml(checklistXml);
 
         if (exCheckService.isEmptyUid(checklist.getChecklistDetails().getUid())) {
             checklist.getChecklistDetails().setUid(UUID.randomUUID().toString());
@@ -288,10 +290,12 @@ public class ExCheckAPI extends BaseRestController {
     ResponseEntity addEditChecklistTask(
             @PathVariable("checklistUid") String checklistUid,
             @PathVariable("taskUid") String taskUid,
-            @RequestBody ChecklistTask checklistTask,
+            @RequestBody String checklistTaskXml,
             @RequestParam(value = "clientUid", required = true) String clientUid,
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
+
+        ChecklistTask checklistTask = exCheckService.checklistTaskFromXml(checklistTaskXml);
 
         if (checklistTask.getUid().compareTo(taskUid) != 0) {
             return new ResponseEntity(HttpStatus.BAD_REQUEST);
@@ -361,10 +365,12 @@ public class ExCheckAPI extends BaseRestController {
     ResponseEntity addEditTemplateTask(
             @PathVariable("templateUid") String templateUid,
             @PathVariable("taskUid") String taskUid,
-            @RequestBody ChecklistTask templateTask,
+            @RequestBody String templateTaskXml,
             @RequestParam(value = "clientUid", required = true) String clientUid,
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
+
+        ChecklistTask templateTask = exCheckService.checklistTaskFromXml(templateTaskXml);
 
         if (templateTask.getUid().compareTo(taskUid) != 0) {
             return new ResponseEntity(HttpStatus.BAD_REQUEST);

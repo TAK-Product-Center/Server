@@ -22,9 +22,9 @@ public interface KMLService {
 	Kml process(LinkedList<CotElement> cotElements);
 
 	/**
-	 * populates a kml document with the transforms of each query result -> kml object.
+	 * populates a kml document with the transforms of each query result -{@literal >} kml object.
 	 * <p>
-	 * also populates the kml doc with the requisite set of styles for representing each cot object.  
+	 * also populates the kml doc with the requisite set of styles for representing each cot object.
 	 */
 	void buildFeatures(LinkedList<CotElement> qrs, Document doc);
 

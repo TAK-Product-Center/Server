@@ -5,9 +5,9 @@ import java.util.Comparator;
 
 /**
  * An enum used to contain all the possible results from manipulating an input or static subscription.
- * <p/>
+ * <p>
  * If the provided change matches the current state, a SUCCESS is expected to be returned.
- * <p/>
+ * </p>
  * Created on 2/26/16.
  */
 

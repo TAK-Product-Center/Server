@@ -14,6 +14,7 @@ import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import tak.server.Constants;
 
+import javax.cache.CacheException;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -89,11 +90,17 @@ public class ActiveGroupCacheHelper {
 
         Map<String, List<Group>> activeGroups = loadActiveGroups();
         if (activeGroups != null) {
-            activeGroupCache = ignite.createCache(Constants.ACTIVE_GROUPS_CACHE);
-            Iterator it = activeGroups.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry userCache = (Map.Entry) it.next();
-                activeGroupCache.put((String) userCache.getKey(), (List<Group>) userCache.getValue());
+            try {
+                activeGroupCache = ignite.createCache(Constants.ACTIVE_GROUPS_CACHE);
+                Iterator it = activeGroups.entrySet().iterator();
+                while (it.hasNext()) {
+                    Map.Entry userCache = (Map.Entry) it.next();
+                    activeGroupCache.put((String) userCache.getKey(), (List<Group>) userCache.getValue());
+                }
+            } catch (CacheException e) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("exception in getActiveGroupsCache", e);
+                }
             }
         } else {
             logger.error("loadActiveGroups failed!");

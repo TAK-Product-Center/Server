@@ -37,8 +37,6 @@ import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 
 /**
  * Used to modify the server CoreConfig.xml file offline. If this is used while the server is running, the changes will not take effect, and may cause undesirable behavior.
- *
- * @command
  */
 public class OfflineConfigModule implements ServerAppModuleInterface {
 
@@ -122,7 +120,7 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 	public List<Input> getInputs() {
 		return configuration.getNetwork().getInput();
 	}
-	
+
 	public List<DataFeed> getDataFeeds() {
 		return configuration.getNetwork().getDatafeed();
 	}
@@ -167,7 +165,6 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 	 * Tells if file authuser is enabled
 	 *
 	 * @return Whether or not it is enabled
-	 * @command
 	 */
 	@Command(description = "Is file authuser enabled?")
 	public boolean isFileAuthEnabled() {
@@ -186,10 +183,10 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 		inputList.add(input);
 		saveChanges();
 	}
-	
+
 	public void addDataFeed(final DataFeed dataFeed) {
 		List<DataFeed> dataFeedList = configuration.getNetwork().getDatafeed();
-		
+
 		for (DataFeed loopFeed : dataFeedList) {
 			if (loopFeed.getName().equals(dataFeed.getName())) {
 				dataFeedList.remove(loopFeed);
@@ -276,7 +273,6 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 	 * Removes the input with the specified getConsistentUniqueReadableIdentifier if it exists and saves the change.
 	 *
 	 * @param inputName The input getConsistentUniqueReadableIdentifier to remove
-	 * @command
 	 */
 	@Command
 	public void removeInput(final String inputName) {

@@ -208,7 +208,7 @@ public class FederationROLHandler {
 								
 				missionService.createMission(md.getName(), md.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), 
 						md.getDescription(), md.getChatRoom(), md.getBaseLayer(), md.getBbox(), md.getPath(), md.getClassification(), md.getTool(),
-						md.getPasswordHash(), missionRole, md.getExpiration(), md.getBoundingPolygon());
+						md.getPasswordHash(), missionRole, md.getExpiration(), md.getBoundingPolygon(), md.getInviteOnly());
 			}
 		}
 
@@ -266,7 +266,7 @@ public class FederationROLHandler {
 			case ADD_CONTENT:
 
 				if (!missionService.exists(mud.getMissionName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)))) {
-					missionService.createMission(mud.getMissionName(), mud.getMissionCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), mud.getMissionDescription(), mud.getMissionChatRoom(), null, null, null, null, mud.getMissionTool(), null, null, null, null);
+					missionService.createMission(mud.getMissionName(), mud.getMissionCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), mud.getMissionDescription(), mud.getMissionChatRoom(), null, null, null, null, mud.getMissionTool(), null, null, null, null, false);
 				}
 
 				if (logger.isDebugEnabled()) {
@@ -385,7 +385,7 @@ public class FederationROLHandler {
 				if (datafeeds == null || datafeeds.size() == 0) {
 					long dataFeedId = dataFeedRepository.addDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
 							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, meta.isSync(), 
-							meta.getSyncCacheRetentionSeconds(), groupVector);
+							meta.getSyncCacheRetentionSeconds(), groupVector, true);
 					
 					if (meta.getTags() != null && meta.getTags().size() > 0)
 						dataFeedRepository.addDataFeedTags(dataFeedId, meta.getTags());
@@ -420,13 +420,13 @@ public class FederationROLHandler {
 				if (datafeeds == null || datafeeds.size() == 0) {
 					long dataFeedId = dataFeedRepository.addDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
 							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, meta.isSync(), 
-							meta.getSyncCacheRetentionSeconds(), groupVector);
+							meta.getSyncCacheRetentionSeconds(), groupVector, true);
 					dataFeedRepository.addDataFeedTags(dataFeedId, meta.getTags());
 				} else {
 					DataFeedDao dataFeed = datafeeds.get(0);
 					dataFeedRepository.updateDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
 							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, 
-							meta.isSync(), meta.getSyncCacheRetentionSeconds());
+							meta.isSync(), meta.getSyncCacheRetentionSeconds(), true);
 					
 					dataFeedRepository.removeAllDataFeedTagsById(dataFeed.getId());
 					

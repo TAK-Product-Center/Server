@@ -131,7 +131,7 @@ public class FederationHubUIServer {
 
     @Bean
     @Order(Ordered.LOWEST_PRECEDENCE)
-    public FederationHubUIService FederationHubBrokerService() {
+    public FederationHubUIService federationHubUIService() {
     	return new FederationHubUIService();
     }
 }

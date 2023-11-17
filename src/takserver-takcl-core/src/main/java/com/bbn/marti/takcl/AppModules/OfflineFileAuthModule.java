@@ -29,8 +29,6 @@ import java.util.*;
 
 /**
  * Used to manage the user authentication file in offline mode. Using it in online mode will likely have no effect, but could cause other unforseen issues.
- *
- * @command
  */
 public class OfflineFileAuthModule implements ServerAppModuleInterface, AdvancedFileAuthModuleInterface {
 
@@ -161,7 +159,6 @@ public class OfflineFileAuthModule implements ServerAppModuleInterface, Advanced
 	 *
 	 * @param userName  The user to add to the group
 	 * @param groupName The group to add the user to
-	 * @command
 	 */
 	public synchronized String addUserToGroup(String userName, String groupName) {
 		List<UserAuthenticationFile.User> userList = authenticationFile.getUser();
@@ -194,8 +191,6 @@ public class OfflineFileAuthModule implements ServerAppModuleInterface, Advanced
 
 	/**
 	 * Removes the user authentication file, which is automatically generated as needed.
-	 *
-	 * @command
 	 */
 	public synchronized void resetConfig() {
 		try {
@@ -323,7 +318,7 @@ public class OfflineFileAuthModule implements ServerAppModuleInterface, Advanced
 				}
 			}
 		}
-		
+
 		if (inGroup != null && inGroup.length > 0) {
 			for (String grp : inGroup) {
 				if (!user.getGroupListIN().contains(grp)) {
@@ -331,7 +326,7 @@ public class OfflineFileAuthModule implements ServerAppModuleInterface, Advanced
 				}
 			}
 		}
-		
+
 		if (outGroup != null && outGroup.length > 0) {
 			for (String grp : outGroup) {
 				if (!user.getGroupListOUT().contains(grp)) {

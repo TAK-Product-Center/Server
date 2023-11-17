@@ -58,6 +58,7 @@ public class VerificationData {
 				Assert.fail(message);
 				throw new RuntimeException(message);
 			}
+			System.out.println("--- VerificationData setUserExpectations, put user: " + user +", expectedSenders.size(): "+ expectedSenders.size()+ ", expectedConnectivityState: " + expectedConnectivityState);
 			userVerificationIterationData.put(user, new VerificationClient(user, expectedSenders, expectedConnectivityState));
 		}
 	}
@@ -65,6 +66,7 @@ public class VerificationData {
 	synchronized void validateAllUserExpectations(String justification) {
 		// TODO: All users should really be validated, not just those tagged with a validator.
 		for (Map.Entry<AbstractUser, VerificationClient> entry : userVerificationIterationData.entrySet()) {
+			System.out.println("\t ---VerificationData: validateAllUserExpectations: entry.getKey():" + entry.getKey() + ", entry.getValue().getProfile(): "+ entry.getValue().getProfile());
 			UserExpectationValidator uev = new UserExpectationValidator(
 					StateEngine.data.getState(entry.getKey()), entry.getValue());
 			uev.validateExpectations(justification, true);

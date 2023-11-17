@@ -9,30 +9,30 @@ import java.util.ListIterator;
 import java.util.NoSuchElementException;
 
 /**
-* A CircularlyLinkedQueue implementation for supporting fast and potentially constant-time, zero-copy appends to other 
+* A CircularlyLinkedQueue implementation for supporting fast and potentially constant-time, zero-copy appends to other
 * CircularlyLinkedQueues.
 *
 * A circularly linked queue is essentially a singly linked list, except that a pointer to the tail element is
-* kept instead of a head reference. The last element is circularly linked to the head of the list, allowing for constant 
+* kept instead of a head reference. The last element is circularly linked to the head of the list, allowing for constant
 * time reads from the head, and constant time writes to the tail.
 *
-* The last element is called the tail, and refers to the most recently inserted element, and can be 
+* The last element is called the tail, and refers to the most recently inserted element, and can be
 * addressed by logical index (size() - 1). If the list is empty, the tail field is null, and the size is 0. This
-* creates a separate case which must be addressed when an element is added to an empty queue, and when the last element of 
+* creates a separate case which must be addressed when an element is added to an empty queue, and when the last element of
 * the queue is removed.
 *
 * Internally, this queue relies on the Node structure to store the parameterized type and a pointer to the next element.
 * The NodeIterator internal class allows for contiguous iteration over the chain of nodes - it returns a Node with each next,
-* and advances an internal Node pointer to the next Node. It starts pointing at the head. 
+* and advances an internal Node pointer to the next Node. It starts pointing at the head.
 *
 * The NodeValueIterator is a shallow wrapper around the NodeIterator class, and simply returns the value in each returned Node.
 *
 * Neither Iterator supports concurrent modification, but are not written to explicitly fail if this occurs.
 *
-* This queue was written (in particular) to support a fast drainTo operation: this method takes another CircularlyLinkedQueue, and an optional 
+* This queue was written (in particular) to support a fast drainTo operation: this method takes another CircularlyLinkedQueue, and an optional
 * size limit, and splices at most limit nodes into the given queue. This is done without instantiating a new Node structure for
-* each element (ie, zero-copy). If the size limit is larger than the size of this queue, the entire list can be spliced in constant time. 
-* Otherwise, limit nodes are selected in time proportional to limit (specifically, the time it takes to iterate across limit nodes), and spliced in. 
+* each element (ie, zero-copy). If the size limit is larger than the size of this queue, the entire list can be spliced in constant time.
+* Otherwise, limit nodes are selected in time proportional to limit (specifically, the time it takes to iterate across limit nodes), and spliced in.
 * The number of elements actually spliced is returned.
 *
 */
@@ -157,20 +157,20 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 	*	This method hooks the tails of two circularly linked queues together, such that the
 	* 	tail of the second queue becomes the tail of the new queue.
 	*
-	*   Given 
-	*		Queue 1: 	0 -> 1 -> .... -> n (first tail)
+	*   Given
+	*		Queue 1: 	0 -{@literal >} 1 -{@literal >} .... -{@literal >} n (first tail)
 	*					^				  |
-	*					|	<-	<-	<-	  V
+	*					|	{@literal <}-	{@literal <}- {@literal <}-	  V
 	*
-	*		Queue 2: 	0 -> 1 -> .... -> n (second tail)
+	*		Queue 2: 	0 -{@literal >} 1 -{@literal >} .... -{@literal >} (second tail)
 	*					^				  |
-	*					|	<-	<-	<-    V
-	* 
+	*					|	{@literal <}-	{@literal <}- {@literal <}-    V
+	*
 	*
 	*	The new queue is
-	* 		        	0 -> 1 -> .... -> n (first tail) -> 0 -> 1 -> .... -> n (second tail)
+	* 		        	0 -{@literal >} 1 -{@literal >} .... -{@literal >} n (first tail) -{@literal >} 0 -{@literal >} 1 -{@literal >} .... -{@literal >} n (second tail)
 	*					^													  |
-	*					|	<-	<-	<-	<-	<-	<-	<-	<-	<-	<-  <-  <-	  V
+	*					|	{@literal <}-	{@literal <}-	{@literal <}-	{@literal <}-	{@literal <}-	{@literal <}-	{@literal <}-	{@literal <}-	{@literal <}-	{@literal <}-  {@literal <}-  {@literal <}-	  V
 	*
 	*/
 	public static <E> void hookTails(Node<E> firstTail, Node<E> secondTail) {
@@ -212,8 +212,8 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 
 	/**
 	* A constant-time, append all operation that hooks this entire queue onto the end of the given one.
-	*  
-	* If this queue is empty, nothing is done. If their queue is empty, our tail node is copied 
+	*
+	* If this queue is empty, nothing is done. If their queue is empty, our tail node is copied
 	* into their tail field. Otherwise (both nonempty), both loops are linked together such that
 	* their tail points to our head, and our tail points to their head.
 	*
@@ -242,7 +242,7 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 
 	/**
 	* A batched append operation that hooks at most maxAdd nodes onto the end of the given queue.
-	* 
+	*
 	* If maxAdd is at least as large as this queue, we append the whole queue with the other drainTo method.
 	* Otherwise, we select maxAdd Nodes, unhook them from our queue, and link them circularly. If the target
 	* queue is empty, this loop becomes their new queue. Otherwise, we hook our queue fragment onto the end of theirs.
@@ -254,10 +254,10 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 		// POST: maxAdd is positive
 		if (maxAdd < size()) {
 			// POST: size is at least 2 : we can safely batch a remove from this queue without moving the tail
-			// select maxAdd nodes, link them into the given structure 
+			// select maxAdd nodes, link them into the given structure
 			Node<E> finger = tail;
 			Node<E> head = tail.next;
-			
+
 			for (int i = 0; i < maxAdd; i++) {
 				finger = finger.next;
 			}
@@ -292,7 +292,7 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 
 	@Override
 	public boolean isEmpty() {
-		return size() == 0;	
+		return size() == 0;
 	}
 
 	@Override
@@ -359,7 +359,7 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 		else if (index == size()) return addAll(coll); // defer to simple tail append
 
 		// build new circular queue, returns tail
-		Node<E> tempTail = buildTail(coll); 
+		Node<E> tempTail = buildTail(coll);
 		if (tempTail == null) return false;
 
 		// splice segment in
@@ -379,9 +379,9 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 	*/
 	public Node<E> getNodeAt(int index) {
 		// primary case, make fastest
-		if (index >= 0 && index < size() - 1) 
+		if (index >= 0 && index < size() - 1)
 			return getNodeBefore(index).next;
-		else if (index < 0 || index >= size()) 
+		else if (index < 0 || index >= size())
 			throw new IndexOutOfBoundsException();
 		else // index == size - 1
 			return tail;
@@ -393,13 +393,13 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 	* index == 0 is special cased to return the tail.
 	*/
 	public Node<E> getNodeBefore(int index) {
-		if (index < 0 || index >= size()) throw new IndexOutOfBoundsException();	
+		if (index < 0 || index >= size()) throw new IndexOutOfBoundsException();
 		else if (index == 0) return tail;
 
 		// POST: index is at least 1
 		NodeIterator<E> iter = new NodeIterator<E>(this);
 
-		// advance the iterator index - 2 times		
+		// advance the iterator index - 2 times
 		while(--index > 0) {
 			iter.next();
 		}
@@ -493,9 +493,9 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 	*/
 	@Override
 	public E remove(int index) {
-		Node<E> before = getNodeBefore(index); 
+		Node<E> before = getNodeBefore(index);
 		Node<E> target = before.next;
-		// getNodeBefore takes care of bounds check internally		
+		// getNodeBefore takes care of bounds check internally
 		// POST: size > 0
 
 		if (size() > 1) {
@@ -530,28 +530,28 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 
 	/**
 	* Advances the iterator until the given element is found, or the iterator is depleted
-	* 
-	* When depleted, 0 is returned. Otherwise, the count of how many iterator positions were clicked before the 
-	* element was found. Note that this means that the 
+	*
+	* When depleted, 0 is returned. Otherwise, the count of how many iterator positions were clicked before the
+	* element was found. Note that this means that the
 	*/
 	public int findNextDistanceTo(E elem, Iterator<E> iter) {
 		int idx = 0;
-		
+
 		while (iter.hasNext()) {
 			idx++;
 			if (elem.equals(iter.next())) {
 				return idx;
 			}
 		}
-		
+
 		return 0;
 	}
 
 	/**
 	* This function uses a single iterator to seek (in a forwards direction) over all the instances of the given object in the list.
-	* If the findNextDistanceTo function never reports an instance, then -1 is returned. 
+	* If the findNextDistanceTo function never reports an instance, then -1 is returned.
 	*
-	* Otherwise, the findNextDistanceTo function is called on the same iterator: each call returns the number of elements 
+	* Otherwise, the findNextDistanceTo function is called on the same iterator: each call returns the number of elements
 	* it passed over before it found the given element. This count is summed into the travelled variable, which always holds the index
 	* of the last instance found. Once no more instances can be found, we stop searching.
 	*/

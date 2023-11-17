@@ -132,6 +132,10 @@
 		window.open("ErrorLog?id=" + ids);
 	}
 
+	function downloadAll() {
+		window.open("ErrorLog?id=ALL");
+	}
+
 	function searchErrorLogs(query) {
 	    var separator = "?";
         var location = window.location.href;
@@ -188,6 +192,7 @@
 
 <input type="button" id="selectAll" value="Select all" onClick="javascript:selectAll();"/>&nbsp;
 <input type="button" id="downloadSelected" value="Download Selected" onClick="javascript:downloadSelected();"/>&nbsp;
+<input type="button" id="downloadAll" value="Download All" onClick="javascript:downloadAll();"/>&nbsp;
 <input type="button" id="deleteSelected" value="Delete Selected" onClick="javascript:deleteSelected();"/>&nbsp;
 <br><br>
 

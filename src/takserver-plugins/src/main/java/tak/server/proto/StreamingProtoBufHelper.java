@@ -4,10 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
 import java.util.Date;
 
-import org.dom4j.Attribute;
-import org.dom4j.Document;
-import org.dom4j.DocumentHelper;
-import org.dom4j.Element;
+import org.dom4j.*;
 import org.dom4j.io.SAXReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,8 +30,6 @@ import tak.server.util.NumericUtil;
 public class StreamingProtoBufHelper {
 
     private static final Logger logger = LoggerFactory.getLogger(StreamingProtoBufHelper.class);
-    private static final StreamingProtoBufHelper instance = new StreamingProtoBufHelper();
-    public static StreamingProtoBufHelper getInstance() { return instance; }
 
     public final static byte MAGIC = (byte)0xbf;
     public final static String TAK_PROTO_VERSION = "1";
@@ -48,7 +43,7 @@ public class StreamingProtoBufHelper {
 
     public StreamingProtoBufHelper() {}
 
-    public TakMessage cot2protoBuf(CotEventContainer cot) {
+    public static TakMessage cot2protoBuf(CotEventContainer cot) {
         try {
         	        	
             if (cot == null) {
@@ -428,7 +423,7 @@ public class StreamingProtoBufHelper {
 		        }
 		    };
 
-    public CotEventContainer proto2cot(TakMessage takMessage) {
+    public static CotEventContainer proto2cot(TakMessage takMessage) {
         try {
             CotEvent cotEvent = takMessage.getCotEvent();
             Document document = DocumentHelper.createDocument();
@@ -612,7 +607,7 @@ public class StreamingProtoBufHelper {
         }
     }
 
-    public int readVarint(ByteBuffer buffer) {
+    public static int readVarint(ByteBuffer buffer) {
         int next = 0;
         int nextShift = 0;
         while (buffer.remaining() > 0) {

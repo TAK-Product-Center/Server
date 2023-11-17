@@ -25,12 +25,18 @@ if [[ "$canamelen" -lt 5 ]]; then
   CA_NAME=`date +%N`
 fi
 
+openssl list -providers 2>&1 | grep "\(invalid command\|unknown option\)" >/dev/null
+if [ $? -ne 0 ] ; then
+  echo "Using legacy provider"
+  LEGACY_PROVIDER="-legacy"
+fi
+
 SUBJ=$SUBJBASE"CN=$CA_NAME"
 echo "Making a CA for " $SUBJ
 openssl req -new -sha256 -x509 -days 3652 -extensions v3_ca -keyout ca-do-not-share.key -out ca.pem -passout pass:${CAPASS} -config ../config.cfg -subj "$SUBJ"
 openssl x509 -in ca.pem  -addtrust clientAuth -addtrust serverAuth -setalias "${CA_NAME}" -out ca-trusted.pem
 
-openssl pkcs12 -export -in ca-trusted.pem -out truststore-root.p12 -nokeys -caname "${CA_NAME}" -passout pass:${CAPASS}
+openssl pkcs12 ${LEGACY_PROVIDER} -export -in ca-trusted.pem -out truststore-root.p12 -nokeys -caname "${CA_NAME}" -passout pass:${CAPASS}
 keytool -import -trustcacerts -file ca.pem -keystore truststore-root.jks -alias "${CA_NAME}" -storepass "${CAPASS}" -noprompt
 cp truststore-root.jks fed-truststore.jks
 

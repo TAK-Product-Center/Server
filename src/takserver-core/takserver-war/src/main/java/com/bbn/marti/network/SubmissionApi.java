@@ -129,6 +129,7 @@ public class SubmissionApi extends BaseRestController {
 
     @RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.GET)
     public ResponseEntity<ApiResponse<DataFeed>> getDataFeed(@PathVariable("name") String name) {
+
     	ResponseEntity<ApiResponse<DataFeed>> result = null;
         try {
             if (!getInputNameValidationErrors(name).isEmpty()) {
@@ -238,9 +239,9 @@ public class SubmissionApi extends BaseRestController {
     		 @RequestBody com.bbn.marti.config.DataFeed dataFeed) {
     	ResponseEntity<ApiResponse<DataFeed>> result = null;
     	
-    	
     	try {
         	String groupVector = martiUtil.getGroupVectorBitString();
+
     		List<DataFeedDao> dataFeeds = dataFeedRepository.getDataFeedByName(name);
 			int type = DataFeedType.valueOf(dataFeed.getType()).ordinal();
 
@@ -253,7 +254,7 @@ public class SubmissionApi extends BaseRestController {
 						dataFeed.getAuth().toString(), dataFeed.getPort(), dataFeed.isAuthRequired(), dataFeed.getProtocol(),
 						dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(), dataFeed.isAnongroup(),
 						dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-						dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector);
+						dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated());
 				
 				inputManager.updateFederationDataFeed(dataFeed);
 
@@ -268,14 +269,14 @@ public class SubmissionApi extends BaseRestController {
 				// Update config file
 				ConnectionModifyResult updateResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
 						.modifyInput(name, dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
-
 				if (updateResult.getHttpStatusCode() == ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
 					dataFeedRepository.updateDataFeedWithGroupVector(dataFeed.getUuid(), dataFeed.getName(), type,
 							dataFeed.getAuth().toString(), dataFeed.getPort(), dataFeed.isAuthRequired(), dataFeed.getProtocol(),
 							dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(), dataFeed.isAnongroup(),
 							dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-							dataFeed.isSync(), 1, groupVector);
-					
+											 //dataFeed.isSync(), 1, groupVector, dataFeed.isFederated());
+							dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated());
+
 					if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
 						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
 						dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag());
@@ -289,6 +290,7 @@ public class SubmissionApi extends BaseRestController {
 	    			result = new ResponseEntity<ApiResponse<DataFeed>>(
 	    					new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
 	    					HttpStatus.OK);
+
 				} else {
 					result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
 		        		HttpStatus.INTERNAL_SERVER_ERROR);
@@ -338,7 +340,7 @@ public class SubmissionApi extends BaseRestController {
 	            	Long dataFeedId = dataFeedRepository.addDataFeed(dataFeed.getUuid(), dataFeed.getName(), type, auth, dataFeed.getPort(),
 	            			dataFeed.isAuthRequired(), dataFeed.getProtocol(), dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(),
 	            			dataFeed.isAnongroup(), dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-	            			dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector);
+	            			dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated());
 
 	            	if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
 	            		dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag());
@@ -395,7 +397,7 @@ public class SubmissionApi extends BaseRestController {
             Collection<InputMetric> inputs = inputManager.getInputMetrics(excludeDataFeeds);
 
             if (logger.isDebugEnabled()) {
-            	logger.debug("inputs: " + inputs);
+            	logger.info("inputs: " + inputs);
             }
 
             metrics.addAll(inputs);
@@ -805,7 +807,7 @@ public class SubmissionApi extends BaseRestController {
     	dataFeed.setTags(tags);
     	dataFeed.setFilterGroups(filterGroups);
     	dataFeed.setSyncCacheRetentionSeconds(dao.getSyncCacheRetentionSeconds());
-
+    	dataFeed.setFederated(dao.getFederated());
     	
 		if (dao.getPort() == 0) {
 			dataFeed.setPort(null);

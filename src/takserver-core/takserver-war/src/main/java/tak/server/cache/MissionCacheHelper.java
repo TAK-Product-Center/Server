@@ -1,8 +1,5 @@
 package tak.server.cache;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.ignite.IgniteCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,9 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Lazy;
 
-import com.bbn.marti.remote.sync.MissionChangeType;
 import com.bbn.marti.sync.model.Mission;
-import com.bbn.marti.sync.model.MissionChange;
 import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.service.MissionService;
 import com.google.common.base.Strings;
@@ -192,7 +187,7 @@ public class MissionCacheHelper {
     @SuppressWarnings("unchecked")
     public IgniteCache<Object, Object> getCache(String cacheName) {
         
-        Object springNativeCache = cacheManager.getCache(cacheName).getNativeCache();
+        Object springNativeCache = cacheManager.getCache(cacheName.toLowerCase()).getNativeCache();
         
         if (!(springNativeCache instanceof IgniteCache)) {
             throw new IllegalArgumentException("invalid cache type " + springNativeCache.getClass().getTypeName()); 
@@ -204,7 +199,7 @@ public class MissionCacheHelper {
     
     public String getKey(String missionName, boolean hydrateDetails) {
         
-        return "[getMission, " + missionName + ", " + (hydrateDetails ? "true, hydrated" : "false") + "]";
+        return "[getMission, " + missionName.toLowerCase() + ", " + (hydrateDetails ? "true, hydrated" : "false") + "]";
     }
     
     public void clearAllMissionCache() {

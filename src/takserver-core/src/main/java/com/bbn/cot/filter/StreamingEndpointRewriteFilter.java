@@ -9,6 +9,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.NavigableSet;
 import java.util.Set;
+import javax.naming.ldap.LdapName;
 
 import org.dom4j.Element;
 import org.dom4j.Node;
@@ -152,7 +153,7 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 					} else if(detached.attribute(UID_ATTR) != null) {
 						uids.add(detached.attributeValue(UID_ATTR));
 					} else if(detached.attribute(MISSION_ATTR) != null) {
-					    missionNames.add(detached.attributeValue(MISSION_ATTR).toLowerCase());
+					    missionNames.add(detached.attributeValue(MISSION_ATTR));
 				        logger.debug("mission destination specified in message: " + detached.attributeValue(MISSION_ATTR));
                     }
 				}
@@ -185,8 +186,21 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 						MissionSubscription missionSubscription = null;
 						User user = (User) cot.getContextValue(Constants.USER_KEY);
 						if (user != null) {
-							missionSubscription = missionSubscriptionRepository.findByMissionNameAndClientUidAndUsernameNoMission(
+							missionSubscription = missionSubscriptionRepository
+									.findByMissionNameAndClientUidAndUsernameNoMission(
 									missionName, clientUid, user.getName());
+
+							if (missionSubscription == null
+									&& user.getCert() != null && user.getCert().getSubjectX500Principal() != null) {
+								// lookup the mission subscription based on CN, needed when input auth=ldap or auth=file
+								String cn = new LdapName(user.getCert().getSubjectX500Principal().getName())
+										.getRdns().stream().filter(i -> i.getType().equalsIgnoreCase("CN"))
+											.findFirst().get().getValue().toString();
+								missionSubscription = missionSubscriptionRepository
+										.findByMissionNameAndClientUidAndUsernameNoMission(
+										missionName, clientUid, cn);
+							}
+
 						} else {
 							missionSubscription = missionSubscriptionRepository.findByMissionNameAndClientUidNoMission(
 									missionName, clientUid);
@@ -308,8 +322,7 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 											logger.debug("rol to federate for mission change " + rol + " to groups " + groups);
 										}
 
-										federationManager.submitFederateROL(rol, groups);
-
+										federationManager.submitMissionFederateROL(rol, groups, missionName);
 									} else {
 										logger.warn("unable to federate mission uid add - cot message specified no groups");
 									}

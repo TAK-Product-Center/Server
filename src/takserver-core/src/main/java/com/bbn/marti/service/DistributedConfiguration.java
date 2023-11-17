@@ -219,6 +219,26 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
         input.setArchiveOnly(desiredState);
         return ConnectionModifyResult.SUCCESS;
     }
+    
+    public ConnectionModifyResult setFederatedFlagNoSave(String inputName, boolean desiredState) {
+        Input input = getInputByName(inputName);
+        if (input == null) {
+            return ConnectionModifyResult.FAIL_NONEXISTENT;
+        }
+        input.setFederated(desiredState);
+        return ConnectionModifyResult.SUCCESS;
+    }
+
+    public ConnectionModifyResult setSyncCacheRetentionSeconds(String inputName, int desiredState) {
+        Input input = getInputByName(inputName);
+        if (input == null) {
+            return ConnectionModifyResult.FAIL_NONEXISTENT;
+        }
+        input.setSyncCacheRetentionSeconds(desiredState);
+        return ConnectionModifyResult.SUCCESS;
+    }
+
+
 
     @SuppressWarnings("rawtypes")
 	public synchronized ConnectionModifyResult updateTagsNoSave(String inputName, List<String> newTagList) throws RemoteException {

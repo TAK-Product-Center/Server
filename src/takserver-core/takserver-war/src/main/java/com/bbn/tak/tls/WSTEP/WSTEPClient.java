@@ -47,7 +47,7 @@ public class WSTEPClient {
 
 	public static X509Certificate[] submitCSR(String CSR, String TemplateName, String svcUrl,
 											  String username, String password,
-											  String truststore, String truststorePassword) {
+											  String truststore, String truststorePassword, String tlsContext) {
 		try {
 			//
 			// create the web service client
@@ -70,7 +70,7 @@ public class WSTEPClient {
 			KeyStore keyStore = KeyStore.getInstance("JKS");
 			keyStore.load(new FileInputStream(truststore), truststorePassword.toCharArray());
 			trustManagerFactory.init(keyStore);
-			SSLContext sslContext = SSLContext.getInstance("TLS");
+			SSLContext sslContext = SSLContext.getInstance(tlsContext);
 			sslContext.init(null, trustManagerFactory.getTrustManagers(), new java.security.SecureRandom());
 
 			// update the web service context with our custom socket factory. this causes us to pull in com.sun.xml.ws

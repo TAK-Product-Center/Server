@@ -12,14 +12,6 @@ dependencies {
 
   compile 'javax.xml.bind:jaxb-api:2.3.0'
 
-  // gRPC
-  compile group: 'io.grpc', name: 'grpc-netty', version: grpc_version
-  compile group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
-  compile group: 'io.grpc', name: 'grpc-stub', version: grpc_version
-
-  // Google's OpenSSL variant
-  // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
-  compile 'io.netty:netty-tcnative-boringssl-static:' + netty_tcnative_version
 
   //compile 'javax.activation:activation:' + javax_activation_version
 

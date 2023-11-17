@@ -246,7 +246,7 @@ public class MissionPackageUploadServlet extends UploadServlet {
 			String pluginClassnames[] = paramsMap.get(Metadata.Field.PluginClassName.name());
 			if (pluginClassnames != null) {
 				String pluginClassname = pluginClassnames[0]; // To be consistent with UploadServlet where we allow only 1 pluginClassname
-				logger.info("~~~ Notifying the plugin {} with file upload event", pluginClassname);
+				logger.info("Notifying the plugin {} with file upload event", pluginClassname);
 				pluginManager.onFileUpload(pluginClassname, requestMetadata);
 			}
 

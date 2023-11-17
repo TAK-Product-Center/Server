@@ -194,7 +194,7 @@
 //			//
 //			// Convert CotEventContainer to protobuf
 //			//
-//			Takmessage.TakMessage takMessage = StreamingProtoBufHelper.getInstance().cot2protoBuf(data);
+//			Takmessage.TakMessage takMessage = StreamingProtoBufHelper.cot2protoBuf(data);
 //			if (takMessage == null) {
 //				System.err.println("cot2protoBuf failed to parse message!");
 //				return null;

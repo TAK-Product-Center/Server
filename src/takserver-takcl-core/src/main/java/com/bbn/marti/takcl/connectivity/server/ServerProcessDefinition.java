@@ -16,6 +16,16 @@ import java.util.Collections;
 import java.util.List;
 
 public enum ServerProcessDefinition {
+	FederationHubBroker("federation-hub-broker", !TAKCLCore.disableFederationHubProcess, "federation-hub/federation-hub-broker.jar", "/opt/tak/federation-hub/logs/federation-hub-broker.log",
+			Collections.unmodifiableList(Arrays.asList(
+					"Started FederationHubServer"
+			)), Arrays.asList("-Dlogging.config=/opt/tak/federation-hub/configs/logback-broker.xml","-DFEDERATION_HUB_BROKER_CONFIG=federation-hub/configs/federation-hub-broker.yml")),
+	
+	FederationHubPolicy("federation-hub-policy", !TAKCLCore.disableFederationHubProcess, "federation-hub/federation-hub-policy.jar", "/opt/tak/federation-hub/logs/federation-hub-policy.log",
+			Collections.unmodifiableList(Arrays.asList(
+					"Started FederationHubPolicyManagerService"
+			)), Arrays.asList("-Dlogging.config=/opt/tak/federation-hub/configs/logback-policy.xml","-DFEDERATION_HUB_POLICY_CONFIG=federation-hub/ui_generated_policy.json")),
+	
 	PluginManager("plugins", !TAKCLCore.disablePluginManagerProcess, "takserver-pm.jar", "logs/takserver-plugins.log",
 			Collections.unmodifiableList(Arrays.asList(
 					"t.s.p.s.DistributedPluginManager - execute method DistributedPluginManager",
@@ -28,7 +38,7 @@ public enum ServerProcessDefinition {
 					"t.s.retention.RetentionApplication - Started RetentionApplication"
 			)), null),
 
-	MessagingService("messaging", true, "takserver.war", "logs/takserver-messaging.log",
+	MessagingService("messaging", !TAKCLCore.disableMessagingProcess, "takserver.war", "logs/takserver-messaging.log",
 			Collections.unmodifiableList(Arrays.asList(
 					"c.b.m.s.DistributedSubscriptionManager - DistributedSubscriptionManager execute",
 					" c.b.m.s.DistributedConfiguration - execute method DistributedConfiguration",
@@ -47,7 +57,7 @@ public enum ServerProcessDefinition {
 					"t.s.messaging.DistributedPluginApi - execute method DistributedPluginApi",
 					"t.s.m.DistributedPluginSelfStopApi - execute method DistributedPluginSelfStopApi",
 					"c.b.m.service.MessagingInitializer - takserver-core init complete"
-			)), "-Dspring.profiles.active=messaging"),
+			)), Arrays.asList("-Dspring.profiles.active=messaging")),
 
 	ApiService("api", !TAKCLCore.disableApiProcess, "takserver.war", "logs/takserver-api.log",
 			Collections.unmodifiableList(Arrays.asList(
@@ -55,23 +65,23 @@ public enum ServerProcessDefinition {
 					"c.b.m.s.DistributedRetentionQueryManager - execute method DistributedRetentionQueryManager",
 					"t.s.api.DistributedPluginMissionApi - execute method DistributedPluginMissionApi",
 					"o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started"
-			)), "-Dspring.profiles.active=api");
+			)), Arrays.asList("-Dspring.profiles.active=api"));
 
 	public final String identifier;
 	public final String jarName;
 	public final String logPath;
 	public final List<String> logWatchValues;
-	public final String modeFlag;
+	public final List<String> jvmFlags;
 	private boolean enabled;
 
 	ServerProcessDefinition(@NotNull String identifier, boolean enabled, @NotNull String jarName,
-	                        @NotNull String logPath, @NotNull List<String> logWatchValues, @Nullable String modeFlag) {
+	                        @NotNull String logPath, @NotNull List<String> logWatchValues, @Nullable List<String> jvmFlags) {
 		this.identifier = identifier;
 		this.enabled = enabled;
 		this.jarName = jarName;
 		this.logPath = logPath;
 		this.logWatchValues = logWatchValues;
-		this.modeFlag = modeFlag;
+		this.jvmFlags = jvmFlags;
 	}
 
 	public void setEnabled(boolean value) {
@@ -97,12 +107,12 @@ public enum ServerProcessDefinition {
 					duration += 500;
 					continue;
 				}
+
 				BufferedReader logFileReader = new BufferedReader(new FileReader(logFile));
 
 				List<String> statementsToRemove = new ArrayList<>(remainingStatementsToSee.size());
-
+				
 				String logLine = logFileReader.readLine();
-
 				while (logLine != null) {
 					for (String value : remainingStatementsToSee) {
 						if (logLine.contains(value)) {

@@ -21,7 +21,7 @@ public abstract class MessageSenderReceiverBase extends PluginBase implements Me
     @Autowired
     private PluginDataFeedApi pluginDataFeedApi;
 
-    MessageSenderReceiverBase() throws ReservedConfigurationException {
+    public MessageSenderReceiverBase() throws ReservedConfigurationException {
         super();
     }
 

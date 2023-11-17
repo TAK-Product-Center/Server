@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 
+import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Federation.Federate;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
@@ -115,6 +116,16 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 			}
 			return;
 		}
+		
+        if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null) {
+        	DataFeed datafeed = (DataFeed)toSend.getContext(Constants.DATA_FEED_KEY);
+        	if (!datafeed.isFederated()) {
+				logger.info("~~~ In submit B: Not send to federation");
+            	return;
+        	}else {
+				logger.info("~~~ In submit B: Will send to federation");
+        	}
+        }
 
 		// increment the hit count in the super class
 		super.incHit(hitTime);

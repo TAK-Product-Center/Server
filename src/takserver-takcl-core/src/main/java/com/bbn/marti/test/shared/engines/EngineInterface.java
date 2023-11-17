@@ -32,7 +32,9 @@ public interface EngineInterface {
 
 	void attemptSendFromUserAndVerify(@NotNull AbstractUser sendingUser, @NotNull AbstractUser... targetUsers);
 
-	void attemptSendFromUserAndVerify(@NotNull AbstractUser sendingUser, @NotNull String missionName);
+	void verifyReceivedMessageSentFromPlugin(@NotNull AbstractUser sendingPlugin, @NotNull AbstractUser... receivedUsers);
+
+	void attemptSendFromUserAndVerify(@NotNull AbstractUser sendingUser, @NotNull String missionName);	
 
 	void attemptSendFromUserAndVerify(@NotNull UserIdentificationData senderIdentification, @NotNull AbstractUser sendingUser, @NotNull AbstractUser... targetUsers);
 

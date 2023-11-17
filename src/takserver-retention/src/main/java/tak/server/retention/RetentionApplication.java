@@ -1,5 +1,9 @@
 package tak.server.retention;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+
+import com.zaxxer.hikari.HikariDataSource;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.Ignition;
 import org.slf4j.Logger;
@@ -18,6 +22,7 @@ import tak.server.retention.scheduler.ExpirationTaskService;
 import tak.server.retention.scheduler.SingleTaskSchedulerService;
 import tak.server.retention.service.DistributedMissionArchiveManager;
 import tak.server.retention.service.MissionArchiveHelper;
+import tak.server.util.DataSourceUtils;
 
 import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.marti.remote.CoreConfig;
@@ -48,6 +53,11 @@ public class RetentionApplication implements CommandLineRunner {
     }
 
     @Bean
+    SpringContextBeanForRetention SpringContextBeanForRetention() {
+        return new SpringContextBeanForRetention();
+    }
+
+    @Bean
     Ignite ignite() {
         return Ignition.getOrStart(IgniteConfigurationHolder.getInstance().getIgniteConfiguration(Constants.RETENTION_PROFILE_NAME,
                 "127.0.0.1",
@@ -59,8 +69,38 @@ public class RetentionApplication implements CommandLineRunner {
 
     @Bean
     public RetentionQueryService dataQueryManager(Ignite ignite) {
-        return ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_RETENTION_QUERY_MANAGER,
+        final RetentionQueryService retentionQueryService = ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_RETENTION_QUERY_MANAGER,
                 RetentionQueryService.class, false);
+
+         boolean isRetentionQueryServiceAvailable = false;
+
+        // block and wait for Retention Query Service (aka MissionService) to become available
+        try {
+            isRetentionQueryServiceAvailable = canAccessRetentionQueryService(retentionQueryService).get();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.error("interrupted checking retention query service availability", e);
+        }
+        logger.info("retention query service available: {}",isRetentionQueryServiceAvailable);
+        return retentionQueryService;
+    }
+
+    private CompletableFuture<Boolean> canAccessRetentionQueryService(RetentionQueryService retentionQueryService) {
+        try {
+            logger.info("Waiting for the Retention Query process... ");
+            return CompletableFuture.completedFuture(accessRetentionQueryService(retentionQueryService));
+        } catch (Exception e) {
+            try {
+                Thread.sleep(10000L);
+            } catch (InterruptedException e1) {
+                logger.error("interrupted sleep", e1);
+            }
+            return canAccessRetentionQueryService(retentionQueryService);
+        }
+    }
+
+    private boolean accessRetentionQueryService(RetentionQueryService retentionQueryService) throws Exception {
+        retentionQueryService.getAllMissions(true, true, "public"); // just test the service
+        return true;
     }
 
     @Bean
@@ -83,12 +123,53 @@ public class RetentionApplication implements CommandLineRunner {
 
     @Bean
     public CoreConfig coreConfig(Ignite ignite) {
-       return ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_CONFIGURATION, CoreConfig.class, false);
+       final CoreConfig coreConfig = ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_CONFIGURATION,
+                CoreConfig.class, false);
+
+        boolean isCoreConfigAvailable = false;
+
+        // block and wait for CoreConfig to become available in messaging process
+        try {
+            isCoreConfigAvailable = canAccessCoreConfig(coreConfig).get();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.error("interrupted checking CoreConfig availability", e);
+        }
+
+        logger.info("CoreConfig available: {}", isCoreConfigAvailable);
+
+        return coreConfig;
     }
-    
+
     @Bean
     public MissionArchiveHelper missionArchiveHelper() {
        return new MissionArchiveHelper();
     }
 
+    private CompletableFuture<Boolean> canAccessCoreConfig(final CoreConfig coreConfig) {
+
+        try {
+            logger.info("Waiting for the Core Config process...");
+            return CompletableFuture.completedFuture(accessCoreConfig(coreConfig));
+        } catch (Exception e) {
+            try {
+                Thread.sleep(10000L);
+            } catch (InterruptedException e1) {
+                logger.error("interrupted sleep", e1);
+            }
+            return canAccessCoreConfig(coreConfig);
+        }
+    }
+
+    private boolean accessCoreConfig(CoreConfig coreConfig) throws Exception {
+        coreConfig.getRemoteConfiguration().getRepository().getConnection(); // check for config
+        return true;
+    }
+
+    @Bean
+    public HikariDataSource dataSource(CoreConfig coreConfig) {
+        HikariDataSource hikariDataSource = null;
+        hikariDataSource = DataSourceUtils.setupDataSourceFromCoreConfig(coreConfig);
+        hikariDataSource.setMaximumPoolSize(2);
+        return hikariDataSource;
+    }
 }

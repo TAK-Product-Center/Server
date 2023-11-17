@@ -28,22 +28,20 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class AbstractRunnableServer {
 
 	public static abstract class AbstractServerProcess {
+		private final boolean enabled;
 		public final ServerProcessDefinition definition;
 
 		public AbstractServerProcess(ServerProcessDefinition definition) {
 			this.definition = definition;
+			this.enabled = definition.isEnabled();
 		}
 
 		public final String getIdentifier() {
 			return definition.identifier;
 		}
 
-		public final void setEnabled(boolean value) {
-			definition.setEnabled(value);
-		}
-
 		public final boolean isEnabled() {
-			return definition.isEnabled();
+			return enabled;
 		}
 
 		public abstract void start(boolean enableReomteDebug);
@@ -209,19 +207,22 @@ public abstract class AbstractRunnableServer {
 		// Set the enabled state
 		repository.setEnable(TestConfiguration.getInstance().dbEnabled);
 
-		String dbHost = TestConfiguration.getInstance().getDbHost(serverIdentifier);
+		if (TestConfiguration.getInstance().dbEnabled) {
+			String dbHost = TestConfiguration.getInstance().getDbHost(serverIdentifier);
 
-		// If the DB Host is set add the credentials
-		if (dbHost != null) {
-			repository.getConnection().setUrl("jdbc:postgresql://" + dbHost + ":5432/cot");
-			repository.getConnection().setUsername("martiuser");
-			repository.getConnection().setPassword(serverIdentifier.getDbPassword());
+			// If the DB Host is set add the credentials
+			if (dbHost != null) {
+				repository.getConnection().setUrl("jdbc:postgresql://" + dbHost + ":5432/cot");
+				repository.getConnection().setUsername("martiuser");
+				repository.getConnection().setPassword(serverIdentifier.getDbPassword());
+			}
 		}
 
 		this.offlineConfigModule.enableSwagger();
 		this.offlineConfigModule.saveChanges();
 
-		TestConfiguration.getInstance().configureDatabase(serverIdentifier);
+		if (TestConfiguration.getInstance().dbEnabled)
+			TestConfiguration.getInstance().configureDatabase(serverIdentifier);
 
 		// Changing the flow tag to match the server ID
 		this.offlineConfigModule.setFlowTag(serverIdentifier.getConsistentUniqueReadableIdentifier());
@@ -253,6 +254,7 @@ public abstract class AbstractRunnableServer {
 		this.getOfflineConfigModule().sethttpPlaintextPort(serverIdentifier.getHttpPlaintextPort());
 		this.getOfflineConfigModule().setHttpsPort(serverIdentifier.getHttpsPort());
 		this.getOfflineConfigModule().setIgnitePortRange(serverIdentifier.getIgniteDiscoveryPort(), serverIdentifier.getIgniteDiscoveryPortCount());
+		this.getOfflineConfigModule().setSSLSecuritySettings();
 
 		serverState = ServerState.DEPLOYING;
 
@@ -266,11 +268,14 @@ public abstract class AbstractRunnableServer {
 		if (!isRunning()) {
 			throw new RuntimeException("Server '" + serverIdentifier.getConsistentUniqueReadableIdentifier() + "' appears to have shutdown immediately after starting. Please ensure another server isn't already running and your config is valid!");
 		}
-
-		onlineInputModule.init(serverIdentifier);
-
-		if (isFileAuthEnabled) {
-			onlineFileAuthModule.init(serverIdentifier);
+		
+		// ignore online input module for fedhub
+		if (!serverIdentifier.getConsistentUniqueReadableIdentifier().contains("FEDHUB")) {
+			onlineInputModule.init(serverIdentifier);
+			
+			if (isFileAuthEnabled) {
+				onlineFileAuthModule.init(serverIdentifier);
+			}
 		}
 	}
 
@@ -295,6 +300,7 @@ public abstract class AbstractRunnableServer {
 							String.join("\"\n\t\"", failures) + "\n There is a good chance the tests may fail!");
 				}
 			}
+			TAKCLCore.defaultStderr.println(errorBuilder);
 			Assert.fail(errorBuilder.toString());
 		}
 	}
@@ -351,6 +357,17 @@ public abstract class AbstractRunnableServer {
 			logger.info("Killing server " + serverIdentifier + "...");
 			innerKillServer();
 		}
+	}
+	
+	public final void enableFederationHubProcess() {	
+		// federation hub enabled, disable all other services
+		ServerProcessDefinition.FederationHubPolicy.setEnabled(true);
+		ServerProcessDefinition.FederationHubBroker.setEnabled(true);
+		
+		ServerProcessDefinition.MessagingService.setEnabled(false);
+		ServerProcessDefinition.ApiService.setEnabled(false);	
+		ServerProcessDefinition.RetentionService.setEnabled(false);
+		ServerProcessDefinition.PluginManager.setEnabled(false);
 	}
 
 	public final void enableRetentionProcess(boolean value) {
