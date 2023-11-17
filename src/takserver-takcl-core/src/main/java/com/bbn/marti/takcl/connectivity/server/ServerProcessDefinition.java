@@ -93,7 +93,7 @@ public enum ServerProcessDefinition {
 	}
 
 	public final List<String> waitForMissingLogStatements(@NotNull AbstractServerProfile serverIdentifier,
-	                                                       @NotNull Path takserverLogsPath, int maxWaitDuration) {
+	                                                       @NotNull Path takserverLogsPath, int maxWaitTimeMs) {
 		boolean serverReady = false;
 		int duration = 0;
 		List<String> remainingStatementsToSee = new ArrayList<>(this.logWatchValues);
@@ -101,7 +101,7 @@ public enum ServerProcessDefinition {
 		File logFile = takserverLogsPath.resolve(this.logPath).toFile();
 
 		try {
-			while (!serverReady && duration < maxWaitDuration) {
+			while (!serverReady && duration < maxWaitTimeMs) {
 				if (!logFile.exists()) {
 					Thread.sleep(500);
 					duration += 500;
@@ -143,7 +143,7 @@ public enum ServerProcessDefinition {
 			if (serverReady) {
 				System.out.println("Server process " + this.identifier + " appears to be ready based on log statements after " + duration + " ms");
 			} else {
-				System.out.println("Server process " + this.identifier + " init timeout of " + maxWaitDuration + " ms reached. The following log statements were not seen:\n\t" +
+				System.out.println("Server process " + this.identifier + " init timeout of " + maxWaitTimeMs + " ms reached. The following log statements were not seen:\n\t" +
 						String.join("\"\n\t\"", remainingStatementsToSee) + "\n There is a good chance the tests may fail!");
 			}
 		} catch (InterruptedException | IOException e) {

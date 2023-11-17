@@ -23,17 +23,16 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.authentication.AuthenticationDetailsSource;
-import org.springframework.security.authentication.AuthenticationEventPublisher;
-import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.security.oauth2.common.exceptions.OAuth2Exception;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import com.bbn.marti.oauth.AuthCookieUtils;
@@ -168,29 +167,29 @@ public class OAuth2AuthenticationProcessingFilter implements Filter, Initializin
 
             }
         }
+        // Begin TAK mods
+        catch (ExpiredJwtException expiredJwtException) {
+            // remove the expired access token to avoid another ExpiredJwtException
+            response.setHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
+                    OAuth2AccessToken.ACCESS_TOKEN, null, 0, true).toString());
+
+            response.setHeader("Location", "/login/refresh");
+            response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
+            return;
+        }
         catch (OAuth2Exception failed) {
             SecurityContextHolder.clearContext();
-
             if (debug) {
                 logger.debug("Authentication request failed: " + failed);
             }
 
-            // Begin TAK mods
             AuthCookieUtils.logout(request, response, null);
-
-//            eventPublisher.publishAuthenticationFailure(new BadCredentialsException(failed.getMessage(), failed),
-//                    new PreAuthenticatedAuthenticationToken("access-token", "N/A"));
-//
-//            authenticationEntryPoint.commence(request, response,
-//                    new InsufficientAuthenticationException(failed.getMessage(), failed));
-//
-            // End TAK mods
-
             return;
         }
 
         chain.doFilter(request, response);
     }
+    // End TAK mods
 
     private boolean isAuthenticated() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

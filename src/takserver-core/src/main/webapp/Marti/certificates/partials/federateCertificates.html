@@ -22,6 +22,7 @@
 					  	<th>Serial Number</th>
 					  	<th>&nbsp;</th>
 						<th>&nbsp;</th>
+					  	<th>Max hops</th>
 					</tr>
 				</thead>
 				
@@ -32,6 +33,7 @@
 					    <td data-ng-bind="fc.serialNumber"></td>
 					    <td><a class="nav" data-ng-click="deleteCertificate(fc.fingerPrint, fc.serialNumber)">Delete</a></td>
 						<td><a class="nav" href="#!/editFederateCAGroups/{{fc.fingerPrint | encodeURIComponent}}">Manage CA Groups</a> </td>
+						<td><input ng-change="saveHops(fc)" data-ng-model="fc.maxHops" class="nav" type="number" min="-1"></td>
 					</tr>
 				</tbody>
 			</table>

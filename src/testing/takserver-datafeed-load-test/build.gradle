@@ -1,3 +1,6 @@
+apply plugin: 'java-library'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
 
 repositories {
   maven {
@@ -11,12 +14,21 @@ repositories {
 
 apply plugin: 'com.github.johnrengelman.shadow'
 
-// support building a single jar that contains plugin code and also dependencies
-shadowJar { }
+buildscript {
+  repositories {
+    mavenCentral()
+    maven {
+      url 'https://plugins.gradle.org/m2'
+    }
+  }
+  dependencies {
+    classpath 'gradle.plugin.com.github.johnrengelman:shadow:' + gradle_shadow_version
+  }
+}
 
 dependencies {
 
-  compile group: 'gov.tak', name: 'takserver-plugins', version: takserver_plugins_version, classifier: 'all'
+  implementation group: 'gov.tak', name: 'takserver-plugins', version: takserver_plugins_version, classifier: 'all'
 
   // add additional depenencies as required for your TAK Server plugin
 }

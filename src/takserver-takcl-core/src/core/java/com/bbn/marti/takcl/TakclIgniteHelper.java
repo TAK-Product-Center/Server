@@ -14,6 +14,7 @@ import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.logger.slf4j.Slf4jLogger;
 import org.apache.ignite.spi.communication.tcp.TcpCommunicationSpi;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
+import org.apache.ignite.spi.discovery.tcp.ipfinder.kubernetes.TcpDiscoveryKubernetesIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -288,8 +289,13 @@ public class TakclIgniteHelper {
 
 		IgniteConfiguration igniteConfiguration;
 		if (serverConfigurationMap.containsKey(tag)) {
-			logger.debug("Getting Existing Server Configuration for " + serverProfile);
+			logger.debug("Getting Existing Server Configuration from CoreConfig.xml for " + serverProfile);
 			igniteConfiguration = serverConfigurationMap.get(tag);
+
+		} else if (k8sMode) {
+			logger.debug("Getting Cluster Server Configuration for " + serverProfile);
+			igniteConfiguration = createClusterIgniteConfiguration();
+
 		} else {
 			try {
 				logger.debug("Creating new Server Configuration for " + serverProfile);
@@ -348,6 +354,22 @@ public class TakclIgniteHelper {
 		igniteInstances.clear();
 		serverConfigurationMap.clear();
 		logger.debug("Cached Ignite Data Cleared");
+	}
+
+	private static synchronized IgniteConfiguration createClusterIgniteConfiguration() {
+		IgniteConfiguration conf = new IgniteConfiguration();
+		TcpDiscoverySpi tds = new TcpDiscoverySpi();
+
+		TcpDiscoveryKubernetesIpFinder ipFinder = new TcpDiscoveryKubernetesIpFinder();
+
+		ipFinder.setServiceName("takserver-ignite");
+		ipFinder.setNamespace("takserver");
+
+		tds.setIpFinder(ipFinder);
+		conf.setDiscoverySpi(tds);
+		conf.setClientMode(true);
+		conf.setUserAttributes(Collections.singletonMap(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME));
+		return conf;
 	}
 
 	private static synchronized IgniteConfiguration createOldIgniteConfiguration(@NotNull AbstractServerProfile serverProfile) {

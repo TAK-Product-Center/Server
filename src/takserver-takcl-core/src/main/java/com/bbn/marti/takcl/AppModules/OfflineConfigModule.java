@@ -1,6 +1,9 @@
 package com.bbn.marti.takcl.AppModules;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -11,6 +14,8 @@ import java.util.Set;
 
 import javax.xml.bind.JAXBException;
 
+import com.bbn.marti.takcl.TAKCLCore;
+import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -68,10 +73,6 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 
 	@Override
 	public void init(@NotNull AbstractServerProfile serverIdentifier) {
-		// TODO: This is a little hacky...
-		if (!serverIdentifier.getUrl().equals("127.0.0.1") && !serverIdentifier.getUrl().equals("localhost")) {
-			throw new RuntimeException("Cannot access the offline user auth file without a known server path!");
-		}
 
 		fileLocation = serverIdentifier.getUserAuthFilePath();
 		this.server = serverIdentifier;
@@ -231,7 +232,7 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 				}
 			}
 
-		} else if (connectionType == ProtocolProfiles.ConnectionType.DATAFEED){
+		} else if (connectionType == ProtocolProfiles.ConnectionType.DATAFEED) {
 			Set<String> feedNameSet = new HashSet<>();
 			for (DataFeed loopFeed : getDataFeeds()) {
 				feedNameSet.add(loopFeed.getName());
@@ -415,8 +416,8 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 
 	public void setSSLSecuritySettings() {
 		SSLHelper ssl = SSLHelper.getInstance();
-		String keystorePath = server.getServerPath() + "keystore.jks";
-		String truststorePath = server.getServerPath() + "truststore.jks";
+		String keystorePath = server.getServerPath() + "certs/files/keystore.jks";
+		String truststorePath = server.getServerPath() + "certs/files/truststore.jks";
 
 		if (!Files.exists(Paths.get(keystorePath))) {
 			ssl.copyServerKeystoreJks(server.getConsistentUniqueReadableIdentifier(), keystorePath);
@@ -432,12 +433,30 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 		tls.setKeymanager("SunX509");
 
 		tls.setKeystore("JKS");
-		tls.setKeystoreFile(keystorePath);
 		tls.setKeystorePass(ssl.getKeystorePass());
 
 		tls.setTruststore("JKS");
-		tls.setTruststoreFile(truststorePath);
 		tls.setTruststorePass(ssl.getTruststorePass());
+
+		if (TAKCLCore.k8sMode) {
+			tls.setKeystoreFile("/certs/files/takserver.jks");
+			tls.setTruststoreFile("/certs/files/truststore.jks");
+
+			if (configuration.getFederation() != null && configuration.getFederation().getFederationServer() != null &&
+					configuration.getFederation().getFederationServer().getTls() != null) {
+				Tls fedTls = configuration.getFederation().getFederationServer().getTls();
+
+				fedTls.setContext("TLSv1.2");
+				fedTls.setKeymanager("SunX509");
+				fedTls.setKeystore("JKS");
+				fedTls.setKeystoreFile("/certs/files/takserver.jks");
+				fedTls.setKeystorePass(ssl.getKeystorePass());
+			}
+
+		} else {
+			tls.setKeystoreFile(keystorePath);
+			tls.setTruststoreFile(truststorePath);
+		}
 
 		// TODO: There is probably a better way to do this
 //        if (configuration.getFederation() == null) {

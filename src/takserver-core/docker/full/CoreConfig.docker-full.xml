@@ -69,7 +69,7 @@
     </subscription>
 
     <repository enable="true" numDbConnections="16" primaryKeyBatchSize="500" insertionBatchSize="500">
-      <connection url="jdbc:postgresql://tak-database:5432/cot" username="martiuser" password="" />
+      <connection url="jdbc:postgresql://tak-database:9999/cot" username="martiuser" password="" />
     </repository>
 
     <repeater enable="true" periodMillis="3000" staleDelayMillis="15000">

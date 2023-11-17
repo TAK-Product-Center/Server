@@ -9,7 +9,7 @@ mkdir -p "$DIR"
 cd "$DIR"
 
 usage() {
-  echo "Usage: ./makeCert.sh [server|client|ca] <common name>"
+  echo "Usage: ./makeCert.sh [server|client|ca|dbclient] <common name>"
   echo "  If you do not provide a common name on the command line, you will be prompted for one"
   exit -1
 }
@@ -26,6 +26,8 @@ if [ "$1" ]; then
     EXT=client
   elif [ "$1" == "ca" ]; then
     EXT=v3_ca
+  elif [ "$1" == "dbclient" ]; then
+    EXT=client
   else
     usage
   fi
@@ -37,11 +39,16 @@ fi
 if [ "$2" ]; then
   SNAME=$2
 else
-  echo "Please give the common name for your certificate (no spaces).  It should be unique.  If you don't enter anything, or try something under 5 characters, I will make one for you"
-  read SNAME
-  canamelen=${#SNAME}
-  if [[ "$canamelen" -lt 5 ]]; then
-    SNAME=`date +%N`
+  if [ "$1" == "dbclient" ]; then
+    echo "Use default name martiuser for database client certificate"
+    SNAME=martiuser
+  else
+    echo "Please give the common name for your certificate (no spaces).  It should be unique.  If you don't enter anything, or try something under 5 characters, I will make one for you"
+    read SNAME
+    canamelen=${#SNAME}
+    if [[ "$canamelen" -lt 5 ]]; then
+      SNAME=`date +%N`
+    fi
   fi
 fi
 
@@ -79,12 +86,17 @@ if [[ "$1" == "ca" ]]; then
   openssl x509 -in "${SNAME}".pem  -addtrust clientAuth -addtrust serverAuth -setalias "${SNAME}" -out "${SNAME}"-trusted.pem
 fi
 
+# Convert the database client private key to PKCS#8 format to use in TAK Server configuration file
+if [[ "$1" == "dbclient" ]]; then
+  openssl pkcs8 -topk8 -outform DER -in "${SNAME}".key -passin pass:$PASS -out "${SNAME}".key.pk8 -nocrypt
+fi
+
 # now add the chain
 cat ca.pem >> "${SNAME}".pem
 cat ca-trusted.pem >> "${SNAME}"-trusted.pem
 
 # now make pkcs12 and jks keystore files
-if [[ "$1" == "server" ||  "$1" == "client" ]]; then
+if [[ "$1" == "server" ||  "$1" == "client" || "$1" == "dbclient" ]]; then
   openssl pkcs12 ${LEGACY_PROVIDER} -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}".p12 -name "${SNAME}" -CAfile ca.pem -passin pass:${PASS} -passout pass:${PASS}
   keytool -importkeystore -deststorepass "${PASS}" -destkeypass "${PASS}" -destkeystore "${SNAME}".jks -srckeystore "${SNAME}".p12 -srcstoretype PKCS12 -srcstorepass "${PASS}" -alias "${SNAME}"
 else # a CA
@@ -113,3 +125,6 @@ else # a CA
   fi
 
 fi
+
+chmod og-rwx "${SNAME}".key
+

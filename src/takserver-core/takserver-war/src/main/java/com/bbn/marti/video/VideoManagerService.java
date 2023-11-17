@@ -88,7 +88,7 @@ public class VideoManagerService {
         			if (type != null) {
 						validator.getValidInput("feed type", type.toString(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 					}
-        			validator.getValidInput("feed alias", feed.getAlias(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+        			validator.getValidInput("feed alias", feed.getAlias(), MartiValidatorConstants.Regex.MartiSafeStringWithQuestion.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
         			validator.getValidInput("feed fov", feed.getFov(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
         			validator.getValidInput("feed heading", feed.getHeading(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
         			validator.getValidInput("feed range", feed.getRange(), MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);

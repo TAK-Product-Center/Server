@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
+import com.google.protobuf.GeneratedMessageV3;
 import org.apache.log4j.Logger;
 import org.dom4j.Document;
 import org.dom4j.io.SAXReader;
@@ -225,6 +226,28 @@ public class StreamingProtoBufProtocol extends AbstractBroadcastingProtocol<CotE
         }
     }
 
+    public static ByteBuffer convertGeneratedMessageV3ToProtoBufBytes(GeneratedMessageV3 message) {
+        try {
+            int messageSize = message.getSerializedSize();
+            int sizeOfSize = CodedOutputStream.computeUInt32SizeNoTag(messageSize);
+            ByteBuffer buffer = ByteBuffer.allocate(1 + sizeOfSize + messageSize);
+
+            //
+            // write out the message to the buffer
+            //
+            CodedOutputStream codedOutputStream = CodedOutputStream.newInstance(buffer);
+            codedOutputStream.write(StreamingProtoBufHelper.MAGIC);
+            codedOutputStream.writeUInt32NoTag(messageSize);
+            message.writeTo(codedOutputStream);
+            ((Buffer) buffer).rewind();
+            return buffer;
+
+        } catch (Exception e) {
+            log.error("exception in convertGeneratedMessageV3ToProtoBufBytes", e);
+            return null;
+        }
+    }
+
     public static ByteBuffer convertCotToProtoBufBytes(CotEventContainer data) {
         ByteBuffer buffer = null;
         try {
@@ -259,21 +282,10 @@ public class StreamingProtoBufProtocol extends AbstractBroadcastingProtocol<CotE
                     log.error("createFileTransferRequest failed!");
                     return null;
                 }
-
-                takMessageSize = takMessage.getSerializedSize();
             }
 
-            int sizeOfSize = CodedOutputStream.computeUInt32SizeNoTag(takMessageSize);
-            buffer = ByteBuffer.allocate(1 + sizeOfSize + takMessageSize);
+            buffer = convertGeneratedMessageV3ToProtoBufBytes(takMessage);
 
-            //
-            // write out the message to the buffer
-            //
-            CodedOutputStream codedOutputStream = CodedOutputStream.newInstance(buffer);
-            codedOutputStream.write(StreamingProtoBufHelper.MAGIC);
-            codedOutputStream.writeUInt32NoTag(takMessageSize);
-            takMessage.writeTo(codedOutputStream);
-            ((Buffer) buffer).rewind();
         }catch(Exception e) {
             log.error("Error converting cot to proto " + e);
         }

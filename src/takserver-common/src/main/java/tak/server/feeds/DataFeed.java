@@ -59,6 +59,8 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 	
 	private boolean federated;
 	
+	private boolean binaryPayloadWebsocketOnly = false;
+	
 	private DataFeed() {}
 	
 	public DataFeed(String uuid, String name, DataFeedType type, List<String> tags) {
@@ -86,6 +88,7 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 		this.filterGroups = datafeed.getFiltergroup();
 		this.syncCacheRetentionSeconds = datafeed.getSyncCacheRetentionSeconds();
 		this.federated = datafeed.isFederated();
+		this.binaryPayloadWebsocketOnly = datafeed.isBinaryPayloadWebsocketOnly();
 		
 		if (datafeed.getPort() == 0) {
 			this.port = null;
@@ -250,6 +253,14 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 		this.federated = federated;
 	}
 	
+	public boolean isBinaryPayloadWebsocketOnly() {
+		return binaryPayloadWebsocketOnly;
+	}
+
+	public void setBinaryPayloadWebsocketOnly(boolean binaryPayloadWebsocketOnly) {
+		this.binaryPayloadWebsocketOnly = binaryPayloadWebsocketOnly;
+	}
+
 	@Override
 	public String toString() {
 		return "DataFeed [uuid=" + uuid + ", name=" + name + ", type=" + type + ", tags=" + tags + ", auth=" + auth
@@ -257,7 +268,8 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 				+ ", iface=" + iface + ", archive=" + archive + ", anongroup=" + anongroup + ", archiveOnly="
 				+ archiveOnly + ", sync=" + sync + ", coreVersion=" + coreVersion + ", coreVersion2TlsVersions="
 				+ coreVersion2TlsVersions + ", filterGroups=" + filterGroups + ", syncCacheRetentionSeconds="
-				+ syncCacheRetentionSeconds + ", federated=" + federated + "]";
+				+ syncCacheRetentionSeconds + ", federated=" + federated + ", binaryPayloadWebsocketOnly="
+				+ binaryPayloadWebsocketOnly + "]";
 	}
 
 	@Override

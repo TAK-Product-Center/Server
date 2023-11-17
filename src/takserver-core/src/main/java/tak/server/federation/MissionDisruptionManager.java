@@ -263,9 +263,12 @@ public class MissionDisruptionManager {
 				ROL changeROL = null;
 				
 				for (MissionChange change : missionChanges) {
+					// don't send mission changes that originated from a federate
+					if (change.getIsFederatedChange()) continue;
+					
 					switch (change.getType()) {
 					case CREATE_MISSION: 
-						MissionMetadata meta = malrc.missionToROLMissionMetadata(fedMission);
+						MissionMetadata meta = MissionActionROLConverter.missionToROLMissionMetadata(fedMission);
 						meta.setName(change.getMissionName());
 						meta.setCreatorUid(change.getCreatorUid());
 						

@@ -93,6 +93,7 @@ import com.bbn.marti.sync.cache.AllCopMissionsCacheKeyGenerator;
 import com.bbn.marti.sync.cache.AllMissionsCacheKeyGenerator;
 import com.bbn.marti.sync.cache.InviteOnlyMissionCacheKeyGenerator;
 import com.bbn.marti.sync.cache.MethodNameMultiStringArgCacheKeyGenerator;
+import com.bbn.marti.sync.federation.MissionChangeAspect;
 import com.bbn.marti.sync.model.MissionChange;
 import com.bbn.marti.sync.model.MissionFeed;
 import com.bbn.marti.sync.repository.DataFeedRepository;
@@ -101,6 +102,7 @@ import com.bbn.marti.sync.repository.LogEntryRepository;
 import com.bbn.marti.sync.repository.MissionChangeRepository;
 import com.bbn.marti.sync.repository.MissionFeedRepository;
 import com.bbn.marti.sync.repository.MissionInvitationRepository;
+import com.bbn.marti.sync.repository.MissionLayerRepository;
 import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.repository.MissionRoleRepository;
 import com.bbn.marti.sync.repository.MissionSubscriptionRepository;
@@ -627,9 +629,14 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 
 		Connection coreDbConnection = config.getRepository().getConnection();
 
-		requireNonNull(requireNonNull(coreDbConnection, "CoreConfig db connection").getUsername(), "CoreConfig db username");
-		requireNonNull(coreDbConnection.getPassword(), "CoreConfig db password");
 		requireNonNull(coreDbConnection.getUrl(), "CoreConfig db url");
+		if (!coreDbConnection.isSslEnabled()) {
+			requireNonNull(requireNonNull(coreDbConnection, "CoreConfig db connection").getUsername(), "CoreConfig db username");
+			requireNonNull(coreDbConnection.getPassword(), "CoreConfig db connection password");	
+		}else {
+			requireNonNull(coreDbConnection.getSslCert(), "CoreConfig db connection ssl cert");
+			requireNonNull(coreDbConnection.getSslKey(), "CoreConfig db connection ssl key");
+		}
 
 		// http session timeout
 		properties.put("server.session.timeout", config.getNetwork().getHttpSessionTimeoutMinutes() * 60);
@@ -825,6 +832,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
     		MissionSubscriptionRepository missionSubscriptionRepository,
     		MissionFeedRepository missionFeedRepository,
 			DataFeedRepository dataFeedRepository,
+    		MissionLayerRepository missionLayerRepository,
     		MapLayerService mapLayerService,
     		GroupManager groupManager,
     		CacheManager cacheManager,
@@ -852,6 +860,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	    		missionSubscriptionRepository,
 	    		missionFeedRepository,
 	    		dataFeedRepository,
+	    		missionLayerRepository,
 	    		mapLayerService,
 	    		groupManager,
 	    		cacheManager,
@@ -1078,6 +1087,11 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	@Bean
 	public MissionServiceAspect missionServiceAspect() {
 		return new MissionServiceAspect();
+	}
+	
+	@Bean
+	public MissionChangeAspect missionChangeAspect() {
+		return new MissionChangeAspect();
 	}
 	
 	@Bean

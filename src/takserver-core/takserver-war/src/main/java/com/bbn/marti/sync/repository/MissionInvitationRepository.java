@@ -10,11 +10,18 @@ import java.util.List;
 
 public interface MissionInvitationRepository extends JpaRepository<MissionInvitation, String> {
 
-    List<MissionInvitation> findAllByMissionNameIgnoreCase(String missionName);
-    MissionInvitation findByToken(String token);
-    MissionInvitation findByMissionNameAndTypeAndInvitee(String missionName, String type, String invitee);
+//    List<MissionInvitation> findAllByMissionNameIgnoreCase(String missionName);
+    
+    List<MissionInvitation> findAllByMissionId(Long missionId);
 
-    @Query(value = "select mi.id, mi.mission_name, mi.invitee, mi.type, mi.creator_uid, mi.create_time, mi.token, mi.role_id  " +
+    
+    MissionInvitation findByToken(String token);
+//    MissionInvitation findByMissionNameAndTypeAndInvitee(String missionName, String type, String invitee);
+
+    MissionInvitation findByMissionIdAndTypeAndInvitee(Long missionId, String type, String invitee);
+
+    
+    @Query(value = "select mi.id, mi.mission_name, mi.invitee, mi.type, mi.creator_uid, mi.create_time, mi.token, mi.role_id, mi.mission_id " +
             "from mission m inner join mission_invitation mi on m.name = mi.mission_name " +
             "where mi.invitee ~* :invitee and mi.type = :type and " + RemoteUtil.GROUP_CLAUSE, nativeQuery = true)
     List<MissionInvitation> findAllMissionInvitationsByInviteeIgnoreCaseAndType(

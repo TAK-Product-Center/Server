@@ -7,13 +7,11 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
-import java.util.Arrays;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManagerFactory;
 
-import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,25 +50,13 @@ public class SSLConfig {
             trust.load(getFileOrResource(config.getTruststoreFile()), config.getTruststorePassword().toCharArray());
             trustMgrFactory.init(trust);
 
-            SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(SslContextBuilder.forServer(keyMgrFactory), SslProvider.OPENSSL) // this ensures that we are using OpenSSL, not JRE SSL
+            sslContext = GrpcSslContexts.configure(SslContextBuilder.forServer(keyMgrFactory), SslProvider.OPENSSL) // this ensures that we are using OpenSSL, not JRE SSL
+            		.protocols("TLSv1.2","TLSv1.3")
             		.trustManager(trustMgrFactory)
-                    .clientAuth(ClientAuth.REQUIRE); // client auth always required
-
-            String context = "TLSv1.2,TLSv1.3";
-
-            String ciphers = config.getCiphers();
-            if (!Strings.isNullOrEmpty(ciphers)) {
-                sslContextBuilder = sslContextBuilder.ciphers(Arrays.asList(ciphers.split(",")));
-                // only set context from config if cipher is also present
-                if (!Strings.isNullOrEmpty(config.getContext())) {
-                    context = config.getContext();
-                }
-            }
-
-            sslContext = sslContextBuilder.protocols(Arrays.asList(context.split(","))).build();
+                    .clientAuth(ClientAuth.REQUIRE) // client auth always required
+                    .build();
 
             return sslContext;
-
         } catch (Exception e) {
             throw new TakException(e);
         }

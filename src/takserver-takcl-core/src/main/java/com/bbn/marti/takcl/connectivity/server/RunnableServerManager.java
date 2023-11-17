@@ -1,9 +1,11 @@
 package com.bbn.marti.takcl.connectivity.server;
 
 import com.bbn.marti.takcl.AppModules.TAKCLConfigModule;
+import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.takcl.TestExceptions;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
+import com.bbn.marti.test.shared.data.servers.MutableServerProfile;
 import com.bbn.marti.tests.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.ignite.Ignition;
@@ -94,11 +96,17 @@ public class RunnableServerManager {
 		cloneFromModelServer(serverIdentifier);
 
 		AbstractRunnableServer newServer;
-		if (serverIdentifier.getUrl().equals(ImmutableServerProfiles.DEFAULT_LOCAL_IP)) {
-			newServer = new LocalRunnableServer(serverIdentifier);
+
+		if (TAKCLCore.k8sMode) {
+			if (serverIdentifier != ImmutableServerProfiles.SERVER_0 &&
+					((serverIdentifier instanceof MutableServerProfile &&
+							((MutableServerProfile) serverIdentifier).baseProfile != ImmutableServerProfiles.SERVER_0))) {
+				throw new RuntimeException("Currently only single-server deployments are supported in cluster mode!");
+			}
+			newServer = new KubernetesRunnableCluster(serverIdentifier);
 
 		} else {
-			newServer = new DockerRunnableServer(serverIdentifier);
+			newServer = new LocalRunnableServer(serverIdentifier);
 		}
 
 		serverMap.put(serverIdentifier.getConsistentUniqueReadableIdentifier(), newServer);
@@ -112,6 +120,7 @@ public class RunnableServerManager {
 				server.stopServer(serverKillDelayMS);
 			}
 			server.offlineFactoryResetServer();
+			server.killServer();
 		}
 		serverMap.clear();
 

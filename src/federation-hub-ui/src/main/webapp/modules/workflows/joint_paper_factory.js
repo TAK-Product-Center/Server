@@ -621,19 +621,19 @@ angular.module('roger_federation.Workflows')
                         addStencilToolip(stencil.graphs.artifacts);
                     } else if (diagramType === "Federation") {
                         stencil.load([
-                            new joint.shapes.bpmn.Activity({
-                                position: { x: 10, y: 10 }, size: { width: 80, height: 80 },
-                                roger_federation: {
-                                    name: "",
-                                    type: "Federate",
-                                    stringId: "",
-                                    description: "",
-                                    attributes: [],
-                                    groups: []
-                                },
-                                graphType: "FederateCell",
-                                icon: "federation"
-                            }),
+                            // new joint.shapes.bpmn.Activity({
+                            //     position: { x: 10, y: 10 }, size: { width: 80, height: 80 },
+                            //     roger_federation: {
+                            //         name: "",
+                            //         type: "Federate",
+                            //         stringId: "",
+                            //         description: "",
+                            //         attributes: [],
+                            //         groups: []
+                            //     },
+                            //     graphType: "FederateCell",
+                            //     icon: "federation"
+                            // }),
                             new joint.shapes.bpmn.Activity({
                                 position: { x: 100, y: 10 }, size: { width: 80, height: 80 },
                                 roger_federation: {
@@ -649,7 +649,7 @@ angular.module('roger_federation.Workflows')
                                 icon: "circle"
                             }),
                             new joint.shapes.bpmn.Activity({
-                                position: { x: 10, y: 100 }, size: { width: 80, height: 80 },
+                                position: { x: 10, y: 10 }, size: { width: 80, height: 80 },
                                 roger_federation: {
                                     name: "",
                                     type: "FederationOutgoing",

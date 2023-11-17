@@ -37,8 +37,8 @@ public interface DataFeedRepository extends JpaRepository<DataFeedDao, Integer> 
 
     @CacheEvict(value = Constants.DATA_FEED_CACHE, allEntries = true)
     @Query(value = "insert into data_feed (uuid, name, type, auth, port, auth_required, protocol, feed_group, iface, archive, anongroup, "
-            + "archive_only, core_version, core_version_tls_versions, sync, sync_cache_retention_seconds, groups, federated) values (:uuid, :name, :type, :auth, :port, :authRequired, :protocol, :feedGroup, "
-            + " :iface, :archive, :anongroup, :archiveOnly, :coreVersion, :coreVersion2TlsVersions, :sync, :syncCacheRetentionSeconds, " + RemoteUtil.GROUP_VECTOR + ", :federated ) returning id", nativeQuery = true)
+            + "archive_only, core_version, core_version_tls_versions, sync, sync_cache_retention_seconds, groups, federated, binary_payload_websocket_only) values (:uuid, :name, :type, :auth, :port, :authRequired, :protocol, :feedGroup, "
+            + " :iface, :archive, :anongroup, :archiveOnly, :coreVersion, :coreVersion2TlsVersions, :sync, :syncCacheRetentionSeconds, " + RemoteUtil.GROUP_VECTOR + ", :federated, :binaryPayloadWebsocketOnly ) returning id", nativeQuery = true)
     Long addDataFeed(@Param("uuid") String uuid, @Param("name") String name, @Param("type") int type,
                      @Param("auth") String auth, @Param("port") Integer port, @Param("authRequired") boolean authRequired,
                      @Param("protocol") String protocol, @Param("feedGroup") String feedGroup, @Param("iface") String iface,
@@ -46,13 +46,13 @@ public interface DataFeedRepository extends JpaRepository<DataFeedDao, Integer> 
                      @Param("archiveOnly") boolean archiveOnly, @Param("coreVersion") int coreVersion,
                      @Param("coreVersion2TlsVersions") String coreVersion2TlsVersions,
                      @Param("sync") boolean sync, @Param("syncCacheRetentionSeconds") int syncCacheRetentionSeconds, @Param("groupVector") String groupVector, 
-                     @Param("federated") boolean federated);
+                     @Param("federated") boolean federated, @Param("binaryPayloadWebsocketOnly") boolean binaryPayloadWebsocketOnly);
 
     
     @CacheEvict(value = Constants.DATA_FEED_CACHE, allEntries = true)
     @Query(value = "update data_feed set name = :name, type = :type, auth = :auth, port = :port, auth_required = :authRequired, protocol = :protocol, "
             + "feed_group = :feedGroup, iface = :iface, archive = :archive, anongroup = :anongroup, archive_only = :archiveOnly, core_version = :coreVersion, "
-            + "core_version_tls_versions = :coreVersion2TlsVersions, sync = :sync, sync_cache_retention_seconds = :syncCacheRetentionSeconds, federated = :federated where uuid = :uuid returning id", nativeQuery = true)
+            + "core_version_tls_versions = :coreVersion2TlsVersions, sync = :sync, sync_cache_retention_seconds = :syncCacheRetentionSeconds, federated = :federated, binary_payload_websocket_only = :binaryPayloadWebsocketOnly where uuid = :uuid returning id", nativeQuery = true)
     Long updateDataFeed(@Param("uuid") String uuid, @Param("name") String name, @Param("type") int type,
                         @Param("auth") String auth, @Param("port") Integer port, @Param("authRequired") boolean authRequired,
                         @Param("protocol") String protocol, @Param("feedGroup") String feedGroup, @Param("iface") String iface,
@@ -60,12 +60,12 @@ public interface DataFeedRepository extends JpaRepository<DataFeedDao, Integer> 
                         @Param("archiveOnly") boolean archiveOnly, @Param("coreVersion") int coreVersion,
                         @Param("coreVersion2TlsVersions") String coreVersion2TlsVersions,
                         @Param("sync") boolean sync, @Param("syncCacheRetentionSeconds") int syncCacheRetentionSeconds,
-                        @Param("federated") boolean federated);
+                        @Param("federated") boolean federated, @Param("binaryPayloadWebsocketOnly") boolean binaryPayloadWebsocketOnly);
 
     @CacheEvict(value = Constants.DATA_FEED_CACHE, allEntries = true)
     @Query(value = "update data_feed set name = :name, type = :type, auth = :auth, port = :port, auth_required = :authRequired, protocol = :protocol, "
             + "feed_group = :feedGroup, iface = :iface, archive = :archive, anongroup = :anongroup, archive_only = :archiveOnly, core_version = :coreVersion, "
-            + "core_version_tls_versions = :coreVersion2TlsVersions, sync = :sync, sync_cache_retention_seconds = :syncCacheRetentionSeconds, groups =" + RemoteUtil.GROUP_VECTOR + ", federated = :federated where uuid = :uuid and " + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+            + "core_version_tls_versions = :coreVersion2TlsVersions, sync = :sync, sync_cache_retention_seconds = :syncCacheRetentionSeconds, groups =" + RemoteUtil.GROUP_VECTOR + ", federated = :federated, binary_payload_websocket_only = :binaryPayloadWebsocketOnly where uuid = :uuid and " + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long updateDataFeedWithGroupVector(@Param("uuid") String uuid, @Param("name") String name, @Param("type") int type,
                         @Param("auth") String auth, @Param("port") Integer port, @Param("authRequired") boolean authRequired,
                         @Param("protocol") String protocol, @Param("feedGroup") String feedGroup, @Param("iface") String iface,
@@ -73,7 +73,7 @@ public interface DataFeedRepository extends JpaRepository<DataFeedDao, Integer> 
                         @Param("archiveOnly") boolean archiveOnly, @Param("coreVersion") int coreVersion,
                         @Param("coreVersion2TlsVersions") String coreVersion2TlsVersions,
                         @Param("sync") boolean sync, @Param("syncCacheRetentionSeconds") int syncCacheRetentionSeconds, @Param("groupVector") String groupVector,
-                        @Param("federated") boolean federated);
+                        @Param("federated") boolean federated, @Param("binaryPayloadWebsocketOnly") boolean binaryPayloadWebsocketOnly);
     
     @CacheEvict(value = Constants.DATA_FEED_CACHE, allEntries = true)
     @Query(value = "delete from data_feed where name = :name and " + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)

@@ -81,9 +81,9 @@ public interface FederatedSubscriptionManager {
 	GuardedStreamHolder<ROL> removeClientROLStreamBySession(String sessionId);
 	GuardedStreamHolder<ROL> getClientROLStreamBySession(String sessionId);
 	
-	void putServerGroupStreamToSession(String sessionId, StreamObserver<FederateGroups> groupStream);
-	StreamObserver<FederateGroups> removeServerGroupStreamBySession(String sessionId);
-	StreamObserver<FederateGroups> getServerGroupStreamBySession(String sessionId);
+	void putServerGroupStreamToSession(String sessionId, GuardedStreamHolder<FederateGroups> groupStreamHolder);
+	GuardedStreamHolder<FederateGroups> removeServerGroupStreamBySession(String sessionId);
+	GuardedStreamHolder<FederateGroups> getServerGroupStreamBySession(String sessionId);
 	
 	void putRemoteContactsMapToChannelHandler(ChannelHandler channelHandler, ConcurrentHashMap<String, RemoteContactWithSA> remoteContactMap);
 	ConcurrentHashMap<String, RemoteContactWithSA> removeRemoteContactsMapByChannelHandler(ChannelHandler channelHandler);

@@ -116,13 +116,16 @@ public class SSLHelper {
 		trustManagerFactory.init(tmks);
 		return (X509TrustManager) trustManagerFactory.getTrustManagers()[0];
 	}
-
-	private static SSLContext initSslContext(String storeType, String password, File keyStoreFile, TrustManager trustManager) throws GeneralSecurityException, IOException {
+	
+	private static KeyManagerFactory initKmf(String storeType, String password, File keyStoreFile) throws GeneralSecurityException, IOException {
 		KeyStore kmks = KeyStore.getInstance(storeType);
 		kmks.load(new FileInputStream(keyStoreFile), password.toCharArray());
 		KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
 		keyManagerFactory.init(kmks, password.toCharArray());
+		return keyManagerFactory;
+	}
 
+	private static SSLContext initSslContext(KeyManagerFactory keyManagerFactory, TrustManager trustManager) throws GeneralSecurityException, IOException {
 		SSLContext theSslContext = SSLContext.getInstance("TLSv1.2");
 		theSslContext.init(keyManagerFactory.getKeyManagers(), new TrustManager[]{trustManager}, null);
 
@@ -134,8 +137,8 @@ public class SSLHelper {
 		try {
 			TAKCLConfigModule conf = TAKCLConfigModule.getInstance();
 			TrustManager trustManager = initTrustManager("PKCS12", conf.getClientKeystorePass(), new File(conf.getTruststoreJKSFilepath()));
-			sslContext = initSslContext("PKCS12", conf.getClientKeystorePass(),
-					new File(conf.getClientKeystoreP12Filepath()), trustManager);
+			KeyManagerFactory kmf = initKmf("PKCS12", conf.getClientKeystorePass(), new File(conf.getClientKeystoreP12Filepath()));
+			sslContext = initSslContext(kmf, trustManager);
 		} catch (GeneralSecurityException | IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -541,6 +544,7 @@ public class SSLHelper {
 
 		private X509TrustManager trustManager;
 		private SSLContext sslContext;
+		private KeyManagerFactory kmf;
 
 		public TakClientSslContext(@NotNull AbstractUser user) {
 			this.userCertPrivateJksPath = user.getCertPrivateJksPath().toFile();
@@ -554,10 +558,15 @@ public class SSLHelper {
 		public SSLSocketFactory getSslSocketFactory() {
 			return sslContext.getSocketFactory();
 		}
+		
+		public KeyManagerFactory getKeyManagerFactory() {
+			return this.kmf;
+		}
 
 		public TakClientSslContext init() throws GeneralSecurityException, IOException {
 			trustManager = initTrustManager(STORETYPE, CLIENT_CERT_PASSWORD, truststoreJksPath);
-			sslContext = initSslContext(STORETYPE, CLIENT_CERT_PASSWORD, userCertPrivateJksPath, trustManager);
+			kmf = initKmf(STORETYPE, CLIENT_CERT_PASSWORD, userCertPrivateJksPath);
+			sslContext = initSslContext(kmf, trustManager);
 			return this;
 		}
 	}

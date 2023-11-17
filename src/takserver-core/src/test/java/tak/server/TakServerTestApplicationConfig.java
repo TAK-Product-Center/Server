@@ -2,6 +2,11 @@ package tak.server;
 
 import java.io.File;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.ignite.Ignite;
@@ -18,12 +23,16 @@ import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.groups.GroupManager;
+import com.bbn.marti.remote.util.ConcurrentMultiHashMap;
 import com.bbn.marti.service.SubscriptionStore;
+import com.bbn.marti.sync.api.PropertiesApi;
+import com.bbn.marti.sync.service.PropertiesService;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Multimap;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
@@ -157,4 +166,64 @@ public class TakServerTestApplicationConfig {
 	SubscriptionStore subscriptionStore() {		
 		return new SubscriptionStore();
 	}
+	
+	@Bean
+	public PropertiesService propertiesService() {
+		return new PropertiesService() {
+
+			@Override
+			public List<String> findAllUids() {
+				List<String> uids = Arrays.asList("1234","2358");
+				return uids;
+			}
+
+			@Override
+			public Map<String, Collection<String>> getKeyValuesByUid(String uid) {
+				if(uid == "1234") {
+					Multimap<String, String> uidKvMap = new ConcurrentMultiHashMap<String, String>();
+					uidKvMap.put("Key1", "value1");
+					uidKvMap.put("Key1", "value2");
+					uidKvMap.put("Key2", "value0");
+					uidKvMap.put("Key2", "value1");
+					return uidKvMap.asMap();
+				} else {
+					return null;
+				}
+			}
+
+			@Override
+			public List<String> getValuesByKeyAndUid(String uid, String key) {
+				if(uid == "1234" && key == "Key1") {
+					List<String> values = new ArrayList<String>();
+					values.add("value1");
+					values.add("value2");
+					return values;
+				} else {
+					return null;
+				}
+			}
+
+			@Override
+			public void putKeyValue(String uid, String key, String value) {
+				
+			}
+
+			@Override
+			public void deleteKey(String uid, String key) {
+				
+			}
+
+			@Override
+			public void deleteAllKeysByUid(String uid) {
+				
+			}
+			
+		};
+	}
+	
+	@Bean 
+	PropertiesApi propertiesApi() {		
+		return new PropertiesApi();
+	}
+	
 }

@@ -30,6 +30,8 @@ public interface FederationManager {
 	List<String> getFederateRemoteGroups(String federateUID);
 	List<String> getCAGroupsInbound(@NotNull String caID);
 	List<String> getCAGroupsOutbound(@NotNull String caID);
+	int getCAMaxHops(String caID);
+	void addMaxHopsToCA(String caID, int maxHops);
 
 	void addFederateToGroupsInbound(@NotNull String federateUID, @NotNull Set<String> localGroupNames);
 	void addFederateToGroupsOutbound(@NotNull String federateUID, @NotNull Set<String> localGroupNames);
@@ -67,7 +69,7 @@ public interface FederationManager {
 	void addCA(X509Certificate ca);
 	void removeCA(X509Certificate ca);
 
-	void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, String notes);
+	void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, String notes, int maxHops);
 	void removeFederate(String federateId);
 
 	List<Federate> getConfiguredFederates();

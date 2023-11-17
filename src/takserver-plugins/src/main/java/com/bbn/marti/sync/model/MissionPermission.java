@@ -26,7 +26,8 @@ public class MissionPermission implements Serializable, Comparable<MissionPermis
         MISSION_SET_ROLE,
         MISSION_SET_PASSWORD,
         MISSION_UPDATE_GROUPS,
-        MISSION_MANAGE_FEEDS
+        MISSION_MANAGE_FEEDS,
+        MISSION_MANAGE_LAYERS
     }
 
     protected static final Logger logger = LoggerFactory.getLogger(MissionPermission.class);

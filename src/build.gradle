@@ -51,7 +51,7 @@ ext {
 
 allprojects {
 
-  apply plugin: 'java'
+  apply plugin: 'java-library'
   apply plugin: 'eclipse'
   apply plugin: 'idea'
 //  apply plugin: 'pmd'
@@ -99,8 +99,7 @@ subprojects {
     }
 
     dependencies {
-      classpath 'com.github.jengelman.gradle.plugins:shadow:' + gradle_shadow_version
-	  classpath 'gradle.plugin.org.openrepose:gradle-jaxb-plugin:2.5.0'
+      classpath 'gradle.plugin.com.github.johnrengelman:shadow:' + gradle_shadow_version
 //      classpath 'gradle.plugin.se.bjurr.violations:violations-gradle-plugin:1.52.2'
 //      classpath 'com.github.jk1:gradle-license-report:1.17'
     }

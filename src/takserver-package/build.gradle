@@ -10,6 +10,8 @@ apply from: "utils/utils.gradle"
 ext {
     // rpm preinstall script
     _preinstall_script = '''\
+echo "takserver-package: preinstall $1 $2"
+
 set +e
 # stop TAK Server if it is running (including older versions)
 pkill -9 -f takserver.jar >/dev/null 2>&1
@@ -29,6 +31,7 @@ uid=`id -u tak 2>/dev/null`
 set -e
 if [ -z "$uid" ] ; then
     # User id 1491 is arbitrary
+    echo "Adding 'tak' user"
     useradd tak -r -u 1491 --no-create-home -d /opt/tak
 fi
 
@@ -39,9 +42,63 @@ fi
 mkdir -p /opt/tak/certs-tmp
 cp /opt/tak/certs/cert-metadata.sh /opt/tak/certs-tmp/. 2>/dev/null || :
 cp /opt/tak/certs/config.cfg /opt/tak/certs-tmp/. 2>/dev/null || :
+
+if [ ! -f /etc/debian_version ]; then
+    # Backup existing retention config files
+    if [ -f /opt/tak/conf/retention/retention-policy.yml ]; then
+        echo "Backing up existing retention policy configuration"
+        cp /opt/tak/conf/retention/retention-policy.yml /opt/tak/conf/retention/retention-policy_bak.yml
+    fi
+
+    if [ -f /opt/tak/conf/retention/retention-service.yml ]; then
+        echo "Backing up existing retention service configuration"
+        cp /opt/tak/conf/retention/retention-service.yml /opt/tak/conf/retention/retention-service_bak.yml
+    fi
+
+    if [ -f /opt/tak/conf/retention/mission-archiving-config.yml ]; then
+        echo "Backing up existing mission archive configuration"
+        cp /opt/tak/conf/retention/mission-archiving-config.yml /opt/tak/conf/retention/mission-archiving-config_bak.yml
+    fi
+    
+    if [ -f /opt/tak/mission-archive/mission-store.yml ]; then
+        echo "Backing up existing mission store"
+        cp /opt/tak/mission-archive/mission-store.yml /opt/tak/mission-archive/mission-store_bak.yml
+    fi
+fi
 '''
+
+    _preuninstall_script = '''\
+echo "takserver-package: preuninstall $1 $2"
+case "$1" in
+    1|upgrade)
+        if [ -f /etc/debian_version ]; then
+            # Backup existing retention config files
+            if [ -f /opt/tak/conf/retention/retention-policy.yml ]; then
+                echo "Backing up existing retention policy configuration"
+                cp /opt/tak/conf/retention/retention-policy.yml /opt/tak/conf/retention/retention-policy_bak.yml
+            fi
+
+            if [ -f /opt/tak/conf/retention/retention-service.yml ]; then
+                echo "Backing up existing retention service configuration"
+                cp /opt/tak/conf/retention/retention-service.yml /opt/tak/conf/retention/retention-service_bak.yml
+            fi
+
+            if [ -f /opt/tak/conf/retention/mission-archiving-config.yml ]; then
+                echo "Backing up existing mission archive configuration"
+                cp /opt/tak/conf/retention/mission-archiving-config.yml /opt/tak/conf/retention/mission-archiving-config_bak.yml
+            fi
+            
+            if [ -f /opt/tak/mission-archive/mission-store.yml ]; then
+                echo "Backing up existing mission store"
+                cp /opt/tak/mission-archive/mission-store.yml /opt/tak/mission-archive/mission-store_bak.yml
+            fi
+        fi
+esac
+'''
+
     // rpm post uninstall script
     _postuninstall_script = '''\
+echo "takserver-package: postuninstall $1 $2"
 case "$1" in
  0|remove)
         # uninstall
@@ -72,6 +129,7 @@ TAK devices on non-multicast networks.
 
 // rpm postinstall script
 def postinstall_script = '''\
+echo "takserver-package: postinstall $1 $2"
 
 export tak_full_version=''' + takversion + '''-''' + takrelease + '''
 
@@ -131,20 +189,41 @@ if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
     mv /opt/tak/db-utils/clear-old-data.sql.bak /opt/tak/db-utils/clear-old-data.sql
 fi
 
+# Reinstate existing retention config files
+if [ -f /opt/tak/conf/retention/retention-policy_bak.yml ]; then
+    echo "Restoring retention policy configuration from backup"
+    mv /opt/tak/conf/retention/retention-policy_bak.yml /opt/tak/conf/retention/retention-policy.yml
+fi
+
+if [ -f /opt/tak/conf/retention/retention-service_bak.yml ]; then
+    echo "Restoring retention service configuration from backup"
+    mv /opt/tak/conf/retention/retention-service_bak.yml /opt/tak/conf/retention/retention-service.yml
+fi
+
+if [ -f /opt/tak/conf/retention/mission-archiving-config_bak.yml ]; then
+    echo "Restoring existing mission archive configuration from backup"
+    mv /opt/tak/conf/retention/mission-archiving-config_bak.yml /opt/tak/conf/retention/mission-archiving-config.yml
+fi
+
+if [ -f /opt/tak/mission-archive/mission-store_bak.yml ]; then
+    echo "Restoring existing mission store from backup"
+    mv /opt/tak/mission-archive/mission-store_bak.yml /opt/tak/mission-archive/mission-store.yml
+fi
+
 # extract takserver.war on Debian based installs
 if [ -f /etc/debian_version ]; then
     sh /opt/tak/setup-for-extracted-war.sh
 fi
 
-echo "Configure or upgrade your TAK Server database:" 
-echo "Run the following: sudo /opt/tak/db-utils/takserver-setup-db.sh" 
-echo "Create login credentials for local adminstrative access to the configuration interface:"
-echo "sudo java -jar /opt/tak/utils/UserManager.jar usermod -A -p <password> <username>"
-echo "For secure operation, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates."
-echo "Using Firefox or Chrome on this computer, browse to this address to verify keystore and truststore configuration:"
-echo "http://localhost:8080" 
-echo "Login with the administrative credentials specified above."
-echo "Follow the rest of the instructions in the Installation section of the configuration guide to complete the setup process." 
+
+sudo /opt/tak/db-utils/takserver-setup-db.sh
+
+echo "By default, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates."
+echo "After generating certificates, use the following command to register an admin account:"
+echo "> sudo java -jar /opt/tak/utils/UserManager.jar certmod -A /opt/tak/certs/files/admin.pem"
+echo "Using Firefox or Chrome on this computer add the admin certificate to the local browser trust and browse to this address to verify keystore and truststore configuration:"
+echo "http://localhost:8443"
+echo "Follow the instructions in the Installation section of the configuration guide to complete the setup process."
 '''
 
 ospackage {
@@ -160,6 +239,7 @@ ospackage {
  url = _url
  summary = _summary
 
+ preUninstall _preuninstall_script
  preInstall _preinstall_script
  postInstall postinstall_script
  postUninstall _postuninstall_script
@@ -174,10 +254,6 @@ ospackage {
 
 
 task prePackage { }
-prePackage.dependsOn ':takserver-core:bootWar'
-prePackage.dependsOn ':takserver-schemamanager:shadowJar'
-prePackage.dependsOn ':takserver-usermanager:shadowJar'
-prePackage.dependsOn ':takserver-takcl-core:publicJar'
 prePackage.dependsOn copyJars
 prePackage.dependsOn copyWars
 prePackage.dependsOn copyCoreConfigXSD
@@ -187,11 +263,21 @@ prePackage.dependsOn copyDbScripts
 prePackage.dependsOn copyDocs
 prePackage.dependsOn copyPolicy
 prePackage.dependsOn copyLicense
-
+prePackage.dependsOn copyAPIScripts
+prePackage.dependsOn copyPluginsJar
+prePackage.dependsOn copyPluginsScripts
+prePackage.dependsOn copyRetentionConfigs
+prePackage.dependsOn copyRetentionJar
+prePackage.dependsOn copyRetentionMissionStoreDir
+prePackage.dependsOn copyRetentionScripts
+prePackage.dependsOn copySchemaManagerJar
 
 buildRpm.dependsOn prePackage
 
 buildDeb.dependsOn prePackage
+
+
+
 
 buildRpm {
   requires('java-11-openjdk-devel')
@@ -229,25 +315,24 @@ task bundleRpmCoreDb(type: Zip) {
 }
 
 task bundlePublishArtifacts(type: Copy) {
-   dependsOn('database:buildRpm', 'federation-hub:buildRpm', 'takserver:buildRpm', 'launcher:buildRpm', 'database:buildDeb', 'federation-hub:buildDeb', 'takserver:buildDeb', 'launcher:buildDeb', 'buildDocker', 'buildHardenedDocker', 'createCIVersionArtifacts', ':takserver-cluster:buildCluster')
+   dependsOn('database:buildRpm', 'federation-hub:buildRpm', 'takserver:buildRpm', 'launcher:buildRpm', 'database:buildDeb', 'federation-hub:buildDeb', 'takserver:buildDeb', 'launcher:buildDeb', 'buildDocker', 'buildIronBankDB', 'buildHardenedDocker', 'buildFullDocker','buildHardenedFullDocker','buildFedhubDocker', 'createCIVersionArtifacts', ':takserver-cluster:buildCluster')
 
     def rpmv = "${takversion}-${takreleaserpm}"
     def zipv = "${takversion}-${takrelease}"
     from("resources/takserver-public-gpg.key",
             "takserver/build/takArtifacts/docs/TAK_Server_Configuration_Guide.pdf",
             "takserver/build/distributions/takserver-${rpmv}.noarch.rpm",
-            "takserver/build/distributions/takserver-docker-${zipv}.zip",
-            "takserver/build/distributions/takserver-docker-full-${zipv}.zip",
-            "takserver/build/distributions/takserver-docker-hardened-${zipv}.zip",
-            "takserver/build/distributions/takserver-docker-hardened-full-${zipv}.zip",
+            "build/distributions/takserver-docker-${zipv}.zip",
+            "build/distributions/takserver-ironbank-db-${zipv}.zip",
+            "build/distributions/takserver-docker-full-${zipv}.zip",
+            "build/distributions/takserver-docker-hardened-${zipv}.zip",
+            "build/distributions/takserver-docker-hardened-full-${zipv}.zip",
             "launcher/build/distributions/takserver-core-${rpmv}.noarch.rpm",
             "database/build/distributions/takserver-database-${rpmv}.noarch.rpm",
             "database/build/distributions/setup-rpm-db.sh",
             "${rootDir}/takserver-cluster/build/distributions/takserver-cluster-${zipv}.zip",
             "federation-hub/build/distributions/takserver-fed-hub-${rpmv}.noarch.rpm",
-//            "API/build/distributions/takserver-api-${tail}",
-//            "build/distributions/takserver-combined-${tail}",
-//            "messaging/build/distributions/takserver-messaging-${tail}",
+            "federation-hub/build/distributions/takserver-fedhub-docker-${zipv}.zip",
             "takserver/build/distributions/takserver_${rpmv}_all.deb",
             "launcher/build/distributions/takserver-core_${rpmv}_all.deb",
             "database/build/distributions/takserver-database_${rpmv}_all.deb",
@@ -257,63 +342,64 @@ task bundlePublishArtifacts(type: Copy) {
 }
 
 task buildFedhubDocker(type: GradleBuild) {
-  group = 'TAKServer'
   description = 'Builds takserver-fedhub-' + takversion + '-' + takreleaserpm + '.zip'
-  buildName = 'buildFedhubDocker'
-  tasks = [
-    'federation-hub:buildRpm',
-    'constructFedhubDockerZip'
-  ]
+  dependsOn('federation-hub:constructFedhubDockerZip')
 }
 
-task buildDocker(type: GradleBuild) {
-  group = 'TAKServer'
+task buildDocker {
   description = 'Builds takserver-docker-' + takversion + '-' + takreleaserpm + '.zip'
-  buildName = 'buildDocker'
-  tasks = [
-    'prePackage',
-    'constructDockerZip'
-  ]
+  dependsOn constructDockerZip
 }
 
-task buildHardenedDocker(type: GradleBuild) {
-  group = 'TAKServer'
+task buildIronBankDB {
+  description = 'takserver-ironbank-db-' + takversion + '-' + takreleaserpm + '.zip'
+  dependsOn constructIronbankDBZip
+}
+
+task buildHardenedDocker {
   description = 'Builds takserver-docker-hardened-' + takversion + '-' + takreleaserpm + '.zip'
-  buildName = 'buildHardenedDocker'
-  tasks = [
-    'prePackage',
-    'constructHardenedDockerZip',
-  ]
+  dependsOn constructHardenedDockerZip
 }
 
-task buildFullDocker(type: GradleBuild) {
-  group = 'TAKServer'
+task buildFullDocker {
   description = 'Builds takserver-docker-full-' + takversion + '-' + takreleaserpm + '.zip'
-  buildName = 'buildFullDocker'
-  tasks = [
-    'prePackage',
-    'constructFullDockerZip'
-  ]
+  dependsOn constructFullDockerZip
 }
 
 
-task buildHardenedFullDocker(type: GradleBuild) {
-    group = 'TAKServer'
+task buildHardenedFullDocker {
     description = 'Builds takserver-docker-hardened-full-' + takversion + '-' + takreleaserpm + '.zip'
-    buildName = 'buildHardenedFullDocker'
-    tasks = [
-            'prePackage',
-            'copyHardenedFullTakserverDockerFiles',
-            'copyHardenedSchemaManagerFiles',
-            'copyPluginsScripts',
-            'copyPluginsJar',
-            'copyRetentionConfigs',
-            'copyRetentionMissionStoreDir',
-            'copyRetentionScripts',
-            'copyRetentionJar',
-            'createVersionFile',
-            'createLogDir',
-            'createPluginsLibDir',
-            'zipHardenedFullTakserverDocker'
-    ]
+    dependsOn constructHardenedFullDockerZip
+}
+
+task createCIVersionArtifact() {
+    // The docker tags, starting with the unique primary docker tag
+    def primaryDockerTag = (takversion + '-' + takreleaserpm).toLowerCase()
+    def dockerTags = [primaryDockerTag]
+    def takVersion = version
+
+    // For properly tagged types, set the appropriate publishPath
+    if (takrelease.contains('RELEASE')) {
+        // If it is a release, also set the x.y version tag
+        dockerTags.add(takversion)
+
+        // If the env var indicates it should be tagged as the latest, tag it as the latest
+        if ("$System.env.TAG_AS_LATEST".toLowerCase() == "true") {
+            dockerTags.add('latest')
+        }
+
+    } else if (!(takrelease.contains('BETA') || takrelease.contains('DEV'))) {
+        // If it is an unknown type, clear the docker tags and set the publish path to dev with branch and hash information
+        primaryDockerTag = ''
+        dockerTags = []
+        takVersion = takversion + '-' + gitbranch.replace('/', '_') + "-" + gitrev.substring(0, 8)
+    }
+
+    // Write as env vars to file that can be easily sourced by CI scripts
+    def tagsStr = dockerTags.join(' ')
+    new File("$projectDir/CI_ENV_VARS").text =
+            "TAK_DOCKER_TAGS=\"$tagsStr\"\n" +
+                    "TAK_VERSION=\"$takVersion\"\n" +
+                    "TAK_RPM_VERSION=\"$takversion-$takreleaserpm\"\n" +
+                    "TAK_DOCKER_PRIMARY_TAG=\"$primaryDockerTag\"\n"
 }

@@ -6,6 +6,8 @@ import java.security.cert.X509Certificate;
 
 import javax.servlet.http.HttpServletRequest;
 
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -157,7 +159,10 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
             authResult = groupManager.authenticate(authenticatorName, user);
         } catch (RemoteLookupFailureException e) {
             throw new CoreCommunicationException("Unable to establish connection with TAK Server core services", e);
-        } catch (OAuth2Exception e) {
+        } catch (OAuth2Exception | JwtException e) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("{}", e.getMessage(), e);
+            }
             throw e;
         } catch (Exception e) {
             throw new BadCredentialsException("Exception performing TAK Server authentication", e);

@@ -47,6 +47,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
     private String readOnlyGroup;
     private String readGroupSuffix;
     private String writeGroupSuffix;
+    private String groupsClaim;
 
 
     public static synchronized OAuthAuthenticator getInstance(GroupManager groupManager) {
@@ -78,6 +79,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
             readOnlyGroup = oauthConf.getReadOnlyGroup();
             readGroupSuffix = oauthConf.getReadGroupSuffix();
             writeGroupSuffix = oauthConf.getWriteGroupSuffix();
+            groupsClaim = oauthConf.getGroupsClaim();
         }
     }
 
@@ -134,8 +136,14 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                 user = new AuthenticatedUser(username, auser.getConnectionId(), auser.getAddress(), auser.getCert(), username, "", "", auser.getConnectionType()); // no password or uid
             }
 
-            // if we have a groups claim in the token, use it to assign groups directly
-            ArrayList<String> groupNames = (ArrayList<String>)claims.get("groups");
+            // try to set groups based on the user_client_roles attribute
+            ArrayList<String> groupNames = (ArrayList<String>) claims.get("user_client_roles");
+
+            // if user_client_roles isn't present, check for the groups attribute
+            if (groupNames == null) {
+                groupNames = (ArrayList<String>) claims.get(groupsClaim);
+            }
+
             if (groupNames != null) {
 
                 Set<String> groupNameSet = LdapAuthenticator.applyGroupPrefixFilter(
@@ -241,8 +249,10 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
             logger.error("rethrowing OAuth2Exception in OAuthAuthenticator!", oAuth2Exception);
             throw oAuth2Exception;
         } catch (JwtException jwtException) {
-            logger.error("rethrowing JwtException as InvalidTokenException!", jwtException);
-            throw new InvalidTokenException(jwtException.getMessage());
+            if (logger.isDebugEnabled()) {
+                logger.debug("rethrowing JwtException as InvalidTokenException!", jwtException);
+            }
+            throw jwtException;
         } catch (Exception e) {
             logger.error("Exception in OAuthAuthenticator!", e);
             authStatus = AuthStatus.FAILURE;

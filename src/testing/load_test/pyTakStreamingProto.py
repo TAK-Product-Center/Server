@@ -22,6 +22,7 @@ from create_proto import CotProtoMessage, get_msg_size
 from mission_api import MissionApiPyTAKHelper
 from utils import p12_to_pem
 
+import stats
 
 class PyTAKStreamingProto:
 
@@ -33,6 +34,9 @@ class PyTAKStreamingProto:
                  self_sa_delta=1.0,
                  mission_config=None,
                  data_dict=None,
+                 ping=False,
+                 ping_interval=1000, # in ms
+                 arr=None,
                  debug=False):
 
         self.certfile = certfile
@@ -42,6 +46,11 @@ class PyTAKStreamingProto:
         self.uid = uid or CotProtoMessage().uid
         self.self_sa_delta = self_sa_delta
         self.last_sa_write = time.time() + self.self_sa_delta
+
+        self.ping = ping
+        self.ping_interval = ping_interval # in ms
+        self.last_ping_write = time.time()*1000 + self.ping_interval # in ms
+        self.arr = arr
 
         if mission_config is not None:
             self.mission_config = mission_config
@@ -153,18 +162,27 @@ class PyTAKStreamingProto:
 
                 next_msg = fullbuffer[:msg_size]
                 fullbuffer = fullbuffer[msg_size:]
-                
-                if self.mission_config.get("react_to_change_message", False):
-                    await self.read_socket.send(next_msg)
-                    
+
+                if self.arr is not None:
+                    self.arr[stats.MESSAGES_RECEIVED_INDEX] += 1
+                # deal with pong messages here, not send it to read_socket
+                proto_message = CotProtoMessage(msg=next_msg)
+                if proto_message.is_pong():
+                    # print("~~~Streaming proto: Received a pong message")
+                    self.arr[stats.MESSAGES_PONG_COUNT_INDEX] += 1
+                    self.arr[stats.TIME_BETWEEN_PING_PONG] += round(time.time()*1000 - self.last_ping_write) # in ms
+                else:
+                    if self.mission_config.get("react_to_change_message", False):
+                        await self.read_socket.send(next_msg)
+
                 connection_data = self.data_dict[self.uid]
                 connection_data['read'] += 1
                 #connection_data['bytes'] += len(data)
                 self.data_dict[self.uid] = connection_data
-                    
+
                 leftovers = None
                 msg_size = 0
-                
+
             data = await reader.read(reader._limit)
             if data == b'':
                 await asyncio.sleep(0.0001)
@@ -214,6 +232,13 @@ class PyTAKStreamingProto:
             self.mission_cot_count[mission] += 1
         self.did_mission_write = True
 
+    async def send_ping(self, writer):
+        ping_message = CotProtoMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]), type="t-x-c-t")
+        writer.write(ping_message.serialize())
+        # print(f"sending Ping: {ping_message.serialize()}")
+        await writer.drain()
+        self.last_ping_write = time.time()*1000 # in ms
+
     async def time_to_write(self):
         while True:
             now = time.time()
@@ -228,6 +253,8 @@ class PyTAKStreamingProto:
                     self.did_mission_write = False
             # if self.data_sync_sess.ready_to_request():
             #     return "data_sync"
+            if (now * 1000 - self.last_ping_write) > self.ping_interval: # in ms
+                return "ping"
             await asyncio.sleep(0.1)
 
     def data_sync_write_target(self, event):
@@ -248,12 +275,32 @@ class PyTAKStreamingProto:
             data_sync_thread = threading.Thread(target=self.data_sync_write_target, args=(data_sync_event,))
             data_sync_thread.start()
             self.last_sa_write = time.time() - self.self_sa_delta
+            self.last_ping_write = time.time()*1000 - self.ping_interval
             while True:
                 write_action = await self.time_to_write()
-                if write_action == "self_sa":
+
+                if write_action == "ping":
+                    await self.send_ping(writer)
+                    # print("~~~Streaming proto: Sent a ping message")
+                    if self.arr is not None:
+                        self.arr[stats.MESSAGES_PING_COUNT_INDEX] += 1
+                        self.arr[stats.MESSAGES_SENT_INDEX] += 1
+
+                elif write_action == "self_sa":
                     await self.send_self_sa(writer)
+                    # print("~~~Streaming proto: Sent send_self_sa")
+                    if self.arr is not None:
+                        self.arr[stats.MESSAGES_SENT_INDEX] += 1
+
                 elif write_action == "mission_cot":
                     await self.send_mission_cot(writer)
+                    # print("~~~Streaming proto: Sent send_mission_cot")
+                    if self.arr is not None:
+                        self.arr[stats.MESSAGES_SENT_INDEX] += 1
+
+                # elif write_action == "data_sync":
+                #     await asyncio.get_event_loop().run_in_executor(self.pool, self.data_sync_sess.make_requests)
+
                 await asyncio.get_event_loop().run_in_executor(self.pool, partial(data_sync_thread.join, timeout=0.1))
                 if not data_sync_thread.is_alive():
                     raise RuntimeError("There was a mission api exception")
@@ -267,13 +314,15 @@ class PyTAKStreamingProto:
             raise
 
 
-
     async def connect_socket(self):
         times_connected = 0
         while True:
             try:
                 self.logger.debug('trying')
                 reader, writer = await asyncio.open_connection(self.address[0], self.address[1], ssl=self.ssl_context)
+                if self.arr is not None:
+                    self.arr[stats.CONNECT_EVENT_COUNT_INDEX] += 1 
+
                 times_connected += 1
                 await self.negotiate_protocol(reader, writer)
                 connection_data = self.data_dict[self.uid]
@@ -288,6 +337,7 @@ class PyTAKStreamingProto:
                     data_sync_port = self.data_sync_sess.port
                     POOL_SIZE = 3
                     self.read_pool = Pool(POOL_SIZE)
+
                     for i in range(POOL_SIZE):
                         self.read_pool.apply_async(read_thread_zmq, args=(port, data_sync_port))
                     await asyncio.sleep(1)
@@ -300,10 +350,10 @@ class PyTAKStreamingProto:
 
                 done, pending = await asyncio.wait([read_task, write_task], return_when=asyncio.FIRST_COMPLETED)
                 for task in pending:
-                    self.logger.error("finishing task: {}".format(task))
+                    self.logger.error("read/write task in pending: {}".format(task))
                     task.cancel()
                 for task in done:
-                    self.logger.error("done task:      {}".format(task))
+                    self.logger.error("read/write task done:      {}".format(task))
                     task.exception()
             except Exception as e:
                 self.logger.error(str(type(e)) + ": " + str(e))
@@ -319,6 +369,9 @@ class PyTAKStreamingProto:
                 if writer is not None:
                     writer.close()
                     writer.transport.abort()
+
+                if self.arr is not None:
+                    self.arr[stats.DISCONNECT_EVENT_COUNT_INDEX] += 1
 
                 connection_data = self.data_dict[self.uid]
                 connection_data['connected'] = False
@@ -339,6 +392,7 @@ def read_thread_zmq(port: int, data_sync_port):
         while True:
             data = socket.recv()
             proto_message = CotProtoMessage(msg=data)
+
             if proto_message.is_sa():
                 continue
 
@@ -359,7 +413,8 @@ def read_thread_zmq(port: int, data_sync_port):
 
 class PyTAKStreamingProtoProcess(multiprocessing.Process):
     def __init__(self, address=None, uid=None, cert=None, password=None, self_sa_delta=5.0,
-                 mission_config=None, data_dict=None):
+                 mission_config=None, data_dict=None,
+                 ping=False, ping_interval=1000, arr=None):
         multiprocessing.Process.__init__(self)
         self.address = address
         self.uid = uid
@@ -369,6 +424,9 @@ class PyTAKStreamingProtoProcess(multiprocessing.Process):
         self.mission_config = mission_config
         self.data_dict = data_dict
         self.agent = None
+        self.ping = ping
+        self.ping_interval = ping_interval
+        self.arr = arr # multiprocessing.Array to store metric data for this client
 
     def run(self):
         try:
@@ -378,7 +436,11 @@ class PyTAKStreamingProtoProcess(multiprocessing.Process):
                                              password=self.password,
                                              self_sa_delta=self.self_sa_delta,
                                              mission_config=self.mission_config,
-                                             data_dict=self.data_dict)
+                                             data_dict=self.data_dict,
+                                             ping=self.ping,
+                                             ping_interval=self.ping_interval,
+                                             arr = self.arr
+                                             )
             if self.uid is None:
                 self.uid = self.agent.uid
             asyncio.get_event_loop().run_until_complete(self.agent.connect_socket())

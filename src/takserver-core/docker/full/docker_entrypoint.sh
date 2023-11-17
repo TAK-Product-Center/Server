@@ -103,7 +103,7 @@ fi
 
 chmod -R 777 ${TR}/data/
 
-python ${TR}/coreConfigEnvHelper.py "${CONFIG}" "${CONFIG}"
+python3 ${TR}/coreConfigEnvHelper.py "${CONFIG}" "${CONFIG}"
 
 # Wait for PGSQL init
 sleep 8
@@ -124,7 +124,7 @@ java -jar -Xmx${PLUGIN_MANAGER_MAX_HEAP}m -Dloader.path=WEB-INF/lib-provided,WEB
 PM_PID=$!
 
 sleep 16
-echo  -e "\033[33;5mWAITING FOR THE SERVER TO START UP BEFORE ADDING THE ADMIN USER...\033[0m" 
+echo  -e "\033[33;5mWAITING FOR THE SERVER TO START UP BEFORE ADDING THE ADMIN USER...\033[0m"
 
 # Give some time for the server to start up
 sleep 44

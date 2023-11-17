@@ -1,0 +1,56 @@
+version: '3.4'
+
+services:
+  takserver:
+    image: hardened-full-takserver:latest
+    env_file:
+      - 'EDIT_ME.env'
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile.hardened-full-takserver
+    volumes:
+      - '../takdata/logs:/opt/tak/logs'
+      - '../takdata/certs:/opt/tak/certs/files'
+    entrypoint: /opt/tak/docker_entrypoint.sh
+    networks:
+      - taknet
+    ports:
+      - '8080:8080'
+      - '8443:8443'
+      - '8444:8444'
+      - '8446:8446'
+      - '8087:8087'
+      - '8088:8088'
+      - '9000:9000'
+      - '9001:9001'
+    depends_on:
+      - takdb_one
+
+  takdb_one:
+    image: hardened-full-takserver-db:latest
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile.hardened-full-takserver-db
+    networks:
+      - taknet
+    ports:
+      - '9999'  # expose the pgpool port which will forward to the postgres DB
+      - '9898'
+      - '9000'
+      - '9694'
+
+  takdb_two:
+    image: hardened-full-takserver-db:latest
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile.hardened-full-takserver-db
+    networks:
+      - taknet
+    ports:
+      - '9999'  # expose the pgpool port which will forward to the postgres DB
+      - '9898'
+      - '9000'
+      - '9694'
+
+networks:
+  taknet:

@@ -1,0 +1,29 @@
+plugins {
+    id "com.github.node-gradle.node" version "3.1.1"
+}
+ 
+apply plugin: 'base'
+apply plugin: "com.github.node-gradle.node"
+ 
+node {
+    version = "18.12.1"
+    download = true
+}
+ 
+task bundle(type: NpmTask, dependsOn: npmInstall) {
+    group = 'bundleAndDeploy'
+    args = ['run', 'build']
+}
+
+task deployToCore(dependsOn: bundle) {
+   group = 'bundleAndDeploy'
+   doLast {
+      copy {
+         from 'build/static'
+         into '../takserver-core/src/main/webapp/Marti/static'
+      }
+   }
+}
+ 
+assemble.dependsOn(deployToCore)
+build.dependsOn(deployToCore)

@@ -8,6 +8,7 @@ import java.util.NavigableSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
+import gov.tak.cop.proto.v1.Binarypayload;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
@@ -85,6 +86,11 @@ public class MessageConverter {
 
 	// Convert CotEventContainer to proto encoding
 	public static byte[] cotToDataMessage(CotEventContainer message, boolean padEmptyGroups, String serverId) {
+		return cotToMessage(message, padEmptyGroups, serverId).toByteArray();
+	}
+
+	// Convert CotEventContainer to proto encoding
+	public static Message cotToMessage(CotEventContainer message, boolean padEmptyGroups, String serverId) {
 
 		Message.Builder mb = Message.newBuilder();
 
@@ -117,6 +123,10 @@ public class MessageConverter {
 		mb.setSource(serverId);
 
 		mb.setPayload(StreamingProtoBufHelper.cot2protoBuf(message));
+
+		if (message.getBinaryPayloads() != null && !message.getBinaryPayloads().isEmpty()) {
+			mb.addAllBloads(message.getBinaryPayloads());
+		}
 
 		String clientId = (String)message.getContext().get(Constants.CLIENT_UID_KEY);
 		if (clientId != null) {
@@ -161,9 +171,10 @@ public class MessageConverter {
 		if (logger.isTraceEnabled()) {
 			logger.trace("TAK proto message converted: " + mb);
 		}
-		
-		return mb.build().toByteArray();
+
+		return mb.build();
 	}
+
 
 	public ROL controlMessageToRol(byte[] controlMessageBytes) throws InvalidProtocolBufferException {
 
@@ -240,6 +251,10 @@ public class MessageConverter {
 		TakMessage takMessage = m.getPayload();
 
 		CotEventContainer cot = StreamingProtoBufHelper.proto2cot(takMessage);
+
+		List<Binarypayload.BinaryPayload> binaryPayloads = m.getBloadsList();
+
+		cot.setBinaryPayloads(binaryPayloads);
 
 		NavigableSet<Group> takGroups = new ConcurrentSkipListSet<>();
 

@@ -38,6 +38,10 @@ public class RemoteSubscription implements Serializable {
    
     @JsonIgnore public AtomicBoolean isWebsocket =  new AtomicBoolean(false);
     
+    @JsonIgnore public AtomicBoolean isLinkedToWebsocket =  new AtomicBoolean(false);
+    
+    @JsonIgnore public String linkedWebsocketConnectionId =  null;
+    
     @JsonIgnore public AtomicBoolean isDataFeed =  new AtomicBoolean(false);
    
     @JsonIgnore @QuerySqlField public UUID originNode;
@@ -53,7 +57,9 @@ public class RemoteSubscription implements Serializable {
     @JsonIgnore @QuerySqlField public AtomicLong writeQueueDepth = new AtomicLong(0L);
     
     @JsonIgnore @QuerySqlField public AtomicLong lastProcTime = new AtomicLong(0L);
-    
+
+    @JsonIgnore @QuerySqlField public AtomicLong lastPingTime = new AtomicLong(0L);
+
     @JsonIgnore public AtomicBoolean hasUpdate = new AtomicBoolean(false);
     
     @JsonIgnore protected static final AtomicLong totalSubmitted = new AtomicLong(0L); 
@@ -142,6 +148,7 @@ public class RemoteSubscription implements Serializable {
         this.numHits = toCopy.numHits;
         this.writeQueueDepth = toCopy.writeQueueDepth;
         this.lastProcTime = toCopy.lastProcTime;
+        this.lastPingTime = toCopy.lastPingTime;
         this.notes = toCopy.notes;
         this.callsign = toCopy.callsign;
         this.clientUid = toCopy.clientUid;
@@ -152,6 +159,8 @@ public class RemoteSubscription implements Serializable {
         this.filterGroups = toCopy.filterGroups;
         this.handlerType = toCopy.handlerType;
         this.isWebsocket = toCopy.isWebsocket;
+        this.isLinkedToWebsocket = toCopy.isLinkedToWebsocket;
+        this.linkedWebsocketConnectionId = toCopy.linkedWebsocketConnectionId;
         setUser(toCopy.getUser());
         this.connectionId = toCopy.connectionId;
         this.username = toCopy.username;

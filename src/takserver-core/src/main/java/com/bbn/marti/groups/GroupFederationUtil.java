@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -600,7 +601,14 @@ public class GroupFederationUtil {
 				if (logger.isDebugEnabled()) {
 					logger.debug("send contact " + contact + " to " + fedSubscription);
 				}
-				fedSubscription.submitLocalContact(FederatedEvent.newBuilder().setContact(contact).build(), System.currentTimeMillis());
+				// attach federate out groups to the contact message
+				List<String> srcGroups = groupManager.getGroups(fedSubscription.getUser())
+						.stream()
+						.filter(g -> g.getDirection() == Direction.OUT)
+						.map(g -> g.getName())
+						.collect(Collectors.toList());
+				
+				fedSubscription.submitLocalContact(FederatedEvent.newBuilder().setContact(contact).addAllFederateGroups(srcGroups).build(), System.currentTimeMillis());
 			});
 		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {

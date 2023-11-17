@@ -106,6 +106,8 @@
       <xs:attribute name="cloudwatchEnable" type="xs:boolean" default="false"/>
       <xs:attribute name="cloudwatchName" type="xs:string" default=""/>
       <xs:attribute name="missionCopTool" type="xs:string" default="vbm"/>
+      <xs:attribute name="pingTimeoutSeconds" type="xs:int"/>
+      <xs:attribute name="pingTimeoutCheckIntervalSeconds" type="xs:int" default="60"/>
     </xs:complexType>
   </xs:element>
 
@@ -155,6 +157,7 @@
             <xs:attribute name="x509groups" type="xs:boolean" default="true"/>
             <xs:attribute name="x509addAnonymous" type="xs:boolean" default="false"/>
             <xs:attribute name="matchGroupInChain" type="xs:boolean" default="false"/>
+            <xs:attribute name="nestedGroupLookup" type="xs:boolean" default="false"/>
             <xs:attribute name="postMissionEventsAsPublic" type="xs:boolean" default="false"/>
             <xs:attribute name="ldapsTruststore" type="xs:string" use="optional"/>
             <xs:attribute name="ldapsTruststoreFile" type="xs:string" use="optional"/>
@@ -441,6 +444,7 @@
     <xs:attribute name="truststorePass" type="xs:string" use="required"/>
     <xs:attribute name="svcUrl" type="xs:string" use="required"/>
     <xs:attribute name="templateName" type="xs:string" use="required"/>
+    <xs:attribute name="trustAllHosts" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <xs:simpleType name="CAType">
@@ -469,9 +473,10 @@
       <xs:annotation>
         <xs:documentation>Security Configuration</xs:documentation>
       </xs:annotation>
-      <xs:all>
+      <xs:sequence>
         <xs:element ref="tls" minOccurs="0"/>
-      </xs:all>
+        <xs:element ref="missionTls" minOccurs="0" maxOccurs="unbounded"/>
+      </xs:sequence>
     </xs:complexType>
   </xs:element>
 
@@ -500,12 +505,20 @@
       <xs:attribute name="truststoreFile" type="xs:string" use="required"/>
       <xs:attribute name="truststorePass" type="xs:string" use="required"/>
       <xs:attribute name="context" type="xs:string" default="TLSv1.2"/>
-      <xs:attribute name="ciphers" type="xs:string" />
       <xs:attribute name="keymanager" type="xs:string" use="required"/>
-      <xs:attribute name="allow128cipher" type="xs:boolean" default="false"/>
-      <xs:attribute name="allowNonSuiteB" type="xs:boolean" default="false"/>
       <xs:attribute name="enableOCSP" type="xs:boolean" default="false"/>
       <xs:attribute name="responderUrl" type="xs:string" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="missionTls">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation/>
+      </xs:annotation>
+      <xs:attribute name="keystore" type="xs:string" use="required"/>
+      <xs:attribute name="keystoreFile" type="xs:string" use="required"/>
+      <xs:attribute name="keystorePass" type="xs:string" use="required"/>
     </xs:complexType>
   </xs:element>
 
@@ -531,7 +544,7 @@
             <xs:attribute name="refreshTokenValidity" type="xs:int"/>
           </xs:complexType>
         </xs:element>
-        <xs:element name="authServer" minOccurs="0" maxOccurs="1">
+        <xs:element name="authServer" minOccurs="0" maxOccurs="unbounded">
           <xs:complexType>
             <xs:annotation>
               <xs:documentation>OAuth authorization server</xs:documentation>
@@ -544,7 +557,8 @@
             <xs:attribute name="scope" type="xs:string"/>
             <xs:attribute name="authEndpoint" type="xs:string" use="required"/>
             <xs:attribute name="tokenEndpoint" type="xs:string" use="required"/>
-            <xs:attribute name="tokenName" type="xs:string" default="access_token"/>
+            <xs:attribute name="accessTokenName" type="xs:string" default="access_token"/>
+            <xs:attribute name="refreshTokenName" type="xs:string" default="refresh_token"/>
             <xs:attribute name="trustAllCerts" type="xs:boolean" default="false"/>
           </xs:complexType>
         </xs:element>
@@ -553,6 +567,7 @@
       <xs:attribute name="readOnlyGroup" type="xs:string" use="optional"/>
       <xs:attribute name="readGroupSuffix" type="xs:string" default="_READ"/>
       <xs:attribute name="writeGroupSuffix" type="xs:string" default="_WRITE"/>
+      <xs:attribute name="groupsClaim" type="xs:string" default="groups"/>
       <xs:attribute name="groupprefix" type="xs:string" default=""/>
     </xs:complexType>
   </xs:element>
@@ -767,6 +782,11 @@
       <xs:attribute name="url" type="xs:string" default="jdbc:postgresql://127.0.0.1:5432/cot"/>
       <xs:attribute name="username" type="xs:string" default="martiuser"/>
       <xs:attribute name="password" type="xs:string" default=""/>
+      <xs:attribute name="sslEnabled" type="xs:boolean" default="false"/>
+      <xs:attribute name="sslMode" type="xs:string" default="verify-ca"/>
+      <xs:attribute name="sslCert" type="xs:string" default=""/>
+      <xs:attribute name="sslKey" type="xs:string" default=""/>
+      <xs:attribute name="sslRootCert" type="xs:string" default=""/>
     </xs:complexType>
   </xs:element>
 
@@ -849,7 +869,6 @@
             </xs:attribute>
             <xs:attribute name="initializationDelaySeconds" type="xs:int" default="30"/>
             <xs:attribute name="maxMessageSizeBytes" type="xs:int" default="1073741824"/>
-            
           </xs:complexType>
         </xs:element>
 
@@ -959,7 +978,12 @@
                 <xs:annotation>
                   <xs:documentation>If true, remote groups are automatically mapped to local groups for this federate.</xs:documentation>
                 </xs:annotation>
-              </xs:attribute>		
+              </xs:attribute>	
+              <xs:attribute name="maxHops" type="xs:int" default="-1">
+                <xs:annotation>
+                  <xs:documentation>How many hops a federate message can make</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>	              	
             </xs:complexType>
           </xs:element>
         </xs:sequence>
@@ -992,7 +1016,8 @@
                 <xs:annotation>
                   <xs:documentation>The fingerprint of the issuing authority for the Federate CA</xs:documentation>
                 </xs:annotation>
-              </xs:attribute>
+              </xs:attribute>	
+              <xs:attribute name="maxHops" type="xs:int" default="-1"/>
             </xs:complexType>
           </xs:element>
         </xs:sequence>
@@ -1195,6 +1220,8 @@
 			type="xs:string" use="optional" default="TLSv1.2,TLSv1.3" />
 		<xs:attribute name="federated" type="xs:boolean"
             default="true" />
+        <xs:attribute name="binaryPayloadWebsocketOnly" type="xs:boolean"
+            default="false" />
 	</xs:complexType>
 	
 	<xs:complexType name="dataFeed">
@@ -1258,6 +1285,12 @@
   <xs:element name="profile">
     <xs:complexType>
       <xs:attribute name="useStreamingGroup" type="xs:boolean" default="false"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="metrics">
+    <xs:complexType>
+      <xs:attribute name="dataFeedStatsIntervalMillis" type="xs:int" default="2000"/>
     </xs:complexType>
   </xs:element>
 

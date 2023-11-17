@@ -47,9 +47,6 @@ public class OfflineFileAuthModule implements ServerAppModuleInterface, Advanced
 	public synchronized void init(@NotNull AbstractServerProfile serverIdentifier) throws EndUserReadableException {
 		// TODO: This is a little hacky...
 		if (!isInitialized) {
-			if (!serverIdentifier.getUrl().equals("127.0.0.1") && !serverIdentifier.getUrl().equals("localhost")) {
-				throw new EndUserReadableException("Cannot access the offline user auth file without a known server path!");
-			}
 
 			fileLocation = serverIdentifier.getUserAuthFilePath();
 			File f = new File(fileLocation);

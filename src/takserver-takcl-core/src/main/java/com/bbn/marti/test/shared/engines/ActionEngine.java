@@ -7,10 +7,12 @@ import com.bbn.marti.takcl.SSLHelper;
 import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.takcl.TestExceptions;
 import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
+import com.bbn.marti.takcl.connectivity.server.KubernetesHelper;
 import com.bbn.marti.takcl.connectivity.server.RunnableServerManager;
 import com.bbn.marti.takcl.connectivity.implementations.UnifiedClient;
 import com.bbn.marti.takcl.connectivity.interfaces.ClientResponseListener;
 import com.bbn.marti.takcl.connectivity.missions.MissionModels;
+import com.bbn.marti.takcl.connectivity.server.ServerProcessDefinition;
 import com.bbn.marti.test.shared.CotGenerator;
 import com.bbn.marti.test.shared.TestConnectivityState;
 import com.bbn.marti.test.shared.data.GroupProfiles;
@@ -23,6 +25,7 @@ import com.bbn.marti.test.shared.data.users.AbstractUser;
 import com.bbn.marti.test.shared.data.users.MutableUser;
 import com.bbn.marti.test.shared.engines.state.StateEngine;
 import com.bbn.marti.test.shared.engines.state.UserState;
+import io.kubernetes.client.openapi.ApiException;
 
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
@@ -600,6 +603,23 @@ public class ActionEngine implements EngineInterface {
 	public void engineFactoryReset() {
 		serverManager.destroyAllServers(SERVER_KILL_DELAY_MS);
 		sleep(SLEEP_TIME_SERVER_STOP);
+
+		// Just in case stray instances are running...
+		if (TAKCLCore.k8sMode) {
+			KubernetesHelper kh = new KubernetesHelper();
+			for (ServerProcessDefinition spd : ServerProcessDefinition.values()) {
+				try {
+					kh.terminateProcessPods(spd);
+				} catch (Exception e) {
+					// Pass
+				}
+			}
+			try {
+				kh.waitForProcessShutdown(Arrays.asList(ServerProcessDefinition.values()));
+			} catch (ApiException e) {
+				// Pass
+			}
+		}
 		data.clear();
 	}
 

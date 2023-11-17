@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.naming.NamingException;
@@ -25,11 +26,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.atakmap.Tak.ROL;
 import com.bbn.marti.config.DataFeed;
+import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.service.InputManager;
+import com.bbn.marti.remote.sync.MissionExpiration;
 import com.bbn.marti.remote.sync.MissionHierarchy;
 import com.bbn.marti.remote.sync.MissionUpdateDetails;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayer;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayerType;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayer;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayerType;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.Metadata;
@@ -183,7 +190,7 @@ public class FederationROLHandler {
 				processUpdate(rol);
 				break;
 			case "assign":
-				processMissionHierarchyUpdate(rol);
+				processAssign(rol);
 				break;
 			default:
 			}
@@ -205,10 +212,12 @@ public class FederationROLHandler {
 					missionRole = new MissionRole(defaultRole);
 					missionRole.setId(md.getDefaultRoleId());
 				}
-								
-				missionService.createMission(md.getName(), md.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), 
-						md.getDescription(), md.getChatRoom(), md.getBaseLayer(), md.getBbox(), md.getPath(), md.getClassification(), md.getTool(),
-						md.getPasswordHash(), missionRole, md.getExpiration(), md.getBoundingPolygon(), md.getInviteOnly());
+				
+				if (!missionService.exists(md.getName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)))) {
+					missionService.createMission(md.getName(), md.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), 
+							md.getDescription(), md.getChatRoom(), md.getBaseLayer(), md.getBbox(), md.getPath(), md.getClassification(), md.getTool(),
+							md.getPasswordHash(), missionRole, md.getExpiration(), md.getBoundingPolygon(), md.getInviteOnly());
+				}
 			}
 		}
 
@@ -245,88 +254,135 @@ public class FederationROLHandler {
 				logger.debug("recieved ROL update mission from core " + rol.getProgram());
 			}
 
-			if (!(parameters instanceof MissionUpdateDetails)) {
+			if (parameters instanceof MissionUpdateDetails) {
+				MissionUpdateDetails mud = (MissionUpdateDetails) parameters;
+
+				if (!isMissionAllowed(mud.getMissionTool())) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("Not processing non-public mission update " + mud);
+					}
+					return;
+				}
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("mission update details: " + mud);
+				}
+
+				switch (requireNonNull(mud.getChangeType(), "mission update change type")) {
+				case ADD_CONTENT:
+
+					if (!missionService.exists(mud.getMissionName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)))) {
+						missionService.createMission(mud.getMissionName(), mud.getMissionCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), mud.getMissionDescription(), mud.getMissionChatRoom(), null, null, null, null, mud.getMissionTool(), null, null, null, null, false);
+					}
+
+					if (logger.isDebugEnabled()) {
+						logger.debug("adding mission content");
+					}
+					missionService.addMissionContent(mud.getMissionName(), mud.getContent(), mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
+
+					if (logger.isDebugEnabled()) {
+						logger.debug("adding mission content complete");
+					}
+					break;
+				case REMOVE_CONTENT:
+					try {
+						if (requireNonNull(coreConfig.getRemoteConfiguration().getFederation(), "federation CoreConfig").isAllowFederatedDelete()) {
+
+							String hash = null;
+							String uid = null;
+
+							if (!mud.getContent().getHashes().isEmpty()) {
+								hash = mud.getContent().getHashes().get(0);
+							}
+
+							if (!mud.getContent().getUids().isEmpty()) {
+								uid = mud.getContent().getUids().get(0);
+							}
+
+							missionService.deleteMissionContent(mud.getMissionName(), hash, uid, mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
+
+						} else {
+							logger.info("ignoring federated delete content - disabled in CoreConfig");
+						}
+					} catch (Exception e) {
+						logger.warn("exception accessing remote CoreConfig", e);
+					}
+					break;
+				default:
+					throw new IllegalArgumentException("invalid mission change type: " + mud.getChangeType());
+				}
+			} else if (parameters instanceof MissionUpdateDetailsForMapLayer) {
+				
+				MissionUpdateDetailsForMapLayer mud = (MissionUpdateDetailsForMapLayer) parameters;
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("MissionUpdateDetailsForMapLayer: " + mud);
+				}
+				
+				if (mud.getType() == MissionUpdateDetailsForMapLayerType.ADD_MAPLAYER_TO_MISSION) {
+					missionService.addMapLayerToMission(mud.getMissionName(), mud.getCreatorUid(), mud.getMission(), mud.getMapLayer());
+					
+				} else if (mud.getType() ==  MissionUpdateDetailsForMapLayerType.UPDATE_MAPLAYER) {
+					missionService.updateMapLayer(mud.getMissionName(), mud.getCreatorUid(), mud.getMission(), mud.getMapLayer());
+					
+				} else if (mud.getType() == MissionUpdateDetailsForMapLayerType.REMOVE_MAPLAYER_FROM_MISSION) {
+					missionService.removeMapLayerFromMission(mud.getMissionName(), mud.getCreatorUid(), mud.getMission(), mud.getMapLayer().getUid());
+				
+				} else {
+					throw new IllegalArgumentException("invalid MissionUpdateDetailsForMapLayerType: " + mud.getType());
+				}
+			} else if (parameters instanceof MissionUpdateDetailsForMissionLayer){
+				
+				MissionUpdateDetailsForMissionLayer mud = (MissionUpdateDetailsForMissionLayer) parameters;
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("MissionUpdateDetailsForMissionLayer: " + mud);
+				}
+				
+				if (mud.getType() == MissionUpdateDetailsForMissionLayerType.ADD_MISSION_LAYER_TO_MISSION) {
+					String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
+					missionService.addMissionLayer(mud.getMissionName(), mud.getMission(), mud.getUid(), mud.getName(), mud.getMissionLayerType(), mud.getParentUid(), mud.getAfter(), mud.getCreatorUid(), groupVector);
+					
+				} else if (mud.getType() == MissionUpdateDetailsForMissionLayerType.REMOVE_MISSION_LAYER_FROM_MISSION) {
+					String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
+					missionService.removeMissionLayer(mud.getMissionName(), mud.getMission(), mud.getLayerUid(), mud.getCreatorUid(), groupVector);
+				} else {
+					throw new IllegalArgumentException("invalid MissionUpdateDetailsForMissionLayerType: " + mud.getType());
+				}		
+				
+			} else {
 				throw new IllegalArgumentException("invalid parameters object type for mission update action: " + parameters.getClass().getSimpleName());
 			}
-
-			MissionUpdateDetails mud = (MissionUpdateDetails) parameters;
-
-			if (!isMissionAllowed(mud.getMissionTool())) {
-				if (logger.isDebugEnabled()) {
-					logger.debug("Not processing non-public mission update " + mud);
-				}
-				return;
-			}
-
-			if (logger.isDebugEnabled()) {
-				logger.debug("mission update details: " + mud);
-			}
-
-			switch (requireNonNull(mud.getChangeType(), "mission update change type")) {
-			case ADD_CONTENT:
-
-				if (!missionService.exists(mud.getMissionName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)))) {
-					missionService.createMission(mud.getMissionName(), mud.getMissionCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), mud.getMissionDescription(), mud.getMissionChatRoom(), null, null, null, null, mud.getMissionTool(), null, null, null, null, false);
-				}
-
-				if (logger.isDebugEnabled()) {
-					logger.debug("adding mission content");
-				}
-				missionService.addMissionContent(mud.getMissionName(), mud.getContent(), mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
-
-				if (logger.isDebugEnabled()) {
-					logger.debug("adding mission content complete");
-				}
-				break;
-			case REMOVE_CONTENT:
-				try {
-					if (requireNonNull(coreConfig.getRemoteConfiguration().getFederation(), "federation CoreConfig").isAllowFederatedDelete()) {
-
-						String hash = null;
-						String uid = null;
-
-						if (!mud.getContent().getHashes().isEmpty()) {
-							hash = mud.getContent().getHashes().get(0);
-						}
-
-						if (!mud.getContent().getUids().isEmpty()) {
-							uid = mud.getContent().getUids().get(0);
-						}
-
-						missionService.deleteMissionContent(mud.getMissionName(), hash, uid, mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
-
-					} else {
-						logger.info("ignoring federated delete content - disabled in CoreConfig");
-					}
-				} catch (Exception e) {
-					logger.warn("exception accessing remote CoreConfig", e);
-				}
-				break;
-			default:
-				throw new IllegalArgumentException("invalid mission change type: " + mud.getChangeType());
-			}
+			
 		}
 
-		private void processMissionHierarchyUpdate(ROL rol) {
+		private void processAssign(ROL rol) {
 
 			if (logger.isDebugEnabled()) {
-				logger.debug("received ROL setParent mission from core " + rol);
+				logger.debug("received ROL process assign mission from core " + rol);
 			}
 
-			if (!(parameters instanceof MissionHierarchy)) {
-				throw new IllegalArgumentException("invalid parameters object type for mission setParent action: "
-						+ parameters.getClass().getSimpleName());
-			}
+			if (parameters instanceof MissionHierarchy) { // for setParent
+				MissionHierarchy missionHierarchy = (MissionHierarchy) parameters;
 
-			MissionHierarchy missionHierarchy = (MissionHierarchy) parameters;
-
-			if (Strings.isNullOrEmpty(missionHierarchy.getParentMissionName())) {
-				missionService.clearParent(missionHierarchy.getMissionName(),
+				if (Strings.isNullOrEmpty(missionHierarchy.getParentMissionName())) {
+					missionService.clearParent(missionHierarchy.getMissionName(),
+							remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
+				} else {
+					missionService.setParent(missionHierarchy.getMissionName(), missionHierarchy.getParentMissionName(),
+							remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
+				}
+			}else if (parameters instanceof MissionExpiration) {
+				
+				MissionExpiration missionExpiration = (MissionExpiration) parameters;
+				
+				missionService.setExpiration(missionExpiration.getMissionName(), missionExpiration.getMissionExpiration(), 
 						remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
-			} else {
-				missionService.setParent(missionHierarchy.getMissionName(), missionHierarchy.getParentMissionName(),
-						remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
+				
+			}else {
+				throw new IllegalArgumentException("ROL assign mission does not have correct parameters");
 			}
+			
 		}
 	}
 	
@@ -385,7 +441,7 @@ public class FederationROLHandler {
 				if (datafeeds == null || datafeeds.size() == 0) {
 					long dataFeedId = dataFeedRepository.addDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
 							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, meta.isSync(), 
-							meta.getSyncCacheRetentionSeconds(), groupVector, true);
+							meta.getSyncCacheRetentionSeconds(), groupVector, true, false);
 					
 					if (meta.getTags() != null && meta.getTags().size() > 0)
 						dataFeedRepository.addDataFeedTags(dataFeedId, meta.getTags());
@@ -420,13 +476,13 @@ public class FederationROLHandler {
 				if (datafeeds == null || datafeeds.size() == 0) {
 					long dataFeedId = dataFeedRepository.addDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
 							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, meta.isSync(), 
-							meta.getSyncCacheRetentionSeconds(), groupVector, true);
+							meta.getSyncCacheRetentionSeconds(), groupVector, true, false);
 					dataFeedRepository.addDataFeedTags(dataFeedId, meta.getTags());
 				} else {
 					DataFeedDao dataFeed = datafeeds.get(0);
 					dataFeedRepository.updateDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
 							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, 
-							meta.isSync(), meta.getSyncCacheRetentionSeconds(), true);
+							meta.isSync(), meta.getSyncCacheRetentionSeconds(), true, false);
 					
 					dataFeedRepository.removeAllDataFeedTagsById(dataFeed.getId());
 					

@@ -20,9 +20,12 @@ public class MissionMetadata extends Parameters {
     private long defaultRoleId;
     private long expiration;
     private boolean inviteOnly;
-    
-    
-    public String getName() {
+    private String guid;
+     
+    public MissionMetadata() {
+		super();
+	}
+	public String getName() {
         return name;
     }
     public void setName(String name) {
@@ -112,14 +115,20 @@ public class MissionMetadata extends Parameters {
 	public void setInviteOnly(boolean inviteOnly) {
 		this.inviteOnly = inviteOnly;
 	}
-
+	public String getGuid() {
+		return guid;
+	}
+	public void setGuid(String guid) {
+		this.guid = guid;
+	}
 	@Override
 	public String toString() {
-		return "MissionMetadata [name=" + name + ", creatorUid=" + creatorUid + ", description=" + description
-				+ ", chatRoom=" + chatRoom + ", tool=" + tool + ", boundingPolygon=" + boundingPolygon + ", bbox="
-				+ bbox + ", passwordHash=" + passwordHash + ", path=" + path + ", classification=" + classification
-				+ ", baseLayer=" + baseLayer + ", parentMissionId=" + parentMissionId + ", defaultRoleId="
-				+ defaultRoleId + ", expiration=" + expiration + "]";
+		return "MissionMetadata [type=" + type + ", name=" + name + ", creatorUid=" + creatorUid + ", description="
+				+ description + ", chatRoom=" + chatRoom + ", tool=" + tool + ", boundingPolygon=" + boundingPolygon
+				+ ", bbox=" + bbox + ", passwordHash=" + passwordHash + ", path=" + path + ", classification="
+				+ classification + ", baseLayer=" + baseLayer + ", parentMissionId=" + parentMissionId
+				+ ", defaultRoleId=" + defaultRoleId + ", expiration=" + expiration + ", inviteOnly=" + inviteOnly
+				+ ", guid=" + guid + "]";
 	}
 
 }

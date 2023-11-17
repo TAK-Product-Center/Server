@@ -2,14 +2,15 @@
 "use strict";
 
 angular.module('roger_federation.Workflows')
-    .controller('AddFederateGroupController', ['$rootScope', '$scope', '$http', '$stateParams', '$modalInstance', '$timeout', '$log', '$cookieStore', 'growl', 'WorkflowTemplate', 'WorkflowService', 'OntologyService', 'JointPaper', addFederateGroupController]);
+    .controller('AddFederateGroupController', ['$rootScope', '$scope', '$state', '$http', '$stateParams', '$modalInstance', '$timeout', '$log', '$cookieStore', 'growl', 'WorkflowTemplate', 'WorkflowService', 'OntologyService', 'JointPaper', addFederateGroupController]);
 
-function addFederateGroupController($rootScope, $scope, $http, $stateParams, $modalInstance, $timeout, $log, $cookieStore, growl, WorkflowTemplate, WorkflowService, OntologyService, JointPaper) {
+function addFederateGroupController($rootScope, $scope, $state, $http, $stateParams, $modalInstance, $timeout, $log, $cookieStore, growl, WorkflowTemplate, WorkflowService, OntologyService, JointPaper) {
 
     $scope.editorTitle = "Add";
     $scope.editExisting = false;
     $scope.submitInProgress = false;
     $scope.roger_federation = undefined;
+    $scope.activeConnections = undefined;
     $scope.filters = [];
     $scope.knownCas = [];
     var cellView;
@@ -17,6 +18,7 @@ function addFederateGroupController($rootScope, $scope, $http, $stateParams, $mo
     $scope.initialize = function() {
         cellView = JointPaper.inpector.options.cellView;
         $scope.roger_federation = JSON.parse(JSON.stringify(cellView.model.attributes.roger_federation)); //Clone
+        $scope.activeConnections = cellView.model.attributes.activeConnections
         if ($scope.roger_federation.name !== "") {
             $scope.editorTitle = "Modify";
             $scope.editExisting = true;
@@ -57,6 +59,14 @@ function addFederateGroupController($rootScope, $scope, $http, $stateParams, $mo
         $modalInstance.dismiss('cancel');
     };
 
+    $scope.showActiveConnections = function() {
+        if (!$scope.editExisting && JointPaper.inpector !== undefined) {
+            JointPaper.inpector.options.cellView.model.remove();
+        }
+        $rootScope.selectedCa = $scope.roger_federation.name
+        $state.go('workflows.editor.connections');
+    }
+
     $scope.generateGraphNameFromFedId = function(oldValue) {
         if (oldValue === $scope.roger_federation.stringId || $scope.roger_federation.stringId === "" || $scope.roger_federation.stringId === undefined) {
             $scope.roger_federation.stringId = $scope.roger_federation.name;
@@ -67,6 +77,10 @@ function addFederateGroupController($rootScope, $scope, $http, $stateParams, $mo
     $scope.newFilter = function() {
         $state.go('workflows.editor.addBPMNFederatePolicy.addPolicyFilter');
     };
+
+    $scope.modifyCa = function() {
+        $state.go('workflows.editor.modifyCa');
+    }
 
     $scope.uploadFile = function() {
 

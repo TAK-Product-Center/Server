@@ -21,11 +21,11 @@ spec:
               value: "k8cluster"
           resources:
             requests:
-              cpu: {{ .Values.takserver.messaging.resources.requests.cpu }}
-              memory: {{ .Values.takserver.messaging.resources.requests.memory }}
+              cpu: "{{ .Values.takserver.messaging.resources.requests.cpu }}"
+              memory: "{{ .Values.takserver.messaging.resources.requests.memory }}"
             limits:
-              cpu: {{ .Values.takserver.api.resources.limits.cpu }}
-              memory: {{ .Values.takserver.api.resources.limits.memory }}
+              cpu: "{{ .Values.takserver.api.resources.limits.cpu }}"
+              memory: "{{ .Values.takserver.api.resources.limits.memory }}"
           ports:
             - containerPort: 8089
               name: tls-8089
@@ -55,13 +55,13 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ .Values.certConfigMapName}}
+            name: "{{ .Values.certConfigMapName }}"
         - name: core-config
           configMap:
-            name: {{ .Values.coreConfigMapName}}
+            name: "{{ .Values.coreConfigMapName }}"
 
       imagePullSecrets:
-        - name: {{ .Values.imagePullSecret }}
+        - name: "{{ .Values.imagePullSecret }}"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -83,11 +83,11 @@ spec:
           image: "{{ .Values.takserver.api.image.repository }}:{{ .Values.takserver.api.image.tag }}"
           resources:
             requests:
-              cpu: {{ .Values.takserver.api.resources.requests.cpu }}
-              memory: {{ .Values.takserver.api.resources.requests.memory }}
+              cpu: "{{ .Values.takserver.api.resources.requests.cpu }}"
+              memory: "{{ .Values.takserver.api.resources.requests.memory }}"
             limits:
-              cpu: {{ .Values.takserver.api.resources.limits.cpu }}
-              memory: {{ .Values.takserver.api.resources.limits.memory }}
+              cpu: "{{ .Values.takserver.api.resources.limits.cpu }}"
+              memory: "{{ .Values.takserver.api.resources.limits.memory }}"
           ports:
             - containerPort: 8443
               name: http-8443
@@ -118,10 +118,10 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ .Values.certConfigMapName}}
+            name: "{{ .Values.certConfigMapName }}"
         - name: core-config
           configMap:
-            name: {{ .Values.coreConfigMapName}}
+            name: "{{ .Values.coreConfigMapName }}"
 
       imagePullSecrets:
-        - name: {{ .Values.imagePullSecret }}
+        - name: "{{ .Values.imagePullSecret }}"

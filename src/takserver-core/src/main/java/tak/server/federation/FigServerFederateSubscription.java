@@ -21,6 +21,7 @@ import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubscriptionStore;
 
+import io.grpc.stub.StreamObserver;
 import io.micrometer.core.instrument.Metrics;
 
 import static java.util.Objects.requireNonNull;
@@ -38,6 +39,7 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 	
 	private GuardedStreamHolder<FederatedEvent> clientEventStreamHolder;
 	private GuardedStreamHolder<ROL> clientROLEventStreamHolder;
+	private GuardedStreamHolder<FederateGroups> clientGroupEventStreamHolder;
 
 	private String federateId;
 
@@ -231,7 +233,7 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 	public void submitFederateGroups(Set<String> federateGroups) {
 		try {
 			SubscriptionStore.getInstance().getServerGroupStreamBySession(sessionId)
-				.onNext(FederateGroups.newBuilder().addAllFederateGroups(federateGroups).build());
+				.send(FederateGroups.newBuilder().addAllFederateGroups(federateGroups).build());
 		} catch (Exception e) {
 			logger.error("Error submitting server federate groups");
 		}
@@ -242,12 +244,20 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
         return "FigServerFederateSubscription [" + super.toString() + "]";
     }
 	
-	private GuardedStreamHolder<FederatedEvent> lazyGetClientStream() {
+	public GuardedStreamHolder<FederatedEvent> lazyGetClientStream() {
 		if (clientEventStreamHolder == null) {
 			clientEventStreamHolder = SubscriptionStore.getInstanceFederatedSubscriptionManager().getClientStreamBySession(sessionId);
 		}
 		
 		return clientEventStreamHolder;
+	}
+	
+	public GuardedStreamHolder<FederateGroups> lazyGetGroupClientStream() {
+		if (clientGroupEventStreamHolder == null) {
+			clientGroupEventStreamHolder = SubscriptionStore.getInstanceFederatedSubscriptionManager().getServerGroupStreamBySession(sessionId);
+		}
+		
+		return clientGroupEventStreamHolder;
 	}
 	
 	public GuardedStreamHolder<ROL> lazyGetROLClientStream() {

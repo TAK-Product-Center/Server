@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
@@ -15,6 +17,7 @@ import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -22,8 +25,10 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistra
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
+import org.springframework.web.socket.server.HandshakeInterceptor;
 import org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean;
 
+import com.bbn.marti.nio.websockets.BinaryPayloadWebSocketHandler;
 import com.bbn.marti.nio.websockets.TakProtoWebSocketHandler;
 import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.Resources;
@@ -42,11 +47,37 @@ public class WebSocketConfiguration implements WebSocketConfigurer, WebSocketMes
 	public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
 
 		WebSocketHandlerRegistration takProtoHandler = registry.addHandler(new TakProtoWebSocketHandler(), "/takproto/1");
-		
+        
+		WebSocketHandlerRegistration binaryPayloadHandler = registry
+        		.addHandler(new BinaryPayloadWebSocketHandler(), "/payload/1/*")
+        		.addInterceptors(auctionInterceptor());
+
 		if(config.getRemoteConfiguration().getNetwork().isAllowAllOrigins()) {
-			takProtoHandler.setAllowedOrigins("*");
+            takProtoHandler.setAllowedOrigins("*");
+            binaryPayloadHandler.setAllowedOrigins("*");
 		}
 	}
+	
+    public HandshakeInterceptor auctionInterceptor() {
+        return new HandshakeInterceptor() {
+			@Override
+			public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
+					WebSocketHandler wsHandler, Map<String, Object> attributes) throws Exception {
+
+                // Get the URI segment corresponding to the auction id during handshake
+                String path = request.getURI().getPath();
+                String clientUid = path.substring(path.lastIndexOf('/') + 1);
+
+                // This will be added to the websocket session
+                attributes.put("clientUid", clientUid);
+                return true;
+			}
+
+			@Override
+			public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
+					WebSocketHandler wsHandler, Exception exception) {}
+        };
+    }
    
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {

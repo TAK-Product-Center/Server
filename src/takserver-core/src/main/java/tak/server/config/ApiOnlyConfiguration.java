@@ -43,7 +43,7 @@ import com.bbn.marti.sync.service.MissionCacheWarmer;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.spring.RequestHolderBean;
-import com.bbn.marti.util.spring.RequestHolderFilterBean;
+import com.bbn.marti.util.spring.MissionRoleAssignmentRequestHolderFilterBean;
 import com.bbn.metrics.MetricsCollector;
 import com.bbn.metrics.service.DatabaseMetricsService;
 
@@ -231,8 +231,8 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 	}
 
 	@Bean
-	public RequestHolderFilterBean requestHolderFilterBean() {
-		return new RequestHolderFilterBean();
+	public MissionRoleAssignmentRequestHolderFilterBean requestHolderFilterBean() {
+		return new MissionRoleAssignmentRequestHolderFilterBean();
 	}
 
     @Bean

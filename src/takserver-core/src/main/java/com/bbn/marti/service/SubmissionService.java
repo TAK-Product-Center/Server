@@ -148,6 +148,7 @@ import tak.server.cot.CotEventContainer;
 import tak.server.cot.CotParser;
 import tak.server.federation.DistributedFederationManager;
 import tak.server.feeds.DataFeed.DataFeedType;
+import tak.server.feeds.DataFeedStatsHelper;
 import tak.server.ignite.IgniteHolder;
 import tak.server.messaging.MessageConverter;
 
@@ -355,27 +356,34 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         try {
         	Set<String> feedUids = new HashSet<>();
 
+			if (logger.isDebugEnabled()) {
+				logger.debug("Looping through DataFeed list.");
+			}
             for (DataFeed feed : feeds) {
             	if (CollectionUtils.isNotEmpty(feed.getFiltergroup()) && feed.getAuth().equals(AuthType.X_509)) {
                     if (logger.isErrorEnabled()) {
-                        logger.error("You have configured a datafeed with both x509 auth and filter groups, the filter groups will be ignored. " + feed.getFiltergroup());
+                        logger.error("You have configured a datafeed with both x509 auth and filter groups, the filter groups will be ignored. {}", feed.getFiltergroup());
                     }
                 }
                 if (Strings.isNullOrEmpty(feed.getUuid())) {
-                  logger.info("Failed to initialize Data Feed: " + feed.getName() 
-                  +  " because no uuid tag was specified. Here is an auto-generated uuid you can use: <uuid>" 
-                      + UUID.randomUUID().toString() + "</uuid>");
+                  logger.info("Failed to initialize Data Feed: {} because no uuid tag was specified. Here is an auto-generated uuid you can use: <uuid>{}</uuid>", feed.getName(), UUID.randomUUID().toString());
                   continue;
                 }
                 
                 if (feedUids.contains(feed.getUuid())) {
-                  logger.info("Failed to initialize Data Feed: " + feed.getName() + " because a data feed with that uuid already exists.");
+                  logger.info("Failed to initialize Data Feed: {} because a data feed with that uuid already exists.", feed.getName());
                   continue;
                 }
-                
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("Adding DataFeed UUID to set of DataFeed UUIDs.");
+				}
                 feedUids.add(feed.getUuid());
-                
-                DataFeedType feedType = EnumUtils.getEnumIgnoreCase(DataFeedType.class, feed.getType());
+
+				if (logger.isTraceEnabled()) {
+					logger.trace("Setting DataFeed values.");
+				}
+				DataFeedType feedType = EnumUtils.getEnumIgnoreCase(DataFeedType.class, feed.getType());
         		
         		if (feedType == null) {
         			feedType = DataFeedType.Streaming;
@@ -412,13 +420,20 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 				Set<Group> groups = groupManager.findGroups(feed.getFiltergroup());
 				String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
-				
+
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("Checking if DataFeed is already in the repository.");
+				}
 				if (dataFeedRepository.getDataFeedByUUID(feed.getUuid()).size() > 0) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("Updating the DataFeed in the repository.");
+					}
 					dataFeedId = dataFeedRepository.updateDataFeed(feed.getUuid(), feed.getName(), feedType.ordinal(),
 							feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
 							feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
 							feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
-							feed.isSync(), feed.getSyncCacheRetentionSeconds(), feed.isFederated());
+							feed.isSync(), feed.getSyncCacheRetentionSeconds(), feed.isFederated(), feed.isBinaryPayloadWebsocketOnly());
 
 					if (feed.getTag().size() > 0) {
 						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
@@ -430,11 +445,14 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 					}
 				} else {
 					if (dataFeedRepository.getDataFeedByName(feed.getName()).size() != 1) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("Adding the DataFeed to the repository.");
+						}
 						dataFeedId = dataFeedRepository.addDataFeed(feed.getUuid(), feed.getName(), feedType.ordinal(),
 								feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
 								feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
 								feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
-								feed.isSync(), feed.getSyncCacheRetentionSeconds(), groupVector, feed.isFederated());
+								feed.isSync(), feed.getSyncCacheRetentionSeconds(), groupVector, feed.isFederated(), feed.isBinaryPayloadWebsocketOnly());
 
 						if (feed.getTag().size() > 0) {
 							dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
@@ -447,10 +465,16 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 					}
 				}
 
+				if (logger.isDebugEnabled()) {
+					logger.debug("Adding the DataFeed to the list of inputs.");
+				}
                 addInput(feed);
             }
             
             // add input metrics for federation data feeds from DB         
+			if (logger.isDebugEnabled()) {
+				logger.trace("Adding InputMetrics for the Federation DataFeeds.");
+			}
             dataFeedRepository.getFederationDataFeeds().forEach(fedFeed -> {
             	DataFeed datafeed = fedFeed.toInput();
             	addMetric(datafeed, new InputMetric(datafeed));
@@ -477,6 +501,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         // listen for messages on this node's submission topic
         ignite.message().localListen(serverInfo.getSubmissionTopic(), (nodeId, message) -> {
+			if (logger.isDebugEnabled()) {
+				logger.debug("In SubmissionTopic listener within Submission Service.");
+			}
         	if (!(message instanceof byte[])) {
 
         		if (dlogger.isDebugEnabled()) {
@@ -489,6 +516,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         	byte[] protoMessage = (byte[]) message;
 
         	try {
+				if (logger.isDebugEnabled()) {
+					logger.debug("Converting Proto Message to CotEventContainer.");
+				}
         		CotEventContainer cot = messageConverter.dataMessageToCot(protoMessage);
 
         		if (dlogger.isTraceEnabled()) {
@@ -551,6 +581,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         			}
         		}
 
+				if (logger.isDebugEnabled()) {
+					logger.debug("Adding CotEventContainer to InputQueue.");
+				}
         		addToInputQueue(cot);
 
         	} catch (RemoteException | DocumentException e) {
@@ -568,7 +601,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         	// listen for messages from plugins
         	ignite.message().localListen(CommonConstants.PLUGIN_PUBLISH_TOPIC, (nodeId, message) -> {
-
+				if (logger.isDebugEnabled()) {
+					logger.debug("In Plugin Publish Topic listener.");
+				}
         		try {
         			
         			if (logger.isTraceEnabled()) {
@@ -585,7 +620,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         			}
 
         			try {
-
+						if (logger.isTraceEnabled()) {
+							logger.trace("Parse bytes into a Message.");
+						}
         				Message m = Message.parseFrom((byte[]) message);
         				if (m != null) {
         					boolean isInterceptorMessage = false;
@@ -593,7 +630,10 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             				if (provenance != null && provenance.contains(Constants.PLUGIN_INTERCEPTOR_PROVENANCE)) {
             					isInterceptorMessage = true;
             				}
-            				
+
+							if (logger.isDebugEnabled()) {
+								logger.debug("Check if Interceptor Message.");
+							}
         					if (isInterceptorMessage) {
             					// do not republish the message if it is marked as intercepted, submit it directly
         						SubmissionService.this.addToInputQueue(messageConverter.dataMessageToCot(m, false));
@@ -604,18 +644,30 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
             					// Check if the message is a datafeed
             					boolean isDataFeedMessage = false;
+								if (logger.isDebugEnabled()) {
+									logger.debug("Check if DataFeed Message.");
+								}
             					if (m.getFeedUuid() != null && !m.getFeedUuid().isEmpty()) {
             						isDataFeedMessage = true;
             					}
-            					
+
+								if (logger.isDebugEnabled()) {
+									logger.debug("Convert Message to Plugin CotEventContainer.");
+								}
             					CotEventContainer pluginCotEvent = messageConverter.dataMessageToCot(m, false);
             					
             					if (isDataFeedMessage) {
-            						
+
+									if (logger.isDebugEnabled()) {
+										logger.debug("Check if the DataFeed is in cache.");
+									}
             						List<tak.server.plugins.PluginDataFeed> cacheResult = pluginDatafeedCacheHelper.getPluginDatafeed(m.getFeedUuid());
             						
             						if (cacheResult == null) { // Does not have in cache
-            							
+
+										if (logger.isDebugEnabled()) {
+											logger.debug("Not in cache. Check if DataFeed is in the Repository.");
+										}
             							List<DataFeedDao> dataFeedInfo = dataFeedRepository.getDataFeedByUUID(m.getFeedUuid());
                     					if (dataFeedInfo.size() == 0) {
                     						
@@ -633,6 +685,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     								dataFeedInfo.get(0).getGroupVector(), groupManager.getAllGroups());
 
                     						// update cache
+											if (logger.isDebugEnabled()) {
+												logger.debug("Create PluginDataFeed and add to Cache.");
+											}
                     						List<tak.server.plugins.PluginDataFeed> pluginDatafeeds = new ArrayList<>();
                     						tak.server.plugins.PluginDataFeed pluginDataFeed = new tak.server.plugins.PluginDataFeed(
                     								m.getFeedUuid(), dataFeedInfo.get(0).getName(), tags, dataFeedInfo.get(0).getArchive(),
@@ -656,7 +711,13 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         					
                         					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
 
+											if (logger.isDebugEnabled()) {
+												logger.debug("Forward the Plugin CotEventContainer along to other services.");
+											}
 											MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+											if (logger.isDebugEnabled()) {
+												logger.debug("Update InputMetric for DataFeed.");
+											}
 											InputMetric inputMetric = getInputMetric(dataFeed.getName());
 											if (inputMetric != null) {
 												inputMetric.getMessagesReceived().incrementAndGet();
@@ -665,7 +726,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     					}
             							
             						} else { // exist in cache
-            							
+										if (logger.isDebugEnabled()) {
+											logger.debug("Found DataFeed in Cache.");
+										}
             							if (cacheResult.size() == 0) { // datafeed with this uuid does not exist
             								
             								if (logger.isWarnEnabled()) {
@@ -673,6 +736,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             								}
                         					
             							} else {
+											if (logger.isDebugEnabled()) {
+												logger.debug("Create new DataFeed from Message.");
+											}
             								com.bbn.marti.config.DataFeed dataFeed = new com.bbn.marti.config.DataFeed();
                         					dataFeed.setUuid(m.getFeedUuid());
                         					dataFeed.setName(cacheResult.get(0).getName());
@@ -688,7 +754,14 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         				
                         					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
 
+											if (logger.isDebugEnabled()) {
+												logger.debug("Forward the Plugin CotEventContainer along to other services.");
+											}
 											MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+
+											if (logger.isDebugEnabled()) {
+												logger.debug("Update InputMetric for DataFeed.");
+											}
 											InputMetric inputMetric = getInputMetric(dataFeed.getName());
 											if (inputMetric != null) {
 												inputMetric.getMessagesReceived().incrementAndGet();
@@ -696,8 +769,22 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 											}
             							}
             						}
+									// whether its in cache or not, we need to update the data feed stats for a data feed message
+									if (logger.isDebugEnabled()) {
+										logger.debug("Add the Data Feed message to the DataFeed Stats.");
+									}
+									double lat = Double.valueOf(pluginCotEvent.getLat()).doubleValue();
+									double lon = Double.valueOf(pluginCotEvent.getLon()).doubleValue();
+									if (!DataFeedStatsHelper.getInstance().addStatsForDataFeedMessage(
+											m.getFeedUuid(), pluginCotEvent.getType(), lat,	lon,
+											pluginCotEvent.getCreationTime(), ((byte[])message).length)) {
+										logger.error("Unable to add new DataFeedStats for Message.");
+									}
 
-            					} else {
+								} else {
+									if (logger.isDebugEnabled()) {
+										logger.debug("Forward the Plugin CotEventContainer along to other services.");
+									}
                 					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
             					}
             					
@@ -990,10 +1077,25 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             	}
 
                 // update reads metric for this input
-                InputMetric metric = util.getInputMetric(((AbstractBroadcastingChannelHandler) handler).getInput());
+				Input input = ((AbstractBroadcastingChannelHandler) handler).getInput();
+                InputMetric metric = util.getInputMetric(input);
                 metric.getMessagesReceived().incrementAndGet();
-
                 metric.getBytesRecieved().addAndGet(data.toString().length());
+
+				if(input instanceof DataFeed)
+				{
+					DataFeed feed = (DataFeed) input;
+					if (Strings.isNullOrEmpty(feed.getUuid())) {
+						double lat = Double.valueOf(data.getLat()).doubleValue();
+						double lon = Double.valueOf(data.getLon()).doubleValue();
+						if (!DataFeedStatsHelper.getInstance().addStatsForDataFeedMessage(
+								feed.getUuid(), data.getType(), lat,	lon,
+								data.getCreationTime(), data.toString().length())) {
+							logger.error("Unable to add new DataFeedStats for Message.");
+						}
+					}
+				}
+
             } catch (Exception e) {
             	if (logger.isDebugEnabled()) {
             		logger.debug("exception writing metric", e);
@@ -1550,7 +1652,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     protected void processNextEvent() {
 
         CotEventContainer c = null;
-        try {
+		try {
             c = inputQueue.take();
 
             if (logger.isTraceEnabled()) {
@@ -1560,6 +1662,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             if (c == null) {
                 return;
             }
+
+			if (logger.isTraceEnabled()) {
+				logger.trace("Found a CotEventContainer in the inputQueue");
+			}
+
         } catch (InterruptedException e1) {
             logger.warn("Exception taking object from queue " + inputQueue, e1);
         }
@@ -1588,6 +1695,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         if (isControlMessage(c.getType())) {
             try {
+				if (logger.isTraceEnabled()) {
+					logger.trace("Processing Control Message.");
+				}
                 processControlMessage(c);
             } catch (IOException e) {
                 logger.debug("exception processing control message", e);
@@ -1609,8 +1719,14 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         }
 
         // add a flow tag (to show that Marti has processed the message)
+		if (logger.isTraceEnabled()) {
+			logger.trace("Adding flow tag (to show that the message has been processed.");
+		}
         flowTagFilter.filter(c);
 
+		if (logger.isTraceEnabled()) {
+			logger.trace("Processing a Contact Message.");
+		}
         processContactMessage(c);
 
         if (logger.isTraceEnabled()) {
@@ -1629,6 +1745,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         if (allServicesHaveRoom ||
         		(config.getSubmission().isDropMesssagesIfAnyServiceIsFull() == false)) {
 
+			if (logger.isTraceEnabled()) {
+				logger.trace("Adding a copy of the CotEventContainer to the other services via the InputQueue.");
+			}
         	for (BaseService s : consumers) {
         		s.addToInputQueue(c.copy());
         	}
@@ -1828,6 +1947,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             if (dest == null) {
                 return;
             }
+
+			dest.lastPingTime = new AtomicLong(new Date().getTime());
 
             CotEventContainer pong = new CotEventContainer(DocumentHelper.parseText(
                     "<event version='2.0' uid='takPong' type='t-x-c-t-r' how='h-g-i-g-o' time='" +
@@ -2341,7 +2462,13 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                 conf.getRepository().isArchive(),
                 conf.getRepository().getConnection().getUsername(),
                 MASK_WORD_FOR_DISPLAY,
-                conf.getRepository().getConnection().getUrl());
+                conf.getRepository().getConnection().getUrl(),
+                conf.getRepository().getConnection().isSslEnabled(),
+                conf.getRepository().getConnection().getSslMode(),
+                conf.getRepository().getConnection().getSslCert(),
+                conf.getRepository().getConnection().getSslKey(),
+                conf.getRepository().getConnection().getSslRootCert()
+                );
     }
 
     @Override
@@ -2358,6 +2485,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             repository.getConnection().setPassword(info.getDbPassword());
         }
         repository.getConnection().setUrl(info.getDbUrl());
+        repository.getConnection().setSslEnabled(info.isSslEnabled());
+        repository.getConnection().setSslMode(info.getSslMode());
+        repository.getConnection().setSslCert(info.getSslCert());
+        repository.getConnection().setSslKey(info.getSslKey());
+        repository.getConnection().setSslRootCert(info.getSslRootCert());
         coreConfig.setAndSaveMessagingConfig(latestSA, repository);
     }
 

@@ -36,6 +36,7 @@ public class MissionCacheResolver implements CacheResolver {
             if ((CacheOperation)context.getOperation() instanceof CacheEvictOperation) {
                 caches.add(cacheManager.getCache(Constants.ALL_MISSION_CACHE));
                 caches.add(cacheManager.getCache(Constants.ALL_COPS_MISSION_CACHE));
+                caches.add(cacheManager.getCache(cacheName + MissionLayerCacheResolver.SUFFIX));
 //                caches.add(cacheManager.getCache(cacheName + MissionChangeCacheResolver.SUFFIX));
             }
 

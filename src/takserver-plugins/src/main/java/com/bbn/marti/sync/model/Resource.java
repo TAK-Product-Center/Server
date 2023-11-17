@@ -6,6 +6,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.NavigableSet;
 import java.util.SimpleTimeZone;
 
 import javax.persistence.Cacheable;
@@ -71,6 +72,9 @@ public class Resource implements Serializable, Comparable<Resource> {
     protected String hash = "";
     protected Long size = 0L;
     protected String tool;
+    protected String groupVector;
+    protected NavigableSet<String> groups;
+    protected Long expiration;
 
     // location is populated via hibernate when Resource is returned via jpa
     protected Point location;
@@ -85,6 +89,24 @@ public class Resource implements Serializable, Comparable<Resource> {
     
     public Resource(String hash) {
         this.hash = hash;
+    }
+    
+    public Resource(String hash, 
+    				String name,
+    				String user,
+    				Long size,
+    				String groupVector,
+    				Date time,
+    				String mimeType,
+    				Long expiration) {
+        this.hash = hash;
+        this.name = name;
+        this.submitter = user;
+        this.size = size;
+        this.groupVector = groupVector;
+        this.submissionTime = time;
+        this.mimeType = mimeType;
+        this.expiration = expiration;
     }
     
     // Adapt Metadata object to Resource object
@@ -311,6 +333,30 @@ public class Resource implements Serializable, Comparable<Resource> {
             this.altitude = altitude;
         }
     }
+    
+    @Column(name = "groups", columnDefinition = "bit varying")
+    @JsonIgnore
+    public String getGroupVector() {
+        return groupVector;
+    }
+
+    public void setGroupVector(String groupVector) {
+        this.groupVector = groupVector;
+    }
+    
+    @Column(name = "expiration", unique = false, nullable = true)
+    public Long getExpiration() {
+        return expiration;
+    }
+
+    public void setExpiration(Long expiration) {
+        this.expiration = expiration;
+    }
+    
+    @Transient
+    public NavigableSet<String> getGroups() { return groups; }
+
+    public void setGroups(NavigableSet<String> groups) { this.groups = groups; }
 
     @Override
     public String toString() {

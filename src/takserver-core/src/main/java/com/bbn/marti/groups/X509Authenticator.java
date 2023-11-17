@@ -16,6 +16,7 @@ import javax.naming.NamingException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 
+import io.jsonwebtoken.JwtException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,11 +140,11 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                 user.setName(cert.token);
                 try {
                     groupManager.authenticate("oauth", user);
-                } catch (OAuth2Exception e) {
+                } catch (OAuth2Exception | JwtException e) {
                     if (logger.isDebugEnabled()) {
-                        logger.debug("found expired token in certificate: " + cert.token);
+                        logger.debug("{} {} ", e.getMessage(), cert.token);
                     }
-                    throw new TakException(cert.token);
+                    throw new TakException();
                 }
 
                 if (input == null) {

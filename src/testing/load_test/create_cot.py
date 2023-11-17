@@ -31,16 +31,16 @@ class CotMessage:
                  lat="0", lon="0",
                  msg=None):
 
+        self.detail = None
+
         if msg is not None:
             self.deserialize(msg)
             return
-
 
         if uid == None:
             uid = "PyTAK-" + id_gen()
 
         self.uid = uid
-
 
         self.event = etree.Element("event",
                                    how=how,
@@ -125,9 +125,16 @@ class CotMessage:
         return True
 
     def is_sa(self):
+        if self.detail is None: # Pong messages might not have a detail tag
+            return False
         for c in self.detail:
             if c.tag == "contact":
                 return True
+        return False
+
+    def is_pong(self):
+        if self.event.attrib.get("type") == "t-x-c-t-r":
+            return True
         return False
 
     def mission_change(self):

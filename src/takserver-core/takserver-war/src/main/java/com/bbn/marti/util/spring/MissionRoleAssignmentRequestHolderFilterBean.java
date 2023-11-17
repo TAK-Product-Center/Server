@@ -2,6 +2,7 @@ package com.bbn.marti.util.spring;
 
 import java.io.IOException;
 import java.net.URLDecoder;
+import java.util.UUID;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
@@ -23,10 +24,11 @@ import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionRole;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.CommonUtil;
+import com.google.common.base.Strings;
 
 @Order(0)
-public class RequestHolderFilterBean extends GenericFilterBean {
-	private static final Logger logger = LoggerFactory.getLogger(RequestHolderFilterBean.class);
+public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterBean {
+	private static final Logger logger = LoggerFactory.getLogger(MissionRoleAssignmentRequestHolderFilterBean.class);
 
 	@Autowired
 	private RequestHolderBean requestBean;
@@ -80,7 +82,7 @@ public class RequestHolderFilterBean extends GenericFilterBean {
 			if (missionEnd == -1) {
 				missionEnd = path.length();
 
-				if (req.getMethod().equals("PUT")
+				if (req.getMethod().equals("PUT") || req.getMethod().equals("POST")
 				|| (req.getMethod().equals("OPTIONS") && config.getRemoteConfiguration().getNetwork().isAllowAllOrigins())) {
 					missionCreate = true;
 				}
@@ -99,14 +101,46 @@ public class RequestHolderFilterBean extends GenericFilterBean {
 				&& 	missionName.compareTo("logs") != 0
 				&& 	missionName.compareTo("invitations") != 0
 				&& 	missionName.compareTo("hierarchy") != 0) {
+					
+					String missionGuid = null;
+					
+					try {
+						String[] parts = path.split("/", 0);
 
+						logger.debug("path parts: {}", parts.length);
+
+						if (parts.length > 5) {
+							missionGuid = parts[5];
+						}
+					} catch (Exception e) {
+						logger.warn("error getting mission guid from path", e);
+					}
+					
+					logger.debug("mission guid {}", missionGuid);
+					
 					//
 					// get the mission
 					//
 					Mission mission = null;
+					
+					logger.debug("mission name (can be guid) : {}", missionName);
 
 					try {
-						mission = missionService.getMissionNoContent(missionName, martiUtil.getGroupVectorBitString(req.getSession().getId()));
+						
+						// for guid case, the missonName looks like 'guid' here
+						if (missionName != null && missionName.toLowerCase().equals("guid") && !Strings.isNullOrEmpty(missionGuid)) {
+							
+							logger.debug("getting mission by guid {}", missionGuid);
+							
+							UUID missionUuid = UUID.fromString(missionGuid);
+							
+							mission = missionService.getMissionNoContentByGuid(missionUuid, martiUtil.getGroupVectorBitString(req.getSession().getId()));
+						} else {
+							
+							logger.debug("getting mission by name {}", missionName);
+							
+							mission = missionService.getMissionNoContent(missionName, martiUtil.getGroupVectorBitString(req.getSession().getId()));
+						}
 
 						MissionRole role = missionService.getRoleForRequest(mission, req);
 
@@ -134,6 +168,8 @@ public class RequestHolderFilterBean extends GenericFilterBean {
 							((HttpServletResponse)servletResponse).setStatus(HttpServletResponse.SC_GONE);
 							return;
 						}
+					} catch (IllegalArgumentException e) {
+						throw new IllegalArgumentException("invalid mission UUID");
 					} catch (Exception e) {
 						logger.warn("exception assigning mission role", e);
 					}

@@ -1,5 +1,6 @@
 package tak.server.system;
 
+import com.bbn.marti.remote.CoreConfig;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
@@ -183,5 +184,18 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		}
 
 		return commonUtil;
+	}
+
+	private CoreConfig coreConfig = null;
+
+	public CoreConfig coreConfig() {
+		if (coreConfig == null) {
+			synchronized (this) {
+				if (coreConfig == null) {
+					coreConfig = springContext.getBean(CoreConfig.class);
+				}
+			}
+		}
+		return coreConfig;
 	}
 }

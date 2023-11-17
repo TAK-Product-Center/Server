@@ -28,42 +28,42 @@ sourceSets {
   }
 }
 dependencies {
-  compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
-  compile group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
-  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-  compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
+  implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+  implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
+  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
 
-  compile project(':federation-common')
+  implementation project(':federation-common')
 
-  compile group: 'com.h2database', name: 'h2', version: h2_version
+  implementation group: 'com.h2database', name: 'h2', version: h2_version
 
   // Apache Ignite (cache and distributed service grid).
-  compile group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_version
-  compile group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
-  compile group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+  implementation group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_version
+  implementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
+  implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
 
-  compile group: 'io.netty', name: 'netty-handler', version: netty_handler_version
-  compile group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
-  compile group: 'io.netty', name: 'netty-tcnative-classes', version: netty_tcnative_version
-  compile group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
-  compile "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
+  implementation group: 'io.netty', name: 'netty-handler', version: netty_handler_version
+  implementation group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
+  implementation group: 'io.netty', name: 'netty-tcnative-classes', version: netty_tcnative_version
+  implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
 
-  compile group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
-  compile group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
-  compile group: 'org.springframework', name: 'spring-context'
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
+  implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
+  implementation group: 'org.springframework', name: 'spring-context'
 
 
-  testCompile group: 'junit', name: 'junit', version: junit_version
-  testCompile group: 'org.mockito', name: 'mockito-core', version: mockito_version
-  testCompile("org.springframework.boot:spring-boot-starter-test") {
+  testImplementation group: 'junit', name: 'junit', version: junit_version
+  testImplementation group: 'org.mockito', name: 'mockito-core', version: mockito_version
+  testImplementation("org.springframework.boot:spring-boot-starter-test") {
     exclude group: "com.vaadin.external.google", module:"android-json"
   }
 
-  testCompile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
 }
 
 compileJava {

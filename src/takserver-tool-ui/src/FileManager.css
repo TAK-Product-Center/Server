@@ -1,0 +1,26 @@
+
+
+  .DataTable{
+    background-color: #fdfdfd;
+    width: 95%;
+    max-width: 200vh;
+    height: 85vh;
+    min-height: 475px;
+    align-content: center;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-size: calc(10px + 2vmin);
+    color: white;
+  }
+
+  .FileManagerLabel{
+    align-self: center;
+    padding-left: 45%;
+    width:100%;
+  }
+
+  .MissionFilter{
+    padding-right: 10px;
+  }

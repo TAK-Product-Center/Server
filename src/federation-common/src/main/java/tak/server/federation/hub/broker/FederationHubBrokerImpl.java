@@ -10,7 +10,9 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.naming.InvalidNameException;
@@ -24,6 +26,12 @@ import org.slf4j.LoggerFactory;
 import com.bbn.roger.fig.FederationUtils;
 import com.google.common.base.Strings;
 
+import tak.server.federation.Federate;
+import tak.server.federation.FederateGroup;
+import tak.server.federation.FederateIdentity;
+import tak.server.federation.FederateOutgoing;
+import tak.server.federation.FederationNode;
+import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
 import tak.server.federation.hub.broker.events.UpdatePolicy;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
@@ -100,6 +108,36 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
             throw new RuntimeException(e);
         }
     }
+    
+	@Override
+	public void deleteGroupCa(String groupId) {
+		FederationHubDependencyInjectionProxy depProxy = FederationHubDependencyInjectionProxy.getInstance();
+		FederationHubPolicyManager fedHubPolicyManager = depProxy.fedHubPolicyManager();
+		SSLConfig sslConfig = depProxy.sslConfig();
+		FederationHubServerConfig fedHubConfig = depProxy.fedHubServerConfig();
+
+		try {
+			for (Enumeration<String> e = sslConfig.getTrust().aliases(); e.hasMoreElements();) {
+				String alias = e.nextElement();
+				X509Certificate cert = (X509Certificate) sslConfig.getTrust().getCertificate(alias);
+				String issuerName = cert.getIssuerX500Principal().getName();
+				String groupName = issuerName + "-" + FederationUtils.getBytesSHA256(cert.getEncoded());
+
+				if (groupName.equals(groupId)) {
+					FederateGroup group = new FederateGroup(new FederateIdentity(groupId));
+					fedHubPolicyManager.removeCaGroup(group);
+					
+					sslConfig.getTrust().deleteEntry(alias);
+					saveTruststoreFile(sslConfig, fedHubConfig);
+					sslConfig.refresh();
+					
+					depProxy.restartV2Server();
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Exception deleteing CA", e);
+		}
+	}
 
     @Override
     public void cancel() {
@@ -138,19 +176,65 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 
 	@Override
 	public List<HubConnectionInfo> getActiveConnections() {
+
 		return FederationHubDependencyInjectionProxy.getInstance()
-			.hubConnectionStore()
-			.getClientStreamMap()
-			.values()
-			.stream()
-			.filter(holder -> holder.isClientHealthy(FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfig().getClientTimeoutTime()))
-			.filter(holder -> holder.getSubscription() != null)
-			.map(holder -> {
-				HubConnectionInfo info = new HubConnectionInfo();
-				info.setConnectionId(holder.getFederateIdentity().getFedId());
-				info.setConnectionType(holder.getSubscription().getIdentity().getType().toString());
-				return info;
-			})
-			.collect(Collectors.toList());
+				.hubConnectionStore()
+				.getConnectionInfos()
+				.stream()
+				.collect(Collectors.toList());
+	}
+
+	@Override
+	public List<String> getGroupsForNode(String federateId) {
+		FederationPolicyGraph policyGraph = FederationHubDependencyInjectionProxy.getInstance()
+				.fedHubPolicyManager()
+				.getPolicyGraph();
+		
+		FederationNode sourceNode = policyGraph.getNode(federateId);
+
+		if (sourceNode != null) {
+			if (sourceNode instanceof Federate || sourceNode instanceof FederateOutgoing) {
+				List<String> groups = FederationHubDependencyInjectionProxy.getInstance()
+						.hubConnectionStore()
+						.getClientGroupStreamMap()
+						.entrySet()
+						.stream()
+						.filter(e -> sourceNode.getFederateIdentity().getFedId().equals(e.getValue().getFederateIdentity().getFedId()))
+						.map(e -> e.getKey())
+						.map(sessionIdentifier -> FederationHubDependencyInjectionProxy.getInstance().hubConnectionStore().getClientToGroupsMap().get(sessionIdentifier))
+						.filter(g -> g != null)
+						.flatMap(g -> g.getFederateGroupsList().stream())
+						.distinct()
+						.collect(Collectors.toList());
+					
+					return groups;
+			}
+			
+			if (sourceNode instanceof FederateGroup) {
+				FederateGroup sourceFederateGroup = (FederateGroup) policyGraph.getNode(federateId);
+				
+				Set<String> federateIdentitiesInGroup = sourceFederateGroup.getFederatesInGroup()
+						.stream()
+						.map(f -> f.getFederateIdentity().getFedId())
+						.collect(Collectors.toSet());
+				
+				List<String> groups = FederationHubDependencyInjectionProxy.getInstance()
+						.hubConnectionStore()
+						.getClientGroupStreamMap()
+						.entrySet()
+						.stream()
+						.filter(e -> federateIdentitiesInGroup.contains(e.getValue().getFederateIdentity().getFedId()))
+						.map(e -> e.getKey())
+						.map(sessionIdentifier -> FederationHubDependencyInjectionProxy.getInstance().hubConnectionStore().getClientToGroupsMap().get(sessionIdentifier))
+						.filter(g -> g != null)
+						.flatMap(g -> g.getFederateGroupsList().stream())
+						.distinct()
+						.collect(Collectors.toList());
+					
+					return groups;
+			}
+		}
+		
+		return new ArrayList<String>();
 	}
 }

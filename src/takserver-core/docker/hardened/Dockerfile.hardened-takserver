@@ -17,7 +17,7 @@ RUN dnf -y upgrade --nodocs \
 
 COPY tak/security/*.rpm .
 # Install EPEL 8 repo
-RUN rpm -Uvh epel-release-8-10.el8.noarch.rpm
+RUN rpm -Uvh epel-release-latest-8.noarch.rpm
 
 # Install dependencies
 RUN dnf update -y --disableplugin=subscription-manager --nodocs \
@@ -57,4 +57,4 @@ RUN chmod u=rwx /opt/tak \
 HEALTHCHECK --start-period=120s --interval=30s --timeout=30s --retries=10 CMD /opt/tak/health/takserver/health_check.sh || exit 1
 
 # Default startup executable. Can include elements of 'docker run' command as parameters.
-ENTRYPOINT ["/bin/bash", "-c", "/opt/tak/configureInDocker.sh init &>> /opt/tak/logs/takserver.log"]
+ENTRYPOINT ["/bin/bash", "-c", "/opt/tak/configureInDocker.sh init |& tee /opt/tak/logs/takserver.log"]

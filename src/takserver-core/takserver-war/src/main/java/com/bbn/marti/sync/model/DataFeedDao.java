@@ -40,6 +40,7 @@ public class DataFeedDao implements Serializable, Comparable<DataFeedDao> {
 	protected int type;
 	protected int syncCacheRetentionSeconds = 3600;
 	protected boolean federated;
+	protected boolean binaryPayloadWebsocketOnly = false;
     protected String groupVector;
 	
 	public com.bbn.marti.config.DataFeed toInput() {
@@ -62,6 +63,7 @@ public class DataFeedDao implements Serializable, Comparable<DataFeedDao> {
     	datafeed.setUuid(uuid);
     	datafeed.setSyncCacheRetentionSeconds(syncCacheRetentionSeconds);
     	datafeed.setFederated(federated);
+    	datafeed.setBinaryPayloadWebsocketOnly(binaryPayloadWebsocketOnly);
 		
 		return datafeed;
 	}
@@ -230,7 +232,16 @@ public class DataFeedDao implements Serializable, Comparable<DataFeedDao> {
     	this.federated = federated;
     }
 
-    @Column(name = "groups", columnDefinition = "bit varying")
+    @Column(name = "binary_payload_websocket_only", unique = false, nullable = true, columnDefinition="boolean")
+    public boolean getBinaryPayloadWebsocketOnly() {
+		return binaryPayloadWebsocketOnly;
+	}
+
+	public void setBinaryPayloadWebsocketOnly(boolean binaryPayloadWebsocketOnly) {
+		this.binaryPayloadWebsocketOnly = binaryPayloadWebsocketOnly;
+	}
+
+	@Column(name = "groups", columnDefinition = "bit varying")
     public String getGroupVector() {
         return groupVector;
     }

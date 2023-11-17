@@ -59,11 +59,11 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 	}
 
 	@Override
-	public PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> groupNames, boolean federated) {
+	public PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> groupNames, boolean federated, boolean binaryPayloadWebsocketOnly) {
 
 		try {
 
-			logger.info("Calling create() method in DistributedPluginDataFeedApi, uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, groupNames: {}, federated: {}", uuid, name, tags, archive, sync, groupNames, federated);
+			logger.info("Calling create() method in DistributedPluginDataFeedApi, uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, groupNames: {}, federated: {}, binaryPayloadWebsocketOnly: {}", uuid, name, tags, archive, sync, groupNames, federated, binaryPayloadWebsocketOnly);
 
 			PluginDatafeedCacheHelper pluginDatafeedCacheHelper = pluginDatafeedCacheHelper();
 			GroupManager groupManager = groupManager();
@@ -105,6 +105,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 					dataFeed.setSync(sync);
 					dataFeed.getFiltergroup().addAll(groupNames);
 					dataFeed.setFederated(federated);
+					dataFeed.setBinaryPayloadWebsocketOnly(binaryPayloadWebsocketOnly);
 
 					MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
 							.modifyInput(name, dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
@@ -115,7 +116,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 
 				dataFeedId = dataFeedRepository.updateDataFeedWithGroupVector(uuid, name, DataFeedType.Plugin.ordinal(),
 						AuthType.ANONYMOUS.toString(), 0, false, "Plugin",
-						"", "", archive, false, false ,0, "", sync, 3600, groupVector, federated);
+						"", "", archive, false, false ,0, "", sync, 3600, groupVector, federated, binaryPayloadWebsocketOnly);
 
 				logger.info("Updated datafeed uuid {}, row id", uuid, dataFeedId);
 
@@ -143,7 +144,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 				}
 
 				// update cache
-				PluginDataFeed re = new PluginDataFeed(uuid, name, tags, archive, sync, groupNames, federated);
+				PluginDataFeed re = new PluginDataFeed(uuid, name, tags, archive, sync, groupNames, federated, binaryPayloadWebsocketOnly);
 				List<PluginDataFeed> pluginDataFeeds = new ArrayList<PluginDataFeed>();
 				pluginDataFeeds.add(re);
 				pluginDatafeedCacheHelper.cachePluginDatafeed(uuid, pluginDataFeeds);
@@ -179,6 +180,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 					dataFeed.setSync(sync);
 					dataFeed.getFiltergroup().addAll(groupNames);
 					dataFeed.setFederated(federated);
+					dataFeed.setBinaryPayloadWebsocketOnly(binaryPayloadWebsocketOnly);
 
 					MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
 							.createDataFeed(dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
@@ -189,7 +191,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 
 				dataFeedId = dataFeedRepository.addDataFeed(uuid, name, DataFeedType.Plugin.ordinal(),
 						AuthType.ANONYMOUS.toString(), 0, false, "Plugin",
-						"", "", archive, false, false ,0, "", sync, 3600, groupVector, federated);
+						"", "", archive, false, false ,0, "", sync, 3600, groupVector, federated, binaryPayloadWebsocketOnly);
 
 				logger.info("Added datafeed uuid {}, row id", uuid, dataFeedId);
 
@@ -217,7 +219,7 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 				}
 
 				// update cache
-				PluginDataFeed re = new PluginDataFeed(uuid, name, tags, archive, sync, groupNames, federated);
+				PluginDataFeed re = new PluginDataFeed(uuid, name, tags, archive, sync, groupNames, federated, binaryPayloadWebsocketOnly);
 				List<PluginDataFeed> pluginDataFeeds = new ArrayList<PluginDataFeed>();
 				pluginDataFeeds.add(re);
 				pluginDatafeedCacheHelper.cachePluginDatafeed(uuid, pluginDataFeeds);
@@ -236,6 +238,13 @@ public class DistributedPluginDataFeedApi implements PluginDataFeedApi, org.apac
 			logger.error("exception in create", e);
 			throw e;
 		}
+	}
+	
+	@Override
+	public PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> groupNames, boolean federated) {
+		
+		return create(uuid, name, tags, archive, sync, groupNames, federated, false);
+
 	}
 	
 	@Override

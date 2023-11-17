@@ -730,7 +730,8 @@ public class MissionModels {
 		MISSION_SET_ROLE,       // Can set user roles
 		MISSION_SET_PASSWORD,   // Can set the mission password
 		MISSION_UPDATE_GROUPS,  // Can update the mission groups
-		MISSION_MANAGE_FEEDS    // TODO: Add tests?
+		MISSION_MANAGE_FEEDS,   // TODO: Add tests?
+		MISSION_MANAGE_LAYERS	// TODO: Add tests?
 	}
 
 	// Server Admin: Default owner role for everything.

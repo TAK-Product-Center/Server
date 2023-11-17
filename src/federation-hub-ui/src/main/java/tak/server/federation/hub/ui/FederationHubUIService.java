@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -36,8 +37,11 @@ import tak.server.federation.hub.broker.HubConnectionInfo;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
 import tak.server.federation.hub.policy.FederationPolicy;
 import tak.server.federation.hub.ui.graph.EdgeFilter;
+import tak.server.federation.hub.ui.graph.FederateCell;
+import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
 import tak.server.federation.hub.ui.graph.FederationPolicyModel;
 import tak.server.federation.hub.ui.graph.FilterUtils;
+import tak.server.federation.hub.ui.graph.GroupCell;
 
 @RequestMapping("/")
 public class FederationHubUIService {
@@ -75,11 +79,6 @@ public class FederationHubUIService {
     @RequestMapping(value = "/fig/federation/{federationId}", method = RequestMethod.GET)
     @ResponseBody
     public FederationPolicyModel getFederationById(@PathVariable String federationId) {
-//        FederationPolicy response = this.cachedPolicies.get(federationId);
-//        HttpStatus status = HttpStatus.OK;
-//        if (response == null) {
-//            status = HttpStatus.NOT_FOUND;
-//        }
         return this.cachedPolicies.get(federationId);
     }
 
@@ -190,7 +189,7 @@ public class FederationHubUIService {
     }
 
     @RequestMapping(value = "/fig/getKnownCaGroups", method = RequestMethod.GET)
-    public ResponseEntity<List<GroupHolder>> getKnownCaGroups() {
+    public ResponseEntity<List<GroupHolder>> getKnownCaGroups() {	    	
         if (isUpdateActiveFederation()) {
             return new ResponseEntity<>(
                 federateGroupsToGroupHolders(fedHubPolicyManager.getCaGroups()),
@@ -198,6 +197,32 @@ public class FederationHubUIService {
                 HttpStatus.OK);
         }
         return new ResponseEntity<>(new HttpHeaders(), HttpStatus.FORBIDDEN);
+    }
+    
+    @RequestMapping(value = "/fig/getKnownGroupsForGraphNode/{graphNodeId}", method = RequestMethod.GET)
+    @ResponseBody
+    public ResponseEntity<List<String>> getKnownGroupsForGraphNode(@PathVariable String graphNodeId) {
+    	List<String> groupsForNode = new ArrayList<>();
+    	
+    	FederationPolicyModel activePolicy = getActivePolicyAsPolicyModel();
+    	activePolicy.getCells().forEach(cell -> {
+    		if (cell.getId().equals(graphNodeId)) {
+    			if (cell instanceof FederateCell) {
+    				FederateCell fCell = (FederateCell) cell;
+    				groupsForNode.addAll(fedHubBroker.getGroupsForNode(fCell.getProperties().getName()));
+    			}
+    			if (cell instanceof GroupCell) {
+    				GroupCell gCell = (GroupCell) cell;
+    				groupsForNode.addAll(fedHubBroker.getGroupsForNode(gCell.getProperties().getName()));
+    			}
+    			if (cell instanceof FederationOutgoingCell) {
+    				FederationOutgoingCell oCell = (FederationOutgoingCell) cell;
+    				groupsForNode.addAll(fedHubBroker.getGroupsForNode(oCell.getProperties().getName()));
+    			}
+    		}
+    	});
+    	
+        return new ResponseEntity<List<String>>(groupsForNode, new HttpHeaders(), HttpStatus.OK);
     }
     
     @RequestMapping(value = "/fig/getActiveConnections", method = RequestMethod.GET)
@@ -228,6 +253,24 @@ public class FederationHubUIService {
             }
         }
         return new ResponseEntity<>(new HttpHeaders(), HttpStatus.FORBIDDEN);
+    }
+    
+    @RequestMapping(value = "/fig/deleteGroupCa/{uid}", method = RequestMethod.DELETE)
+    public ResponseEntity<Void> deleteGroupCa(@PathVariable("uid") String uid) {
+    	try {
+        	Collection<FederateGroup> federateGroups = fedHubPolicyManager.getCaGroups();
+    		if (federateGroups != null) {
+    			for (FederateGroup fg : federateGroups) {
+    				if (fg.getFederateIdentity().getFedId().equals(uid)) {
+    					fedHubBroker.deleteGroupCa(uid);
+    				}
+    			}
+    		}
+    		return new ResponseEntity<>(new HttpHeaders(), HttpStatus.OK);
+    	} catch (Exception e) {
+    		logger.error("error with deleteGroupCa", e);
+    		return new ResponseEntity<>(new HttpHeaders(), HttpStatus.BAD_REQUEST);
+		}
     }
     
     private boolean isUpdateActiveFederation() {

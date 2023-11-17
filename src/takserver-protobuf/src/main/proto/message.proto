@@ -1,13 +1,14 @@
 syntax = "proto3";
 
 import "takmessage.proto";
+import "binarypayload.proto";
 
 package atakmap.commoncommo.protobuf.v1;
 
 // Container for TakMessage and metadata, such as groups
 message Message {
     TakMessage payload = 1;
-
+    
     string source = 2;
     
     string clientId = 3;
@@ -25,6 +26,7 @@ message Message {
     string feedUuid = 9;
 
     string connectionId = 10;
-
+    
+    // optional sequence of binary payloads
+    repeated gov.tak.cop.proto.v1.BinaryPayload bloads = 11;
 }
-

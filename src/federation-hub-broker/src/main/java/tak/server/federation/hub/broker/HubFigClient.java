@@ -129,14 +129,14 @@ public class HubFigClient implements Serializable {
 	private List<String> hubClientGroups = new ArrayList<>();
 	
 	private Subscription serverSubscription;
-	private ConnectionInfo info;
+	private HubConnectionInfo info;
 	
 	public HubFigClient(FederationHubServerConfig fedHubConfig, FederationOutgoingCell federationOutgoingCell) {
 		this.fedHubConfig = fedHubConfig;
 		this.host = federationOutgoingCell.getProperties().getHost();
 		this.port = federationOutgoingCell.getProperties().getPort();
 		this.fedName = federationOutgoingCell.getProperties().getOutgoingName();
-		this.info = new ConnectionInfo(ConnectionInfo.ConnectionType.OUTGOING, fedName);
+		this.info = new HubConnectionInfo();
 	}
 
 	public ManagedChannel getChannel() {
@@ -196,10 +196,10 @@ public class HubFigClient implements Serializable {
 						if (value.getStreamUpdate() != null && value.getStreamUpdate().getStatus() == ServingStatus.SERVING) {
 							setupEventStreamSender();
 							
-							FederateGroups federateGroups = FederateGroups.newBuilder()
-									.addAllFederateGroups(FederationHubBrokerService.getInstance().getFederationHubGroups(fedName))
+							FederateGroups federateGroups = FederationHubBrokerService.getInstance().getFederationHubGroups(fedName).toBuilder()
 									.setStreamUpdate(ServerHealth.newBuilder().setStatus(ServerHealth.ServingStatus.SERVING).build())
 									.build();
+							
 							groupStreamHolder.send(federateGroups);
 						}
 						
@@ -224,7 +224,6 @@ public class HubFigClient implements Serializable {
 				});
 		
 		final AtomicBoolean initROLStream = new AtomicBoolean(false);
-
 		healthScheduler = scheduler.scheduleWithFixedDelay(() -> {
 			ClientHealth clientHealth = ClientHealth.newBuilder().setStatus(ClientHealth.ServingStatus.SERVING).build();
 
@@ -268,7 +267,6 @@ public class HubFigClient implements Serializable {
 									public void onCompleted() {}
 								});
 					}
-
 				}
 
 				@Override
@@ -383,7 +381,7 @@ public class HubFigClient implements Serializable {
 		if (eventStreamHolder != null && serverSubscription != null) {
 			eventStreamHolder.setSubscription(serverSubscription);
 			
-			List<ConnectionInfo> existingConnectionsFromRemoteServer = FederationHubDependencyInjectionProxy.getInstance()
+			List<HubConnectionInfo> existingConnectionsFromRemoteServer = FederationHubDependencyInjectionProxy.getInstance()
 				.hubConnectionStore()
 				.getConnectionInfos()
 				.stream()
@@ -395,6 +393,14 @@ public class HubFigClient implements Serializable {
 					logger.info("Error: Connection to/from " + fedName +  " already exists. Disallowing duplicate");
 				processDisconnectWithoutRetry();
 			} else {
+				info.setConnectionId(fedName);
+				info.setRemoteConnectionType(serverSubscription.getIdentity().getType().toString());
+				info.setLocalConnectionType(Identity.ConnectionType.FEDERATION_HUB_CLIENT.toString());
+				info.setRemoteServerId(serverSubscription.getIdentity().getServerId());
+				info.setFederationProtocolVersion(2);
+            	info.setGroupIdentities(FederationHubBrokerService.getInstance().getFederationPolicyGraph().getFederate(fedName).getGroupIdentities());
+            	info.setRemoteAddress(host);
+
 				FederationHubDependencyInjectionProxy.getInstance().hubConnectionStore().addConnectionInfo(fedName, info);
 			}
 			logger.info("Outgoing connection for {} established ", fedName);

@@ -1,6 +1,7 @@
 package com.bbn.marti.oauth;
 
 import java.io.UnsupportedEncodingException;
+import java.security.KeyManagementException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -8,13 +9,16 @@ import java.util.Base64;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.bbn.marti.config.Tls;
+import com.google.common.base.Strings;
 import okhttp3.OkHttpClient;
 
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 import org.owasp.esapi.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.http.client.OkHttp3ClientHttpRequestFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -92,13 +97,92 @@ public class OAuthApi {
         }
     }
 
+    private void processAuthServerRequest(
+            MultiValueMap<String, String> requestBody,
+            HttpServletRequest request, HttpServletResponse response)
+            throws NoSuchAlgorithmException, KeyManagementException, ParseException {
+
+        // get the auth server config
+        Oauth.AuthServer authServer = getAuthServerConfig();
+        if (authServer == null) {
+            throw new IllegalStateException("missing auth server config");
+        }
+
+        // call the token endpoint
+        RestTemplate restTemplate;
+
+        if (authServer.isTrustAllCerts()) {
+            TrustManager[] trustAllCerts = new TrustManager[]{
+                    new X509TrustManager() {
+                        @Override
+                        public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {
+                        }
+
+                        @Override
+                        public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {
+                        }
+
+                        @Override
+                        public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                            return new java.security.cert.X509Certificate[]{};
+                        }
+                    }
+            };
+
+            Tls tlsConfig = coreConfig.getRemoteConfiguration().getSecurity().getTls();
+            SSLContext sslContext = SSLContext.getInstance(tlsConfig.getContext());
+            sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+
+            OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                    .sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager) trustAllCerts[0])
+                    .hostnameVerifier((hostname, session) -> true);
+            restTemplate = new RestTemplate(new OkHttp3ClientHttpRequestFactory(builder.build()));
+
+        } else {
+            restTemplate = new RestTemplate(new OkHttp3ClientHttpRequestFactory());
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        ResponseEntity<String> tokenResponse = restTemplate.exchange(
+                authServer.getTokenEndpoint(), HttpMethod.POST,
+                new HttpEntity<MultiValueMap<String, String>>(requestBody, headers),
+                String.class);
+
+        // validate the response
+        if (tokenResponse.getStatusCode() != HttpStatus.OK) {
+            throw new IllegalStateException("token endpoint returned " + tokenResponse.getStatusCodeValue());
+        }
+
+        // extract the token
+        JSONObject tokenJson = (JSONObject) new JSONParser().parse(tokenResponse.getBody());
+
+        if (!tokenJson.containsKey(authServer.getAccessTokenName())) {
+            throw new IllegalStateException("missing access_token in response");
+        }
+
+        // store the access token in a cookie
+        String access_token = (String)tokenJson.get(authServer.getAccessTokenName());
+        response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
+                OAuth2AccessToken.ACCESS_TOKEN, access_token, -1, true).toString());
+
+        // store the refresh token in the session, if we have one
+        if (tokenJson.containsKey(authServer.getRefreshTokenName())) {
+            String refreshToken = (String)tokenJson.get(authServer.getRefreshTokenName());
+            request.getSession().setAttribute(authServer.getRefreshTokenName(), refreshToken);
+        }
+
+        response.setHeader("Cache-Control", "must-revalidate, max-age=0, no-cache, no-store");
+        response.setDateHeader("Expires", 0);
+    }
+
     @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
     @RequestMapping(value = "/login/redirect", method = RequestMethod.GET)
     public ModelAndView handleRedirect(
             @RequestParam(value = "code", required = true) String code,
             @RequestParam(value = "state", required = true) String state,
             @CookieValue(value = "state", required = true) String stateCookie,
-            HttpServletResponse response) {
+            HttpServletRequest request, HttpServletResponse response) {
 
         try {
             // validate the inputs
@@ -115,12 +199,6 @@ public class OAuthApi {
                     MartiValidatorConstants.Regex.MartiSafeString.name(),
                     MartiValidatorConstants.LONG_STRING_CHARS, false);
 
-            // get the auth server config
-            Oauth.AuthServer authServer = getAuthServerConfig();
-            if (authServer == null) {
-                throw new IllegalStateException("missing auth server config");
-            }
-
             // validate the request state
             if (!sha256(stateCookie).equals(state)) {
                 throw new IllegalStateException("state did not match request!");
@@ -130,6 +208,12 @@ public class OAuthApi {
             response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
                     "state", stateCookie, 0, false).toString());
 
+            // get the auth server config
+            Oauth.AuthServer authServer = getAuthServerConfig();
+            if (authServer == null) {
+                throw new IllegalStateException("missing auth server config");
+            }
+
             // build up the parameters for the token request
             MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<String, String>();
             requestBody.add("grant_type", "authorization_code");
@@ -138,66 +222,7 @@ public class OAuthApi {
             requestBody.add("client_secret", authServer.getSecret());
             requestBody.add("redirect_uri", authServer.getRedirectUri());
 
-            // call the token endpoint
-            RestTemplate restTemplate;
-
-            if (authServer.isTrustAllCerts()) {
-                TrustManager[] trustAllCerts = new TrustManager[]{
-                        new X509TrustManager() {
-                            @Override
-                            public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {
-                            }
-
-                            @Override
-                            public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {
-                            }
-
-                            @Override
-                            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                                return new java.security.cert.X509Certificate[]{};
-                            }
-                        }
-                };
-
-                Tls tlsConfig = coreConfig.getRemoteConfiguration().getSecurity().getTls();
-                SSLContext sslContext = SSLContext.getInstance(tlsConfig.getContext());
-                sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
-
-                OkHttpClient.Builder builder = new OkHttpClient.Builder()
-                        .sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager) trustAllCerts[0])
-                        .hostnameVerifier((hostname, session) -> true);
-                restTemplate =  new RestTemplate(new OkHttp3ClientHttpRequestFactory(builder.build()));
-
-            } else {
-                restTemplate =  new RestTemplate(new OkHttp3ClientHttpRequestFactory());
-            }
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-            ResponseEntity<String> tokenResponse = restTemplate.exchange(
-                    authServer.getTokenEndpoint(), HttpMethod.POST,
-                    new HttpEntity<MultiValueMap<String, String>>(requestBody, headers),
-                    String.class);
-
-            // validate the response
-            if (tokenResponse.getStatusCode() != HttpStatus.OK) {
-                throw new IllegalStateException("token endpoint returned " + tokenResponse.getStatusCodeValue());
-            }
-
-            // extract the token
-            JSONObject tokenJson = (JSONObject) new JSONParser().parse(tokenResponse.getBody());
-            if (!tokenJson.containsKey(authServer.getTokenName())) {
-                throw new IllegalStateException("missing access_token in response");
-            }
-            String access_token = (String) tokenJson.get(authServer.getTokenName());
-
-            // store the access token in a cookie
-            response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
-                    OAuth2AccessToken.ACCESS_TOKEN, access_token, -1, true).toString());
-            response.setHeader("Cache-Control", "must-revalidate, max-age=0, no-cache, no-store");
-            response.setDateHeader("Expires", 0);
-
-            // TODO save token in database, test revocation with ui manager
+            processAuthServerRequest(requestBody, request, response);
 
             return new ModelAndView(new InternalResourceView("/Marti/login/redirect.html"));
 
@@ -205,6 +230,39 @@ public class OAuthApi {
             logger.error("exception in handleRedirect", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return null;
+        }
+    }
+
+    @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
+    @RequestMapping(value = "/login/refresh", method = RequestMethod.GET)
+    public void handleRefresh(
+            HttpServletRequest request, HttpServletResponse response) {
+        try {
+            // get the auth server config
+            Oauth.AuthServer authServer = getAuthServerConfig();
+            if (authServer == null) {
+                throw new IllegalStateException("missing auth server config");
+            }
+
+            String refreshToken = (String) request.getSession().getAttribute(authServer.getRefreshTokenName());
+            if (Strings.isNullOrEmpty(refreshToken)) {
+                SecurityContextHolder.clearContext();
+                AuthCookieUtils.logout(request, response, null);
+                return;
+            }
+
+            // build up the parameters for the token request
+            MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<String, String>();
+            requestBody.add("grant_type", "refresh_token");
+            requestBody.add("refresh_token", refreshToken);
+            requestBody.add("client_id", authServer.getClientId());
+            requestBody.add("client_secret", authServer.getSecret());
+
+            processAuthServerRequest(requestBody, request, response);
+
+        } catch (Exception e) {
+            logger.error("exception in handleRefresh", e);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         }
     }
 
@@ -228,8 +286,10 @@ public class OAuthApi {
         if (coreConfig != null &&
                 coreConfig.getRemoteConfiguration() != null &&
                 coreConfig.getRemoteConfiguration().getAuth() != null &&
-                coreConfig.getRemoteConfiguration().getAuth().getOauth() != null) {
-            return coreConfig.getRemoteConfiguration().getAuth().getOauth().getAuthServer();
+                coreConfig.getRemoteConfiguration().getAuth().getOauth() != null &&
+                coreConfig.getRemoteConfiguration().getAuth().getOauth().getAuthServer() != null &&
+                !coreConfig.getRemoteConfiguration().getAuth().getOauth().getAuthServer().isEmpty()) {
+            return coreConfig.getRemoteConfiguration().getAuth().getOauth().getAuthServer().get(0);
         }
         return null;
     }

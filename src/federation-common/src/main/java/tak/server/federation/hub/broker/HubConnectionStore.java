@@ -24,14 +24,14 @@ public class HubConnectionStore {
     private final Map<String, GuardedStreamHolder<FederateGroups>> clientGroupStreamMap = new ConcurrentHashMap<>();
     private final Map<String, FederateGroups> clientToGroups = new ConcurrentHashMap<>();
     private final Map<String, SSLSession> sessionMap =  new ConcurrentHashMap<>();
-    private final Map<String, ConnectionInfo> connectionInfos = new ConcurrentHashMap<>();
+    private final Map<String, HubConnectionInfo> connectionInfos = new ConcurrentHashMap<>();
     
-    
-    public Collection<ConnectionInfo> getConnectionInfos() {
+    public Collection<HubConnectionInfo> getConnectionInfos() {
     	return connectionInfos.values();
     }
     
-    public void addConnectionInfo(String id, ConnectionInfo info) {
+
+    public void addConnectionInfo(String id, HubConnectionInfo info) {
     	connectionInfos.put(id, info);
     }
     

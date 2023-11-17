@@ -1,20 +1,39 @@
 package com.bbn.marti.sync.service;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.UUID;
+
 import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.jdbc.core.ResultSetExtractor;
 
 import com.bbn.marti.config.GeospatialFilter;
 import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.sync.MissionContent;
-import com.bbn.marti.sync.model.*;
+import com.bbn.marti.sync.model.DataFeedDao;
+import com.bbn.marti.sync.model.ExternalMissionData;
+import com.bbn.marti.sync.model.LogEntry;
+import com.bbn.marti.sync.model.Mission;
+import com.bbn.marti.sync.model.MissionChange;
+import com.bbn.marti.sync.model.MissionFeed;
+import com.bbn.marti.sync.model.MissionInvitation;
+import com.bbn.marti.sync.model.MissionLayer;
+import com.bbn.marti.sync.model.MissionPermission;
+import com.bbn.marti.sync.model.MissionRole;
+import com.bbn.marti.sync.model.MissionSubscription;
+import com.bbn.marti.sync.model.Resource;
+import com.bbn.marti.sync.model.UidDetails;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import tak.server.cache.CotCacheWrapper;
 import tak.server.cot.CotElement;
 import tak.server.cot.CotEventContainer;
-
-import org.springframework.jdbc.core.ResultSetExtractor;
 
 
 /*
@@ -26,14 +45,21 @@ import org.springframework.jdbc.core.ResultSetExtractor;
 public interface MissionService {
 	
     Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom, String baseLayer, String bbox, String path, String classification, String tool, String passwordHash, MissionRole defaultRole, Long expiration, String boundingPolygon, Boolean inviteOnly);
+    Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom, String baseLayer, String bbox, String path, String classification, String tool, String passwordHash, MissionRole defaultRole, Long expiration, String boundingPolygon, Boolean inviteOnly, UUID guid);
     
     Mission getMission(String missionName, boolean hydrateDetails);
+    
+    Mission getMissionByGuid(UUID missionGuid, boolean hydrateDetails);
 
     Mission getMission(String missionName, String groupVector);
+
+    Mission getMissionByGuid(UUID missionGuid, String groupVector);
 
     Mission getMissionNoDetails(String missionName, String groupVector);
 
     Mission getMissionNoContent(String missionName, String groupVector);
+    
+	Mission getMissionNoContentByGuid(UUID missionGuid, String groupVector);
 
     List<Mission> getAllMissions(boolean passwordProtected, boolean defaultRole, String tool, NavigableSet<Group> groups);
 
@@ -81,7 +107,7 @@ public interface MissionService {
 
     Mission addMissionContent(String missionName, MissionContent content, String creatorUid, String groupVector);
 
-    Mission addMissionContentAtTime(String missionName, MissionContent content, String creatorUid, String groupVector, Date date, String xmlContentForNotification);
+    Mission addMissionContentAtTime(String missionName, MissionContent missionContent, String creatorUid, String groupVector, Date date, String xmlContentForNotification);
 
     boolean addMissionPackage(String missionName, byte[] missionPackage, String creatorUid, NavigableSet<Group> groups, List<MissionChange> conflicts);
 
@@ -101,6 +127,20 @@ public interface MissionService {
 
     Map<Integer, List<String>> hydrate(Set<Resource> resources);
 
+    MissionLayer addMissionLayer(String missionName, Mission mission, String uid, String Name, MissionLayer.Type type, String parentUid, String afterUid, String creatorUid, String groupVector);
+
+    void setLayerName(String missionName, Mission mission, String layerUid, String name, String creatorUid);
+
+    void setLayerPosition(String missionName, Mission mission, String layerUid, String afterUid, String creatorUid);
+
+    void setLayerParent(String missionName, Mission mission, String layerUid, String parentUid, String afterUid, String creatorUid);
+
+    void removeMissionLayer(String missionName, Mission mission, String layerUid, String creatorUid, String groupVector);
+
+    List<MissionLayer> hydrateMissionLayers(String missionName, Mission mission);
+
+    MissionLayer hydrateMissionLayer(String missionName, Mission mission, String layerUid);
+
     Mission hydrate(Mission mission, boolean hydrateDetails);
 
     Resource hydrate(Resource resource);
@@ -116,11 +156,17 @@ public interface MissionService {
 
     void validateMission(Mission mission, String missionName);
     
+	void validateMissionByGuid(Mission mission, UUID missionGuid);
+    
     void invalidateMissionCache(String cacheName);
 
     boolean isDeleted(String missionName);
+    
+	boolean isDeletedByGuid(UUID missionGuid);
 
     Set<MissionChange> getMissionChanges(String missionName, String groupVector, Long secago, Date start, Date end, boolean squashed);
+    
+    Set<MissionChange> getMissionChangesByGuid(UUID missionGuid, String groupVector, Long secago, Date start, Date end, boolean squashed);
 
     String getMissionKml(String missionName, String urlBase, String groupVector);
 
@@ -175,8 +221,10 @@ public interface MissionService {
 	CotEventContainer getLatestCotEventContainerForUid(String uid, String groupVector);
 
 	Mission getMissionByNameCheckGroups(String missionName, String groupVector);
+	
+	Mission getMissionByGuidCheckGroups(UUID missionGuid, String groupVector);
 
-    boolean setExpiration(String missionName, Long ttl);
+    boolean setExpiration(String missionName, Long ttl, String groupVector);
 
     void deleteMissionByTtl(Integer ttl);
 

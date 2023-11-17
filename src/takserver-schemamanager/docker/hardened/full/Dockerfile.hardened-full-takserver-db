@@ -1,0 +1,59 @@
+## Environment variables outside image context. These will be available until the first FROM statement.
+ARG BASE_REGISTRY=registry1.dso.mil
+ARG BASE_DEPLOY_IMAGE=ironbank/opensource/postgres/postgresql
+ARG BASE_DEPLOY_TAG=15.1
+
+####################################################################################################
+
+## Base deploy image
+FROM ${BASE_REGISTRY}/${BASE_DEPLOY_IMAGE}:${BASE_DEPLOY_TAG} as deploy_container
+
+USER root:root
+
+# Upgrade first
+RUN dnf -y upgrade --nodocs \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+# Adding RHEL repos and signatures
+COPY tak/security/rpms/repos/* /etc/yum.repos.d/
+COPY tak/security/rpms/signatures /opt/signatures
+
+# Install EPEL 8 repo
+COPY tak/security/*.rpm .
+RUN rpm -Uvh epel-release-latest-8.noarch.rpm
+
+# Install dependencies
+RUN rpm --import /opt/signatures/* \
+    && dnf -y install https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm \
+    && dnf -qy module disable postgresql \
+    && dnf -y upgrade --nodocs \
+    && dnf -y install --nodocs \
+        java-11-openjdk \
+        postgis33_15 \
+        postgis33_15-utils \
+        pgpool-II \
+        pgpool-II-pg15-extensions \
+        && sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/pgsql-15/share/postgresql.conf.sample \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+RUN chown -R postgres:postgres /var/lib/postgresql && \
+    chmod -R 775 /var/lib/postgresql && \
+    chown -R postgres:postgres /var/run/postgresql && \
+    chmod -R 770 /var/run/postgresql
+
+#runs in takserver-setup-db.sh but fails because of permissions. running as root to prevent error
+RUN chkconfig --level 345 postgresql-15 on
+
+COPY --chown=postgres:postgres tak /opt/tak
+
+RUN chmod u=rwx /opt/tak \
+    && find /opt/tak/ -type d -exec chmod u=rwx {} \; \
+	&& find /opt/tak/ -type f -name "*.*" -exec chmod u=rw {} \; \
+	&& find /opt/tak/ -type f -name "*.sh" -exec chmod u=rx {} \;
+
+# HEALTHCHECK --start-period=120s --interval=30s --timeout=30s --retries=10 CMD opt/tak/health/takserver-db/health_check.sh || exit 1
+
+# Default startup executable. Can include elements of 'docker run' command as parameters.
+ENTRYPOINT ["/opt/tak/db-utils/full/configureInDocker.sh"]

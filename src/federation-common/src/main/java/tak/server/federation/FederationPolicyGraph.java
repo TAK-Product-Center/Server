@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import tak.server.federation.hub.policy.FederationPolicyGraphImpl.FederationPolicyReachabilityHolder;
+
 /*
  * Interface for a FederationPolicyGraph object to represent a federation
  * policy as defined by the federation policy schema.
@@ -109,7 +111,7 @@ public interface FederationPolicyGraph {
      * has a valid path to. Throws FederationException if the
      * given source node does not exist.
      */
-    public Set<Federate> allReachableFederates(FederationNode source)
+    public FederationPolicyReachabilityHolder allReachableFederates(FederationNode source)
         throws FederationException;
 
     /*
@@ -117,8 +119,22 @@ public interface FederationPolicyGraph {
      * indicated by the sourceUid has a valid path to. Throws
      * FederationException if the given source node does not exist.
      */
-    public Set<Federate> allReachableFederates(String sourceUid)
+    public FederationPolicyReachabilityHolder allReachableFederates(String sourceUid)
         throws FederationException;
+    
+    /*
+     * Returns the set of all nodes that have a valid path to
+     * the source node. Throws FederationException if the
+     * given source node does not exist.
+     */
+	Set<Federate> allReceivableFederates(FederationNode source) throws FederationException;
+	
+	/*
+     * Returns the set of all nodes that have a valid path to
+     * the node with the given sourceUid. Throws FederationException if the
+     * given source node does not exist.
+     */
+	Set<Federate> allReceivableFederates(String sourceUid) throws FederationException;
 
     /* Operations on edges. */
 

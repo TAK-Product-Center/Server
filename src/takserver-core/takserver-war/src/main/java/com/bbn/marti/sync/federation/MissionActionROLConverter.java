@@ -2,6 +2,7 @@ package com.bbn.marti.sync.federation;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.security.InvalidParameterException;
 import java.util.Objects;
 
 import org.slf4j.Logger;
@@ -10,12 +11,20 @@ import org.slf4j.LoggerFactory;
 import com.atakmap.Tak.BinaryBlob;
 import com.atakmap.Tak.ROL;
 import com.atakmap.Tak.ROL.Builder;
+import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.sync.MissionChangeType;
 import com.bbn.marti.remote.sync.MissionContent;
+import com.bbn.marti.remote.sync.MissionExpiration;
+import com.bbn.marti.remote.sync.MissionHierarchy;
 import com.bbn.marti.remote.sync.MissionUpdateDetails;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayer;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayerType;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayer;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayerType;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.model.Mission;
+import com.bbn.marti.sync.model.MissionLayer;
 import com.bbn.marti.sync.model.Resource;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,32 +45,31 @@ public class MissionActionROLConverter {
 		this.remoteUtil = remoteUtil;
 		this.mapper = mapper;
 	}
-	
-	public MissionMetadata missionToROLMissionMetadata(Mission mission) {
-		MissionMetadata mc = new MissionMetadata();
-		mc.setName(mission.getName());
-		mc.setCreatorUid(mission.getCreatorUid());
-		mc.setDescription(mission.getDescription());
-		mc.setChatRoom(mission.getChatRoom());
-		mc.setTool(mission.getTool());
-		mc.setBbox(mission.getBbox());
-		mc.setBoundingPolygon(mission.getBoundingPolygon());
-		mc.setInviteOnly(mission.isInviteOnly());
-
-		if (mission.getParent() != null)
-			mc.setParentMissionId(mission.getParent().getId());
 		
-		mc.setPasswordHash(mission.getPasswordHash());
-		mc.setPath(mission.getPath());
-		mc.setClassification(mission.getClassification());
-		mc.setBaseLayer(mission.getBaseLayer());
+	public static MissionMetadata missionToROLMissionMetadata(Mission mission) {
+		MissionMetadata meta = new MissionMetadata();
+		meta.setName(mission.getName());
+		meta.setCreatorUid(mission.getCreatorUid());
+		meta.setDescription(mission.getDescription());
+		meta.setChatRoom(mission.getChatRoom());
+		meta.setTool(mission.getTool());
+		meta.setBoundingPolygon(mission.getBoundingPolygon());
+		meta.setBbox(mission.getBbox());
+		meta.setPasswordHash(mission.getPasswordHash());
+		meta.setPath(mission.getPath());
+		meta.setClassification(mission.getClassification());
+		meta.setBaseLayer(mission.getBaseLayer());
+		if (mission.getParent()!=null) {
+			meta.setParentMissionId(mission.getParent().getId());
+		}
+		if (mission.getDefaultRole() != null) {
+			meta.setDefaultRoleId(mission.getDefaultRole().getId());    			
+		}
+		meta.setExpiration(mission.getExpiration());
+		meta.setInviteOnly(mission.isInviteOnly());
+		meta.setGuid(mission.getGuid());
 		
-		if (mission.getDefaultRole() != null)
-			mc.setDefaultRoleId(mission.getDefaultRole().getId());
-		
-		mc.setExpiration(mission.getExpiration());
-		
-		return mc;
+		return meta;
 	}
 
 	public ROL createMissionToROL(MissionMetadata mc) throws JsonProcessingException {		
@@ -204,5 +212,60 @@ public class MissionActionROLConverter {
 		Builder rol = ROL.newBuilder().setProgram("update resource\n" + metadataJson + ";");
 
 		return rol.build();
+	}
+	
+	public ROL setParentToROL(MissionHierarchy missionHierarchy) throws JsonProcessingException {		
+		
+		return ROL.newBuilder().setProgram("assign mission\n" + mapper.writeValueAsString(missionHierarchy) + ";").build();
+	}
+	
+	public ROL setMissionExpirationToROL(MissionExpiration missionExpiration) throws JsonProcessingException {
+		
+		return ROL.newBuilder().setProgram("assign mission\n" + mapper.writeValueAsString(missionExpiration) + ";").build();
+	}
+
+	public ROL addMissionLayerToROL(MissionUpdateDetailsForMissionLayer missionUpdateDetailsForMissionLayer) throws JsonProcessingException {		
+		
+		if (missionUpdateDetailsForMissionLayer.getType() != MissionUpdateDetailsForMissionLayerType.ADD_MISSION_LAYER_TO_MISSION) {
+			throw new InvalidParameterException("MissionUpdateDetailsForMissionLayerType must have type ADD_MISSION_LAYER_TO_MISSION");
+		}
+		
+		return ROL.newBuilder().setProgram("update mission\n" + mapper.writeValueAsString(missionUpdateDetailsForMissionLayer) + ";").build();
+	}
+	
+	public ROL deleteMissionLayerToROL(MissionUpdateDetailsForMissionLayer missionUpdateDetailsForMissionLayer) throws JsonProcessingException {
+		
+		if (missionUpdateDetailsForMissionLayer.getType() != MissionUpdateDetailsForMissionLayerType.REMOVE_MISSION_LAYER_FROM_MISSION) {
+			throw new InvalidParameterException("MissionUpdateDetailsForMissionLayerType must have type REMOVE_MISSION_LAYER_FROM_MISSION");
+		}
+		
+		return ROL.newBuilder().setProgram("update mission\n" + mapper.writeValueAsString(missionUpdateDetailsForMissionLayer) + ";").build();
+	}
+
+	public ROL addMapLayerToMissionToROL(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer) throws JsonProcessingException {
+		
+		if (missionUpdateDetailsForMapLayer.getType() != MissionUpdateDetailsForMapLayerType.ADD_MAPLAYER_TO_MISSION) {
+			throw new InvalidParameterException("missionUpdateDetailsForMapLayer must have type ADD_MAPLAYER_TO_MISSION");
+		}
+		
+		return ROL.newBuilder().setProgram("update mission\n" + mapper.writeValueAsString(missionUpdateDetailsForMapLayer) + ";").build();
+	}
+	
+	public ROL updateMapLayerToROL(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer) throws JsonProcessingException {		
+		
+		if (missionUpdateDetailsForMapLayer.getType() != MissionUpdateDetailsForMapLayerType.UPDATE_MAPLAYER) {
+			throw new InvalidParameterException("missionUpdateDetailsForMapLayer must have type UPDATE_MAPLAYER");
+		}
+		
+		return ROL.newBuilder().setProgram("update mission\n" + mapper.writeValueAsString(missionUpdateDetailsForMapLayer) + ";").build();
+	}
+	
+	public ROL removeMapLayerFromMissionToROL(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer) throws JsonProcessingException {
+		
+		if (missionUpdateDetailsForMapLayer.getType() != MissionUpdateDetailsForMapLayerType.REMOVE_MAPLAYER_FROM_MISSION) {
+			throw new InvalidParameterException("missionUpdateDetailsForMapLayer must have type REMOVE_MAPLAYER_FROM_MISSION");
+		}
+		
+		return ROL.newBuilder().setProgram("update mission\n" + mapper.writeValueAsString(missionUpdateDetailsForMapLayer) + ";").build();
 	}
 }

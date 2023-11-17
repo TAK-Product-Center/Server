@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.sql.Timestamp;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,6 +23,9 @@ import com.google.common.base.Strings;
 
 import tak.server.Constants;
 import tak.server.util.NumericUtil;
+
+import gov.tak.cop.proto.v1.Binarypayload;
+
 
 public class CotEventContainer extends XmlContainer implements Serializable {
 	
@@ -88,6 +92,8 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 	private boolean stored = false;
 	
 	private ByteBuffer protoBufBytes = null;
+
+	private List<Binarypayload.BinaryPayload> binaryPayloads = null;
 	
 	public CotEventContainer() {
 		super();
@@ -471,6 +477,14 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 		this.protoBufBytes = protoBufBytes;
 	}
 
+	public List<Binarypayload.BinaryPayload> getBinaryPayloads() {
+		return binaryPayloads;
+	}
+
+	public void setBinaryPayloads(List<Binarypayload.BinaryPayload> binaryPayloads) {
+		this.binaryPayloads = binaryPayloads;
+	}
+
 	private void copyInstanceVariables(CotEventContainer toCopy) {
 		this.start = toCopy.getStartLong();
 		this.stale = toCopy.getStaleLong();
@@ -490,6 +504,7 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 		this.submissionTime = toCopy.getSubmissionTime();
 		this.creationTime = toCopy.creationTime;
 		this.protoBufBytes = toCopy.getProtoBufBytes();
+		this.binaryPayloads = toCopy.getBinaryPayloads();
 	}
 	
 	public CotElement asCotElement() {

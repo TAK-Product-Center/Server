@@ -19,10 +19,11 @@ public class TAKCLCore {
 	public static final String CORE_NETWORK_V1_TAG = "coreNetworkV1-";
 	public static final String CORE_NETWORK_V2_TAG = "coreNetworkV2-";
 
+	public static final PrintStream stdout = System.out;
+	public static final PrintStream stderr = System.err;
+
 	public static boolean TEST_MODE = true;
 	private static final String SYSARG_PREFIX = "com.bbn.marti.takcl.";
-
-	public static final String dockerSubnet;
 	public static final double sleepMultiplier;
 	public static final Long igniteNetworkTimeout;
 	@Nullable
@@ -65,6 +66,8 @@ public class TAKCLCore {
 	@Nullable
 	public static final Integer systemMonitorPeriodSeconds;
 
+	public static boolean k8sMode;
+
 	public enum TakclOption {
 		// TestConfiguration settings
 		EnableDB(SYSARG_PREFIX + "dbEnabled", "TAKCL_ENABLE_DB", "true", true),
@@ -75,7 +78,6 @@ public class TAKCLCore {
 
 		// General Settings
 		SleepMultiplier(SYSARG_PREFIX + "sleepMultiplier", "TAKCL_SLEEP_MULTIPLIER", "1", false),
-		DockerSubnet(SYSARG_PREFIX + "dockerSubnet", "TAKCL_DOCKER_SUBNET", null, false),
 		IgniteManualRetryTimeout(SYSARG_PREFIX + "igniteManualRetryTimeout", "TAKCL_IGNITE_MANUAL_RETRY_TIMEOUT", "0", false),
 		IgniteClientFailureDetectionTimeout(SYSARG_PREFIX + "igniteClientFailureDetectionTimeout", "TAKCL_IGNITE_CLIENT_FAILURE_DETECTION_TIMEOUT", null, false),
 		IgniteFailureDetectionTimeout(SYSARG_PREFIX + "igniteFailureDetectionTimeout", "TAKCL_IGNITE_FAILURE_DETECTION_TIMEOUT", null, false),
@@ -101,7 +103,8 @@ public class TAKCLCore {
 		ServerStartupWaitTime(SYSARG_PREFIX + "serverStartupWaitTime", "TAKCL_SERVER_STARTUP_WAIT_TIME", null, false),
 		PostgresPassword(SYSARG_PREFIX + "postgresPassword", "TAKCL_SERVER_POSTGRES_PASSWORD", null, false),
 		ServerLogLevelOverrides(SYSARG_PREFIX + "serverLogLevelOverrides", "TAKCL_SERVER_LOG_LEVEL_OVERRIDES", null, false),
-		SystemMonitorPeriodSeconds(SYSARG_PREFIX + "systemMonitorPeriodSeconds", "TAKCL_SYSTEM_MONITOR_PERIOD_SECONDS", null, false);
+		SystemMonitorPeriodSeconds(SYSARG_PREFIX + "systemMonitorPeriodSeconds", "TAKCL_SYSTEM_MONITOR_PERIOD_SECONDS", null, false),
+		K8SMode(SYSARG_PREFIX + "k8sMode", "TAKCL_K8S_MODE", "false", true);
 
 		public final String sysPropKey;
 		public final String value;
@@ -225,7 +228,6 @@ public class TAKCLCore {
 
 	static {
 		sleepMultiplier = TakclOption.SleepMultiplier.getDouble();
-		dockerSubnet = TakclOption.DockerSubnet.getStringOrNull();
 		igniteManualRetryTimeout = TakclOption.IgniteManualRetryTimeout.getLong();
 		igniteClientFailureDetectionTimeout = TakclOption.IgniteClientFailureDetectionTimeout.getLongOrNull();
 		igniteFailureDetectionTimeout = TakclOption.IgniteFailureDetectionTimeout.getLongOrNull();
@@ -250,5 +252,6 @@ public class TAKCLCore {
 		postgresPassword = TakclOption.PostgresPassword.getStringOrNull();
 		serverLogLevelOverrides = TakclOption.ServerLogLevelOverrides.getStringOrNull();
 		systemMonitorPeriodSeconds = TakclOption.SystemMonitorPeriodSeconds.getIntegerOrNull();
+		k8sMode = TakclOption.K8SMode.getBoolean();
 	}
 }

@@ -14,6 +14,7 @@ import com.bbn.marti.config.Federation.FederationServer;
 import com.bbn.marti.config.Qos;
 import com.bbn.marti.config.Repository;
 import com.bbn.marti.config.Tls;
+import com.bbn.marti.config.Vbm;
 
 public interface CoreConfig {
 
@@ -41,6 +42,8 @@ public interface CoreConfig {
 	void setAndSaveQos(Qos qos);
 
     void setAndSaveStoreForwardChatEnabled(boolean storeForwardChatEnabled);
+	
+    void setAndSaveVbmConfiguration(Vbm vbm);
     
     boolean isContactApiFilter();
     

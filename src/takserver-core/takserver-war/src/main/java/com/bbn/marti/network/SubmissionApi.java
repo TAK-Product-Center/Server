@@ -254,7 +254,7 @@ public class SubmissionApi extends BaseRestController {
 						dataFeed.getAuth().toString(), dataFeed.getPort(), dataFeed.isAuthRequired(), dataFeed.getProtocol(),
 						dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(), dataFeed.isAnongroup(),
 						dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-						dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated());
+						dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated(), dataFeed.isBinaryPayloadWebsocketOnly());
 				
 				inputManager.updateFederationDataFeed(dataFeed);
 
@@ -275,7 +275,7 @@ public class SubmissionApi extends BaseRestController {
 							dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(), dataFeed.isAnongroup(),
 							dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
 											 //dataFeed.isSync(), 1, groupVector, dataFeed.isFederated());
-							dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated());
+							dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated(), dataFeed.isBinaryPayloadWebsocketOnly());
 
 					if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
 						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
@@ -340,7 +340,7 @@ public class SubmissionApi extends BaseRestController {
 	            	Long dataFeedId = dataFeedRepository.addDataFeed(dataFeed.getUuid(), dataFeed.getName(), type, auth, dataFeed.getPort(),
 	            			dataFeed.isAuthRequired(), dataFeed.getProtocol(), dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(),
 	            			dataFeed.isAnongroup(), dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-	            			dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated());
+	            			dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated(), dataFeed.isBinaryPayloadWebsocketOnly());
 
 	            	if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
 	            		dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag());
@@ -808,6 +808,7 @@ public class SubmissionApi extends BaseRestController {
     	dataFeed.setFilterGroups(filterGroups);
     	dataFeed.setSyncCacheRetentionSeconds(dao.getSyncCacheRetentionSeconds());
     	dataFeed.setFederated(dao.getFederated());
+    	dataFeed.setBinaryPayloadWebsocketOnly(dao.getBinaryPayloadWebsocketOnly());
     	
 		if (dao.getPort() == 0) {
 			dataFeed.setPort(null);

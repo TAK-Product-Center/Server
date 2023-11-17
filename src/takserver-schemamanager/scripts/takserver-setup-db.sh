@@ -13,6 +13,19 @@
 #  exit 1
 #fi
 
+run_schema_manager () {
+  echo "Applying the TAKServer specific schema changes for the TAK Server version..."
+  if [ IS_DOCKER ]; then
+     java -jar SchemaManager.jar upgrade
+  elif [ -e /opt/tak/db-utils/SchemaManager.jar ]; then
+     java -jar /opt/tak/db-utils/SchemaManager.jar upgrade
+  else
+     echo "ERROR: Unable to find SchemaManager.jar!"
+     exit 1
+  fi
+  echo "Database updated with SchemaManager.jar"
+}
+
 username='martiuser'
 password=""
 # try to get password from /opt/tak/CoreConfig.xml
@@ -25,10 +38,24 @@ if [ -z "$password" ]; then
     password=$(echo $(grep -m 1 "<connection" /opt/tak/CoreConfig.example.xml)  | sed 's/.*password="//; s/".*//')
   fi
 fi
+
+# If the envpass environment variable is set, set the password for the example. 
+# This allows for prebuilt docker containers (such as ironbank) to have configuration passed to them
+if [ ! -z "$envpass" ]; then
+  password=$envpass
+  sed -i "s/password=\"\"/password=\"$envpass\"/g" /opt/tak/CoreConfig.example.xml
+fi
+
 # cant find password - request one from user
 if [ -z "$password" ]; then
-  : ${1?' Could not find a password in /opt/tak/CoreConfig.xml or /opt/tak/CoreConfig.example.xml. Please supply a plaintext database password as the first parameter'}
-  password=$1
+  read -p 'Could not find a password in /opt/tak/CoreConfig.xml or /opt/tak/CoreConfig.example.xml. Please supply a plaintext database password: ' userPasswordInput
+  password=$userPasswordInput
+fi
+
+# cant read password from user input, exit and warn
+if [ -z "$password" ]; then
+  echo "WARNING: Skipping schema changes, no DB password could be found! These can be manually applied by running sudo /opt/tak/db-utils/takserver-setup-db.sh"
+  exit 1
 fi
 
 # switch CWD to the location where this script resides
@@ -199,6 +226,8 @@ if [ ! -z "$PGBIN_OLD" ]; then
   echo "***** Upgrade needed *****"
   if [ "$PRE_POSTGRES_10" = true ]; then
      echo "Upgrading from a version prior to TAK 1.3.11 (Postgresql 10) is not tested and guaranteed to work!"
+     # default to yes for non-interative script executions
+     REPLY="y"
      read -p "Are you sure you want to proceed? (y or n)" -n 1 -r
      if [ "$REPLY" =~ "^[Nn]$" ]; then
        echo "\nExiting..."
@@ -217,22 +246,6 @@ if [ ! -d $PGDATA ]; then
   exit 1
 fi
 
-# Only setup Database or reinitialize data if we didn't upgrade
-if [ -z "$PGDATA_OLD" ]; then
-  # Get user's permission before obliterating the database
-  DB_EXISTS=`su postgres -c "psql -l 2>/dev/null" | grep ^[[:blank:]]*$DB_NAME`
-  if [ "x$DB_EXISTS" != "x" ]; then
-     echo "WARNING: Database '$DB_NAME' already exists!"
-     echo "Proceeding will DESTROY your existing data!"
-     echo "You can back up your data using the pg_dump command. (See 'man pg_dump' for details.)"
-     read -p "Type 'erase' (without quotes) to erase the '$DB_NAME' database now:" kickme
-     if [ "$kickme" != "erase" ]; then
-         echo "User didn't say 'erase'. Aborting."
-         exit 1
-     fi
-     su postgres -c "psql --command='drop database if exists $DB_NAME;'"
-  fi
-fi
 
 # Install our version of pg_hba.conf
 echo "Installing TAKServer's version of PostgreSQL access-control policy."
@@ -314,8 +327,11 @@ if [ -z "$PGDATA_OLD" ]; then
     # create the database
     echo "Creating database $DB_NAME"
     su - postgres -c "createdb -U postgres --owner=martiuser $DB_NAME"
+
     if [ $? -ne 0 ]; then
-       exit 1
+       echo "Database $DB_NAME exists. Running SchemaManager."
+       run_schema_manager
+       exit 0
     fi
     echo "Database $DB_NAME created."
 else
@@ -348,14 +364,4 @@ else
   echo "After running the delete_old_cluster.sh script, you should also do a 'yum erase' of the RPMs for the previous database version."
 fi
 
-echo "Applying the TAKServer specific schema changes for the TAK Server version..."
-if [ IS_DOCKER ]; then
-   java -jar SchemaManager.jar upgrade
-elif [ -e /opt/tak/db-utils/SchemaManager.jar ]; then
-   java -jar /opt/tak/db-utils/SchemaManager.jar upgrade
-else
-   echo "ERROR: Unable to find SchemaManager.jar!"
-   exit 1
-fi
-echo "Database updated with SchemaManager.jar"
-
+run_schema_manager
