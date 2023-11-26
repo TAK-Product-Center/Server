@@ -219,6 +219,26 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
         input.setArchiveOnly(desiredState);
         return ConnectionModifyResult.SUCCESS;
     }
+    
+    public ConnectionModifyResult setFederatedFlagNoSave(String inputName, boolean desiredState) {
+        Input input = getInputByName(inputName);
+        if (input == null) {
+            return ConnectionModifyResult.FAIL_NONEXISTENT;
+        }
+        input.setFederated(desiredState);
+        return ConnectionModifyResult.SUCCESS;
+    }
+
+    public ConnectionModifyResult setSyncCacheRetentionSeconds(String inputName, int desiredState) {
+        Input input = getInputByName(inputName);
+        if (input == null) {
+            return ConnectionModifyResult.FAIL_NONEXISTENT;
+        }
+        input.setSyncCacheRetentionSeconds(desiredState);
+        return ConnectionModifyResult.SUCCESS;
+    }
+
+
 
     @SuppressWarnings("rawtypes")
 	public synchronized ConnectionModifyResult updateTagsNoSave(String inputName, List<String> newTagList) throws RemoteException {
@@ -293,7 +313,7 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     }
 
     @Override
-    public void saveChangesAndUpdateCache() {
+    public synchronized void saveChangesAndUpdateCache() {
     	updateCache();
     	saveChanges();
     }
@@ -519,6 +539,12 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
 	@Override
     public void setAndSaveStoreForwardChatEnabled(boolean storeForwardChatEnabled) {
 	    getRemoteConfiguration().getBuffer().getQueue().setEnableStoreForwardChat(storeForwardChatEnabled);
+	    saveChangesAndUpdateCache();
+    }
+	
+	@Override
+    public void setAndSaveVbmConfiguration(Vbm vbm) {
+	    getRemoteConfiguration().setVbm(vbm);
 	    saveChangesAndUpdateCache();
     }
 

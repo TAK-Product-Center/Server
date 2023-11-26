@@ -74,6 +74,7 @@ import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Dropfilter;
 import com.bbn.marti.config.Federation.FederationServer;
 import com.bbn.marti.config.Filter;
+import com.bbn.marti.config.GeospatialFilter;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.config.MicrosoftCAConfig;
 import com.bbn.marti.config.NameEntries;
@@ -125,7 +126,6 @@ import com.bbn.marti.remote.groups.NetworkInputAddResult;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.sync.model.DataFeedDao;
 import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.util.FixedSizeBlockingQueue;
 import com.bbn.marti.util.MessageConversionUtil;
@@ -140,13 +140,15 @@ import io.micrometer.core.instrument.Metrics;
 import tak.server.CommonConstants;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
-import tak.server.cache.PluginDatafeedCacheHelper;
+import tak.server.cache.DatafeedCacheHelper;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotElement;
 import tak.server.cot.CotEventContainer;
 import tak.server.cot.CotParser;
 import tak.server.federation.DistributedFederationManager;
+import tak.server.feeds.DataFeedDTO;
 import tak.server.feeds.DataFeed.DataFeedType;
+import tak.server.feeds.DataFeedStatsHelper;
 import tak.server.ignite.IgniteHolder;
 import tak.server.messaging.MessageConverter;
 
@@ -175,6 +177,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     // makes all points added to missions visible to __ANON__
     private boolean postMissionEventsAsPublic = false;
+
+	private boolean alwaysArchiveMissionCot = false;
 
     private DistributedConfiguration config;
 
@@ -217,7 +221,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     private DataFeedRepository dataFeedRepository;
     
 	@Autowired
-	private PluginDatafeedCacheHelper pluginDatafeedCacheHelper;
+	private DatafeedCacheHelper pluginDatafeedCacheHelper;
     
 	public static SubmissionService getInstance() {
 		if (instance == null) {
@@ -245,7 +249,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     "t-b-a",
                     "t-b-c",
                     "t-b-q",
-                    "t-x-c-t",
+					"t-x-c-f",
+					"t-x-c-t",
                     "t-x-c-t-r",
                     "t-x-takp-q",
                     "t-x-c-m",
@@ -319,6 +324,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         postMissionEventsAsPublic = config.getAuth() != null && config.getAuth().getLdap() != null &&
                 config.getAuth().getLdap().isPostMissionEventsAsPublic();
 
+        alwaysArchiveMissionCot = config.getNetwork().isAlwaysArchiveMissionCot();
+
         List<Input> inputs = config.getNetwork().getInput();
 
 
@@ -353,27 +360,34 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         try {
         	Set<String> feedUids = new HashSet<>();
 
+			if (logger.isDebugEnabled()) {
+				logger.debug("Looping through DataFeed list.");
+			}
             for (DataFeed feed : feeds) {
             	if (CollectionUtils.isNotEmpty(feed.getFiltergroup()) && feed.getAuth().equals(AuthType.X_509)) {
                     if (logger.isErrorEnabled()) {
-                        logger.error("You have configured a datafeed with both x509 auth and filter groups, the filter groups will be ignored. " + feed.getFiltergroup());
+                        logger.error("You have configured a datafeed with both x509 auth and filter groups, the filter groups will be ignored. {}", feed.getFiltergroup());
                     }
                 }
                 if (Strings.isNullOrEmpty(feed.getUuid())) {
-                  logger.info("Failed to initialize Data Feed: " + feed.getName() 
-                  +  " because no uuid tag was specified. Here is an auto-generated uuid you can use: <uuid>" 
-                      + UUID.randomUUID().toString() + "</uuid>");
+                  logger.info("Failed to initialize Data Feed: {} because no uuid tag was specified. Here is an auto-generated uuid you can use: <uuid>{}</uuid>", feed.getName(), UUID.randomUUID().toString());
                   continue;
                 }
                 
                 if (feedUids.contains(feed.getUuid())) {
-                  logger.info("Failed to initialize Data Feed: " + feed.getName() + " because a data feed with that uuid already exists.");
+                  logger.info("Failed to initialize Data Feed: {} because a data feed with that uuid already exists.", feed.getName());
                   continue;
                 }
-                
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("Adding DataFeed UUID to set of DataFeed UUIDs.");
+				}
                 feedUids.add(feed.getUuid());
-                
-                DataFeedType feedType = EnumUtils.getEnumIgnoreCase(DataFeedType.class, feed.getType());
+
+				if (logger.isTraceEnabled()) {
+					logger.trace("Setting DataFeed values.");
+				}
+				DataFeedType feedType = EnumUtils.getEnumIgnoreCase(DataFeedType.class, feed.getType());
         		
         		if (feedType == null) {
         			feedType = DataFeedType.Streaming;
@@ -410,13 +424,22 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 				Set<Group> groups = groupManager.findGroups(feed.getFiltergroup());
 				String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
-				
+
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("Checking if DataFeed is already in the repository.");
+				}
 				if (dataFeedRepository.getDataFeedByUUID(feed.getUuid()).size() > 0) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("Updating the DataFeed in the repository.");
+					}
+					
+					// TODO: update to support predicate feeds if necessary (may not be because the messages don't flow thru the server
 					dataFeedId = dataFeedRepository.updateDataFeed(feed.getUuid(), feed.getName(), feedType.ordinal(),
 							feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
 							feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
 							feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
-							feed.isSync(), feed.getSyncCacheRetentionSeconds());
+							feed.isSync(), feed.getSyncCacheRetentionSeconds(), feed.isFederated(), feed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
 
 					if (feed.getTag().size() > 0) {
 						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
@@ -428,11 +451,14 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 					}
 				} else {
 					if (dataFeedRepository.getDataFeedByName(feed.getName()).size() != 1) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("Adding the DataFeed to the repository.");
+						}
 						dataFeedId = dataFeedRepository.addDataFeed(feed.getUuid(), feed.getName(), feedType.ordinal(),
 								feed.getAuth().toString(), feed.getPort(), feed.isAuthRequired(), feed.getProtocol(),
 								feed.getGroup(), feed.getIface(), feed.isArchive(), feed.isAnongroup(),
 								feed.isArchiveOnly(), feed.getCoreVersion(), feed.getCoreVersion2TlsVersions(),
-								feed.isSync(), feed.getSyncCacheRetentionSeconds(), groupVector);
+								feed.isSync(), feed.getSyncCacheRetentionSeconds(), groupVector, feed.isFederated(), feed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
 
 						if (feed.getTag().size() > 0) {
 							dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
@@ -445,10 +471,16 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 					}
 				}
 
+				if (logger.isDebugEnabled()) {
+					logger.debug("Adding the DataFeed to the list of inputs.");
+				}
                 addInput(feed);
             }
             
             // add input metrics for federation data feeds from DB         
+			if (logger.isDebugEnabled()) {
+				logger.trace("Adding InputMetrics for the Federation DataFeeds.");
+			}
             dataFeedRepository.getFederationDataFeeds().forEach(fedFeed -> {
             	DataFeed datafeed = fedFeed.toInput();
             	addMetric(datafeed, new InputMetric(datafeed));
@@ -475,6 +507,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         // listen for messages on this node's submission topic
         ignite.message().localListen(serverInfo.getSubmissionTopic(), (nodeId, message) -> {
+			if (logger.isDebugEnabled()) {
+				logger.debug("In SubmissionTopic listener within Submission Service.");
+			}
         	if (!(message instanceof byte[])) {
 
         		if (dlogger.isDebugEnabled()) {
@@ -487,6 +522,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         	byte[] protoMessage = (byte[]) message;
 
         	try {
+				if (logger.isDebugEnabled()) {
+					logger.debug("Converting Proto Message to CotEventContainer.");
+				}
         		CotEventContainer cot = messageConverter.dataMessageToCot(protoMessage);
 
         		if (dlogger.isTraceEnabled()) {
@@ -549,6 +587,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         			}
         		}
 
+				if (logger.isDebugEnabled()) {
+					logger.debug("Adding CotEventContainer to InputQueue.");
+				}
         		addToInputQueue(cot);
 
         	} catch (RemoteException | DocumentException e) {
@@ -566,7 +607,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         	// listen for messages from plugins
         	ignite.message().localListen(CommonConstants.PLUGIN_PUBLISH_TOPIC, (nodeId, message) -> {
-
+				if (logger.isDebugEnabled()) {
+					logger.debug("In Plugin Publish Topic listener.");
+				}
         		try {
         			
         			if (logger.isTraceEnabled()) {
@@ -583,7 +626,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         			}
 
         			try {
-
+						if (logger.isTraceEnabled()) {
+							logger.trace("Parse bytes into a Message.");
+						}
         				Message m = Message.parseFrom((byte[]) message);
         				if (m != null) {
         					boolean isInterceptorMessage = false;
@@ -591,7 +636,10 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             				if (provenance != null && provenance.contains(Constants.PLUGIN_INTERCEPTOR_PROVENANCE)) {
             					isInterceptorMessage = true;
             				}
-            				
+
+							if (logger.isDebugEnabled()) {
+								logger.debug("Check if Interceptor Message.");
+							}
         					if (isInterceptorMessage) {
             					// do not republish the message if it is marked as intercepted, submit it directly
         						SubmissionService.this.addToInputQueue(messageConverter.dataMessageToCot(m, false));
@@ -602,19 +650,31 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
             					// Check if the message is a datafeed
             					boolean isDataFeedMessage = false;
+								if (logger.isDebugEnabled()) {
+									logger.debug("Check if DataFeed Message.");
+								}
             					if (m.getFeedUuid() != null && !m.getFeedUuid().isEmpty()) {
             						isDataFeedMessage = true;
             					}
-            					
+
+								if (logger.isDebugEnabled()) {
+									logger.debug("Convert Message to Plugin CotEventContainer.");
+								}
             					CotEventContainer pluginCotEvent = messageConverter.dataMessageToCot(m, false);
             					
             					if (isDataFeedMessage) {
-            						
+
+									if (logger.isDebugEnabled()) {
+										logger.debug("Check if the DataFeed is in cache.");
+									}
             						List<tak.server.plugins.PluginDataFeed> cacheResult = pluginDatafeedCacheHelper.getPluginDatafeed(m.getFeedUuid());
             						
             						if (cacheResult == null) { // Does not have in cache
-            							
-            							List<DataFeedDao> dataFeedInfo = dataFeedRepository.getDataFeedByUUID(m.getFeedUuid());
+
+										if (logger.isDebugEnabled()) {
+											logger.debug("Not in cache. Check if DataFeed is in the Repository.");
+										}
+            							List<DataFeedDTO> dataFeedInfo = dataFeedRepository.getDataFeedByUUID(m.getFeedUuid());
                     					if (dataFeedInfo.size() == 0) {
                     						
                     						// update cache with empty result
@@ -626,10 +686,19 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         					
                     					} else {
                     						List<String> tags = dataFeedRepository.getDataFeedTagsById(dataFeedInfo.get(0).getId());
-                    						
+
+                    						Set<String> groupNames = RemoteUtil.getInstance().getGroupNamesForBitVectorString(
+                    								dataFeedInfo.get(0).getGroupVector(), groupManager.getAllGroups());
+
                     						// update cache
+											if (logger.isDebugEnabled()) {
+												logger.debug("Create PluginDataFeed and add to Cache.");
+											}
                     						List<tak.server.plugins.PluginDataFeed> pluginDatafeeds = new ArrayList<>();
-                    						tak.server.plugins.PluginDataFeed pluginDataFeed = new tak.server.plugins.PluginDataFeed(m.getFeedUuid(), dataFeedInfo.get(0).getName(), tags, dataFeedInfo.get(0).getArchive(), dataFeedInfo.get(0).isSync());
+                    						tak.server.plugins.PluginDataFeed pluginDataFeed = new tak.server.plugins.PluginDataFeed(
+                    								m.getFeedUuid(), dataFeedInfo.get(0).getName(), tags, dataFeedInfo.get(0).getArchive(),
+													dataFeedInfo.get(0).isSync(),  new ArrayList<String>(groupNames), dataFeedInfo.get(0).getFederated());
+                    						
                     						pluginDatafeeds.add(pluginDataFeed);
                         					pluginDatafeedCacheHelper.cachePluginDatafeed(m.getFeedUuid(), pluginDatafeeds);
                     						
@@ -639,13 +708,22 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         					dataFeed.getTag().addAll(tags); 
                         					dataFeed.setArchive(dataFeedInfo.get(0).getArchive());
                         					dataFeed.setSync(dataFeedInfo.get(0).isSync());
-                        					if (logger.isDebugEnabled()) {
-                        						logger.debug("Retrieve Datafeed info from dataFeedRepository: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync());
+											dataFeed.getFiltergroup().addAll(groupNames);
+                    						dataFeed.setFederated(dataFeedInfo.get(0).getFederated());
+
+											if (logger.isDebugEnabled()) {
+                            					logger.debug("Retrieve Datafeed info from dataFeedRepository: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, federated: {}, filtergroup: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync(), dataFeed.isFederated(), dataFeed.getFiltergroup());
                         					}
-                        				
+                        					
                         					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
 
-                        					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+											if (logger.isDebugEnabled()) {
+												logger.debug("Forward the Plugin CotEventContainer along to other services.");
+											}
+											MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+											if (logger.isDebugEnabled()) {
+												logger.debug("Update InputMetric for DataFeed.");
+											}
 											InputMetric inputMetric = getInputMetric(dataFeed.getName());
 											if (inputMetric != null) {
 												inputMetric.getMessagesReceived().incrementAndGet();
@@ -654,7 +732,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     					}
             							
             						} else { // exist in cache
-            							
+										if (logger.isDebugEnabled()) {
+											logger.debug("Found DataFeed in Cache.");
+										}
             							if (cacheResult.size() == 0) { // datafeed with this uuid does not exist
             								
             								if (logger.isWarnEnabled()) {
@@ -662,20 +742,32 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             								}
                         					
             							} else {
+											if (logger.isDebugEnabled()) {
+												logger.debug("Create new DataFeed from Message.");
+											}
             								com.bbn.marti.config.DataFeed dataFeed = new com.bbn.marti.config.DataFeed();
                         					dataFeed.setUuid(m.getFeedUuid());
                         					dataFeed.setName(cacheResult.get(0).getName());
                         					dataFeed.getTag().addAll(cacheResult.get(0).getTags());
                         					dataFeed.setArchive(cacheResult.get(0).isArchive());
                         					dataFeed.setSync(cacheResult.get(0).isSync());
-                        					
-                        					if (logger.isDebugEnabled()) {
-                        						logger.debug("Retrieve Datafeed info from cache: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync());
+											dataFeed.getFiltergroup().addAll(cacheResult.get(0).getFilterGroups());
+                        					dataFeed.setFederated(cacheResult.get(0).isFederated());
+
+											if (logger.isDebugEnabled()) {
+												logger.debug("Retrieve Datafeed info from cache: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, federated: {}, filtergroup: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync(), dataFeed.isFederated(), dataFeed.getFiltergroup());
                         					}
                         				
                         					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
 
-                        					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+											if (logger.isDebugEnabled()) {
+												logger.debug("Forward the Plugin CotEventContainer along to other services.");
+											}
+											MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
+
+											if (logger.isDebugEnabled()) {
+												logger.debug("Update InputMetric for DataFeed.");
+											}
 											InputMetric inputMetric = getInputMetric(dataFeed.getName());
 											if (inputMetric != null) {
 												inputMetric.getMessagesReceived().incrementAndGet();
@@ -683,8 +775,22 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 											}
             							}
             						}
+									// whether its in cache or not, we need to update the data feed stats for a data feed message
+									if (logger.isDebugEnabled()) {
+										logger.debug("Add the Data Feed message to the DataFeed Stats.");
+									}
+									double lat = Double.valueOf(pluginCotEvent.getLat()).doubleValue();
+									double lon = Double.valueOf(pluginCotEvent.getLon()).doubleValue();
+									if (!DataFeedStatsHelper.getInstance().addStatsForDataFeedMessage(
+											m.getFeedUuid(), pluginCotEvent.getType(), lat,	lon,
+											pluginCotEvent.getCreationTime(), ((byte[])message).length)) {
+										logger.error("Unable to add new DataFeedStats for Message.");
+									}
 
-            					} else {
+								} else {
+									if (logger.isDebugEnabled()) {
+										logger.debug("Forward the Plugin CotEventContainer along to other services.");
+									}
                 					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
             					}
             					
@@ -977,10 +1083,25 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             	}
 
                 // update reads metric for this input
-                InputMetric metric = util.getInputMetric(((AbstractBroadcastingChannelHandler) handler).getInput());
+				Input input = ((AbstractBroadcastingChannelHandler) handler).getInput();
+                InputMetric metric = util.getInputMetric(input);
                 metric.getMessagesReceived().incrementAndGet();
-
                 metric.getBytesRecieved().addAndGet(data.toString().length());
+
+				if(input instanceof DataFeed)
+				{
+					DataFeed feed = (DataFeed) input;
+					if (Strings.isNullOrEmpty(feed.getUuid())) {
+						double lat = Double.valueOf(data.getLat()).doubleValue();
+						double lon = Double.valueOf(data.getLon()).doubleValue();
+						if (!DataFeedStatsHelper.getInstance().addStatsForDataFeedMessage(
+								feed.getUuid(), data.getType(), lat,	lon,
+								data.getCreationTime(), data.toString().length())) {
+							logger.error("Unable to add new DataFeedStats for Message.");
+						}
+					}
+				}
+
             } catch (Exception e) {
             	if (logger.isDebugEnabled()) {
             		logger.debug("exception writing metric", e);
@@ -1148,12 +1269,22 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                         NavigableSet<Group> groups = groupManager.getGroups(uzer);
 
                         if (groups != null) {
-                            if (postMissionEventsAsPublic && data.getDocument().selectNodes(
-                                    "/event/detail/marti/dest[@mission]").size() > 0) {
-                                //make a copy of the group set so we don't modify the actual user
-                                groups = new ConcurrentSkipListSet<>(groups);
-                                groups.add(groupManager.getGroup("__ANON__", Direction.IN));
-                            }
+
+                        	if (postMissionEventsAsPublic || alwaysArchiveMissionCot) {
+								if (data.getDocument().selectNodes(
+										"/event/detail/marti/dest[@mission]").size() > 0) {
+
+									if (postMissionEventsAsPublic) {
+										//make a copy of the group set so we don't modify the actual user
+										groups = new ConcurrentSkipListSet<>(groups);
+										groups.add(groupManager.getGroup("__ANON__", Direction.IN));
+									}
+
+									if (alwaysArchiveMissionCot) {
+										data.setContext(Constants.ARCHIVE_EVENT_KEY, Boolean.TRUE);
+									}
+								}
+							}
 
                             // Only put IN groups in the message - out groups do not matter here
                             data.setContext(Constants.GROUPS_KEY, gfu.filterGroupDirection(Direction.IN, groups));
@@ -1537,7 +1668,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     protected void processNextEvent() {
 
         CotEventContainer c = null;
-        try {
+		try {
             c = inputQueue.take();
 
             if (logger.isTraceEnabled()) {
@@ -1547,6 +1678,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             if (c == null) {
                 return;
             }
+
+			if (logger.isTraceEnabled()) {
+				logger.trace("Found a CotEventContainer in the inputQueue");
+			}
+
         } catch (InterruptedException e1) {
             logger.warn("Exception taking object from queue " + inputQueue, e1);
         }
@@ -1575,6 +1711,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         if (isControlMessage(c.getType())) {
             try {
+				if (logger.isTraceEnabled()) {
+					logger.trace("Processing Control Message.");
+				}
                 processControlMessage(c);
             } catch (IOException e) {
                 logger.debug("exception processing control message", e);
@@ -1596,8 +1735,14 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         }
 
         // add a flow tag (to show that Marti has processed the message)
+		if (logger.isTraceEnabled()) {
+			logger.trace("Adding flow tag (to show that the message has been processed.");
+		}
         flowTagFilter.filter(c);
 
+		if (logger.isTraceEnabled()) {
+			logger.trace("Processing a Contact Message.");
+		}
         processContactMessage(c);
 
         if (logger.isTraceEnabled()) {
@@ -1616,6 +1761,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         if (allServicesHaveRoom ||
         		(config.getSubmission().isDropMesssagesIfAnyServiceIsFull() == false)) {
 
+			if (logger.isTraceEnabled()) {
+				logger.trace("Adding a copy of the CotEventContainer to the other services via the InputQueue.");
+			}
         	for (BaseService s : consumers) {
         		s.addToInputQueue(c.copy());
         	}
@@ -1642,7 +1790,10 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             case "t-b":
                 processSubscriptionMessage(c);
                 break;
-            case "t-b-q":
+			case "t-x-c-f":
+				processFilterMessage(c);
+				break;
+			case "t-b-q":
                 logger.info("ignoring durable messaging (t-b-q) control message");
                 break;
             case "t-x-c-t":
@@ -1686,22 +1837,6 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             return;
         }
 
-        GeospatialEventFilter geospatialEventFilter = null;
-        Node filterNode = subNode.selectSingleNode("*[local-name() = 'filter']");
-        if (filterNode != null) {
-            try {
-                JAXBContext jaxbContext = JAXBContext.newInstance(Filter.class);
-                Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
-                StringReader sr = new StringReader(filterNode.asXML());
-                Filter filter = (Filter) unmarshaller.unmarshal(sr);
-                if (filter != null) {
-                    geospatialEventFilter = new GeospatialEventFilter(filter.getGeospatialFilter());
-                }
-            } catch (JAXBException e) {
-                logger.error("Exception reading filter from subscription! " + e.getMessage());
-            }
-        }
-
         TransportCotEvent transportType = TransportCotEvent.findByID(tokens[0]);
         Tuple<ChannelHandler, Protocol<CotEventContainer>> handlerAndProtocol = null;
         Subscription subscription = null;
@@ -1718,7 +1853,6 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     		logger.debug("updating subscription: " + subscription);
                     	}
                         subscription.xpath = xpath;
-                        subscription.geospatialEventFilter = geospatialEventFilter;
                     } else {
                         logger.warn("can't update a subscription that doesn't exist");
                     }
@@ -1764,6 +1898,34 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         }
     }
 
+	private void processFilterMessage(CotEventContainer msg) {
+		try {
+			GeospatialEventFilter filter = null;
+
+			List<Node> bboxNodes = msg.getDocument().selectNodes(
+					"/event/detail/subscription/geospatialFilter/boundingBox");
+			if (bboxNodes != null && !bboxNodes.isEmpty()) {
+				GeospatialFilter geospatialFilter = new GeospatialFilter();
+				for (Node bboxNode : bboxNodes) {
+					GeospatialFilter.BoundingBox boundingBox = new GeospatialFilter.BoundingBox();
+					boundingBox.setMinLongitude(Double.valueOf(bboxNode.valueOf("@minLongitude")));
+					boundingBox.setMinLatitude(Double.valueOf(bboxNode.valueOf("@minLatitude")));
+					boundingBox.setMaxLongitude(Double.valueOf(bboxNode.valueOf("@maxLongitude")));
+					boundingBox.setMaxLatitude(Double.valueOf(bboxNode.valueOf("@maxLatitude")));
+					geospatialFilter.getBoundingBox().add(boundingBox);
+				}
+				filter = new GeospatialEventFilter(geospatialFilter);
+			}
+
+			ChannelHandler handler = msg.getContext(Constants.SOURCE_TRANSPORT_KEY, ChannelHandler.class);
+			Subscription subscription = subscriptionStore.getByHandler(handler);
+			subscription.geospatialEventFilter = filter;
+
+		} catch (Exception e) {
+			logger.error("Exception in processFilterMessage!", e);
+		}
+	}
+
     private void processMetricsMessage(CotEventContainer msg) {
         try {
             Subscription subscription = subscriptionStore.getByHandler((ChannelHandler) msg.getContextValue(Constants.SOURCE_TRANSPORT_KEY));
@@ -1801,6 +1963,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             if (dest == null) {
                 return;
             }
+
+			dest.lastPingTime = new AtomicLong(new Date().getTime());
 
             CotEventContainer pong = new CotEventContainer(DocumentHelper.parseText(
                     "<event version='2.0' uid='takPong' type='t-x-c-t-r' how='h-g-i-g-o' time='" +
@@ -2099,7 +2263,6 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     	}
 
     	synchronized (configLock) {
-
     		try {
     			Input currentState = config.getInputByName(inputName);
 
@@ -2146,8 +2309,12 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     			}
 
     			// Modify the archive flags
-    			if (currentState.isArchive() != modifiedInput.isArchive() || currentState.isArchiveOnly() != modifiedInput.isArchiveOnly()) {
+    			if (currentState.isArchive() != modifiedInput.isArchive() || currentState.isArchiveOnly() != modifiedInput.isArchiveOnly() || currentState.isFederated() != modifiedInput.isFederated() || currentState.getSyncCacheRetentionSeconds() != modifiedInput.getSyncCacheRetentionSeconds()) {
     				// Modify the archive flag
+			    logger.info("current arch, arch_only, federated: " + currentState.isArchive() + "," + currentState.isArchiveOnly() +
+					"," + currentState.isFederated());
+			    logger.info("modified arch, arch_only, federated: " + modifiedInput.isArchive() + "," + modifiedInput.isArchiveOnly() +
+					"," + modifiedInput.isFederated());
     				if (currentState.isArchive() != modifiedInput.isArchive()) {
     					result = config.setArchiveFlagNoSave(inputName, modifiedInput.isArchive());
     					if (result != ConnectionModifyResult.SUCCESS) {
@@ -2162,13 +2329,33 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                             return result;
                         }
     				}
+    				
+    				// Modify federated flag
+      				if (currentState.isFederated() != modifiedInput.isFederated()) {
+      					result = config.setFederatedFlagNoSave(inputName, modifiedInput.isFederated());
+    					if (result != ConnectionModifyResult.SUCCESS) {
+                            return result;
+                        }
+    				}
 
+				// Modify syncCacheRetentionSeconds value
+
+				if (currentState.getSyncCacheRetentionSeconds() !=
+				    modifiedInput.getSyncCacheRetentionSeconds())
+				    {
+					result = config.setSyncCacheRetentionSeconds(inputName, modifiedInput.getSyncCacheRetentionSeconds());
+					if(result != ConnectionModifyResult.SUCCESS)
+					    {
+						return result;
+					    }
+				    }
+    				
 					// Save the flag changes;
     				updateProtocolListeners(config.getInputByName(inputName));
     				nettyBuilder.modifyServerInput(modifiedInput);
     				config.saveChangesAndUpdateCache();
     			}
-
+    			
     			// Modify data feed attributes
 				if (modifiedInput instanceof DataFeed && currentState instanceof DataFeed) {
 					DataFeed modifiedDataFeed = (DataFeed) modifiedInput;
@@ -2291,7 +2478,13 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                 conf.getRepository().isArchive(),
                 conf.getRepository().getConnection().getUsername(),
                 MASK_WORD_FOR_DISPLAY,
-                conf.getRepository().getConnection().getUrl());
+                conf.getRepository().getConnection().getUrl(),
+                conf.getRepository().getConnection().isSslEnabled(),
+                conf.getRepository().getConnection().getSslMode(),
+                conf.getRepository().getConnection().getSslCert(),
+                conf.getRepository().getConnection().getSslKey(),
+                conf.getRepository().getConnection().getSslRootCert()
+                );
     }
 
     @Override
@@ -2308,6 +2501,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             repository.getConnection().setPassword(info.getDbPassword());
         }
         repository.getConnection().setUrl(info.getDbUrl());
+        repository.getConnection().setSslEnabled(info.isSslEnabled());
+        repository.getConnection().setSslMode(info.getSslMode());
+        repository.getConnection().setSslCert(info.getSslCert());
+        repository.getConnection().setSslKey(info.getSslKey());
+        repository.getConnection().setSslRootCert(info.getSslRootCert());
         coreConfig.setAndSaveMessagingConfig(latestSA, repository);
     }
 

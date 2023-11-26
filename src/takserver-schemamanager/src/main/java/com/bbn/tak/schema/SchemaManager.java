@@ -31,6 +31,7 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.ParameterException;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import tak.server.util.JavaVersionChecker;
 
 /**
  * Command-line utility for managing TAK server database schema.
@@ -57,6 +58,7 @@ public class SchemaManager {
     private boolean isHelp = false;
 
     public static void main(String args[]) {
+        JavaVersionChecker.check();
         disableAccessWarnings();
         int exitStatus = EXIT_OK;
         SchemaManager instance = null;
@@ -286,6 +288,7 @@ public class SchemaManager {
                 logger.debug(sql);
                 deleteStatement.execute(sql);
             }
+            
             flyway.clean();
             logger.debug("Database '" + database + "' has been cleaned.");
             // Rebuild the metadata table
@@ -323,7 +326,7 @@ public class SchemaManager {
         config.setPassword(commonOptions.password);
         dataSource = new HikariDataSource(config);
 
-        flyway = Flyway.configure().dataSource(dataSource).table("schema_version").load();
+        flyway = Flyway.configure().cleanDisabled(false).dataSource(dataSource).table("schema_version").load();
         return true;
     }
 

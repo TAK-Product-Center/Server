@@ -1,5 +1,14 @@
+apply plugin: 'java-library'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
 
 repositories {
+  flatDir {
+    dirs '../../takserver-plugins/build/libs'
+  }
+
+/**
+ * -- Uncomment this if pulling takserver-plugins.jar from artifactory instead of using local build version --
   maven {
     url = 'https://artifacts.tak.gov/artifactory/maven'
     credentials {
@@ -7,16 +16,31 @@ repositories {
       password = "$takGovPassword"
     }
   }
+ */
 }
 
 apply plugin: 'com.github.johnrengelman.shadow'
 
-// support building a single jar that contains plugin code and also dependencies
-shadowJar { }
+buildscript {
+  repositories {
+    mavenCentral()
+    maven {
+      url 'https://plugins.gradle.org/m2'
+    }
+  }
+  dependencies {
+    classpath 'gradle.plugin.com.github.johnrengelman:shadow:' + gradle_shadow_version
+  }
+}
 
 dependencies {
+  // Use the local takserver-plugins-<version>.jar
+  implementation group: '', name: 'takserver-plugins', version: '+', classifier: 'all'
 
-  compile group: 'gov.tak', name: 'takserver-plugins', version: takserver_plugins_version, classifier: 'all'
+  /*
+    Use this line instead if pulling from and testing a different tak-server version than the local one ---
+    implementation group: 'gov.tak', name: 'takserver-plugins', version: takserver_plugins_version, classifier: 'all'
+ */
 
   // add additional depenencies as required for your TAK Server plugin
 }

@@ -1,0 +1,70 @@
+<link rel="stylesheet" href="../../styles/tablesorter/style.css" type="text/css" media="print, projection, screen" />
+<style type="text/css">
+.modal-dialog {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+}
+.modal-content {
+    height: 100%;
+    min-height: 100%;
+    height: auto;
+    border-radius: 0;
+}
+</style>
+<h3 style="align-content: center; text-align: center;">Active Federation Hub Connections</h3>
+<div class="modal-header">
+    <div style="clear: both">
+        <h3 class="modal-title" style="float: left">{{editorTitle}} {{roger_federation.type}}</h3>
+        <h4 ng-if="editExisting" style="float: right">{{roger_federation.name}}</h4>
+    </div>
+</div>
+
+<div class="modal-footer">
+    <button class="btn btn-primary" type="button" ng-click="cancel()">Close</button>
+</div>
+
+<div class="modal-body" data-ng-init="initialize()">
+    <form name="federateForm">
+        <div style="align-content: center; text-align: center">
+          <select ng-model="selectedCa" style="text-align: center;" ng-change="updateFilter()">
+            <option>All</option>
+              <option ng-repeat="ca in knownCas" value="{{ca.uid}}">{{ca.uid}}</option>
+          </select>
+        </div>
+        <div>
+          <table id="activeConnectionsList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+                <thead>
+                  <tr>
+                    <th>Connection Id</th>
+                    <th>Local Connection Type</th>
+                    <th>Remote Connection Type</th>
+                    <th>Remote Address</th>
+                    <th>Federation Protocol Version</th>
+                    <th>Group Identities</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr data-ng-repeat="ac in filteredActiveConnections">
+                    <td data-ng-bind="ac.connectionId"></td>
+                    <td data-ng-bind="ac.localConnectionType"></td>
+                    <td data-ng-bind="ac.remoteConnectionType"></td>
+                    <td data-ng-bind="ac.remoteAddress"></td>
+                    <td data-ng-bind="ac.federationProtocolVersion"></td>
+                    <td>
+                      <div data-ng-repeat="group in ac.groupIdentities">
+                        {{group}}
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-primary" type="button" ng-click="cancel()" ng-show="filteredActiveConnections.length >= 10">Close</button>
+        </div>
+    </form>
+</div>

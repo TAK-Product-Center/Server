@@ -111,6 +111,11 @@ class CotProtoMessage:
     def is_sa(self):
         return self.message.cotEvent.detail.HasField("contact")
 
+    def is_pong(self):
+        if self.message.cotEvent.type == "t-x-c-t-r":
+            return True
+        return False   
+
     def mission_change(self):
         xml_details = etree.fromstring("<detail>"+self.message.cotEvent.detail.xmlDetail+"</detail>")
         for xml_detail in xml_details.getchildren():

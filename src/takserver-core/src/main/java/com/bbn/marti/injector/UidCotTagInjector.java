@@ -84,8 +84,13 @@ public class UidCotTagInjector implements Injector<RemoteSubscription, CotEventC
             }
 
             for (UidInject uidInject : configuration.getFilter().getInjectionfilter().getUidInject()) {
-                addInjector(uidInject);
+                try {
+                    addInjector(uidInject);
+                } catch (Exception e) {
+                    logger.error("exception adding injector " + uidInject.getUid(), e);
+                }
             }
+
         } catch (Exception e) {
             logger.error("exception in load!", e);
         }

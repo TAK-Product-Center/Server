@@ -34,19 +34,19 @@ public class AllCopMissionsCacheKeyGenerator implements KeyGenerator {
 		// path
 		if (params[2] != null) {
 			keyBuilder.append("_");
-			keyBuilder.append((String) params[2]);
+			keyBuilder.append((String) params[3]);
 		}
 
 		// page
 		if (params[3] != null) {
 			keyBuilder.append("_");
-			keyBuilder.append((String.valueOf(params[3])));
+			keyBuilder.append((String.valueOf(params[4])));
 		}
 
 		//size
 		if (params[4] != null) {
 			keyBuilder.append("_");
-			keyBuilder.append((String.valueOf(params[4])));
+			keyBuilder.append((String.valueOf(params[5])));
 		}
 
     	return keyBuilder.toString();

@@ -59,7 +59,6 @@ public class FederationHubServerConfig {
     private String nonce;
     @JsonIgnore
     private String fullId;
-   
     
     public int getOutgoingReconnectSeconds() {
 		return outgoingReconnectSeconds;

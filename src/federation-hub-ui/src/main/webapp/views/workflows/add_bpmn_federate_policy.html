@@ -6,72 +6,107 @@
 </div>
 
 <div class="modal-body" data-ng-init="initialize()">
-
-  <script type="text/ng-template" id="nodes_renderer.html">
-    <div style="display:inline-block" ui-tree-handle class="tree-node tree-node-content">
-      <a class="btn btn-success btn-xs" ng-if="node.nodes && node.nodes.length > 0" data-nodrag ng-click="toggle(this)"><span
-              class="glyphicon"
-              ng-class="{
-              'glyphicon-chevron-right': collapsed,
-              'glyphicon-chevron-down': !collapsed
-            }"></span></a>
-      <a class="btn btn-danger btn-xs" data-nodrag ng-click="remove(this)"><span class="glyphicon glyphicon-remove"></span></a>
-      <span ng-show="node.type === 'filter'"><a class="btn btn-primary btn-xs" data-nodrag style="margin-right: 8px;"><span class="glyphicon glyphicon-plus text-muted"></span></a></span>
-      <span ng-show="node.type === 'and'"><a class="btn btn-primary btn-xs" data-nodrag ng-click="newSubItem(this)" style="margin-right: 8px;"><large><span class="glyphicon glyphicon-plus"></span></large></a></span>
-      <span ng-show="node.type === 'or'"><a class="btn btn-primary btn-xs" data-nodrag ng-click="newSubItem(this)" style="margin-right: 8px;"><large><span class="glyphicon glyphicon-plus"></span></large></a></span>
-
-
-      <div class="btn-group" uib-tooltip="select type: boolean operation or attribute">
-        <label data-nodrag class="btn btn-primary" ng-model="node.type" uib-btn-radio="'filter'">Filter</label>
-        <label data-nodrag class="btn btn-success" ng-model="node.type" uib-btn-radio="'and'">AND</label>
-        <label data-nodrag class="btn btn-success" ng-model="node.type" uib-btn-radio="'or'">OR</label>
-      </div>
-
-
-
-      <div ng-show="node.type === 'filter'" style="margin-top:10px">
-        <select class="form-control" ng-model="node.filter" ng-options="o.name for o in filters track by o.name"></select>
-
-        <label>Filter Name: {{ node.filter.name }}</label>
-        <li ng-repeat="arg in node.filter.args">
-          <label style="width:70px">Type: {{arg.name}} ({{ arg.type }})</label>
-          <input ng-show="isArgumentEditable(arg)" style="width:190px" type="text" ng-model="arg.value"
-                 placeholder="Value"
-                 tooltip-placement="top"
-                 tooltip-trigger="mouseenter"
-                 tooltip-enable="!node.value"
-                 data-nodrag />
-        </li>
-
-        <p>Filter Description:  {{ node.filter.description }}</p>
-      </div>
-
-      <ol ng-show="node.type !== 'filter'" ui-tree-nodes="" ng-model="node.nodes" ng-class="{hidden: collapsed}">
-        <div ng-repeat="node in node.nodes"><li ui-tree-node ng-include="'nodes_renderer.html'"></div></li>
-      </ol>
-    </div>
-  </script>
-
-
   <form name="federatePolicyForm">
     <div class="form-group">
       <label for="name">Name</label>
       <input type="text" name="name" class="form-control" ng-model="roger_federation.name" ng-class="{ 'has-error': roger_federation.name.$touched && roger_federation.name.$invalid }" required/>
       <p ng-show="roger_federation.name.$error.required">A Policy name is required.</p>
     </div>
+    <h3>Group Filtering</h3>
+    <div style="border: 1px solid gray; padding:5px;">
+      <ul style="padding-left:15px;list-style: none;">
+          <li style="padding-bottom:5px;">
+            <input id="allRadio" value="allGroups" ng-model="roger_federation.groupsFilterType" type="radio" name="groupsFilterType" />
+            <label>&nbsp;Allow All Messages</label>
+            <span>(This must be used for all V1 server connections and any V2 server connections that aren't running group mapping)</span>
+          </li>
+          <li style="padding-bottom:5px;">
+            <input id="allowedRadio" value="allowed" ng-model="roger_federation.groupsFilterType" type="radio" name="groupsFilterType" />
+            <label>&nbsp;Allowed Groups</label>
+            <span>(allow any message containing one of these groups)</span>
+          </li>
+          <li style="padding-bottom:5px;">
+            <input id="disallowedRadio" value="disallowed" ng-model="roger_federation.groupsFilterType" type="radio" name="groupsFilterType" />
+            <label>&nbsp;Disallowed Groups</label>
+            <span>(block any message containing one of these groups)</span>
+          </li>
+          <li style="padding-bottom:5px;">
+            <input id="allowedAndDisallowedRadio" value="allowedAndDisallowed" ng-model="roger_federation.groupsFilterType" type="radio" name="groupsFilterType" />
+            <label>&nbsp;Allowed And Disallowed Groups</label>
+            <span>(allow messages that contains an allowed group and contains no disallowed groups)</span>
+          </li>
+      </ul>
 
-    <div class="row form-group">
-      <label class="col-sm-3">Filters</label>
-      <div>
-        <div ui-tree data-drag-enabled="false" id="tree-root">
-          <ol ui-tree-nodes ng-model="roger_federation.edgeFilters">
-            <!--<a class="btn btn-primary btn-xs" data-nodrag style="margin-right: 8px;"><span class="glyphicon glyphicon-plus text-muted"></span></a>-->
-            <a class="btn btn-primary btn-xs" data-nodrag ng-click="newTopNode()" style="margin-right: 8px;"><large><span class="glyphicon glyphicon-plus"></span></large></a>
-            <li ng-repeat="node in roger_federation.edgeFilters" ui-tree-node ng-include="'nodes_renderer.html'"></li>
-          </ol>
-        </div>
-      </div>
+      <table data-ng-show="roger_federation.groupsFilterType == 'allowed' || roger_federation.groupsFilterType == 'disallowed' || roger_federation.groupsFilterType == 'allowedAndDisallowed'" class="formTable">
+        <tr>
+          <td class="rowHeader"><label style="font-weight:normal;" for="remoteGroups">Known Outbound Groups&nbsp;</label></td>
+          <td class="rowValue">
+            <select name="outboundGroup" data-ng-model="outboundGroup" id="outboundGroup">
+              <option value ="">-- Select Group -- </option>
+              <option data-ng-repeat="outboundGroup in federateOutboundGroups" value="{{outboundGroup}}">{{outboundGroup}}</option>
+            </select>
+          </td>
+        </tr>
+        <tr>
+
+        <tr>
+          <td class="rowHeader"><label style="font-weight:normal;" for="outboundGroup">Remote Group</label></td>
+          <td class="rowValue">
+            <input type="text" data-ng-model="outboundGroup" name="outboundGroup" maxlength="255" data-ng-pattern="/^[\w\d\s\.\(\)@#$_\=\-\+\[\]\{\},\|\\]*$/"/>
+          </td>
+        </tr>
+        <tr>
+          <td style="text-align:right;"colspan="2">
+            <button data-ng-show="roger_federation.groupsFilterType == 'allowed' || roger_federation.groupsFilterType == 'allowedAndDisallowed'" type="button" class="btn btn-default" data-ng-click="allowGroup(outboundGroup)" >Allow Group</button>
+            <button data-ng-show="roger_federation.groupsFilterType == 'disallowed' || roger_federation.groupsFilterType == 'allowedAndDisallowed'" type="button" class="btn btn-default" data-ng-click="disallowGroup(outboundGroup)">Disallow Group</button>
+          </td>
+          <td></td>
+        </tr>
+      </table>
     </div>
+    
+    </br>
+    <table data-ng-show="roger_federation.groupsFilterType == 'allowed' || roger_federation.groupsFilterType == 'allowedAndDisallowed'" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+      <thead>
+      <tr>
+        <th>Allowed Group</th>
+        <th></th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr data-ng-repeat="group in roger_federation.allowedGroups">
+        <td>{{group}}</td>
+        <td>
+          </select><a class="nav" data-ng-click="deleteAllowedGroup(group)">Remove</a>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+    <div data-ng-show="roger_federation.allowedGroups.length == 0 && (roger_federation.groupsFilterType == 'allowed' || roger_federation.groupsFilterType == 'allowedAndDisallowed')">
+      <table class="tablesorter"><tr><td colspan="2">No Allowed Groups Configured</td></tr></table>
+    </div>
+
+    </br>
+    <table data-ng-show="roger_federation.groupsFilterType == 'disallowed' || roger_federation.groupsFilterType == 'allowedAndDisallowed'" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+      <thead>
+      <tr>
+        <th>Disallowed Group</th>
+        <th></th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr data-ng-repeat="group in roger_federation.disallowedGroups">
+        <td>{{group}}</td>
+        <td>
+          </select><a class="nav" data-ng-click="deleteDisallowedGroup(group)">Remove</a>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+    <div data-ng-show="roger_federation.disallowedGroups.length == 0 && (roger_federation.groupsFilterType == 'disallowed' || roger_federation.groupsFilterType == 'allowedAndDisallowed')">
+      <table class="tablesorter"><tr><td colspan="2">No DisAllowed Groups Configured</td></tr></table>
+    </div>
+
 
     <div class="modal-footer">
       <button class="btn btn-primary" type="button" ng-click="submit()" ng-disabled="!federatePolicyForm.$valid">OK</button>

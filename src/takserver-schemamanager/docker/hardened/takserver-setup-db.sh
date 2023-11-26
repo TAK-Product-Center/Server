@@ -13,6 +13,8 @@
 #  exit 1
 #fi
 
+echo "TAK Server DB Setup [Docker Hardened]"
+
 username='martiuser'
 password=""
 # try to get password from /opt/tak/CoreConfig.xml
@@ -25,6 +27,14 @@ if [ -z "$password" ]; then
     password=$(echo $(grep -m 1 "<connection" /opt/tak/CoreConfig.example.xml)  | sed 's/.*password="//; s/".*//')
   fi
 fi
+
+# If the envpass environment variable is set, set the password for the example. 
+# This allows for prebuilt docker containers (such as ironbank) to have configuration passed to them
+if [ ! -z "$envpass" ]; then
+  password=$envpass
+  sed -i "s/password=\"\"/password=\"$envpass\"/g" /opt/tak/CoreConfig.example.xml
+fi
+
 # cant find password - request one from user
 if [ -z "$password" ]; then
   : ${1?' Could not find a password in /opt/tak/CoreConfig.xml or /opt/tak/CoreConfig.example.xml. Please supply a plaintext database password as the first parameter'}
@@ -35,7 +45,6 @@ md5pass=$(echo -n "md5" && echo -n "$password$username" | md5sum | tr -dc "a-zA-
 
 # switch CWD to the location where this script resides
 cd `dirname $0`
-
 DB_NAME=$1
 if [ $# -lt 1 ]; then
   DB_NAME=cot
@@ -44,16 +53,8 @@ fi
 DB_INIT=""
 # Ensure PostgreSQL is initialized.
 
-if [ -x /usr/pgsql-10/bin/postgresql-10-setup ]; then
-    DB_INIT="/usr/pgsql-10/bin/postgresql-10-setup initdb"
-elif [ -x /usr/bin/postgresql-setup ]; then
-    DB_INIT="/usr/bin/postgresql-setup initdb"
-elif [ -x /usr/pgsql-9.4/bin/initdb ]; then
-    DB_INIT="service postgresql-9.4 initdb"
-elif [ -x /usr/pgsql-9.5/bin/initdb ]; then
-    DB_INIT="service postgresql-9.5 initdb"
-elif [ -x /usr/pgsql-9.6/bin/initdb ]; then
-    DB_INIT="service postgresql-9.6 initdb"
+if [ -x /usr/pgsql-15/bin/postgresql-15-setup ]; then
+    DB_INIT="/usr/pgsql-15/bin/postgresql-15-setup initdb"
 else
     echo "WARNING: Unable to automatically initialize PostgreSQL database."
 fi
@@ -70,33 +71,9 @@ fi
 # Figure out where the system keeps the PostgreSQL data
 
 if [ -z ${PGDATA+x} ]; then
-   if [ -d /var/lib/pgsql/10/data ]; then
-        export PGDATA=/var/lib/pgsql/10/data
-        POSTGRES_CMD="service postgresql-10 restart"
-   elif [ -x /usr/bin/systemctl ]; then
-       export PGDATA=`/usr/bin/systemctl show postgresql.service -p Environment | sed 's/.*PGDATA\=\([a-zA-Z0-9]*\)/\1/'`
-       POSTGRES_CMD="/bin/systemctl restart postgresql.service"
-   elif [ -d /var/lib/pgsql/10/data ]; then
-        export PGDATA=/var/lib/pgsql/10/data
-        POSTGRES_CMD="service postgresql-10 restart"
-   elif [ -d /var/lib/pgsql/9.6/data ]; then
-       export PGDATA=/var/lib/pgsql/9.6/data
-       POSTGRES_CMD="service postgresql-9.6 restart"
-   elif [ -d /var/lib/pgsql/9.5/data ]; then
-       export PGDATA=/var/lib/pgsql/9.5/data
-       POSTGRES_CMD="service postgresql-9.5 restart"
-   elif [ -d /var/lib/pgsql/9.4/data ]; then
-       export PGDATA=/var/lib/pgsql/9.4/data
-       POSTGRES_CMD="service postgresql-9.4 restart"
-   elif [ -d /var/lib/pgsql/9.3/data ]; then
-       export PGDATA=/var/lib/pgdsql/9.3/data
-       POSTGRES_CMD="service postgresql-9.3 restart"
-   elif [ -d /var/lib/pgsql/9.2/data ]; then
-       export PGDATA=/var/lib/pgsql/9.2/data
-       POSTGRES_CMD="service postgresql-9.2 restart"
-   elif [ -d /var/lib/pgsql/data ]; then
-       export PGDATA=/var/lib/pgdata/data
-       POSTGRES_CMD="service postgresql restart"
+   if [ -d /var/lib/pgsql/15/data ]; then
+        export PGDATA=/var/lib/pgsql/15/data
+        POSTGRES_CMD="service postgresql-15 restart"
    else
        echo "PGDATA not set and unable to find PostgreSQL data directory automatically."
        echo "Please set PGDATA and re-run this script."
@@ -124,31 +101,47 @@ if [ "x$DB_EXISTS" != "x" ]; then
    psql --command='drop database if exists $DB_NAME;'
 fi
 
+IS_DOCKER=false
 if [ -e pg_hba.conf ]; then
-  IS_DOCKER='true'
+  IS_DOCKER=true
 fi
+
+# Verify and add en_US.UTF-8 locale on Debian based installations
+if ! $(locale -a | grep -iq en_US.UTF8); then 
+  if [ -e /etc/locale.gen ]; then
+    echo "Adding en_US.UTF-8 locale"
+    sudo sed -i -e"s/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g" /etc/locale.gen
+    sudo locale-gen
+  fi
+fi
+
+# Start PG services to allow identification of data directory and config files
+echo "(Re)starting PostgreSQL service."
+$POSTGRES_CMD
 
 # Install our version of pg_hba.conf
 echo "Installing TAKServer's version of PostgreSQL access-control policy."
+PGHBA=$(psql -AXqtc "SHOW hba_file")
 # Back up pg_hba.conf
 BACKUP_SUFFIX=`date --rfc-3339='seconds' | sed 's/ /-/'`
-HBA_BACKUP=$PGDATA/pg_hba.conf.backup-$BACKUP_SUFFIX
+HBA_BACKUP=$PGHBA.backup-$BACKUP_SUFFIX
 if [ -e /opt/tak/db-utils/pg_hba.conf ] || [ -e pg_hba.conf ]; then
-  if [ -e $PGDATA/pg_hba.conf ]; then
-    mv $PGDATA/pg_hba.conf $HBA_BACKUP
+  if [ -e $PGHBA ]; then
+    mv $PGHBA $HBA_BACKUP
     echo "Copied existing PostgreSQL access-control policy to $HBA_BACKUP."
   fi
 
    # for docker install
-  if [ IS_DOCKER ]; then
-    cp pg_hba.conf $PGDATA
+  if [ "$IS_DOCKER" = true ]; then
+    echo "Docker db install"
+    cp pg_hba.conf $PGHBA
   else
     # for RPM install
-    echo "RPM db install"
-      cp /opt/tak/db-utils/pg_hba.conf $PGDATA
+    echo "RPM/DEB db install"
+    cp /opt/tak/db-utils/pg_hba.conf $PGHBA
   fi
 
-  echo "Installed TAKServer's PostgreSQL access-control policy to $PGDATA/pg_hba.conf."
+  echo "Installed TAKServer's PostgreSQL access-control policy to $PGHBA."
   echo "Restarting PostgreSQL service."
   $POSTGRES_CMD
 else
@@ -156,26 +149,37 @@ else
   exit 1
 fi
 
-CONF_BACKUP=$PGDATA/postgresql.conf.backup-$BACKUP_SUFFIX
+PGCONFIG=$(psql -AXqtc "SHOW config_file")
+CONF_BACKUP=$PGCONFIG.backup-$BACKUP_SUFFIX
 if [ -e /opt/tak/db-utils/postgresql.conf ] || [ -e postgresql.conf ];  then
-  if [ -e $PGDATA/postgresql.conf ]; then
-    mv $PGDATA/postgresql.conf $CONF_BACKUP
+  PGIDENT=$(psql -AXqtc "SHOW ident_file")
+
+  if [ -e $PGCONFIG ]; then
+    mv $PGCONFIG $CONF_BACKUP
     echo "Copied existing PostgreSQL configuration to $CONF_BACKUP."
   fi
 
    # for docker install
-  if [ IS_DOCKER ]; then
-    cp postgresql.conf $PGDATA
+  if [ "$IS_DOCKER" = true ]; then
+    cp postgresql.conf $PGCONFIG
   else
     # for RPM install
-    echo "RPM db install"
-      cp /opt/tak/db-utils/postgresql.conf $PGDATA
+    echo "RPM/DEB db install"
+    cp /opt/tak/db-utils/postgresql.conf $PGCONFIG
   fi
 
-  echo "Installed TAKServer's PostgreSQL configuration to $PGDATA/postgresql.conf."
+  # multi distro compatibility
+  sed -i -e"s|^[# ]*data_directory[ ]*=.*$|data_directory = '$PGDATA'|" $PGCONFIG
+  sed -i -e"s|^[# ]*hba_file[ ]*=.*$|hba_file = '$PGHBA'|" $PGCONFIG
+  sed -i -e"s|^[# ]*ident_file[ ]*=.*$|ident_file = '$PGIDENT'|" $PGCONFIG
+
+  echo "Installed TAKServer's PostgreSQL configuration to $PGCONFIG."
   echo "Restarting PostgreSQL service."
   $POSTGRES_CMD
 fi
+
+# Use pg_ctl command to restart PG service in Docker and take up new hba/config
+pg_ctl restart
 
 DB_NAME=cot
 if [ $# -eq 1 ] ; then
@@ -183,19 +187,34 @@ if [ $# -eq 1 ] ; then
 fi
 
 # Create the user "martiuser" if it does not exist.
-echo "Creating user \"martiuser\" ..."
-psql -U postgres -c "CREATE ROLE martiuser LOGIN ENCRYPTED PASSWORD '$md5pass' SUPERUSER INHERIT CREATEDB NOCREATEROLE;"
-
-# create the database
-echo "Creating database $DB_NAME"
-createdb -U postgres --owner=martiuser $DB_NAME
-if [ $? -ne 0 ]; then
-    exit 1
+martiuser_exists=`psql -U postgres -AXqtc "SELECT 1 FROM pg_roles WHERE rolname='$username'"`
+if [ $? -eq 0 ] && [ "$martiuser_exists" = "1" ]; then
+    echo "Postgres user \"$username\" exists."
+else
+    echo "Creating user \"#username\" ..."
+    psql -U postgres -c "CREATE ROLE $username LOGIN ENCRYPTED PASSWORD '$md5pass' SUPERUSER INHERIT CREATEDB NOCREATEROLE;"
+    if [ $? -ne 0 ]; then
+        echo "Something went wrong with creating user '$username'.  Exiting..."
+        exit 1
+    fi
 fi
 
-echo "Database $DB_NAME created."
+# create the database if it doesn't exist
+db_exists=`psql -XtAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'"`
+if [ $? -eq 0 ] && [ "$db_exists" = "1" ]; then
+  echo "Database already created..."
+else
+    # create the database
+    echo "Creating database $DB_NAME"
+    createdb -U postgres --owner=$username $DB_NAME
+    if [ $? -ne 0 ]; then
+        echo "Something went wrong with creating the database $DB_NAME.  Exiting..."
+        exit 1
+    fi
+    echo "Database $DB_NAME created."
+fi
 
-if [ IS_DOCKER ]; then
+if [ "$IS_DOCKER" = true ]; then
    java -jar SchemaManager.jar upgrade
 elif [ -e /opt/tak/db-utils/SchemaManager.jar ]; then
    java -jar /opt/tak/db-utils/SchemaManager.jar upgrade
@@ -212,16 +231,8 @@ if [ ! -x /usr/bin/systemctl ]; then
 fi
 
 # Set PostgreSQL to run automatically at boot time
-if [ -d /var/lib/pgsql/10/data ]; then
-    START_INIT="chkconfig --level 345 postgresql-10 on"
-elif [ -x /usr/bin/systemctl ]; then
-    /usr/bin/systemctl enable postgresql.service
-elif [ -d /var/lib/pgsql/9.4/data ]; then
-    START_INIT="chkconfig --level 345 postgresql-9.4 on"
-elif [ -d /var/lib/pgsql/9.5/data ]; then
-    START_INIT="chkconfig --level 345 postgresql-9.5 on"
-elif [ -d /var/lib/pgsql/9.6/data ]; then
-    START_INIT="chkconfig --level 345 postgresql-9.6 on"
+if [ -d /var/lib/pgsql/15/data ]; then
+    START_INIT="chkconfig --level 345 postgresql-15 on"
 else
   echo "ERROR: unable to detect postgres version to start on boot"
   exit 1

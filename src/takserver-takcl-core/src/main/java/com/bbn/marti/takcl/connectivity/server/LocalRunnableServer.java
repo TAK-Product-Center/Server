@@ -1,5 +1,6 @@
 package com.bbn.marti.takcl.connectivity.server;
 
+import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import org.jetbrains.annotations.NotNull;
 
@@ -11,9 +12,11 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class LocalRunnableServer extends AbstractRunnableServer {
+import org.jetbrains.annotations.NotNull;
 
-	private final List<LocalServerProcessContainer> processes;
+import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
+
+public class LocalRunnableServer extends AbstractRunnableServer {
 
 	public class LocalServerProcessContainer extends AbstractServerProcess {
 
@@ -81,16 +84,18 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 			));
 
 			command.addAll(JDK_JAVA_OPTIONS);
-			if (definition.modeFlag != null) {
-				command.add(definition.modeFlag);
+			
+			if (definition.jvmFlags != null) {
+				command.addAll(definition.jvmFlags);
 			}
 
 			if (enableRemoteDebug) {
 				command.add(REMOTE_DEBUG_ARGS);
 			}
 
-			command.addAll(Arrays.asList("-jar", "-Xmx2000m", "-XX:+HeapDumpOnOutOfMemoryError", definition.jarName));
-			command.addAll(LOGGING_ARGUMENTS);
+			command.addAll(Arrays.asList("-Xmx2000m", "-XX:+HeapDumpOnOutOfMemoryError", "-jar", definition.jarName));
+			if (!definition.jarName.toLowerCase().contains("federation"))
+				command.addAll(LOGGING_ARGUMENTS);
 
 			// Build the process
 			ProcessBuilder processBuilder = new ProcessBuilder(command);
@@ -135,9 +140,9 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 			}
 		}
 
-		public List<String> waitForMissingLogStatements(int maxWaitDuration) {
+		public List<String> waitForMissingLogStatements(int maxWaitTimeMs) {
 			List<String> remainingStatementsToSee = definition.waitForMissingLogStatements(
-					serverIdentifier, Paths.get(serverIdentifier.getServerPath()), maxWaitDuration);
+					serverIdentifier, Paths.get(serverIdentifier.getServerPath()), maxWaitTimeMs);
 
 			if (!isRunning()) {
 				throw new RuntimeException("Server '" + serverIdentifier.getConsistentUniqueReadableIdentifier() + "' appears to have shutdown immediately after starting. Please ensure another server isn't already running and your config is valid!");
@@ -159,78 +164,20 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 
 	public LocalRunnableServer(AbstractServerProfile serverIdentifier) {
 		super(serverIdentifier);
-		processes = Collections.unmodifiableList(Arrays.asList(
-				new LocalServerProcessContainer(ServerProcessDefinition.MessagingService),
-				new LocalServerProcessContainer(ServerProcessDefinition.ApiService),
-				new LocalServerProcessContainer(ServerProcessDefinition.PluginManager),
-				new LocalServerProcessContainer(ServerProcessDefinition.RetentionService)
-		));
-	}
-
-	@Override
-	protected boolean isServerProcessRunning(boolean shouldBeOnline) {
-
-		// If they aren't all the same, raise an exception indicating the difference
-		Boolean sharedState = null;
-
-		// Get the state of all enabled processes
-		Map<String, Boolean> enabledProcessStates = processes.stream().filter(
-				LocalServerProcessContainer::isEnabled).collect(Collectors.toMap(
-				LocalServerProcessContainer::getIdentifier, LocalServerProcessContainer::isRunning));
-
-		for (String processName : enabledProcessStates.keySet()) {
-			boolean state = enabledProcessStates.get(processName);
-
-			if (shouldBeOnline && !state) {
-
-				logger.error("The server process " + processName + " Should be running but it is not!  `ps -aux` output:");
-				try {
-					File f = File.createTempFile("PsOutput", ".txt");
-					String psLog = null;
-					ProcessBuilder pb = new ProcessBuilder().command("ps", "-aux").redirectErrorStream(true).redirectOutput(f);
-					Process p = pb.start();
-					p.waitFor();
-					String psResults = Files.readString(f.toPath());
-					System.out.println(psResults);
-
-				} catch (Exception e) {
-					throw new RuntimeException(e);
-				}
-
-			} else if (!shouldBeOnline && state) {
-				logger.error("The server process " + processName + " Should not be running but it is!");
-			}
-
-			if (sharedState == null) {
-				sharedState = state;
-			}
-			if (state != sharedState) {
-				StringBuilder sb = new StringBuilder("Inconsistent process states for " + serverIdentifier + ":");
-				for (String processName2 : enabledProcessStates.keySet()) {
-					sb.append(" ").append(processName2).append(".isRunning=").append(enabledProcessStates.get(processName2));
-				}
-				logger.error(sb.toString());
-				throw new RuntimeException(sb.toString());
-			}
-		}
-		assert (sharedState != null);
-		return sharedState;
 	}
 
 	@Override
 	public List<AbstractServerProcess> getEnabledServerProcesses() {
-		return processes.stream().filter(LocalServerProcessContainer::isEnabled).collect(Collectors.toList());
+		return processes.stream().filter(AbstractServerProcess::isEnabled).collect(Collectors.toList());
 	}
 
 	@Override
 	protected void innerStopServer() {
-		processes.parallelStream().filter(LocalServerProcessContainer::isEnabled).forEach(LocalServerProcessContainer::stop);
+		processes.parallelStream().filter(AbstractServerProcess::isEnabled).forEach(AbstractServerProcess::stop);
 	}
 
 	@Override
 	protected void innerDeployServer(@NotNull String sessionIdentifier, boolean enableRemoteDebug) {
-		String serverPathString = serverIdentifier.getServerPath();
-
 		try {
 			logPath = Paths.get(logDirectory).toAbsolutePath().resolve(sessionIdentifier);
 			if (!Files.exists(logPath)) {
@@ -247,12 +194,31 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 			throw new RuntimeException(e);
 		}
 
-		processes.stream().filter(LocalServerProcessContainer::isEnabled).forEach(b -> b.start(enableRemoteDebug));
+		Map<AbstractServerProcess, Exception> processExceptions = new HashMap<>();
+		processes.stream().filter(AbstractServerProcess::isEnabled).forEach(b -> {
+			try {
+				b.start(enableRemoteDebug);
+			} catch (Exception e) {
+				processExceptions.put(b, e);
+			}
+		});
+
+		if (!processExceptions.isEmpty()) {
+			Exception e = null;
+			for (AbstractServerProcess container : processExceptions.keySet()) {
+				System.err.println("Error starting up process \"" + container.getIdentifier() + "\"!");
+				e = processExceptions.get(container);
+				System.err.println(e.getMessage());
+				e.printStackTrace(System.err);
+			}
+			// Throw something to disrupt the tests
+			throw new RuntimeException(e);
+		}
 	}
 
 	@Override
 	public synchronized void innerKillServer() {
-		processes.parallelStream().filter(LocalServerProcessContainer::isEnabled).forEach(LocalServerProcessContainer::kill);
+		processes.parallelStream().filter(AbstractServerProcess::isEnabled).forEach(AbstractServerProcess::kill);
 	}
 
 //	private void checkServerState(boolean shouldBeOnline) {
@@ -302,4 +268,14 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 		}
 		System.out.println("COLLECTING LOGS DONE!");
 	}
+
+	protected List<LocalServerProcessContainer> createProcessContainerList() {
+		ServerProcessDefinition[] definitions = ServerProcessDefinition.values();
+		ArrayList<LocalServerProcessContainer> containers = new ArrayList<>(definitions.length);
+		for (ServerProcessDefinition definition : ServerProcessDefinition.values()) {
+			containers.add(new LocalServerProcessContainer(definition));
+		}
+		return Collections.unmodifiableList(containers);
+	}
+
 }

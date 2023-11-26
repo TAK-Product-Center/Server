@@ -45,7 +45,6 @@
                           <li ng-repeat="request in workflow.semanticRequests">
                             <a>
                                 <span class="btn btn-default btn-sm glyphicon glyphicon-pencil" ng-click="editSemanticSubscription(request)"/>
-                                <span class="btn btn-default btn-sm glyphicon glyphicon-trash"  ng-click="deleteSemanticSubscription(request)"/>
                               {{request.name}}
                             </a>
                           </li>
@@ -69,6 +68,7 @@
                   <li><a href="" ng-click="policyJsonAsFile()" title="Download policy as json file" class="fa fa-floppy-o" style="color:white; font-size: 24px"></a></li>
                   <li><a href="" ng-click="sendToFederationManagerAndFile()" title="Set policy as active policy, and save it to the server" class="fa fa-cloud-upload" style="color:white; font-size: 24px"></a></li>
                   <li><a href="" ng-click="sendToFederationManagerWithoutDownload()" title="Send policy to Federation Manager" class="fa fa-upload" style="color:white; font-size: 24px"></a></li>
+                  <li><a href="" ng-click="showActiveConnections()" title="Show Active Connections" class="fa fa-exchange" style="color:white; font-size: 24px"></a></li>
               </ul>
             </div>
           </nav>

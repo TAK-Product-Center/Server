@@ -17,8 +17,8 @@ import com.bbn.marti.remote.RemoteSubscription;
 
 /*
  * Operations for keeping track of users and groups.
- * 
- * 
+ *
+ *
  */
 public interface GroupManager {
 
@@ -26,37 +26,47 @@ public interface GroupManager {
      * Get all groups of which a user is a member.
      */
     NavigableSet<Group> getGroups(User user);
-    
+
     /*
      * Get all users.
      */
     Collection<User> getAllUsers();
-    
+
     /*
      * Get all connection ids.
      */
     Set<String> getAllConnectionIds();
-    
+
     /*
      * Get all groups.
      */
     Collection<Group> getAllGroups();
-   
+
     /*
      * Add user to group. Create user and group if they don't exist.
      */
     void addUserToGroup(User user, Group group);
-    
+
+    /*
+     * Sets a max classification for the user
+     */
+    void setClassificationForUser(User user, UserClassification userClassification);
+
+    /*
+     * Gets the classification info for the user
+     */
+    UserClassification getClassificationForUser(User user);
+
     /*
      * Add user, creating if it doesn't exist.
      */
     void addUser(User user);
-    
+
     /*
      * Get group by id and direction
      */
     Group getGroup(String id, Direction direction);
-    
+
     /*
      * Find a User object by connectionId
      */
@@ -66,7 +76,12 @@ public interface GroupManager {
      * Get all groups by connection id
      */
     NavigableSet<Group> getGroupsByConnectionId(String connectionId);
-    
+
+    /*
+     * Get classification by connection id
+     */
+    UserClassification getUserClassificationByConnectionId(String connectionId);
+
     /*
      * Get cached group vector by connection id
      */
@@ -84,31 +99,31 @@ public interface GroupManager {
      * handler is an Object, not a ConnectionInfo, to keep this interface decoupled from the NIO code.
      */
     Reachability<User> getReachability(Object connectionInfo);
-    
+
     /*
      * Remove a user from a group.
-     * 
+     *
      */
     void removeUserFromGroup(User user, Group group);
-    
+
     /*
      * Remove a user and associated group memberships
-     * 
+     *
      */
-    void removeUser(User user);    
-    
+    void removeUser(User user);
+
     /*
-     * Update group membership for a user, comparing the current group membership set with the provided group set. 
-     * 
+     * Update group membership for a user, comparing the current group membership set with the provided group set.
+     *
      */
     void updateGroups(User user, Set<Group> groups);
-    
+
     /*
      * Get the set of groups that set a but not in set b
-     * 
+     *
      */
     Set<Group> getGroupDiff(Set<Group> a, Set<Group> b);
-    
+
     /*
      * Generate a Set<Group> from a list of group names.
      */
@@ -118,12 +133,12 @@ public interface GroupManager {
      * Finds a Set<Group> from a list of existing groups.
      */
     Set<Group> findGroups(List<String> groupNames);
-    
+
     /*
      * Explicity track user by connectionId
      */
     void putUserByConnectionId(User user, String connectionId);
-   
+
     /*
      * Set subscription for a user
      */
@@ -133,7 +148,7 @@ public interface GroupManager {
      * Get subscription for a user
      */
     RemoteSubscription getSubscriptionForUser(User user);
-    
+
     /*
      * Register an authenticator
      */
@@ -151,10 +166,9 @@ public interface GroupManager {
 
     /**
      * Searches ldap groups (e.g., to help user configure items that require a group distinguished name reference)
-     * 
+     *
      * @param groupNameFilter String optional filter applied to the LDAP cn attribute
-     * @return List<LdapGroup> instances
-     * @throws RemoteException
+     * @return List of @See LdapGroup instances
      */
     List<LdapGroup> searchGroups(String groupNameFilter, boolean exactMatch);
 
@@ -165,7 +179,7 @@ public interface GroupManager {
     LdapUser searchUser(String username);
 
     String getGroupPrefix();
-    
+
     /*
      * Make a copy of this user and its current group membership, so that it be independently managed. The copied user will be assigned a randomly generated connection id.
      */
@@ -173,13 +187,13 @@ public interface GroupManager {
 
     /*
      * Fill in Group details using the configured cache / DB
-     * 
+     *
      */
     Group hydrateGroup(Group group);
-    
+
     /*
      * make an LDAP connection to the configured server
-     * 
+     *
      */
     DirContext connectLdap();
 
@@ -194,10 +208,10 @@ public interface GroupManager {
      *
      */
     boolean testLdap();
-    
+
     /*
-     * Get the representation of a group vector, as a NavigableSet data structure 
-     * 
+     * Get the representation of a group vector, as a NavigableSet data structure
+     *
      */
     NavigableSet<Group> groupVectorToGroupSet(String groupVector);
 

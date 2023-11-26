@@ -8,6 +8,8 @@ inputManagerControllers.controller('InputListCtrl', ['$rootScope', '$window', '$
 			$scope.hasAdminRole = false;
 			$scope.dbIsConnected = true;
             $scope.maxConnections = 0;
+			$rootScope.deliveryTableApiSent = false;
+			$rootScope.readTableApiSent = false;
 			(function setAdmin() {
 			  $http.get('/Marti/api/util/isAdmin').then(function(response){
 		    	  $scope.hasAdminRole = response.data;
@@ -41,6 +43,54 @@ inputManagerControllers.controller('InputListCtrl', ['$rootScope', '$window', '$
                    		console.log(apiResponse);
                 	}
             	)
+			};
+
+			$scope.saveDeliveryRateLimiter = function() {
+				$rootScope.deliveryTableApiSent = true;
+				$http.put('/Marti/api/qos/delivery/set', $rootScope.deliveryRateRules)
+					.then(function(response){
+						alert('Table saved successfully')
+						$rootScope.deliveryTableApiSent = false;
+					}).catch(function (error) {
+						alert('Error saving table')
+						$rootScope.deliveryTableApiSent = false;
+					});
+		}
+
+			$scope.saveReadRateLimiter = function() {
+				$rootScope.readTableApiSent = true;
+				$http.put('/Marti/api/qos/read/set', $rootScope.readRateRules)
+				.then(function(response){
+					alert('Table saved successfully')
+					$rootScope.readTableApiSent = false;
+				}).catch(function (error) {
+					alert('Error saving table')
+					$rootScope.readTableApiSent = false;
+				});
+			};
+
+			$scope.addRowDeliveryTable = function() {
+				var row = {
+					"clientThresholdCount": 0,
+					"reportingRateLimitSeconds": 0
+				}
+				$rootScope.deliveryRateRules.push(row);
+			};
+
+			$scope.deleteRowDeliveryTable = function() {
+				$rootScope.deliveryRateRules.pop();
+			};
+
+			$scope.addRowReadTable = function() {
+				var row = {
+					"clientThresholdCount": 0,
+					"reportingRateLimitSeconds": 0
+				}
+				$rootScope.readRateRules.push(row);
+			};
+
+			$scope.deleteRowReadTable = function() {
+				$rootScope.readRateRules.pop();
 			};
 		    
 		    // populate QoS enable / disable
@@ -352,12 +402,14 @@ inputManagerControllers.controller('DataFeedCreationCtrl',
 					$scope.dataFeed.tags = '';
 					$scope.dataFeed.auth = 'X_509';
 					$scope.dataFeed.protocol = 'tls';
+					$scope.dataFeed.syncCacheRetentionSeconds = "3600";
 					$scope.dataFeed.archive = 'true';
 					$scope.dataFeed.anongroup = 'false';
 					$scope.dataFeed.archiveOnly = 'false';
 					$scope.dataFeed.coreVersion = "2";
 					$scope.dataFeed.protocol = 'tls';
 					$scope.dataFeed.sync = 'false';
+					$scope.dataFeed.federated = 'true';
 					$scope.inputNameDuplicate = false;
 					$scope.serviceReportedMessages = false;
 					$scope.messages = [];
@@ -426,6 +478,7 @@ inputManagerControllers.controller('DataFeedModificationCtrl', ['$scope', '$loca
 					$scope.dataFeed = apiResponse.data;
 					$scope.hideArchive = false;
 					$scope.hideArchiveOnly = false;
+					$scope.hideFederated = false;
 					var protocol = apiResponse.data.protocol.toLowerCase();
 					$scope.hideFilterGroupList = (apiResponse.data.auth.toLowerCase() != 'anonymous');
 				},

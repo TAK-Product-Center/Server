@@ -157,8 +157,6 @@ public class App {
 		protected final JUnitResultFormatter formatter;
 		private ByteArrayOutputStream stdout, stderr, stdcombined;
 
-		public static final PrintStream defaultStdout = System.out;
-		public static final PrintStream defaultStderr = System.err;
 		private int problem;
 		private long startTime;
 
@@ -186,16 +184,16 @@ public class App {
 			stderr = new ByteArrayOutputStream();
 
 			stdcombined = new ByteArrayOutputStream();
-			System.setOut(new PrintStream(new TeeOutputStream(defaultStdout, new TeeOutputStream(stdout, stdcombined))));
-			System.setErr(new PrintStream(new TeeOutputStream(defaultStderr, new TeeOutputStream(stderr, stdcombined))));
+			System.setOut(new PrintStream(new TeeOutputStream(TAKCLCore.defaultStdout, new TeeOutputStream(stdout, stdcombined))));
+			System.setErr(new PrintStream(new TeeOutputStream(TAKCLCore.defaultStderr, new TeeOutputStream(stderr, stdcombined))));
 		}
 
 		@Override
 		public void testFinished(Description description) throws Exception {
 			System.out.flush();
 			System.err.flush();
-			System.setOut(defaultStdout);
-			System.setErr(defaultStderr);
+			System.setOut(TAKCLCore.defaultStdout);
+			System.setErr(TAKCLCore.defaultStderr);
 
 			formatter.setSystemOutput(stdout.toString());
 			formatter.setSystemError(stderr.toString());

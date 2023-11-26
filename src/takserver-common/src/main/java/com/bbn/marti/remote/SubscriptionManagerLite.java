@@ -16,7 +16,7 @@ import com.bbn.marti.remote.socket.SituationAwarenessMessage;
 
 public interface SubscriptionManagerLite {
 
-    enum ChangeType { CONTENT, LOG, KEYWORD, METADATA, EXTERNAL_DATA, UID_KEYWORD, RESOURCE_KEYWORD, MISSION_DELETE, MISSION_CREATE, DATA_FEED, MAP_LAYER }
+    enum ChangeType { CONTENT, LOG, KEYWORD, METADATA, EXTERNAL_DATA, UID_KEYWORD, RESOURCE_KEYWORD, MISSION_DELETE, MISSION_CREATE, DATA_FEED, MAP_LAYER, MISSION_LAYER }
 
 	RemoteSubscription getRemoteSubscriptionByClientUid(String cUid);
     RemoteSubscription getSubscriptionByClientUid(String cUid);
@@ -77,4 +77,8 @@ public interface SubscriptionManagerLite {
 	 * Return a list of active subscriptions, with filtering options.
 	 */
 	List<RemoteSubscription> getSubscriptionsWithGroupAccess(String groupVector, boolean noFederates, Set<Group> filterWriteOnlyGroups);
+	
+	
+	String linkWebsocketToExistingSub(String connectionId, String clientUid, String username);
+	void unlinkWebsocketExistingSub(String connectionId, String clientUid);
 }

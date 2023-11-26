@@ -2,6 +2,8 @@ package tak.server.qos;
 
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -83,6 +85,29 @@ public class MessageDeliveryStrategy extends MessageBaseStrategy<CotEventContain
 		enabled.set(config.getRemoteConfiguration().getFilter().getQos().getDeliveryRateLimiter().isEnabled());
         
         isInit.set(true);
+	}
+	
+	@EventListener({QosRefreshedEvent.class})
+	private void refreshQosDelivery() {
+		rateLimits = new HashMap<>();
+		rateThresholds = new LinkedList<>();
+		
+		// populate rate limit table
+		// this table is used for rapid lookup of rate limits when client counts change
+		for (RateLimitRule rule : config.getRemoteConfiguration().getFilter().getQos().getDeliveryRateLimiter().getRateLimitRule()) {
+			rateLimits.put(rule.getClientThresholdCount(), rule.getReportingRateLimitSeconds());
+			rateThresholds.add(rule.getClientThresholdCount());
+			
+			if (rule.getReportingRateLimitSeconds() > maxRate) {
+				maxRate = rule.getReportingRateLimitSeconds();
+			}
+		}
+
+		// sort rate threshold in descending order, because we will use the first rate that matches client count
+		rateThresholds.sort(Collections.reverseOrder());
+		if (enabled.get() && metrics != null && metrics.getMetrics() != null) {
+			changeRateLimitIfRequired((int) metrics.getMetrics().getNumClients());
+		}
 	}
 
 	@Override

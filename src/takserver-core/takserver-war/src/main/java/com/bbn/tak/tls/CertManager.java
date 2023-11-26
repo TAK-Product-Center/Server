@@ -6,6 +6,8 @@ import static com.bbn.tak.tls.Constants.CERTBITS;
 import static com.bbn.tak.tls.Constants.KEY_TYPE;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -23,6 +25,7 @@ import sun.security.pkcs.PKCS9Attribute;
 import sun.security.pkcs10.PKCS10;
 import sun.security.pkcs10.PKCS10Attribute;
 import sun.security.tools.keytool.CertAndKeyGen;
+import sun.security.util.KnownOIDs;
 import sun.security.util.ObjectIdentifier;
 import sun.security.x509.*;
 
@@ -181,13 +184,9 @@ public class CertManager {
         return ext;
     }
 
-    private static final int[] serverAuthOidData = {1, 3, 6, 1, 5, 5, 7, 3, 1};
-    private static final int[] clientAuthOidData = {1, 3, 6, 1, 5, 5, 7, 3, 2};
-    private static final int[] enableChannelsOidData = {1, 2, 840, 113549, 1, 9, 7};
-
     public static Object getServerExtKeyUsage() throws IOException {
-        ObjectIdentifier serverAuthObjId = new ObjectIdentifier(serverAuthOidData);
-        ObjectIdentifier clientAuthObjId = new ObjectIdentifier(clientAuthOidData);
+        ObjectIdentifier serverAuthObjId = ObjectIdentifier.of(KnownOIDs.serverAuth);
+        ObjectIdentifier clientAuthObjId = ObjectIdentifier.of(KnownOIDs.clientAuth);
         Vector<ObjectIdentifier> obj = new Vector<>(2);
         obj.add(serverAuthObjId);
         obj.add(clientAuthObjId);
@@ -196,8 +195,8 @@ public class CertManager {
     }
 
     public static Object getClientExtKeyUsage(boolean addChannelsExtUsage) throws IOException {
-        ObjectIdentifier clientAuthObjId = new ObjectIdentifier(clientAuthOidData);
-        ObjectIdentifier enableChannelsObjId = new ObjectIdentifier(enableChannelsOidData);
+        ObjectIdentifier clientAuthObjId = ObjectIdentifier.of(KnownOIDs.clientAuth);
+        ObjectIdentifier enableChannelsObjId = ObjectIdentifier.of(KnownOIDs.ChallengePassword);
         Vector<ObjectIdentifier> obj = new Vector<>(1);
         obj.add(clientAuthObjId);
         if (addChannelsExtUsage) {
@@ -216,7 +215,7 @@ public class CertManager {
         Signature signature = Signature.getInstance(signatureAlg);
         signature.initSign(cert.key);
         X500Name subject = new X500Name(cert.cert.getSubjectDN().toString());
-        request.encodeAndSign(subject, signature);
+        request.encodeAndSign(subject, cert.key, signatureAlg);
         return request;
     }
 }

@@ -12,6 +12,8 @@ import com.bbn.marti.takcl.AppModules.OfflineFileAuthModule;
 import com.bbn.marti.takcl.AppModules.OnlineFileAuthModule;
 import com.bbn.marti.takcl.AppModules.generic.ServerAppModuleInterface;
 import com.bbn.marti.takcl.cli.advanced.AdvancedCliMainHelper;
+import tak.server.util.JavaVersionChecker;
+
 
 import ch.qos.logback.classic.Level;
 
@@ -21,6 +23,7 @@ import ch.qos.logback.classic.Level;
 public class UserManager extends AdvancedCliMainHelper {
 
 	public static void main(String[] args) {
+		JavaVersionChecker.check();
 		System.setProperty("java.net.preferIPv4Stack", "true");
 
 		TestExceptions.DO_NOT_CLOSE_IGNITE_INSTANCES = false;

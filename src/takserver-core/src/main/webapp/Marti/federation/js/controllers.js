@@ -301,16 +301,16 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
                      },
                      function (apiResponse) {
                          $scope.getFederateGroupsMap();
+                         window.location.reload();
                      },
                      function (apiResponse) {
+                          alert('An error occurred adding the group. Please correct the errors and resubmit.');
                           $scope.serviceReportedMessages = true;
                           $scope.messages = apiResponse.data.messages;
-                          alert('An error occurred adding the group. Please correct the errors and resubmit.');
                           $scope.submitInProgress = false;
                      }
                      );
-               }
-               window.location.reload();
+               } 
         }
 
         $scope.deleteGroupMap = function (remoteGroup, localGroup) {
@@ -381,6 +381,150 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
         $scope.getFederateGroups();
         $scope.getFederateGroupsMap();
         $scope.getFederateRemoteGroups();
+    }
+]);
+
+federationManagerControllers.controller('FederateMissionsCtrl', ['$scope',
+    '$location',
+    'FederateDetailsService',
+    'MissionListService',
+    // 'FederateMissionsUpdateService',
+    '$routeParams',
+    '$http',
+    '$modal',
+    function (
+        $scope,
+        $location,
+        FederateDetailsService,
+        MissionListService,
+        // FederateMissionsUpdateService,
+        $routeParams,
+        $http,
+        $modal
+    ) {
+        $scope.federateId = $routeParams.id;
+        $scope.federateName = $routeParams.name;
+        $scope.submitInProgress = false;
+        $scope.vbm_filter_checkbox = false;
+        $scope.mission_federate_default = null;
+
+        function getFederateMissionsFromConfig() {
+            
+         };
+
+        function getAllVbmCopMissionsWithFederateSetting() {
+            
+            var federateMissionsFromConfig;
+
+            FederateDetailsService.query({
+                federateId: $scope.federateId
+            },
+            function (apiResponse) {
+                console.log(apiResponse.data);
+                
+                if (apiResponse.data.mission == null){
+                    federateMissionsFromConfig = [];
+                }else{
+                    federateMissionsFromConfig = apiResponse.data.mission;
+                    if (apiResponse.data.missionFederateDefault == null){
+                        $scope.mission_federate_default = true; //default value for mission_federate_default is true
+                    }else{
+                        $scope.mission_federate_default = apiResponse.data.missionFederateDefault;
+                    }
+                    
+                }         
+                $scope.showRmiError = false;
+
+                MissionListService.query(
+                     function(apiResponse2) {
+                         var list_of_all_missions = apiResponse2.data;
+                         $scope.missions = [];
+                         var found;
+                         for (var mission of list_of_all_missions) {
+                            found = false;
+                            for (var x of federateMissionsFromConfig){
+                                if (x.name == mission.name){
+                                    $scope.missions.push({'name': mission.name , 'enabled': x.enabled, 'tool': mission.tool });
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (found == false){
+                                $scope.missions.push({'name': mission.name , 'enabled': null, 'tool': mission.tool});
+                            } 
+                         }
+                         console.log($scope.missions);
+                     },
+                     function(apiResponse2) {
+                        $scope.missions = [];
+                        console.log('error');
+                        console.log(apiResponse2);
+                        alert('Error when querying mission for federate');
+                     }
+                );   
+                
+            },
+            function () {
+                $scope.showRmiError = true;
+            });      
+        };
+
+        $scope.backToFederates = function () {
+            console.log('back to federates');
+            window.history.back();
+        };
+
+        $scope.cancel = function () {
+            $scope.backToFederates();
+        };
+
+        $scope.vbm_filter_func = function (mission) { 
+            if ($scope.vbm_filter_checkbox == false || ($scope.vbm_filter_checkbox == true && mission.tool.toLowerCase() == 'vbm')){
+                return mission;
+            }
+        };
+
+        $scope.saveFederateMissions = function () {
+            $scope.submitInProgress = true;
+
+            console.log($scope.missions); 
+            var missions_with_defined_value_only = []; // filter out the missions whose values are not set to either true or false
+            for (var mission of $scope.missions) {
+                if (mission.enabled == true || mission.enabled == false){
+                    missions_with_defined_value_only.push(mission);
+                }
+            }
+            console.log(missions_with_defined_value_only); 
+
+            // Note: Could not find a way to set both federateId in request path and the data in the request body using FederateMissionsUpdateService
+            if ($scope.mission_federate_default == null){
+                alert("Need to set default value for mission federate");
+                return;
+            }
+
+            $http({
+                url: '/Marti/api/federatemissions/'+ $scope.federateId,
+                method: "PUT",
+                data: {
+                    missionFederateDefault: $scope.mission_federate_default,
+                    missions: missions_with_defined_value_only
+                    }
+            })
+            .then(function(apiResponse) {
+                    console.log(apiResponse.data);
+                    $scope.showRmiError = false;
+                    $scope.submitInProgress = false;
+                    alert("Successfully updated mission federation");
+            }, 
+            function(apiResponse) { 
+                    $scope.showRmiError = true;
+                    alert("Error saving the federate missions");
+                    $scope.submitInProgress = false;
+            });
+
+        }
+
+        getAllVbmCopMissionsWithFederateSetting();
     }
 ]);
 

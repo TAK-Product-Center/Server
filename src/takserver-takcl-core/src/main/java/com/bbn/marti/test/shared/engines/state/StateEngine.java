@@ -36,6 +36,7 @@ public class StateEngine implements EngineInterface {
 	@Override
 	public void offlineAddUsersAndConnectionsIfNecessary(@NotNull AbstractUser... users) {
 		for (AbstractUser user : users) {
+			
 			UserState us = data.getState(user);
 			us.getServerState().setActiveInDeployment();
 			((ConnectionState) us.getConnectionState()).setActiveInDeployment();
@@ -118,7 +119,13 @@ public class StateEngine implements EngineInterface {
 		data.updateKnownCallsignAndUidState();
 		data.updateState();
 	}
-
+	
+	@Override
+	public void verifyReceivedMessageSentFromPlugin(@NotNull AbstractUser sendingPlugin, @NotNull AbstractUser... receivedUsers) {
+		data.updateKnownCallsignAndUidState();
+		data.updateState();
+	}
+	
 	@Override
 	public void authenticateAndVerifyClient(@NotNull AbstractUser users) {
 //        data.clearTestIterationData();

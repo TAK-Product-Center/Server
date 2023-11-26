@@ -47,6 +47,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
     private String readOnlyGroup;
     private String readGroupSuffix;
     private String writeGroupSuffix;
+    private String groupsClaim;
 
 
     public static synchronized OAuthAuthenticator getInstance(GroupManager groupManager) {
@@ -78,6 +79,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
             readOnlyGroup = oauthConf.getReadOnlyGroup();
             readGroupSuffix = oauthConf.getReadGroupSuffix();
             writeGroupSuffix = oauthConf.getWriteGroupSuffix();
+            groupsClaim = oauthConf.getGroupsClaim();
         }
     }
 
@@ -113,9 +115,12 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                 if (oAuth2AccessToken == null || oAuth2AccessToken.isExpired()) {
                     throw new OAuth2Exception("defaultTokenServices.readAccessToken failed!");
                 }
-            } else {
+            } else if (claims.get("email") != null) {
                 // For jwt's from keycloak, get the username from the email claim
                 username = (String) claims.get("email");
+            } else {
+                // For other trusted tokens, assign a random username if we don't have an attribute mapping
+                username = UUID.randomUUID().toString();
             }
 
             if (user instanceof AuthenticatedUser) {
@@ -131,8 +136,28 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                 user = new AuthenticatedUser(username, auser.getConnectionId(), auser.getAddress(), auser.getCert(), username, "", "", auser.getConnectionType()); // no password or uid
             }
 
-            // if we have a groups claim in the token, use it to assign groups directly
-            ArrayList<String> groupNames = (ArrayList<String>)claims.get("groups");
+            // try to set groups based on the user_client_roles attribute
+            ArrayList<String> groupNames = (ArrayList<String>) claims.get("user_client_roles");
+
+            // if user_client_roles isn't present, check for the groups attribute
+            if (groupNames == null) {
+                groupNames = (ArrayList<String>) claims.get(groupsClaim);
+            }
+
+            // set user's classification if included in the token
+            String country = (String) claims.get("country");
+            ArrayList<String> classification = (ArrayList<String>) claims.get("classification");
+            if (country != null && classification != null) {
+
+                ArrayList<String> accms = (ArrayList<String>) claims.get("accms");
+                ArrayList<String> sciControls = (ArrayList<String>) claims.get("sciControls");
+
+                UserClassification userClassification = new UserClassification(
+                        country, classification, accms, sciControls);
+
+                groupManager.setClassificationForUser(user, userClassification);
+            }
+
             if (groupNames != null) {
 
                 Set<String> groupNameSet = LdapAuthenticator.applyGroupPrefixFilter(
@@ -238,8 +263,10 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
             logger.error("rethrowing OAuth2Exception in OAuthAuthenticator!", oAuth2Exception);
             throw oAuth2Exception;
         } catch (JwtException jwtException) {
-            logger.error("rethrowing JwtException as InvalidTokenException!", jwtException);
-            throw new InvalidTokenException(jwtException.getMessage());
+            if (logger.isDebugEnabled()) {
+                logger.debug("rethrowing JwtException as InvalidTokenException!", jwtException);
+            }
+            throw jwtException;
         } catch (Exception e) {
             logger.error("Exception in OAuthAuthenticator!", e);
             authStatus = AuthStatus.FAILURE;

@@ -21,19 +21,19 @@ import com.bbn.security.web.MartiValidatorConstants;
 /**
  * Metadata describing a specific resource in the Marti Enterprise Sync feature.
  * Each resource in the Enterprise Sync DB has a unique combination of attributes
- * such as resourec name, submission time, MIME type, that fully describes it. 
- * This class encapsulates that information. 
- * 
- * The nested enum, <code>Field</code>, defines the universe of available 
+ * such as resourec name, submission time, MIME type, that fully describes it.
+ * This class encapsulates that information.
+ *
+ * The nested enum, <code>Field</code>, defines the universe of available
  * metadata attributes. In the typical case, not all <code>Metadata</code> instances
  * will have values for these attributes.
- * 
- * The implementation is a thin wrapper around a Map<Field, String[]>.
- * 
+ *
+ * The implementation is a thin wrapper around a Map{@literal <}Field, String[]{@literal >}.
+ *
  *
  */
 public class Metadata implements Serializable {
-	
+
 	private static final long serialVersionUID = -3768137666973346597L;
 
 	public enum Field {
@@ -57,16 +57,16 @@ public class Metadata implements Serializable {
 		Tool(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS, false, false),
 		EXPIRATION(MartiValidatorConstants.Regex.Double, MartiValidatorConstants.SHORT_STRING_CHARS, false, false),
 		PluginClassName(MartiValidatorConstants.Regex.Filename, MartiValidatorConstants.DEFAULT_STRING_CHARS, false, false);
-		
+
 		/**
 		 * Validation pattern to be used by ESAPI for input validation.
-		 * The pattern is a regex described in the sytem configuration file, 
+		 * The pattern is a regex described in the sytem configuration file,
 		 * <code>validation.properties</code>.
 		 */
 		public final MartiValidatorConstants.Regex validationType;
 		/**
 		 * Maximum length of the value of this attribute.
-		 * Some fields are array-valued, in which case this refers to the maximum length of 
+		 * Some fields are array-valued, in which case this refers to the maximum length of
 		 * each array element.
 		 */
 		public final int maximumLength;
@@ -87,13 +87,13 @@ public class Metadata implements Serializable {
 			this.isArray = isArray;
 			this.isMachineGenerated = isMachineGenerated;
 		}
-		
+
 		/**
 		 * Gets the equivalent Field instance matching a given String.
 		 * The string matching is case-insensitive.
 		 * One Field, <code>MIMEType</code>, has an alias: it will match
 		 * the string "MIME" as well as "MIMEType".
-		 * 
+		 *
 		 * @param given String to convert to a Field
 		 * @return the matching Field, or <code>null</code> if the String didn't match any Field
 		 */
@@ -101,21 +101,21 @@ public class Metadata implements Serializable {
 			if (given.compareToIgnoreCase("MIME") == 0) {
 				return Metadata.Field.MIMEType;
 			}
-			
+
 			for (Field field : Field.values()) {
 				if (field.toString().compareToIgnoreCase(given) == 0) {
 					return field;
-				} 
+				}
 			}
-			
+
 			return null;
 		}
 	}
-	
+
 	public static final int DEFAULT_FIELD_LENGTH = 1024;
-	
+
 	private static final Logger log = Logger.getLogger(Metadata.class.getCanonicalName());
-	
+
 	/**
 	 * Makes a deep copy of a given Metadata instance.
 	 * This is an alternative to <code>clone</code>
@@ -138,7 +138,7 @@ public class Metadata implements Serializable {
 		}
 		return copy;
 	}
-	
+
 	/**
 	 * Creates a metadata instance from a JSONObject
 	 */
@@ -165,7 +165,7 @@ public class Metadata implements Serializable {
 
 		return newObject;
 	}
-	
+
 	public static Metadata fromMap(Map<Field, String[]> map)  {
 		Metadata newObject = new Metadata();
 		for (Field key : map.keySet()) {
@@ -173,7 +173,7 @@ public class Metadata implements Serializable {
 		}
 		return newObject;
 	}
-	
+
 	/**
 	 * Parses a JSON-encoded collection of Metadata instances
 	 * @param text an encoded JSONObject or JSONArray of metadata
@@ -181,7 +181,7 @@ public class Metadata implements Serializable {
 	 */
 	public static Metadata[] fromJSON(String text) {
 		JSONParser parser = new JSONParser();
-		
+
 		ArrayList<Metadata> results = new ArrayList<Metadata>();
 		try {
 			Object parsedObj = parser.parse(text);
@@ -211,9 +211,9 @@ public class Metadata implements Serializable {
 		}
 		return results.toArray(new Metadata[results.size()]);
 	}
-		
+
 	private Map<Field, String[]> fields =  new HashMap<Field, String[]>();
-	
+
 	public Map<Field, String[]> getFields() {
 		return fields;
 	}
@@ -225,7 +225,7 @@ public class Metadata implements Serializable {
 	public boolean equals(Object other) {
 		return this.matches(Arrays.asList(Metadata.Field.values()), other);
 	}
-	
+
 	/**
 	 * Gets all values of the given metadata field.
 	 * @param attribute name of the attribute to get
@@ -234,11 +234,11 @@ public class Metadata implements Serializable {
 	public String[] getAll(Field attribute) {
 		return fields.get(attribute);
 	}
-	
+
 	/**
 	 * Gets the first value of a metadata attribute. Intended to be used on single-valued attrributes
-	 * such as file name. 
-	 * @param attribute 
+	 * such as file name.
+	 * @param attribute
 	 * @return the first string associated with that attribute, or null if that attribute is not defined.
 	 */
 	public String getFirst(Field attribute) {
@@ -249,9 +249,9 @@ public class Metadata implements Serializable {
 		}
 		return first;
 	}
-	
+
 	/**
-	 * Gets the first value of a metadata attribute. Returns an empty string if attribute not defined. Never returns 
+	 * Gets the first value of a metadata attribute. Returns an empty string if attribute not defined. Never returns
 	 * <code>null</code>.
 	 * @param attribute
 	 * @return the first string associated with that attribute, or empty string if that attribute is not defined.
@@ -263,8 +263,8 @@ public class Metadata implements Serializable {
 		}
 		return value;
 	}
-	
-	
+
+
 	/**
 	 * Gets the numeric value of the altitude field, if it is defined
 	 * @return the altitude value, or <code>Double.NaN</code> if altitude is undefined
@@ -279,10 +279,10 @@ public class Metadata implements Serializable {
 				log.warning("Failed to parse " + Field.Altitude.toString() + ": " + ex.getMessage());
 			}
 		}
-		return altitude; 
+		return altitude;
 	}
-	
-	
+
+
 	/**
 	 * Gets the keywords for this Metadata instance as a string array.
 	 * @return Array containing each keyword as a separate element, or null if keywords are undefined.
@@ -290,7 +290,7 @@ public class Metadata implements Serializable {
 	public String[] getKeywords() {
 		return this.getAll(Field.Keywords);
 	}
-	
+
 	/**
 	 * Gets the numeric value of the latitude field, if it is defined
 	 * @return the latitude value, or <code>Double.NaN</code> if latitude is undefined
@@ -307,7 +307,7 @@ public class Metadata implements Serializable {
 		}
 		return latitude;
 	}
-		
+
 	/**
 	 * Gets the numeric value of the longitude field, if it is defined
 	 * @return the longitude value, or <code>Double.NaN</code> if longitude is undefined.
@@ -324,10 +324,10 @@ public class Metadata implements Serializable {
 		}
 		return longitude;
 	}
-	
+
 	/**
 	 * Gets the hash of the data object.
-	 * @return a 
+	 * @return a
 	 */
 	public String getHash() {
 		String hash = this.getFirst(Field.Hash);
@@ -336,7 +336,7 @@ public class Metadata implements Serializable {
 		}
 		return hash;
 	}
-	
+
 	/**
 	 * @return the number of non-null metadata fields
 	 */
@@ -349,9 +349,9 @@ public class Metadata implements Serializable {
 		}
 		return count;
 	}
-	
+
 	/**
-	 * @return the coordinates of the resource's location as a String: POINT(lon lat), 
+	 * @return the coordinates of the resource's location as a String: POINT(lon lat),
 	 * or <code>null</code> if either coordinate is undefined
 	 */
 	public String getPointString() {
@@ -362,16 +362,16 @@ public class Metadata implements Serializable {
 		}
 		return "POINT(" + this.getLongitude() + " " + this.getLatitude() + ")";
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @return the database primary key of the instance, or <code>null</code> if the key is not defined
 	 */
 	public Integer getPrimaryKey() {
 		Integer key = null;
 		String[] primaryKeyStrings = this.getAll(Metadata.Field.PrimaryKey);
 		if (primaryKeyStrings != null && primaryKeyStrings.length > 0) {
-		try {	
+		try {
 			key = Integer.parseInt(primaryKeyStrings[0]);
 		} catch (NullPointerException | NumberFormatException ex) {
 			log.warning("Failed to parse " + Metadata.Field.PrimaryKey.toString() + ": " + ex.getMessage());
@@ -379,7 +379,7 @@ public class Metadata implements Serializable {
 		}
 		return key;
 	}
-	
+
 	/**
 	 * Gets the size of the content in bytes.
 	 * @return the size of the content in bytes, or <code>null</code> if the metadata has no associated content.
@@ -395,10 +395,10 @@ public class Metadata implements Serializable {
 						+ ": " + ex.getMessage());
 			}
 		}
-		
+
 		return sizeInBytes;
 	}
-	
+
 	public Long getExpiration() {
 	    String expiration_string = this.getFirst(Field.EXPIRATION);
 	    if (expiration_string == null) {
@@ -411,20 +411,20 @@ public class Metadata implements Serializable {
 	public String getUid() {
 		return this.getFirst(Field.UID);
 	}
-		
+
 	/**
 	 * @return true if this object has all the same fields and values of <code>other</code>.
 	 */
 	public boolean isSupersetOf(Metadata other) {
 		return this.matches(other.fields.keySet(), other);
 	}
-	
+
 	/**
 	 * Returns true if a collection of fields have the same value as in another Metadata instance.
 	 * This is like a selective version of <code>equals</code> that only compares specified fields.
 	 * It is useful when you want to compare two <code>Metadata</code> instances but ignore
 	 * automatically-populated fields such as submission time or primary key.
-	 * 
+	 *
 	 * @param fields Collection of fields to compare
 	 * @param other instance to compare to
 	 * @return true if the contents of all members of <code>fields</code> lexically match
@@ -439,7 +439,7 @@ public class Metadata implements Serializable {
 			log.finer("Comparing field " + field.toString());
 			String[] myValue = this.getAll(field);
 			String[] otherValue = ((Metadata)other).getAll(field);
-	
+
 			if (myValue == null && otherValue == null) {
 				// Both null; that's a match
 				continue;
@@ -457,11 +457,11 @@ public class Metadata implements Serializable {
 		}
 		return true;
 	}
-	
+
 	public void set(Field field, String value) {
 		fields.put(field, new String[] {value});
 	}
-	
+
 	public void set(Field field, String[] values) {
 			fields.put(field, values);
 			if (values != null && values.length > 1 && !field.isArray) {
@@ -474,16 +474,16 @@ public class Metadata implements Serializable {
 			set(field, Double.toString(value));
 		}
 	}
-	
+
 	public void set(Field field, Long value) {
 		if (value != null) {
 			set(field, Long.toString(value));
 		}
 	}
-	
+
 	/**
 	 * Converts the Metadata instance to a <code>JSONObject</code> for generating JSON output.
-	 * 
+	 *
 	 * @return a JSONObject that can be converted to a String using <code>JSONObject.toJSONString()</code>
 	 */
 	@SuppressWarnings("unchecked")
@@ -503,7 +503,7 @@ public class Metadata implements Serializable {
 		}
 		return json;
 	}
-	
+
 	public String getPluginClassName() {
 		return this.getFirst(Field.PluginClassName);
 	}

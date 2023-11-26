@@ -25,9 +25,18 @@ public class DataSourceUtils {
 
         int max_connections = 0;
 	    if (repository.isEnable()) {
+	    	
 	        Properties props = new Properties();
 	        props.setProperty("user", coreDbConnection.getUsername());
-	        props.setProperty("password", coreDbConnection.getPassword());
+	        if (!coreDbConnection.isSslEnabled()) {
+	        	props.setProperty("password", coreDbConnection.getPassword());	        	
+	        }else {
+	        	props.setProperty("sslmode", coreDbConnection.getSslMode());
+	        	props.setProperty("sslcert", coreDbConnection.getSslCert());
+	        	props.setProperty("sslkey", coreDbConnection.getSslKey());
+	        	props.setProperty("sslrootcert", coreDbConnection.getSslRootCert());
+	        }
+	        
 	        try(java.sql.Connection conn = DriverManager.getConnection(coreDbConnection.getUrl(), props); ResultSet res = conn.createStatement().executeQuery("show max_connections")) {
 	            
 	            res.next();
@@ -47,15 +56,8 @@ public class DataSourceUtils {
             numDbConnections = repository.getNumDbConnections();
         }
         
-        if (logger.isDebugEnabled()) {
-            logger.debug("There are: " + Runtime.getRuntime().availableProcessors()
-                    + " cpus currently available; The max connections is: " + max_connections
-                    + " and the computed connection pool size is: " + numDbConnections);
-        }
-        
-        if (logger.isDebugEnabled()) {
-            logger.debug("We are setting up a connection pool of size: " + numDbConnections);
-        }
+        logger.info(Runtime.getRuntime().availableProcessors() + " CPU cores detected. Postgres server maximum allowed connections value is " + max_connections
+                    + ". The computed connection pool size is: " + numDbConnections);
 
         HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setUsername(coreDbConnection.getUsername());
@@ -68,14 +70,22 @@ public class DataSourceUtils {
         hikariConfig.setAllowPoolSuspension(true);
         hikariConfig.setInitializationFailTimeout(-1);
         hikariConfig.setMinimumIdle(1);
+        if (coreDbConnection.isSslEnabled()) {
+    	    logger.info("SSL connection to database is enabled, client user: {}", coreDbConnection.getUsername());
+        	hikariConfig.addDataSourceProperty("user", coreDbConnection.getUsername());
+        	hikariConfig.addDataSourceProperty("sslmode", coreDbConnection.getSslMode());
+        	hikariConfig.addDataSourceProperty("sslcert", coreDbConnection.getSslCert());
+        	hikariConfig.addDataSourceProperty("sslkey", coreDbConnection.getSslKey());
+        	hikariConfig.addDataSourceProperty("sslrootcert", coreDbConnection.getSslRootCert());
+        }
 
         if (!repository.isEnable()) {
                 // Zero would be ideal.... But an exception is thrown if less than 250 is chosen
         	hikariConfig.setConnectionTimeout(250);
         }
 
-        HikariDataSource hds = new HikariDataSource(hikariConfig);
-        return hds;
+        return new HikariDataSource(hikariConfig);
+        
 	}
 	
 }

@@ -41,12 +41,18 @@
             cache : false,
             contentType : false,
             processData : false,
+            success: function (response){
+                location.reload();
+            },
             error : function(stat, err) {
-                $.jnotify("Error deleting", "error");
+                if (stat.responseJSON !== null && stat.responseJSON.message != ""){
+                    $.jnotify("Error: " + stat.responseJSON.message, "error", 3000); 
+                } else{
+                    $.jnotify("Error deleting", "error", 3000);
+                }
             }
         });
 
-        location.reload();
     }
 
     function getSelected() {
@@ -98,6 +104,7 @@
 			addCell(row, cell++, createDiv(createContents(missions[i].contents)), 'top');
 			addCell(row, cell++, createDiv(createUids(missions[i].uids)), 'top');
 			addCell(row, cell++, createDiv(createGroups(missions[i].groups)), 'top');
+			addCell(row, cell++, createDiv(createFeeds(missions[i].feeds)), 'top');
 			addCell(row, cell++, createDiv(createKeywords(missions[i].keywords)), 'top');
 			addCell(row, cell++, document.createTextNode(missions[i].creatorUid), 'top');
 			addCell(row, cell++, document.createTextNode(missions[i].createTime), 'top');
@@ -195,6 +202,7 @@
             <th>Contents</th>
             <th>UIDs</th>
             <th>Groups</th>
+            <th>Feeds</th>
             <th>Keywords</th>
             <th>Creator Uid</th>
             <th>Create Time</th>

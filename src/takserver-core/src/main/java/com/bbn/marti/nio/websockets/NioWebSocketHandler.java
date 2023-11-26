@@ -163,7 +163,7 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
 
         				// parse and broadcast the message
         				TakMessage takMessage = TakMessage.parseFrom(eventBytes);
-        				CotEventContainer cotEventContainer = StreamingProtoBufHelper.getInstance().proto2cot(takMessage);
+        				CotEventContainer cotEventContainer = StreamingProtoBufHelper.proto2cot(takMessage);
 
         				if (isNotDOSLimited(cotEventContainer) && isNotReadLimited(cotEventContainer))
         					protocolListeners.forEach(listener -> listener.onDataReceived(cotEventContainer, channelHandler, protocol));
@@ -179,7 +179,7 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
         
         IgniteHolder.getInstance()
         	.getIgnite()
-        	.message(IgniteHolder.getInstance().getIgnite().cluster().forClients().forAttribute(Constants.TAK_PROFILE_KEY, Constants.API_PROFILE_NAME))
+        	.message(IgniteHolder.getInstance().getIgnite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.API_PROFILE_NAME))
         	.localListen("websocket-read-listener-" + connectionId, igniteReadListenerPredicate);
     }
     

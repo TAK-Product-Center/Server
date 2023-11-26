@@ -420,8 +420,11 @@ public class FederationApi extends BaseRestController {
 	}
 
 	@RequestMapping(value = "/federategroupsmap/{federateId}", method = RequestMethod.POST)
-	public ResponseEntity<ApiResponse<String>> addFederateGroupMap(@PathVariable("federateId") String federateId, String remoteGroup, String localGroup) {
+	public ResponseEntity<ApiResponse<String>> addFederateGroupMap(@PathVariable("federateId") String federateId, @RequestParam("remoteGroup") String remoteGroup, @RequestParam("localGroup") String localGroup) {
 
+		if (logger.isDebugEnabled()) {
+			logger.debug("Received POST request addFederateGroupMap for federateId {}", federateId);
+		}
 		ResponseEntity<ApiResponse<String>> result = null;
 
 		List<String> errors = null;
@@ -746,6 +749,29 @@ public class FederationApi extends BaseRestController {
 		return result;
 	}
 
+	@RequestMapping(value = "/federatecahops", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<String>> setFederateCAHops(@RequestBody FederateCAHopsAssociation federateCAHopsAssociation){
+		ResponseEntity<ApiResponse<String>> result = null;
+
+		List<String> errors = new ArrayList<>();
+		try{
+			federationInterface.addMaxHopsToCA(federateCAHopsAssociation.getCaId(), federateCAHopsAssociation.getMaxHops());
+			
+			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION,
+					String.class.getName(), federateCAHopsAssociation.getCaId()), HttpStatus.OK);
+		}
+		catch(Exception e){
+			logger.error("Exception changing federate CA hops", e);
+			errors.add(e.getMessage());
+		}
+
+		if(result == null){
+			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), null, errors),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+		return result;
+	}
+
 	@RequestMapping(value = "/outgoingconnections", method = RequestMethod.POST)
 	public ResponseEntity<ApiResponse<Federation.FederationOutgoing>> createOutgoingConnection(@RequestBody Federation.FederationOutgoing outgoingConnection) {
 
@@ -843,7 +869,10 @@ public class FederationApi extends BaseRestController {
 			x509Certificates = federationInterface.getCAList();
 			if (x509Certificates != null) {
 				for (X509Certificate x : x509Certificates) {
-					certificateSummaries.add(new CertificateSummary(x.getIssuerDN().getName(), x.getSubjectDN().getName(), x.getSerialNumber(), getCertFingerprint(x)));
+					String fingerprint = getCertFingerprint(x);
+					int maxHops = federationInterface.getCAMaxHops(fingerprint);
+					
+					certificateSummaries.add(new CertificateSummary(x.getIssuerDN().getName(), x.getSubjectDN().getName(), x.getSerialNumber(), fingerprint, maxHops));
 				}
 			}
 			result = new ResponseEntity<ApiResponse<List<CertificateSummary>>>(new ApiResponse<List<CertificateSummary>>(Constants.API_VERSION, CertificateSummary.class.getName(), certificateSummaries), HttpStatus.OK);
@@ -961,7 +990,7 @@ public class FederationApi extends BaseRestController {
 			errors = getValidationErrors(federate);
 			if (errors.isEmpty()) {
 				federationInterface.updateFederateDetails(federate.getId(), federate.isArchive(), federate.isShareAlerts(),
-						federate.isFederatedGroupMapping(), federate.isAutomaticGroupMapping(), federate.getNotes());
+						federate.isFederatedGroupMapping(), federate.isAutomaticGroupMapping(), federate.getNotes(), federate.getMaxHops());
 
 				result = new ResponseEntity<ApiResponse<Federate>>(new ApiResponse<Federate>(Constants.API_VERSION,
 						Federate.class.getName(), federate), HttpStatus.OK);
@@ -1314,5 +1343,33 @@ public class FederationApi extends BaseRestController {
 		fedEventRepository.clearFederationEvents();
 		
 		logger.info("Federation events cleared");
+	}
+	
+	@RequestMapping(value = "/federatemissions/{federateId}", method = RequestMethod.PUT)
+	public ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>> updateFederateMissions(@PathVariable String federateId, @RequestBody FederateMissionPerConnectionSettings federateMissionPerConnectionSettings) {
+
+		ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>> result = null;
+
+		logger.trace("RMI federationInterface: " + federationInterface);
+		List<String> errors = new ArrayList<String>();
+
+		try {
+			federationInterface.updateFederateMissionSettings(federateId, federateMissionPerConnectionSettings.isMissionFederateDefault(), federateMissionPerConnectionSettings.getMissions());
+
+			result = new ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>>(new ApiResponse<FederateMissionPerConnectionSettings>(Constants.API_VERSION,
+					FederateMissionPerConnectionSettings.class.getName(), federateMissionPerConnectionSettings), HttpStatus.OK);
+			
+		} catch (Exception e) {
+			logger.error("Exception updating federate details.", e);
+			errors.add(e.getMessage());
+		}
+
+		if (result == null) {
+			//This would be an error condition (not an empty input list or bad request)
+			result = new ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>>(new ApiResponse<FederateMissionPerConnectionSettings>(Constants.API_VERSION,
+					String.class.getName(), null, errors), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
 	}
 }

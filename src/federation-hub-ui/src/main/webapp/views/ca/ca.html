@@ -1,0 +1,29 @@
+<link rel="stylesheet" href="../../styles/tablesorter/style.css" type="text/css" media="print, projection, screen" />
+<div style="margin-left: 10%; margin-right: 10%">
+  <h3 style="align-content: center; text-align: center;">Remove Saved CA's</h3>
+  <div class="modal-body" data-ng-init="initialize()">
+    <div class="row">
+      <div style="margin-right: 1.5%; margin-left: 1.5%;">
+        <table class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+          <thead>
+            <tr>
+              <th style="text-align: center; align-content: center;">CA</th>
+              <th style="text-align: center; align-content: center;">Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="ca in knownCas" style="text-align: center; align-content: center;">
+              <td>{{ca.uid}}</td>
+              <td>
+                <button data-ng-click="deleteGroupCa(ca.uid)" class="btn-danger">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" type="button" ng-click="cancel()">Close</button>
+    </div>
+  </div>
+</div>

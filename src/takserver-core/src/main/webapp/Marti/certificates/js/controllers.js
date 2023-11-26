@@ -2,8 +2,8 @@
 
 var certificateManagerControllers = angular.module('certificateManagerControllers', []);
 
-certificateManagerControllers.controller('FederateCertificatesListCtrl', ['$scope', '$location', 'FederateCertificatesService', 
-      function ($scope, $location, FederateCertificatesService) {
+certificateManagerControllers.controller('FederateCertificatesListCtrl', ['$scope', '$location', 'FederateCertificatesService', 'FederateCAHopsService',
+      function ($scope, $location, FederateCertificatesService, FederateCAHopsService) {
 	
     		$scope.showRmiError = false;
 
@@ -22,6 +22,21 @@ certificateManagerControllers.controller('FederateCertificatesListCtrl', ['$scop
 							function() {alert('An unexpected error occurred deleting the certificate.');});
 				}
 			}
+
+            $scope.saveHops = function(fc){
+                if (fc.maxHops === 0) 
+                    return
+
+                var federateCAHopsAssociation = {};
+                federateCAHopsAssociation["caId"] = fc.fingerPrint;
+                federateCAHopsAssociation["maxHops"] = fc.maxHops;
+                FederateCAHopsService.save(federateCAHopsAssociation);
+            }
+
+
+            $scope.changeHops = function(fc) {
+
+            }
 
 			$scope.getFederateCertificates();
 
@@ -133,4 +148,6 @@ certificateManagerControllers.controller('FederateCAGroupsCtrl', ['$scope', '$lo
         $scope.getFederateCAGroups();
 
     }]);
+
+
 

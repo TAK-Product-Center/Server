@@ -11,16 +11,12 @@ public class MissionUtils {
 
 	public static void findAndSetTransientValuesForMission(Mission mission) {
 	
-		logger.debug("~~~ Call findAndSetTransientValuesForMission");
-
 		Set<MissionFeed> feeds  = mission.getFeeds();
 
 		if (feeds != null) {
 			for (MissionFeed feed: feeds) {
 				MissionFeedUtils.findAndSetNameForMissionFeed(feed);
 			}
-		}else {
-			logger.debug("~~~ Feed is null");		
 		}
 		
 		Set<MissionChange> missionChanges = mission.getMissionChanges();
@@ -31,11 +27,7 @@ public class MissionUtils {
 				MissionChangeUtils.findAndSetTransientValuesForMissionChange(missionChange);
 	        }
 	        
-		}else {
-			logger.debug("~~~ Mission Change is null");		
 		}
 		
-		logger.debug("~~~ Done findAndSetTransientValuesForMission");
-
 	}
 }

@@ -33,9 +33,7 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 	private int numberOfFeeds = 2; // default value
 	private int numberOfTracksPerFeed = 3; // default value
 	
-//	private double messageRatePerTrackInSecond = 0.5; // number of messages per track in second
-//	private long period; // calculated value based on messageRatePerTrackInSecond, in milliseconds;
-	
+
 	private int delay = 10; // in milliseconds
 	
 	private ScheduledExecutorService worker;
@@ -104,8 +102,7 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 		
 		startTime = System.currentTimeMillis();
 						
-//		future = worker.scheduleAtFixedRate (new DataFeedMessageSender(), 3000, period, TimeUnit.MILLISECONDS);
-		future = worker.scheduleWithFixedDelay(new DataFeedMessageSender(), 3000, delay, TimeUnit.MILLISECONDS);	
+		future = worker.scheduleWithFixedDelay(new DataFeedMessageSender(), 3000, delay, TimeUnit.MILLISECONDS);
 	}
 	
 	private class DataFeedMessageSender implements Runnable {
@@ -114,7 +111,7 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 		public void run() {
 			
 			String trackUid = "dummyTrackUid"; // this value will be replaced
-			String SA = "<event version=\"2.0\" uid=\""+trackUid+"\" type=\"a-f-G-U-C\" how=\"m-g\" time=\"2020-02-12T13:16:07Z\" start=\"2020-02-12T13:16:05Z\" stale=\"2020-02-12T13:16:50Z\"><point lat=\"40.255716\" lon=\"-72.045306\" hae=\"-22.22983896651138\" ce=\"4.9\" le=\"9999999.0\"/><detail><__group name=\"Dark Blue\" role=\"Team Member\"/><precisionlocation geopointsrc=\"GPS\" altsrc=\"GPS\"/><status battery=\"32\"/><takv device=\"SAMSUNG SM-G975U1\" platform=\"ATAK-CIV\" os=\"29\" version=\"3.12.0-45691.45691-CIV\"/><track speed=\"0.0\" course=\"344.72362164876733\"/><contact endpoint=\"*:-1:stcp\" phone=\"19999999999\" callsign=\"coolata\"/><uid Droid=\"coolata\"/></detail></event>";
+			String SA = "<event version=\"2.0\" uid=\""+trackUid+"\" type=\"a-f-G-U-C\" how=\"m-g\" time=\"2020-02-12T13:16:07Z\" start=\"2020-02-12T13:16:05Z\" stale=\"2020-02-12T13:16:50Z\" caveat=\"TestCaveat\" releaseableTo=\"TestReleaseableTo\"><point lat=\"40.255716\" lon=\"-72.045306\" hae=\"-22.22983896651138\" ce=\"4.9\" le=\"9999999.0\"/><detail><__group name=\"Dark Blue\" role=\"Team Member\"/><precisionlocation geopointsrc=\"GPS\" altsrc=\"GPS\"/><status battery=\"32\"/><takv device=\"SAMSUNG SM-G975U1\" platform=\"ATAK-CIV\" os=\"29\" version=\"3.12.0-45691.45691-CIV\"/><track speed=\"0.0\" course=\"344.72362164876733\"/><contact endpoint=\"*:-1:stcp\" phone=\"19999999999\" callsign=\"coolata\"/><uid Droid=\"coolata\"/></detail></event>";
 			
 			int currentCount = count.incrementAndGet();
 
@@ -161,7 +158,7 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 			logger.info("Deleting datafeeds used in load testing");
 			PluginDataFeedApi pluginDataFeedApi = getPluginDataFeedApi();
 			for (String feedUuid : feedUuids) {
-				pluginDataFeedApi.delete(feedUuid);
+				pluginDataFeedApi.delete(feedUuid, new ArrayList<String>());
 			}
 			logger.info("Deleted all datafeeds used in load testing");
 

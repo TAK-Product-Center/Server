@@ -36,7 +36,7 @@ import org.springframework.util.Assert;
  * {@link AuthenticationProvider}s.
  *
  * <p>
- * <tt>AuthenticationProvider</tt>s are usually tried in order until one provides a
+ * {@literal <}tt{@literal >}AuthenticationProvider{@literal <}/tt{@literal >}s are usually tried in order until one provides a
  * non-null response. A non-null response indicates the provider had authority to decide
  * on the authentication request and no further providers are tried. If a subsequent
  * provider successfully authenticates the request, the earlier authentication exception
@@ -70,7 +70,7 @@ import org.springframework.util.Assert;
  * the case of authentication failure) and publishes an
  * {@link org.springframework.security.authentication.event.AuthenticationSuccessEvent
  * AuthenticationSuccessEvent} if authentication succeeds. If you are using the namespace
- * then an instance of this bean will be used automatically by the <tt>&lt;http&gt;</tt>
+ * then an instance of this bean will be used automatically by the {@literal <}tt{@literal >}&lt;http&gt;{@literal <}/tt{@literal >}
  * configuration, so you will receive events from the web part of your application
  * automatically.
  * <p>
@@ -159,7 +159,7 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
         AuthenticationException lastException = null;
         Authentication result = null;
         boolean debug = logger.isDebugEnabled();
-        
+
         logger.debug("in authenticate - providers: " + getProviders() + " " + providers.getClass().getSimpleName());
 
         for (AuthenticationProvider provider : getProviders()) {
@@ -167,7 +167,7 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
                 logger.debug("Authentication attempt using "
                         + provider.getClass().getName() + " for " + authentication + " " + authentication.getClass().getSimpleName());
             }
-            
+
             if (!provider.supports(toTest)) {
                 continue;
             }

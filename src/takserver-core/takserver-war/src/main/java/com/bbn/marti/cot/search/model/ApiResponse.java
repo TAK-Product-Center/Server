@@ -28,8 +28,20 @@ public class ApiResponse<T> {
         this.nodeId = ApiDependencyProxy.getInstance().serverInfo().getServerId();
     }
     
+    public ApiResponse(String nodeId) {
+    	super();
+        this.nodeId = nodeId;
+    }
+    
     public ApiResponse(String version, String type, T data) {
         this();
+        this.version = version;
+        this.type = type;
+        this.data = data;
+    }
+    
+    public ApiResponse(String nodeId, String version, String type, T data) {
+        this(nodeId);
         this.version = version;
         this.type = type;
         this.data = data;

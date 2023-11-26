@@ -85,7 +85,7 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	private final Map<ChannelHandler, ConcurrentHashMap<String, RemoteContactWithSA>> contactList = new ConcurrentHashMap<>();
 	private final Map<String, GuardedStreamHolder<FederatedEvent>> sessionClientStreamMap = new ConcurrentHashMap<>();
 	private final Map<String, GuardedStreamHolder<ROL>> sessionROLClientStreamMap = new ConcurrentHashMap<>();
-	private final Map<String, StreamObserver<FederateGroups>> sessionGroupServerStreamMap = new ConcurrentHashMap<>();
+	private final Map<String, GuardedStreamHolder<FederateGroups>> sessionGroupServerStreamMap = new ConcurrentHashMap<>();
 	private final Map<String, RemoteContact> contactMap = new ConcurrentHashMap<>();
 	private final Map<ConnectionInfo, Subscription> connectionSubMap = new ConcurrentHashMap<>();
 	private final Map<User, Subscription> userSubscriptionMap = new ConcurrentHashMap<>();
@@ -142,12 +142,8 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	}
 	
 	private void updateSubscriptionCaches(Subscription subscription) {
-		
-		RemoteSubscription sub = new RemoteSubscription(subscription);
-		sub.prepareForSerialization();
-				
-		IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().put(subscription.uid, sub);
-		IgniteCacheHolder.getIgniteSubscriptionClientUidTackerCache().put(subscription.clientUid, sub);
+		RemoteSubscription sub = new RemoteSubscription(subscription);		
+		IgniteCacheHolder.cacheRemoteSubscription(sub);
 	}
 	
 	public Set<RemoteFile> getFileSet() {
@@ -188,6 +184,7 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 		
 		SqlFieldsQuery qry = new SqlFieldsQuery(sb.toString());
 		qry.setArgs(sort);
+		qry.setDistributedJoins(true);
 		
 		return qry;
 	}
@@ -231,8 +228,8 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	 */
 	public Subscription removeByUid(String uid) {
 		Subscription subscription = uidSubscriptionMap.remove(uid);
-		IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().remove(uid);
 		if (subscription != null) {
+			IgniteCacheHolder.removeCachedRemoteSubscription(subscription);
 			channelHandlerSubscriptionMap.remove(subscription.handler);
             InputMetric inputMetric = SubmissionService.getInstance().getMetricByPort(subscription.handler.localPort());
             if (inputMetric != null) {
@@ -266,7 +263,6 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 			clientUidToSubMap.entrySet().stream().forEach(e -> {
 				if (e.getValue().equals(subscription)) {
 					clientUidToSubMap.remove(e.getKey());
-					IgniteCacheHolder.getIgniteSubscriptionClientUidTackerCache().remove(e.getKey());
 				}
 			});
 			
@@ -275,7 +271,8 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 				logger.debug("exception removing subscription from clientUidToSubMap", e);
 			}
 		}
-		IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().remove(subscription.uid);
+		
+		IgniteCacheHolder.removeCachedRemoteSubscription(subscription);
 
 		return uidSubscriptionMap.remove(subscription.uid);
 	}	
@@ -610,17 +607,17 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	}
 
 	@Override
-	public void putServerGroupStreamToSession(String sessionId, StreamObserver<FederateGroups> groupStream) {
+	public void putServerGroupStreamToSession(String sessionId, GuardedStreamHolder<FederateGroups> groupStream) {
 		sessionGroupServerStreamMap.put(sessionId, groupStream);	
 	}
 
 	@Override
-	public StreamObserver<FederateGroups> removeServerGroupStreamBySession(String sessionId) {
+	public GuardedStreamHolder<FederateGroups> removeServerGroupStreamBySession(String sessionId) {
 		return sessionGroupServerStreamMap.remove(sessionId);
 	}
 
 	@Override
-	public StreamObserver<FederateGroups> getServerGroupStreamBySession(String sessionId) {
+	public GuardedStreamHolder<FederateGroups> getServerGroupStreamBySession(String sessionId) {
 		return sessionGroupServerStreamMap.get(sessionId);
 	}
 

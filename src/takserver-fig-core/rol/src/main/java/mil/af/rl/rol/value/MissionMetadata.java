@@ -19,9 +19,13 @@ public class MissionMetadata extends Parameters {
     private long parentMissionId;
     private long defaultRoleId;
     private long expiration;
-    
-    
-    public String getName() {
+    private boolean inviteOnly;
+    private String guid;
+     
+    public MissionMetadata() {
+		super();
+	}
+	public String getName() {
         return name;
     }
     public void setName(String name) {
@@ -105,13 +109,26 @@ public class MissionMetadata extends Parameters {
 	public void setBaseLayer(String baseLayer) {
 		this.baseLayer = baseLayer;
 	}
+	public boolean getInviteOnly() {
+		return inviteOnly;
+	}
+	public void setInviteOnly(boolean inviteOnly) {
+		this.inviteOnly = inviteOnly;
+	}
+	public String getGuid() {
+		return guid;
+	}
+	public void setGuid(String guid) {
+		this.guid = guid;
+	}
 	@Override
 	public String toString() {
-		return "MissionMetadata [name=" + name + ", creatorUid=" + creatorUid + ", description=" + description
-				+ ", chatRoom=" + chatRoom + ", tool=" + tool + ", boundingPolygon=" + boundingPolygon + ", bbox="
-				+ bbox + ", passwordHash=" + passwordHash + ", path=" + path + ", classification=" + classification
-				+ ", baseLayer=" + baseLayer + ", parentMissionId=" + parentMissionId + ", defaultRoleId="
-				+ defaultRoleId + ", expiration=" + expiration + "]";
+		return "MissionMetadata [type=" + type + ", name=" + name + ", creatorUid=" + creatorUid + ", description="
+				+ description + ", chatRoom=" + chatRoom + ", tool=" + tool + ", boundingPolygon=" + boundingPolygon
+				+ ", bbox=" + bbox + ", passwordHash=" + passwordHash + ", path=" + path + ", classification="
+				+ classification + ", baseLayer=" + baseLayer + ", parentMissionId=" + parentMissionId
+				+ ", defaultRoleId=" + defaultRoleId + ", expiration=" + expiration + ", inviteOnly=" + inviteOnly
+				+ ", guid=" + guid + "]";
 	}
 
 }

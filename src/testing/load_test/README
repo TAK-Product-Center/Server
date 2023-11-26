@@ -8,7 +8,7 @@ There are two main ways to use the tool, with the config file (base_config.yml):
 
 or using only command line arguments:
 
->$ python tak_tester.py —host <hostname/ip> —cert <path_to_cert> —password <password_for_cert> —-test-pytak
+>$ python tak_tester.py --host <hostname/ip> --cert <path_to_cert> --password <password_for_cert> --test-pytak
 
 The --clients <num_clients> option will override the option set in the config file, if you want to run the test with a different number without changing the file.
 
@@ -72,4 +72,22 @@ to mission change announcements by making the appropriate datasync call. In the 
 the non-random scenario is provided, and the random configuration is commented out below, should you wish to use it instead.
 The main difference is that instead of list of missions to subscribe to, you should provide the number
 of missions the client should randomly select to subscribe.
+
+
+CloudWatch Configuration:
+
+To configure pyTAK to send metric data to CloudWatch, follow the instructions in the "Configuration" section in the link:
+https://boto3.amazonaws.com/v1/documentation/api/latest/guide/quickstart.html
+
+>> vim ~/.aws/credentials
+[default]
+aws_access_key_id = YOUR_ACCESS_KEY
+aws_secret_access_key = YOUR_SECRET_KEY
+
+>> vim ~/.aws/config
+[default]
+region=us-east-2
+
+You can run the main method in cloud_watch.py to check your configuration.
+
 

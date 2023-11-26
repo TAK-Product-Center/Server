@@ -1,4 +1,4 @@
-apply plugin: 'java'
+apply plugin: 'java-library'
 apply plugin: 'com.google.protobuf'
 apply plugin: 'maven-publish'
 apply plugin: 'idea'
@@ -18,8 +18,8 @@ buildscript {
     }
   }
   dependencies {
-    classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.8'
-    classpath 'com.github.jengelman.gradle.plugins:shadow:6.1.0'
+    classpath 'com.google.protobuf:protobuf-gradle-plugin:' + gradle_protobuf_version
+    classpath 'gradle.plugin.com.github.johnrengelman:shadow:' + gradle_shadow_version
   }
 }
 
@@ -28,27 +28,26 @@ buildscript {
 repositories {
   mavenCentral()
   mavenLocal()
-  jcenter()
 }
 dependencies {
 
-  compile group: 'org.eclipse.jetty', name: 'jetty-util', version: '9.4.10.RC0'
+  implementation group: 'org.eclipse.jetty', name: 'jetty-util', version: '9.4.10.RC0'
 
   // gRPC
-  compile group: 'io.grpc', name: 'grpc-netty', version: grpc_version
-  compile group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
-  compile group: 'io.grpc', name: 'grpc-stub', version: grpc_version
+  implementation group: 'io.grpc', name: 'grpc-netty', version: grpc_version
+  implementation group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
+  implementation group: 'io.grpc', name: 'grpc-stub', version: grpc_version
 
   // Google's OpenSSL variant
   // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
-  compile 'io.netty:netty-tcnative-boringssl-static:' + boringssl_static_version
+  implementation 'io.netty:netty-tcnative-boringssl-static:' + boringssl_static_version
 
-  //compile 'javax.activation:activation:' + javax_activation_version
+  //implementation 'javax.activation:activation:' + javax_activation_version
 
-  compile 'javax.annotation:javax.annotation-api:1.3.2'
+  implementation 'javax.annotation:javax.annotation-api:' + javax_annotation_api_version
 
   // for netty performance, put javassist on the classpath
-  compile group: 'org.javassist', name: 'javassist', version: javassist_version
+  implementation group: 'org.javassist', name: 'javassist', version: javassist_version
 }
 
 // protobuf code generation step
@@ -76,8 +75,8 @@ idea {
   module {
     // Not using generatedSourceDirs because of
     // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
-    sourceDirs += file("${projectDir}/build/generated/source/proto/main/java");
-    sourceDirs += file("${projectDir}/build/generated/source/proto/main/grpc");
+    sourceDirs += file("${projectDir}/build/generated/source/proto/main/java")
+    sourceDirs += file("${projectDir}/build/generated/source/proto/main/grpc")
   }
 }
 

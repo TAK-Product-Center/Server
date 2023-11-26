@@ -1,8 +1,5 @@
-
-
 package com.bbn.marti.network;
 
-import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -19,15 +16,10 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
-import org.apache.ignite.internal.processors.service.GridServiceProxy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.aop.framework.Advised;
-import org.springframework.aop.framework.AopProxyUtils;
-import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -51,7 +43,6 @@ import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.NetworkInputAddResult;
 import com.bbn.marti.remote.service.InputManager;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.sync.model.DataFeedDao;
 import com.bbn.marti.sync.repository.DataFeedRepository;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.security.web.MartiValidator;
@@ -61,16 +52,19 @@ import com.google.common.collect.ComparisonChain;
 import tak.server.Constants;
 import tak.server.feeds.DataFeed;
 import tak.server.feeds.DataFeed.DataFeedType;
+import tak.server.feeds.DataFeedDTO;
 import tak.server.ignite.MessagingIgniteBroker;
 
 /**
  *
- * REST endpoint for interfacing with  submission service
+ * REST API for configuring inputs and streaming data feeds (which are extensions of inputs)
  *
  */
 @RestController
 public class SubmissionApi extends BaseRestController {
+	
     private static final String CONTEXT = "SubmissionApi";
+    
     Logger logger = LoggerFactory.getLogger(SubmissionApi.class);
 
     @Autowired
@@ -86,7 +80,7 @@ public class SubmissionApi extends BaseRestController {
 	private CoreConfig coreConfig;
     
 	@Autowired
-	private CommonUtil martiUtil;
+	private CommonUtil commonUtil;
 
     @Autowired
     private GroupManager groupManager;
@@ -103,46 +97,23 @@ public class SubmissionApi extends BaseRestController {
     @Autowired
 	DataSource ds;
     
-    @RequestMapping(value = "/datafeeds", method = RequestMethod.GET)
-    public ResponseEntity<ApiResponse<List<DataFeed>>> getDataFeeds(HttpServletResponse response) {
-    	setCacheHeaders(response);
-
-        List<DataFeed> dataFeeds = new ArrayList<>();
-
-		try {
-			String groupVector = martiUtil.getGroupVectorBitString();
-			List<DataFeedDao> dataFeedDaos = dataFeedRepository.getDataFeedsByGroups(groupVector);
-			
-			if (dataFeedDaos != null) {
-				for (DataFeedDao dao : dataFeedDaos) {
-					DataFeed dataFeed = convertDataFeedDao(dao);
-					dataFeeds.add(dataFeed);
-				}
-			}
-        } catch (Exception e) {
-        	logger.error("Failed getting data feeds", e);
-            return new ResponseEntity<ApiResponse<List<DataFeed>>>(new ApiResponse<List<DataFeed>>(Constants.API_VERSION, DataFeed.class.getName(), null), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-        
-        return new ResponseEntity<ApiResponse<List<DataFeed>>>(new ApiResponse<List<DataFeed>>(Constants.API_VERSION, DataFeed.class.getName(), dataFeeds), HttpStatus.OK);
-    }
-
     @RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.GET)
     public ResponseEntity<ApiResponse<DataFeed>> getDataFeed(@PathVariable("name") String name) {
+
     	ResponseEntity<ApiResponse<DataFeed>> result = null;
         try {
             if (!getInputNameValidationErrors(name).isEmpty()) {
                 result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
                 		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
             } else {
-            	String groupVector = martiUtil.getGroupVectorBitString();
-                List<DataFeedDao> dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
+            	String groupVector = commonUtil.getGroupVectorBitString();
+                List<DataFeedDTO> dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
                 if (dataFeeds == null || dataFeeds.size() != 1) {
                     result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
                     		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
                 } else {
-					DataFeedDao dataFeed = dataFeeds.get(0);
-    				DataFeed returnDataFeed = this.convertDataFeedDao(dataFeed);
+					DataFeedDTO dataFeedDTO = dataFeeds.get(0);
+    				DataFeed returnDataFeed = dfs.adaptDataFeedDTOtoDataFeed(dataFeedDTO);
     				result = new ResponseEntity<ApiResponse<DataFeed>>(
     						new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), returnDataFeed),
     						HttpStatus.OK);
@@ -161,8 +132,8 @@ public class SubmissionApi extends BaseRestController {
     public ResponseEntity<ApiResponse<DataFeed>> deleteDataFeed(@PathVariable("name") String name) {
 
     	ResponseEntity<ApiResponse<DataFeed>> result = null;
-    	String groupVector = martiUtil.getGroupVectorBitString();
-    	List<DataFeedDao> dataFeeds = new ArrayList<>();
+    	String groupVector = commonUtil.getGroupVectorBitString();
+    	List<DataFeedDTO> dataFeeds = new ArrayList<>();
 
     	// Verify correct groups before deleting from config file
         try {
@@ -171,7 +142,7 @@ public class SubmissionApi extends BaseRestController {
                 		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
             } else {
             	// only check groups if not admin
-            	if (!martiUtil.isAdmin()) {
+            	if (!commonUtil.isAdmin()) {
             		dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
                     if (dataFeeds == null || dataFeeds.size() != 1) {
                         result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
@@ -203,9 +174,7 @@ public class SubmissionApi extends BaseRestController {
 			logger.error("Exception deleting data feed from config file.", e);
 
 			// Shouldn't return error in case deleting from database is needed
-        	// return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
-        	// 		HttpStatus.INTERNAL_SERVER_ERROR);
-		}
+    	}
 
         try {
 			// Delete from database
@@ -238,10 +207,10 @@ public class SubmissionApi extends BaseRestController {
     		 @RequestBody com.bbn.marti.config.DataFeed dataFeed) {
     	ResponseEntity<ApiResponse<DataFeed>> result = null;
     	
-    	
     	try {
-        	String groupVector = martiUtil.getGroupVectorBitString();
-    		List<DataFeedDao> dataFeeds = dataFeedRepository.getDataFeedByName(name);
+        	String groupVector = commonUtil.getGroupVectorBitString();
+
+    		List<DataFeedDTO> dataFeeds = dataFeedRepository.getDataFeedByName(name);
 			int type = DataFeedType.valueOf(dataFeed.getType()).ordinal();
 
             if (!getInputNameValidationErrors(name).isEmpty() || dataFeeds == null || dataFeeds.size() != 1) {
@@ -253,7 +222,7 @@ public class SubmissionApi extends BaseRestController {
 						dataFeed.getAuth().toString(), dataFeed.getPort(), dataFeed.isAuthRequired(), dataFeed.getProtocol(),
 						dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(), dataFeed.isAnongroup(),
 						dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-						dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector);
+						dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated(), dataFeed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
 				
 				inputManager.updateFederationDataFeed(dataFeed);
 
@@ -268,14 +237,14 @@ public class SubmissionApi extends BaseRestController {
 				// Update config file
 				ConnectionModifyResult updateResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
 						.modifyInput(name, dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
-
 				if (updateResult.getHttpStatusCode() == ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
 					dataFeedRepository.updateDataFeedWithGroupVector(dataFeed.getUuid(), dataFeed.getName(), type,
 							dataFeed.getAuth().toString(), dataFeed.getPort(), dataFeed.isAuthRequired(), dataFeed.getProtocol(),
 							dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(), dataFeed.isAnongroup(),
 							dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-							dataFeed.isSync(), 1, groupVector);
-					
+											 //dataFeed.isSync(), 1, groupVector, dataFeed.isFederated());
+							dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated(), dataFeed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
+
 					if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
 						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
 						dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag());
@@ -289,6 +258,7 @@ public class SubmissionApi extends BaseRestController {
 	    			result = new ResponseEntity<ApiResponse<DataFeed>>(
 	    					new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
 	    					HttpStatus.OK);
+
 				} else {
 					result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
 		        		HttpStatus.INTERNAL_SERVER_ERROR);
@@ -338,7 +308,7 @@ public class SubmissionApi extends BaseRestController {
 	            	Long dataFeedId = dataFeedRepository.addDataFeed(dataFeed.getUuid(), dataFeed.getName(), type, auth, dataFeed.getPort(),
 	            			dataFeed.isAuthRequired(), dataFeed.getProtocol(), dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(),
 	            			dataFeed.isAnongroup(), dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-	            			dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector);
+	            			dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated(), dataFeed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
 
 	            	if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
 	            		dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag());
@@ -395,7 +365,7 @@ public class SubmissionApi extends BaseRestController {
             Collection<InputMetric> inputs = inputManager.getInputMetrics(excludeDataFeeds);
 
             if (logger.isDebugEnabled()) {
-            	logger.debug("inputs: " + inputs);
+            	logger.info("inputs: " + inputs);
             }
 
             metrics.addAll(inputs);
@@ -781,41 +751,7 @@ public class SubmissionApi extends BaseRestController {
     	}
 		return errors;
     }
-    
-    private DataFeed convertDataFeedDao(DataFeedDao dao) {
-		DataFeedType type = DataFeedType.values()[dao.getType()];
-		List<String> tags = dataFeedRepository.getDataFeedTagsById(dao.getId());
-		List<String> filterGroups = dataFeedRepository.getDataFeedFilterGroupsById(dao.getId());
-		AuthType auth = AuthType.valueOf(dao.getAuth());
-
-    	DataFeed dataFeed = new DataFeed(dao.getUUID(), dao.getName(), type,  new ArrayList<String>());
-
-    	dataFeed.setAuth(auth);
-    	dataFeed.setAnongroup(dao.getAnongroup());
-    	dataFeed.setAuthRequired(dao.getAuthRequired());
-    	dataFeed.setProtocol(dao.getProtocol());
-    	dataFeed.setGroup(dao.getFeedGroup());
-    	dataFeed.setIface(dao.getIface());
-    	dataFeed.setArchive(dao.getArchive());
-    	dataFeed.setAnongroup(dao.getAnongroup());
-    	dataFeed.setArchiveOnly(dao.getArchiveOnly());
-    	dataFeed.setCoreVersion(dao.getCoreVersion().intValue());
-    	dataFeed.setCoreVersion2TlsVersions(dao.getCoreVersion2TlsVersions());
-    	dataFeed.setSync(dao.isSync());
-    	dataFeed.setTags(tags);
-    	dataFeed.setFilterGroups(filterGroups);
-    	dataFeed.setSyncCacheRetentionSeconds(dao.getSyncCacheRetentionSeconds());
-
-    	
-		if (dao.getPort() == 0) {
-			dataFeed.setPort(null);
-		} else {
-			dataFeed.setPort(dao.getPort());
-		}
-
-    	return dataFeed;
-    }
-
+   
     private static final int INPUT_NAME_MAX_LENGTH = 30;
     private static final int PORT_RANGE_LOW = 1;
     private static final int PORT_RANGE_HIGH = 65535;

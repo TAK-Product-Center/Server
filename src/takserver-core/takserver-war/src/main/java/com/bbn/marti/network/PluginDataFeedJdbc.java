@@ -46,7 +46,7 @@ public class PluginDataFeedJdbc {
 				if (dbItem.getFilterGroup() != null) {
 					filterGroups.add(dbItem.getFilterGroup());
 				}
-				pluginFeed = new PluginDataFeed(dbItem.getUuid(), dbItem.getName(), tags, dbItem.isArchive(), dbItem.isSync(), filterGroups);
+				pluginFeed = new PluginDataFeed(dbItem.getUuid(), dbItem.getName(), tags, dbItem.isArchive(), dbItem.isSync(), filterGroups, dbItem.isFederated(), dbItem.isBinaryPayloadWebsocketOnly());
 				hashTable.put(dbItem.getUuid(),pluginFeed);
 			}else {
 				if (dbItem.getTag() != null && !pluginFeed.getTags().contains(dbItem.getTag())) {
@@ -67,7 +67,7 @@ public class PluginDataFeedJdbc {
 		
 		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
-		String query = "select uuid, name, tag, archive, sync, groups, filter_group from data_feed left join data_feed_tag on data_feed_tag.data_feed_id = data_feed.id left join data_feed_filter_group on data_feed_filter_group.data_feed_id = data_feed.id where type = " + DataFeedType.Plugin.ordinal();
+		String query = "select uuid, name, tag, archive, sync, groups, filter_group, federated, binary_payload_websocket_only from data_feed left join data_feed_tag on data_feed_tag.data_feed_id = data_feed.id left join data_feed_filter_group on data_feed_filter_group.data_feed_id = data_feed.id where type = " + DataFeedType.Plugin.ordinal();
 		
 		List<PluginDataFeedWithTagEntry> result = jdbcTemplate.query(query, new PluginDataFeedWithTagEntryMapper());
 
@@ -89,7 +89,9 @@ public class PluginDataFeedJdbc {
 			pluginDataFeedWithTagEntry.setArchive(rs.getBoolean("archive"));
 			pluginDataFeedWithTagEntry.setSync(rs.getBoolean("sync"));
 			pluginDataFeedWithTagEntry.setFilterGroup(rs.getString("filter_group"));
-
+			pluginDataFeedWithTagEntry.setFederated(rs.getBoolean("federated"));
+			pluginDataFeedWithTagEntry.setBinaryPayloadWebsocketOnly(rs.getBoolean("binary_payload_websocket_only"));
+			
 			return pluginDataFeedWithTagEntry;
 		}
 			
@@ -110,6 +112,10 @@ public class PluginDataFeedJdbc {
 		private boolean sync;
 		
 		private String filterGroup;
+		
+		private boolean federated;
+		
+		private boolean binaryPayloadWebsocketOnly;
 		
 		public PluginDataFeedWithTagEntry() {
 		}
@@ -171,13 +177,30 @@ public class PluginDataFeedJdbc {
 		public void setFilterGroup(String filterGroup) {
 			this.filterGroup = filterGroup;
 		}
+		
+		public boolean isFederated() {
+			return federated;
+		}
+
+		public void setFederated(boolean federated) {
+			this.federated = federated;
+		}
+
+		public boolean isBinaryPayloadWebsocketOnly() {
+			return binaryPayloadWebsocketOnly;
+		}
+
+		public void setBinaryPayloadWebsocketOnly(boolean binaryPayloadWebsocketOnly) {
+			this.binaryPayloadWebsocketOnly = binaryPayloadWebsocketOnly;
+		}
 
 		@Override
 		public String toString() {
 			return "PluginDataFeedWithTagEntry [uuid=" + uuid + ", name=" + name + ", tag=" + tag + ", archive="
-					+ archive + ", sync=" + sync + "]";
+					+ archive + ", sync=" + sync + ", filterGroup=" + filterGroup + ", federated=" + federated
+					+ ", binaryPayloadWebsocketOnly=" + binaryPayloadWebsocketOnly + "]";
 		}
-		
+	
 	}
 
 }

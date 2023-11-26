@@ -39,6 +39,7 @@ public class TestLogger {
 	 * @param targetDirectory The target directory for new logs
 	 */
 	public static void setFileLogging(@NotNull String targetDirectory) {
+		System.out.println("TestLogger setFileLogging is set to " + targetDirectory);
 		loggingDirectory = targetDirectory;
 	}
 
@@ -48,6 +49,7 @@ public class TestLogger {
 	 * @param testIdentifier The identifier for the test
 	 */
 	public static void startTestWithIdentifier(@NotNull String testIdentifier) {
+		System.out.println("TestLogger startTestWithIdentifier " + testIdentifier + "...");
 		flushLog();
 
 		if (exitThread == null) {
@@ -81,6 +83,7 @@ public class TestLogger {
 					Files.createDirectory(filepath);
 				}
 				filepath = filepath.resolve("activityLog.json");
+				System.out.println("TestLogger writing to: " + filepath);
 				JsonWriter writer = new JsonWriter(new FileWriter(filepath.toFile()));
 				writer.setIndent("    ");
 				gson.toJson(currentTestLog, TestLog.class, writer);
@@ -121,7 +124,7 @@ public class TestLogger {
 			recipientSet.add(targetUser);
 		}
 
-		System.out.println(sender + " >-" + count + "-> " + targetUser + " - Justification: " + justification);
+		System.out.println("TestLogger: logUserSend: "+ sender + " >-" + count + "-> " + targetUser + " - Justification: " + justification);
 	}
 
 	/**
@@ -132,12 +135,12 @@ public class TestLogger {
 	 */
 	public static void logUserConnected(@NotNull String userIdentifier, @Nullable String justification) {
 		currentTestLog.currentCommandLog.connectedUsers.add(userIdentifier);
-		System.out.println(userIdentifier + " connected. Justification: " + justification);
+		System.out.println("TestLogger: " + userIdentifier + " connected. Justification: " + justification);
 	}
 
 	public static void logUserAuthenticated(@NotNull String userIdentifier, @Nullable String justification) {
 		currentTestLog.currentCommandLog.authenticatedUsers.add(userIdentifier);
-		System.out.println(userIdentifier + " authenticated. Justification: " + justification);
+		System.out.println("TestLogger: " + userIdentifier + " authenticated. Justification: " + justification);
 	}
 
 
@@ -149,7 +152,7 @@ public class TestLogger {
 	 */
 	public static void logUserDisconnected(@NotNull String userIdentifier, @Nullable String justification) {
 		currentTestLog.currentCommandLog.disconnectedUsers.add(userIdentifier);
-		System.out.println(userIdentifier + " disconnected. Justification: " + justification);
+		System.out.println("TestLogger: " + userIdentifier + " disconnected. Justification: " + justification);
 	}
 
 	/**

@@ -557,7 +557,7 @@ public class ExCheckService {
 
         // create a new mission for the checklist
         Mission checklistMission = missionService.createMission(checklistId, clientUid, groupVector,
-                checklist.getChecklistDetails().getDescription(), null, null, null, null, null, EXCHECK_TOOL, null, useDefaultRole, null, null);
+                checklist.getChecklistDetails().getDescription(), null, null, null, null, null, EXCHECK_TOOL, null, useDefaultRole, null, null, false);
 
         // add the new checklist to the checklist mission
         MissionContent content = new MissionContent();

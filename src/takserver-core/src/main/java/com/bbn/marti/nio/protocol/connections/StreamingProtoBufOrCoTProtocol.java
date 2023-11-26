@@ -123,7 +123,7 @@ public class StreamingProtoBufOrCoTProtocol extends AbstractBroadcastingProtocol
     }
 
     /**
-     * @note DO NOT put the channel handler in the string -- typically prints out its listener as
+     * DO NOT put the channel handler in the string -- typically prints out its listener as
      * part of its toString method
      */
     @Override
@@ -154,7 +154,7 @@ public class StreamingProtoBufOrCoTProtocol extends AbstractBroadcastingProtocol
     	if (version == null) {
     		synchronized (StreamingProtoBufOrCoTProtocol.class) {
     			try {
-    		
+
     				return MessagingDependencyInjectionProxy.getInstance().versionBean().getVer();
 
     			} catch (Exception e) {
@@ -275,7 +275,7 @@ public class StreamingProtoBufOrCoTProtocol extends AbstractBroadcastingProtocol
 
     public final ProtocolListenerInstantiator<CotEventContainer> negotiationCallback =
             new AbstractAutoProtocolListener<CotEventContainer>() {
-    	
+
     	private static final long serialVersionUID = 9879877823L;
 
 		@Override

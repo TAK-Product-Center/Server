@@ -83,27 +83,34 @@ ln -s "${TR}/data/logs" "${TR}/logs"
 cd ${CR}
 
 if [[ ! -f "${CR}/files/root-ca.pem" ]];then
-	CAPASS=${CA_PASS} bash makeRootCa.sh --ca-name "${CA_NAME}"
+	CAPASS=${CA_PASS} bash /opt/tak/certs/makeRootCa.sh --ca-name "${CA_NAME}"
 else
 	echo Using existing root CA.
 fi
 
+if [[ ! -f "${CR}/files/intermediate-signing.jks" ]];then
+  echo "Making new signing certificate."
+  export CAPASS=${CA_PASS}
+  yes | /opt/tak/certs/makeCert.sh ca intermediate
+else
+  echo "Using existing intermediate CA certificate."
+fi
 
 if [[ ! -f "${CR}/files/takserver.pem" ]];then
-	CAPASS=${CA_PASS} PASS="${TAKSERVER_CERT_PASS}" bash makeCert.sh server takserver
+	CAPASS=${CA_PASS} PASS="${TAKSERVER_CERT_PASS}" bash /opt/tak/certs/makeCert.sh server takserver
 else
 	echo Using existing takserver certificate.
 fi
 
 if [[ ! -f "${CR}/files/${ADMIN_CERT_NAME}.pem" ]];then
-	CAPASS=${CA_PASS} PASS="${ADMIN_CERT_PASS}" bash makeCert.sh client "${ADMIN_CERT_NAME}"
+	CAPASS=${CA_PASS} PASS="${ADMIN_CERT_PASS}" bash /opt/tak/certs/makeCert.sh client "${ADMIN_CERT_NAME}"
 else
 	echo Using existing ${ADMIN_CERT_NAME} certificate.
 fi
 
 chmod -R 777 ${TR}/data/
 
-python ${TR}/coreConfigEnvHelper.py "${CONFIG}" "${CONFIG}"
+python3 ${TR}/coreConfigEnvHelper.py "${CONFIG}" "${CONFIG}"
 
 # Wait for PGSQL init
 sleep 8
@@ -120,11 +127,11 @@ java -jar -Xmx${MESSAGING_MAX_HEAP}m -Dspring.profiles.active=messaging takserve
 MESSAGING_PID=$!
 java -jar -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api -Dkeystore.pkcs12.legacy takserver.war &
 API_PID=$!
-java -jar -Xmx${PLUGIN_MANAGER_MAX_HEAP}m takserver-pm.jar &
+java -jar -Xmx${PLUGIN_MANAGER_MAX_HEAP}m -Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/ takserver-pm.jar &
 PM_PID=$!
 
 sleep 16
-echo  -e "\033[33;5mWAITING FOR THE SERVER TO START UP BEFORE ADDING THE ADMIN USER...\033[0m" 
+echo  -e "\033[33;5mWAITING FOR THE SERVER TO START UP BEFORE ADDING THE ADMIN USER...\033[0m"
 
 # Give some time for the server to start up
 sleep 44

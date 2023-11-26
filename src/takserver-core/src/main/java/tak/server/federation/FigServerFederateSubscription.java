@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 
+import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Federation.Federate;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
@@ -20,6 +21,7 @@ import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubscriptionStore;
 
+import io.grpc.stub.StreamObserver;
 import io.micrometer.core.instrument.Metrics;
 
 import static java.util.Objects.requireNonNull;
@@ -37,6 +39,7 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 	
 	private GuardedStreamHolder<FederatedEvent> clientEventStreamHolder;
 	private GuardedStreamHolder<ROL> clientROLEventStreamHolder;
+	private GuardedStreamHolder<FederateGroups> clientGroupEventStreamHolder;
 
 	private String federateId;
 
@@ -102,7 +105,7 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 			return;
 		}
 
-		if (!isVoidWarranty() && toSend.hasContextKey(GroupFederationUtil.FEDERATE_ID_KEY)) {
+		if (toSend.hasContextKey(GroupFederationUtil.FEDERATE_ID_KEY)) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("not federating federated message");
 			}
@@ -115,6 +118,16 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 			}
 			return;
 		}
+		
+        if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null) {
+        	DataFeed datafeed = (DataFeed)toSend.getContext(Constants.DATA_FEED_KEY);
+        	if (!datafeed.isFederated()) {
+				logger.info("~~~ In submit B: Not send to federation");
+            	return;
+        	}else {
+				logger.info("~~~ In submit B: Will send to federation");
+        	}
+        }
 
 		// increment the hit count in the super class
 		super.incHit(hitTime);
@@ -220,7 +233,7 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 	public void submitFederateGroups(Set<String> federateGroups) {
 		try {
 			SubscriptionStore.getInstance().getServerGroupStreamBySession(sessionId)
-				.onNext(FederateGroups.newBuilder().addAllFederateGroups(federateGroups).build());
+				.send(FederateGroups.newBuilder().addAllFederateGroups(federateGroups).build());
 		} catch (Exception e) {
 			logger.error("Error submitting server federate groups");
 		}
@@ -231,12 +244,20 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
         return "FigServerFederateSubscription [" + super.toString() + "]";
     }
 	
-	private GuardedStreamHolder<FederatedEvent> lazyGetClientStream() {
+	public GuardedStreamHolder<FederatedEvent> lazyGetClientStream() {
 		if (clientEventStreamHolder == null) {
 			clientEventStreamHolder = SubscriptionStore.getInstanceFederatedSubscriptionManager().getClientStreamBySession(sessionId);
 		}
 		
 		return clientEventStreamHolder;
+	}
+	
+	public GuardedStreamHolder<FederateGroups> lazyGetGroupClientStream() {
+		if (clientGroupEventStreamHolder == null) {
+			clientGroupEventStreamHolder = SubscriptionStore.getInstanceFederatedSubscriptionManager().getServerGroupStreamBySession(sessionId);
+		}
+		
+		return clientGroupEventStreamHolder;
 	}
 	
 	public GuardedStreamHolder<ROL> lazyGetROLClientStream() {

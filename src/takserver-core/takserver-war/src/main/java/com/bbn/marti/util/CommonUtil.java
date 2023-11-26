@@ -37,10 +37,12 @@ import org.springframework.oxm.Marshaller;
 import com.bbn.marti.config.Federation.Federate;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationManager;
+import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.User;
+import com.bbn.marti.remote.groups.UserClassification;
 import com.bbn.marti.remote.socket.ChatMessage;
 import com.bbn.marti.remote.socket.SituationAwarenessMessage;
 import com.bbn.marti.remote.socket.TakMessage;
@@ -99,8 +101,12 @@ public class CommonUtil {
 	 * Get the group set for the authenticated for an active HttpServletRequest
 	 * 
 	 */
-	public NavigableSet<Group> getGroupsFromRequest(HttpServletRequest request) throws RemoteException {
-		return getGroupsFromSessionId(request.getSession().getId());
+	public NavigableSet<Group> getGroupsFromRequest(HttpServletRequest request) {
+		try {
+			return getGroupsFromSessionId(request.getSession().getId());
+		} catch (RemoteException re) { // minimize the scope of RemoteException pollution
+			throw new TakException(re);
+		}
 	}
 
 	/*
@@ -108,8 +114,15 @@ public class CommonUtil {
 	 * active HttpServletRequest
 	 * 
 	 */
-	public NavigableSet<Group> getGroupsFromActiveRequest() throws RemoteException {
-		return getGroupsFromSessionId(requestBean.getRequest().getSession().getId());
+	public NavigableSet<Group> getGroupsFromActiveRequest() {
+
+		try {
+
+			return getGroupsFromSessionId(requestBean.getRequest().getSession().getId());
+
+		} catch (RemoteException re) {
+			throw new TakException(re);
+		}
 	}
 
 	/*
@@ -195,6 +208,45 @@ public class CommonUtil {
 		return groups;
 	}
 
+	public UserClassification getUserClassificationFromSessionId(String sessionId) {
+		return groupManager.getUserClassificationByConnectionId(sessionId);
+	}
+
+	public UserClassification getUserClassificationFromActiveRequest() throws RemoteException {
+
+		if (requestBean == null) {
+			logger.error("requestBean is null");
+			return null;
+		}
+
+		if (requestBean.getRequest() == null) {
+			logger.error("requestBean.getRequest() is null");
+			return null;
+		}
+
+		if (requestBean.getRequest().getSession() == null) {
+			logger.error("requestBean.getRequest().getSession() is null");
+			return null;
+		}
+
+		return getUserClassificationFromSessionId(requestBean.getRequest().getSession().getId());
+	}
+	
+	public UserClassification getUserClassificationFromRequest(HttpServletRequest request) throws RemoteException {
+
+		if (request == null) {
+			logger.error("request is null");
+			return null;
+		}
+
+		if (request.getSession() == null) {
+			logger.error("request.getSession() is null");
+			return null;
+		}
+
+		return getUserClassificationFromSessionId(request.getSession().getId());
+	}
+
 	/*
 	 * Get the user from the currently active HttpServletRequest
 	 * 
@@ -203,6 +255,8 @@ public class CommonUtil {
 
 		return groupManager.getUserByConnectionId(requestBean.getRequest().getSession().getId());
 	}
+	
+	
 
 	/*
 	 * Get the group vector corresponding to the authenticated for the currently

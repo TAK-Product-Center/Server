@@ -1,7 +1,7 @@
 # TAK Server Development
-*Requires Java 11*
+*Requires Java 17*
 
-* Linux / MacOS is recommended for development. If using Windows, replace "gradlew" with "gradlew.bat" in commands below.
+* Linux or MacOS is recommended for development. If using Windows, replace "gradlew" with "gradlew.bat" in commands below. An x86-64 architecture CPU is required to build from source, including on MacOS. M1 or M2 Apple silicon is not supported.
 
 Links:
  * [Test Execution](src/takserver-takcl-core/docs/testing.md)
@@ -33,7 +33,7 @@ docker run -it -d --rm --name TakserverServer0DB \
     --env POSTGRES_HOST_AUTH_METHOD=trust \
     --env POSTGRES_USER=martiuser \
     --env POSTGRES_DB=cot \
-    -p 5432 postgis/postgis:10-3.1
+    -p 5432 postgis/postgis:15-3.3
 
 echo SQL SERVER IP: `docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' TakserverServer0DB`
 ```
@@ -48,7 +48,9 @@ Setup Local Database. If the postgis container was used, only the last two lines
 ```
 
 Configure Local CoreConfig and Certs
-```cd takserver-core/example```
+```
+cd takserver-core/example
+```
 
 This is the CoreConfig that takserver war will look for when running from the takserver-core/example directory. From this point, just follow the instructions at takserver/src/docs/TAK_Server_Configuration_Guide.pdf to set up the CoreConfig and Certs. Make sure that the CoreConfig now points to the directory where the certs were generated locally.
 
@@ -56,28 +58,31 @@ See appendix B in src/docs/TAK_Server_Configuration_Guide.pdf for cert generatio
 
 ### Build and run TAK server locally for development
 
+Note that due to Java 17, there are a lot of '--add-opens' arguments in the JDK_JAVA_OPTIONS
 ```
 cd takserver-core
 ../gradlew clean bootWar bootJar
 cd example
-export JDK_JAVA_OPTIONS="-Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/ -Djava.net.preferIPv4Stack=true -Djava.security.egd=file:/dev/./urandom -DIGNITE_UPDATE_NOTIFIER=false -DIGNITE_QUIET=true"
+export IGNITE_HOME="$PWD/ignite"
+export JDK_JAVA_OPTIONS="-Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/ -Djava.net.preferIPv4Stack=true -Djava.security.egd=file:/dev/./urandom -DIGNITE_UPDATE_NOTIFIER=false -DIGNITE_QUIET=true -Dio.netty.tmpdir=$PWD -Djava.io.tmpdir=$PWD -Dio.netty.native.workdir=$PWD -Djdk.tls.client.protocols=TLSv1.2  --add-opens=java.base/sun.security.pkcs=ALL-UNNAMED --add-opens=java.base/sun.security.pkcs10=ALL-UNNAMED --add-opens=java.base/sun.security.util=ALL-UNNAMED --add-opens=java.base/sun.security.x509=ALL-UNNAMED --add-opens=java.base/sun.security.tools.keytool=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-opens=jdk.internal.jvmstat/sun.jvmstat.monitor=ALL-UNNAMED --add-opens=java.base/sun.reflect.generics.reflectiveObjects=ALL-UNNAMED --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.math=ALL-UNNAMED --add-opens=java.sql/java.sql=ALL-UNNAMED --add-opens=java.base/javax.net.ssl=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=jdk.unsupported/sun.misc=ALL-UNNAMED --add-opens=java.base/java.lang.ref=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.security=ALL-UNNAMED --add-opens=java.base/java.security.ssl=ALL-UNNAMED --add-opens=java.base/java.security.cert=ALL-UNNAMED --add-opens=java.base/sun.security.rsa=ALL-UNNAMED --add-opens=java.base/sun.security.ssl=ALL-UNNAMED --add-opens=java.base/sun.security.x500=ALL-UNNAMED --add-opens=java.base/sun.security.pkcs12=ALL-UNNAMED --add-opens=java.base/sun.security.provider=ALL-UNNAMED --add-opens=java.base/javax.security.auth.x500=ALL-UNNAMED"
+
 ```
 
 TAK server consists of two processes: Messaging and API. The messaging process can run independently, but the API process needs to connect to the ignite server that runs as a part of the messaging process. For both processes, -Xmx should always be specified.
 
 Run Messaging (note - this command and the following one to run api include the **duplicatelogs** profile. This turns off the filter that blocks duplicated log messages that cause log spam in operational deployments of TAK Server.
 ```
-java -Xmx<value> -Dspring.profiles.active=messaging,duplicatelogs -jar ../build/libs/takserver-core-xyz.war
+java -server -XX:+AlwaysPreTouch -XX:+UseG1GC -XX:+ScavengeBeforeFullGC -XX:+DisableExplicitGC -Xmx<value> -Dspring.profiles.active=messaging,duplicatelogs -jar ../build/libs/takserver-core-xyz.war
 ```
 
 Run API
 ```
-java -Xmx<value> -Dspring.profiles.active=api,duplicatelogs -jar ../build/libs/takserver-core-xyz.war
+java -server -XX:+AlwaysPreTouch -XX:+UseG1GC -XX:+ScavengeBeforeFullGC -XX:+DisableExplicitGC -Xmx<value> -Dspring.profiles.active=api,duplicatelogs -Dkeystore.pkcs12.legacy -jar ../build/libs/takserver-core-xyz.war
 ```
 
 Run Plugin Manager (useful when working on plugin capability)
 ```
-java -Xmx<value> -jar ../../takserver-plugin-manager/build/libs/takserver-plugin-manager-xyz.jar 
+java -server -XX:+AlwaysPreTouch -XX:+UseG1GC -XX:+ScavengeBeforeFullGC -XX:+DisableExplicitGC -Xmx<value> -jar ../../takserver-plugin-manager/build/libs/takserver-plugin-manager-xyz.jar 
 ```
 
 ### RPM Generation
@@ -113,16 +118,24 @@ java -Xmx<value> -Dspring.profiles.active=messaging -jar ../build/libs/takserver
 ```
 
 turn down log level of all logs:
-```java -jar takserver.war $@ --logging.level.root=ERROR```
+```
+java -jar takserver.war $@ --logging.level.root=ERROR
+```
 
 turn down log level for subscriptions:
-```java -jar takserver.war $@ --logging.level.com.bbn.marti.service.Subscription=ERROR```
+```
+java -jar takserver.war $@ --logging.level.com.bbn.marti.service.Subscription=ERROR
+```
 
 turn off logs just for subscriptions:
-```java -jar takserver.war $@ --logging.level.com.bbn.marti.service.Subscription=OFF```
+```
+java -jar takserver.war $@ --logging.level.com.bbn.marti.service.Subscription=OFF
+```
 
 entirely disable most logging:
-```java -jar takserver.war $@ --logging.level.root=OFF```
+```
+java -jar takserver.war $@ --logging.level.root=OFF
+```
 
 The default log level for most things is INFO. Possible levels are INFO, WARN, ERROR, OFF (in order of decreasing log frequency)
 
@@ -134,6 +147,13 @@ These levels can be applied globally with this option
 i.e.
 
 ```--logging.level.root=ERROR```
+
+The TAK Server log files can be found in the _logs_ subdirectory:
+
+1. _takserver-messaging.log_ - Execution-level information about the messaging process, including client connection events, error messages and warnings.
+2. _takserver-api.log_ - Execution-level information about the API process, including error messages and warnings.
+3. _takserver-messaging-console.log_ - Java Virtual Machine (JVM) informational messages and errors, for the messaging process.
+4. _takserver-api-console.log_ - Java Virtual Machine (JVM) informational messages and errors, for the API process.
 
 ## Swagger
 https://localhost:8443/swagger-ui.html

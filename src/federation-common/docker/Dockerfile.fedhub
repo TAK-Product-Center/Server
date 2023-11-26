@@ -1,0 +1,5 @@
+FROM eclipse-temurin:17-jammy
+RUN apt update && \
+	apt-get install -y emacs-nox net-tools netcat vim
+
+ENTRYPOINT ["/bin/bash", "-c", "/opt/tak/federation-hub/scripts/configureInDocker.sh init"]

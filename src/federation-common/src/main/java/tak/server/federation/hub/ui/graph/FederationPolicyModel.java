@@ -128,7 +128,10 @@ public class FederationPolicyModel {
             FederationNode sourceNode = policyGraph.getNode(getCellNameFromId(edgeCell.getSourceId()));
             FederationNode destinationNode = policyGraph.getNode(getCellNameFromId(edgeCell.getDestinationId()));
             try {
-                policyGraph.addEdge(new FederateEdge(sourceNode.getFederateIdentity(), destinationNode.getFederateIdentity(), edgeCell.getProperties().getFilterExpression()));
+                policyGraph.addEdge(new FederateEdge(sourceNode.getFederateIdentity(), destinationNode.getFederateIdentity(), edgeCell.getProperties().getFilterExpression(),
+                		new HashSet<String>(edgeCell.getProperties().getAllowedGroups()), new HashSet<String>(edgeCell.getProperties().getDisallowedGroups()), 
+                		FederateEdge.getGroupFilterType(edgeCell.getProperties().getGroupsFilterType())));
+               
                 for (FilterNode node : edgeCell.getProperties().getFilters()) {
                     policyGraph.getFilterObjectSet().add(node.getFilter().getFilterObject());
                 }
@@ -177,6 +180,9 @@ public class FederationPolicyModel {
                 EdgeCell edgeCell = (EdgeCell) cell;
                 StringEdge stringEdge = new StringEdge(getCellNameFromId(edgeCell.getSourceId()), getCellNameFromId(edgeCell.getDestinationId()));
                 stringEdge.setFilterExpression(edgeCell.getProperties().getFilterExpression());
+                stringEdge.setAllowedGroups(new HashSet<>(edgeCell.getProperties().getAllowedGroups()));
+                stringEdge.setDisallowedGroups(new HashSet<>(edgeCell.getProperties().getDisallowedGroups()));
+                stringEdge.setGroupsFilterType(FederateEdge.getGroupFilterType(edgeCell.getProperties().getGroupsFilterType()));
                 policy.getFederate_edges().add(stringEdge);
                 for (FilterNode node : edgeCell.getProperties().getFilters()) {
                     policy.getFilter_objects().add(node.getFilter().getFilterObject());
@@ -269,7 +275,7 @@ public class FederationPolicyModel {
         properties.setId(group.getName());
         properties.setFilters(filterExpressionToFilterNodes(group.getFilterExpression()));
 
-        return groupCell;
+        return groupCell; 
     }
 
     private static EdgeCell policyEdgeToCell(FederateEdge edge) {

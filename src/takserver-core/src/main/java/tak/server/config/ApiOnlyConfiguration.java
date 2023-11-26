@@ -43,13 +43,14 @@ import com.bbn.marti.sync.service.MissionCacheWarmer;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.spring.RequestHolderBean;
-import com.bbn.marti.util.spring.RequestHolderFilterBean;
+import com.bbn.marti.util.spring.MissionRoleAssignmentRequestHolderFilterBean;
 import com.bbn.metrics.MetricsCollector;
 import com.bbn.metrics.service.DatabaseMetricsService;
 
 import tak.server.CommonConstants;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
+import tak.server.cache.classification.ClassificationCacheHelper;
 import tak.server.cot.CotEventContainer;
 import tak.server.grid.ContactManagerProxyFactory;
 import tak.server.grid.CoreConfigProxyFactoryForAPI;
@@ -101,6 +102,11 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 	@Bean
 	ActiveGroupCacheHelper getActiveGroupCacheHelper() {
 		return new ActiveGroupCacheHelper();
+	}
+
+	@Bean
+	ClassificationCacheHelper getClassificationCacheHelper() {
+		return new ClassificationCacheHelper();
 	}
 
 	@Bean
@@ -231,8 +237,8 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 	}
 
 	@Bean
-	public RequestHolderFilterBean requestHolderFilterBean() {
-		return new RequestHolderFilterBean();
+	public MissionRoleAssignmentRequestHolderFilterBean requestHolderFilterBean() {
+		return new MissionRoleAssignmentRequestHolderFilterBean();
 	}
 
     @Bean

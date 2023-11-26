@@ -61,7 +61,7 @@ public class ScheduledRetentionService implements Runnable{
 //            localQueryService.deleteMissionPackageByTtl(retentionPolicy.getDataRetentionMap().get(MISSION_PACKAGES));
 
         } catch (Exception e) {
-            logger.error("Error accessing retention query service ", e);
+            logger.error("Error accessing retention query service " + e.getMessage());
         }
     }
 

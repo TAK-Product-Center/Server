@@ -168,7 +168,7 @@ if [ $DEPLOY == true ];then
         --env POSTGRES_HOST_AUTH_METHOD=trust \
         --env POSTGRES_USER=${POSTGRES_USER} \
         --env POSTGRES_DB=${POSTGRES_DB} \
-        -p ${POSTGRES_PORT} postgis/postgis:10-3.1
+        -p ${POSTGRES_PORT} postgis/postgis:15-3.3
     fi
 
     DOCKER0_IP=`docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${SERVER0_DOCKER_DB_IDENTIFIER}`

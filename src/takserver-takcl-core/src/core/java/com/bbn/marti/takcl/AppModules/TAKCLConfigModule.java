@@ -97,6 +97,10 @@ public class TAKCLConfigModule implements AppModuleInterface {
 		return str + (str.endsWith("/") ? "" : "/");
 	}
 
+	public Path getCoreConfigExamplePath() {
+		return Paths.get(getTakServerPath(), fileRouter.getRunnableServerConfig().getCleanConfigFile());
+	}
+
 	public String getTakJarFilepath() {
 		return Paths.get(getTakServerPath(), fileRouter.getRunnableServerConfig().getJarName()).toString();
 	}

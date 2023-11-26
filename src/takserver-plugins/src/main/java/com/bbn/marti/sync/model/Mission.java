@@ -1,3 +1,4 @@
+
 package com.bbn.marti.sync.model;
 
 import java.io.Serializable;
@@ -115,11 +116,14 @@ public class Mission implements Serializable, Comparable<Mission> {
     protected MissionRole defaultRole;
     protected MissionRole ownerRole;
     protected String token;
+    protected Boolean inviteOnly;
 
     protected Set<MissionChange> missionChanges;
     protected List<LogEntry> logs;
 
     protected Long expiration;
+    
+    protected String guid;
 
     // no-arg constructor
     public Mission() {
@@ -172,6 +176,7 @@ public class Mission implements Serializable, Comparable<Mission> {
         defaultRole = other.defaultRole;
         ownerRole = other.ownerRole;
         token = other.token;
+        inviteOnly = other.inviteOnly;
         missionChanges = other.missionChanges;
         logs = other.logs;
         expiration = other.expiration;
@@ -434,6 +439,16 @@ public class Mission implements Serializable, Comparable<Mission> {
     public String getToken() { return token; }
 
     public void setToken(String token) { this.token = token; }
+
+    @Column(name = "invite_only", unique = false, nullable = true)
+    public Boolean isInviteOnly() {
+        return inviteOnly;
+    }
+
+    public void setInviteOnly(Boolean inviteOnly) {
+        this.inviteOnly = inviteOnly;
+    }
+
     @Transient
     public MissionRole getOwnerRole() { return ownerRole; }
 
@@ -451,8 +466,17 @@ public class Mission implements Serializable, Comparable<Mission> {
     public List<LogEntry> getLogs() { return logs; }
 
     public void setLogs(List<LogEntry> logs) { this.logs = logs; }
+    
+    public String getGuid() {
+		return guid;
+	}
+    
+    @Column(name = "guid", unique = true, nullable = false)
+	public void setGuid(String guid) {
+		this.guid = guid;
+	}
 
-    @Override
+	@Override
     public String toString() {
         StringBuilder builder = new StringBuilder();
         builder.append("Mission [name=");

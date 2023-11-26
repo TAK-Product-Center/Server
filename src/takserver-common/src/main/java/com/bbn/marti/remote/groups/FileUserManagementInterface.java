@@ -22,15 +22,15 @@ import com.bbn.marti.xml.bindings.UserAuthenticationFile.User;
 
 /**
  * Abstract interface used to define what can be done for user management
- * <p/>
+ * <p>
  * Created on 9/21/15.
  */
 public interface FileUserManagementInterface {
-	
+
 	UserAuthenticationFile getUserAuthenticationFile();
 
     boolean userExists(@NotNull String userIdentifier);
-    
+
     FileAuthenticatorControl addOrUpdateUser(@NotNull String userIdentifier, @Nullable String userPassword, boolean wasPasswordAlreadyHashed);
 
     FileAuthenticatorControl addOrUpdateUserFromCertificate(@NotNull X509Certificate certificate);
@@ -73,9 +73,9 @@ public interface FileUserManagementInterface {
     String getUserFingerprint(@NotNull String userIdentifier);
 
 	User getFirstUser(String userIdentifier);
-	
+
 	SimpleGroupWithUsersModel getUsersInGroup(String groupName);
- 
+
 	@NotNull
 	Set<String> getGroupNames();
 }

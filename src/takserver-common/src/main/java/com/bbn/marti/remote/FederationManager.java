@@ -30,6 +30,8 @@ public interface FederationManager {
 	List<String> getFederateRemoteGroups(String federateUID);
 	List<String> getCAGroupsInbound(@NotNull String caID);
 	List<String> getCAGroupsOutbound(@NotNull String caID);
+	int getCAMaxHops(String caID);
+	void addMaxHopsToCA(String caID, int maxHops);
 
 	void addFederateToGroupsInbound(@NotNull String federateUID, @NotNull Set<String> localGroupNames);
 	void addFederateToGroupsOutbound(@NotNull String federateUID, @NotNull Set<String> localGroupNames);
@@ -41,6 +43,7 @@ public interface FederationManager {
 	void removeFederateInboundGroupsMap(@NotNull String federateUID, @NotNull String remoteGroup, @NotNull String localGroup);
 	void removeInboundGroupFromCA(@NotNull String caID, @NotNull Set<String> localGroupNames);
 	void removeOutboundGroupFromCA(@NotNull String caID, @NotNull Set<String> localGroupNames);
+	void updateFederateMissionSettings(@NotNull String federateUID, @NotNull boolean missionFederateDefault, @NotNull List<Federation.Federate.Mission> federateMissions);
 
 	// Get outgoing config object by address and port
 	List<FederationOutgoing> getOutgoingConnections(@NotNull String address, int port);
@@ -66,7 +69,7 @@ public interface FederationManager {
 	void addCA(X509Certificate ca);
 	void removeCA(X509Certificate ca);
 
-	void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, String notes);
+	void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, String notes, int maxHops);
 	void removeFederate(String federateId);
 
 	List<Federate> getConfiguredFederates();
@@ -74,10 +77,12 @@ public interface FederationManager {
 	// Send ROL to messaging process, to be federated subject to group filtering.
 	// Attach outbound groups to the ROL for federates using group mapping
 	void submitFederateROL(ROL rol, NavigableSet<Group> groups);
+	void submitMissionFederateROL(ROL rol, NavigableSet<Group> groups, String missionName);
 	
 	// Send ROL to messaging process, to be federated subject to group filtering.
-		// Attach outbound groups to the ROL for federates using group mapping
+	// Attach outbound groups to the ROL for federates using group mapping
 	void submitFederateROL(ROL rol, NavigableSet<Group> groups, String fileHash);
+	void submitMissionFederateROL(ROL rol, NavigableSet<Group> groups, String fileHash, String missionName);
 
 	void reconfigureFederation();
 

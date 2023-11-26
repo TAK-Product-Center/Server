@@ -30,7 +30,7 @@ spec:
       restartPolicy: Never
       initContainers:
         - name: check-db-ready
-          image: postgres:11.12-alpine
+          image: postgres:15-alpine
           command: ['sh', '-c',
               'until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT;
                 do echo waiting for database; sleep 5; done;']

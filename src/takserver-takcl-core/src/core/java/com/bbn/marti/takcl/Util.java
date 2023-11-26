@@ -240,7 +240,7 @@ public class Util {
 		try {
 			Path currentPath = Paths.get(Util.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParent();
 
-			List<String> expectedEntries = Arrays.asList("gradlew", "takserver-common", "takserver-core", "takserver-takcl-core", "takserver-usermanager");
+			List<String> expectedEntries = Arrays.asList("gradlew", "takserver-common", "federation-common", "takserver-core", "takserver-takcl-core", "takserver-usermanager");
 
 			do {
 				boolean allFilesExist = true;

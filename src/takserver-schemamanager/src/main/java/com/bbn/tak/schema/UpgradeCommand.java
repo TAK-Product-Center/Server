@@ -72,7 +72,7 @@ public class UpgradeCommand extends Command {
 		if (migrationIsValid) {
 			int numberOfUpgrades = 0;
 			try {
-				numberOfUpgrades = schemaManager.flyway.migrate();
+				numberOfUpgrades = schemaManager.flyway.migrate().migrationsExecuted;
 				if (numberOfUpgrades > 0) {
 					logger.info("Successfully applied " + numberOfUpgrades + " update(s).");
 				}
@@ -86,58 +86,14 @@ public class UpgradeCommand extends Command {
 					throw new FlywayException("checksum  repair failed", ee);
 				}
 				
-				if (!updateMigrationChecksum()) {
-					throw e;
-				} else {
-					numberOfUpgrades = schemaManager.flyway.migrate();
-					if (numberOfUpgrades > 0) {
-						logger.info("Successfully applied " + numberOfUpgrades + " update(s).");
-					}
-					logger.info("TAK server database schema is up to date.");
+				numberOfUpgrades = schemaManager.flyway.migrate().migrationsExecuted;
+				if (numberOfUpgrades > 0) {
+					logger.info("Successfully applied " + numberOfUpgrades + " update(s).");
 				}
+				logger.info("TAK server database schema is up to date.");
 			}
 		}
 	
 		return migrationIsValid;
 	}
-	
-	private boolean updateMigrationChecksum() {
-		boolean updateSucceeded = false;
-		try (Connection connection = schemaManager.getConnection()) {
-			Statement updateStatement = null;
-			try {
-				StringBuilder sqlBuilder = new StringBuilder();
-				sqlBuilder.append("update schema_version set checksum = 88061531 where version = '7';");
-				sqlBuilder.append("update schema_version set checksum = -70506124 where version = '8';");
-				sqlBuilder.append("update schema_version set checksum = 891535701 where version = '31';");
-				sqlBuilder.append("update schema_version set checksum = -164769237 where version = '32';");
-				String sql = sqlBuilder.toString();
-				updateStatement = connection.createStatement();
-				logger.debug(sql);
-				updateStatement.execute(sql);
-				logger.info("Updated Migration Checksums");
-				updateSucceeded = true;
-			} catch (SQLException ex) {
-				logger.info(ex.getMessage());
-				if (logger.isDebugEnabled()) {
-					ex.printStackTrace();
-				}
-			} finally {
-				if (updateStatement != null) {
-					try {
-						updateStatement.close();
-					} catch (SQLException ex) {
-						logger.debug(ex.getMessage());
-					}
-				}
-			}
-
-		} catch (SQLException ex) {
-			logger.error("Error trying to open SQL connection ", ex);
-		}
-				
-		return updateSucceeded;
-	}
-	
-
 }

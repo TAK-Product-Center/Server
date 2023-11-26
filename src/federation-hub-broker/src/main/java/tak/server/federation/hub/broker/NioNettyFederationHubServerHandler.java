@@ -1,10 +1,26 @@
 package tak.server.federation.hub.broker;
 
+import java.net.InetSocketAddress;
+import java.nio.Buffer;
+import java.nio.ByteBuffer;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.net.ssl.SSLPeerUnverifiedException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.atakmap.Tak.FederatedEvent;
-
+import com.atakmap.Tak.Identity;
 import com.bbn.roger.fig.FederationUtils;
-
 import com.google.protobuf.InvalidProtocolBufferException;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -12,22 +28,8 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import tak.server.federation.FederateIdentity;
 import tak.server.federation.FederationException;
-
-import javax.net.ssl.SSLPeerUnverifiedException;
-import java.net.InetSocketAddress;
-import java.nio.Buffer;
-import java.nio.ByteBuffer;
-import java.security.cert.Certificate;
-import java.security.cert.X509Certificate;
-import java.util.Comparator;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.HashMap;
-import java.util.Set;
 
 public class NioNettyFederationHubServerHandler extends SimpleChannelInboundHandler<byte[]> {
     private final static Logger logger = LoggerFactory.getLogger(NioNettyFederationHubServerHandler.class);
@@ -43,6 +45,8 @@ public class NioNettyFederationHubServerHandler extends SimpleChannelInboundHand
     private FederateIdentity federateIdentity;
 
     private final Set<FederatedEvent> cache;
+    
+    private final String sessionId;
 
     public Set<FederatedEvent> getCache() {
         return cache;
@@ -50,9 +54,10 @@ public class NioNettyFederationHubServerHandler extends SimpleChannelInboundHand
 
     private FederationHubBrokerService brokerService;
 
-    public NioNettyFederationHubServerHandler(FederationHubBrokerService brokerService,
+    public NioNettyFederationHubServerHandler(String sessionId, FederationHubBrokerService brokerService,
             Comparator<FederatedEvent> comp) {
         super();
+        this.sessionId = sessionId;
         this.brokerService = brokerService;
         this.cache = new ConcurrentSkipListSet<FederatedEvent>(comp);
     }
@@ -87,8 +92,8 @@ public class NioNettyFederationHubServerHandler extends SimpleChannelInboundHand
                         ctx.close();
                         return;
                     }
-
                     nettyContext = ctx;
+                    InetSocketAddress remoteSocketAddress = (InetSocketAddress) ctx.channel().remoteAddress();
                     try {
                         SslHandler sslhandler = (SslHandler)nettyContext.channel().pipeline().get("ssl");
                         certArray = sslhandler.engine().getSession().getPeerCertificates();
@@ -99,13 +104,23 @@ public class NioNettyFederationHubServerHandler extends SimpleChannelInboundHand
                     }
 
                     createConnectionInfo();
-                    String fedId = ((X509Certificate)certArray[0]).getSubjectDN().toString() +
-                        "-" + FederationUtils.getBytesSHA256(certArray[0].getEncoded());
+                    String fedId = FederationUtils.getBytesSHA256(certArray[0].getEncoded()) + "-" + ctx.hashCode();
                     federateIdentity = new FederateIdentity(fedId);
-                    brokerService.addCaFederateToPolicyGraph(federateIdentity,
-                        certArray);
+                    brokerService.addCaFederateToPolicyGraph(federateIdentity, certArray);
                     setReader();
                     alreadyClosed.set(false);
+                    HubConnectionInfo hubConnectionInfo = new HubConnectionInfo();
+                    hubConnectionInfo.setConnectionId(fedId);
+                    hubConnectionInfo.setRemoteConnectionType(Identity.ConnectionType.FEDERATION_TAK_CLIENT.toString());
+                    hubConnectionInfo.setLocalConnectionType(Identity.ConnectionType.FEDERATION_HUB_SERVER.toString());
+                    hubConnectionInfo.setFederationProtocolVersion(1);
+                    hubConnectionInfo.setRemoteAddress(remoteSocketAddress.getHostString() + ":" + remoteSocketAddress.getPort());
+                   
+                    boolean success = brokerService.addV1ConnectionInfo(sessionId, hubConnectionInfo);
+                    if (!success) {
+                    	forceClose();
+                    }
+                    
                     brokerService.sendContactMessagesV1(NioNettyFederationHubServerHandler.this);
                 }
             });
@@ -223,7 +238,7 @@ public class NioNettyFederationHubServerHandler extends SimpleChannelInboundHand
                     Message federatedMessage = new Message(new HashMap<>(),
                         new FederatedEventPayload(event));
                     try {
-                        brokerService.assignMessageSourceAndDestinationsFromPolicy(federatedMessage,
+                        brokerService.assignGroupFilteredMessageSourceAndDestinationsFromPolicy(federatedMessage, null,
                             federateIdentity);
                         Set<AddressableEntity<?>> dests = federatedMessage.getDestinations();
                     } catch (FederationException e) {
@@ -253,14 +268,15 @@ public class NioNettyFederationHubServerHandler extends SimpleChannelInboundHand
         if (nettyContext != null && nettyContext.channel().isActive()) {
             nettyContext.close();
         }
+        brokerService.removeV1Connection(sessionId);
     }
 
     @Override
     public void channelUnregistered(ChannelHandlerContext ctx) {
         if (connectionInfo != null && alreadyClosed.compareAndSet(false, true) == true) {
-            /* TODO Perform federate close. */
-            //messagingUtil.processFederateClose(connectionInfo, channelHandler, SubscriptionStore.getInstance().getByHandler(channelHandler));
+        	
         }
+        brokerService.removeV1Connection(sessionId);
         ctx.close();
     }
 }

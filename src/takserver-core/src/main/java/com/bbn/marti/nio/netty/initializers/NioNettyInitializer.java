@@ -50,7 +50,11 @@ public abstract class NioNettyInitializer extends ChannelInitializer<SocketChann
 	private SslContext sslContext;
 	private TrustManagerFactory trustMgrFactory;
 	private KeyManagerFactory keyMgrFactory;
-	private NioNettyInitializer() {}
+	private NioNettyInitializer() {
+		Input input = new Input();
+		input.setMaxMessageReadSizeBytes(65536);
+		this.input = input;
+	}
 	
 	private NioNettyInitializer(Input input) {
 		this.input = input;

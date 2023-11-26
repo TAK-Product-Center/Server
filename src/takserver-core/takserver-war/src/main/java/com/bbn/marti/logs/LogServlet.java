@@ -2,10 +2,7 @@ package com.bbn.marti.logs;
 
 import java.io.*;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -15,6 +12,8 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.bbn.marti.config.Email;
+import com.bbn.marti.email.EmailClient;
 import com.bbn.marti.remote.CoreConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.io.IOUtils;
@@ -207,48 +206,12 @@ public class LogServlet extends EsapiServlet {
 		}
 
 		if (body != null) {
-			sendEmail(body, cc, logAsZip);
-		}
-	}
-
-	private void sendEmail(String text, String cc, HashMap<String, byte[]> attachments) {
-		try {
-
-			JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
-			mailSender.setHost(coreConfig.getRemoteConfiguration().getEmail().getHost());
-			mailSender.setPort(coreConfig.getRemoteConfiguration().getEmail().getPort());
-			mailSender.setUsername(coreConfig.getRemoteConfiguration().getEmail().getUsername());
-			mailSender.setPassword(coreConfig.getRemoteConfiguration().getEmail().getPassword());
-
-			if (mailSender == null) {
-				logger.error("error getting mailSender!");
-				return;
-			}
-
-			MimeMessage message = mailSender.createMimeMessage();
-			message.setContent(text, "text/html");
-
-			MimeMessageHelper helper = new MimeMessageHelper(message, true, "utf-8");
-			helper.setFrom(coreConfig.getRemoteConfiguration().getEmail().getFrom());
-			helper.setTo(coreConfig.getRemoteConfiguration().getEmail().getLogAlertsTo());
-
-			if (cc != null) {
-				helper.addCc(cc);
-			}
-
-			helper.setSubject(coreConfig.getRemoteConfiguration().getEmail().getLogAlertsSubject());
-			helper.setText(text);
-
-			if (attachments != null) {
-				for (Map.Entry<String, byte[]> attachment : attachments.entrySet()) {
-					helper.addAttachment(attachment.getKey(), new ByteArrayResource(attachment.getValue()));
-				}
-			}
-
-			mailSender.send(message);
-
-		} catch (Exception e) {
-			logger.error("exception in sendEmail!", e);
+			EmailClient.sendEmail(
+					coreConfig.getRemoteConfiguration().getEmail(),
+					coreConfig.getRemoteConfiguration().getEmail().getLogAlertsSubject(),
+					body,
+					coreConfig.getRemoteConfiguration().getEmail().getLogAlertsTo(),
+					cc, logAsZip);
 		}
 	}
 
@@ -268,60 +231,69 @@ public class LogServlet extends EsapiServlet {
 	      	String id = getParameterValue(httpParameters, QueryParameter.id.name());
 	      	String[] ids = id.split(",");
 
-	      	//
-	      	// return the single file in it's original form
-	      	//
-	      	if (ids.length == 1)
-	      	{
-	      		int logId = Integer.parseInt(ids[0]);
-		      	Log log = persistenceStore.getLog(logId);
-	
-		        response.setContentType("text/plain");
-		        int contentLength = log.getContents().length;
-		        response.setContentLength(contentLength);
-				String contentDisposition = "attachment; filename=" + ids[0] + "_" + log.getFilename();
-				contentDisposition = validator.getValidInput("Content Disposition", contentDisposition, "Filename", MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
-				response.addHeader("Content-Disposition", contentDisposition);
-		        response.getOutputStream().write(log.getContents());
-	      	}
+	      	if (ids.length == 1) {
+				if (ids[0].equals("ALL")) {
+					//
+					// collect up all log ids to return in a single zip
+					//
+					List<String> idList = new LinkedList<>();
+					for (Log log : persistenceStore.getLogs(
+							null, null, false, false)) {
+						idList.add(Integer.toString(log.getId()));
+					}
+					ids = idList.toArray(new String[0]);
+				} else {
+					//
+					// return the single file in it's original form
+					//
+					int logId = Integer.parseInt(ids[0]);
+					Log log = persistenceStore.getLog(logId);
+
+					response.setContentType("text/plain");
+					int contentLength = log.getContents().length;
+					response.setContentLength(contentLength);
+					String contentDisposition = "attachment; filename=" + ids[0] + "_" + log.getFilename();
+					contentDisposition = validator.getValidInput("Content Disposition", contentDisposition, "Filename", MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
+					response.addHeader("Content-Disposition", contentDisposition);
+					response.getOutputStream().write(log.getContents());
+					return;
+				}
+			}
 	      	
 	      	//
 	      	// return the selected files as a zip
 	      	//
-	      	else
-	      	{
-	      		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	      		BufferedOutputStream bos = new BufferedOutputStream(baos);
-	      		ZipOutputStream zos = new ZipOutputStream(bos);
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			BufferedOutputStream bos = new BufferedOutputStream(baos);
+			ZipOutputStream zos = new ZipOutputStream(bos);
 
-	      		for (String nextId : ids)
-	      		{
-		      		int logId = Integer.parseInt(nextId);
-			      	Log log = persistenceStore.getLog(logId);
-			      	if (log == null) {
-			      		logger.error("Unable to find logId : " + logId);
-			      		continue;
-					}
+			for (String nextId : ids)
+			{
+				int logId = Integer.parseInt(nextId);
+				Log log = persistenceStore.getLog(logId);
+				if (log == null) {
+					logger.error("Unable to find logId : " + logId);
+					continue;
+				}
 
-      		        zos.putNextEntry(new ZipEntry(nextId + "_" + log.getFilename()));
-      		        zos.write(log.getContents());
-      		        zos.closeEntry();
-	      		}
-      		    zos.close();
-	      		
-		        response.setContentType("application/zip");
-		        int contentLength = baos.size();
-		        response.setContentLength(contentLength);
-		        
-		        String date = new SimpleDateFormat("yyyy-MM-dd_hh-mm-ss").format(new Date());
-		        String filename = "LogExport" + date + ".zip";
-				response.addHeader(
-						"Content-Disposition", 
-						"attachment; filename=" + filename);	
-		      	
-		       response.getOutputStream().write(baos.toByteArray());
-	      	}
-	        
+				zos.putNextEntry(new ZipEntry(nextId + "_" + log.getFilename()));
+				zos.write(log.getContents());
+				zos.closeEntry();
+			}
+			zos.close();
+
+			response.setContentType("application/zip");
+			int contentLength = baos.size();
+			response.setContentLength(contentLength);
+
+			String date = new SimpleDateFormat("yyyy-MM-dd_hh-mm-ss").format(new Date());
+			String filename = "LogExport" + date + ".zip";
+			response.addHeader(
+					"Content-Disposition",
+					"attachment; filename=" + filename);
+
+		   response.getOutputStream().write(baos.toByteArray());
+
 	    } catch (Exception e) {
 	        logger.error("Exception!", e);
 	        response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);

@@ -1,3 +1,7 @@
+//import se.bjurr.violations.gradle.plugin.ViolationsTask
+//import com.github.jk1.license.render.InventoryHtmlReportRenderer
+//import com.github.jk1.license.render.XmlReportRenderer
+
 buildscript {
 
   repositories {
@@ -9,12 +13,13 @@ buildscript {
 
   dependencies {
     classpath 'org.ajoberstar:grgit:1.7.2'
+//    classpath 'gradle.plugin.se.bjurr.violations:violations-gradle-plugin:1.52.2'
+//    classpath 'com.github.jk1:gradle-license-report:1.17'
   }
 }
 
 apply plugin: 'eclipse'
 apply plugin: 'idea'
-
 apply from: 'gradle/license.gradle', to: project
 
 ext {
@@ -35,7 +40,7 @@ ext {
   takreleaserpm = takrel1 + takrel2
 
   def (tvmaj, tvmin) = tv.tokenize('.')
-  
+
   verMajor = tvmaj
   verMinor = tvmin
   verPatch = takrel2
@@ -46,12 +51,88 @@ ext {
 
 allprojects {
 
-  apply plugin: 'java'
+  apply plugin: 'java-library'
   apply plugin: 'eclipse'
   apply plugin: 'idea'
+//  apply plugin: 'pmd'
 
-  sourceCompatibility = 1.8
-  targetCompatibility = 1.8
+
+  sourceCompatibility = 17
+  targetCompatibility = 17
+
+
+// The java opens values. These must be managed in takserver-core/scripts/setenv.sh in addition to here!
+ext.java_internal_opens = [
+    // Compile/test takserver required opens
+    'java.base/sun.security.pkcs',
+    'java.base/sun.security.pkcs10',
+    'java.base/sun.security.util',
+    'java.base/sun.security.x509',
+    'java.base/sun.security.tools.keytool',
+
+    // Ignite required opens as per https://github.com/apache/ignite/blob/master/bin/include/jvmdefaults.sh
+    'java.base/jdk.internal.misc',
+    'java.base/sun.nio.ch',
+    'java.management/com.sun.jmx.mbeanserver',
+    'jdk.internal.jvmstat/sun.jvmstat.monitor',
+    'java.base/sun.reflect.generics.reflectiveObjects',
+    'jdk.management/com.sun.management.internal',
+    'java.base/java.io',
+    'java.base/java.nio',
+    'java.base/java.util',
+    'java.base/java.util.concurrent',
+    'java.base/java.util.concurrent.locks',
+    'java.base/java.util.concurrent.atomic',
+    'java.base/java.lang',
+    'java.base/java.lang.invoke',
+    'java.base/java.math',
+    'java.sql/java.sql',
+
+    // Confirmed runtime requires
+    'java.base/javax.net.ssl',
+	'java.base/java.net',
+
+    // Runtime requires and misc found from previous jdk17 upgrade attempt
+    // One was needed, so I'll just include them all instead of trial-and-error it
+    'jdk.unsupported/sun.misc',
+    'java.base/java.lang.ref',
+    'java.base/java.lang.reflect',
+    'java.base/java.security',
+    'java.base/java.security.ssl',
+    'java.base/java.security.cert',
+    'java.base/sun.security.rsa',
+    'java.base/sun.security.ssl',
+    'java.base/sun.security.x500',
+    'java.base/sun.security.pkcs12',
+    'java.base/sun.security.provider',
+    'java.base/javax.security.auth.x500'
+    ]
+
+ext.common_java_args = ext.java_internal_opens.collect { '--add-opens=' + it + '=ALL-UNNAMED' }
+//// 'exports' is not a typo. As per javac, "warning: [options] --add-opens has no effect at compile time"
+ext.common_javac_args = ext.java_internal_opens.collect { '--add-exports=' + it + '=ALL-UNNAMED' }
+ext.common_manifest = ['Add-Opens': ext.java_internal_opens.join(' ')]
+
+  // Apply compiler exports and opens
+  tasks.withType(JavaCompile.class).configureEach {
+    options.compilerArgs += common_javac_args
+  }
+
+
+  // Apply test exports and opens
+  tasks.withType(Test.class).configureEach {
+    jvmArgs += common_java_args
+  }
+
+  // Apply Jar (which BootJar and ShadowJar extends) exports and opens manifest entries
+  tasks.withType(Jar.class).configureEach {
+    manifest.attributes.putAll(common_manifest)
+  }
+
+  // Apply War (which BootWar extends) exports and opens manifest entries
+  tasks.withType(War.class).configureEach {
+    manifest.attributes.putAll(common_manifest)
+  }
 
 // alternate way to set target
 // https://github.com/gradle/gradle/issues/2510
@@ -92,15 +173,55 @@ subprojects {
     }
 
     dependencies {
-      classpath 'com.github.jengelman.gradle.plugins:shadow:' + gradle_shadow_version
-	  classpath 'gradle.plugin.org.openrepose:gradle-jaxb-plugin:2.5.0'
+      classpath 'gradle.plugin.com.github.johnrengelman:shadow:' + gradle_shadow_version
+//      classpath 'gradle.plugin.se.bjurr.violations:violations-gradle-plugin:1.52.2'
+//      classpath 'com.github.jk1:gradle-license-report:1.17'
     }
   }
 
-  clean {
-    delete 'bin/'
-  }
+//  apply plugin: 'se.bjurr.violations.violations-gradle-plugin' // Normalizes quality reports for Gitlab CI
+//  apply plugin: 'pmd'
+//  // Define a new task to merge quality reports and convert them into a format GitLab can consume
+//  tasks.create('violations', ViolationsTask) {
+//    maxReporterColumnWidth = 0 // 0 means "no limit"
+//    maxRuleColumnWidth = 60
+//    maxSeverityColumnWidth = 0
+//    maxLineColumnWidth = 0
+//    maxMessageColumnWidth = 50
+//    codeClimateFile = new File(project.buildDir.path + '/code-climate-file.json')
+//    // Will create a CodeClimate JSON report.
+//    violations = [
+//            ["PMD", buildDir.path, ".*/pmd/.*\\.xml\$", "pmd"]
+//    ]
+//  }
+//  pmd {
+//    ignoreFailures = true
+//    toolVersion = '6.47.0'
+//    ruleSetFiles = files("${rootDir}/.quality/config/pmd-ruleset.xml")
+//    // Note: The ruleSets array is explicitly set to empty to avoid using the default configuration.
+//    ruleSets = []
+//  }
+//
+//  apply plugin: 'com.github.jk1.dependency-license-report'
+//  licenseReport {
+//    // Don't include artifacts of project's own group in the report
+//    excludeOwnGroup = true
+//
+//    // Don't exclude bom dependencies.
+//    // If set to true, then all boms will be excluded from the report
+//    excludeBoms = false
+//
+//    // Set custom report renderer, implementing ReportRenderer.
+//    // Yes, you can write your own to support any format necessary.
+//    renderers = [new XmlReportRenderer()]
+//    renderers = [new InventoryHtmlReportRenderer()]
+//
+//    // This is for the allowed-licenses-file in checkLicense Task
+//    // Accepts File, URL or String path to local or remote file
+//    allowedLicensesFile = new File("${rootDir}/.licenses/config/allowed-licenses.json")
+//  }
+//
+//  clean {
+//    delete 'bin/'
+//  }
 }
-
-
-

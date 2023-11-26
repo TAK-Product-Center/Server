@@ -32,18 +32,18 @@ import tak.server.cot.CotEventContainer;
  * This service acts as a repeater for certain messages. Any messages added to this service
  * will be repeated out to all interested parties at regular intervals. This service will
  * adapt itself to the configuration specified in the config file. Those parameters are:
- * 
+ *
  * KEY						| TYPE		| DEFAULT	| DESCRIPTION
  * --------------------------------------------------------------------------------------------------------------------
  * enable					| Boolean 	| false		| determines if this service will be started or not
  * maxAllowedRepeatables	| Integer 	| int max	| the maximum number of messages that this service will manage
  * periodMillis				| Integer	| 10000		| the period in milliseconds in which this service will initiate dissemination
- * 
+ *
  * In addition the repeater node can contain 0 or more sub-nodes of the form:
- * 	<repeatableType initiate-test="/event/detail/initiate-repeat" cancel-test="/event/detail/cancel" _name="TestType1"/>
+ * 	{@literal <}repeatableType initiate-test="/event/detail/initiate-repeat" cancel-test="/event/detail/cancel" _name="TestType1"/{@literal >}
  * Each such sub-node will specify the test that must be satisfied by an incoming message in order to initiate repeating
  * and the test that must be satisfied in order to cancel an already repeating message.
- * 
+ *
  *
  */
 
@@ -60,7 +60,7 @@ public class RepeaterService extends BaseService {
 	private BrokerService brokerService;
 	private CoreConfig coreConfig;
 	private GroupManager groupManager;
-	
+
 	// ** configuration driven
 	private Boolean active = Boolean.TRUE;
 	private Integer maxAllowedRepeatables;
@@ -80,7 +80,7 @@ public class RepeaterService extends BaseService {
 		loadRepeatableTypesFromConfig();
 		loadBuildItRepeatableTypes();
 		initiatePeriodicExecution();
-		
+
 		LOGGER.debug("Repeater Service created [maxAllowedRepeatables=" + maxAllowedRepeatables + ", periodMillis=" + repeaterManager.getPeriodMillis() + "]");
 	}
 
@@ -107,7 +107,7 @@ public class RepeaterService extends BaseService {
 	 */
 	private void initiatePeriodicExecution() {
 		final Runnable periodicTask = new Runnable() {
-			
+
 			@Override
 			public void run() {
 				try {
@@ -119,7 +119,7 @@ public class RepeaterService extends BaseService {
 				}
 			}
 		};
-		
+
 		//scheduler.scheduleAtFixedRate(periodicTask, 0, repeaterManager.getPeriodMillis(), TimeUnit.MILLISECONDS);
 		Resources.repeaterPool.schedule(periodicTask, repeaterManager.getPeriodMillis(), TimeUnit.MILLISECONDS);
 	}
@@ -141,33 +141,33 @@ public class RepeaterService extends BaseService {
 		// ** All other messages are ignored by this service.
 		Tuple<Boolean, String> isInitiateMsg = isRepeatInitiatorMessage(cotMsg);
 		if(isInitiateMsg.left()) {
-			
-			
-		    
+
+
+
 //		   User user = (User) cotMsg.getContextValue(SubmissionService.USER_KEY);
-//		    
+//
 //		    if (user == null) {
 //		        throw new TakException("repeatable message " + cotMsg + " does not contain a user - skipping");
 //		    }
-		    
+
 		    LOGGER.debug("New repeatable message request found. ");
-		    
+
 		    // Get a copy of the user
 		    try {
-		        
-		        
+
+
 		        User user = (User) cotMsg.getContextValue(Constants.USER_KEY);
 
 		        if (user != null) {
 			        User rptUser = groupManager.replicateUserAndGroupMembership(user);
 		        	cotMsg.setContext(Constants.USER_KEY, rptUser);
 		        }
-		        
+
                 cotMsg.setContext(Constants.REPEATER_KEY, true);
 		    } catch (Exception e) {
 		        throw new TakException(e);
 		    }
-		    
+
 			if(hasRoomInQueueFor(cotMsg)) {
 				repeaterManager.addMessage(cotMsg, isInitiateMsg.right());
 				return true;
@@ -186,7 +186,7 @@ public class RepeaterService extends BaseService {
 				return true;
 			} else {
 				LOGGER.warn("Received request to cancel repeat treatment for " + cotMsg.getUid() + ", however messages for this UID were not being repeated.");
-				return false; 
+				return false;
 			}
 		} else {
 			return false;
@@ -207,7 +207,7 @@ public class RepeaterService extends BaseService {
 	}
 
 	/**
-	 * Determine if the given message is a cancellation message or not. 
+	 * Determine if the given message is a cancellation message or not.
 	 * @param cotMsg The message to analyze
 	 * @return True if it represents a cancellation order for a repeated message
 	 */
@@ -218,7 +218,7 @@ public class RepeaterService extends BaseService {
 				return true;
 			}
 		}
-		
+
 		return false;
 	}
 
@@ -243,11 +243,11 @@ public class RepeaterService extends BaseService {
 	protected void processNextEvent() {
 		// ** No processing occurs on a per message basis, instead it occurs periodically. See executePeriodicTask(void).
 	}
-	
+
 	private static String getConfigurationKey(String propertyName) {
 		return CONFIG_KEY_BASE + propertyName;
 	}
-	
+
 	/**
 	 * Allows for pausing and resuming of this service. Set to true to allow service to execute, false to pause.
 	 * @param active
@@ -255,17 +255,17 @@ public class RepeaterService extends BaseService {
 	public void setActive(boolean active) {
 		this.active = active;
 	}
-	
+
 	@Override
 	public void startService() {
 		setActive(true);
 	}
-	
+
 	@Override
 	public void stopService(boolean wait) {
 		setActive(false);
 	}
-	
+
 	/**
 	 * This is the core logic that is executed on a periodic basis. It results in all repeatable messages being disseminated.
 	 */
@@ -275,7 +275,7 @@ public class RepeaterService extends BaseService {
 				long now = System.currentTimeMillis();
 				cotMsg.setTime(DateUtil.toCotTime(now));
 				cotMsg.setStale(DateUtil.toCotTime(now + coreConfig.getRemoteConfiguration().getRepeater().getStaleDelayMillis()));
-				
+
 				if (LOGGER.isDebugEnabled()) {
 					LOGGER.debug("submitted repeated message to broker service: " + cotMsg);
 
@@ -291,7 +291,7 @@ public class RepeaterService extends BaseService {
 						}
 					}
 				}
-				
+
 				brokerService.addToInputQueue(cotMsg);
 			}
 
@@ -305,16 +305,16 @@ public class RepeaterService extends BaseService {
 				cotMsg.setType("b-a-o-can");
 
 				String callsign = cotMsg.getCallsign();
-				
+
 				Node detailNode = cotMsg.getDocument().selectSingleNode("/event/detail");
 				detailNode.detach();
-				
+
 				Element eventElement = (Element)cotMsg.getDocument().nodeIterator().next();
 				Element newDetail = eventElement.addElement("detail");
 				Element newEmergency = newDetail.addElement("emergency");
 				newEmergency.addAttribute("cancel", "true");
 				newEmergency.setText(callsign);
-				
+
 				brokerService.addToInputQueue(cotMsg);
 
 				removedEntries.add(cotMsg.getUid());

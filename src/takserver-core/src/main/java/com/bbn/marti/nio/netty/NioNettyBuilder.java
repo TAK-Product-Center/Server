@@ -38,6 +38,7 @@ import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
@@ -114,7 +115,10 @@ public class NioNettyBuilder implements Serializable {
 							}
 						})
 						.handler(new NioNettyUdpHandler(input))
+						.option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
 						.option(ChannelOption.AUTO_CLOSE, true)
+						.option(ChannelOption.SO_RCVBUF, input.getMaxMessageReadSizeBytes())
+						.option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(input.getMaxMessageReadSizeBytes()))
 				        .option(ChannelOption.SO_BROADCAST, true);
 
 				portToNettyServer.put(input.getPort(), bootstrap.bind(input.getPort()).sync().channel().closeFuture());
@@ -161,6 +165,9 @@ public class NioNettyBuilder implements Serializable {
 							}
 						})
 						.handler(new NioNettyUdpHandler(input))
+						.option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+						.option(ChannelOption.SO_RCVBUF, input.getMaxMessageReadSizeBytes())
+						.option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(input.getMaxMessageReadSizeBytes()))
 						.option(ChannelOption.AUTO_CLOSE, true);
 				
 				InetSocketAddress groupAddress = SocketUtils.socketAddress(group.getHostAddress(), input.getPort());
@@ -222,6 +229,8 @@ public class NioNettyBuilder implements Serializable {
 				bootstrap.group(bossGroup, workerGroup)
 						.channel(isEpoll ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
 						.option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+						.option(ChannelOption.SO_RCVBUF, initializer.getInput().getMaxMessageReadSizeBytes())
+						.option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(initializer.getInput().getMaxMessageReadSizeBytes()))
 						.childHandler(initializer)
 						.childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, new WriteBufferWaterMark(lowMark, highMark))
 						.childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);

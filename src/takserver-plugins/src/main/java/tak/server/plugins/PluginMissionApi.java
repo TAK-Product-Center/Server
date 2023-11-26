@@ -15,9 +15,14 @@ public interface PluginMissionApi {
 	Mission readMission(String name, boolean changes, boolean logs, Long secago, Date start, Date end) throws Exception;
 
 	Mission createMission(String nameParam, String creatorUidParam, String[] groupNamesParam, String descriptionParam,
+		  	String chatRoomParam, String baseLayerParam, String bboxParam, List<String> boundingPolygonParam,
+		  	String pathParam, String classificationParam, String toolParam, String passwordParam,
+		  	String roleParam, Long expirationParam, byte[] missionPackage) throws Exception;
+
+	Mission createMission(String nameParam, String creatorUidParam, String[] groupNamesParam, String descriptionParam,
 			String chatRoomParam, String baseLayerParam, String bboxParam, List<String> boundingPolygonParam,
 			String pathParam, String classificationParam, String toolParam, String passwordParam,
-			String roleParam, Long expirationParam, byte[] missionPackage) throws Exception;
+			String roleParam, Long expirationParam, Boolean inviteOnly, byte[] missionPackage) throws Exception;
 	
 	Mission deleteMission(String name, String creatorUid, boolean deepDelete) throws Exception;
 
@@ -39,7 +44,7 @@ public interface PluginMissionApi {
 
 	Mission getParent(String parentName) throws Exception;
 	
-	void addFeed(String missionName, String creatorUid, String dataFeedUid, String filterBbox, String filterType, String filterCallsign);
+	void addFeed(String missionName, String creatorUid, String dataFeedUid, String filterBbox, List<String> filterCotTypes, String filterCallsign);
 
 	void removeFeed(String missionName, String feedUid, String creatorUid);
 

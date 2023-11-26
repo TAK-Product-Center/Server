@@ -22,6 +22,7 @@ public class MartiValidatorConstants {
 		Hexidecimal,				// hexidecimal numbers
 		KmlGeometry,				// <Point><coordinates>  tag in KML
 		MartiSafeString, 			// Alphanumeric plus certain special characters such _, -, :, /
+		MartiSafeStringWithQuestion,// Adds the question mark to MartiSafeString
 		NonNegativeInteger, 		// Digits only
 		URL,						// http, https, ftp, and ftps URLs
 		SafeString,					// Alphanumeric plus space character

@@ -5,10 +5,14 @@ import java.lang.reflect.Field;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
+import javax.cache.expiry.Duration;
+import javax.cache.expiry.TouchedExpiryPolicy;
 
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.cache.CacheAtomicityMode;
+import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.eviction.fifo.FifoEvictionPolicyFactory;
 import org.apache.ignite.cache.spring.SpringCacheManager;
 import org.apache.ignite.configuration.CacheConfiguration;
@@ -80,12 +84,19 @@ public class TakIgniteSpringCacheManager extends SpringCacheManager {
 		if (cache == null) {
 
 			CacheConfiguration<Object, Object> cacheConfig = new CacheConfiguration<>(name);
-			
+
+			if (config.getRemoteConfiguration().getBuffer().getQueue().isEnableCacheGroupPerName()) {
+				cacheConfig.setGroupName("takserver-cache-group-" + name);
+			} else if (config.getRemoteConfiguration().getBuffer().getQueue().isEnableCacheGroup()) {
+				cacheConfig.setGroupName("takserver-cache-group");
+			}
+
 			if (config.getRemoteConfiguration().getNetwork().isCloudwatchEnable()) {
 				cacheConfig.setStatisticsEnabled(true);
 			}
 			
 			cacheConfig.setAtomicityMode(CacheAtomicityMode.ATOMIC);
+			cacheConfig.setCacheMode(CacheMode.REPLICATED);
 
 			IgniteCache<Object, Object> igniteCache = null;
 
@@ -116,6 +127,11 @@ public class TakIgniteSpringCacheManager extends SpringCacheManager {
 				}
 			}
 
+			int cacheLastTouchedExpiryMinutes = config.getRemoteConfiguration().getBuffer().getQueue().getCacheLastTouchedExpiryMinutes();
+			if (cacheLastTouchedExpiryMinutes != -1) {
+				cacheConfig.setExpiryPolicyFactory(
+						TouchedExpiryPolicy.factoryOf(new Duration(TimeUnit.MINUTES, cacheLastTouchedExpiryMinutes)));
+			}
 
 			// near cache defaults to off but can be configured
 			if (!messagingProfileActive && config.getRemoteConfiguration().getBuffer().getQueue().getNearCacheMaxSize() > 0) {
@@ -130,28 +146,10 @@ public class TakIgniteSpringCacheManager extends SpringCacheManager {
 				igniteCache = visibleIgnite.getOrCreateCache(cacheConfig);
 			}
 
-
 			if (logger.isDebugEnabled()) {
 				logger.debug("create cache name: " + name + " atomicity mode: " + cacheConfig.getAtomicityMode() + " mode: " + cacheConfig.getCacheMode());
 			}
-			
-			
-			if (config.getRemoteConfiguration().getNetwork().isCloudwatchEnable()) {
-				final IgniteCache<Object, Object> finalIgniteCache = igniteCache;
-				
-				// FIXME
-//
-//				Metrics.counter(name + "-CACHE", "CacheHits", () -> finalIgniteCache.metrics().getCacheHits(), StandardUnit.Count);
-//				CloudWatchPublisher.addMetric(name + "-CACHE", "CacheMisses", () -> finalIgniteCache.metrics().getCacheMisses(), StandardUnit.Count);
-//				CloudWatchPublisher.addMetric(name + "-CACHE", "CacheMisses", () -> finalIgniteCache.metrics().getCacheMisses(), StandardUnit.Count);
-//				CloudWatchPublisher.addMetric(name + "-CACHE", "CachePuts", () -> finalIgniteCache.metrics().getCachePuts(), StandardUnit.Count);
-//				CloudWatchPublisher.addMetric(name + "-CACHE", "CacheGets", () -> finalIgniteCache.metrics().getCacheGets(), StandardUnit.Count);
-//				CloudWatchPublisher.addMetric(name + "-CACHE", "CacheEvicts", () -> finalIgniteCache.metrics().getCacheEvictions(), StandardUnit.Count);
-//				CloudWatchPublisher.addMetric(name + "-CACHE", "CacheRemovals", () -> finalIgniteCache.metrics().getCacheRemovals(), StandardUnit.Count);
-//				CloudWatchPublisher.addMetric(name + "-CACHE", "CacheHitPercent", () -> finalIgniteCache.metrics().getCacheHitPercentage(), StandardUnit.Percent);
-//				CloudWatchPublisher.addMetric(name + "-CACHE", "CacheMissPercent", () -> finalIgniteCache.metrics().getCacheMissPercentage(), StandardUnit.Percent);	
-			}
-
+		
 			cache = new SpringCache(igniteCache, this);
 			SpringCache old = caches.putIfAbsent(name, cache);
 
@@ -274,7 +272,7 @@ class SpringCache implements Cache {
 
 	/** {@inheritDoc} */
 	@Override public void clear() {
-		cache.clearAsync();
+		cache.clear();
 	}
 
 	/**
@@ -303,6 +301,4 @@ class SpringCache implements Cache {
 			return this == o || (o != null && getClass() == o.getClass());
 		}
 	}
-
-
 }

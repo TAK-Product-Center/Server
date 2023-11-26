@@ -1,10 +1,12 @@
 package com.bbn.marti.test.shared.engines;
 
 import com.bbn.marti.takcl.TestExceptions;
+import com.bbn.marti.takcl.connectivity.server.RunnableServerManager;
 import com.bbn.marti.test.shared.CotGenerator;
 import com.bbn.marti.test.shared.TestConnectivityState;
 import com.bbn.marti.test.shared.data.GroupSetProfiles;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
+import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import com.bbn.marti.test.shared.data.users.AbstractUser;
 import com.bbn.marti.test.shared.engines.state.*;
 import com.bbn.marti.tests.Assert;
@@ -126,7 +128,8 @@ public class EngineHelper {
 					return computeLocalReachability(source, target);
 
 				} else {
-					return isFederatedDirectionallyReachable(source, target) ||
+					return isFederatedDirectionallyReachable(source, target) || 
+							isFederatedDirectionallyHubReachable(source, target) ||
 							isSubscriptionDirectionallyReachable(source, target);
 				}
 			}
@@ -229,7 +232,7 @@ public class EngineHelper {
 
 		AbstractServerProfile sourceServer = sourceServerState.getProfile();
 		AbstractServerProfile targetServer = targetServerState.getProfile();
-
+		
 		// If the source server is federated
 		return sourceServerState.federation.isFederated() &&
 				// And the target server is federated
@@ -242,6 +245,35 @@ public class EngineHelper {
 				hasIntersection(sourceUser.getProfile().getActualGroupSetAccess().groupSet, sourceServerState.federation.getFederateState(targetServer).getOutboundGroups()) &&
 				// And the target user's groups intersect with the source server to target server inbound federate groups
 				hasIntersection(targetUser.getProfile().getActualGroupSetAccess().groupSet, targetServerState.federation.getFederateState(sourceServer).getInboundGroups());
+	}
+	
+	// this is very simplistic right now, and will need future work. 
+	// currently it only works for 2 TAK Servers each connected to ImmutableServerProfiles.FEDHUB_0 or ImmutableServerProfiles.FEDHUB_1. 
+	// this will not handle multiple hubs, or a hub with an outgoing to a TAK Server
+	private static boolean isFederatedDirectionallyHubReachable(@NotNull UserState sourceUser, @NotNull UserState targetUser) {
+		
+		ServerState sourceServerState = sourceUser.getServerState();
+		ServerState targetServerState = targetUser.getServerState();
+		
+		ImmutableServerProfiles[] hubs = { ImmutableServerProfiles.FEDHUB_0, ImmutableServerProfiles.FEDHUB_1 };
+		for (ImmutableServerProfiles hub : hubs) {
+			// if the hub isn't running, skip it
+			if (!RunnableServerManager.getInstance().serverInstanceExists(hub)) continue;
+			
+			// both TAK Servers don't have a hub connection
+			boolean hasHubAsFederate = sourceServerState.federation.getFederateState(hub) != null && targetServerState.federation.getFederateState(hub) != null;
+			if (!hasHubAsFederate) return false;
+			
+			boolean federationEnabled = sourceServerState.federation.isFederated() && targetServerState.federation.isFederated();
+			boolean bothConnectedToHub = sourceServerState.federation.isOutgoingConnection(hub) && targetServerState.federation.isOutgoingConnection(hub);			
+			boolean sameGroups = targetUser.getProfile().getActualGroupSetAccess().groupSet != null && sourceUser.getProfile().getActualGroupSetAccess().groupSet != null;
+			boolean groupsAreOutbound = hasIntersection(sourceUser.getProfile().getActualGroupSetAccess().groupSet, sourceServerState.federation.getFederateState(hub).getOutboundGroups());
+			boolean groupsAreInbound = hasIntersection(targetUser.getProfile().getActualGroupSetAccess().groupSet, targetServerState.federation.getFederateState(hub).getInboundGroups());
+			
+			if (federationEnabled && bothConnectedToHub && sameGroups && groupsAreOutbound && groupsAreInbound) return true; 
+		}
+
+		return false;
 	}
 
 
@@ -261,7 +293,7 @@ public class EngineHelper {
 
 		Map<AbstractUser, TreeSet<AbstractUser>> outcomeMap = new HashMap<>();
 
-		if (targetUsers.size() == 0) {
+		if (targetUsers.size() == 0) {			 
 			for (UserState possibleRecipient : StateEngine.data.getUserStates()) {
 				boolean generalReachability = computeGeneralReachability(sourceUser, willConnectIfNecessary, willAuthIfNecessary, possibleRecipient, false, false, false);
 
@@ -282,6 +314,7 @@ public class EngineHelper {
 						(targetUserIdentificationData == UserIdentificationData.UID ||
 								targetUserIdentificationData == UserIdentificationData.UID_AND_CALLSIGN) &&
 						sourceUser.getServerState().isUserUidKnown(targetUser)) {
+
 					if (!outcomeMap.containsKey(targetUser.getProfile())) {
 						outcomeMap.put(targetUser.getProfile(), new TreeSet<AbstractUser>());
 					}
@@ -291,6 +324,7 @@ public class EngineHelper {
 						(targetUserIdentificationData == UserIdentificationData.CALLSIGN ||
 								targetUserIdentificationData == UserIdentificationData.UID_AND_CALLSIGN) &&
 						sourceUser.getServerState().isUserCallsignKnown(targetUser)) {
+
 					if (!outcomeMap.containsKey(targetUser.getProfile())) {
 						outcomeMap.put(targetUser.getProfile(), new TreeSet<AbstractUser>());
 					}

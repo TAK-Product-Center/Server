@@ -8,6 +8,7 @@ import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.http.HttpSessionListener;
+import javax.sql.DataSource;
 
 import org.apache.ignite.Ignite;
 import org.slf4j.Logger;
@@ -80,7 +81,8 @@ import com.bbn.marti.network.LDAPApi;
 import com.bbn.marti.network.SecurityAuthenticationApi;
 import com.bbn.marti.network.SubmissionApi;
 import com.bbn.marti.network.UIDSearchApi;
-import com.bbn.marti.oauth.admin.TokenApi;
+import com.bbn.marti.oauth.OAuthApi;
+import com.bbn.marti.oauth.TokenApi;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationConfigInterface;
 import com.bbn.marti.remote.groups.FileUserManagementInterface;
@@ -95,6 +97,7 @@ import com.bbn.marti.service.FederationHttpConnectorManager;
 import com.bbn.marti.service.RepositoryService;
 import com.bbn.marti.sync.ContentServlet;
 import com.bbn.marti.sync.DeleteServlet;
+import com.bbn.marti.sync.EnterpriseSyncCacheHelper;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.FileList;
 import com.bbn.marti.sync.JDBCEnterpriseSyncService;
@@ -118,6 +121,8 @@ import com.bbn.marti.sync.federation.MissionActionROLConverter;
 import com.bbn.marti.sync.federation.MissionFederationAspect;
 import com.bbn.marti.sync.federation.MissionFederationManager;
 import com.bbn.marti.sync.federation.MissionFederationManagerROL;
+import com.bbn.marti.sync.service.PropertiesService;
+import com.bbn.marti.sync.service.PropertiesServiceDefaultImpl;
 import com.bbn.marti.util.IconsetDirWatcher;
 import com.bbn.marti.util.VersionApi;
 import com.bbn.marti.util.spring.HttpSessionCreatedEventListener;
@@ -148,14 +153,20 @@ import com.bbn.vbm.VBMConfigurationApi;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import tak.server.Constants;
+import tak.server.api.DistributedPluginCoreConfigApi;
 import tak.server.api.DistributedPluginFileApi;
 import tak.server.api.DistributedPluginMissionApi;
 import tak.server.cache.ContactCacheHelper;
 import tak.server.cache.MissionCacheResolver;
+import tak.server.cache.MissionLayerCacheResolver;
 import tak.server.federation.FederationConfigManager;
+import tak.server.filemanager.FileManagerApi;
+import tak.server.filemanager.FileManagerService;
+import tak.server.filemanager.FileManagerServiceDefaultImpl;
 import tak.server.grid.MissionArchiveManagerProxyFactory;
 import tak.server.grid.PluginManagerProxyFactory;
 import tak.server.grid.RetentionPolicyConfigProxyFactory;
+import tak.server.plugins.PluginCoreConfigApi;
 import tak.server.plugins.PluginDataApi;
 import tak.server.plugins.PluginFileApi;
 import tak.server.plugins.PluginManagerApi;
@@ -164,6 +175,7 @@ import tak.server.qos.QoSApi;
 import tak.server.qos.QoSManager;
 import tak.server.retention.RetentionApi;
 import tak.server.system.ApiDependencyProxy;
+import tak.server.util.ErrorController;
 import tak.server.util.ExecutorSource;
 import tak.server.util.LoginAccessController;
 
@@ -251,6 +263,7 @@ public class ApiConfiguration implements WebMvcConfigurer {
 		ServletRegistrationBean<ContentServlet> bean = new ServletRegistrationBean<>(
 				new ContentServlet(), compatServletPath + "/sync/content/*");
 		bean.setLoadOnStartup(1);
+		bean.setAsyncSupported(true);
 		return bean;
 	}
 
@@ -260,6 +273,7 @@ public class ApiConfiguration implements WebMvcConfigurer {
 				new UploadServlet(), compatServletPath + "/sync/upload/*");
 		bean.setLoadOnStartup(1);
 		bean.setMultipartConfig(multipartConfigElement());
+		bean.setAsyncSupported(true);
 		return bean;
 	}
 
@@ -757,6 +771,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	public PropertiesApi propertiesApi() {
 		return new PropertiesApi();
 	}
+	
+	@Bean
+	public FileManagerApi fileManagerApi() {
+		return new FileManagerApi();
+	}
 
 	@Bean
 	public MetadataApi metadataApi() {
@@ -856,7 +875,10 @@ public class ApiConfiguration implements WebMvcConfigurer {
 
 	@Bean("missionCacheResolver")
 	public MissionCacheResolver missionCacheResolver() { return new MissionCacheResolver(); }
-	
+
+	@Bean("missionLayerCacheResolver")
+	public MissionLayerCacheResolver missionLayerCacheResolver() { return new MissionLayerCacheResolver(); }
+
 	@Bean
 	public QoSManager qosManager(Ignite ignite) {
 		
@@ -873,6 +895,16 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Bean
 	public LoginAccessController loginAcccessController() {
 		return new LoginAccessController();
+	}
+
+	@Bean
+	public ErrorController ErrorController() {
+		return new ErrorController();
+	}
+
+	@Bean
+	public OAuthApi OAuthApi() {
+		return new OAuthApi();
 	}
 	
 	@Bean
@@ -922,6 +954,13 @@ public class ApiConfiguration implements WebMvcConfigurer {
 		return ignite.services(ClusterGroupDefinition.getApiLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_MISSION_API, PluginMissionApi.class, false);
 
 	}
+
+	@Bean
+	public PluginCoreConfigApi pluginCoreConfigApi(Ignite ignite) {
+		DistributedPluginCoreConfigApi distributedPluginCoreConfigApi = new DistributedPluginCoreConfigApi();
+		ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_CORECONFIG_API, distributedPluginCoreConfigApi);
+		return ignite.services(ClusterGroupDefinition.getApiLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_CORECONFIG_API, PluginCoreConfigApi.class, false);
+	}
 	
 	public DataFeedFederationAspect DataFeedFederationAspect(MissionFederationManager mfm) {
 		return new DataFeedFederationAspect(null, null, mfm);
@@ -936,6 +975,16 @@ public class ApiConfiguration implements WebMvcConfigurer {
 
 		return ignite.services(ClusterGroupDefinition.getApiLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_FILE_API, PluginFileApi.class, false);
 
+	}
+	
+	@Bean
+	public PropertiesService propertiesService(DataSource dataSource) {
+		return new PropertiesServiceDefaultImpl(dataSource);
+	}
+	
+	@Bean
+	public FileManagerService fileManagerService(DataSource dataSource) {
+		return new FileManagerServiceDefaultImpl(dataSource);
 	}
 
 }

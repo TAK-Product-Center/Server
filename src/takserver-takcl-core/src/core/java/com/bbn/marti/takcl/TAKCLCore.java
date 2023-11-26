@@ -3,6 +3,7 @@ package com.bbn.marti.takcl;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -12,13 +13,17 @@ import java.nio.file.Paths;
  */
 public class TAKCLCore {
 
+	public static final PrintStream defaultStdout = System.out;
+	public static final PrintStream defaultStderr = System.err;
+
 	public static final String CORE_NETWORK_V1_TAG = "coreNetworkV1-";
 	public static final String CORE_NETWORK_V2_TAG = "coreNetworkV2-";
 
+	public static final PrintStream stdout = System.out;
+	public static final PrintStream stderr = System.err;
+
 	public static boolean TEST_MODE = true;
 	private static final String SYSARG_PREFIX = "com.bbn.marti.takcl.";
-
-	public static final String dockerSubnet;
 	public static final double sleepMultiplier;
 	public static final Long igniteNetworkTimeout;
 	@Nullable
@@ -38,11 +43,14 @@ public class TAKCLCore {
 	public static final boolean cliIgnoreCoreConfig;
 	public static final long igniteManualRetryTimeout;
 	public static boolean useTakclIgniteConfig;
+	public static final boolean disableMessagingProcess;
 	public static final boolean disableApiProcess;
 
 	public static final boolean disableRetentionProcess;
 
 	public static final boolean disablePluginManagerProcess;
+	
+	public static final boolean disableFederationHubProcess;
 	@Nullable
 	public static final Path testCertSourceDir;
 	public static final boolean keepServersRunning;
@@ -58,6 +66,8 @@ public class TAKCLCore {
 	@Nullable
 	public static final Integer systemMonitorPeriodSeconds;
 
+	public static boolean k8sMode;
+
 	public enum TakclOption {
 		// TestConfiguration settings
 		EnableDB(SYSARG_PREFIX + "dbEnabled", "TAKCL_ENABLE_DB", "true", true),
@@ -68,7 +78,6 @@ public class TAKCLCore {
 
 		// General Settings
 		SleepMultiplier(SYSARG_PREFIX + "sleepMultiplier", "TAKCL_SLEEP_MULTIPLIER", "1", false),
-		DockerSubnet(SYSARG_PREFIX + "dockerSubnet", "TAKCL_DOCKER_SUBNET", null, false),
 		IgniteManualRetryTimeout(SYSARG_PREFIX + "igniteManualRetryTimeout", "TAKCL_IGNITE_MANUAL_RETRY_TIMEOUT", "0", false),
 		IgniteClientFailureDetectionTimeout(SYSARG_PREFIX + "igniteClientFailureDetectionTimeout", "TAKCL_IGNITE_CLIENT_FAILURE_DETECTION_TIMEOUT", null, false),
 		IgniteFailureDetectionTimeout(SYSARG_PREFIX + "igniteFailureDetectionTimeout", "TAKCL_IGNITE_FAILURE_DETECTION_TIMEOUT", null, false),
@@ -83,7 +92,9 @@ public class TAKCLCore {
 		TakclConfigPath(SYSARG_PREFIX + "config.filepath", "TAKCL_CONFIG_PATH", null, false),
 		// TODO: This is a hack. We should figure out why the tests don't like the ConfigurationHolder from takserver-common
 		UseTakclIgniteConfig(SYSARG_PREFIX + "takclIgniteConfig", "TAKCL_IGNITE_CONFIG", "true", true),
+		DisableMessagingProcess(SYSARG_PREFIX + "disableMessagingProcess", "TAKCL_DISABLE_MESSAGING_PROCESS", "false", true),
 		DisableApiProcess(SYSARG_PREFIX + "disableApiProcess", "TAKCL_DISABLE_API_PROCESS", "false", true),
+		DisableFederationHubProcess(SYSARG_PREFIX + "disableFederationHubProcess", "TAKCL_DISABLE_FEDERATION_HUB_PROCESS", "true", true),
 		DisableRetentionProcess(SYSARG_PREFIX + "disableRetentionProcess", "TAKCL_DISABLE_RETENTION_PROCESS", "true", true),
 		DisablePluginManagerProcess(SYSARG_PREFIX + "disablePluginManagerProcess", "TAKCL_DISABLE_PLUGIN_MANAGER_PROCESS", "true", true),
 		TestCertSourceDir(SYSARG_PREFIX + "testCertSourceDir", "TAKCL_TEST_CERT_SRC_DIR", null, false),
@@ -92,7 +103,8 @@ public class TAKCLCore {
 		ServerStartupWaitTime(SYSARG_PREFIX + "serverStartupWaitTime", "TAKCL_SERVER_STARTUP_WAIT_TIME", null, false),
 		PostgresPassword(SYSARG_PREFIX + "postgresPassword", "TAKCL_SERVER_POSTGRES_PASSWORD", null, false),
 		ServerLogLevelOverrides(SYSARG_PREFIX + "serverLogLevelOverrides", "TAKCL_SERVER_LOG_LEVEL_OVERRIDES", null, false),
-		SystemMonitorPeriodSeconds(SYSARG_PREFIX + "systemMonitorPeriodSeconds", "TAKCL_SYSTEM_MONITOR_PERIOD_SECONDS", null, false);
+		SystemMonitorPeriodSeconds(SYSARG_PREFIX + "systemMonitorPeriodSeconds", "TAKCL_SYSTEM_MONITOR_PERIOD_SECONDS", null, false),
+		K8SMode(SYSARG_PREFIX + "k8sMode", "TAKCL_K8S_MODE", "false", true);
 
 		public final String sysPropKey;
 		public final String value;
@@ -216,7 +228,6 @@ public class TAKCLCore {
 
 	static {
 		sleepMultiplier = TakclOption.SleepMultiplier.getDouble();
-		dockerSubnet = TakclOption.DockerSubnet.getStringOrNull();
 		igniteManualRetryTimeout = TakclOption.IgniteManualRetryTimeout.getLong();
 		igniteClientFailureDetectionTimeout = TakclOption.IgniteClientFailureDetectionTimeout.getLongOrNull();
 		igniteFailureDetectionTimeout = TakclOption.IgniteFailureDetectionTimeout.getLongOrNull();
@@ -229,7 +240,9 @@ public class TAKCLCore {
 		coreConfigPath = TakclOption.CoreConfigPath.getStringOrNull();
 		cliIgnoreCoreConfig = TakclOption.CliIgnoreCoreConfig.getBoolean();
 		useTakclIgniteConfig = TakclOption.UseTakclIgniteConfig.getBoolean() && TestExceptions.USE_TAKCL_IGNITE_CONFIGURATION_AS_INDICATED;
+		disableMessagingProcess = TakclOption.DisableMessagingProcess.getBoolean();
 		disableApiProcess = TakclOption.DisableApiProcess.getBoolean();
+		disableFederationHubProcess = TakclOption.DisableFederationHubProcess.getBoolean();
 		disablePluginManagerProcess = TakclOption.DisablePluginManagerProcess.getBoolean();
 		disableRetentionProcess = TakclOption.DisableRetentionProcess.getBoolean();
 		testCertSourceDir = TakclOption.TestCertSourceDir.getPathOrNull(true);
@@ -239,5 +252,6 @@ public class TAKCLCore {
 		postgresPassword = TakclOption.PostgresPassword.getStringOrNull();
 		serverLogLevelOverrides = TakclOption.ServerLogLevelOverrides.getStringOrNull();
 		systemMonitorPeriodSeconds = TakclOption.SystemMonitorPeriodSeconds.getIntegerOrNull();
+		k8sMode = TakclOption.K8SMode.getBoolean();
 	}
 }

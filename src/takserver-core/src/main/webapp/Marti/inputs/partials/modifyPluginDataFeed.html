@@ -81,6 +81,14 @@
 				</select>
 			</td>
 		</tr>
+		
+		<tr data-ng-hide="hideFederated">
+            <td class="rowHeader"><label for="federated">Federated</label></td>
+            <td class="rowValue">
+                <select name="federated" data-ng-model="dataFeed.federated" required data-ng-options="boolToStr(item) for item in [true, false]">
+                </select>
+            </td>
+        </tr>
 
 		<tr>
 			<td style="padding:10px;" align="right">

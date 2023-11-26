@@ -1,7 +1,9 @@
 package com.bbn.marti.groups;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
@@ -11,18 +13,19 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.bbn.cot.filter.FlowTagFilter;
+import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
 import com.bbn.marti.feeds.DataFeedService;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.Direction;
-import com.bbn.marti.remote.groups.FederateUser;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.Reachability;
@@ -64,6 +67,9 @@ public class MessagingUtilImpl implements MessagingUtil {
 
 	@Autowired
 	private GroupFederationUtil groupFederationUtil;
+
+	@Autowired
+	private FlowTagFilter flowTagFilter;
 	
 	private static MessagingUtilImpl instance;
 	
@@ -379,6 +385,30 @@ public class MessagingUtilImpl implements MessagingUtil {
 	        	logger.trace("submitted delete message for processing: " + deleteMessage);
 	        }
 	    }
+	}
+
+	@Override
+	public void sendDeliveryFailure(String senderUid, CotEventContainer c) {
+		CotEventContainer failureNotification = new CotEventContainer(c, true,
+				ImmutableSet.of(
+						Constants.ARCHIVE_EVENT_KEY,
+						StreamingEndpointRewriteFilter.EXPLICIT_CALLSIGN_KEY,
+						StreamingEndpointRewriteFilter.EXPLICIT_UID_KEY));
+
+		// strip off the flow tag filter so we can resend from this server again
+		flowTagFilter.unfilter(failureNotification);
+
+		// set the type on the failure notification to indicate the message has been stored
+		failureNotification.setType("b-t-f-s");
+
+		// turn off message archiving so we dont save the message again
+		failureNotification.setContext(Constants.ARCHIVE_EVENT_KEY, Boolean.FALSE);
+
+		Set<String> uids = new HashSet<>();
+		uids.add(senderUid);
+		failureNotification.setContextValue(StreamingEndpointRewriteFilter.EXPLICIT_UID_KEY, new ArrayList<String>(uids));
+
+		cotMessenger().send(failureNotification);
 	}
 	
 	private Messenger<CotEventContainer> cotMessenger() {

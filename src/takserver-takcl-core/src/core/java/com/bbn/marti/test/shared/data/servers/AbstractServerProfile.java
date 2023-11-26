@@ -7,6 +7,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -16,11 +17,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class AbstractServerProfile implements Comparable<Object>, Comparator<Object> {
 
+	private static final HashMap<AbstractServerProfile,String> kubernetesIpMap = new HashMap<>();
+
 	public static final String MISSION_PATH_FORMAT_STRING = "https://%s:%d/";
 	private static AtomicInteger altPortRangeStart = new AtomicInteger(22000);
 
 	private final String consistentUniqueReadableIdentifier;
-	private final String url;
+	private String url;
 	private final int federationPort;
 	private final int federationV2Port;
 
@@ -61,7 +64,7 @@ public abstract class AbstractServerProfile implements Comparable<Object>, Compa
 	}
 
 	public String getMissionBaseUrl() {
-		return String.format(MISSION_PATH_FORMAT_STRING, url, httpsPort);
+		return String.format(MISSION_PATH_FORMAT_STRING, getUrl(), httpsPort);
 	}
 
 	public abstract List<AbstractConnection> getInputs();
@@ -140,6 +143,10 @@ public abstract class AbstractServerProfile implements Comparable<Object>, Compa
 
 	public final int getHttpsPort() {
 		return httpsPort;
+	}
+
+	public final void setUrl(String url) {
+		this.url = url;
 	}
 
 	public final String getUrl() {

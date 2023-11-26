@@ -8,7 +8,7 @@ import "detail.proto";
 // A note about timestamps:
 // Uses "timeMs" units, which is number of milliseconds since
 // 1970-01-01 00:00:00 UTC
-//
+        //
 // All items are required unless otherwise noted!
 // "required" means if they are missing in the XML during outbound
 // conversion to protobuf, the message will be
@@ -18,9 +18,23 @@ message CotEvent {
 
     string type = 1;               // <event type="x">
 
-    string access = 2;             // optional
+    string access = 2;             // optional, but see below!
+                                   // field was optional in early
+                                   // cot implementations but now required
+                                   // in MIL-STD-6090.
+                                   // This message definition treats as
+                                   // "optional" due to legacy definition/use,
+                                   // but updated/new clients should be
+                                   // populating on all outgoing message and
+                                   // should treat any missing/empty value
+                                   // as CoT value "Undefined".
+                                   // A CoT/XML value of "Undefined" for this
+                                   // field should be conveyed in this message
+                                   // by omitting this value for compactness
     string qos = 3;                // optional
     string opex = 4;               // optional
+    string caveat = 16;            // optional
+    string releaseableTo = 17;     // optional
 
     string uid = 5;                // <event uid="x">
     uint64 sendTime = 6;           // <event time="x"> converted to timeMs
@@ -39,9 +53,6 @@ message CotEvent {
     // This is optional - if omitted, then the cot message
     // had no data under <detail>
     Detail detail = 15;
-
-    uint64 submissionTime = 16;
-    uint64 creationTime = 17;
 
 }
 

@@ -101,7 +101,7 @@ public class Feed {
 			validator.getValidInput("feed", getUuid(), 
 					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 			validator.getValidInput("feed", getAlias(), 
-					MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.SHORT_STRING_CHARS, true);
+					MartiValidatorConstants.Regex.MartiSafeStringWithQuestion.name(), MartiValidatorConstants.SHORT_STRING_CHARS, true);
 			validator.getValidInput("feed", getLatitude(), 
 					MartiValidatorConstants.Regex.Coordinates.name(), MartiValidatorConstants.SHORT_STRING_CHARS, true);
 			validator.getValidInput("feed", getLongitude(), 

@@ -13,11 +13,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.atakmap.Tak.ROL;
 import com.atakmap.Tak.ROL.Builder;
+import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationManager;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.sync.MissionContent;
+import com.bbn.marti.remote.sync.MissionExpiration;
 import com.bbn.marti.remote.sync.MissionHierarchy;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayer;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayer;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.DataPackageFileBlocker;
 import com.bbn.marti.sync.EnterpriseSyncService;
@@ -26,6 +30,8 @@ import com.bbn.marti.sync.Metadata.Field;
 import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionChange;
 import com.bbn.marti.sync.model.MissionChangeUtils;
+import com.bbn.marti.sync.model.MissionLayer;
+import com.bbn.marti.sync.model.MissionLayer.Type;
 import com.bbn.marti.sync.service.MissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
@@ -82,7 +88,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 
 			try {
 				if (coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) {
-					fedMgr.submitFederateROL(malrc.createMissionToROL(missionMeta), groups);
+					fedMgr.submitMissionFederateROL(malrc.createMissionToROL(missionMeta), groups, missionMeta.getName());
 				}
 			} catch (Exception e) {
 				logger.warn("remote exception sending ROL", e);
@@ -109,7 +115,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			}
 
 			try {
-				fedMgr.submitFederateROL(malrc.deleteMissionToROL(name, creatorUid), groups);
+				fedMgr.submitMissionFederateROL(malrc.deleteMissionToROL(name, creatorUid), groups, name);
 			} catch (Exception e) {
 				logger.warn("remote exception sending ROL", e);
 			}
@@ -126,11 +132,17 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			return;
 		}
 		
-		if (isMissionAllowed(mission.getTool())) {
-			createDataFeed(missionMeta, groups);
-		} else {
+		try { 
+			if (isMissionAllowed(mission.getTool())) {
+				fedMgr.submitMissionFederateROL(malrc.createDataFeedToROL(missionMeta), groups, mission.getName());
+			} else {
+				if (logger.isDebugEnabled()) {
+					logger.debug("not federating non-public mission action for mission " + mission.getName());
+				}
+			}
+		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {
-				logger.debug("not federating non-public mission action for mission " + mission.getName());
+				logger.debug("exception constructing or sending feed create federated ROL", e);
 			}
 		}
 	
@@ -142,13 +154,20 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			return;
 		}
 		
-		if (isMissionAllowed(mission.getTool())) {
-			updateDataFeed(missionMeta, groups);
-		} else {
+		try { 
+			if (isMissionAllowed(mission.getTool())) {
+				fedMgr.submitMissionFederateROL(malrc.updateDataFeedToROL(missionMeta), groups, mission.getName());
+			} else {
+				if (logger.isDebugEnabled()) {
+					logger.debug("not federating non-public mission action for mission " + mission.getName());
+				}
+			}
+		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {
-				logger.debug("not federating non-public mission action for mission " + mission.getName());
+				logger.debug("exception constructing or sending feed update federated ROL", e);
 			}
 		}
+		
 	}
 
 	@Override
@@ -157,13 +176,19 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			return;
 		}
 		
-		if (isMissionAllowed(mission.getTool())) {
-			deleteDataFeed(missionMeta, groups);
-		} else {
-			if (logger.isDebugEnabled()) {
-				logger.debug("not federating non-public mission action for mission " + mission.getName());
+		try { 
+			if (isMissionAllowed(mission.getTool())) {
+				fedMgr.submitMissionFederateROL(malrc.deleteDataFeedToROL(missionMeta), groups, mission.getName());
+			} else {
+				if (logger.isDebugEnabled()) {
+					logger.debug("not federating non-public mission action for mission " + mission.getName());
+				}
 			}
-		}
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending feed delete federated ROL", e);
+			}
+		}	
 	}
 
 	@Override
@@ -213,7 +238,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 
 	@Override
 	public void addMissionContent(String missionName, MissionContent content, String creatorUid, NavigableSet<Group> groups) {
-
+		
 		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
 			return;
 		}
@@ -255,7 +280,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			}
 
 			try {
-				fedMgr.submitFederateROL(malrc.addMissionContentToROL(content, missionName, creatorUid, mission), groups);
+				fedMgr.submitMissionFederateROL(malrc.addMissionContentToROL(content, missionName, creatorUid, mission), groups, missionName);
 			} catch (Exception e) {
 				logger.warn("remote exception sending ROL", e);
 			}
@@ -295,7 +320,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			}
 
 			try {
-				fedMgr.submitFederateROL(malrc.deleteMissionContentToROL(missionName, hash, uid, creatorUid, mission), groups);
+				fedMgr.submitMissionFederateROL(malrc.deleteMissionContentToROL(missionName, hash, uid, creatorUid, mission), groups, missionName);
 			} catch (Exception e) {
 				logger.warn("remote exception sending ROL", e);
 			}
@@ -324,11 +349,8 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 				logger.debug("federated setParent " + missionName + "," + parentMissionName + ", groups: " + groups);
 			}
 
-			Builder rol = ROL.newBuilder().setProgram("assign mission\n" +
-					mapper.writeValueAsString(missionHierarchy) + ";");
-
 			try {
-				fedMgr.submitFederateROL(rol.build(), groups);
+				fedMgr.submitMissionFederateROL(malrc.setParentToROL(missionHierarchy), groups, missionName);
 			} catch (Exception e) {
 				logger.warn("remote exception sending ROL", e);
 			}
@@ -355,11 +377,8 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 				logger.debug("federated clearParent " + missionName + ", groups: " + groups);
 			}
 
-			Builder rol = ROL.newBuilder().setProgram("assign mission\n" +
-					mapper.writeValueAsString(missionHierarchy) + ";");
-
 			try {
-				fedMgr.submitFederateROL(rol.build(), groups);
+				fedMgr.submitMissionFederateROL(malrc.setParentToROL(missionHierarchy), groups, missionName);
 			} catch (Exception e) {
 				logger.warn("remote exception sending ROL", e);
 			}
@@ -372,10 +391,14 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 	}
 	
 	 /*
-     * save file with without payload from byte array
+     * save file with payload from byte array
      */
     @Override
     public void insertResource(Metadata metadata, byte[] content, NavigableSet<Group> groups) {
+
+    	if (metadata == null) {
+    		return;
+		}
 
         if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
 
@@ -429,11 +452,21 @@ public class MissionFederationManagerROL implements MissionFederationManager {
     }
 	
 	/*
-	 * save file with without payload from InputStream
+	 * save file with payload from InputStream
 	 */
 	@Override
 	public void insertResource(Metadata metadata, InputStream contentStream, NavigableSet<Group> groups) {
-		
+
+		if (metadata == null) {
+			logger.warn("not federating file - null metadata");
+			return;
+		}
+
+		if (Strings.isNullOrEmpty(metadata.getHash())) {
+			logger.warn("not federating file - blank hash");
+			return;
+		}
+
 		if (logger.isDebugEnabled()) {
 			logger.debug("metadata json for federated insert resource: " + metadata.toJSONObject() + " hash: " + metadata.getHash());
 		}
@@ -443,20 +476,10 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			if (logger.isDebugEnabled()) {
 				logger.debug("skipping federation of a file  " +  metadata);
 			}
+			return;
+		}
 
-			return;
-		}
-		
-		if (metadata == null) {
-			logger.warn("not federating file - null metadata");
-			return;
-		}
-		
-		if (Strings.isNullOrEmpty(metadata.getHash())) {
-			logger.warn("not federating file - blank hash");
-			return;
-		}
-		
+
 		byte[] content = null;
 		
 		// need to get content from database / cache instead of being passed in above.
@@ -480,7 +503,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 					
 					content = DataPackageFileBlocker.blockCoT(metadata, content, cotFilter);
 					if (content == null) {
-						if (logger.isDebugEnabled()) {
+						if (logger.isDebugEnabled()) {  // i.e., the content was blocked
 							logger.debug("filtered content is null, not federating enterprise sync insert resource");
 						}
 						return;
@@ -492,11 +515,17 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 		}
 
 		if (isBlockedFileEnabled()) {
+			try {
+				content = syncService.getContentByHash(metadata.getHash(), remoteUtil.bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups)));
+			} catch (SQLException | NamingException e) {
+				logger.error("exception fetching content for file " + metadata.getHash() + " - not federating this file");
+				return;
+			}
 			String fileExt = coreConfig.getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
 			try {
 				byte[] filteredContent = DataPackageFileBlocker.blockResourceContent(metadata, content, fileExt);
 				if (filteredContent != null) {
-					fedMgr.submitFederateROL(malrc.getInsertResourceROLNoContent(metadata), groups);
+					fedMgr.submitFederateROL(malrc.getInsertResourceROL(metadata, filteredContent), groups);
 				} else {
 					if (logger.isDebugEnabled()) {
 						logger.debug("filtered content is null, not federating enterprise sync insert resource");
@@ -529,6 +558,132 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			logger.error("exception federating enterprise sync update resource", e);
 		}
 	}
+	
+	@Override
+	public void setExpiration(String missionName, Long expiration, NavigableSet<Group> groups) {
+		
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		
+		try {
+			MissionExpiration missionExpiration = new MissionExpiration();
+			missionExpiration.setMissionName(missionName);
+			missionExpiration.setMissionExpiration(expiration);
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("federated setExpiration " + missionName + ", expiration" + expiration);
+			}
+
+			try {
+				fedMgr.submitMissionFederateROL(malrc.setMissionExpirationToROL(missionExpiration), groups, missionName);
+			} catch (Exception e) {
+				logger.warn("remote exception sending ROL", e);
+			}
+
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending mission setExpiration federated ROL", e);
+			}
+		}
+	}
+	
+	@Override
+	public void addMissionLayer(MissionUpdateDetailsForMissionLayer missionUpdateDetailsForMissionLayer, NavigableSet<Group> groups) {
+		
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		
+		try {
+			
+			fedMgr.submitMissionFederateROL(malrc.addMissionLayerToROL(missionUpdateDetailsForMissionLayer), groups, missionUpdateDetailsForMissionLayer.getMission().getName());
+
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending addMissionLayer federated ROL", e);
+			}
+		}
+	}
+	
+	@Override
+	public void deleteMissionLayer(MissionUpdateDetailsForMissionLayer missionUpdateDetailsForMissionLayer, NavigableSet<Group> groups) {
+
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		 
+		try {
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("intercepted deleteMissionLayer: {}", missionUpdateDetailsForMissionLayer.getLayerUid());
+			}
+
+			fedMgr.submitMissionFederateROL(malrc.deleteMissionLayerToROL(missionUpdateDetailsForMissionLayer), groups, missionUpdateDetailsForMissionLayer.getMission().getName());
+			
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending deleteMissionLayer federated ROL", e);
+			}
+		}	
+		
+	}
+	
+	@Override
+	public void addMapLayerToMission(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer, NavigableSet<Group> groups) {
+		
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		
+		try { 
+			
+			fedMgr.submitMissionFederateROL(malrc.addMapLayerToMissionToROL(missionUpdateDetailsForMapLayer), groups, missionUpdateDetailsForMapLayer.getMission().getName());
+			
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending addMapLayer federated ROL", e);
+			}
+		}
+		
+	}
+	
+	@Override
+	public void updateMapLayer(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer, NavigableSet<Group> groups) {
+		
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		
+		try {
+			
+			fedMgr.submitMissionFederateROL(malrc.updateMapLayerToROL(missionUpdateDetailsForMapLayer), groups, missionUpdateDetailsForMapLayer.getMission().getName());
+			
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending updateMapLayer federated ROL", e);
+			}
+		}
+	}
+	
+	@Override
+	public void removeMapLayerFromMission(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer, NavigableSet<Group> groups) {
+		
+		if (!(coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+		
+		try { 
+			
+			fedMgr.submitMissionFederateROL(malrc.removeMapLayerFromMissionToROL(missionUpdateDetailsForMapLayer), groups, missionUpdateDetailsForMapLayer.getMission().getName());
+			
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending updateMapLayer federated ROL", e);
+			}
+		}
+		
+	}
 
 	private boolean isBlockedFileEnabled() {
 		String fileExt = coreConfig.getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
@@ -556,4 +711,5 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			return false;
 		}
 	}
+
 }

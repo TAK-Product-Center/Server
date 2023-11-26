@@ -2,11 +2,14 @@
 
 package com.bbn.cot.filter;
 
-import java.time.Duration;
+import javax.naming.ldap.LdapName;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 
@@ -53,8 +56,10 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 	public static String CALLSIGN_ATTR = "callsign";
 	public static String PUBLISH_ATTR = "publish";
 	public static String MISSION_ATTR = "mission";
+	public static String PATH_ATTR = "path";
+	public static String AFTER_ATTR = "after";
 
-  	public static String DEST_XPATH = String.format("/event/detail/marti/dest[@%s or @%s or @%s or @%s]", CALLSIGN_ATTR, PUBLISH_ATTR, UID_ATTR, MISSION_ATTR);
+  	public static String DEST_XPATH = String.format("/event/detail/marti/dest[@%s or @%s or @%s or @%s or @%s or @%s]", CALLSIGN_ATTR, PUBLISH_ATTR, UID_ATTR, MISSION_ATTR, PATH_ATTR, AFTER_ATTR);
 
   	private static final Logger logger = LoggerFactory.getLogger(StreamingEndpointRewriteFilter.class);
 
@@ -104,6 +109,8 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 				List<String> callsignList = new LinkedList<String>();
 				Set<String> uids = new HashSet<>();
 				Set<String> missionNames = new HashSet<>();
+				Map<String, String> missionPathMap = new HashMap<>();
+				Map<String, String> missionAfterMap = new HashMap<>();
 
 				String clientUid = "";
 				try {
@@ -152,8 +159,15 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 					} else if(detached.attribute(UID_ATTR) != null) {
 						uids.add(detached.attributeValue(UID_ATTR));
 					} else if(detached.attribute(MISSION_ATTR) != null) {
-					    missionNames.add(detached.attributeValue(MISSION_ATTR).toLowerCase());
+					    missionNames.add(detached.attributeValue(MISSION_ATTR));
 				        logger.debug("mission destination specified in message: " + detached.attributeValue(MISSION_ATTR));
+
+				        if (detached.attribute(PATH_ATTR) != null) {
+				        	missionPathMap.put(detached.attributeValue(MISSION_ATTR), detached.attributeValue(PATH_ATTR));
+				        	if (detached.attribute(AFTER_ATTR) != null) {
+								missionAfterMap.put(detached.attributeValue(MISSION_ATTR), detached.attributeValue(AFTER_ATTR));
+							}
+						}
                     }
 				}
 
@@ -185,8 +199,21 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 						MissionSubscription missionSubscription = null;
 						User user = (User) cot.getContextValue(Constants.USER_KEY);
 						if (user != null) {
-							missionSubscription = missionSubscriptionRepository.findByMissionNameAndClientUidAndUsernameNoMission(
+							missionSubscription = missionSubscriptionRepository
+									.findByMissionNameAndClientUidAndUsernameNoMission(
 									missionName, clientUid, user.getName());
+
+							if (missionSubscription == null
+									&& user.getCert() != null && user.getCert().getSubjectX500Principal() != null) {
+								// lookup the mission subscription based on CN, needed when input auth=ldap or auth=file
+								String cn = new LdapName(user.getCert().getSubjectX500Principal().getName())
+										.getRdns().stream().filter(i -> i.getType().equalsIgnoreCase("CN"))
+											.findFirst().get().getValue().toString();
+								missionSubscription = missionSubscriptionRepository
+										.findByMissionNameAndClientUidAndUsernameNoMission(
+										missionName, clientUid, cn);
+							}
+
 						} else {
 							missionSubscription = missionSubscriptionRepository.findByMissionNameAndClientUidNoMission(
 									missionName, clientUid);
@@ -239,6 +266,19 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 								try {
 									MissionContent missionContent = new MissionContent();
 									missionContent.getUids().add(copyCot.getUid());
+
+									if (missionPathMap.containsKey(missionName)) {
+
+										if (missionAfterMap.containsKey(missionName)) {
+											missionContent.setAfter(missionAfterMap.get(missionName));
+										}
+
+										MissionContent pathContent = new MissionContent();
+										pathContent.getOrCreatePaths().put(
+												missionPathMap.get(missionName), Arrays.asList(missionContent));
+										missionContent = pathContent;
+									}
+
 									missionService.addMissionContent(missionName, missionContent, finClientUid, finGroupVector);
 								} catch (Exception e) {
 									logger.error("exception adding content uid to mission " + e.getMessage(), e);
@@ -308,8 +348,7 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 											logger.debug("rol to federate for mission change " + rol + " to groups " + groups);
 										}
 
-										federationManager.submitFederateROL(rol, groups);
-
+										federationManager.submitMissionFederateROL(rol, groups, missionName);
 									} else {
 										logger.warn("unable to federate mission uid add - cot message specified no groups");
 									}

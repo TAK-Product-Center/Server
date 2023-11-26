@@ -59,6 +59,7 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
     protected static final Logger logger = LoggerFactory.getLogger(MissionChange.class);
     
     protected Long id;
+    protected boolean isFederatedChange;
     protected MissionChangeType type;
     protected String contentHash;
     protected String contentUid;
@@ -197,6 +198,15 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
 
     public void setMissionName(String missionName) {
         this.missionName = missionName;
+    }
+    
+    @Column(name = "remote_federated_change")
+    public boolean getIsFederatedChange() {
+        return isFederatedChange;
+    }
+
+    public void setIsFederatedChange(boolean isFederatedChange) {
+        this.isFederatedChange = isFederatedChange;
     }
 
     @Column(name = "uid")

@@ -57,10 +57,13 @@ import org.springframework.web.context.request.RequestContextListener;
 import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.marti.AltitudeConverter;
 import com.bbn.marti.JDBCQueryAuditLogHelper;
+import com.bbn.marti.classification.service.ClassificationService;
+import com.bbn.marti.classification.service.ClassificationServiceImpl;
 import com.bbn.marti.config.Cluster;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.Connection;
 import com.bbn.marti.config.Network;
+import com.bbn.marti.config.Oauth;
 import com.bbn.marti.config.Security;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.config.Tls.Crl;
@@ -89,9 +92,12 @@ import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.service.kml.KMLService;
 import com.bbn.marti.service.kml.KMLServiceImpl;
 import com.bbn.marti.service.kml.KmlIconStrategyJaxb;
+import com.bbn.marti.sync.EnterpriseSyncCacheHelper;
 import com.bbn.marti.sync.cache.AllCopMissionsCacheKeyGenerator;
 import com.bbn.marti.sync.cache.AllMissionsCacheKeyGenerator;
+import com.bbn.marti.sync.cache.InviteOnlyMissionCacheKeyGenerator;
 import com.bbn.marti.sync.cache.MethodNameMultiStringArgCacheKeyGenerator;
+import com.bbn.marti.sync.federation.MissionChangeAspect;
 import com.bbn.marti.sync.model.MissionChange;
 import com.bbn.marti.sync.model.MissionFeed;
 import com.bbn.marti.sync.repository.DataFeedRepository;
@@ -100,6 +106,7 @@ import com.bbn.marti.sync.repository.LogEntryRepository;
 import com.bbn.marti.sync.repository.MissionChangeRepository;
 import com.bbn.marti.sync.repository.MissionFeedRepository;
 import com.bbn.marti.sync.repository.MissionInvitationRepository;
+import com.bbn.marti.sync.repository.MissionLayerRepository;
 import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.repository.MissionRoleRepository;
 import com.bbn.marti.sync.repository.MissionSubscriptionRepository;
@@ -133,12 +140,15 @@ import tak.server.config.ApiConfiguration;
 import tak.server.config.ApiOnlyConfiguration;
 import tak.server.config.MessagingConfiguration;
 import tak.server.config.MessagingOnlyConfiguration;
+import tak.server.filemanager.FileManagerService;
+import tak.server.filemanager.FileManagerServiceDefaultImpl;
 import tak.server.ignite.IgniteConfigurationHolder;
 import tak.server.ignite.IgniteHolder;
 import tak.server.ignite.grid.SubscriptionManagerProxyHandler;
 import tak.server.messaging.MessageConverter;
 import tak.server.profile.ProfileTracker;
 import tak.server.util.DataSourceUtils;
+import tak.server.util.JavaVersionChecker;
 
 @ImportResource({"classpath:app-context.xml", "classpath:security-context.xml"})
 @Import({ApiConfiguration.class, ApiOnlyConfiguration.class, MessagingConfiguration.class, MessagingOnlyConfiguration.class})
@@ -146,7 +156,7 @@ import tak.server.util.DataSourceUtils;
 @EnableAsync
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 @EnableJpaRepositories(basePackages= {"com.bbn.marti.sync.repository"})
-@EntityScan(basePackages={"com.bbn.marti.sync.model"})
+@EntityScan(basePackages={"com.bbn.marti.sync.model, tak.server.feeds"})
 public class ServerConfiguration extends SpringBootServletInitializer  {
 	/*
 	 * This configuration contains beans that common to all configs (See Constants.java for configurations)
@@ -158,7 +168,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	private static boolean noTlsConfig = true;
 
 	public static void main(String[] args) {
-
+		JavaVersionChecker.check();
 		// Redirect JUL logging to slf4j
         SLF4JBridgeHandler.removeHandlersForRootLogger();
         SLF4JBridgeHandler.install();
@@ -207,6 +217,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 
 		@SuppressWarnings("unused")
 		ApplicationContext context = application.run(args);
+		JavaVersionChecker.check(logger);
 	}
 
 	@Value("${takserver.compat.context-path}")
@@ -225,13 +236,19 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 
 		TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory();
 
-		factory.addErrorPages(new ErrorPage(HttpStatus.NOT_FOUND, "/error-404.html"));
+		factory.addErrorPages(new ErrorPage(HttpStatus.NOT_FOUND, "/error"));
 
-		factory.addErrorPages(new ErrorPage(HttpStatus.UNAUTHORIZED, "/login"));
+		String loginUrl = "/login";
+		Oauth oauthConfig = LocalConfiguration.getInstance().getConfiguration().getAuth().getOauth();
+		if (oauthConfig != null && !oauthConfig.isUseTakServerLoginPage() && !oauthConfig.getAuthServer().isEmpty()) {
+			loginUrl = "/login/auth";
+		}
 
-		factory.addErrorPages(new ErrorPage(HttpStatus.FORBIDDEN, "/login"));
+		factory.addErrorPages(new ErrorPage(HttpStatus.UNAUTHORIZED, loginUrl));
 
-		factory.addErrorPages(new ErrorPage("/error.html"));
+		factory.addErrorPages(new ErrorPage(HttpStatus.FORBIDDEN, loginUrl));
+
+		factory.addErrorPages(new ErrorPage("/error"));
 
 		Security security = config.getSecurity();
 
@@ -516,6 +533,11 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
     }
 
 	@Bean
+	public KeyGenerator inviteOnlyMissionsCacheKeyGenerator() {
+		return new InviteOnlyMissionCacheKeyGenerator();
+	}
+
+	@Bean
     public KeyGenerator methodNameMultiStringArgCacheKeyGenerator() {
         return new MethodNameMultiStringArgCacheKeyGenerator();
     }
@@ -614,16 +636,38 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		}
 
 		if (coreConfig.getConfiguration().getNetwork().getTomcatMaxPool() > -1) {
-			properties.put("server.tomcat.max-threads", coreConfig.getConfiguration().getNetwork().getTomcatMaxPool());
+			properties.put("server.tomcat.threads.max", coreConfig.getConfiguration().getNetwork().getTomcatMaxPool());
+			
+			if (coreConfig.getConfiguration().getNetwork().isTomcatPoolIdleToMax()) {
+				properties.put("server.tomcat.threads.min-spare", coreConfig.getConfiguration().getNetwork().getTomcatMaxPool());
+			}
+
+			System.out.println("Tomcat explicit worker pool size: " + coreConfig.getConfiguration().getNetwork().getTomcatMaxPool());
+
 		} else {
-			properties.put("server.tomcat.max-threads", Runtime.getRuntime().availableProcessors() * 32);
+			
+			int tomcatPoolSize = Runtime.getRuntime().availableProcessors() * coreConfig.getConfiguration().getNetwork().getTomcatPoolMultiplier();
+			
+			properties.put("server.tomcat.threads.max", tomcatPoolSize);
+			
+			if (coreConfig.getConfiguration().getNetwork().isTomcatPoolIdleToMax()) {
+				properties.put("server.tomcat.threads.min-spare", tomcatPoolSize);
+			}
+			
+			System.out.println("Tomcat computed worker pool size: " + tomcatPoolSize);
+
 		}
 
 		Connection coreDbConnection = config.getRepository().getConnection();
 
-		requireNonNull(requireNonNull(coreDbConnection, "CoreConfig db connection").getUsername(), "CoreConfig db username");
-		requireNonNull(coreDbConnection.getPassword(), "CoreConfig db password");
 		requireNonNull(coreDbConnection.getUrl(), "CoreConfig db url");
+		if (!coreDbConnection.isSslEnabled()) {
+			requireNonNull(requireNonNull(coreDbConnection, "CoreConfig db connection").getUsername(), "CoreConfig db username");
+			requireNonNull(coreDbConnection.getPassword(), "CoreConfig db connection password");	
+		}else {
+			requireNonNull(coreDbConnection.getSslCert(), "CoreConfig db connection ssl cert");
+			requireNonNull(coreDbConnection.getSslKey(), "CoreConfig db connection ssl key");
+		}
 
 		// http session timeout
 		properties.put("server.session.timeout", config.getNetwork().getHttpSessionTimeoutMinutes() * 60);
@@ -792,6 +836,11 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 
 	@Bean
 	MapLayerService mapLayerService() { return new MapLayerService(); }
+	
+	@Bean
+	public FileManagerService fileManagerService(DataSource dataSource) {
+		return new FileManagerServiceDefaultImpl(dataSource);
+	}
 
 	@Bean
 	public SubscriptionManagerProxyHandler subscriptionManagerProxyHandler(CoreConfig config) {
@@ -800,32 +849,35 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	// Used by messaging and API processes
 	@Bean
 	MissionService missionService(
-    		DataSource dataSource,
-    		MissionRepository missionRepository,
-    		MissionChangeRepository missionChangeRepository,
-    		ResourceRepository resourceRepository,
-    		LogEntryRepository logEntryRepository,
-    		SubscriptionManagerLite subscriptionManager,
-    		SubscriptionManagerProxyHandler subscriptionManagerProxy,
-    		RemoteUtil remoteUtil,
-    		Marshaller marshaller,
-    		com.bbn.marti.sync.EnterpriseSyncService syncStore,
-    		JDBCCachingKMLDao kmlDao,
-    		KMLService kmlService,
-    		CoreConfig coreConfig,
-    		SubmissionInterface submission,
-    		ExternalMissionDataRepository externalMissionDataRepository,
-    		MissionInvitationRepository missionInvitationRepository,
-    		MissionSubscriptionRepository missionSubscriptionRepository,
-    		MissionFeedRepository missionFeedRepository,
+			DataSource dataSource,
+			MissionRepository missionRepository,
+			MissionChangeRepository missionChangeRepository,
+			ResourceRepository resourceRepository,
+			LogEntryRepository logEntryRepository,
+			SubscriptionManagerLite subscriptionManager,
+			SubscriptionManagerProxyHandler subscriptionManagerProxy,
+			RemoteUtil remoteUtil,
+			Marshaller marshaller,
+			com.bbn.marti.sync.EnterpriseSyncService syncStore,
+			JDBCCachingKMLDao kmlDao,
+			KMLService kmlService,
+			CoreConfig coreConfig,
+			SubmissionInterface submission,
+			ExternalMissionDataRepository externalMissionDataRepository,
+			MissionInvitationRepository missionInvitationRepository,
+			MissionSubscriptionRepository missionSubscriptionRepository,
+			MissionFeedRepository missionFeedRepository,
 			DataFeedRepository dataFeedRepository,
-    		MapLayerService mapLayerService,
-    		GroupManager groupManager,
-    		CacheManager cacheManager,
-    		CommonUtil commonUtil,
-    		MissionRoleRepository missionRoleRepository,
-    		CoTCacheHelper cotCacheHelper,
-    		MissionCacheHelper missionCacheHelper) {
+			MissionLayerRepository missionLayerRepository,
+			MapLayerService mapLayerService,
+			GroupManager groupManager,
+			CacheManager cacheManager,
+			CommonUtil commonUtil,
+			MissionRoleRepository missionRoleRepository,
+			CoTCacheHelper cotCacheHelper,
+			MissionCacheHelper missionCacheHelper,
+			ClassificationService classificationService,
+			FileManagerService fileManagerService) {
 		return new MissionServiceDefaultImpl(
 				dataSource,
 	    		missionRepository,
@@ -846,18 +898,21 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	    		missionSubscriptionRepository,
 	    		missionFeedRepository,
 	    		dataFeedRepository,
+	    		missionLayerRepository,
 	    		mapLayerService,
 	    		groupManager,
 	    		cacheManager,
 	    		commonUtil,
 	    		missionRoleRepository,
 	    		cotCacheHelper,
-	    		missionCacheHelper);
+	    		missionCacheHelper,
+				classificationService,
+				fileManagerService);
 	}
 	
 	@Bean
-	DataFeedService dataFeedService(DataSource dataSource, DataFeedRepository dataFeedRepository, CacheManager cacheManager) {
-		return new DataFeedService(dataSource, dataFeedRepository, cacheManager);
+	DataFeedService dataFeedService(DataSource dataSource, DataFeedRepository dataFeedRepository) {
+		return new DataFeedService(dataSource, dataFeedRepository);
 	}
 
 	@Bean("kmlDao")
@@ -1070,12 +1125,25 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	}
 
 	@Bean
+	public ClassificationService classificationService() { return new ClassificationServiceImpl(); }
+
+	@Bean
 	public MissionServiceAspect missionServiceAspect() {
 		return new MissionServiceAspect();
 	}
 	
 	@Bean
+	public MissionChangeAspect missionChangeAspect() {
+		return new MissionChangeAspect();
+	}
+	
+	@Bean
 	public NetworkMetricsEndpoint networkMetrics(@Lazy MetricsCollector metricsCollector, SubscriptionManager subscriptionManager) {
 		return new NetworkMetricsEndpoint(metricsCollector, subscriptionManager);
+	}
+	
+	@Bean
+	public EnterpriseSyncCacheHelper enterpriseSyncCacheHelper() {
+		return new EnterpriseSyncCacheHelper();
 	}
 }

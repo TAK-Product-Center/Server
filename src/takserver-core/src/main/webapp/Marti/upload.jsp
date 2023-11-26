@@ -154,7 +154,7 @@ metadata is defined.</p>
 
 </form>
 
-<a href="EnterpriseSync.jsp">Back to Enterprise Sync</a>
+<a href="FileManager.html">Back to File Manager</a>
 
 <hr />
 	<%@ include file="footer.jsp" %>

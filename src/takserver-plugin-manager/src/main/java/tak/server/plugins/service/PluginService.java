@@ -6,12 +6,11 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import javax.sql.DataSource;
-
 import org.apache.ignite.Ignite;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.cache.spring.SpringCacheManager;
 import org.apache.ignite.configuration.CacheConfiguration;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -25,18 +24,20 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 
 import com.bbn.cluster.ClusterGroupDefinition;
+import com.bbn.marti.config.Cluster;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.ServerInfo;
 import com.zaxxer.hikari.HikariDataSource;
 
 import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
-import com.bbn.marti.config.Cluster;
 import tak.server.Constants;
 import tak.server.PluginManager;
 import tak.server.PluginRegistry;
+import tak.server.cache.TakIgniteSpringCacheManager;
 import tak.server.ignite.IgniteConfigurationHolder;
 import tak.server.messaging.Messenger;
 import tak.server.plugins.PluginApi;
+import tak.server.plugins.PluginCoreConfigApi;
 import tak.server.plugins.PluginDataFeedApi;
 import tak.server.plugins.PluginFileApi;
 import tak.server.plugins.PluginFileApiImpl;
@@ -52,8 +53,7 @@ import tak.server.plugins.messaging.PluginClusterMessenger;
 import tak.server.plugins.messaging.PluginMessenger;
 import tak.server.plugins.util.PluginManagerDependencyInjectionProxy;
 import tak.server.util.DataSourceUtils;
-import tak.server.cache.TakIgniteSpringCacheManager;
-import org.apache.ignite.cache.spring.SpringCacheManager;
+import tak.server.util.JavaVersionChecker;
 
 
 @SpringBootApplication(exclude = {
@@ -68,6 +68,7 @@ public class PluginService implements CommandLineRunner {
 	private static final Logger logger = LoggerFactory.getLogger(PluginService.class);
 	
 	public static void main(String[] args) {
+		JavaVersionChecker.check();
 		SpringApplication application = new SpringApplication(PluginService.class);
 		
 		boolean isK8Cluster = Arrays.stream(System.getProperties().getProperty("spring.profiles.active", "").split(","))
@@ -84,7 +85,8 @@ public class PluginService implements CommandLineRunner {
 			application.setAdditionalProfiles(profiles.toArray(new String[0]));
 		}
 		
-		ignite =  Ignition.getOrStart(IgniteConfigurationHolder.getInstance().getIgniteConfiguration(PluginManagerConstants.PLUGIN_MANAGER_IGNITE_PROFILE, "127.0.0.1", isCluster, isK8Cluster, false, false, 47500, 100, 47100, 100, 512, 600000, 52428800, 52428800));
+		ignite =  Ignition.getOrStart(IgniteConfigurationHolder.getInstance().getIgniteConfiguration
+				(PluginManagerConstants.PLUGIN_MANAGER_IGNITE_PROFILE, "127.0.0.1", isCluster, isK8Cluster, false, false, 47500, 100, 47100, 100, 512, 600000, 52428800, 52428800, -1, false, -1.f, false, false, -1, false, 300000, 300000, 600000));
 		
 		if (ignite == null) {
 			System.exit(1);
@@ -92,7 +94,8 @@ public class PluginService implements CommandLineRunner {
 
 		// start sping boot app
 		application.run(args);
-    }
+		JavaVersionChecker.check(logger);
+	}
 	
 	@Override
 	public void run(String... args) throws Exception { }
@@ -104,7 +107,7 @@ public class PluginService implements CommandLineRunner {
 	}
 	
 	@Bean
-	PluginStarter pluginIntializer(Ignite ignite, PluginDataFeedApi pdfApi, ServerInfo serverInfo, PluginApi pluginApi, PluginSelfStopApi pluginSelfStopApi, PluginMissionApi pluginMissionApi, PluginFileApi pluginFileApi) {
+	PluginStarter pluginIntializer(Ignite ignite, PluginDataFeedApi pdfApi, ServerInfo serverInfo, PluginApi pluginApi, PluginSelfStopApi pluginSelfStopApi, PluginMissionApi pluginMissionApi, PluginFileApi pluginFileApi, PluginCoreConfigApi pluginCoreConfigApi) {
 		return new PluginStarter(serverInfo, pluginApi);
 	}
 	
@@ -265,6 +268,45 @@ public class PluginService implements CommandLineRunner {
 		
 		return api;
 	}
+
+	private boolean accessPluginCoreConfigApi(PluginCoreConfigApi api) throws Exception {
+		api.getSecurity();
+		return true;
+	}
+
+	private CompletableFuture<Boolean> canAccessPluginCoreConfigApi(final PluginCoreConfigApi api) {
+
+		try {
+			logger.info("Waiting for the API process...");
+			return CompletableFuture.completedFuture(accessPluginCoreConfigApi(api));
+		} catch (Exception e) {
+			try {
+				Thread.sleep(1000L);
+			} catch (InterruptedException e1) {
+				logger.error("interruped sleep", e1);
+			}
+			return canAccessPluginCoreConfigApi(api);
+		}
+	}
+
+	@Bean
+	public PluginCoreConfigApi pluginCoreConfigApi(Ignite ignite) {
+		final PluginCoreConfigApi api = ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite))
+				.serviceProxy(Constants.DISTRIBUTED_PLUGIN_CORECONFIG_API, PluginCoreConfigApi.class, false);
+
+		boolean isApiAvailable = false;
+
+		// block and wait for PluginMissionApi to become available in API process
+		try {
+			isApiAvailable = canAccessPluginCoreConfigApi(api).get();
+		} catch (InterruptedException | ExecutionException e) {
+			logger.error("interrupted checking pluginCoreConfigApi availablity", e);
+		}
+
+		logger.info("pluginCoreConfigApi available: {}", isApiAvailable);
+
+		return api;
+	}
 	
 	@Bean
 	public PluginFileApiJDBC pluginFileApiJDBC(CoreConfig coreConfig) {
@@ -279,7 +321,7 @@ public class PluginService implements CommandLineRunner {
 
 		return new PluginFileApiImpl(pluginFileApiFromApiProcess, pluginFileApiJDBC);
 	}
-	
+
     @Bean
     public CoreConfig coreConfig(Ignite ignite) {
     	    	    	

@@ -9,4 +9,6 @@ public interface FederationHubBroker {
     void addGroupCa(X509Certificate ca);
     void updatePolicy(FederationPolicyModel federationPolicyModel);
     List<HubConnectionInfo> getActiveConnections();
+    List<String> getGroupsForNode(String federateId);
+	void deleteGroupCa(String groupId);
 }

@@ -32,7 +32,7 @@ public class MissionModels {
 
 	/**
 	 * Converts a list of values to a displayable list of key-value pairs with unicode.
-	 * The conversion by the JUnit xml to things like "&apos;" was making things incredibly unreadable in raw xml...
+	 * The conversion by the JUnit xml to things like {@literal "&apos;"} was making things incredibly unreadable in raw xml...
 	 * @param keyValuePairs
 	 * @return
 	 */
@@ -730,7 +730,8 @@ public class MissionModels {
 		MISSION_SET_ROLE,       // Can set user roles
 		MISSION_SET_PASSWORD,   // Can set the mission password
 		MISSION_UPDATE_GROUPS,  // Can update the mission groups
-		MISSION_MANAGE_FEEDS    // TODO: Add tests?
+		MISSION_MANAGE_FEEDS,   // TODO: Add tests?
+		MISSION_MANAGE_LAYERS	// TODO: Add tests?
 	}
 
 	// Server Admin: Default owner role for everything.

@@ -4,10 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
 import java.util.Date;
 
-import org.dom4j.Attribute;
-import org.dom4j.Document;
-import org.dom4j.DocumentHelper;
-import org.dom4j.Element;
+import org.dom4j.*;
 import org.dom4j.io.SAXReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,8 +30,6 @@ import tak.server.util.NumericUtil;
 public class StreamingProtoBufHelper {
 
     private static final Logger logger = LoggerFactory.getLogger(StreamingProtoBufHelper.class);
-    private static final StreamingProtoBufHelper instance = new StreamingProtoBufHelper();
-    public static StreamingProtoBufHelper getInstance() { return instance; }
 
     public final static byte MAGIC = (byte)0xbf;
     public final static String TAK_PROTO_VERSION = "1";
@@ -48,7 +43,7 @@ public class StreamingProtoBufHelper {
 
     public StreamingProtoBufHelper() {}
 
-    public TakMessage cot2protoBuf(CotEventContainer cot) {
+    public static TakMessage cot2protoBuf(CotEventContainer cot) {
         try {
         	        	
             if (cot == null) {
@@ -127,18 +122,17 @@ public class StreamingProtoBufHelper {
                      cotEventBuilder.setStaleTime(DateUtil.millisFromCotTimeStr(stale.getText()));
                  }
             }
-            
-            Date submitTime = cot.getSubmissionTime();
-            long submitMillis;
-            if (submitTime != null && (submitMillis = submitTime.getTime()) > 0) {
-            	cotEventBuilder.setSubmissionTime(submitMillis);
-            } 
-            
-            long creationTime = cot.getCreationTime();
-            if (creationTime > 0) {
-            	cotEventBuilder.setCreationTime(creationTime);
-            } 
-            
+
+            Attribute caveat = root.attribute("caveat");
+            if (caveat != null) {
+                cotEventBuilder.setCaveat(caveat.getText());
+            }
+
+            Attribute releaseableTo = root.attribute("releaseableTo");
+            if (releaseableTo != null) {
+                cotEventBuilder.setReleaseableTo(releaseableTo.getText());
+            }
+
             Attribute opex = root.attribute("opex");
             if (opex != null) {
                 cotEventBuilder.setOpex(opex.getText());
@@ -411,6 +405,18 @@ public class StreamingProtoBufHelper {
 
             TakMessage.Builder takMessageBuilder = TakMessage.newBuilder();
             takMessageBuilder.setCotEvent(cotEvent);
+
+            Date submitTime = cot.getSubmissionTime();
+            long submitMillis;
+            if (submitTime != null && (submitMillis = submitTime.getTime()) > 0) {
+                takMessageBuilder.setSubmissionTime(submitMillis);
+            }
+
+            long creationTime = cot.getCreationTime();
+            if (creationTime > 0) {
+                takMessageBuilder.setCreationTime(creationTime);
+            }
+
             TakMessage takMessage = takMessageBuilder.build();
 
             return takMessage;
@@ -428,7 +434,7 @@ public class StreamingProtoBufHelper {
 		        }
 		    };
 
-    public CotEventContainer proto2cot(TakMessage takMessage) {
+    public static CotEventContainer proto2cot(TakMessage takMessage) {
         try {
             CotEvent cotEvent = takMessage.getCotEvent();
             Document document = DocumentHelper.createDocument();
@@ -444,7 +450,17 @@ public class StreamingProtoBufHelper {
                     .addAttribute("time", DateUtil.toCotTime(cotEvent.getSendTime()))
                     .addAttribute("start", DateUtil.toCotTime(cotEvent.getStartTime()))
                     .addAttribute("stale", DateUtil.toCotTime(cotEvent.getStaleTime()));
-            
+
+            String caveat = cotEvent.getCaveat();
+            if (caveat != null && caveat.length() > 0) {
+                eventElement.addAttribute("caveat", caveat);
+            }
+
+            String releaseableTo = cotEvent.getReleaseableTo();
+            if (releaseableTo != null && releaseableTo.length() > 0) {
+                eventElement.addAttribute("releaseableTo", releaseableTo);
+            }
+
             String opex = cotEvent.getOpex();
             if (opex != null && opex.length() > 0) {
                 eventElement.addAttribute("opex", opex);
@@ -585,16 +601,12 @@ public class StreamingProtoBufHelper {
             cotEventContainer.setTimeLong(cotEvent.getSendTime());
             cotEventContainer.setStartLong(cotEvent.getStartTime());
             cotEventContainer.setStaleLong(cotEvent.getStaleTime());
-            
-            if (cotEvent.getSubmissionTime() > 0) {
-            	cotEventContainer.setSubmissionTime(new Date(cotEvent.getSubmissionTime()));
+            if (takMessage.getSubmissionTime() > 0) {
+                cotEventContainer.setSubmissionTime(new Date(takMessage.getSubmissionTime()));
             }
-            
-            
-            if (cotEvent.getCreationTime() > 0) {
-            	cotEventContainer.setCreationTime(cotEvent.getCreationTime());
+            if (takMessage.getCreationTime() > 0) {
+                cotEventContainer.setCreationTime(takMessage.getCreationTime());
             }
-                        
             cotEventContainer.setLatDouble(cotEvent.getLat());
             cotEventContainer.setLonDouble(cotEvent.getLon());
             cotEventContainer.setHaeDouble(cotEvent.getHae());
@@ -612,7 +624,7 @@ public class StreamingProtoBufHelper {
         }
     }
 
-    public int readVarint(ByteBuffer buffer) {
+    public static int readVarint(ByteBuffer buffer) {
         int next = 0;
         int nextShift = 0;
         while (buffer.remaining() > 0) {

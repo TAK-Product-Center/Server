@@ -17,6 +17,7 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.SQLException;
 import java.util.concurrent.TimeUnit;
 
 public class TestConfiguration {
@@ -56,9 +57,10 @@ public class TestConfiguration {
 		try {
 			Connection c = DriverManager.getConnection("jdbc:postgresql://" + server.getDbHost() + ":5432/cot", "martiuser", server.getDbPassword());
 			c.close();
-			log.debug(server + " SQL Host: " + server.getDbHost() + ". Status: Available");
+			log.debug("{} SQL Host: {}. Status: Available", server, server.getDbHost());
 			return true;
 		} catch (SQLException e) {
+			log.debug("SQLException occurred", e);
 			log.debug(server + " SQL Host: " + server.getDbHost() + ". Status: Unavailable");
 			return false;
 		}
@@ -98,16 +100,21 @@ public class TestConfiguration {
 		}
 
 		boolean server0Available = testDb(ImmutableServerProfiles.SERVER_0);
-		if (server0Available) {
-			dbAvailable = true;
-		} else {
-			// If not available and the host is not defined, assume Unavailable is ok
-			if (server0DBHost == null) {
-				dbAvailable = false;
+
+		if (TestConfiguration.getInstance().dbEnabled) {
+			if (server0Available) {
+				dbAvailable = true;
 			} else {
-				// Otherwise, it should have been available, so throw an exception
-				throw new RuntimeException("Cannot connect to the defined postgresql server '" + this.server0DBHost + "'!");
+				// If not available and the host is not defined, assume Unavailable is ok
+				if (server0DBHost == null) {
+					dbAvailable = false;
+				} else {
+					// Otherwise, it should have been available, so throw an exception
+					throw new RuntimeException("Cannot connect to the defined postgresql server '" + this.server0DBHost + "'!");
+				}
 			}
+		} else {
+			dbAvailable = false;
 		}
 
 		if (dbAvailable) {

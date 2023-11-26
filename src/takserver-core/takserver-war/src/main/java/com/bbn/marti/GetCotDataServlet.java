@@ -92,7 +92,7 @@ public class GetCotDataServlet extends EsapiServlet {
 		// query by cot uid
 		if (cotUid != null) {
 		    // get latest cot event by uid
-		    String cotQuery = "SELECT id, uid, cot_type, access, qos, opex, start, time, stale, how, point_hae, point_ce, point_le, detail, servertime, event_pt, ST_AsText(event_pt) FROM cot_router WHERE uid = ? ORDER BY id DESC LIMIT 1";
+		    String cotQuery = "SELECT id, uid, cot_type, access, qos, opex, start, time, stale, how, point_hae, point_ce, point_le, detail, servertime, caveat, releaseableto, event_pt, ST_AsText(event_pt) FROM cot_router WHERE uid = ? ORDER BY id DESC LIMIT 1";
 		    try {
 		    	try (Connection connection = ds.getConnection(); PreparedStatement stmt = queryWrapper.prepareStatement(cotQuery, connection)) {
 		    		stmt.setString(1, cotUid);
@@ -113,7 +113,7 @@ public class GetCotDataServlet extends EsapiServlet {
 
 		} else if (cotId >= 0) {
 		    // query DB for CoT meta-data on cotId
-		    String cotQuery = "SELECT id, uid, cot_type, access, qos, opex, start, time, stale, how, point_hae, point_ce, point_le, detail, servertime, event_pt, ST_AsText(event_pt) FROM cot_router WHERE id = ?";
+		    String cotQuery = "SELECT id, uid, cot_type, access, qos, opex, start, time, stale, how, point_hae, point_ce, point_le, detail, servertime, caveat, releaseableto, event_pt, ST_AsText(event_pt) FROM cot_router WHERE id = ?";
 		    try (Connection connection = ds.getConnection(); PreparedStatement stmt = queryWrapper.prepareStatement(cotQuery, connection)) {
 		        stmt.setInt(1, cotId);
 		        

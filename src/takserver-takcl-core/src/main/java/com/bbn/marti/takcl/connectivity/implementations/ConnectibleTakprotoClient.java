@@ -285,6 +285,7 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 
 		public static final int MAX_SIZE = 65536;
 		public static final String TAKPROTO_PATH = "/takproto/1";
+	    	private final Logger log = LoggerFactory.getLogger(ConnectibleTakprotoClient.class);
 
 		private interface TakserverService {
 			@GET("/index.html")
@@ -308,7 +309,6 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 							// TODO: Not this
 							return true;
 						});
-
 				Retrofit retrofit = new Retrofit.Builder()
 						.baseUrl(serverUrl)
 						.client(okHttpClientBuilder.build())
@@ -352,7 +352,7 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 				//
 				// Convert CotEventContainer to protobuf
 				//
-				Takmessage.TakMessage takMessage = StreamingProtoBufHelper.getInstance().cot2protoBuf(data);
+				Takmessage.TakMessage takMessage = StreamingProtoBufHelper.cot2protoBuf(data);
 				if (takMessage == null) {
 					System.err.println("cot2protoBuf failed to parse message!");
 					return null;
@@ -521,7 +521,7 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 
 							// parse and broadcast the message
 							Takmessage.TakMessage takMessage = Takmessage.TakMessage.parseFrom(eventBytes);
-							CotEventContainer cotEventContainer = StreamingProtoBufHelper.getInstance().proto2cot(takMessage);
+							CotEventContainer cotEventContainer = StreamingProtoBufHelper.proto2cot(takMessage);
 							String result = cotEventContainer.asXml();
 							responseListener.accept(result);
 

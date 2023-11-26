@@ -26,9 +26,6 @@ public interface MapLayerRepository extends JpaRepository<MapLayer, Long> {
 
     List<MapLayer> findAllByMissionIsNull(Sort sort);
 
-    @Transactional
-    void deleteByUid(String uid);
-
     @Modifying
     @Transactional
     @Query(value = "update maplayer set default_layer = false")
@@ -38,5 +35,10 @@ public interface MapLayerRepository extends JpaRepository<MapLayer, Long> {
     @Transactional
     @Query(value = "delete from maplayer where mission_id = :mission_id", nativeQuery = true)
     void deleteAllByMissionId(@Param("mission_id") Long mission_id);
+
+    @Modifying
+    @Transactional
+    @Query(value = "delete from maplayer where uid = :uid", nativeQuery = true)
+    void deleteByUid(@Param("uid") String uid);
 }
 

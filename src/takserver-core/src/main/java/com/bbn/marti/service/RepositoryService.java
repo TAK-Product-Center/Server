@@ -41,6 +41,7 @@ import com.bbn.cot.filter.Filter;
 import com.bbn.cot.filter.ImageFormattingFilter;
 import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Repository;
+import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.remote.ConnectionEventTypeValue;
 import com.bbn.marti.remote.ImagePref;
 import com.bbn.marti.remote.QueueMetric;
@@ -143,9 +144,9 @@ public class RepositoryService extends BaseService {
 	        if (c.getContextValue(Constants.ARCHIVE_EVENT_KEY) != null && !((Boolean) c.getContextValue(Constants.ARCHIVE_EVENT_KEY)).booleanValue()) {
 	            return false;
 	        }
-	        
-	        // This is the case where c is a datafeed message, and the datafeed archive is disabled 
-			if (c.getContextValue(Constants.DATA_FEED_KEY) != null && ((DataFeed) c.getContextValue(Constants.DATA_FEED_KEY)).isArchive() == false) { 
+
+	        // This is the case where c is a datafeed message, and the datafeed archive is disabled
+			if (c.getContextValue(Constants.DATA_FEED_KEY) != null && ((DataFeed) c.getContextValue(Constants.DATA_FEED_KEY)).isArchive() == false) {
 				return false;
 			}
 	    } catch (Exception e) {
@@ -234,12 +235,12 @@ public class RepositoryService extends BaseService {
 					}
 					}
 				});
-				
+
 			} catch (RejectedExecutionException ree) {
 				// count how often full queue has blocked message send
 				Metrics.counter(Constants.METRIC_REPOSITORY_QUEUE_FULL_SKIP).increment();
 			}
-		}	
+		}
 	}
 
 	private static final String cotRouterTableName = "cot_router";
@@ -257,9 +258,9 @@ public class RepositoryService extends BaseService {
 							+ "start, time, stale, detail, "
 							+ "access, qos, opex, "
 							+ "how, point_hae, point_ce, point_le, groups, "
-							+ "id, servertime) VALUES "
-							+ "(?,ST_GeometryFromText(?, 4326),?,?,?,?,?,?,?,?,?,?,?,?,(?)::bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + "), nextval('cot_router_seq'),?) ")) {
-				
+							+ "id, servertime, caveat, releaseableto) VALUES "
+							+ "(?,ST_GeometryFromText(?, 4326),?,?,?,?,?,?,?,?,?,?,?,?,(?)::bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + "), nextval('cot_router_seq'),?,?,?) ")) {
+
 				// formats each cot message as we iterate over it
 				Iterable<CotEventContainer> imageFormattedEvents = Iterables.filter(events, imageFilter);
 				LinkedList<CotEventContainer> toRemove = new LinkedList<>();
@@ -304,15 +305,15 @@ public class RepositoryService extends BaseService {
 							}
 							continue;
 						}
-						
+
 						event.setContext(Constants.GROUPS_BIT_VECTOR_KEY, groupsBitVector);
-						
-						// CoT is valid, but came from a data feed. add it to the list and let {#archiveBatchDataFeedCot()}	handle it					
+
+						// CoT is valid, but came from a data feed. add it to the list and let {#archiveBatchDataFeedCot()}	handle it
 						if (event.getContextValue(Constants.DATA_FEED_KEY) != null) {
 							dataFeedEvents.add(event);
 							continue;
 						}
-						
+
 						setCotQueryParams(cotRouterInsert, event);
 
 						cotRouterInsert.addBatch();
@@ -333,7 +334,7 @@ public class RepositoryService extends BaseService {
 					log.debug("exception executing CoT insert batch ", e);
 				}
 			}
-			
+
 			archiveBatchDataFeedCot(dataFeedEvents, connection);
 
 		} catch (SQLException eee) {
@@ -342,8 +343,9 @@ public class RepositoryService extends BaseService {
 			}
 		}
 	}
-	
+
 	private void setCotQueryParams(PreparedStatement dataFeedInsert, CotEventContainer event) throws SQLException {
+
 		dataFeedInsert.setString(1, event.getUid());
 		dataFeedInsert.setString(2, "POINT(" + event.getLon() + " "
 				+ event.getLat() + ")");
@@ -366,7 +368,7 @@ public class RepositoryService extends BaseService {
 		dataFeedInsert.setDouble(14, event.getLe());
 
 		dataFeedInsert.setString(15, RemoteUtil.getInstance().bitVectorToString((boolean[]) event.getContext(Constants.GROUPS_BIT_VECTOR_KEY)));
-		
+
 		//
 		// check to see if this event has serverTime (set by SubmissionService.processNextEvent)
 		//
@@ -378,9 +380,12 @@ public class RepositoryService extends BaseService {
 		}
 		dataFeedInsert.setTimestamp(16, new Timestamp(DatatypeConverter
 				.parseDateTime(serverTime).getTimeInMillis()), utcCalendar);
+
+		dataFeedInsert.setString(17, event.getCaveat());
+		dataFeedInsert.setString(18, event.getReleaseableTo());
 	}
-	
-	// link the Cot UID to the data feed it came from	
+
+	// link the Cot UID to the data feed it came from
 	private void archiveBatchDataFeedCot(List<CotEventContainer> events, Connection connection) {
 
 		if (events.size() != 0) {
@@ -391,16 +396,16 @@ public class RepositoryService extends BaseService {
 					+ "start, time, stale, detail, "
 					+ "access, qos, opex, "
 					+ "how, point_hae, point_ce, point_le, groups, "
-					+ "id, servertime) VALUES "
-					+ "(?,ST_GeometryFromText(?, 4326),?,?,?,?,?,?,?,?,?,?,?,?,(?)::bit(" 
-					+ RemoteUtil.GROUPS_BIT_VECTOR_LEN + "), nextval('cot_router_seq'),?) returning id)" 
+					+ "id, servertime, caveat, releaseableto) VALUES "
+					+ "(?,ST_GeometryFromText(?, 4326),?,?,?,?,?,?,?,?,?,?,?,?,(?)::bit("
+					+ RemoteUtil.GROUPS_BIT_VECTOR_LEN + "), nextval('cot_router_seq'),?,?,?) returning id)"
 					+ " INSERT INTO data_feed_cot (cot_router_id, data_feed_id) VALUES ((SELECT id FROM inserted_row), (SELECT id FROM data_feed WHERE uuid = ?))")) {
-	
+
 				for (CotEventContainer event : events) {
 					try {
 						setCotQueryParams(dataFeedInsert, event);
-						
-						dataFeedInsert.setString(17, ((DataFeed) event.getContext(Constants.DATA_FEED_KEY)).getUuid());
+
+						dataFeedInsert.setString(19, ((DataFeed) event.getContext(Constants.DATA_FEED_KEY)).getUuid());
 
 						dataFeedInsert.execute();
 					} catch (Exception e) {
@@ -761,7 +766,6 @@ public class RepositoryService extends BaseService {
 	 * @param callsign  String (required)
 	 * @param uid       String (required)
 	 * @param eventType ConnectionEventTypeValue (required)
-	 * @return boolean indicating success
 	 */
 	public void auditCallsignUIDEventAsync(String callsign, String uid, String username, ConnectionEventTypeValue eventType, String groupVector) {
 
@@ -772,6 +776,13 @@ public class RepositoryService extends BaseService {
 		if (!config.getRepository().isEnableCallsignAudit()) {
 			return;
 		}
+
+		// don't include the generated uuid for anonymous users in the audit
+		if (username.startsWith(GroupFederationUtil.ANONYMOUS_USERNAME_BASE)) {
+			username = GroupFederationUtil.ANONYMOUS_USERNAME_BASE;
+		}
+
+		final String fusername = username;
 
 		Resources.callsignAuditExecutor.execute(() -> {
 
@@ -788,7 +799,7 @@ public class RepositoryService extends BaseService {
 							"select ce.id, cet.id, current_timestamp, (?)::bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + ") " +
 							"from client_endpoint ce join connection_event_type cet on cet.event_name = ? " +
 							"where ce.callsign = ? and ce.uid = ? and username = ?");
-					
+
 					if (log.isDebugEnabled()) {
 						log.debug("Insert client endpoint callsign: " + callsign + " uid: " + uid);
 					}
@@ -798,10 +809,10 @@ public class RepositoryService extends BaseService {
 						try (PreparedStatement ps_ep = conn.prepareStatement(ep_sql)) {
 							ps_ep.setString(1, callsign);
 							ps_ep.setString(2, uid);
-							ps_ep.setString(3, username);
+							ps_ep.setString(3, fusername);
 							ps_ep.setString(4, callsign);
 							ps_ep.setString(5, uid);
-							ps_ep.setString(6, username);
+							ps_ep.setString(6, fusername);
 							ps_ep.executeUpdate();
 
 							// Insert a client endpoint row
@@ -810,7 +821,7 @@ public class RepositoryService extends BaseService {
 								ps_epe.setString(2, eventType.value());
 								ps_epe.setString(3, callsign);
 								ps_epe.setString(4, uid);
-								ps_epe.setString(5, username);
+								ps_epe.setString(5, fusername);
 								ps_epe.executeUpdate();
 							}
 						}
@@ -832,8 +843,6 @@ public class RepositoryService extends BaseService {
 	/**
 	 * Insert Disconnect events for any client endpoints that may have not been properly
 	 * disconnected due to a sudden CORE broker shutdown. Called from MartiMain during startup.
-	 *
-	 * @return boolean indicating success
 	 */
 
 	//    @CacheEvict(value = Constants.CONTACTS_CACHE, allEntries = true)
@@ -950,13 +959,6 @@ public class RepositoryService extends BaseService {
 			try (ResultSet rs = ps.executeQuery()) {
 
 				if (rs.next()) {
-
-					//					private String name;
-					//					private String creatorUid;
-					//					private String chatRoom;
-					//					private String tool;
-					//					private String description;
-
 					mm.setName(missionName);
 					mm.setCreatorUid(rs.getString(1));
 					mm.setChatRoom(rs.getString(2));

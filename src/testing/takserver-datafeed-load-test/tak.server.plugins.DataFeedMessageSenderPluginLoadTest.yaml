@@ -1,5 +1,5 @@
 numberOfFeeds: 50
-numberOfTracksPerFeed: 800
-delay: 1
+numberOfTracksPerFeed: 400
+delay: 10
 numberOfThreads: 3
 system: {archive: true}

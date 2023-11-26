@@ -5,14 +5,13 @@ package com.bbn.marti.sync;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
+import javax.servlet.AsyncContext;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -54,161 +53,163 @@ public class ContentServlet extends EnterpriseSyncServlet {
 
 	private static final int DEFAULT_PARAMETER_LENGTH = 1024;
 
-	private void getResource(HttpServletRequest request, HttpServletResponse response, HttpMethod method)
-			throws ServletException, IOException {
-
-	  Metrics.counter("DownloadMissionContent", "missions", "content").increment();
-
-	  initAuditLog(request);
-	  // Get group vector for the user associated with this session
-	  String groupVector = commonUtil.getGroupBitVector(request);
-
-	  if (Strings.isNullOrEmpty(groupVector)) {
-	  	throw new IllegalStateException("empty group vector");
-	  }
-
-	  log.finer("group vector: " + groupVector);
-
-      String remoteHost = "unidentified host";
-      String context = "GET request parameters";
-      byte[] content = new byte[0];
-      Metadata match = null;
-      List<Metadata> matches = null;
-      try {
-        String requestHost = request.getRemoteHost();
-        if (requestHost != null && validator != null) {
-          remoteHost = validator.getValidInput(context, requestHost, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
-        }
-        // Parse & validate the request parameters
-        String uid = getUid(request.getParameterMap());
-		String hash = getHash(request.getParameterMap());
-		Integer offset = getOffset(request.getParameterMap());
-
-		String query = "uid: " + uid + "; hash: " + hash + "; offset " + offset;
-		if (logger.isDebugEnabled()) {
-			logger.debug(query);
-		}
+	private void getResource(AsyncContext async, HttpMethod method) throws ServletException, IOException {
 		
-        if (uid != null){
-          content = enterpriseSyncService.getContentByUid(uid, groupVector);
-          matches = enterpriseSyncService.getMetadataByUid(uid, groupVector);
-        } else if( hash != null) {
-			content = enterpriseSyncService.getContentByHash(hash, groupVector);
-			if (logger.isDebugEnabled()) {
-				logger.debug("content by hash size: " + (content != null ? content.length : "null"));
+		HttpServletRequest request = (HttpServletRequest) async.getRequest();
+		HttpServletResponse response = (HttpServletResponse) async.getResponse();
+		
+		Metrics.counter("DownloadMissionContent", "missions", "content").increment();
+
+		initAuditLog(request);
+		// Get group vector for the user associated with this session
+		String groupVector = commonUtil.getGroupBitVector(request);
+
+		if (Strings.isNullOrEmpty(groupVector)) {
+			throw new IllegalStateException("empty group vector");
+		}
+
+		String remoteHost = "unidentified host";
+		String context = "GET request parameters";
+		byte[] content = new byte[0];
+		Metadata match = null;
+		List<Metadata> matches = null;
+		try {
+			String requestHost = request.getRemoteHost();
+			if (requestHost != null && validator != null) {
+				remoteHost = validator.getValidInput(context, requestHost, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
 			}
-			try {
-			    matches = enterpriseSyncService.getMetadataByHash(hash, groupVector);
-			} catch (Exception e) {
+			// Parse & validate the request parameters
+			String uid = getUid(request.getParameterMap());
+			String hash = getHash(request.getParameterMap());
+			Integer offset = getOffset(request.getParameterMap());
+
+			String query = "uid: " + uid + "; hash: " + hash + "; offset " + offset;
+			if (logger.isDebugEnabled()) {
+				logger.debug(query);
+			}
+
+			if (hash != null) {
+				content = enterpriseSyncService.getContentByHash(hash, groupVector);
 				if (logger.isDebugEnabled()) {
-					logger.debug("exception getting metadata " + e.getMessage(), e);
+					logger.debug("content by hash size: " + (content != null ? content.length : "null"));
+				}
+				try {
+					matches = enterpriseSyncService.getMetadataByHash(hash, groupVector);
+				} catch (Exception e) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("exception getting metadata " + e.getMessage(), e);
+					}
+				}
+			} else if (uid != null){
+				content = enterpriseSyncService.getContentByUid(uid, groupVector);
+				matches = enterpriseSyncService.getMetadataByUid(uid, groupVector);
+			}
+
+			if (matches == null || matches.isEmpty()) {
+				throw new NotFoundException("no metadata results for " + query);
+			}
+
+			if (content == null) {
+				if (logger.isErrorEnabled()) {
+					logger.error("found null content for :" + StringUtils.normalizeSpace(query));
+				}
+				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+				return;
+			}
+
+			// Just take the first one on the list, which is the most recent
+			match = matches.get(0);
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("Metadata is: " + match.toJSONObject().toString());
+			}
+
+			String mimeType = match.getFirst(Metadata.Field.MIMEType);
+			if(validator != null && validator.isValidInput("MIME Type", mimeType, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false)) {
+				// Set MIME type of HTTP response
+				if (response.containsHeader("Content-Type")) {
+					response.setHeader("Content-Type", mimeType);
+				} else {
+					response.addHeader("Content-Type", mimeType);
 				}
 			}
-		}
 
-	  	if (matches == null || matches.isEmpty()) {
-        	throw new NotFoundException("no metadata results for " + query);
-	  	}
+			// Set file name of HTTP response
+			String filename = match.getFirstSafely(Metadata.Field.DownloadPath);
 
-	  	if (content == null) {
-			  if (logger.isErrorEnabled()) {
-				  logger.error("found null content for :" + StringUtils.normalizeSpace(query));
-			  }
+			if (filename.isEmpty()) {
+				filename = match.getFirstSafely(Metadata.Field.Name);
+			}
+
+			if (filename.isEmpty()) {
+				filename = DEFAULT_FILENAME;
+			}
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("enterprise sync filename: " + filename);
+			}
+
+			String contentDisposition = "inline; filename=" + filename;
+			if (validator != null && validator.isValidInput("Content Disposition", contentDisposition, "Filename", DEFAULT_PARAMETER_LENGTH, false)) {
+				if (response.containsHeader("Content-Disposition")) {
+					response.setHeader("Content-Disposition", contentDisposition);
+				} else {
+					response.addHeader("Content-Disposition", contentDisposition);
+				}
+			}
+
+			response.setStatus(HttpServletResponse.SC_OK);
+
+			if (method == HttpMethod.GET) {
+
+
+				// apply offset param
+				if (offset != null && offset > 0) {
+
+					// validate the offset
+					if (content.length < 1 || offset > content.length - 1) {
+						throw new IllegalArgumentException("invalid offset " + offset + " for file size " + content.length);
+					}
+
+					if (logger.isInfoEnabled()) {
+						logger.info("applying offset " + offset);
+					}
+					content = Arrays.copyOfRange(content, offset, content.length);
+				}
+
+				try (OutputStream outStream = response.getOutputStream()) {
+
+					if (outStream == null) {
+						logger.error("response.getOutputStream() returned null!");
+						response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+						return;
+					}
+
+					outStream.write(content);
+				}
+			}		
+
+		} catch (NamingException | SQLException ex) {
+			logger.error("error fetching file " + ex.getMessage(), ex);
 			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			return;
+		} catch (IntrusionException e) {
+			logger.error("Intrusion attempt from " + remoteHost + ": " + e.getMessage());
+			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Intrusion attempt detected! HTTP request denied.");
+			return;
+		} catch (ValidationException | IllegalArgumentException e) {
+			logger.error("Invalid input from " + remoteHost + ": " + e.getMessage());
+			response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+			return;
+		} catch (NotFoundException e) {
+			logger.debug("Query didn't return anything ", e);
+			response.sendError(HttpServletResponse.SC_NOT_FOUND, "File not found");
+		} catch (Exception e) {
+			logger.error("Exception in getResource ", e);
+			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+		} finally {
+			async.complete();
 		}
-
-	  	// Just take the first one on the list, which is the most recent
-	  	match = matches.get(0);
-
-	  	if (logger.isDebugEnabled()) {
-	  		logger.debug("Metadata is: " + match.toJSONObject().toString());
-	  	}
-
-		String mimeType = match.getFirst(Metadata.Field.MIMEType);
-        if(validator != null && validator.isValidInput("MIME Type", mimeType, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false)) {
-			  // Set MIME type of HTTP response
-			  if (response.containsHeader("Content-Type")) {
-				  response.setHeader("Content-Type", mimeType);
-			  } else {
-				  response.addHeader("Content-Type", mimeType);
-			  }
-        }
-
-        // Set file name of HTTP response
-        String filename = match.getFirstSafely(Metadata.Field.DownloadPath);
-        
-        if (filename.isEmpty()) {
-          filename = match.getFirstSafely(Metadata.Field.Name);
-        }
-     
-        if (filename.isEmpty()) {
-          filename = DEFAULT_FILENAME;
-        }
-
-        if (logger.isDebugEnabled()) {
-        	logger.debug("enterprise sync filename: " + filename);
-        }
-
-        String contentDisposition = "inline; filename=" + filename;
-        if (validator != null && validator.isValidInput("Content Disposition", contentDisposition, "Filename", DEFAULT_PARAMETER_LENGTH, false)) {
-        	if (response.containsHeader("Content-Disposition")) {
-        		response.setHeader("Content-Disposition", contentDisposition);
-        	} else {
-        		response.addHeader("Content-Disposition", contentDisposition);
-        	}
-        }
-
-        response.setStatus(HttpServletResponse.SC_OK);
-
-	    if (method == HttpMethod.GET) {
-
-
-			// apply offset param
-			if (offset != null && offset > 0) {
-
-				// validate the offset
-				if (content.length < 1 || offset > content.length - 1) {
-					throw new IllegalArgumentException("invalid offset " + offset + " for file size " + content.length);
-				}
-
-				if (logger.isInfoEnabled()) {
-					logger.info("applying offset " + offset);
-				}
-				content = Arrays.copyOfRange(content, offset, content.length);
-			}
-
-			try (OutputStream outStream = response.getOutputStream()) {
-
-				if (outStream == null) {
-					logger.error("response.getOutputStream() returned null!");
-					response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-					return;
-				}
-
-				outStream.write(content);
-			}
-	    }		
-		
-      } catch (NamingException | SQLException ex) {
-        logger.error("error fetching file " + ex.getMessage(), ex);
-        response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-        return;
-      } catch (IntrusionException e) {
-        logger.error("Intrusion attempt from " + remoteHost + ": " + e.getMessage());
-        response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Intrusion attempt detected! HTTP request denied.");
-        return;
-      } catch (ValidationException | IllegalArgumentException e) {
-        logger.error("Invalid input from " + remoteHost + ": " + e.getMessage());
-        response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
-        return;
-      } catch (NotFoundException e) {
-        logger.debug("Query didn't return anything " + e.getMessage(), e);
-        response.sendError(HttpServletResponse.SC_NOT_FOUND, "File not found");
-      } catch (Exception e) {
-		logger.error("Exception in getResource! " + e.getMessage(), e);
-		response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-	  }
 	}
 
 	/**
@@ -229,13 +230,38 @@ public class ContentServlet extends EnterpriseSyncServlet {
 	@Override
 	protected void doGet(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
-		getResource(request, response, HttpMethod.GET);
+
+		AsyncContext async = request.startAsync();
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("GET resource");
+		}
+
+		async.start(() -> {
+			try {
+				getResource(async, HttpMethod.GET);
+			} catch (Exception e) {
+				logger.error("error processing getResource", e);
+			} 
+		});		
 	}
 
 	@Override
-	protected void doHead(HttpServletRequest request, HttpServletResponse response)
-			throws ServletException, IOException {
-		getResource(request, response, HttpMethod.HEAD);
+	protected void doHead(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		
+		AsyncContext async = request.startAsync();
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("HEAD resource");
+		}
+
+		async.start(() -> {
+			try {
+				getResource(async, HttpMethod.HEAD);
+			} catch (Exception e) {
+				logger.error("error processing HEAD getResource", e);
+			} 
+		});		
 	}
 
 	/**

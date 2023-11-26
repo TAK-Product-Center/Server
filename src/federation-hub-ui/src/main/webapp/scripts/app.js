@@ -13,6 +13,7 @@ angular
         'ngAnimate',
         'ngCookies',
         'ngResource',
+        'ngStorage',
         'ngMessages',
         'ngFileSaver',
         'ui.router',
@@ -933,6 +934,24 @@ angular
                 controller: 'AddFederationOutgoingController'
             });
 
+            modalStateProvider.state('workflows.editor.connections', {
+                backdrop: 'static',
+                keyboard: false,
+                size: 'lg',
+                url: '/connections',
+                templateUrl: "views/connections/connections.html",
+                controller: 'ConnectionsController'
+            });
+
+             modalStateProvider.state('workflows.editor.modifyCa', {
+                backdrop: 'static',
+                keyboard: false,
+                size: 'lg',
+                url: '/modifyCa',
+                templateUrl: "views/ca/ca.html",
+                controller: 'CaController'
+            });
+
             modalStateProvider.state('workflows.editor.addBPMNFederatePolicy', {
                 backdrop: 'static',
                 keyboard: false,
@@ -1073,6 +1092,7 @@ angular
     .config(function (JSONFormatterConfigProvider) {
         JSONFormatterConfigProvider.hoverPreviewEnabled = true;
     })
+
 //
 //.run(function($rootScope, $state, AUTH_EVENTS, ACCESS_EVENTS, growl, AuthenticationService) {
 //

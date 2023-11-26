@@ -19,11 +19,17 @@ public class MessagingConfigInfo implements Serializable {
     private String dbUsername;
     private String dbPassword;
     private String dbUrl;
+    private boolean sslEnabled;
+    private String sslMode;
+    private String sslCert;
+    private String sslKey;
+    private String sslRootCert;
 
     public MessagingConfigInfo(){}
 
     public MessagingConfigInfo(boolean latestSA, int numDbConnections, boolean connectionPoolAutoSize,
-                               boolean archive, String dbUsername, String dbPassword, String dbUrl) {
+                               boolean archive, String dbUsername, String dbPassword, String dbUrl,
+                               boolean sslEnabled, String sslMode, String sslCert, String sslKey, String sslRootCert) {
     	this.latestSA = latestSA;
     	this.numDbConnections = numDbConnections;
     	this.numAutoDbConnections = 200 + (int)Math.min(845, (Runtime.getRuntime().availableProcessors() - 4) * 9.2);
@@ -32,6 +38,11 @@ public class MessagingConfigInfo implements Serializable {
     	this.dbUsername = dbUsername;
     	this.dbPassword = dbPassword;
     	this.dbUrl = dbUrl;
+    	this.sslEnabled = sslEnabled;
+    	this.sslMode = sslMode;
+    	this.sslCert = sslCert;
+    	this.sslKey = sslKey;
+    	this.sslRootCert = sslRootCert;
     }
 
     public boolean isLatestSA() {
@@ -97,4 +108,45 @@ public class MessagingConfigInfo implements Serializable {
     public void setDbUrl(String dbUrl) {
         this.dbUrl = dbUrl;
     }
+
+	public boolean isSslEnabled() {
+		return sslEnabled;
+	}
+
+	public void setSslEnabled(boolean sslEnabled) {
+		this.sslEnabled = sslEnabled;
+	}
+
+	public String getSslMode() {
+		return sslMode;
+	}
+
+	public void setSslMode(String sslMode) {
+		this.sslMode = sslMode;
+	}
+
+	public String getSslCert() {
+		return sslCert;
+	}
+
+	public void setSslCert(String sslCert) {
+		this.sslCert = sslCert;
+	}
+
+	public String getSslKey() {
+		return sslKey;
+	}
+
+	public void setSslKey(String sslKey) {
+		this.sslKey = sslKey;
+	}
+
+	public String getSslRootCert() {
+		return sslRootCert;
+	}
+
+	public void setSslRootCert(String sslRootCert) {
+		this.sslRootCert = sslRootCert;
+	}
+
 }

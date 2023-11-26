@@ -14,8 +14,8 @@
       <div data-ng-hide="dbConfig.connectionPoolAutoSize">Connection Pool auto-detection is disabled, default value will be used.</div>
       <div data-ng-if="hasAdminRole && actualNum > maxConnections">
       Increasing the <strong>max_connections</strong> property in the PostgreSQL database configuration to at least <strong>{{(actualNum * 2) + 10}}</strong> is suggested.<br>Increasing the <strong>max_buffers</strong> 
-      property is also suggested.<br>On a RHEL 7 or CentOS 7 system this configuration file is normally located at <strong>/var/lib/pgsql/10/data/postgresql.conf</strong><br>
-      See PostgreSQL <a href="https://www.postgresql.org/docs/10/runtime-config-connection.html">documentation</a> for further information.</div>
+      property is also suggested.<br>On RHEL, CentOS, and Rocky systems this configuration file is normally located at <strong>/var/lib/pgsql/15/data/postgresql.conf</strong><br>On Debian, Ubuntu, and RaspPi systems this configuration file is normally located at <strong>/etc/postgresql/15/main/postgresql.conf</strong><br>
+      See PostgreSQL <a href="https://www.postgresql.org/docs/15/runtime-config-connection.html">documentation</a> for further information.</div>
       <br> 
 	   Database URL:<strong> {{dbConfig.dbUrl}}</strong><br>
        Database Username:<strong> {{dbConfig.dbUsername}}</strong><br>

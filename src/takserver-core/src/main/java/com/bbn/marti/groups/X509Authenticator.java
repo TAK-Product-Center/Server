@@ -16,6 +16,7 @@ import javax.naming.NamingException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 
+import io.jsonwebtoken.JwtException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,11 +140,11 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                 user.setName(cert.token);
                 try {
                     groupManager.authenticate("oauth", user);
-                } catch (OAuth2Exception e) {
+                } catch (OAuth2Exception | JwtException e) {
                     if (logger.isDebugEnabled()) {
-                        logger.debug("found expired token in certificate: " + cert.token);
+                        logger.debug("{} {} ", e.getMessage(), cert.token);
                     }
-                    throw new TakException(cert.token);
+                    throw new TakException();
                 }
 
                 if (input == null) {
@@ -190,7 +191,9 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                 // contains the channels ext key usage attribute (using Challenge Password OID)
                 if (DistributedConfiguration.getInstance().getAuth().isX509UseGroupCache()) {
                     try {
-                        useGroupCache = user.getCert().getExtendedKeyUsage().contains("1.2.840.113549.1.9.7");
+                        useGroupCache =
+                                user.getCert().getExtendedKeyUsage().contains("1.2.840.113549.1.9.7") ||
+                                !DistributedConfiguration.getInstance().getAuth().isX509UseGroupCacheRequiresExtKeyUsage();
                     } catch (CertificateParsingException cpe) {
                         logger.error("exception getting cert's extendedKeyUsage", cpe);
                     }
@@ -443,7 +446,13 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
             activeGroupCacheHelper.setActiveGroupsForUser(username, activeGroups);
 
             // notify the user that their cache has been updated
-            DistributedSubscriptionManager.getInstance().sendGroupsUpdatedMessage(username, null);
+            try {
+                DistributedSubscriptionManager.getInstance().sendGroupsUpdatedMessage(username, null);
+            } catch (Exception e) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("exception calling sendGroupsUpdatedMessage!", e);
+                }
+            }
         }
 
         // remove any inactive cache entries prior to push the groups to the user

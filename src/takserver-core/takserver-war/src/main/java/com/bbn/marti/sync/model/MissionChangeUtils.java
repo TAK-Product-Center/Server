@@ -177,15 +177,10 @@ public class MissionChangeUtils {
     
 	public static void findAndSetTransientValuesForMissionChange(MissionChange missionChange) {
 		
-		logger.debug("~~~~ Finding ContentType for missionChange");
 		findAndSetContentResource(missionChange);
-		logger.debug("~~~~ Finding UidDetails for missionChange");
 		findAndSetUidDetails(missionChange);
-		logger.debug("~~~~ Finding MissionFeed for missionChange");
 		findAndSetMissionFeed(missionChange);
-		logger.debug("~~~~ Finding MapLayer for missionChange");
 		findAndSetMapLayer(missionChange);
-        logger.debug("~~~~ Finding MapLayer for externalData");
         findAndSetExternalMissionData(missionChange);
 
 	}

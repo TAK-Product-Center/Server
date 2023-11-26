@@ -286,4 +286,16 @@ public class CotApi extends BaseRestController {
     		return new ResponseEntity<String>(result.toString(), headers, HttpStatus.OK);
     	};
     }
+    
+    @RequestMapping(value = "/cot/matchUid", method = RequestMethod.GET)
+    ResponseEntity<List<String>> getCotEventsByTimeAndBbox(
+		@RequestParam(value = "search", defaultValue = " ", required = false) String search){
+    	
+    	final String sessionId = requestHolder.sessionId();
+		final String groupVector = commonUtil.getGroupVectorBitString(sessionId);
+		
+		List<String> results = missionService.getAllCotForString(search, groupVector);
+		HttpHeaders headers = new HttpHeaders();
+		return new ResponseEntity<List<String>>(results, headers, HttpStatus.OK);
+    }
 }

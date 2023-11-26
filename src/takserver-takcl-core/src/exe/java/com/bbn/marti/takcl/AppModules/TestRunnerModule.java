@@ -1,16 +1,14 @@
 package com.bbn.marti.takcl.AppModules;
 
 import com.bbn.marti.takcl.AppModules.generic.AppModuleInterface;
-import com.bbn.marti.takcl.TakclIgniteHelper;
-import com.bbn.marti.takcl.TestConfiguration;
-import com.bbn.marti.takcl.TestExceptions;
-import com.bbn.marti.takcl.TestLogger;
+import com.bbn.marti.takcl.*;
 import com.bbn.marti.takcl.cli.EndUserReadableException;
 import com.bbn.marti.takcl.cli.simple.Command;
 import com.bbn.marti.takcl.config.common.TakclRunMode;
 import com.bbn.marti.test.shared.AbstractSingleServerTestClass;
 import com.bbn.marti.test.shared.AbstractTestClass;
 import com.bbn.marti.tests.*;
+import com.bbn.marti.tests.federationmissions.FederationEnterpriseFileSync;
 import com.bbn.marti.tests.missions.*;
 import com.cloudbees.junit.runner.App;
 import org.apache.commons.io.IOUtils;
@@ -60,6 +58,7 @@ public class TestRunnerModule implements AppModuleInterface {
 			GeneralTests.class,
 			InputTests.class,
 			StartupTests.class,
+			PluginStartupTests.class,
 			StreamingDataFeedsTests.class,
 			PointToPointTests.class,
 			SubscriptionTests.class,
@@ -71,7 +70,9 @@ public class TestRunnerModule implements AppModuleInterface {
 			MissionFileSync.class,
 			MissionUserCustomRolesTests.class,
 			MissionUserDefaultRolesTests.class,
-			UserManagementTests.class
+			FederationEnterpriseFileSync.class,
+			UserManagementTests.class,
+			FedHubTests.class
 //			SimpleTests.class
 	};
 
@@ -226,7 +227,7 @@ public class TestRunnerModule implements AppModuleInterface {
 		handleTestComparisonResults(result);
 	}
 
-	@Command(description = "Runs a set of test suites. '/opt/tak/TEST_TMP' will be used as the temporary directory by default.")
+	@Command(description = "Runs a set of test suites locally. '/opt/tak/TEST_RESULTS' will be used as the temporary directory by default.")
 	public void run(String... testIdentifier) throws EndUserReadableException {
 		TestConfiguration.getInstance().validate();
 		boolean testResult = true;
@@ -253,6 +254,12 @@ public class TestRunnerModule implements AppModuleInterface {
 		TestExceptions.DO_NOT_CLOSE_IGNITE_INSTANCES = false;
 		TakclIgniteHelper.closeAllIgniteInstances();
 		System.exit(testResult ? 0 : 1);
+	}
+
+	@Command(description = "Runs a set of test suites within the containing k8s cluster. '/opt/tak/TEST_RESULTS' will be used as the temporary directory by default.")
+	public void runk8s(String... testIdentifier) throws EndUserReadableException {
+		TAKCLCore.k8sMode = true;
+		run(testIdentifier);
 	}
 
 

@@ -20,4 +20,6 @@ public interface MessagingUtil {
 	void sendDisconnectMessage(Subscription subscription, ConnectionInfo connection);
 	
 	void sendDisconnect(CotEventContainer lastSA, Subscription subscription);
+
+	void sendDeliveryFailure(String senderUid, CotEventContainer c);
 }

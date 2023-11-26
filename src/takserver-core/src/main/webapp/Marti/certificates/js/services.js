@@ -11,3 +11,10 @@ services.factory('FederateCAGroupsService', function($resource){
             }
       );
     });
+
+services.factory('FederateCAHopsService', function($resource){
+      return $resource('/Marti/api/federatecahops/:caId', {}, {
+                 'query' : {method: 'GET', isArray: false}
+            }
+      );
+    });

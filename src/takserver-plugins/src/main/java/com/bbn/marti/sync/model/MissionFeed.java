@@ -4,11 +4,19 @@ import javax.persistence.*;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlTransient;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Strings;
 import com.google.common.collect.ComparisonChain;
+
+import org.json.simple.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,8 +33,8 @@ public class MissionFeed implements Serializable, Comparable<MissionFeed> {
 
     protected String uid;
     protected String dataFeedUid;
-    protected String filterBbox;
-    protected String filterType;
+    protected String filterPolygon;
+    protected String filterCotTypesSerialized;
     protected String filterCallsign;
     protected Mission mission;
     @Transient protected String name;
@@ -65,20 +73,48 @@ public class MissionFeed implements Serializable, Comparable<MissionFeed> {
         this.name = name;
     }
 
-    @Column(name = "filter_bbox", nullable = false, columnDefinition = "TEXT")
-    public String getFilterBbox() {
-        return filterBbox;
+    @Column(name = "filter_polygon", nullable = false, columnDefinition = "TEXT")
+    public String getFilterPolygon() {
+		return filterPolygon;
+	}
+	public void setFilterPolygon(String filterPolygon) {
+		this.filterPolygon = filterPolygon;
+	}
+    
+    @Column(name = "filter_cot_types", nullable = false, columnDefinition = "TEXT")
+    public String getFilterCotTypesSerialized() {
+        return filterCotTypesSerialized;
     }
-    public void setFilterBbox(String filterBbox) {
-        this.filterBbox = filterBbox;
+	public void setFilterCotTypesSerialized(String filterCotTypesSerialized) {
+        this.filterCotTypesSerialized = filterCotTypesSerialized;
     }
+    
+    @JsonIgnore
+    @XmlTransient
+    @Transient
+    public List<String> getFilterCotTypes() {
 
-    @Column(name = "filter_type", nullable = false, columnDefinition = "TEXT")
-    public String getFilterType() {
-        return filterType;
+        if (Strings.isNullOrEmpty(filterCotTypesSerialized)) {
+            return new ArrayList<>();
+        }
+
+    	try {
+			ObjectMapper mapper = new ObjectMapper();
+			List<String> deserialized = Arrays.asList(mapper.readValue(this.filterCotTypesSerialized, String[].class));
+			return deserialized;
+		} catch (Exception e) {
+			logger.error("Error parsing filterCotTypesSerialized for MissionFeed uid {}", uid ,e);
+			return null; 
+		}
     }
-    public void setFilterType(String filterType) {
-        this.filterType = filterType;
+    public void setFilterCotTypes(List<String> filterCotTypes) {
+        if (filterCotTypes == null) {
+            return;
+        }
+
+    	Collections.sort(filterCotTypes);
+    	String serialized = JSONArray.toJSONString(filterCotTypes);
+    	this.setFilterCotTypesSerialized(serialized);
     }
 
     @Column(name = "filter_callsign", nullable = false, columnDefinition = "TEXT")
@@ -101,8 +137,8 @@ public class MissionFeed implements Serializable, Comparable<MissionFeed> {
         return ComparisonChain.start()
                 .compare(this.uid, that.uid)
                 .compare(this.dataFeedUid, that.dataFeedUid)
-                .compare(this.filterBbox, that.filterBbox)
-                .compare(this.filterType, that.filterType)
+                .compare(this.filterPolygon, that.filterPolygon)
+                .compare(this.filterCotTypesSerialized, that.filterCotTypesSerialized)
                 .compare(this.filterCallsign, that.filterCallsign)
                 .result();
     }
@@ -112,8 +148,8 @@ public class MissionFeed implements Serializable, Comparable<MissionFeed> {
         final int prime = 31;
         int result = 1;
         result = prime * result + ((dataFeedUid == null) ? 0 : dataFeedUid.hashCode());
-        result = prime * result + ((filterBbox == null) ? 0 : filterBbox.hashCode());
-        result = prime * result + ((filterType == null) ? 0 : filterType.hashCode());
+        result = prime * result + ((filterPolygon == null) ? 0 : filterPolygon.hashCode());
+        result = prime * result + ((filterCotTypesSerialized == null) ? 0 : filterCotTypesSerialized.hashCode());
         result = prime * result + ((filterCallsign == null) ? 0 : filterCallsign.hashCode());
         return result;
     }
@@ -134,16 +170,16 @@ public class MissionFeed implements Serializable, Comparable<MissionFeed> {
         } else if (!dataFeedUid.equals(other.dataFeedUid))
             return false;
 
-        if (filterBbox == null) {
-            if (other.filterBbox != null)
+        if (filterPolygon == null) {
+            if (other.filterPolygon != null)
                 return false;
-        } else if (!filterBbox.equals(other.filterBbox))
+        } else if (!filterPolygon.equals(other.filterPolygon))
             return false;
-
-        if (filterType == null) {
-            if (other.filterType != null)
+        
+        if (filterCotTypesSerialized == null) {
+            if (other.filterCotTypesSerialized != null)
                 return false;
-        } else if (!filterType.equals(other.filterType))
+        } else if (!filterCotTypesSerialized.equals(other.filterCotTypesSerialized))
             return false;
 
         if (filterCallsign == null) {
@@ -164,11 +200,11 @@ public class MissionFeed implements Serializable, Comparable<MissionFeed> {
         builder.append(", dataFeedUid=");
         builder.append(dataFeedUid);
 
-        builder.append(", filterBbox=");
-        builder.append(filterBbox);
-
-        builder.append(", filterType=");
-        builder.append(filterType);
+        builder.append(", filterPolygon=");
+        builder.append(filterPolygon);
+        
+        builder.append(", filterCotTypesSerialized=");
+        builder.append(filterCotTypesSerialized);
 
         builder.append(", filterCallsign=");
         builder.append(filterCallsign);

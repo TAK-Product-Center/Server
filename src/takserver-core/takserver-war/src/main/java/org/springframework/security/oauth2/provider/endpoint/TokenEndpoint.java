@@ -19,10 +19,7 @@ package org.springframework.security.oauth2.provider.endpoint;
 import com.bbn.marti.oauth.AuthCookieUtils;
 import com.bbn.marti.oauth.TAKClientDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
@@ -149,8 +146,8 @@ public class TokenEndpoint extends AbstractEndpoint {
             throw new UnsupportedGrantTypeException("Unsupported grant type");
         }
 
-        final Cookie cookieToken = AuthCookieUtils.createCookie(token.getValue(), token.getExpiresIn());
-        response.addCookie(cookieToken);
+        final ResponseCookie cookieToken = AuthCookieUtils.createCookie(OAuth2AccessToken.ACCESS_TOKEN, token.getValue(), -1, true);
+        response.setHeader(HttpHeaders.SET_COOKIE, cookieToken.toString());
 
         return getResponse(token);
     }

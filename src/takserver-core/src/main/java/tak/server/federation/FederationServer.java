@@ -67,6 +67,7 @@ import com.atakmap.Tak.ClientHealth;
 import com.atakmap.Tak.ContactListEntry;
 import com.atakmap.Tak.Empty;
 import com.atakmap.Tak.FederateGroups;
+import com.atakmap.Tak.FederateHops;
 import com.atakmap.Tak.FederatedChannelGrpc;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.Identity;
@@ -129,6 +130,8 @@ import io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.micrometer.core.instrument.Metrics;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.netty.util.internal.logging.Slf4JLoggerFactory;
 import mil.af.rl.rol.FederationProcessor;
 import mil.af.rl.rol.MissionRolVisitor;
 import mil.af.rl.rol.Resource;
@@ -170,7 +173,7 @@ public class FederationServer {
 	private final Map<String, GuardedStreamHolder<ROL>> clientROLStreamMap = new ConcurrentHashMap<>();
 	private final Map<String, String> clientROLStreamNames = new ConcurrentHashMap<>();
 	private final Map<String, String> serverFederateMap = new ConcurrentHashMap<>();
-	private final Map<String, StreamObserver<FederateGroups>> serverFederateGroupStreamMap = new ConcurrentHashMap<>();
+	private final Map<String, GuardedStreamHolder<FederateGroups>> serverFederateGroupStreamMap = new ConcurrentHashMap<>();
 	
 	@Autowired
 	private DistributedFederationManager federationManager;
@@ -241,6 +244,8 @@ public class FederationServer {
 	@EventListener({ContextRefreshedEvent.class})
 	private void init() {
 		fedServer = this;
+		
+		InternalLoggerFactory.setDefaultFactory(Slf4JLoggerFactory.INSTANCE);
 
 		try {
 			// if the federation truststore is pointing to the root truststore - undo it and set to fed truststore.
@@ -283,6 +288,8 @@ public class FederationServer {
 			serverConfig.setKeystorePassword(fedServerConfig.getTls().getKeystorePass());
 			serverConfig.setTruststoreFile(fedServerConfig.getTls().getTruststoreFile());
 			serverConfig.setTruststorePass(fedServerConfig.getTls().getTruststorePass());
+			serverConfig.setContext(fedServerConfig.getTls().getContext());
+			serverConfig.setCiphers(fedServerConfig.getTls().getCiphers());
 			serverConfig.setSkipGateway(true); // eliminate this
 			serverConfig.setMaxMessageSizeBytes(fedConfig().getFederationServer().getMaxMessageSizeBytes()); // put in coreconfig
 			serverConfig.setMetricsLogIntervalSeconds(60); // put in coreconfig
@@ -325,6 +332,8 @@ public class FederationServer {
 	    serverConfig.setKeystorePassword(fedServerConfig.getTls().getKeystorePass());
 	    serverConfig.setTruststoreFile(fedServerConfig.getTls().getTruststoreFile());
 	    serverConfig.setTruststorePass(fedServerConfig.getTls().getTruststorePass());
+		serverConfig.setContext(fedServerConfig.getTls().getContext());
+		serverConfig.setCiphers(fedServerConfig.getTls().getCiphers());
 	    serverConfig.setSkipGateway(true); // eliminate this
 	    serverConfig.setMaxMessageSizeBytes(134217728); // put in coreconfig
 	    serverConfig.setMetricsLogIntervalSeconds(60); // put in coreconfig
@@ -369,7 +378,7 @@ public class FederationServer {
 			}
 
 			NettyServerBuilder serverBuilder = NettyServerBuilder.forPort(config.getPort())
-					.maxMessageSize(config.getMaxMessageSizeBytes()) // max message size. If not specified, defaults to 4MB
+					.maxInboundMessageSize(config.getMaxMessageSizeBytes()) // max message size. If not specified, defaults to 4MB
 					.sslContext(sslConfig.getSslContext())
 					.executor(Resources.federationGrpcExecutor)
 					.workerEventLoopGroup(Resources.federationGrpcWorkerEventLoopGroup)
@@ -561,7 +570,13 @@ public class FederationServer {
 				connection.setConnectionId(getCurrentSessionId());
 
 				fedSub = (FigServerFederateSubscription) federatedSubscriptionManager.getFederateSubscription(connection);
-
+								
+				// try and set here if federate is available
+				Federate federate = federationManager.getFederate(serverFederateMap.get(getCurrentSessionId()));
+				if (federate != null) {
+					streamHolder.setMaxFederateHops(federate.getMaxHops());
+				}
+				
 				if (logger.isDebugEnabled()) {
 					logger.debug("fedSub: " + fedSub);
 				}
@@ -577,7 +592,7 @@ public class FederationServer {
 				}
 
 				// keep track of clientStream and its associated federate identity
-				String id = new String(session.getId(), Charsets.UTF_8);
+				String id = getCurrentSessionId();
 				fs.clientStreamMap.put(id, streamHolder);
 
 			} catch (SSLPeerUnverifiedException | CertificateEncodingException e) {
@@ -679,10 +694,15 @@ public class FederationServer {
 						subscription,
 						(ROL a, ROL b) -> ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result(), false);
 
+				// try and set here if federate is available
+				if (federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())) != null) {
+					rolStreamHolder.setMaxFederateHops(federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())).getMaxHops());
+				}
+				
 				federatedSubscriptionManager.putClientROLStreamToSession(getCurrentSessionId(), rolStreamHolder);
 
 				// keep track of clientStream and its associated federate identity
-				String id = new String(session.getId(), Charsets.UTF_8);
+				String id = getCurrentSessionId();
 				fs.clientROLStreamMap.put(id, rolStreamHolder);
 				fs.clientROLStreamNames.put(id, clientName);
 
@@ -696,13 +716,13 @@ public class FederationServer {
 				try {
 					// send out data feeds to federate
 					if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
-						List<ROL> feedMessages = mdm.getDataFeedEvents();
+						List<ROL> feedMessages = mdm.getDataFeedEventsForFederatedDataFeedOnly();
 						
 						AtomicLong delayMs = new AtomicLong(100L);										
 						for (final ROL feedMessage : feedMessages) {
 							Resources.scheduledClusterStateExecutor.schedule(() -> {
 								try {
-									clientStream.onNext(feedMessage);
+									rolStreamHolder.send(feedMessage);
 								} catch (Exception e) {
 									logger.error("exception federating data feed", e);
 								}
@@ -786,6 +806,7 @@ public class FederationServer {
 										changeMessages.add(changeBuilder.build());
 									}
 
+									changeMessages.add(change);
 									changeCount.incrementAndGet();
 								});
 
@@ -799,7 +820,7 @@ public class FederationServer {
 								for (final ROL fedChange : changeMessages) {
 									Resources.scheduledClusterStateExecutor.schedule(() -> {
 										try {
-											clientStream.onNext(fedChange);
+											rolStreamHolder.send(fedChange);
 										} catch (Exception e) {
 											logger.error("exception federating mission disruption change", e);
 										}
@@ -888,7 +909,7 @@ public class FederationServer {
 
 						SSLSession session = (SSLSession) sslSessionKey.get(Context.current());
 
-						String sessionId = new String(session.getId(), Charsets.UTF_8);
+						String sessionId = getCurrentSessionId();
 
 						// create a federation processor for this ROL type, and process the ROL program
 						federationProcessorFactory.newProcessor(resource.get(), operation.get(), parameters.get(), sessionId).process(clientROL);
@@ -1039,6 +1060,7 @@ public class FederationServer {
 						
 						X509Certificate cert = (X509Certificate) getCurrentClientCert();
 						X509Certificate caCert = (X509Certificate) getCurrentCaCert();
+												
 						String principalDN = cert.getSubjectX500Principal().getName();
 						String issuerDN = cert.getIssuerX500Principal().getName();
 						String fingerprint = RemoteUtil.getInstance().getCertSHA256Fingerprint(cert); // Get the cert fingerprint
@@ -1073,18 +1095,23 @@ public class FederationServer {
 							federate.setFederatedGroupMapping(DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isFederatedGroupMapping());
 							federate.setAutomaticGroupMapping(DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAutomaticGroupMapping());
 
-		                    for (FederateCA ca : fedConfig().getFederateCA()) {
-		                        if (ca.getFingerprint().compareTo(RemoteUtil.getInstance().getCertSHA256Fingerprint(caCert)) == 0) {
-		                            for (String groupname : ca.getInboundGroup()) {
-		                                federate.getInboundGroup().add(groupname);
-		                            }
-		                            for (String groupname : ca.getOutboundGroup()) {
-		                                federate.getOutboundGroup().add(groupname);
-		                            }
-		                            break;
-		                        }
-		                    }
-
+							if (caCert != null) {
+								for (FederateCA ca : fedConfig().getFederateCA()) {
+			                        if (ca.getFingerprint().compareTo(RemoteUtil.getInstance().getCertSHA256Fingerprint(caCert)) == 0) {
+			                            for (String groupname : ca.getInboundGroup()) {
+			                                federate.getInboundGroup().add(groupname);
+			                            }
+			                            for (String groupname : ca.getOutboundGroup()) {
+			                                federate.getOutboundGroup().add(groupname);
+			                            }
+			                            
+										// set the new federate max hops based on pre-configured CA settings
+			                            federate.setMaxHops(ca.getMaxHops());
+			                            break;
+			                        }
+			                    }	
+							}
+		                    
 							federationManager.addFederateToConfig(federate);
 
 							if (logger.isDebugEnabled()) {
@@ -1107,7 +1134,6 @@ public class FederationServer {
 							}
 						}
 
-						
 						serverFederateMap.put(getCurrentSessionId(), federate.getId());
 						
 						if (logger.isDebugEnabled()) {
@@ -1231,7 +1257,7 @@ public class FederationServer {
 									if (logger.isDebugEnabled()) {
 										logger.debug("preparing to send server federate groups = " + federate.getOutboundGroup());
 									}
-									serverFederateGroupStreamMap.get(getCurrentSessionId()).onNext(FederateGroups.newBuilder().addAllFederateGroups(outgoingGroups).build());
+									serverFederateGroupStreamMap.get(getCurrentSessionId()).send(FederateGroups.newBuilder().addAllFederateGroups(outgoingGroups).build());
 								}
 							}
 
@@ -1242,7 +1268,16 @@ public class FederationServer {
 							federateSubscription.setHandler(channelHandler);
 							federateSubscription.setIsAutoMapped((matchingCA && federate.isFederatedGroupMapping() && federate.isAutomaticGroupMapping()));
 
-
+							if (clientStreamMap.get(getCurrentSessionId()) != null) {
+								clientStreamMap.get(getCurrentSessionId()).setMaxFederateHops(federate.getMaxHops());
+							}
+							if (clientROLStreamMap.get(getCurrentSessionId()) != null) {
+								clientROLStreamMap.get(getCurrentSessionId()).setMaxFederateHops(federate.getMaxHops());
+							}
+							if (serverFederateGroupStreamMap.get(getCurrentSessionId()) != null) {
+								serverFederateGroupStreamMap.get(getCurrentSessionId()).setMaxFederateHops(federate.getMaxHops());
+							}
+							
 							if (logger.isDebugEnabled()) {
 								logger.debug("adding federate subscription: " + federateSubscription);
 							}
@@ -1256,7 +1291,7 @@ public class FederationServer {
 									if (logger.isDebugEnabled()) {
 										logger.debug("preparing to send server federate groups = " + federate.getOutboundGroup());
 									}
-									serverFederateGroupStreamMap.get(getCurrentSessionId()).onNext(FederateGroups.newBuilder().addAllFederateGroups(outgoingGroups).build());
+									serverFederateGroupStreamMap.get(getCurrentSessionId()).send(FederateGroups.newBuilder().addAllFederateGroups(outgoingGroups).build());
 								}
 							}
 
@@ -1303,11 +1338,11 @@ public class FederationServer {
 					String msg = "federate disconnected or connectivity lost";
 					
 					try {
-						serverFederateGroupStreamMap.get(getCurrentSessionId()).onError(t);
+						serverFederateGroupStreamMap.get(getCurrentSessionId()).cancel("",t);
 					} catch (Exception e) {}
 
 					try {
-						serverFederateGroupStreamMap.get(getCurrentSessionId()).onError(t);
+						serverFederateGroupStreamMap.get(getCurrentSessionId()).cancel("",t);
 					} catch (Exception e) {}
 
 					if (t instanceof io.grpc.StatusException) {
@@ -1353,12 +1388,13 @@ public class FederationServer {
 					if (logger.isDebugEnabled()) {
 						logger.debug("Collecting client federate groups: " + value);
 					}
+					
 					groupFederationUtil.collectRemoteFederateGroups(new HashSet<String>(value.getFederateGroupsList()),  federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())));
 				}
 
 				@Override
 				public void onError(Throwable t) {
-
+					logger.error("error in clientFederateGroupsStream", t);
 				}
 
 				@Override
@@ -1369,13 +1405,50 @@ public class FederationServer {
 		}
 
 		@Override
-		public void serverFederateGroupsStream(Subscription request, StreamObserver<FederateGroups> responseObserver) {
-			serverFederateGroupStreamMap.put(getCurrentSessionId(), responseObserver);
-			federatedSubscriptionManager.putServerGroupStreamToSession(getCurrentSessionId(), responseObserver);
-			// let the client know the group stream is ready
-			responseObserver.onNext(FederateGroups.newBuilder().setStreamUpdate(ServerHealth.newBuilder().setStatus(ServerHealth.ServingStatus.SERVING).build()).build());
-			if (logger.isDebugEnabled()) {
-				logger.debug("Setting the serverFederateGroupsStreamObserver");
+		public void serverFederateGroupsStream(Subscription subscription, StreamObserver<FederateGroups> responseObserver) {
+			String clientName = subscription.getIdentity().getName();
+
+			if (Strings.isNullOrEmpty(clientName)) {
+				throw new IllegalArgumentException("invalid clientEventStream request from client - null or empty name was provided");
+			}
+	
+			try {
+				SSLSession session = (SSLSession) sslSessionKey.get(Context.current());
+
+				Certificate[] clientCertArray = requireNonNull(requireNonNull(session, "SSL Session").getPeerCertificates(), "SSL peer certs array");
+
+				if (clientCertArray.length == 0) {
+					throw new IllegalArgumentException("client cert not available");
+				}
+
+				String fedCertHash = FederationUtils.getBytesSHA256(clientCertArray[0].getEncoded());
+					
+					
+				
+				GuardedStreamHolder<FederateGroups> groupStreamHolder = new GuardedStreamHolder<>(
+						responseObserver,
+						clientName,
+						fedCertHash,
+						session,
+						subscription,
+						(FederateGroups a, FederateGroups b) -> ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result(), false);
+				
+				// try and set here if federate is available
+				Federate federate = federationManager.getFederate(serverFederateMap.get(getCurrentSessionId()));
+				if (federate != null) {
+					groupStreamHolder.setMaxFederateHops(federate.getMaxHops());
+				}
+				
+				serverFederateGroupStreamMap.put(getCurrentSessionId(), groupStreamHolder);
+				federatedSubscriptionManager.putServerGroupStreamToSession(getCurrentSessionId(), groupStreamHolder);
+				
+				// let the client know the group stream is ready
+				groupStreamHolder.send(FederateGroups.newBuilder().setStreamUpdate(ServerHealth.newBuilder().setStatus(ServerHealth.ServingStatus.SERVING).build()).build());
+				if (logger.isDebugEnabled()) {
+					logger.debug("Setting the serverFederateGroupsStreamObserver");
+				}
+			} catch (SSLPeerUnverifiedException | CertificateEncodingException e) {
+				throw new RuntimeException("error obtaining federate client cert", e);
 			}
 		}
 
@@ -1387,7 +1460,7 @@ public class FederationServer {
 
 			if (config.isEnableHealthCheck()) {
 
-				String sessionId = new String(((SSLSession) sslSessionKey.get(Context.current())).getId(), Charsets.UTF_8);
+				String sessionId = getCurrentSessionId();
 
 				if (clientStreamMap.containsKey(sessionId)) {
 					
@@ -1853,7 +1926,10 @@ public class FederationServer {
 						cot.setContext(Constants.GROUPS_KEY, groups);
 					}
 
-					//                            cot.setContextValue(RepositoryService.ARCHIVE_EVENT_KEY, config.isArchive()); // TODO: make archive configurable per FIG federate
+					if (!federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())).isArchive()) {
+						cot.setContextValue(Constants.ARCHIVE_EVENT_KEY, Boolean.FALSE);
+					}
+
 				} else {
 					if (logger.isDebugEnabled()) {
 						logger.debug("user not found for federate subscription for FIG message");
@@ -2042,7 +2118,7 @@ public class FederationServer {
 
 	private String getCurrentSessionId() {
 		try {		
-			return sslSessionIdKey.get(Context.current()).toString();
+			return new String(((SSLSession) sslSessionKey.get(Context.current())).getId(), Charsets.UTF_8);
 		} catch (Exception e) {
 			throw new TakException(e);
 		}
@@ -2103,7 +2179,8 @@ public class FederationServer {
 			return caCert;
 
 		} catch (Exception e) {
-			throw new TakException(e);
+			logger.warn("Warning: Could not find CA in connecting federate's cert chain. CA level group assignment will be skipped.");
+			return null;
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package tak.server.feeds;
 
 import java.io.Serializable;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -8,8 +9,10 @@ import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
 
 import com.bbn.marti.config.AuthType;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.collect.ComparisonChain;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class DataFeed implements Serializable, Comparable<DataFeed> {
 
 	private static final long serialVersionUID = -7747557200324370313L;
@@ -18,7 +21,8 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 		Streaming,
 		API,
 		Plugin,
-		Federation
+		Federation,
+		Predicate
 	}
 	
 	private String uuid;
@@ -57,6 +61,19 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 		
 	private int syncCacheRetentionSeconds = 3600;
 	
+	private boolean federated;
+	
+	private boolean binaryPayloadWebsocketOnly = false;
+	
+	private String predicateLang;
+	
+	private String predicate;
+	
+	private URL predicateDataSourceEndpoint;
+	
+	private String predicateAuthType;
+	
+	@SuppressWarnings("unused")
 	private DataFeed() {}
 	
 	public DataFeed(String uuid, String name, DataFeedType type, List<String> tags) {
@@ -82,7 +99,9 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 		this.coreVersion = datafeed.getCoreVersion();
 		this.coreVersion2TlsVersions = datafeed.getCoreVersion2TlsVersions();
 		this.filterGroups = datafeed.getFiltergroup();
-		this.syncCacheRetentionSeconds = datafeed.getSyncCacheRetentionSeconds();		
+		this.syncCacheRetentionSeconds = datafeed.getSyncCacheRetentionSeconds();
+		this.federated = datafeed.isFederated();
+		this.binaryPayloadWebsocketOnly = datafeed.isBinaryPayloadWebsocketOnly();
 		
 		if (datafeed.getPort() == 0) {
 			this.port = null;
@@ -239,14 +258,69 @@ public class DataFeed implements Serializable, Comparable<DataFeed> {
 		this.syncCacheRetentionSeconds = syncCacheRetentionSeconds;
 	}
 
+	public boolean isFederated() {
+		return federated;
+	}
+
+	public void setFederated(boolean federated) {
+		this.federated = federated;
+	}
+	
+	public boolean isBinaryPayloadWebsocketOnly() {
+		return binaryPayloadWebsocketOnly;
+	}
+
+	public void setBinaryPayloadWebsocketOnly(boolean binaryPayloadWebsocketOnly) {
+		this.binaryPayloadWebsocketOnly = binaryPayloadWebsocketOnly;
+	}
+	
+	public String getPredicateLang() {
+		return predicateLang;
+	}
+
+	public void setPredicateLang(String predicateLang) {
+		this.predicateLang = predicateLang;
+	}
+
+	public URL getPredicateDataSourceEndpoint() {
+		return predicateDataSourceEndpoint;
+	}
+
+	public void setPredicateDataSourceEndpoint(URL predicateDataSourceEndpoint) {
+		this.predicateDataSourceEndpoint = predicateDataSourceEndpoint;
+	}
+
+	public String getPredicateAuthType() {
+		return predicateAuthType;
+	}
+
+	public void setPredicateAuthType(String predicateAuthType) {
+		this.predicateAuthType = predicateAuthType;
+	}
+
+	public int getSyncCacheRetentionSeconds() {
+		return syncCacheRetentionSeconds;
+	}
+	
+	public String getPredicate() {
+		return predicate;
+	}
+
+	public void setPredicate(String predicate) {
+		this.predicate = predicate;
+	}
+	
 	@Override
 	public String toString() {
-		return "DataFeed [uuid=" + uuid + ", name=" + name + ", type=" + type + ", tags=" + tags + ", auth=" + auth
+		return "DataFeed [uuid=" + uuid + ", name=" + name + ", kind=" + type + ", tags=" + tags + ", auth=" + auth
 				+ ", port=" + port + ", authRequired=" + authRequired + ", protocol=" + protocol + ", group=" + group
 				+ ", iface=" + iface + ", archive=" + archive + ", anongroup=" + anongroup + ", archiveOnly="
 				+ archiveOnly + ", sync=" + sync + ", coreVersion=" + coreVersion + ", coreVersion2TlsVersions="
-				+ coreVersion2TlsVersions + ", filterGroups=" + filterGroups + ", latestSACacheSeconds="
-				+ syncCacheRetentionSeconds + "]";
+				+ coreVersion2TlsVersions + ", filterGroups=" + filterGroups + ", syncCacheRetentionSeconds="
+				+ syncCacheRetentionSeconds + ", federated=" + federated + ", binaryPayloadWebsocketOnly="
+				+ binaryPayloadWebsocketOnly + ", predicateLang=" + predicateLang + ", predicate=" + predicate
+				+ ", predicateDataSourceEndpoint=" + predicateDataSourceEndpoint + ", predicateAuthType="
+				+ predicateAuthType + "]";
 	}
 
 	@Override

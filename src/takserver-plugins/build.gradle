@@ -20,29 +20,31 @@ publishing {
 }
 dependencies {
 
-  compile ("com.google.protobuf:protobuf-java:$protobuf_java_version") {
+  api ("com.google.protobuf:protobuf-java:$protobuf_java_version") {
     exclude group: 'javax.annotation'
     exclude group: 'javax.activation'
     exclude group: 'com.google.guava'
   }
 
-  compile group: 'org.yaml', name: 'snakeyaml', version: snake_yaml_version
-  compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  implementation group: 'org.yaml', name: 'snakeyaml', version: snake_yaml_version
+  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
 
-  compile(project(':takserver-protobuf')) {
+  api(project(':takserver-protobuf')) {
     exclude group: 'io.grpc'
     exclude group: 'io.netty'
   }
 
-  compile group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
-  compile group: 'com.googlecode.json-simple', name: 'json-simple', version: json_simple_version
-  compile group: 'javax.xml.bind', name: 'jaxb-api', version: jaxb_api_version
-  compile group: 'javax.persistence', name: 'javax.persistence-api', version: javax_persistence_api_version
-  compile group: 'com.intellij', name: 'annotations', version: intellij_annotations_version // IntelliJ @NotNull annotation
-  compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jackson_version
-  compile group: 'joda-time', name: 'joda-time', version: joda_version
+  implementation group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
+  implementation group: 'com.googlecode.json-simple', name: 'json-simple', version: json_simple_version
+  implementation group: 'javax.xml.bind', name: 'jaxb-api', version: jaxb_api_version
+  implementation group: 'javax.persistence', name: 'javax.persistence-api', version: javax_persistence_api_version
+  implementation group: 'com.intellij', name: 'annotations', version: intellij_annotations_version // IntelliJ @NotNull annotation
+  implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jackson_version
+  implementation group: 'joda-time', name: 'joda-time', version: joda_version
+  implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: jackson_version
+  implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jackson_version
 
-  compile ("org.dom4j:dom4j:$dom4j_version") {
+  api ("org.dom4j:dom4j:$dom4j_version") {
        exclude group: 'pull-parser'
        exclude group: 'xpp3'
   }
@@ -52,11 +54,11 @@ dependencies {
        exclude group: 'xpp3'
   }
 
-  compile group: 'org.locationtech.jts', name: 'jts-core', version: jts_version
-    
-  testCompile group: 'junit', name: 'junit', version: junit_version
-  testCompile group: 'org.json', name: 'json', version: json_org_version
-  testCompile group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  api group: 'org.locationtech.jts', name: 'jts-core', version: jts_version
+
+  testImplementation group: 'junit', name: 'junit', version: junit_version
+  testImplementation group: 'org.json', name: 'json', version: json_org_version
+  testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
 }
 
 shadowJar {

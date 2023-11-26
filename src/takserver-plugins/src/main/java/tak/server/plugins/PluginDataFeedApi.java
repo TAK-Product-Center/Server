@@ -5,10 +5,23 @@ import java.util.List;
 
 public interface PluginDataFeedApi {
 	
-	  PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> groups);
-	  PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync);
-	  PluginDataFeed create(String uuid, String name, List<String> tags);
-	  void delete(String uuid, List<String> groups);
-	  Collection<PluginDataFeed> getAllPluginDataFeeds();
-	  
+	PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> groups, boolean federated, boolean binaryPayloadWebsocketOnly);
+	
+	PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> groups, boolean federated);
+
+	PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync, List<String> groups);
+
+	PluginDataFeed create(String uuid, String name, List<String> tags, boolean archive, boolean sync);
+
+	PluginDataFeed create(String uuid, String name, List<String> tags);
+	
+	PredicateDataFeed createPredicateFeed(String uuid, String name, List<String> tags);
+
+	
+	
+	
+	void delete(String uuid, List<String> groups);
+
+	Collection<PluginDataFeed> getAllPluginDataFeeds();
+
 }

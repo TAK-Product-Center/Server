@@ -9,7 +9,7 @@ The docker image for takserver-core depends on this.
 
 ```
 cd utils/cluster
-docker build -f Dockerfile.postgres10_postgis24 -t tak/postgres10_postgis24:latest .
+docker build -f Dockerfile.postgres14_postgis3 -t tak/postgres14_postgis3:latest .
 ```
 
 ```
@@ -21,7 +21,7 @@ OR
 ## or build the base image, skipping cache
 ```  
 cd utils/cluster
-docker build --no-cache -f Dockerfile.postgres10_postgis24 -t tak/postgres10_postgis24:latest .
+docker build --no-cache -f Dockerfile.postgres14_postgis3 -t tak/postgres14_postgis3:latest .
 ```
 
 ## build images from source

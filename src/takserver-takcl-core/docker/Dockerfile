@@ -9,7 +9,7 @@ RUN yum install -y sudo \
     openssh-server openssh-clients \
     # Install takserver dependencies
 	perl-PlRPC perl-version \
-    java-11-openjdk-devel java-11-openjdk postgresql10 postgresql10-contrib postgresql10-server postgis30_10 postgis30_10-utils \
+    java-11-openjdk-devel java-11-openjdk postgresql15 postgresql15-contrib postgresql15-server postgis33_15 postgis33_15-utils \
 	unzip openssl \
 	perl-Compress-Raw-Bzip2 perl-Compress-Raw-Zlib perl-DBD-Pg perl-DBI perl-Data-Dumper perl-IO-Compress perl-Net-Daemon \
     # Install Nicities
