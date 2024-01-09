@@ -4,7 +4,7 @@
 <%@ page import="org.owasp.esapi.ESAPI" %>
 <%@ page import="com.bbn.marti.video.Feed" %>
 <%@ page import="com.bbn.marti.util.CommonUtil" %>
-<%@ page import="com.bbn.marti.util.spring.SpringContextBeanForApi" %>
+<%@ page import="com.bbn.marti.remote.util.SpringContextBeanForApi" %>
 
 
 <%
@@ -38,7 +38,7 @@
   if (feedId != null) {
     title = "Edit";
     action = "Save";
-    Feed feed = com.bbn.marti.util.spring.SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.video.VideoManagerService.class).getFeed(Integer.parseInt(feedId), groupVector);
+    Feed feed = SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.video.VideoManagerService.class).getFeed(Integer.parseInt(feedId), groupVector);
     uuid = feed.getUuid();
     active = Boolean.toString(feed.getActive());
     alias = feed.getAlias();

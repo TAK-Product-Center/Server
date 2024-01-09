@@ -5,7 +5,7 @@ import java.sql.SQLException;
 import java.util.NavigableSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import javax.sql.DataSource;
 
 import org.jetbrains.annotations.NotNull;

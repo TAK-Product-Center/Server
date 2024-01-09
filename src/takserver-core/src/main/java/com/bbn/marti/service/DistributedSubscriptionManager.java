@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -61,6 +60,7 @@ import org.springframework.context.event.EventListener;
 import com.bbn.cot.filter.DropEventFilter;
 import com.bbn.cot.filter.GeospatialEventFilter;
 import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
+import com.bbn.marti.classification.service.ClassificationService;
 import com.bbn.marti.config.CertificateSigning;
 import com.bbn.marti.config.Dropfilter;
 import com.bbn.marti.config.Filter;
@@ -102,7 +102,7 @@ import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.Tuple;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.metrics.dto.MetricSubscription;
 import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
@@ -121,6 +121,7 @@ import tak.server.federation.FigFederateSubscription;
 import tak.server.ignite.IgniteHolder;
 import tak.server.ignite.cache.IgniteCacheHolder;
 import tak.server.messaging.MessageConverter;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 public class DistributedSubscriptionManager implements SubscriptionManager, org.apache.ignite.services.Service {
 	
@@ -135,6 +136,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	private final Logger changeLogger = LoggerFactory.getLogger(Constants.CHANGE_LOGGER);
 
 	private Validator validator;
+
+	private boolean applyClassificationFilter = false;
 
 	public DistributedSubscriptionManager() {
 		if (logger.isDebugEnabled()) {
@@ -191,7 +194,21 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		
 		return commonUtil.get();
 	}
-    
+
+	private final AtomicReference<ClassificationService> classificationService = new AtomicReference<>();
+
+	private ClassificationService classificationService() {
+		if (classificationService.get() == null) {
+			synchronized (this) {
+				if (classificationService.get() == null) {
+					classificationService.set(SpringContextBeanForApi.getSpringContext().getBean(ClassificationService.class));
+				}
+			}
+		}
+
+		return classificationService.get();
+	}
+
     @Override
 	public void cancel(ServiceContext ctx) {
     	if (logger.isDebugEnabled()) {
@@ -221,7 +238,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	
 	@EventListener({ContextRefreshedEvent.class})
 	private void onContextRefresh() {
-		if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
 			setupIgniteListeners();
 		}
         // load static subscriptions
@@ -230,6 +247,9 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		schedulePeriodicPingTimeoutCheck();
         
 		clientCountRef.set(Metrics.gauge(Constants.METRIC_CLIENT_COUNT, clientCountRef.get()));
+
+		applyClassificationFilter = CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm() != null &&
+				CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled();
 	}
 	
 	private void schedulePeriodicSubscriptionCacheUpdates() {
@@ -246,13 +266,13 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 
 	private void schedulePeriodicPingTimeoutCheck() {
-		Integer pingTimeoutSeconds = DistributedConfiguration.getInstance().
+		Integer pingTimeoutSeconds = CoreConfigFacade.getInstance().
 				getRemoteConfiguration().getNetwork().getPingTimeoutSeconds();
 		if (pingTimeoutSeconds == null) {
 			return;
 		}
 
-		int pingTimeoutCheckIntervalSeconds = DistributedConfiguration.getInstance().
+		int pingTimeoutCheckIntervalSeconds = CoreConfigFacade.getInstance().
 				getRemoteConfiguration().getNetwork().getPingTimeoutCheckIntervalSeconds();
 
 		Resources.ghostConnectionCleanupPool.scheduleWithFixedDelay(() -> {
@@ -309,7 +329,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	
 	public synchronized void loadStaticSubscriptions() {
 	 	
-	 	for (com.bbn.marti.config.Subscription.Static staticSubscription : config().getSubscription().getStatic()) {
+	 	for (com.bbn.marti.config.Subscription.Static staticSubscription : CoreConfigFacade.getInstance().getRemoteConfiguration().getSubscription().getStatic()) {
 	 	    
 	 	    if (logger.isDebugEnabled()) {
 	 	    	logger.debug("Adding static subscription: " + staticSubscription);
@@ -435,7 +455,14 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
                     	}
                         continue;
                     }
-                    
+
+					if (applyClassificationFilter) {
+						if (!classificationService().canAccess(
+								groupManager().getClassificationForUser(receiver), c)) {
+							continue;
+						}
+					}
+
 			        // source related
 			        NavigableSet<Group> srcGroups = null;
                     
@@ -498,15 +525,15 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		List<Subscription> result = new LinkedList<Subscription>();
 		for (String d : destList) {
 			Subscription s = subscriptionStore().getSubscriptionByClientUid(d);
-			if(s != null) {
+			if (s != null) {
 				boolean found = false;
 				for(Subscription i : result) {
-					if(s == i) {
+					if (s == i) {
 						found = true;
 						break;
 					}
 				}
-				if(!found) {
+				if (!found) {
 					result.add(s);
 				}
 			} else {
@@ -616,7 +643,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	* TODO: implement explicit endpoint to subscription matching
 	*/
 	private List<Subscription> getExplicitPubMatches(CotEventContainer c, List<String> destList) {
-		if(logger.isWarnEnabled()) {
+		if (logger.isWarnEnabled()) {
 			for (String dest : destList) {
 				logger.warn("Don't support explicit endpoint publishing yet: " + dest);
 			}
@@ -641,12 +668,12 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			if (subscription != null) {
 				boolean found = false;
 				for(Subscription i : subscriptions) {
-					if(subscription == i) {
+					if (subscription == i) {
 						found = true;
 						break;
 					}
 				}
-				if(!found) {
+				if (!found) {
 					
 					if (logger.isTraceEnabled()) {
 						logger.trace("Found explicit match for callsign " + callsign + " for message " + c.partial());
@@ -742,7 +769,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
         	
         	Subscription destSubscription = destSubscriptionEntry.getValue();
       
-        	if (config().getRemoteConfiguration().getFederation() == null) {
+        	if (CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation() == null) {
         		if (zender instanceof FederateUser && destSubscription.getUser() instanceof FederateUser) {
         			continue;
         		}
@@ -819,6 +846,13 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 							dupeLogger.trace("not self message - subIdHash: " + subIdHash + " msgIdHash " + msgIdHash);
 						}
 
+						if (applyClassificationFilter) {
+							if (!classificationService().canAccess(
+									groupManager().getClassificationForUser(receiver), cot)) {
+								continue;
+							}
+						}
+
 						matches.add(destSubscription);
 					} else {
 						if (dupeLogger.isTraceEnabled()) {
@@ -892,7 +926,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		
 		subscriptionStore().put(subscription.uid, subscription);
 
-		if(subscription.handler.host() != null) {  // static subs 
+		if (subscription.handler.host() != null) {  // static subs 
 			logger.info("Added Subscription: id=" + subscription.uid + " source=" +
 					subscription.handler.host().toString().replace("/", ""));
 		}
@@ -920,8 +954,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 					tokens[1], remote.iface,
 					Integer.parseInt(tokens[2]), remote.xpath, remote.uid, remote.filterGroups, remote.toStatic().getFilter());
 
-			config().getSubscription().getStatic().add(remote.toStatic());
-			config().saveChangesAndUpdateCache();
+			CoreConfigFacade.getInstance().getRemoteConfiguration().getSubscription().getStatic().add(remote.toStatic());
+			CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
 		} catch (Exception e) {
 			throw new TakException("Error adding subscription", e);
 		}
@@ -1070,11 +1104,11 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 	
 	private void checkAndDeleteStaticSubscription(String uid) {
-		List<com.bbn.marti.config.Subscription.Static> staticSubs = config().getSubscription().getStatic();
+		List<com.bbn.marti.config.Subscription.Static> staticSubs = CoreConfigFacade.getInstance().getRemoteConfiguration().getSubscription().getStatic();
 		for(com.bbn.marti.config.Subscription.Static ss : staticSubs) {
-			if(ss.getName().compareTo(uid) == 0) {
+			if (ss.getName().compareTo(uid) == 0) {
 				staticSubs.remove(ss);
-				config().saveChangesAndUpdateCache();
+				CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
 				break;
 			}
         }
@@ -1133,7 +1167,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
         
         try {
         	for(Map.Entry<String,Subscription> entry : subscriptionStore().getViewOfCallsignMap().entrySet()) {
-        		if(entry.getValue() == sub) {
+        		if (entry.getValue() == sub) {
         			subscriptionStore().removeSubscriptionByCallsign(entry.getKey());
         			break;
         		}
@@ -1166,7 +1200,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 
         try {
         	for(Map.Entry<ConnectionInfo,Subscription> entry : subscriptionStore().getViewOfConnectionSubMap().entrySet()) {
-        		if(entry.getValue() == sub) {
+        		if (entry.getValue() == sub) {
         			subscriptionStore().removeSubscriptionByConnectionInfo(entry.getKey());
         			// if we already found a clientUid match in another sub, we can bail
         			if (keepMissionSubsForClientUid) {
@@ -1189,7 +1223,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
         
         try {
         	for(Map.Entry<User,Subscription> entry : subscriptionStore().getViewOfUserSubscriptionMap().entrySet()) {
-        		if(entry.getValue() == sub) {
+        		if (entry.getValue() == sub) {
         			//log.warn("removing uid from sub: " + entry.getKey());
         			subscriptionStore().removeSubscriptionByUser(entry.getKey());
         			break;
@@ -1518,7 +1552,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		
         Subscription match = subscriptionStore().getByHandler(handler);
         if (match != null) {
-			if(overwriteSub) {
+			if (overwriteSub) {
 				match.callsign = callsign;
 				match.clientUid = clientUid;
 			}
@@ -1849,7 +1883,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			return;
 		}
 
-		if (config().getRepository().isEnable()) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getRepository().isEnable()) {
 			if (!Strings.isNullOrEmpty(username)) {
 				missionSubscriptionRepository().deleteByMissionNameAndClientUidAndUsername(missionName, clientUid, username);
 			} else {
@@ -1876,7 +1910,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			return Lists.newArrayList(subscriptionStore().getLocalUidsByMission(missionName));
 		} else {
 			List<String> missionSubscriptions = new ArrayList<>();
-			for (MissionSubscription missionSubscription : missionSubscriptionRepository().findAllByMissionNameNoMission(missionName)) {
+			for (MissionSubscription missionSubscription : MessagingDependencyInjectionProxy.getInstance().missionService().getMissionSubscriptionsByMissionNameNoMission(missionName)) {
 				missionSubscriptions.add(missionSubscription.getClientUid());
 			}
 			return missionSubscriptions;
@@ -1905,7 +1939,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
    	public  void announceMissionChange(String missionName, ChangeType changeType, String creatorUid, String tool, String changes, String xmlContentForNotification) {
 	   CotEventContainer changeMessage = createMissionChangeMessage(missionName, changeType, creatorUid, tool, changes, xmlContentForNotification);
 
-	   if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+	   if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
 		   MessagingDependencyInjectionProxy.getInstance().clusterManager().onAnnounceMissionChangeMessage(changeMessage, missionName);
 	   } else {
 		   submitAnnounceMissionChangeCot(missionName, changeMessage);
@@ -1963,7 +1997,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
     	}
         
         if (!websocketHits.isEmpty()) {
-			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, changeMessage, config().getNetwork().getServerId());
+			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, changeMessage, CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId());
 		} 
         
         if (!explicitTopics.isEmpty()) {
@@ -1997,7 +2031,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			return;
 		}
     	
-		if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
 			MessagingDependencyInjectionProxy.getInstance().clusterManager().onBroadcastMissionAnnouncementMessage(message, creatorUid, groupVector);
 		} else {
 			submitBroadcastMissionAnnouncementCot(creatorUid, groupVector, message); 
@@ -2061,7 +2095,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		sendToPlugins(message);
 
     	if (!websocketHits.isEmpty()) {
-			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, message, config().getNetwork().getServerId());
+			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, message, CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId());
 		}
 	}
 
@@ -2072,7 +2106,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 
 		CotEventContainer inviteMessage = createMissionInviteMessage(missionName, authorUid, tool, token, roleXml);
 				
-		if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
 			MessagingDependencyInjectionProxy.getInstance().clusterManager().onSendMissionInviteMessage(inviteMessage, uids);
 		} else {
 			submitSendMissionInviteCot(uids, inviteMessage); 
@@ -2107,7 +2141,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 		
 		if (!websocketHits.isEmpty()) {
-			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, inviteMessage, config().getNetwork().getServerId());
+			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, inviteMessage,
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId());
 		}
 
 		sendToPlugins(inviteMessage);
@@ -2118,7 +2153,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 
 		CotEventContainer roleChangeMessage = createMissionRoleChangeMessage(missionName, authorUid, tool, roleXml);
 		
-		if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
 			MessagingDependencyInjectionProxy.getInstance().clusterManager().onSendMissionRoleChangeMessage(roleChangeMessage, uid);
 		} else {
 			submitSendMissionRoleChangeCot(uid, roleChangeMessage);
@@ -2141,7 +2176,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			if (sub.isWebsocket.get() && sub.getHandler() instanceof AbstractBroadcastingChannelHandler) {
 				Set<String> websocketHits = new ConcurrentSkipListSet<>();
 				websocketHits.add(((AbstractBroadcastingChannelHandler) sub.getHandler()).getConnectionId());
-				WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, roleChangeMessage, config().getNetwork().getServerId());
+				WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, roleChangeMessage,
+						CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId());
 			} else {
 				sub.submit(roleChangeMessage);
 			}
@@ -2256,7 +2292,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 
 	private TAKServerCAConfig getTAKServerCAConfig() {
 		try {
-			CertificateSigning certificateSigningConfig = config().getRemoteConfiguration().getCertificateSigning();
+			CertificateSigning certificateSigningConfig =
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getCertificateSigning();
 			if (certificateSigningConfig == null) {
 				logger.error("Certificate signing config not found!");
 				return null;
@@ -2397,10 +2434,6 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		return subscriptionStore().getSubMetricsByClientUid(clientUid);
 	}
 	
-	private DistributedConfiguration config() {
-		return DistributedConfiguration.getInstance();
-	}
-	
 	private GroupFederationUtil groupFederationUtil() {
 		return GroupFederationUtil.getInstance();
 	}
@@ -2427,6 +2460,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	public String createWebsocketSubscription(UUID apiNode, User user, String inGroupVector, String outGroupVector, String sessionId, String connectionId, InetSocketAddress local, InetSocketAddress remote) {
 		User coreUser = new AuthenticatedUser(user.getId(), user.getConnectionId(), user.getAddress(), user.getCert(),
 				user.getName(), "", "", ConnectionType.CORE);
+		coreUser.setToken(user.getToken());
 		try {
 			Set<Group> groups = groupManager().groupVectorToGroupSet(inGroupVector, Direction.IN.getValue());
 			Set<Group> outGroups = groupManager().groupVectorToGroupSet(outGroupVector, Direction.OUT.getValue());
@@ -2435,7 +2469,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			groupManager().addUser(coreUser);
 			groupManager().updateGroups(coreUser, groups);
 			groupManager().putUserByConnectionId(coreUser, connectionId);
-			NioWebSocketHandler handler = new NioWebSocketHandler(apiNode, sessionId, connectionId, local, remote);
+			NioWebSocketHandler handler = new NioWebSocketHandler(apiNode, sessionId, connectionId, local, remote,
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth());
 			handler.channelActive(null);
 			websocketMap.put(connectionId, handler);
 		} catch (Exception e) {
@@ -2573,11 +2608,14 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 					}
 
 				} catch (Exception e) {
-					logger.error("sendGroupsUpdatedMessage : exception sending to user : " + username, e);
+					if (logger.isDebugEnabled()) {
+						logger.debug("sendGroupsUpdatedMessage : exception sending to user : " + username, e);
+					}
 				}
 			}
 
-			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, groupChangeMessage, config().getNetwork().getServerId());
+			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, groupChangeMessage,
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId());
 
 		} catch (Exception e) {
 			logger.error("exception in sendGroupsUpdatedMessage!", e);
@@ -2588,7 +2626,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	public boolean deleteSubscriptionssByCertificate(X509Certificate x509Certificate) {
 		List<Subscription> deletes = new LinkedList<>();
 		for(Map.Entry<User,Subscription> entry : subscriptionStore().getViewOfUserSubscriptionMap().entrySet()) {
-			if(entry.getKey().getCert() != null && entry.getKey().getCert().equals(x509Certificate)) {
+			if (entry.getKey().getCert() != null && entry.getKey().getCert().equals(x509Certificate)) {
 				deletes.add(entry.getValue());
 			}
 		}

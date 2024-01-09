@@ -5,7 +5,10 @@ TAKDIR=/opt/tak
 CERTDIR=${TAKDIR}/certs
 EXCONFIGFILE=${TAKDIR}/CoreConfig.example.xml
 CONFIGFILE=${TAKDIR}/CoreConfig.xml
+EXTAKIGNITECONFIGFILE=${TAKDIR}/TAKIgniteConfig.example.xml
+TAKIGNITECONFIGFILE=${TAKDIR}/TAKIgniteConfig.xml
 
+CONFIG_PID=null
 MESSAGING_PID=null
 API_PID=null
 PM_PID=null
@@ -20,6 +23,10 @@ check_env_var() {
 
 killall() {
     echo Please wait a moment. It may take serveral seconds to fully shut down TAKServer.
+    if [ $CONFIG_PID != null ];then
+        kill $CONFIG_PID
+    fi
+
     if [ $MESSAGING_PID != null ];then
         kill $MESSAGING_PID
     fi
@@ -51,6 +58,11 @@ cd ${CERTDIR}
 # If just regenerating the certs.  Variables will need to be updated beforehand.
 if [[ -f "${CONFIGFILE}" ]];then
   EXCONFIGFILE=${CONFIGFILE}
+fi
+
+# If just regenerating the certs.  Variables will need to be updated beforehand.
+if [[ -f "${TAKIGNITECONFIGFILE}" ]];then
+  EXTAKIGNITECONFIGFILE=${TAKIGNITECONFIGFILE}
 fi
 
 if [[ ! -d "${CERTDIR}/files" ]];then
@@ -111,6 +123,8 @@ if [[ -z "$(ls -A "${CERTDIR}/files")" ]];then
    . ./setenv.sh
 
    echo "Starting the Server in order to add the ADMIN user."
+   java -jar -Xmx${CONFIG_MAX_HEAP}m -Dspring.profiles.active=config takserver.war &
+   CONFIG_PID=$!
    java -jar -Xmx${MESSAGING_MAX_HEAP}m -Dspring.profiles.active=messaging takserver.war &
    MESSAGING_PID=$!
    java -jar -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api -Dkeystore.pkcs12.legacy takserver.war &
@@ -121,6 +135,7 @@ if [[ -z "$(ls -A "${CERTDIR}/files")" ]];then
 
    echo "Waiting to allow the server to start up"
    sleep 60
+   TAKCL_TAKIGNITECONFIG_PATH="${TAKIGNITECONFIGFILE}"
    TAKCL_CORECONFIG_PATH="${CONFIGFILE}"
    echo "Adding ADMIN certs"
    java -jar ${TAKDIR}/utils/UserManager.jar certmod -A "${CERTDIR}/files/${ADMIN_CERT_NAME}.pem"
@@ -146,6 +161,8 @@ echo "PostgreSQL and PGPool started"
 echo "Starting TAK Server ..."
 cd ${TAKDIR}
 . ./setenv.sh
+java -jar -Xmx${CONFIG_MAX_HEAP}m -Dspring.profiles.active=config takserver.war &
+CONFIG_PID=$!
 java -jar -Xmx${MESSAGING_MAX_HEAP}m -Dspring.profiles.active=messaging takserver.war &
 MESSAGING_PID=$!
 java -jar -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api -Dkeystore.pkcs12.legacy takserver.war &

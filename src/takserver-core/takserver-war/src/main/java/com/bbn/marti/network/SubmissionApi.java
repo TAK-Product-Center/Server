@@ -13,9 +13,10 @@ import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,121 +63,130 @@ import tak.server.ignite.MessagingIgniteBroker;
  */
 @RestController
 public class SubmissionApi extends BaseRestController {
-	
-    private static final String CONTEXT = "SubmissionApi";
-    
-    Logger logger = LoggerFactory.getLogger(SubmissionApi.class);
 
-    @Autowired
-    private MartiValidator validator;
+	private static final String CONTEXT = "SubmissionApi";
 
-    @Autowired
-    ApplicationContext context;
+    private static String MASK_WORD_FOR_DISPLAY = "********";
 
-    @Autowired
-    private InputManager inputManager;
+	Logger logger = LoggerFactory.getLogger(SubmissionApi.class);
 
-    @Autowired
-	private CoreConfig coreConfig;
-    
+	@Autowired
+	private MartiValidator validator;
+
+	@Autowired
+	ApplicationContext context;
+
+	@Autowired
+	private InputManager inputManager;
+
 	@Autowired
 	private CommonUtil commonUtil;
 
-    @Autowired
-    private GroupManager groupManager;
-    
-    @Autowired
-    private RemoteUtil remoteUtil;
-	
-    @Autowired
-    DataFeedRepository dataFeedRepository;
-    
-    @Autowired
-    DataFeedService dfs;
-    
-    @Autowired
+	@Autowired
+	private GroupManager groupManager;
+
+	@Autowired
+	private RemoteUtil remoteUtil;
+
+	@Autowired
+	DataFeedRepository dataFeedRepository;
+
+	@Autowired
+	DataFeedService dfs;
+
+	@Autowired
 	DataSource ds;
-    
-    @RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.GET)
-    public ResponseEntity<ApiResponse<DataFeed>> getDataFeed(@PathVariable("name") String name) {
 
-    	ResponseEntity<ApiResponse<DataFeed>> result = null;
-        try {
-            if (!getInputNameValidationErrors(name).isEmpty()) {
-                result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
-                		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
-            } else {
-            	String groupVector = commonUtil.getGroupVectorBitString();
-                List<DataFeedDTO> dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
-                if (dataFeeds == null || dataFeeds.size() != 1) {
-                    result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
-                    		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
-                } else {
+	@RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.GET)
+	public ResponseEntity<ApiResponse<DataFeed>> getDataFeed(@PathVariable("name") String name) {
+
+		ResponseEntity<ApiResponse<DataFeed>> result = null;
+		try {
+			if (!getInputNameValidationErrors(name).isEmpty()) {
+				result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+			} else {
+				String groupVector = commonUtil.getGroupVectorBitString();
+				List<DataFeedDTO> dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
+				if (dataFeeds == null || dataFeeds.size() != 1) {
+					result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+							DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+				} else {
 					DataFeedDTO dataFeedDTO = dataFeeds.get(0);
-    				DataFeed returnDataFeed = dfs.adaptDataFeedDTOtoDataFeed(dataFeedDTO);
-    				result = new ResponseEntity<ApiResponse<DataFeed>>(
-    						new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), returnDataFeed),
-    						HttpStatus.OK);
-                }
-            }
-        } catch (Exception e) {
-            logger.error("Exception getting data feed.", e);
-        	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
-        			HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+					DataFeed returnDataFeed = dfs.adaptDataFeedDTOtoDataFeed(dataFeedDTO);
+					result = new ResponseEntity<ApiResponse<DataFeed>>(
+							new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), returnDataFeed),
+							HttpStatus.OK);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Exception getting data feed.", e);
+			result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
 
-    	return result;
-    }
+		return result;
+	}
 
-    @RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.DELETE)
-    public ResponseEntity<ApiResponse<DataFeed>> deleteDataFeed(@PathVariable("name") String name) {
+	@RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.DELETE)
+	public ResponseEntity<ApiResponse<DataFeed>> deleteDataFeed(@PathVariable("name") String name) {
 
-    	ResponseEntity<ApiResponse<DataFeed>> result = null;
-    	String groupVector = commonUtil.getGroupVectorBitString();
-    	List<DataFeedDTO> dataFeeds = new ArrayList<>();
+		ResponseEntity<ApiResponse<DataFeed>> result = null;
+		String groupVector = commonUtil.getGroupVectorBitString();
+		List<DataFeedDTO> dataFeeds = new ArrayList<>();
 
-    	// Verify correct groups before deleting from config file
-        try {
-            if (!getInputNameValidationErrors(name).isEmpty()) {
-                result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
-                		DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
-            } else {
-            	// only check groups if not admin
-            	if (!commonUtil.isAdmin()) {
-            		dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
-                    if (dataFeeds == null || dataFeeds.size() != 1) {
-                        result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
-        						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
-                    }	
-            	} else {
-            		dataFeeds = dataFeedRepository.getDataFeedByName(name);
-            	}
-            }
-        } catch (Exception ex) {
-        	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
-        			HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-        
-        if (result != null) {
-        	return result;
-        }
-    	
-        try {
-            if (!getInputNameValidationErrors(name).isEmpty()) {
-                return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+		// Verify correct groups before deleting from config file
+		try {
+			if (!getInputNameValidationErrors(name).isEmpty()) {
+				result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+			} else {
+				// only check groups if not admin
+				if (!commonUtil.isAdmin()) {
+					dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
+					if (dataFeeds == null || dataFeeds.size() != 1) {
+						result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+								DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
+					}
+				} else {
+					dataFeeds = dataFeedRepository.getDataFeedByName(name);
+				}
+			}
+		} catch (Exception ex) {
+			result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		if (result != null) {
+			return result;
+		}
+
+		try {
+			if (!getInputNameValidationErrors(name).isEmpty()) {
+				return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
 						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
 			} else {
 				// Delete from config file
+                // If changes are saved during activation of the change the nodes can hit a situation where
+                // the first node to complete triggers the CoreConfig update on other nodes before they apply 
+                // the update which can lead to state consistency issues
+                if (CoreConfigFacade.getInstance().isCluster()) {
 				MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service)
-						.deleteDataFeed(name), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                        .deleteDataFeed(name, false), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                    CoreConfigFacade.getInstance().removeDataFeedAndSave(name);
+                } else {
+                    MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service)
+                        .deleteDataFeed(name, true), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                }
+
 			}
 		} catch (Exception e) {
 			logger.error("Exception deleting data feed from config file.", e);
 
 			// Shouldn't return error in case deleting from database is needed
-    	}
+		}
 
-        try {
+		try {
 			// Delete from database
 			if (dataFeeds.size() > 0 && dataFeeds.get(0) != null) {
 				Long dataFeedId = dataFeeds.get(0).getId();
@@ -188,574 +198,662 @@ public class SubmissionApi extends BaseRestController {
 						new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
 						HttpStatus.OK);
 			} else {
-                result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+				result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
 						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
 			}
 
 
 		} catch (Exception e) {
 			logger.error("Exception deleting data feed from database.", e);
-        	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
-        			HttpStatus.INTERNAL_SERVER_ERROR);
+			result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+					HttpStatus.INTERNAL_SERVER_ERROR);
 		}
 
-        return result;
-    }
+		return result;
+	}
 
-    @RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.PUT)
-    public ResponseEntity<ApiResponse<DataFeed>> modifyDataFeed(@PathVariable("name") String name,
-    		 @RequestBody com.bbn.marti.config.DataFeed dataFeed) {
-    	ResponseEntity<ApiResponse<DataFeed>> result = null;
-    	
-    	try {
-        	String groupVector = commonUtil.getGroupVectorBitString();
+	@RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.PUT)
+	public ResponseEntity<ApiResponse<DataFeed>> modifyDataFeed(@PathVariable("name") String name,
+																@RequestBody com.bbn.marti.config.DataFeed dataFeed) {
+		ResponseEntity<ApiResponse<DataFeed>> result = null;
 
-    		List<DataFeedDTO> dataFeeds = dataFeedRepository.getDataFeedByName(name);
+		try {
+			String groupVector = commonUtil.getGroupVectorBitString();
+
+			List<DataFeedDTO> dataFeeds = dataFeedRepository.getDataFeedByName(name);
 			int type = DataFeedType.valueOf(dataFeed.getType()).ordinal();
 
-            if (!getInputNameValidationErrors(name).isEmpty() || dataFeeds == null || dataFeeds.size() != 1) {
-                result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+			if (!getInputNameValidationErrors(name).isEmpty() || dataFeeds == null || dataFeeds.size() != 1) {
+				result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
 						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
-			} else if (DataFeedType.valueOf(dataFeed.getType()) == DataFeedType.Federation){	
+			} else if (DataFeedType.valueOf(dataFeed.getType()) == DataFeedType.Federation){
 				// federation needs to be handled a little different. it does not have a core config entry, and only has a few editable attributes
 				dataFeedRepository.updateDataFeedWithGroupVector(dataFeed.getUuid(), dataFeed.getName(), type,
 						dataFeed.getAuth().toString(), dataFeed.getPort(), dataFeed.isAuthRequired(), dataFeed.getProtocol(),
 						dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(), dataFeed.isAnongroup(),
 						dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
 						dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated(), dataFeed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
-				
+
 				inputManager.updateFederationDataFeed(dataFeed);
 
 			} else {
-	    		dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
-	    		if (dataFeeds == null || dataFeeds.size() != 1) {
-	    			return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+				dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
+				if (dataFeeds == null || dataFeeds.size() != 1) {
+					return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
 							DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
-	    		}
+				}
 
 				Long dataFeedId = dataFeeds.get(0).getId();
+
+                ConnectionModifyResult updateResult;
+
 				// Update config file
-				ConnectionModifyResult updateResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
-						.modifyInput(name, dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                // If changes are saved during activation of the change the nodes can hit a situation where
+                // the first node to complete triggers the CoreConfig update on other nodes before they apply 
+                // the update which can lead to state consistency issues
+                if (CoreConfigFacade.getInstance().isCluster()) {
+                    updateResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
+                        .modifyInput(name, dataFeed, false), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+
+                    if (updateResult.getHttpStatusCode() == ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
+                        updateResult = CoreConfigFacade.getInstance().updateInputGroupsNoSave(name, dataFeed.getFiltergroup().toArray(new String[dataFeed.getFiltergroup().size()]));
+                        if (updateResult.getHttpStatusCode() != ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
+                            return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+                                HttpStatus.INTERNAL_SERVER_ERROR);
+                        }
+
+                        CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
+
+                        CoreConfigFacade.getInstance().updateTagsNoSave(name, dataFeed.getTag());
+
+                        if (dataFeed.isSync() != dataFeed.isSync()) {
+                            ConnectionModifyResult commandResult = CoreConfigFacade.getInstance().setSyncFlagNoSave(name, dataFeed.isSync());
+                            if (commandResult.getHttpStatusCode() != ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
+                                return new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+                                    HttpStatus.valueOf(commandResult.getHttpStatusCode()));
+                            }
+                        }
+                        CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
+                    }
+                } else {
+                    updateResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
+                        .modifyInput(name, dataFeed, true), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                }
+
 				if (updateResult.getHttpStatusCode() == ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
 					dataFeedRepository.updateDataFeedWithGroupVector(dataFeed.getUuid(), dataFeed.getName(), type,
 							dataFeed.getAuth().toString(), dataFeed.getPort(), dataFeed.isAuthRequired(), dataFeed.getProtocol(),
 							dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(), dataFeed.isAnongroup(),
 							dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-											 //dataFeed.isSync(), 1, groupVector, dataFeed.isFederated());
+							//dataFeed.isSync(), 1, groupVector, dataFeed.isFederated());
 							dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated(), dataFeed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
 
 					if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
 						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
-						dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag());
+						dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag().toArray(String[]::new));
 					}
 
 					if (dataFeed.getFiltergroup() != null && dataFeed.getFiltergroup().size() > 0) {
 						dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
-						dataFeedRepository.addDataFeedFilterGroups(dataFeedId, dataFeed.getFiltergroup());
+						dataFeedRepository.addDataFeedFilterGroups(dataFeedId, dataFeed.getFiltergroup().toArray(String[]::new));
 					}
 
-	    			result = new ResponseEntity<ApiResponse<DataFeed>>(
-	    					new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
-	    					HttpStatus.OK);
+					result = new ResponseEntity<ApiResponse<DataFeed>>(
+							new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+							HttpStatus.OK);
 
 				} else {
 					result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
-		        		HttpStatus.INTERNAL_SERVER_ERROR);
+							HttpStatus.INTERNAL_SERVER_ERROR);
 				}
 			}
-    	} catch (Exception e) {
-    		logger.error("Failed updating data feed", e);
-        	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
-        			HttpStatus.INTERNAL_SERVER_ERROR);
-    	}
+		} catch (Exception e) {
+			logger.error("Failed updating data feed", e);
+			result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
 
-    	return result;
-    }
+		return result;
+	}
 
-    @RequestMapping(value = "/datafeeds", method = RequestMethod.POST)
-    public ResponseEntity<ApiResponse<DataFeed>> createDataFeed(@RequestBody com.bbn.marti.config.DataFeed dataFeed) {
+	@RequestMapping(value = "/datafeeds", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<DataFeed>> createDataFeed(@RequestBody com.bbn.marti.config.DataFeed dataFeed) {
 
-    	ResponseEntity<ApiResponse<DataFeed>> result = null;
-    	DataFeed returnDataFeed = new DataFeed(dataFeed);
-        List<String> errors = new ArrayList<>();
-        
-        // Needed for permissions to access data feed
-        if (dataFeed.getFiltergroup().size() == 0) {
-        	dataFeed.getFiltergroup().add(Constants.ANON_GROUP);
-        }
-        
+		ResponseEntity<ApiResponse<DataFeed>> result = null;
+		DataFeed returnDataFeed = new DataFeed(dataFeed);
+		List<String> errors = new ArrayList<>();
+
+		// Needed for permissions to access data feed
+		if (dataFeed.getFiltergroup().size() == 0) {
+			dataFeed.getFiltergroup().add(Constants.ANON_GROUP);
+		}
+
 		Set<Group> groups = groupManager.findGroups(dataFeed.getFiltergroup());
 		String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
 
 		try {
-        	if (dataFeed.getUuid() == null) {
-        		dataFeed.setUuid(UUID.randomUUID().toString());
-        	}
+			if (dataFeed.getUuid() == null) {
+				dataFeed.setUuid(UUID.randomUUID().toString());
+			}
 
 			errors = getDataFeedValidationErrors(dataFeed);
 
-        	if (errors.isEmpty()) {
-            	// Add dataFeed to config file
-	            NetworkInputAddResult addResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
-	            		.createDataFeed(dataFeed), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
-	            
-	            if (addResult == NetworkInputAddResult.SUCCESS) {
-	        		// Add dataFeed to database
-	            	int type = DataFeedType.valueOf(dataFeed.getType()).ordinal();
-	            	String auth = dataFeed.getAuth().toString();
+			if (errors.isEmpty()) {
+                NetworkInputAddResult addResult;
+				// Add dataFeed to config file
+                // If changes are saved during activation of the change the nodes can hit a situation where
+                // the first node to complete triggers the CoreConfig update on other nodes before they apply 
+                // the update which can lead to state consistency issues
+                if (CoreConfigFacade.getInstance().isCluster()) {
+                    addResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
+                        .createDataFeed(dataFeed, false), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                    if (addResult == NetworkInputAddResult.SUCCESS) {
+                        if (dataFeed.getProtocol() == null || dataFeed.getType().equals("Plugin")) {
+                            CoreConfigFacade.getInstance().addInputAndSave(dataFeed);
+                        }
+                    }
+                } else {
+                    addResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
+                        .createDataFeed(dataFeed, true), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                }
 
-	            	Long dataFeedId = dataFeedRepository.addDataFeed(dataFeed.getUuid(), dataFeed.getName(), type, auth, dataFeed.getPort(),
-	            			dataFeed.isAuthRequired(), dataFeed.getProtocol(), dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(),
-	            			dataFeed.isAnongroup(), dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
-	            			dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated(), dataFeed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
+				if (addResult == NetworkInputAddResult.SUCCESS) {
+					// Add dataFeed to database
+					int type = DataFeedType.valueOf(dataFeed.getType()).ordinal();
+					String auth = dataFeed.getAuth().toString();
 
-	            	if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
-	            		dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag());
-	            	}
-	            	
-					if (dataFeed.getFiltergroup() != null && dataFeed.getFiltergroup().size() > 0) {
-						dataFeedRepository.addDataFeedFilterGroups(dataFeedId, dataFeed.getFiltergroup());
+					Long dataFeedId = dataFeedRepository.addDataFeed(dataFeed.getUuid(), dataFeed.getName(), type, auth, dataFeed.getPort(),
+							dataFeed.isAuthRequired(), dataFeed.getProtocol(), dataFeed.getGroup(), dataFeed.getIface(), dataFeed.isArchive(),
+							dataFeed.isAnongroup(), dataFeed.isArchiveOnly(), dataFeed.getCoreVersion(), dataFeed.getCoreVersion2TlsVersions(),
+							dataFeed.isSync(), dataFeed.getSyncCacheRetentionSeconds(), groupVector, dataFeed.isFederated(), dataFeed.isBinaryPayloadWebsocketOnly(), null, null, null, null);
+
+					if (dataFeed.getTag() != null && dataFeed.getTag().size() > 0) {
+						dataFeedRepository.addDataFeedTags(dataFeedId, dataFeed.getTag().toArray(String[]::new));
 					}
-	            	
+
+					if (dataFeed.getFiltergroup() != null && dataFeed.getFiltergroup().size() > 0) {
+						dataFeedRepository.addDataFeedFilterGroups(dataFeedId, dataFeed.getFiltergroup().toArray(String[]::new));
+					}
+
 					result = new ResponseEntity<ApiResponse<DataFeed>>(
 							new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), returnDataFeed),
 							HttpStatus.OK);
-	            } else {
-	            	logger.error("Error adding data feed to config file " + addResult.getDisplayMessage());
-	            	errors.add(addResult.getDisplayMessage());
-	            }
-            } else {
-	            result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
-	            		DataFeed.class.getName(), returnDataFeed, errors), HttpStatus.BAD_REQUEST);
-            }
-        } catch (Exception e) {
-            logger.error("Exception adding input.", e);
-            errors.add(e.getMessage());
-        }
-
-        if (result == null) {
-        	result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null, errors),
-        			HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        return result;
-    }
-    
-    @RequestMapping(value = "/inputs", method = RequestMethod.GET)
-    public ResponseEntity<ApiResponse<SortedSet<InputMetric>>> getInputMetrics(
-    		@RequestParam(value = "excludeDataFeeds", defaultValue = "false") boolean excludeDataFeeds, HttpServletResponse response) {
-
-    	setCacheHeaders(response);
-
-        SortedSet<InputMetric> metrics = null;
-
-        // sort metrics by input port number, then name
-        try {
-            metrics = new ConcurrentSkipListSet<InputMetric>(new Comparator<InputMetric>() {
-                @Override
-                public int compare(InputMetric thiz, InputMetric that) {
-                    return ComparisonChain.start()
-                            .compare(thiz.getInput().getPort(), that.getInput().getPort())
-                            .compare(thiz.getInput().getName(), that.getInput().getName())
-                            .result();
-                }
-            });
-
-            Collection<InputMetric> inputs = inputManager.getInputMetrics(excludeDataFeeds);
-
-            if (logger.isDebugEnabled()) {
-            	logger.info("inputs: " + inputs);
-            }
-
-            metrics.addAll(inputs);
-        } catch (Exception e) {
-        	if (logger.isDebugEnabled()) {
-        		logger.debug("Exception getting input metrics", e);
-        	}
-        }
-
-        if (metrics != null) {
-            return new ResponseEntity<ApiResponse<SortedSet<InputMetric>>>(new ApiResponse<SortedSet<InputMetric>>(Constants.API_VERSION, InputMetric.class.getName(), metrics), HttpStatus.OK);
-        } else {
-        	//This would be an error condition (not an empty input list)
-            return new ResponseEntity<ApiResponse<SortedSet<InputMetric>>>(new ApiResponse<SortedSet<InputMetric>>(Constants.API_VERSION, InputMetric.class.getName(), null), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    @RequestMapping(value = "/inputs/{name}", method = RequestMethod.DELETE)
-    public ResponseEntity<ApiResponse<Input>> deleteInput(@PathVariable("name") String name) {
-
-        //Not clear what the payload for the ApiResponse should be here (Integer number of inputs deleted, the input itself). We don't have either of these returned by service
-    	//layer for now, so just set payload to Input and set the value to null.
-    	ResponseEntity<ApiResponse<Input>> result = null;
-
-
-        try {
-            if (!getInputNameValidationErrors(name).isEmpty()) {
-                result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION,
-                		Input.class.getName(), null), HttpStatus.BAD_REQUEST);
-            } else {
-	        	if (inputManager != null) {
-	        		MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service).deleteInput(name), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
-		            
-	        		//Again, we're returning ok even if nothing was actually deleted, which is not ideal, but we need to change the
-		            //interface to return something besides void here
-		            result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION,
-		            		Input.class.getName(), null), HttpStatus.OK);
-	            }
-            }
-        } catch (Exception e) {
-            logger.error("Exception deleting input.", e);
-        }
-
-        if (result == null) {
-        	//This would be an error condition (not an empty input list or a bad request)
-        	result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION, Input.class.getName(), null),
-        			HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        return result;
-    }
-
-    @RequestMapping(value = "/inputs/{id}", method = RequestMethod.PUT)
-    public ResponseEntity<ApiResponse<ConnectionModifyResult>> modifyInput(@PathVariable("id") String id, @RequestBody Input input) {
-
-    	ResponseEntity<ApiResponse<ConnectionModifyResult>> result = null;
-
-    	List<String> errors = new ArrayList<>();
-
-    	try {
-    		ConnectionModifyResult updateResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
-    				.modifyInput(id, input), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
-
-    		result = new ResponseEntity<ApiResponse<ConnectionModifyResult>>(new ApiResponse<ConnectionModifyResult>(Constants.API_VERSION,
-    				ConnectionModifyResult.class.getName(), updateResult), HttpStatus.valueOf(updateResult.getHttpStatusCode()));
-
-    	} catch (Exception e) {
-    		logger.error("Exception updating input.", e);
-    		//In general, revealing raw exceptions to the user is not a good idea, but for now, as discussed,
-    		//we'll leave this in until more granular exceptions are thrown by the service layer.
-    		//The types of errors we'll see here concern missing cert files or lack of root access
-    		//for lower port numbers the user has provided.
-    		errors.add(e.getMessage());
-    	}
-
-    	if (result == null) {
-    		//This would be an error condition (not an empty input list or bad request)
-    		result = new ResponseEntity<ApiResponse<ConnectionModifyResult>>(new ApiResponse<ConnectionModifyResult>(Constants.API_VERSION,
-    				ConnectionModifyResult.class.getName(), new ConnectionModifyResult("Error: No response received from server.", HttpStatus.INTERNAL_SERVER_ERROR.value())),
-    				HttpStatus.INTERNAL_SERVER_ERROR);
-    	}
-
-    	return result;
-    }
-
-    @RequestMapping(value = "/inputs", method = RequestMethod.POST)
-    public ResponseEntity<ApiResponse<Input>> createInput(@RequestBody Input input) {
-
-        ResponseEntity<ApiResponse<Input>> result = null;
-
-        List<String> errors = null;
-
-        try {
-        	errors = getValidationErrors(input);
-            if (errors.isEmpty()) {
-
-	            NetworkInputAddResult addResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
-	            		.createInput(input), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
-
-	            if (addResult == NetworkInputAddResult.SUCCESS) {
-		            result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION,
-		            		Input.class.getName(), input), HttpStatus.OK);
-	            } else {
-	            	logger.error("NetworkInputAddResult was " + addResult.getDisplayMessage());
-	            	errors.add(addResult.getDisplayMessage());
-	            }
-            } else {
-	            result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION,
-	            		Input.class.getName(), input, errors), HttpStatus.BAD_REQUEST);
-            }
-        } catch (Exception e) {
-            logger.error("Exception adding input.", e);
-            //In general, revealing raw exceptions to the user is not a good idea, but for now, as discussed,
-            //we'll leave this in until more granular exceptions are thrown by the service layer.
-            //The types of errors we'll see here concern missing cert files or lack of root access
-            //for lower port numbers the user has provided.
-            errors.add(e.getMessage());
-        }
-
-        if (result == null) {
-        	//This would be an error condition (not an empty input list or bad request)
-        	result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION, Input.class.getName(), null, errors),
-        			HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        return result;
-    }
-
-    @RequestMapping(value = "/inputs/{name}", method = RequestMethod.GET)
-    public ResponseEntity<ApiResponse<InputMetric>> getInputMetric(@PathVariable("name") String name, HttpServletResponse response) {
-
-    	setCacheHeaders(response);
-
-        //Really the way this function is used is to get an Input, not an InputMetric, but leave it as generic for CRUD purposes
-        InputMetric metric = null;
-        ResponseEntity<ApiResponse<InputMetric>> result = null;
-
-        try {
-            if (!getInputNameValidationErrors(name).isEmpty()) {
-                result = new ResponseEntity<ApiResponse<InputMetric>>(new ApiResponse<InputMetric>(Constants.API_VERSION,
-                		InputMetric.class.getName(), null), HttpStatus.BAD_REQUEST);
-            } else {
-            	Collection<InputMetric> metrics = inputManager.getInputMetrics(false);
-            	if (metrics != null) {
-            		for (InputMetric m : metrics) {
-            			if (m.getInput().getName().equalsIgnoreCase(name)) {
-            				metric = m;
-            				break;
-            			}
-            		}
-            	}
-            	result = new ResponseEntity<ApiResponse<InputMetric>>(new ApiResponse<InputMetric>(Constants.API_VERSION,
-	            		InputMetric.class.getName(), metric), HttpStatus.OK);
-            }
-        } catch (Exception e) {
-        	if (logger.isDebugEnabled()) {
-        		logger.debug("Exception getting input metric", e);
-        	}
-        }
-
-        if (result == null) {
-        	//This would be an error condition (not an empty input list or bad request)
-        	result = new ResponseEntity<ApiResponse<InputMetric>>(new ApiResponse<InputMetric>(Constants.API_VERSION,
-            		InputMetric.class.getName(), null), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        return result;
-    }
-
-    @RequestMapping(value = "/inputs/config", method = RequestMethod.GET)
-	public ResponseEntity<ApiResponse<MessagingConfigInfo>> getConfigInfo(){
-    	try{
-    		MessagingConfigInfo messagingConfigInfo = inputManager.getConfigInfo();
-    		return new ResponseEntity<ApiResponse<MessagingConfigInfo>>(new ApiResponse<MessagingConfigInfo>(Constants.API_VERSION, MessagingConfigInfo.class.getName(),
-					messagingConfigInfo), HttpStatus.OK);
+				} else {
+					logger.error("Error adding data feed to config file " + addResult.getDisplayMessage());
+					errors.add(addResult.getDisplayMessage());
+				}
+			} else {
+				result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
+						DataFeed.class.getName(), returnDataFeed, errors), HttpStatus.BAD_REQUEST);
+			}
+		} catch (Exception e) {
+			logger.error("Exception adding input.", e);
+			errors.add(e.getMessage());
 		}
-		catch(Exception e){
-    		logger.info("MessagingConfigInfo: " + e.getMessage());
-    		return new ResponseEntity<ApiResponse<MessagingConfigInfo>>(new ApiResponse<MessagingConfigInfo>(Constants.API_VERSION, MessagingConfigInfo.class.getName(),
-			null), HttpStatus.INTERNAL_SERVER_ERROR);
+
+		if (result == null) {
+			result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION, DataFeed.class.getName(), null, errors),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+
+	@RequestMapping(value = "/inputs", method = RequestMethod.GET)
+	public ResponseEntity<ApiResponse<SortedSet<InputMetric>>> getInputMetrics(
+			@RequestParam(value = "excludeDataFeeds", defaultValue = "false") boolean excludeDataFeeds, HttpServletResponse response) {
+
+		setCacheHeaders(response);
+
+		SortedSet<InputMetric> metrics = null;
+
+		// sort metrics by input port number, then name
+		try {
+			metrics = new ConcurrentSkipListSet<InputMetric>(new Comparator<InputMetric>() {
+				@Override
+				public int compare(InputMetric thiz, InputMetric that) {
+					return ComparisonChain.start()
+							.compare(thiz.getInput().getPort(), that.getInput().getPort())
+							.compare(thiz.getInput().getName(), that.getInput().getName())
+							.result();
+				}
+			});
+
+			Collection<InputMetric> inputs = inputManager.getInputMetrics(excludeDataFeeds);
+
+			if (logger.isDebugEnabled()) {
+				logger.info("inputs: " + inputs);
+			}
+
+			metrics.addAll(inputs);
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Exception getting input metrics", e);
+			}
+		}
+
+		if (metrics != null) {
+			return new ResponseEntity<ApiResponse<SortedSet<InputMetric>>>(new ApiResponse<SortedSet<InputMetric>>(Constants.API_VERSION, InputMetric.class.getName(), metrics), HttpStatus.OK);
+		} else {
+			//This would be an error condition (not an empty input list)
+			return new ResponseEntity<ApiResponse<SortedSet<InputMetric>>>(new ApiResponse<SortedSet<InputMetric>>(Constants.API_VERSION, InputMetric.class.getName(), null), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	@RequestMapping(value = "/inputs/{name}", method = RequestMethod.DELETE)
+    public ResponseEntity<ApiResponse<Input>> deoleteInput(@PathVariable("name") String name) {
+
+		//Not clear what the payload for the ApiResponse should be here (Integer number of inputs deleted, the input itself). We don't have either of these returned by service
+		//layer for now, so just set payload to Input and set the value to null.
+		ResponseEntity<ApiResponse<Input>> result = null;
+
+
+		try {
+			if (!getInputNameValidationErrors(name).isEmpty()) {
+				result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION,
+						Input.class.getName(), null), HttpStatus.BAD_REQUEST);
+			} else {
+				if (inputManager != null) {
+                    // If changes are saved during activation of the change the nodes can hit a situation where
+                    // the first node to complete triggers the CoreConfig update on other nodes before they apply 
+                    // the update which can lead to state consistency issues
+                    if (CoreConfigFacade.getInstance().isCluster()) {
+                        MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service).deleteInput(name, false), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                        CoreConfigFacade.getInstance().removeInputAndSave(name);
+                    } else {
+                        MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service).deleteInput(name, true), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                    }
+
+					//Again, we're returning ok even if nothing was actually deleted, which is not ideal, but we need to change the
+					//interface to return something besides void here
+					result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION,
+							Input.class.getName(), null), HttpStatus.OK);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Exception deleting input.", e);
+		}
+
+		if (result == null) {
+			//This would be an error condition (not an empty input list or a bad request)
+			result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION, Input.class.getName(), null),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+
+	@RequestMapping(value = "/inputs/{id}", method = RequestMethod.PUT)
+	public ResponseEntity<ApiResponse<ConnectionModifyResult>> modifyInput(@PathVariable("id") String id, @RequestBody Input input) {
+
+		ResponseEntity<ApiResponse<ConnectionModifyResult>> result = null;
+
+		List<String> errors = new ArrayList<>();
+
+		try {
+            ConnectionModifyResult updateResult;
+            // If changes are saved during activation of the change the nodes can hit a situation where
+            // the first node to complete triggers the CoreConfig update on other nodes before they apply 
+            // the update which can lead to state consistency issues
+            if (CoreConfigFacade.getInstance().isCluster()) {
+                updateResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
+                    .modifyInput(id, input, false), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+
+                if (updateResult.getHttpStatusCode() == ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
+                    updateResult = CoreConfigFacade.getInstance().updateInputGroupsNoSave(id, input.getFiltergroup().toArray(new String[input.getFiltergroup().size()]));
+                    if (updateResult.getHttpStatusCode() == ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
+                        CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
+                    }
+                }
+            } else {
+                updateResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
+                    .modifyInput(id, input, true), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+            }
+
+
+			result = new ResponseEntity<ApiResponse<ConnectionModifyResult>>(new ApiResponse<ConnectionModifyResult>(Constants.API_VERSION,
+					ConnectionModifyResult.class.getName(), updateResult), HttpStatus.valueOf(updateResult.getHttpStatusCode()));
+
+		} catch (Exception e) {
+			logger.error("Exception updating input.", e);
+			//In general, revealing raw exceptions to the user is not a good idea, but for now, as discussed,
+			//we'll leave this in until more granular exceptions are thrown by the service layer.
+			//The types of errors we'll see here concern missing cert files or lack of root access
+			//for lower port numbers the user has provided.
+			errors.add(e.getMessage());
+		}
+
+		if (result == null) {
+			//This would be an error condition (not an empty input list or bad request)
+			result = new ResponseEntity<ApiResponse<ConnectionModifyResult>>(new ApiResponse<ConnectionModifyResult>(Constants.API_VERSION,
+					ConnectionModifyResult.class.getName(), new ConnectionModifyResult("Error: No response received from server.", HttpStatus.INTERNAL_SERVER_ERROR.value())),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+
+	@RequestMapping(value = "/inputs", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<Input>> createInput(@RequestBody Input input) {
+
+		ResponseEntity<ApiResponse<Input>> result = null;
+
+		List<String> errors = null;
+
+		try {
+			errors = getValidationErrors(input);
+			if (errors.isEmpty()) {
+                NetworkInputAddResult addResult;
+                // If changes are saved during activation of the change the nodes can hit a situation where
+                // the first node to complete triggers the CoreConfig update on other nodes before they apply 
+                // the update which can lead to state consistency issues
+                if (CoreConfigFacade.getInstance().isCluster()) {
+                    addResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
+                        .createInput(input, false), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                    if (addResult == NetworkInputAddResult.SUCCESS) {
+                        CoreConfigFacade.getInstance().addInputAndSave(input);
+                    }
+                } else {
+                    addResult = MessagingIgniteBroker.brokerServiceCalls(service -> ((InputManager) service)
+                        .createInput(input, true), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+                }
+
+				if (addResult == NetworkInputAddResult.SUCCESS) {
+					result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION,
+							Input.class.getName(), input), HttpStatus.OK);
+				} else {
+					logger.error("NetworkInputAddResult was " + addResult.getDisplayMessage());
+					errors.add(addResult.getDisplayMessage());
+				}
+			} else {
+				result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION,
+						Input.class.getName(), input, errors), HttpStatus.BAD_REQUEST);
+			}
+		} catch (Exception e) {
+			logger.error("Exception adding input.", e);
+			//In general, revealing raw exceptions to the user is not a good idea, but for now, as discussed,
+			//we'll leave this in until more granular exceptions are thrown by the service layer.
+			//The types of errors we'll see here concern missing cert files or lack of root access
+			//for lower port numbers the user has provided.
+			errors.add(e.getMessage());
+		}
+
+		if (result == null) {
+			//This would be an error condition (not an empty input list or bad request)
+			result = new ResponseEntity<ApiResponse<Input>>(new ApiResponse<Input>(Constants.API_VERSION, Input.class.getName(), null, errors),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+
+	@RequestMapping(value = "/inputs/{name}", method = RequestMethod.GET)
+	public ResponseEntity<ApiResponse<InputMetric>> getInputMetric(@PathVariable("name") String name, HttpServletResponse response) {
+
+		setCacheHeaders(response);
+
+		//Really the way this function is used is to get an Input, not an InputMetric, but leave it as generic for CRUD purposes
+		InputMetric metric = null;
+		ResponseEntity<ApiResponse<InputMetric>> result = null;
+
+		try {
+			if (!getInputNameValidationErrors(name).isEmpty()) {
+				result = new ResponseEntity<ApiResponse<InputMetric>>(new ApiResponse<InputMetric>(Constants.API_VERSION,
+						InputMetric.class.getName(), null), HttpStatus.BAD_REQUEST);
+			} else {
+				Collection<InputMetric> metrics = inputManager.getInputMetrics(false);
+				if (metrics != null) {
+					for (InputMetric m : metrics) {
+						if (m.getInput().getName().equalsIgnoreCase(name)) {
+							metric = m;
+							break;
+						}
+					}
+				}
+				result = new ResponseEntity<ApiResponse<InputMetric>>(new ApiResponse<InputMetric>(Constants.API_VERSION,
+						InputMetric.class.getName(), metric), HttpStatus.OK);
+			}
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Exception getting input metric", e);
+			}
+		}
+
+		if (result == null) {
+			//This would be an error condition (not an empty input list or bad request)
+			result = new ResponseEntity<ApiResponse<InputMetric>>(new ApiResponse<InputMetric>(Constants.API_VERSION,
+					InputMetric.class.getName(), null), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+
+	@RequestMapping(value = "/inputs/config", method = RequestMethod.GET)
+	public ResponseEntity<ApiResponse<MessagingConfigInfo>> getConfigInfo(){
+		try{
+			MessagingConfigInfo messagingConfigInfo = inputManager.getConfigInfo();
+			return new ResponseEntity<ApiResponse<MessagingConfigInfo>>(new ApiResponse<MessagingConfigInfo>(Constants.API_VERSION, MessagingConfigInfo.class.getName(),
+					messagingConfigInfo), HttpStatus.OK);
+        } catch (Exception e) {
+			logger.info("MessagingConfigInfo: " + e.getMessage());
+			return new ResponseEntity<ApiResponse<MessagingConfigInfo>>(new ApiResponse<MessagingConfigInfo>(Constants.API_VERSION, MessagingConfigInfo.class.getName(),
+					null), HttpStatus.INTERNAL_SERVER_ERROR);
 		}
 	}
 
 	@RequestMapping(value = "/inputs/config", method = RequestMethod.PUT)
 	public ResponseEntity<ApiResponse<String>> modifyConfigInfo(@RequestBody MessagingConfigInfo msgInfo){
-    	try{
-    	    //Validate username thats displayed to prevent XSS exploit
-    		validator.getValidInput(CONTEXT, msgInfo.getDbUsername(), "MartiSafeString", MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
+		try{
+			//Validate username thats displayed to prevent XSS exploit
+			validator.getValidInput(CONTEXT, msgInfo.getDbUsername(), "MartiSafeString", MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 
-    		MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service)
+            // If changes are saved during activation of the change the nodes can hit a situation where
+            // the first node to complete triggers the CoreConfig update on other nodes before they apply 
+            // the update which can lead to state consistency issues
+            if (CoreConfigFacade.getInstance().isCluster()) {
+                CoreConfigFacade.getInstance().modifyMessagingConfig(msgInfo);
+            } else {
+			MessagingIgniteBroker.brokerVoidServiceCalls(service -> ((InputManager) service)
 					.modifyConfigInfo(msgInfo), Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class);
+            }
 
-    		return new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, MessagingConfigInfo.class.getName(),
+			return new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, MessagingConfigInfo.class.getName(),
 					"Successfully modified messaging config"), HttpStatus.OK);
-		}
-		catch (Exception e){
-    		return new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, null, null), HttpStatus.BAD_REQUEST);
+        } catch (Exception e) {
+			return new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, null, null), HttpStatus.BAD_REQUEST);
 		}
 	}
 
 	@RequestMapping(value = "/database/cotCount", method = RequestMethod.GET)
 	public ResponseEntity<ApiResponse<Map<String, Integer>>> getDatabaseCotCounts() {
-	    Map<String, Integer> cotCounts = new HashMap<String, Integer>();
-        try {
-            CotImageBean cotBean = context.getBean(CotImageBean.class);
-            cotCounts.put("cotEvents", cotBean.getCountOfCoT());
-            cotCounts.put("cotImages", cotBean.getCountOfImages());
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        return new ResponseEntity<ApiResponse<Map<String, Integer>>>(new ApiResponse<Map<String, Integer>>(Constants.API_VERSION, Map.class.getName(), cotCounts), HttpStatus.OK);
+		Map<String, Integer> cotCounts = new HashMap<String, Integer>();
+		try {
+			CotImageBean cotBean = context.getBean(CotImageBean.class);
+			cotCounts.put("cotEvents", cotBean.getCountOfCoT());
+			cotCounts.put("cotImages", cotBean.getCountOfImages());
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return new ResponseEntity<ApiResponse<Map<String, Integer>>>(new ApiResponse<Map<String, Integer>>(Constants.API_VERSION, Map.class.getName(), cotCounts), HttpStatus.OK);
 	}
 
 	@RequestMapping(value = "/inputs/storeForwardChat/enabled", method = RequestMethod.GET)
 	public boolean isStoreForwardChatEnabled() {
-		return coreConfig.getRemoteConfiguration().getBuffer().getQueue().isEnableStoreForwardChat();
+		return CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().isEnableStoreForwardChat();
 	}
 
 	@RequestMapping(value = "/inputs/storeForwardChat/enable", method = RequestMethod.PUT)
 	public void enableStoreForwardChat() {
-		coreConfig.setAndSaveStoreForwardChatEnabled(true);
+		CoreConfigFacade.getInstance().setAndSaveStoreForwardChatEnabled(true);
 	}
 
 	@RequestMapping(value = "/inputs/storeForwardChat/disable", method = RequestMethod.PUT)
 	public void disableStoreForwardChat() {
-		coreConfig.setAndSaveStoreForwardChatEnabled(false);
+		CoreConfigFacade.getInstance().setAndSaveStoreForwardChatEnabled(false);
 	}
 
-    /**
-     * Validates input name for both save and query REST endpoints.
-     *
-     * @param name
-     * @return
-     */
-    private List<String> getInputNameValidationErrors(String name) {
+	/**
+	 * Validates input name for both save and query REST endpoints.
+	 *
+	 * @param name
+	 * @return
+	 */
+	private List<String> getInputNameValidationErrors(String name) {
 
-    	List<String> errors = new ArrayList<String>();
+		List<String> errors = new ArrayList<String>();
 
-    	//Validate input name
-    	if (name == null || name.trim().length() == 0) {
-    		errors.add("Missing input name.");
-    	} else {
-    		name = name.trim();
+		//Validate input name
+		if (name == null || name.trim().length() == 0) {
+			errors.add("Missing input name.");
+		} else {
+			name = name.trim();
 
-    		if (name.length() > INPUT_NAME_MAX_LENGTH) {
-    			errors.add("Invalid input name length.");
-    		} else {
-    			if (name.replaceFirst("^[A-Za-z0-9_\\s]+$", "").length() > 0) {
-    				errors.add("Invalid input name.");
-    			}
-    		}
-    	}
+			if (name.length() > INPUT_NAME_MAX_LENGTH) {
+				errors.add("Invalid input name length.");
+			} else {
+				if (name.replaceFirst("^[A-Za-z0-9_\\s]+$", "").length() > 0) {
+					errors.add("Invalid input name.");
+				}
+			}
+		}
 
-    	return errors;
-    }
+		return errors;
+	}
 
 
-    private List<String> getValidationErrors(Input input) {
+	private List<String> getValidationErrors(Input input) {
 
-    	List<String> errors = new ArrayList<String>();
+		List<String> errors = new ArrayList<String>();
 
-    	if (input == null) {
-    		//Should not occur
-    		errors.add("Missing input definition.");
-    	} else {
-	    	//Validate auth type (required)
-	    	if (input.getAuth() == null) {
-	    		errors.add("Missing authentication type.");
-	    	}
+		if (input == null) {
+			//Should not occur
+			errors.add("Missing input definition.");
+		} else {
+			//Validate auth type (required)
+			if (input.getAuth() == null) {
+				errors.add("Missing authentication type.");
+			}
 
-	    	//Validate input name
-	    	errors.addAll(getInputNameValidationErrors(input.getName()));
-	    	if (input.getName() != null) {
-	    		input.setName(input.getName().trim());
-	    	}
+			//Validate input name
+			errors.addAll(getInputNameValidationErrors(input.getName()));
+			if (input.getName() != null) {
+				input.setName(input.getName().trim());
+			}
 
-	    	//Validate protocol
-	    	if (!PROTOCOLS.contains(input.getProtocol().toString().toLowerCase())) {
-	    		errors.add("Invalid protocol selection.");
-	    	} else {
-	    		input.setProtocol(input.getProtocol());
-	    	}
+			//Validate protocol
+			if (!PROTOCOLS.contains(input.getProtocol().toString().toLowerCase())) {
+				errors.add("Invalid protocol selection.");
+			} else {
+				input.setProtocol(input.getProtocol());
+			}
 
-	    	//Validate port
-	    	if (input.getPort() < PORT_RANGE_LOW || input.getPort() > PORT_RANGE_HIGH) {
-	    		errors.add("Invalid port value.");
-	    	}
+			//Validate port
+			if (input.getPort() < PORT_RANGE_LOW || input.getPort() > PORT_RANGE_HIGH) {
+				errors.add("Invalid port value.");
+			}
 
-	    	//Validate multicast group
-	    	if (input.getGroup() != null && input.getGroup().trim().length() > 0) {
-	    		input.setGroup(input.getGroup().trim());
-	    		if (input.getGroup().replaceFirst("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", "").length() > 0) {
-	    			errors.add("Invalid multicast group value.");
-	    		}
-	    	}
+			//Validate multicast group
+			if (input.getGroup() != null && input.getGroup().trim().length() > 0) {
+				input.setGroup(input.getGroup().trim());
+				if (input.getGroup().replaceFirst("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", "").length() > 0) {
+					errors.add("Invalid multicast group value.");
+				}
+			}
 
-	    	//Validate interface
-	    	if (input.getIface() != null && input.getIface().trim().length() > 0) {
-	    		input.setIface(input.getIface().trim());
-	    		if (input.getIface().replaceFirst("^[A-Za-z0-9]+$", "").length() > 0) {
-	    			errors.add("Invalid interface value.");
-	    		}
-	    	}
+			//Validate interface
+			if (input.getIface() != null && input.getIface().trim().length() > 0) {
+				input.setIface(input.getIface().trim());
+				if (input.getIface().replaceFirst("^[A-Za-z0-9]+$", "").length() > 0) {
+					errors.add("Invalid interface value.");
+				}
+			}
 
-	    	//Enforce (Anonymous <=> (tcp v udp))
+			//Enforce (Anonymous <=> (tcp v udp))
 
-	    	//If protocol is tcp or udp, then auth type must be anonymous
-	    	if ((input.getProtocol().equals("tcp") || input.getProtocol().equals("udp") || input.getProtocol().equals("mcast") || input.getProtocol().equals("cotmcast") ) && input.getAuth() != AuthType.ANONYMOUS) {
-	    		errors.add("If Protocol is set to TCP, UDP or Multicast, then Authentication Type should be Anonymous.");
-	    	}
+			//If protocol is tcp or udp, then auth type must be anonymous
+			if ((input.getProtocol().equals("tcp") || input.getProtocol().equals("udp") || input.getProtocol().equals("mcast") || input.getProtocol().equals("cotmcast") ) && input.getAuth() != AuthType.ANONYMOUS) {
+				errors.add("If Protocol is set to TCP, UDP or Multicast, then Authentication Type should be Anonymous.");
+			}
 
-	    	//Enforce (File v LDAP) <=> (stcp v tls v prototls v cottls))
-	    	//If auth type is file or ldap, then protocol must be stcp or tls
-	    	if ((input.getAuth() == AuthType.FILE || input.getAuth() == AuthType.LDAP) && !(input.getProtocol().equals("stcp") || input.getProtocol().equals("tls") || input.getProtocol().equals("prototls") || input.getProtocol().equals("cottls"))) {
-	    		errors.add("If Authentication Type is set to File or LDAP, then Protocol should be be Streaming TCP or Secure Streaming TCP.");
-	    	}
+			//Enforce (File v LDAP) <=> (stcp v tls v prototls v cottls))
+			//If auth type is file or ldap, then protocol must be stcp or tls
+			if ((input.getAuth() == AuthType.FILE || input.getAuth() == AuthType.LDAP) && !(input.getProtocol().equals("stcp") || input.getProtocol().equals("tls") || input.getProtocol().equals("prototls") || input.getProtocol().equals("cottls"))) {
+				errors.add("If Authentication Type is set to File or LDAP, then Protocol should be be Streaming TCP or Secure Streaming TCP.");
+			}
 
-	    	//If protocol is mcast, then multicast group must not be empty
-	    	if ((input.getProtocol().equals("mcast") || input.getProtocol().equals("cotmcast")) && (input.getGroup() == null || input.getGroup().trim().isEmpty())) {
-	    		errors.add("If Protocol is set to Multicast, then the Multicast Group must be provided.");
-	    	}
+			//If protocol is mcast, then multicast group must not be empty
+			if ((input.getProtocol().equals("mcast") || input.getProtocol().equals("cotmcast")) && (input.getGroup() == null || input.getGroup().trim().isEmpty())) {
+				errors.add("If Protocol is set to Multicast, then the Multicast Group must be provided.");
+			}
 
-	    	//If multicast group must is not empty, then protocol must be mcast
-	    	if (input.getGroup() != null && !input.getGroup().trim().isEmpty() && !input.getProtocol().equals("mcast") && !input.getProtocol().equals("cotmcast")) {
-	    		errors.add("If the Multicast Group is provided, then Protocol should be set to Multicast.");
-	    	}
-    	}
+			//If multicast group must is not empty, then protocol must be mcast
+			if (input.getGroup() != null && !input.getGroup().trim().isEmpty() && !input.getProtocol().equals("mcast") && !input.getProtocol().equals("cotmcast")) {
+				errors.add("If the Multicast Group is provided, then Protocol should be set to Multicast.");
+			}
+		}
 
-    	return errors;
-    }
-    
-    private List<String> getDataFeedValidationErrors(com.bbn.marti.config.DataFeed dataFeed) {
-    	List<String> errors = new ArrayList<>();
+		return errors;
+	}
 
-    	if (dataFeed == null) {
-    		//Should not occur
-    		errors.add("Missing data feed definition.");
-    	} else {
+	private List<String> getDataFeedValidationErrors(com.bbn.marti.config.DataFeed dataFeed) {
+		List<String> errors = new ArrayList<>();
 
-	    	//Validate input name
-	    	errors.addAll(getInputNameValidationErrors(dataFeed.getName()));
-	    	if (dataFeed.getName() != null) {
-	    		dataFeed.setName(dataFeed.getName().trim());
-	    	}
+		if (dataFeed == null) {
+			//Should not occur
+			errors.add("Missing data feed definition.");
+		} else {
 
-	    	//Validate feed type
+			//Validate input name
+			errors.addAll(getInputNameValidationErrors(dataFeed.getName()));
+			if (dataFeed.getName() != null) {
+				dataFeed.setName(dataFeed.getName().trim());
+			}
+
+			//Validate feed type
 			if (dataFeed.getType() == null) {
 				errors.add("Null data feed type provided");
 			}
 
-	    	//Validate multicast group
-	    	if (dataFeed.getGroup() != null && dataFeed.getGroup().trim().length() > 0) {
-	    		dataFeed.setGroup(dataFeed.getGroup().trim());
-	    		if (dataFeed.getGroup().replaceFirst("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", "").length() > 0) {
-	    			errors.add("Invalid multicast group value.");
-	    		}
-	    	}
+			//Validate multicast group
+			if (dataFeed.getGroup() != null && dataFeed.getGroup().trim().length() > 0) {
+				dataFeed.setGroup(dataFeed.getGroup().trim());
+				if (dataFeed.getGroup().replaceFirst("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", "").length() > 0) {
+					errors.add("Invalid multicast group value.");
+				}
+			}
 
-	    	//Validate interface
-	    	if (dataFeed.getIface() != null && dataFeed.getIface().trim().length() > 0) {
-	    		dataFeed.setIface(dataFeed.getIface().trim());
-	    		if (dataFeed.getIface().replaceFirst("^[A-Za-z0-9]+$", "").length() > 0) {
-	    			errors.add("Invalid interface value.");
-	    		}
-	    	}
+			//Validate interface
+			if (dataFeed.getIface() != null && dataFeed.getIface().trim().length() > 0) {
+				dataFeed.setIface(dataFeed.getIface().trim());
+				if (dataFeed.getIface().replaceFirst("^[A-Za-z0-9]+$", "").length() > 0) {
+					errors.add("Invalid interface value.");
+				}
+			}
 
-	    	//Enforce (File v LDAP) <=> (stcp v tls v prototls v cottls))
-	    	//If auth type is file or ldap, then protocol must be stcp or tls
-	    	if ((dataFeed.getAuth() == AuthType.FILE || dataFeed.getAuth() == AuthType.LDAP) && !(dataFeed.getProtocol().equals("stcp") || dataFeed.getProtocol().equals("tls") || dataFeed.getProtocol().equals("prototls") || dataFeed.getProtocol().equals("cottls"))) {
-	    		errors.add("If Authentication Type is set to File or LDAP, then Protocol should be be Streaming TCP or Secure Streaming TCP.");
-	    	}
+			//Enforce (File v LDAP) <=> (stcp v tls v prototls v cottls))
+			//If auth type is file or ldap, then protocol must be stcp or tls
+			if ((dataFeed.getAuth() == AuthType.FILE || dataFeed.getAuth() == AuthType.LDAP) && !(dataFeed.getProtocol().equals("stcp") || dataFeed.getProtocol().equals("tls") || dataFeed.getProtocol().equals("prototls") || dataFeed.getProtocol().equals("cottls"))) {
+				errors.add("If Authentication Type is set to File or LDAP, then Protocol should be be Streaming TCP or Secure Streaming TCP.");
+			}
 
-	    	//If protocol is mcast, then multicast group must not be empty
-	    	if ((dataFeed.getProtocol().equals("mcast") || dataFeed.getProtocol().equals("cotmcast")) && (dataFeed.getGroup() == null || dataFeed.getGroup().trim().isEmpty())) {
-	    		errors.add("If Protocol is set to Multicast, then the Multicast Group must be provided.");
-	    	}
+			//If protocol is mcast, then multicast group must not be empty
+			if ((dataFeed.getProtocol().equals("mcast") || dataFeed.getProtocol().equals("cotmcast")) && (dataFeed.getGroup() == null || dataFeed.getGroup().trim().isEmpty())) {
+				errors.add("If Protocol is set to Multicast, then the Multicast Group must be provided.");
+			}
 
-	    	//If multicast group must is not empty, then protocol must be mcast
-	    	if (dataFeed.getGroup() != null && !dataFeed.getGroup().trim().isEmpty() && !dataFeed.getProtocol().equals("mcast") && !dataFeed.getProtocol().equals("cotmcast")) {
-	    		errors.add("If the Multicast Group is provided, then Protocol should be set to Multicast.");
-	    	}
-    	}
+			//If multicast group must is not empty, then protocol must be mcast
+			if (dataFeed.getGroup() != null && !dataFeed.getGroup().trim().isEmpty() && !dataFeed.getProtocol().equals("mcast") && !dataFeed.getProtocol().equals("cotmcast")) {
+				errors.add("If the Multicast Group is provided, then Protocol should be set to Multicast.");
+			}
+		}
 		return errors;
-    }
-   
-    private static final int INPUT_NAME_MAX_LENGTH = 30;
-    private static final int PORT_RANGE_LOW = 1;
-    private static final int PORT_RANGE_HIGH = 65535;
+	}
 
-    //As discussed with team, this will go into an enum in a future release; ok for now
-    public static final List<String> PROTOCOLS = Collections.unmodifiableList(Arrays.asList("tcp", "udp", "stcp", "tls", "mcast", "cotmcast", "prototls", "cottls"));
+	private static final int INPUT_NAME_MAX_LENGTH = 30;
+	private static final int PORT_RANGE_LOW = 1;
+	private static final int PORT_RANGE_HIGH = 65535;
+
+	//As discussed with team, this will go into an enum in a future release; ok for now
+	public static final List<String> PROTOCOLS = Collections.unmodifiableList(Arrays.asList("tcp", "udp", "stcp", "tls", "mcast", "cotmcast", "prototls", "cottls", "quic", "grpc"));
 }

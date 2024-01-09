@@ -23,14 +23,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration;
+import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.boot.web.embedded.jetty.JettyServerCustomizer;
 import org.springframework.boot.web.embedded.jetty.JettyServletWebServerFactory;
 import org.springframework.boot.web.server.ErrorPage;
 import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,12 +42,13 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import tak.server.federation.hub.FederationHubConstants;
 import tak.server.federation.hub.FederationHubUtils;
+import tak.server.federation.hub.broker.FederationHubBroker;
 import tak.server.federation.hub.broker.FederationHubBrokerProxyFactory;
 import tak.server.federation.hub.policy.FederationHubPolicyManagerProxyFactory;
 import tak.server.federation.hub.ui.keycloak.KeycloakTokenParser;
 import tak.server.federation.hub.ui.manage.AuthorizationFileWatcher;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = {MongoAutoConfiguration.class, MongoDataAutoConfiguration.class})
 public class FederationHubUIServer {
 
     private static final String DEFAULT_CONFIG_FILE = "/opt/tak/federation-hub/configs/federation-hub-ui.yml";
@@ -57,7 +58,6 @@ public class FederationHubUIServer {
     private static Ignite ignite = null;
 
     private static String configFile;
-
 
     public static void main(String[] args) {
         if (args.length > 1) {
@@ -107,7 +107,7 @@ public class FederationHubUIServer {
     public FederationHubPolicyManagerProxyFactory fedHubPolicyManagerProxyFactory() {
         return new FederationHubPolicyManagerProxyFactory();
     }
-    
+
 	private void makeConnector(FederationHubUIConfig fedHubConfig, Server server, int port, boolean clientAuth) {
 		HttpConfiguration httpConfig = new HttpConfiguration();
 		httpConfig.setSecureScheme("https");
@@ -118,7 +118,7 @@ public class FederationHubUIServer {
 		httpConfig.setSendServerVersion(true);
 		httpConfig.setSendDateHeader(false);
 
-		SslContextFactory sslContextFactory = new SslContextFactory.Server();
+		SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
 		sslContextFactory.setKeyStorePath(fedHubConfig.getKeystoreFile());
 		sslContextFactory.setKeyStorePassword(fedHubConfig.getKeystorePassword());
 		sslContextFactory.setKeyStoreType(fedHubConfig.getKeystoreType());
@@ -131,7 +131,9 @@ public class FederationHubUIServer {
 
 		// SSL HTTP Configuration
 		HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
-		httpsConfig.addCustomizer(new SecureRequestCustomizer());
+		SecureRequestCustomizer src = new SecureRequestCustomizer();
+      	src.setSniHostCheck(false);
+		httpsConfig.addCustomizer(src);
 
 		// SSL Connector
 		ServerConnector sslConnector = new ServerConnector(server,
@@ -144,8 +146,10 @@ public class FederationHubUIServer {
     @Bean
     public ConfigurableServletWebServerFactory jettyServletFactory(FederationHubUIConfig fedHubConfig) {
       	JettyServletWebServerFactory factory = new JettyServletWebServerFactory();
-    	
+
     	factory.addServerCustomizers(new JettyServerCustomizer() {
+
+
 
 			@Override
 			public void customize(Server server) {
@@ -154,9 +158,9 @@ public class FederationHubUIServer {
 					logger.info("Stopping default Jetty Connector: " + defaultConnector);
 					server.getConnectors()[0].stop();
 				} catch (Exception e) {}
-				
+
 				makeConnector(fedHubConfig, server, fedHubConfig.getPort(), true);
-								
+
 				if (fedHubConfig.isAllowOauth() && Strings.isNotEmpty(fedHubConfig.getKeycloakAccessTokenName()) &&
 						Strings.isNotEmpty(fedHubConfig.getKeycloakAdminClaimValue()) &&
 						Strings.isNotEmpty(fedHubConfig.getKeycloakAuthEndpoint()) &&
@@ -170,11 +174,11 @@ public class FederationHubUIServer {
 						Strings.isNotEmpty(fedHubConfig.getKeycloakTokenEndpoint()))
 					makeConnector(fedHubConfig, server, fedHubConfig.getOauthPort(), false);
 			}
-    		
+
     	});
-    	
+
     	factory.addErrorPages(new ErrorPage(HttpStatus.UNAUTHORIZED, "/login"), new ErrorPage(HttpStatus.FORBIDDEN, "/login"));
-    	
+
         return factory;
     }
 
@@ -196,11 +200,11 @@ public class FederationHubUIServer {
             throws JsonParseException, JsonMappingException, IOException {
         return loadConfig(configFile);
     }
-    
+
     @Bean
     public PasswordEncoder passwordEncoder() {
     	return new BCryptPasswordEncoder();
-    }  
+    }
 
     @Bean
     public AuthorizationFileWatcher authFileWatcher(FederationHubUIConfig fedHubConfig) {
@@ -214,15 +218,14 @@ public class FederationHubUIServer {
         Runtime.getRuntime().addShutdownHook(new Thread(authFileWatcher::stop));
         return authFileWatcher;
     }
-    
+
     @Bean
     public KeycloakTokenParser keycloakTokenParser(FederationHubUIConfig getFedHubConfig) {
     	return new KeycloakTokenParser(getFedHubConfig);
     }
 
     @Bean
-    @Order(Ordered.LOWEST_PRECEDENCE)
-    public FederationHubUIService federationHubUIService() {
-    	return new FederationHubUIService();
+    public FederationHubBrokerMetricsPoller federationHubBrokerMetricsPoller(FederationHubBroker fedHubBroker) {
+        return new FederationHubBrokerMetricsPoller(fedHubBroker);
     }
 }

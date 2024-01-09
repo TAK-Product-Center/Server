@@ -2,6 +2,7 @@
 
 package com.bbn.tak.tls;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -15,11 +16,11 @@ import java.util.Arrays;
 import java.util.List;
 
 import javax.security.auth.x500.X500Principal;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBElement;
-import javax.xml.bind.Marshaller;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBElement;
+import jakarta.xml.bind.Marshaller;
 import javax.xml.namespace.QName;
 
 import org.slf4j.Logger;
@@ -95,21 +96,18 @@ public class CertManagerApi extends BaseRestController {
 
     private static final String DEFAULT_PASSWORD = "atakatak";
     
-    @Autowired
-    CoreConfig coreConfig;
-
     @RequestMapping(value = "/tls/makeClientKeyStore", method = RequestMethod.GET)
     ResponseEntity<byte[]> makeKeyStore(@RequestParam(value = "cn", required = false) String cn,
                                         @RequestParam(value = "password", required = false,
                                                 defaultValue = DEFAULT_PASSWORD) String password) throws Exception {
-        if(cn == null || cn.isEmpty()) {
+        if (cn == null || cn.isEmpty()) {
             cn = getHttpUser();
         }
 
         X509Certificate[] signingCertChain = subMgr.getSigningCertChain();
         X509Certificate signingCert = signingCertChain[0];
         String dn = verifyCN(cn, signingCert);
-        if(dn == null) {
+        if (dn == null) {
             logger.error("Can't make certificate for cn="+cn);
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Can't make certificate for cn="+cn);
             return null;
@@ -149,7 +147,7 @@ public class CertManagerApi extends BaseRestController {
 
     protected String verifyCN(String cn, X509Certificate issuer) {
         logger.warn("generating client cert for: " + getHttpUser());
-        if(cn.compareTo(getHttpUser()) == 0) {
+        if (cn.compareTo(getHttpUser()) == 0) {
             logger.warn("cn matched username");
             String issuerDn = issuer.getSubjectDN().getName();
             logger.warn(" issuer dn: " + issuerDn);
@@ -161,7 +159,7 @@ public class CertManagerApi extends BaseRestController {
 
     private CertKey makeClientCert(String dn, CertKey signingCert) throws Exception {
 
-        CertificateSigning certificateSigningConfig = coreConfig.getRemoteConfiguration().getCertificateSigning();
+        CertificateSigning certificateSigningConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getCertificateSigning();
         if (certificateSigningConfig == null) {
             throw new TakException("CertificateSigning element not found in CoreConfig!");
         }
@@ -181,7 +179,7 @@ public class CertManagerApi extends BaseRestController {
 /*
     @RequestMapping(value = "/tls/makeClient", method = RequestMethod.GET)
     PEMCertKey makeClientCert(@RequestParam(value = "cn", required = true) String CN) throws Exception {
-        if(validity == null) {
+        if (validity == null) {
             validity = DEFAULT_VALIDITY;
         }
         subMgr.
@@ -208,7 +206,7 @@ public class CertManagerApi extends BaseRestController {
 
     protected ResponseEntity<String> signCert(String base64CSR, String issuerDN, CERTTYPE type) throws Exception {
         String bareRequest;
-        if(base64CSR.startsWith(Constants.CSRBEGIN)) {
+        if (base64CSR.startsWith(Constants.CSRBEGIN)) {
             bareRequest = base64CSR.replace(Constants.CSRBEGIN, "").replace(Constants.CSREND, "").trim();
         } else {
             bareRequest = base64CSR;
@@ -231,7 +229,7 @@ public class CertManagerApi extends BaseRestController {
 */
     private CertificateConfig getCertificateConfig() {
         try {
-            CertificateSigning certificateSigningConfig = coreConfig.getRemoteConfiguration().getCertificateSigning();
+            CertificateSigning certificateSigningConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getCertificateSigning();
             if (certificateSigningConfig == null) {
                 throw new TakException("CertificateSigning element not found in CoreConfig!");
             }

@@ -9,7 +9,8 @@ import java.net.NetworkInterface;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import com.bbn.marti.nio.protocol.connections.*;
+import com.bbn.marti.nio.protocol.connections.SingleCotProtocol;
+import com.bbn.marti.nio.protocol.connections.SingleProtobufOrCotProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

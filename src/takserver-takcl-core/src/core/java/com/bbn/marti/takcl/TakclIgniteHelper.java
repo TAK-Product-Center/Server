@@ -1,12 +1,19 @@
 package com.bbn.marti.takcl;
 
-import com.bbn.marti.config.Buffer;
-import com.bbn.marti.config.Cluster;
-import com.bbn.marti.config.Configuration;
-import com.bbn.marti.remote.groups.FileUserManagementInterface;
-import com.bbn.marti.remote.service.InputManager;
-import com.bbn.marti.takcl.cli.EndUserReadableException;
-import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
+import java.io.FileNotFoundException;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import jakarta.xml.bind.JAXBException;
+
 import org.apache.ignite.Ignite;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.cluster.ClusterGroup;
@@ -19,18 +26,24 @@ import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
+
+import com.bbn.marti.config.TAKIgniteConfiguration;
+import com.bbn.marti.remote.groups.FileUserManagementInterface;
+import com.bbn.marti.remote.service.InputManager;
+import com.bbn.marti.takcl.cli.EndUserReadableException;
+import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
+
 import tak.server.Constants;
 import tak.server.ignite.IgniteConfigurationHolder;
+import tak.server.util.JAXBUtils;
 
-import javax.xml.bind.JAXBException;
-import java.io.FileNotFoundException;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static com.bbn.marti.takcl.TAKCLCore.*;
+import static com.bbn.marti.takcl.TAKCLCore.igniteManualRetryTimeout;
+import static com.bbn.marti.takcl.TAKCLCore.igniteNetworkTimeout;
+import static com.bbn.marti.takcl.TAKCLCore.ignitePortOverride;
+import static com.bbn.marti.takcl.TAKCLCore.ignitePortRangeOverride;
+import static com.bbn.marti.takcl.TAKCLCore.igniteScanInterfaces;
+import static com.bbn.marti.takcl.TAKCLCore.k8sMode;
+import static com.bbn.marti.takcl.TAKCLCore.useTakclIgniteConfig;
 
 public class TakclIgniteHelper {
 
@@ -43,39 +56,39 @@ public class TakclIgniteHelper {
 	private static final AtomicInteger identifierCounter = new AtomicInteger();
 
 	public static final void overrideServerConfigurationFromCoreConfig(@NotNull AbstractServerProfile serverProfile,
-	                                                                   @NotNull Configuration serverConfiguration) {
+																	   @NotNull TAKIgniteConfiguration serverIgniteConfiguration) {
 		if (serverConfigurationMap.containsKey(serverProfile.getConsistentUniqueReadableIdentifier())) {
 			logger.warn("Override already configured for '" + serverProfile.getConsistentUniqueReadableIdentifier() + "'!");
 			return;
 		}
-		logger.debug("Using Ignite configuration details from CoreConfig.xml");
-
-		if (serverConfiguration.getCluster() == null) {
-			serverConfiguration.setCluster(new Cluster());
-		}
-		Cluster clusterConfig = serverConfiguration.getCluster();
-		Buffer bufferConfig = serverConfiguration.getBuffer();
+		logger.debug("Using Ignite configuration details from TAKIgniteConfig.xml");
 
 		String igniteProfile = "takcl" + identifierCounter.getAndIncrement();
-		String igniteHost = bufferConfig.getIgniteHost();
-		boolean isCluster = clusterConfig.isEnabled();
-		boolean isKubernetes = clusterConfig.isKubernetes();
+		String igniteHost = serverIgniteConfiguration.getIgniteHost();
+		boolean isCluster = serverIgniteConfiguration.isClusterEnabled();
+		boolean isKubernetes = serverIgniteConfiguration.isClusterKubernetes();
 		boolean useEmbeddedIgnite = false;
-		boolean isIgniteMulticast = bufferConfig.isIgniteMulticast();
-		Integer igniteNonMulticastDiscoveryPort = bufferConfig.getIgniteNonMulticastDiscoveryPort();
-		Integer igniteNonMulticastDiscoveryPortCount = bufferConfig.getIgniteNonMulticastDiscoveryPortCount();
-		int igniteCommunicationPort = bufferConfig.getIgniteCommunicationPort();
-		int igniteCommunicationPortCount = bufferConfig.getIgniteCommunicationPortCount();
-		int igniteQueueCapacity = bufferConfig.getQueue().getCapacity();
-		long workerTimeoutMS = bufferConfig.getIgniteWorkerTimeoutMilliseconds();
+		boolean isIgniteMulticast = serverIgniteConfiguration.isIgniteMulticast();
+		Integer igniteNonMulticastDiscoveryPort = serverIgniteConfiguration.getIgniteNonMulticastDiscoveryPort();
+		Integer igniteNonMulticastDiscoveryPortCount = serverIgniteConfiguration.getIgniteNonMulticastDiscoveryPortCount();
+		int igniteCommunicationPort = serverIgniteConfiguration.getIgniteCommunicationPort();
+		int igniteCommunicationPortCount = serverIgniteConfiguration.getIgniteCommunicationPortCount();
+		int igniteQueueCapacity = serverIgniteConfiguration.getCapacity();
+		long workerTimeoutMS = serverIgniteConfiguration.getIgniteWorkerTimeoutMilliseconds();
 
-		IgniteConfigurationHolder ich = new IgniteConfigurationHolder();
+		TAKIgniteConfiguration takIgniteConfig = IgniteConfigurationHolder.getInstance().getTAKIgniteConfiguration(
+				igniteHost, isCluster, isKubernetes,	useEmbeddedIgnite, isIgniteMulticast,
+				igniteNonMulticastDiscoveryPort, igniteNonMulticastDiscoveryPortCount,
+				igniteCommunicationPort, igniteCommunicationPortCount, igniteQueueCapacity, workerTimeoutMS,
+				serverIgniteConfiguration.getCacheOffHeapInitialSizeBytes(),
+				serverIgniteConfiguration.getCacheOffHeapMaxSizeBytes(),
+				-1, false, -1.f, false,
+				false, -1, true,
+				-1, -1, -1);
 
-		IgniteConfiguration igniteConfig = ich.getIgniteConfiguration(igniteProfile, igniteHost, isCluster, isKubernetes,
-				useEmbeddedIgnite, isIgniteMulticast, igniteNonMulticastDiscoveryPort, igniteNonMulticastDiscoveryPortCount,
-				igniteCommunicationPort, igniteCommunicationPortCount, igniteQueueCapacity, workerTimeoutMS, serverConfiguration.getBuffer().getQueue().getCacheOffHeapInitialSizeBytes(), serverConfiguration.getBuffer().getQueue().getCacheOffHeapMaxSizeBytes(),
-				-1, false, -1.f, false, false, -1, true, -1, -1, -1);
+		IgniteConfiguration igniteConfig =  IgniteConfigurationHolder.getInstance().getIgniteConfiguration(igniteProfile, takIgniteConfig);
 		igniteConfig.setGridLogger(new Slf4jLogger(TAKCLogging.getLogger("org.apache.ignite")));
+
 
 
 		if (TAKCLCore.igniteClientFailureDetectionTimeout != null) {
@@ -127,6 +140,7 @@ public class TakclIgniteHelper {
 				ipFinder.setAddresses(Arrays.asList(TAKCLCore.igniteIpAddressOverride + portAppendValue));
 			}
 		}
+
 
 		serverConfigurationMap.put(serverProfile.getConsistentUniqueReadableIdentifier(), igniteConfig);
 	}
@@ -290,7 +304,7 @@ public class TakclIgniteHelper {
 
 		IgniteConfiguration igniteConfiguration;
 		if (serverConfigurationMap.containsKey(tag)) {
-			logger.debug("Getting Existing Server Configuration from CoreConfig.xml for " + serverProfile);
+			logger.debug("Getting Existing Server Configuration from TAKIgniteConfig.xml for " + serverProfile);
 			igniteConfiguration = serverConfigurationMap.get(tag);
 
 		} else if (k8sMode) {
@@ -303,8 +317,8 @@ public class TakclIgniteHelper {
 				if (useTakclIgniteConfig) {
 					igniteConfiguration = createOldIgniteConfiguration(serverProfile);
 				} else {
-					Configuration config = Util.loadJAXifiedXML(serverProfile.getConfigFilePath(), Configuration.class.getPackage().getName());
-					overrideServerConfigurationFromCoreConfig(serverProfile, config);
+					TAKIgniteConfiguration takIgniteConfig = JAXBUtils.loadJAXifiedXML(serverProfile.getTAKIgniteConfigFilePath(), TAKIgniteConfiguration.class.getPackage().getName());
+					overrideServerConfigurationFromCoreConfig(serverProfile, takIgniteConfig);
 					igniteConfiguration = serverConfigurationMap.get(tag);
 				}
 			} catch (FileNotFoundException | JAXBException e) {

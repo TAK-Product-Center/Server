@@ -23,7 +23,13 @@ angular.module('roger_federation.Config')
           hostname = location.hostname;
         }
 
-        var port = Number(location.port)
+        var api_port = location.port;
+        var local_data = localStorage.getItem("api_port");
+
+        if(local_data !== null){
+          api_port = local_data;
+        }
+        var port = Number(api_port)
 
         if (typeof $localStorage.configuration === "undefined") {
           $localStorage.configuration = {};
@@ -59,7 +65,6 @@ angular.module('roger_federation.Config')
         };
 
         initialized = true;
-        service.setServerInfoFromHAL();
       }
 
 
@@ -248,32 +253,6 @@ angular.module('roger_federation.Config')
 //            return serverStatus;
 //          });
       };
-
-      service.getHALInfo = function() {
-        return $http.get(
-          service.getServerRootUrlStr() + '/info').then(
-          function(res) {
-            return res;
-          },
-          function(reason) {
-            throw reason;
-          });
-      };
-
-      service.setServerInfoFromHAL = function() {
-        service.getHALInfo().then(
-          function(res) {
-            serverInfo.fuseki.uri = res.data.fuseki.host + ":" + res.data.fuseki.port;
-            serverInfo.roger_federation.version = res.data.build.version;
-            return res;
-          },
-          function(reason) {
-            serverInfo.fuseki.uri = "localhost:3030";
-            serverInfo.roger_federation.version = "?";
-            throw reason;
-          });
-      };
-
 
       return service;
 

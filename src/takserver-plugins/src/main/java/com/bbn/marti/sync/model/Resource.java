@@ -9,20 +9,22 @@ import java.util.List;
 import java.util.NavigableSet;
 import java.util.SimpleTimeZone;
 
-import javax.persistence.Cacheable;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
-import javax.persistence.Transient;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlTransient;
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import jakarta.persistence.Cacheable;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Converter;
+import jakarta.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.bind.annotation.XmlTransient;
+import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import org.hibernate.annotations.Formula;
-import org.hibernate.annotations.Type;
+//import org.hibernate.annotations.Type;
 import org.jetbrains.annotations.NotNull;
 import org.locationtech.jts.geom.Point;
 
@@ -148,7 +150,7 @@ public class Resource implements Serializable, Comparable<Resource> {
         setHash(metadata.getHash());
         
         if (metadata.getSize() != null) {
-        	setSize(new Long(metadata.getSize()));
+        	setSize(Long.valueOf(metadata.getSize()));
         }
         
         setSubmitter(metadata.getFirst(Field.SubmissionUser));
@@ -317,7 +319,8 @@ public class Resource implements Serializable, Comparable<Resource> {
         }
     }
 
-    @Type(type = "org.locationtech.jts.geom.Point")
+    //@Type(type = "org.locationtech.jts.geom.Point")
+    //@Convert(converter=Point.class)
     @Column(columnDefinition="Point", nullable = true)
     Point getLocation() { return location; }
 

@@ -16,7 +16,7 @@ import com.bbn.marti.remote.groups.AuthStatus;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.service.Resources;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 /*
  * Dummy authenticator, always succeeds.

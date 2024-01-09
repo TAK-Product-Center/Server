@@ -3,22 +3,26 @@
 package com.bbn.marti.groups;
 
 import java.rmi.RemoteException;
-import java.util.*;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
+import java.util.SortedSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
 
 import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.network.BaseRestController;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -27,6 +31,11 @@ import com.bbn.marti.remote.LdapGroup;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.util.CommonUtil;
 
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
 
@@ -57,9 +66,6 @@ public class GroupsApi extends BaseRestController {
 
     @Autowired
     SubscriptionManagerLite subscriptionManager;
-
-    @Autowired
-    CoreConfig coreConfig;
 
     public GroupManager getGroupManager() {
         return groupManager;
@@ -238,7 +244,7 @@ public class GroupsApi extends BaseRestController {
             }
 
             try {
-                if (coreConfig.getRemoteConfiguration().getAuth().getDefault().equalsIgnoreCase("ldap")) {
+                if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getDefault().equalsIgnoreCase("ldap")) {
                     for (Group group : groups) {
                         List<LdapGroup> ldapGroups = groupManager.searchGroups(group.getName(), true);
                         if (ldapGroups.size() == 0) {
@@ -290,7 +296,7 @@ public class GroupsApi extends BaseRestController {
 
         boolean groupCacheEnabled = false;
         try {
-            groupCacheEnabled = coreConfig.getRemoteConfiguration().getAuth().isX509UseGroupCache();
+            groupCacheEnabled = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509UseGroupCache();
         } catch (Exception e) {
             logger.error("exception in getGroupCacheEnabled", e);
         }

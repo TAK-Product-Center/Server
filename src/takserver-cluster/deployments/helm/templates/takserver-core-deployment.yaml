@@ -37,7 +37,7 @@ spec:
             exec:
               command:
               - /messaging-readiness.sh
-            initialDelaySeconds: 20
+            initialDelaySeconds: 80
             periodSeconds: 5
           livenessProbe:
             exec:
@@ -45,10 +45,13 @@ spec:
               - /messaging-readiness.sh
             initialDelaySeconds: 120
             periodSeconds: 30
-            failureThreshold: 5
+            failureThreshold: 6
           volumeMounts:
             - name: config #The name(key) value must match pod volumes name(key) value
-              mountPath: /certs/files/
+              mountPath: /certs-configmap/
+            - name: tak-ignite-config
+              mountPath: /TAKIgniteConfig.xml
+              subPath: TAKIgniteConfig.xml
             - name: core-config
               mountPath: /CoreConfig.xml
               subPath: CoreConfig.xml
@@ -56,6 +59,9 @@ spec:
         - name: config
           configMap:
             name: "{{ .Values.certConfigMapName }}"
+        - name: tak-ignite-config
+          configMap:
+            name: "{{ .Values.takIgniteConfigMapName }}"
         - name: core-config
           configMap:
             name: "{{ .Values.coreConfigMapName }}"
@@ -104,17 +110,75 @@ spec:
             initialDelaySeconds: 1
             periodSeconds: 1
           livenessProbe:
-            tcpSocket:
-              port: 8443
+            exec:
+              command:
+              - /api-readiness.sh
             initialDelaySeconds: 180
             periodSeconds: 10
-            failureThreshold: 3
+            failureThreshold: 4
           volumeMounts:
             - name: config #The name(key) value must match pod volumes name(key) value
-              mountPath: /certs/files/
+              mountPath: /certs-configmap/
+            - name: tak-ignite-config
+              mountPath: /TAKIgniteConfig.xml
+              subPath: TAKIgniteConfig.xml
+      volumes:
+        - name: config
+          configMap:
+            name: "{{ .Values.certConfigMapName }}"
+        - name: tak-ignite-config
+          configMap:
+            name: "{{ .Values.takIgniteConfigMapName }}"
+
+      imagePullSecrets:
+        - name: "{{ .Values.imagePullSecret }}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: takserver-config
+spec:
+  selector:
+      matchLabels:
+        app: takserver-config
+  replicas: {{ .Values.takserver.config.replicas }}
+  template:
+    metadata:
+      labels:
+        app: takserver-config
+    spec:
+      serviceAccountName: takserver-ignite
+      containers:
+        - name: takserver-config 
+          image: "{{ .Values.takserver.config.image.repository }}:{{ .Values.takserver.config.image.tag }}"
+          resources:
+            requests:
+              cpu: "{{ .Values.takserver.config.resources.requests.cpu }}"
+              memory: "{{ .Values.takserver.config.resources.requests.memory }}"
+            limits:
+              cpu: "{{ .Values.takserver.config.resources.limits.cpu }}"
+              memory: "{{ .Values.takserver.config.resources.limits.memory }}"
+          readinessProbe:
+            exec:
+              command:
+              - /config-readiness.sh
+            initialDelaySeconds: 1
+            periodSeconds: 1
+          livenessProbe:
+            tcpSocket:
+              port: 10800
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 4
+          volumeMounts:
+            - name: config #The name(key) value must match pod volumes name(key) value
+              mountPath: /certs-configmap/
             - name: core-config
               mountPath: /CoreConfig.xml
               subPath: CoreConfig.xml
+            - name: tak-ignite-config
+              mountPath: /TAKIgniteConfig.xml
+              subPath: TAKIgniteConfig.xml
       volumes:
         - name: config
           configMap:
@@ -122,6 +186,9 @@ spec:
         - name: core-config
           configMap:
             name: "{{ .Values.coreConfigMapName }}"
+        - name: tak-ignite-config
+          configMap:
+            name: "{{ .Values.takIgniteConfigMapName }}"
 
       imagePullSecrets:
         - name: "{{ .Values.imagePullSecret }}"

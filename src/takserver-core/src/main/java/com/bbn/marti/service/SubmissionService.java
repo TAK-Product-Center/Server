@@ -1,11 +1,8 @@
-
-
 package com.bbn.marti.service;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.StringReader;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.UnknownHostException;
@@ -29,15 +26,15 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import javax.xml.XMLConstants;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
+import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
+
+import io.micrometer.core.instrument.Metrics;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.EnumUtils;
@@ -55,6 +52,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.xml.sax.SAXException;
+
+import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
 
 import com.bbn.cot.filter.DataFeedFilter;
 import com.bbn.cot.filter.DropEventFilter;
@@ -107,7 +106,6 @@ import com.bbn.marti.nio.util.CodecSource;
 import com.bbn.marti.remote.AuthenticationConfigInfo;
 import com.bbn.marti.remote.ConnectionEventTypeValue;
 import com.bbn.marti.remote.ContactManager;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.MessagingConfigInfo;
 import com.bbn.marti.remote.MessagingConfigurator;
@@ -131,13 +129,10 @@ import com.bbn.marti.util.FixedSizeBlockingQueue;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.Tuple;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
-import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
-import io.micrometer.core.instrument.Metrics;
 import tak.server.CommonConstants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
 import tak.server.cache.DatafeedCacheHelper;
@@ -180,10 +175,6 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 	private boolean alwaysArchiveMissionCot = false;
 
-    private DistributedConfiguration config;
-
-    private final CoreConfig coreConfig;
-
     private final DistributedFederationManager federationManager;
 
 	private final GroupFederationUtil groupFederationUtil;
@@ -208,16 +199,12 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     private final MessageConverter messageConverter;
 
-//    private final ActiveGroupCacheHelper activeGroupCacheHelper;
-    
     private final RemoteUtil remoteUtil;
 
     private static SubmissionService instance = null;
 
     private static String MASK_WORD_FOR_DISPLAY = "********";
 
-    private AtomicBoolean isIntercept = null;
-    
     private DataFeedRepository dataFeedRepository;
     
 	@Autowired
@@ -261,8 +248,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     public SubmissionService(DistributedFederationManager dfm, NioNettyBuilder nb, MessagingUtilImpl mui, NioServer ns,
                              GroupManager gm, ScrubInvalidValues siv, MessageConversionUtil mcu,
                              GroupFederationUtil gfu, InjectionManager im, RepositoryService rs,
-                             Ignite i, SubscriptionManager sm, SubscriptionStore store, FlowTagFilter flowTag, ContactManager contactManager, ServerInfo serverInfo, CoreConfig coreConfig,
-                             MessageConverter messageConverter, ActiveGroupCacheHelper agch, RemoteUtil remoteUtil, DataFeedRepository dfr) {
+                             Ignite i, SubscriptionManager sm, SubscriptionStore store, FlowTagFilter flowTag,
+							 ContactManager contactManager, ServerInfo serverInfo, MessageConverter messageConverter,
+							 ActiveGroupCacheHelper agch, RemoteUtil remoteUtil, DataFeedRepository dfr) {
     	this.federationManager = dfm;
         this.nettyBuilder = nb;
         this.messagingUtil = mui;
@@ -279,14 +267,12 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         this.flowTagFilter = flowTag;
         this.contactManager = contactManager;
         this.serverInfo = serverInfo;
-        this.coreConfig = coreConfig;
         this.messageConverter = messageConverter;
-//        this.activeGroupCacheHelper = agch;
         this.remoteUtil = remoteUtil;
         this.dataFeedRepository = dfr;
 
-        DistributedConfiguration dc = DistributedConfiguration.getInstance();
-        Auth.Ldap ldapConfig = dc.getAuth().getLdap();
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+        Auth.Ldap ldapConfig = config.getAuth().getLdap();
         if (ldapConfig != null) {
         	if (logger.isDebugEnabled()) {
         		logger.debug("setting up LDAP authenticator");
@@ -295,9 +281,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             // "inject" group manager dependency in the singleton instance of LdapAuthenticator
             LdapAuthenticator.getInstance(ldapConfig, gm);
 
-            dc.getAuth().setX509AddAnonymous(ldapConfig.isX509AddAnonymous());
-            dc.getAuth().setX509Groups(ldapConfig.isX509Groups());
-            dc.saveChanges();
+			config.getAuth().setX509AddAnonymous(ldapConfig.isX509AddAnonymous());
+			config.getAuth().setX509Groups(ldapConfig.isX509Groups());
+			CoreConfigFacade.getInstance().saveChanges();
         }
     }
 
@@ -312,7 +298,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     @EventListener({ContextRefreshedEvent.class})
     public void init() throws IOException, DocumentException {
 
-        config = DistributedConfiguration.getInstance();
+        Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
         // setup the global geospatial input filter
         if (config.getFilter().getGeospatialFilter() != null) {
@@ -443,11 +429,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 					if (feed.getTag().size() > 0) {
 						dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
-						dataFeedRepository.addDataFeedTags(dataFeedId, feed.getTag());
+						dataFeedRepository.addDataFeedTags(dataFeedId, feed.getTag().toArray(String[]::new));
 					}
 					if (feed.getFiltergroup().size() > 0) {
 						dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
-						dataFeedRepository.addDataFeedFilterGroups(dataFeedId, feed.getFiltergroup());
+						dataFeedRepository.addDataFeedFilterGroups(dataFeedId, feed.getFiltergroup().toArray(String[]::new));
 					}
 				} else {
 					if (dataFeedRepository.getDataFeedByName(feed.getName()).size() != 1) {
@@ -462,11 +448,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 						if (feed.getTag().size() > 0) {
 							dataFeedRepository.removeAllDataFeedTagsById(dataFeedId);
-							dataFeedRepository.addDataFeedTags(dataFeedId, feed.getTag());
+							dataFeedRepository.addDataFeedTags(dataFeedId, feed.getTag().toArray(String[]::new));
 						}
 						if (feed.getFiltergroup().size() > 0) {
 							dataFeedRepository.removeAllDataFeedFilterGroupsById(dataFeedId);
-							dataFeedRepository.addDataFeedFilterGroups(dataFeedId, feed.getFiltergroup());
+							dataFeedRepository.addDataFeedFilterGroups(dataFeedId, feed.getFiltergroup().toArray(String[]::new));
 						}
 					}
 				}
@@ -603,7 +589,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         });
 
         // use ignite for plugin messaging when outside the cluster
-        if (config.getRemoteConfiguration().getPlugins().isUsePluginMessageQueue() && !config.getRemoteConfiguration().getCluster().isEnabled()) {
+        if (config.getPlugins().isUsePluginMessageQueue() && !config.getCluster().isEnabled()) {
 
         	// listen for messages from plugins
         	ignite.message().localListen(CommonConstants.PLUGIN_PUBLISH_TOPIC, (nodeId, message) -> {
@@ -922,7 +908,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     	
 		// Add to subscribers
         try {
-            long uid = config.getRemoteConfiguration().getCluster().isEnabled() ?
+			Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
+            long uid = config.getCluster().isEnabled() ?
                         IgniteHolder.getInstance().getIgnite().atomicLong("streamingUidGen", 1, true).getAndIncrement() :
                         streamingUidGen.getAndIncrement();
 
@@ -995,6 +983,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     }
 
     public void handleChannelDisconnect(ChannelHandler handler) {
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
 		try {
 
 			if (logger.isDebugEnabled()) {
@@ -1027,7 +1017,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                             getGroupVectorFromHandler(handler));
                 }
             }
-            if (config.getRemoteConfiguration().getFederation() != null) {
+            if (config.getFederation() != null) {
                 federationManager.removeLocalContact(subscription.clientUid);
             }
 
@@ -1067,7 +1057,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 		@Override
         public void onDataReceived(final CotEventContainer data, ChannelHandler handler, Protocol<CotEventContainer> protocol) {
-        	if (config.getRemoteConfiguration().getSubmission().isIgnoreStaleMessages()) {
+			Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
+        	if (config.getSubmission().isIgnoreStaleMessages()) {
                 if (MessageConversionUtil.isStale(data)) {
                 	if (logger.isDebugEnabled()) {
                 		logger.debug("ignoring stale message: " + data);
@@ -1088,8 +1080,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                 metric.getMessagesReceived().incrementAndGet();
                 metric.getBytesRecieved().addAndGet(data.toString().length());
 
-				if(input instanceof DataFeed)
-				{
+                if (input instanceof DataFeed) {
 					DataFeed feed = (DataFeed) input;
 					if (Strings.isNullOrEmpty(feed.getUuid())) {
 						double lat = Double.valueOf(data.getLat()).doubleValue();
@@ -1215,7 +1206,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                 }
             }
 
-            if(scrubInvalidValues.filter(data) == null) {
+            if (scrubInvalidValues.filter(data) == null) {
                 logger.warn("Dropping CoT with invalid values");
                 return;
             }
@@ -1244,7 +1235,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                 }
 
                 if (Strings.isNullOrEmpty(sub.clientUid) || sub.clientUid.compareTo(data.getUid()) == 0) {
-                	if (config.getRemoteConfiguration().getFederation() != null) {
+                	if (config.getFederation() != null) {
                 		try {
                 			federationManager.addLocalContact(data, handler);
                 		} catch (Exception e) {
@@ -1370,6 +1361,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     return;
                 }
 
+				Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
                 long storeForwardQueryBufferMs = config.getBuffer().getQueue().getStoreForwardQueryBufferMs();
                 long storeForwardSendBufferMs = config.getBuffer().getQueue().getStoreForwardSendBufferMs();
 
@@ -1400,9 +1393,10 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 		public void onDataReceived(CotEventContainer data, ChannelHandler handler, Protocol<CotEventContainer> protocol) {
 			try {
 				Resources.callsignAssignmentExecutor.execute(() -> {
-					String endpoint = data.getEndpoint();
-					String callsign = data.getCallsign();
-					if (endpoint != null || data.matchXPath("/event/detail/selfSA")) {
+					CotEventContainer copy = data.copy();
+					String endpoint = copy.getEndpoint();
+					if (endpoint != null) {
+						String callsign = copy.getCallsign();
 						protocol.removeProtocolListener(this);
 						if (logger.isDebugEnabled()) {
 							logger.debug("Extracting callsign for message from handler " + handler);
@@ -1425,7 +1419,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 							}
 						}
 
-						if (config.getBuffer().getQueue().isEnableStoreForwardChat()) {
+						if (CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().isEnableStoreForwardChat()) {
 							try {
 								forwardMessages(sub, groupVector);
 							} catch (Exception e) {
@@ -1458,13 +1452,23 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 		}
     };
 
-    // default to not clustering the input add
+    // default to not clustering the input add and saving
     public void addInput(Input input) throws IOException {
-    	addInput(input, false);
+        addInput(input, false, true);
+    }
+
+    @Override
+    public void addInputAndSave(Input newInput, boolean cluster) throws IOException {
+        addInput(newInput, cluster, true);
+    }
+
+    @Override
+    public void addInputNoSave(Input newInput, boolean cluster) throws IOException {
+        addInput(newInput, cluster, false);
     }
 
     // add input business logic, optional clustering of the input add
-    public void addInput(Input input, boolean cluster) throws IOException {
+    public void addInput(Input input, boolean cluster, boolean saveChanges) throws IOException {
     	
     	logger.info("input class type: " + input.getClass().getSimpleName());
     	
@@ -1482,7 +1486,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 			}
 			if (feed.getProtocol() == null || feed.getType().equals("Plugin")) {
 		        addMetric(input, new InputMetric(input));
-		        config.addInputAndSave(input);
+                if (saveChanges) {
+				CoreConfigFacade.getInstance().addInputAndSave(input);
+                }
 		        return;
 			}
         }
@@ -1495,8 +1501,10 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         if (input.getProtocol().equals("grpc")) {
         	nettyBuilder.buildGrpcServer(input);
-        }
-        else if (!isUdp) {
+        } else if (input.getProtocol().equals("quic")) {
+        	input.setCoreVersion2TlsVersions("TLSv1.3");     	
+        	nettyBuilder.buildQuicServer(input);
+        } else if (!isUdp) {
 
         	if (isTls) {
         		nettyBuilder.buildTlsServer(input);
@@ -1507,7 +1515,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         	}
         } else {
 
-            if (config.getRemoteConfiguration().getSecurity() == null) {
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getSecurity() == null) {
                 throw new IllegalArgumentException("Security section of CoreConfig is required");
             }
             
@@ -1549,8 +1557,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 		}
         addMetric(input, new InputMetric(input));
-
-        config.addInputAndSave(input);
+        if (saveChanges) {
+		CoreConfigFacade.getInstance().addInputAndSave(input);
+        }
     }
 
     public void removeInput(String inputName) {
@@ -1640,16 +1649,17 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         		messageReceivedLocal.incrementAndGet();
 
-        		if (config.getRemoteConfiguration().getCluster().isEnabled() && MessagingDependencyInjectionProxy.getInstance().clusterManager() != null) {
+				Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
+        		if (config.getCluster().isEnabled() && MessagingDependencyInjectionProxy.getInstance().clusterManager() != null) {
         			ClusterManager.countMessageReceived();
         		}
 
-        		if (config.getRemoteConfiguration().getCluster().isEnabled()
+        		if (config.getCluster().isEnabled()
         				&& MessagingDependencyInjectionProxy.getInstance().clusterManager() != null
         				&& !isControlMessage(c.getType())
         				&& (c.getContextValue(Constants.PLUGIN_MESSAGE_KEY) == null
-        					|| ((Boolean) c.getContextValue(Constants.PLUGIN_MESSAGE_KEY)).booleanValue() != true))
-        		{
+                    || ((Boolean) c.getContextValue(Constants.PLUGIN_MESSAGE_KEY)).booleanValue() != true)) {
         			Resources.clusterStateProcessor.execute(() -> {
         				MessagingDependencyInjectionProxy.getInstance().clusterManager().onDataMessage(c);
         			});
@@ -1726,6 +1736,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         if (logger.isTraceEnabled()) {
         	logger.trace("passed control message check");
         }
+
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
         if (config.getFilter().getFlowtag().isEnable() && c.matchXPath("/event/detail/_flow-tags_[@" + flowTagFilter.flowTag() + "]")) {
             //we've already processed this message, throw it away
@@ -2019,7 +2031,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         if (isTls) {
 
-            Tls tlsConfig = config.getRemoteConfiguration().getSecurity().getTls();
+            Tls tlsConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getSecurity().getTls();
 
             if (tlsConfig == null) {
                 throw new IllegalArgumentException("tls config not available");
@@ -2083,13 +2095,22 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     @Override
     public NetworkInputAddResult addInputAndSave(Input newInput) {
+        return validateAndAddInput(newInput, true);
+    }
+
+    @Override
+    public NetworkInputAddResult addInputNoSave(Input newInput) {
+        return validateAndAddInput(newInput, false);
+    }
+
+    private NetworkInputAddResult validateAndAddInput(Input newInput, boolean saveChanges) {
 
 
     	if (logger.isDebugEnabled()) {
     		logger.debug("addInputAndSave " + newInput.getName() + " " + newInput.getPort() + " " + newInput.getAuth());
     	}
 
-		DistributedConfiguration config = MessagingDependencyInjectionProxy.getInstance().coreConfig();
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
     	NetworkInputAddResult returnResult = NetworkInputAddResult.SUCCESS;
 
@@ -2106,8 +2127,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     			} else {
 
-    				List<Input> currentInputList = config.getNetworkInputs();
-					List<DataFeed> currentDataFeedList = config.getNetworkDataFeeds();
+    				List<Input> currentInputList = CoreConfigFacade.getInstance().getNetworkInputs();
+					List<DataFeed> currentDataFeedList = CoreConfigFacade.getInstance().getNetworkDataFeeds();
     				String protocol = newInput.getProtocol();
 
     				boolean isUdp = protocol.equals(TransportCotEvent.UDP.configID);
@@ -2174,7 +2195,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     			}
 
     			if (returnResult == NetworkInputAddResult.SUCCESS) {
-    				addInput(newInput, true);
+                    addInput(newInput, true, saveChanges);
     			}
 
     			if (logger.isDebugEnabled()) {
@@ -2191,14 +2212,25 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     @Override
     public void removeInputAndSave(String name) {
+        removeInput(name, true);
+    }
+
+    @Override
+    public void removeInputNoSave(String name) {
+        removeInput(name, false);
+    }
+
+    public void removeInput(String name, boolean saveChanges) {
+
     	if (logger.isDebugEnabled()) {
     		logger.debug("Removing input '" + name + "' if it exists.");
     	}
-
+        if (saveChanges) {
     	try {
-    		config.removeInputAndSave(name);
+			CoreConfigFacade.getInstance().removeInputAndSave(name);
     	} catch (RemoteException e) {
     		throw new TakException(e);
+            }
     	}
 
         // untrack metrics
@@ -2256,7 +2288,16 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     }
 
     @Override
-    public ConnectionModifyResult modifyInputAndSave(String inputName, Input modifiedInput) {
+    public ConnectionModifyResult modifyInputAndSave(String inputName, Input input) {
+        return modifyInput(inputName, input, true);
+    }
+
+    @Override
+    public ConnectionModifyResult modifyInputNoSave(String inputName, Input input) {
+        return modifyInput(inputName, input, false);
+    }
+
+    public ConnectionModifyResult modifyInput(String inputName, Input modifiedInput, boolean saveChanges) {
 
     	if (logger.isDebugEnabled()) {
     		logger.debug("modifyInputAndSave " + inputName + " " + modifiedInput);
@@ -2264,7 +2305,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     	synchronized (configLock) {
     		try {
-    			Input currentState = config.getInputByName(inputName);
+    			Input currentState = CoreConfigFacade.getInstance().getInputByName(inputName);
 
     			if (currentState == null) {
     				return ConnectionModifyResult.FAIL_NONEXISTENT;
@@ -2296,13 +2337,24 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     			// Modify the groups
     			String originalGroupList = Arrays.deepToString(currentState.getFiltergroup().toArray());
 
-    			ConnectionModifyResult result = config.updateInputGroupsNoSave(inputName, modifiedInput.getFiltergroup().toArray(new String[modifiedInput.getFiltergroup().size()]));
-    			if (result != ConnectionModifyResult.SUCCESS) {
+                ConnectionModifyResult result;
+
+                if (saveChanges) {
+                    result = CoreConfigFacade.getInstance().updateInputGroupsNoSave(inputName, modifiedInput.getFiltergroup().toArray(new String[modifiedInput.getFiltergroup().size()]));
+    			if (result.getHttpStatusCode() != ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
                     return result;
                 }
+                } else {
+                    if (CoreConfigFacade.getInstance().getInputByName(inputName) == null) {
+                        return ConnectionModifyResult.FAIL_NONEXISTENT;
+                    }
+                }
 
-    			groupFederationUtil.updateInputGroups(config.getInputByName(inputName));
-    			config.saveChangesAndUpdateCache();
+
+    			groupFederationUtil.updateInputGroups(CoreConfigFacade.getInstance().getInputByName(inputName));
+                if (saveChanges) {
+				CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
+                }
 
     			if (logger.isDebugEnabled()) {
     				logger.debug("Input '" + inputName + "' has had its groups changed from " + originalGroupList + " to " + Arrays.deepToString(modifiedInput.getFiltergroup().toArray()));
@@ -2316,24 +2368,24 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 			    logger.info("modified arch, arch_only, federated: " + modifiedInput.isArchive() + "," + modifiedInput.isArchiveOnly() +
 					"," + modifiedInput.isFederated());
     				if (currentState.isArchive() != modifiedInput.isArchive()) {
-    					result = config.setArchiveFlagNoSave(inputName, modifiedInput.isArchive());
-    					if (result != ConnectionModifyResult.SUCCESS) {
+    					result = CoreConfigFacade.getInstance().setArchiveFlagNoSave(inputName, modifiedInput.isArchive());
+    					if (result.getHttpStatusCode() != ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
                             return result;
                         }
     				}
 
     				// Modify the archive only flag
     				if (currentState.isArchiveOnly() != modifiedInput.isArchiveOnly()) {
-    					result = config.setArchiveOnlyFlagNoSave(inputName, modifiedInput.isArchiveOnly());
-    					if (result != ConnectionModifyResult.SUCCESS) {
+    					result = CoreConfigFacade.getInstance().setArchiveOnlyFlagNoSave(inputName, modifiedInput.isArchiveOnly());
+    					if (result.getHttpStatusCode() != ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
                             return result;
                         }
     				}
     				
     				// Modify federated flag
       				if (currentState.isFederated() != modifiedInput.isFederated()) {
-      					result = config.setFederatedFlagNoSave(inputName, modifiedInput.isFederated());
-    					if (result != ConnectionModifyResult.SUCCESS) {
+      					result = CoreConfigFacade.getInstance().setFederatedFlagNoSave(inputName, modifiedInput.isFederated());
+    					if (result.getHttpStatusCode() != ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
                             return result;
                         }
     				}
@@ -2341,60 +2393,77 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 				// Modify syncCacheRetentionSeconds value
 
 				if (currentState.getSyncCacheRetentionSeconds() !=
-				    modifiedInput.getSyncCacheRetentionSeconds())
-				    {
-					result = config.setSyncCacheRetentionSeconds(inputName, modifiedInput.getSyncCacheRetentionSeconds());
-					if(result != ConnectionModifyResult.SUCCESS)
-					    {
+                        modifiedInput.getSyncCacheRetentionSeconds()) {
+                        if (saveChanges) {
+					result = CoreConfigFacade.getInstance().setSyncCacheRetentionSeconds(inputName, modifiedInput.getSyncCacheRetentionSeconds());
+                            if (result.getHttpStatusCode() != ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
 						return result;
+                            }
+                        } else {
+                            if (CoreConfigFacade.getInstance().getInputByName(inputName) == null) {
+                                return ConnectionModifyResult.FAIL_NONEXISTENT;
+                            }
 					    }
 				    }
     				
 					// Save the flag changes;
-    				updateProtocolListeners(config.getInputByName(inputName));
+    				updateProtocolListeners(CoreConfigFacade.getInstance().getInputByName(inputName));
     				nettyBuilder.modifyServerInput(modifiedInput);
-    				config.saveChangesAndUpdateCache();
+                    if (saveChanges) {
+					CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
     			}
+                }
     			
     			// Modify data feed attributes
 				if (modifiedInput instanceof DataFeed && currentState instanceof DataFeed) {
 					DataFeed modifiedDataFeed = (DataFeed) modifiedInput;
 					DataFeed currentDataFeed = (DataFeed) currentState;
 
-					config.updateTagsNoSave(inputName, modifiedDataFeed.getTag());
+					CoreConfigFacade.getInstance().updateTagsNoSave(inputName, modifiedDataFeed.getTag());
 					
 					if (modifiedDataFeed.isSync() != currentDataFeed.isSync()) {
-						result = config.setSyncFlagNoSave(inputName, modifiedDataFeed.isSync());
-						if (result != ConnectionModifyResult.SUCCESS) {
+						result = CoreConfigFacade.getInstance().setSyncFlagNoSave(inputName, modifiedDataFeed.isSync());
+						if (result.getHttpStatusCode() != ConnectionModifyResult.SUCCESS.getHttpStatusCode()) {
 							return result;
 						}
 					}
-					config.saveChangesAndUpdateCache();
+                    if (saveChanges) {
+					CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
 				}
+                }
 				
 				// Update input in inputMetric
-				updateMetric(config.getInputByName(inputName));
-    		}
-    		catch (RemoteException e) {
+				updateMetric(CoreConfigFacade.getInstance().getInputByName(inputName));
+            } catch (RemoteException e) {
     			throw new TakException(e); // will not happen
     		}
 
     		return ConnectionModifyResult.SUCCESS;
+        }
     	}
 
+    @Override
+    public void removeDataFeedAndSave(String name) {
+        removeDataFeed(name, true);
     }
 
 	@Override
-	public void removeDataFeedAndSave(String name) {
+    public void removeDataFeedNoSave(String name) {
+        removeDataFeed(name, false);
+    }
+
+    public void removeDataFeed(String name, boolean saveChanges) {
 		if (logger.isDebugEnabled()) {
 			logger.debug("Removing datafeed '" + name + "' if it exists.");
 		}
 
+        if (saveChanges) {
 		try {
-			config.removeDataFeedAndSave(name);
+			CoreConfigFacade.getInstance().removeDataFeedAndSave(name);
 		} catch (RemoteException e) {
 			throw new TakException(e);
 		}
+        }
 
         // untrack metrics
         InputMetric inputMetric = inputMetrics.get(name);
@@ -2469,7 +2538,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     @Override
     public MessagingConfigInfo getMessagingConfig() {
-        Configuration conf = coreConfig.getRemoteConfiguration();
+        Configuration conf = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
         return new MessagingConfigInfo(
                 conf.getBuffer().getLatestSA().isEnable(),
@@ -2489,24 +2558,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     @Override
     public void modifyMessagingConfig(MessagingConfigInfo info) {
-        Configuration conf = coreConfig.getRemoteConfiguration();
-        Repository repository = conf.getRepository();
-        LatestSA latestSA = conf.getBuffer().getLatestSA();
-        latestSA.setEnable(info.isLatestSA());
-        repository.setNumDbConnections(info.getNumDbConnections());
-        repository.setConnectionPoolAutoSize(info.isConnectionPoolAutoSize());
-        repository.setArchive(info.isArchive());
-        repository.getConnection().setUsername(info.getDbUsername());
-        if (!info.getDbPassword().equals(MASK_WORD_FOR_DISPLAY)) {
-            repository.getConnection().setPassword(info.getDbPassword());
-        }
-        repository.getConnection().setUrl(info.getDbUrl());
-        repository.getConnection().setSslEnabled(info.isSslEnabled());
-        repository.getConnection().setSslMode(info.getSslMode());
-        repository.getConnection().setSslCert(info.getSslCert());
-        repository.getConnection().setSslKey(info.getSslKey());
-        repository.getConnection().setSslRootCert(info.getSslRootCert());
-        coreConfig.setAndSaveMessagingConfig(latestSA, repository);
+        CoreConfigFacade.getInstance().modifyMessagingConfig(info);
     }
 
     public QueueMetric getQueueMetrics() {
@@ -2515,8 +2567,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 	@Override
 	public AuthenticationConfigInfo getAuthenticationConfig() {
-		Ldap ldap = coreConfig.getRemoteConfiguration().getAuth().getLdap();
-		if(ldap == null) {
+		Ldap ldap = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap();
+		if (ldap == null) {
 			/**
 	        	return new AuthenticationConfigInfo(
 	        			"",
@@ -2543,29 +2595,12 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 	@Override
 	public void modifyAuthenticationConfig(AuthenticationConfigInfo info) {
-	    Configuration localConfig = coreConfig.getRemoteConfiguration();
-
-		Ldap ldap = localConfig.getAuth().getLdap();
-		if(ldap == null) {
-			ldap = new Ldap();
-		}
-		ldap.setUrl(info.getUrl());
-		ldap.setUserstring(info.getUserString());
-		ldap.setUpdateinterval(info.getUpdateInterval());
-		ldap.setGroupprefix(info.getGroupPrefix());
-		ldap.setServiceAccountDN(info.getServiceAccountDN());
-		ldap.setServiceAccountCredential(info.getServiceAccountCredential());
-		ldap.setGroupBaseRDN(info.getGroupBaseRDN());
-		if (logger.isDebugEnabled()) {
-		    logger.debug("group prefix is now: " + ldap.getGroupprefix());
-		}
-		coreConfig.setAndSaveLDAP(ldap);
-
+        CoreConfigFacade.getInstance().modifyAuthenticationConfig(info);
 	}
 
 	@Override
     public SecurityConfigInfo getSecurityConfig() {
-	    Configuration conf = coreConfig.getRemoteConfiguration();
+	    Configuration conf = CoreConfigFacade.getInstance().getRemoteConfiguration();
         Tls tls = conf.getSecurity().getTls();
 
         boolean enableEnrollment = false;
@@ -2628,84 +2663,14 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     @Override
     public void modifySecurityConfig(SecurityConfigInfo info) {
-        Configuration conf = coreConfig.getRemoteConfiguration();
-        Tls tls = conf.getSecurity().getTls();
-        FederationServer fedServer = conf.getFederation().getFederationServer();
-        Auth auth = conf.getAuth();
-        tls.setKeystoreFile(info.getKeystoreFile());
-        tls.setTruststoreFile(info.getTruststoreFile());
-        tls.setKeystorePass(info.getKeystorePass());
-        tls.setTruststorePass(info.getTruststorePass());
-        tls.setContext(info.getTlsVersion());
-        auth.setX509Groups(info.isX509Groups());
-        auth.setX509AddAnonymous(info.isX509addAnon());
-        fedServer.getTls().setKeystoreFile(info.getKeystoreFile());
-        fedServer.getTls().setKeystorePass(info.getKeystorePass());
-        if(auth.getLdap() != null) {
-        	auth.getLdap().setX509Groups(info.isX509Groups());
-        	auth.getLdap().setX509AddAnonymous(info.isX509addAnon());
-        }
-        coreConfig.setAndSaveSecurityConfig(tls, auth, fedServer);
-
-        if (info.isEnableEnrollment()) {
-            CertificateSigning certificateSigning = coreConfig.getRemoteConfiguration().getCertificateSigning();
-            if (certificateSigning == null) {
-                certificateSigning = new CertificateSigning();
-            }
-
-            CertificateConfig certificateConfig = certificateSigning.getCertificateConfig();
-            if (certificateConfig == null) {
-                certificateConfig = new CertificateConfig();
-                certificateSigning.setCertificateConfig(certificateConfig);
-            }
-
-            NameEntries nameEntries = certificateConfig.getNameEntries();
-            if (nameEntries == null) {
-                nameEntries = new NameEntries();
-
-                NameEntry nameEntry = new NameEntry();
-                nameEntry.setName("O");
-                nameEntry.setValue("TAK");
-                nameEntries.getNameEntry().add(nameEntry);
-
-                nameEntry = new NameEntry();
-                nameEntry.setName("OU");
-                nameEntry.setValue("TAK");
-                nameEntries.getNameEntry().add(nameEntry);
-
-                certificateConfig.setNameEntries(nameEntries);
-            }
-
-            certificateSigning.setCA(CAType.fromValue(info.getCaType()));
-
-            if (certificateSigning.getCA() == CAType.TAK_SERVER) {
-                TAKServerCAConfig takServerCAConfig = new TAKServerCAConfig();
-                takServerCAConfig.setKeystore("JKS");
-                takServerCAConfig.setSignatureAlg("SHA256WithRSA");
-                takServerCAConfig.setKeystoreFile(info.getSigningKeystoreFile());
-                takServerCAConfig.setKeystorePass(info.getSigningKeystorePass());
-                takServerCAConfig.setValidityDays(info.getValidityDays());
-                certificateSigning.setTAKServerCAConfig(takServerCAConfig);
-
-            } else if (certificateSigning.getCA() == CAType.MICROSOFT_CA) {
-                MicrosoftCAConfig microsoftCAConfig = new MicrosoftCAConfig();
-                microsoftCAConfig.setUsername(info.getMscaUserName());
-                microsoftCAConfig.setPassword(info.getMscaPassword());
-                microsoftCAConfig.setTruststore(info.getMscaTruststore());
-                microsoftCAConfig.setTruststorePass(info.getMscaTruststorePass());
-                microsoftCAConfig.setTemplateName(info.getMscaTemplateName());
-                certificateSigning.setMicrosoftCAConfig(microsoftCAConfig);
-            }
-
-            coreConfig.setAndSaveCertificateSigningConfig(certificateSigning);
-        }
+        CoreConfigFacade.getInstance().modifySecurityConfig(info);
     }
 
     @Override
     public Collection<Integer> getNonSecurePorts() {
-        DistributedConfiguration c = config.getInstance();
-        List<Input> inputs = c.getNetwork().getInput();
-        List<Connector> connectors = c.getNetwork().getConnector();
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+        List<Input> inputs = config.getNetwork().getInput();
+        List<Connector> connectors = config.getNetwork().getConnector();
         Set<Integer> unsecurePorts = new HashSet<Integer>();
         for (Input input : inputs) {
             if (!input.getProtocol().contains("tls")) {
@@ -2723,9 +2688,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
     @Override
     public HashMap<String, Boolean> verifyConfiguration() {
-        DistributedConfiguration c = config.getInstance();
-        String keystoreFileName = c.getSecurity().getTls().getKeystoreFile();
-        String truststoreFileName = c.getSecurity().getTls().getTruststoreFile();
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+        String keystoreFileName = config.getSecurity().getTls().getKeystoreFile();
+        String truststoreFileName = config.getSecurity().getTls().getTruststoreFile();
         File keystoreFile = new File(keystoreFileName);
         File truststoreFile = new File(truststoreFileName);
         HashMap<String, Boolean> ret = new HashMap<String, Boolean>();

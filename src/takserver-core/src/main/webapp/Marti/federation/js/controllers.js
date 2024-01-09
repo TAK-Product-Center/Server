@@ -658,6 +658,105 @@ federationManagerControllers.controller('OutgoingConnectionCreationCtrl', ['$sco
     }
 ]);
 
+federationManagerControllers.controller('OutgoingConnectionModificationCtrl', ['$scope',
+    '$location',
+    '$routeParams',
+    'OutgoingConnectionsService',
+    function (
+        $scope,
+        $location,
+        $routeParams,
+        OutgoingConnectionsService
+    ) {
+
+        $scope.originalOutgoingDisplayName = $routeParams.id
+        $scope.allOutgoingConnections = [];
+        $scope.originalOutgoing = {}
+        $scope.modifiedOutgoing = {}
+
+        OutgoingConnectionsService.query(
+            function (apiResponse) {
+                $scope.allOutgoingConnections = apiResponse.data;
+                $scope.showRmiError = false;
+
+                $scope.originalOutgoing = $scope.allOutgoingConnections.find(outgoing => { 
+                    return outgoing.displayName === $scope.originalOutgoingDisplayName
+                })
+
+                $scope.modifiedOutgoing = JSON.parse(JSON.stringify($scope.originalOutgoing))
+            },
+            function () {
+                $scope.showRmiError = true;
+            });
+
+        $scope.cancel = function () {
+            $location.path("/");
+        };
+
+        $scope.saveOutgoingConnection = function (outgoingConnection) {
+            // if outgoing is enabled, warn that current changes will restart connection
+            if ($scope.originalOutgoing.enabled && $scope.modifiedOutgoing.enabled) {
+                if ($scope.originalOutgoing.displayName !== $scope.modifiedOutgoing.displayName ||
+                    $scope.originalOutgoing.address !== $scope.modifiedOutgoing.address ||
+                    $scope.originalOutgoing.port !== $scope.modifiedOutgoing.port ||
+                    $scope.originalOutgoing.protocolVersion !== $scope.modifiedOutgoing.protocolVersion) {
+                    if (confirm('Config changes will restart the connection')) {
+                        // nothing to do
+                    } else {
+                      alert('Save Canceled.');
+                      return;
+                    }
+                }
+            }
+
+            $scope.submitInProgress = true;
+            OutgoingConnectionsService.update({
+                    'original': $scope.originalOutgoing,
+                    'update': $scope.modifiedOutgoing
+                },
+                function (apiResponse) {
+                     $location.path('/');
+                },
+                function (apiResponse) {
+                    $scope.serviceReportedMessages = true;
+                    $scope.messages = apiResponse.data.messages;
+                    alert('An error occurred saving the outgoing connection. Please correct the errors and resubmit.');
+                    $scope.submitInProgress = false;
+                }
+            );
+        }
+
+        $scope.checkMaxRetries = function (outgoingConnection) {
+            if (outgoingConnection.unlimitedRetries == true && outgoingConnection.fallback) {
+                outgoingConnection.maxRetriesFallbackError = true;
+            } else {
+                outgoingConnection.maxRetriesFallbackError = false;
+            }
+        }
+
+        $scope.isDisplayNameUnique = function (outgoingConnection) {
+            if (!outgoingConnection.displayName) {
+                return;
+            }
+            var displayName = outgoingConnection.displayName.toUpperCase();
+            if (displayName != null && displayName.trim() != '') {
+                outgoingConnection.displayNameDuplicate = false;
+
+                for (i in $scope.allOutgoingConnections) {
+                    if (displayName === $scope.allOutgoingConnections[i].displayName.toUpperCase()) {
+                        // ignore duplicate with original self
+                        if (displayName === $scope.originalOutgoing.displayName.toUpperCase())
+                            continue
+
+                        outgoingConnection.displayNameDuplicate = true;
+                        return
+                    }
+                }
+            }
+        }
+    }
+]);
+
 
 federationManagerControllers.controller('FederateContactsListCtrl', ['$scope',
     '$location',

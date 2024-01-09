@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import com.bbn.marti.service.BrokerService;
 import com.bbn.marti.service.RepositoryService;
 import com.bbn.marti.service.SubmissionService;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 
 public final class QueueMetricsService implements Serializable {

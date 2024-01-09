@@ -4,11 +4,16 @@ import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.List;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.awspring.cloud.autoconfigure.context.properties.AwsS3ResourceLoaderProperties;
+import io.awspring.cloud.autoconfigure.metrics.CloudWatchExportAutoConfiguration;
 
 import org.apache.ignite.Ignite;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.MetricsEndpointAutoConfiguration;
 import org.springframework.boot.actuate.metrics.MetricsEndpoint;
@@ -56,7 +61,6 @@ import com.bbn.marti.network.PluginDataFeedJdbc;
 import com.bbn.marti.nio.netty.NioNettyBuilder;
 import com.bbn.marti.nio.server.NioServer;
 import com.bbn.marti.remote.ContactManager;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.DataFeedCotService;
 import com.bbn.marti.remote.FederationManager;
 import com.bbn.marti.remote.ServerInfo;
@@ -70,10 +74,8 @@ import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.repeater.DistributedRepeaterManager;
 import com.bbn.marti.repeater.RepeaterStore;
 import com.bbn.marti.service.BrokerService;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.DistributedContactManager;
 import com.bbn.marti.service.DistributedSubscriptionManager;
-import com.bbn.marti.service.LocalConfiguration;
 import com.bbn.marti.service.MessagingInitializer;
 import com.bbn.marti.service.MissionPackageExtractor;
 import com.bbn.marti.service.PluginStore;
@@ -87,7 +89,6 @@ import com.bbn.marti.sync.federation.DataFeedFederationAspect;
 import com.bbn.marti.sync.federation.FederationROLHandler;
 import com.bbn.marti.sync.federation.MissionActionROLConverter;
 import com.bbn.marti.sync.repository.DataFeedRepository;
-import com.bbn.marti.sync.repository.FederationEventRepository;
 import com.bbn.marti.sync.service.DistributedDataFeedCotService;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.MessageConversionUtil;
@@ -99,10 +100,7 @@ import com.bbn.metrics.service.ActuatorMetricsService;
 import com.bbn.metrics.service.DatabaseMetricsService;
 import com.bbn.metrics.service.NetworkMetricsService;
 import com.bbn.metrics.service.QueueMetricsService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.awspring.cloud.autoconfigure.context.properties.AwsS3ResourceLoaderProperties;
-import io.awspring.cloud.autoconfigure.metrics.CloudWatchExportAutoConfiguration;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
 import tak.server.cache.classification.ClassificationCacheHelper;
@@ -118,7 +116,6 @@ import tak.server.federation.DistributedFederationManager;
 import tak.server.federation.FederationServer;
 import tak.server.federation.MissionDisruptionManager;
 import tak.server.federation.TakFigClient;
-import tak.server.grid.CoreConfigProxyFactoryForMessaging;
 import tak.server.messaging.DistributedCotMessenger;
 import tak.server.messaging.DistributedPluginApi;
 import tak.server.messaging.DistributedPluginDataFeedApi;
@@ -136,7 +133,6 @@ import tak.server.qos.MessageDOSStrategy;
 import tak.server.qos.MessageDeliveryStrategy;
 import tak.server.qos.MessageReadStrategy;
 import tak.server.qos.QoSManager;
-
 /*
  * services that are only used in separate messaging process, and monolith
  */
@@ -149,19 +145,13 @@ public class MessagingConfiguration {
 	@Autowired
 	ServletContext servletContext;
 
-	@Order(Ordered.HIGHEST_PRECEDENCE)
-	@Bean
-	public LocalConfiguration localConfiguration() {
-		return LocalConfiguration.getInstance();
-	}
-
 	@Bean
 	public SubmissionService submissionService(DistributedFederationManager dfm, NioNettyBuilder nb, MessagingUtilImpl mui, NioServer ns, GroupManager gm,
 											   ScrubInvalidValues siv, MessageConversionUtil mcu, GroupFederationUtil gfu, InjectionManager im, RepositoryService rs, Ignite ig, SubscriptionManager sm,
-											   SubscriptionStore ss, FlowTagFilter flowTag, ContactManager contactManager, ServerInfo serverInfo, @Qualifier(Constants.MESSAGING_CORE_CONFIG_PROXY_BEAN) CoreConfig coreConfig,
+											   SubscriptionStore ss, FlowTagFilter flowTag, ContactManager contactManager, ServerInfo serverInfo,
 											   MessageConverter messageConverter, ActiveGroupCacheHelper activeGroupCacheHelper, RemoteUtil remoteUtil, DataFeedRepository dfr) {
 
-		return new SubmissionService(dfm, nb, mui, ns, gm, siv, mcu, gfu, im, rs, ig, sm, ss, flowTag, contactManager, serverInfo, coreConfig, messageConverter, activeGroupCacheHelper, remoteUtil, dfr);
+		return new SubmissionService(dfm, nb, mui, ns, gm, siv, mcu, gfu, im, rs, ig, sm, ss, flowTag, contactManager, serverInfo, messageConverter, activeGroupCacheHelper, remoteUtil, dfr);
 	}
 
 	@Bean
@@ -170,19 +160,15 @@ public class MessagingConfiguration {
 	}
 
 	@Bean
-	public RepeaterService repeaterService(CoreConfig coreConfig, BrokerService brokerService, GroupManager groupManager, DistributedRepeaterManager repeaterManager) {
-		return new RepeaterService(coreConfig, brokerService, groupManager, repeaterManager);
+	public RepeaterService repeaterService(BrokerService brokerService, GroupManager groupManager, DistributedRepeaterManager repeaterManager) {
+		return new RepeaterService(brokerService, groupManager, repeaterManager);
 	}
 
 	@Order(Ordered.LOWEST_PRECEDENCE)
 	@Bean
 	public DistributedFederationManager distributedFederationManager(
-			Ignite ignite,
-			CoreConfig coreConfig,
-			CoreConfigProxyFactoryForMessaging coreConfigProxy,
-			DistributedConfiguration distConf,
-			FederationEventRepository federationEventRepository) throws RemoteException {
-		DistributedFederationManager distributedFederationManager = new DistributedFederationManager(ignite, coreConfig);
+			Ignite ignite) throws RemoteException {
+		DistributedFederationManager distributedFederationManager = new DistributedFederationManager(ignite);
 		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_FEDERATION_MANAGER, distributedFederationManager);
 		return distributedFederationManager;
 	}
@@ -227,8 +213,8 @@ public class MessagingConfiguration {
 	}
 
 	@Bean(Constants.DISTRIBUTED_COT_MESSENGER)
-	public Messenger<CotEventContainer> distributedCotMessenger(Ignite ignite, SubscriptionStore subscriptionStore, ServerInfo serverInfo, MessageConverter messageConverter, SubmissionService submissionService, CoreConfig config) {
-		return new DistributedCotMessenger(ignite, subscriptionStore, serverInfo,  messageConverter, submissionService, config);
+	public Messenger<CotEventContainer> distributedCotMessenger(Ignite ignite, SubscriptionStore subscriptionStore, ServerInfo serverInfo, MessageConverter messageConverter, SubmissionService submissionService) {
+		return new DistributedCotMessenger(ignite, subscriptionStore, serverInfo,  messageConverter, submissionService);
 	}
 
 	@Bean(Constants.DISTRIBUTED_TAK_MESSENGER)
@@ -363,14 +349,6 @@ public class MessagingConfiguration {
 	}
 
 	@Bean
-	public DistributedConfiguration coreConfig(Ignite ignite) {
-		DistributedConfiguration distributedConfiguration = DistributedConfiguration.getInstance();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_CONFIGURATION, distributedConfiguration);
-		
-		return distributedConfiguration;
-	}
-
-	@Bean
 	public com.bbn.marti.util.MessageConversionUtil coreMessagingUtil() {
 		return new com.bbn.marti.util.MessageConversionUtil();
 	}
@@ -390,8 +368,8 @@ public class MessagingConfiguration {
 	}
 
 	@Bean
-	public FederationROLHandler federationROLHandler(MissionService missionService, EnterpriseSyncService syncService, RemoteUtil remoteUtil, CoreConfig coreConfig, DataFeedRepository dataFeedRepository) throws RemoteException {
-		return new FederationROLHandler(missionService, syncService, remoteUtil, coreConfig, dataFeedRepository);
+	public FederationROLHandler federationROLHandler(MissionService missionService, EnterpriseSyncService syncService, RemoteUtil remoteUtil, DataFeedRepository dataFeedRepository) throws RemoteException {
+		return new FederationROLHandler(missionService, syncService, remoteUtil, dataFeedRepository);
 	}
 
 	@Bean
@@ -410,8 +388,8 @@ public class MessagingConfiguration {
 	// TODO: handle this for cluster
 	@Bean
 	@Primary
-	public ServerInfo serverInfo(Ignite ignite, CoreConfig config) {
-		DistributedServerInfo distributedServerInfo =  new DistributedServerInfo(ignite, config);
+	public ServerInfo serverInfo(Ignite ignite) {
+		DistributedServerInfo distributedServerInfo =  new DistributedServerInfo(ignite);
 		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SERVER_INFO, distributedServerInfo);
 
 		ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_SERVER_INFO, ServerInfo.class, false);
@@ -485,12 +463,6 @@ public class MessagingConfiguration {
 		return new MessagingUtilImpl();
 	}
 
-	@Bean(Constants.MESSAGING_CORE_CONFIG_PROXY_BEAN)
-	@Primary
-	public CoreConfigProxyFactoryForMessaging coreConfigProxyFactory() {
-	    return new CoreConfigProxyFactoryForMessaging();
-	}
-	
 	@Bean
 	InjectionManager injectionManager(GroupFederationUtil groupFederationUtil) {
 		return new InjectionManager(groupFederationUtil);
@@ -620,7 +592,7 @@ public class MessagingConfiguration {
 	}
 	
 	@Bean
-	public DataFeedCotCacheHelper dataFeedCotCacheHelper(CoreConfig config) {
+	public DataFeedCotCacheHelper dataFeedCotCacheHelper() {
 		return new DataFeedCotCacheHelper();
 	}
 }

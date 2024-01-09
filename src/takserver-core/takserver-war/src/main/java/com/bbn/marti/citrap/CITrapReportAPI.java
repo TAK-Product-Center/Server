@@ -6,9 +6,10 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.IntrusionException;
@@ -65,10 +66,7 @@ public class CITrapReportAPI extends BaseRestController {
     
     @Autowired
     com.bbn.marti.citrap.PersistenceStore persistenceStore;
-    
-    @Autowired
-    CoreConfig coreConfig;
-    
+
     @Autowired
     ApplicationContext context;
 
@@ -86,9 +84,9 @@ public class CITrapReportAPI extends BaseRestController {
             // Get group vector for the user associated with this session
             String groupVector = martiUtil.getGroupBitVector(request);
         
-            if (reportMP.length > coreConfig.getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB() * 1000000) {
+            if (reportMP.length > CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB() * 1000000) {
                 String message = "Uploaded file exceeds server's size limit of "
-                        + coreConfig.getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB()
+                        + CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB()
                         + " MB! (limit is set in CoreConfig)";
                 logger.error(message);
                 return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
@@ -97,7 +95,7 @@ public class CITrapReportAPI extends BaseRestController {
             ReportType report = ciTrapReportService.addReport(
                     reportMP, clientUid, groupVector, missionService, subscriptionManager,
                     martiUtil.getGroupsFromRequest(request),
-                    coreConfig.getRemoteConfiguration().getCitrap());
+                    CoreConfigFacade.getInstance().getRemoteConfiguration().getCitrap());
             if (report == null) {
                 logger.error("addReport failed");
                 return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);

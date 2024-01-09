@@ -1,7 +1,9 @@
 package tak.server.federation.hub.broker;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,6 +17,9 @@ import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
 
 import tak.server.federation.GuardedStreamHolder;
+import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
+import tak.server.federation.hub.broker.events.StreamReadyEvent;
+import tak.server.federation.hub.broker.events.UpdatePolicy;
 
 public class HubConnectionStore {
     private static final Logger logger = LoggerFactory.getLogger(HubConnectionStore.class);
@@ -26,10 +31,18 @@ public class HubConnectionStore {
     private final Map<String, SSLSession> sessionMap =  new ConcurrentHashMap<>();
     private final Map<String, HubConnectionInfo> connectionInfos = new ConcurrentHashMap<>();
     
+    private final Map<String, List<ROL>> tempRolCache = new ConcurrentHashMap<>();
+    
+    public void cacheRol( ROL rol, String id) {
+    	if (!tempRolCache.containsKey(id)) 
+    		tempRolCache.put(id, new ArrayList<>());
+    	
+    	tempRolCache.get(id).add(rol);
+    }
+    
     public Collection<HubConnectionInfo> getConnectionInfos() {
     	return connectionInfos.values();
     }
-    
 
     public void addConnectionInfo(String id, HubConnectionInfo info) {
     	connectionInfos.put(id, info);
@@ -42,6 +55,7 @@ public class HubConnectionStore {
     	this.clientToGroups.remove(id);
     	this.sessionMap.remove(id);
     	this.connectionInfos.remove(id);
+    	this.tempRolCache.remove(id);
     }
     
     public void clearStreamMaps() {
@@ -51,6 +65,7 @@ public class HubConnectionStore {
     	this.clientToGroups.clear();
     	this.sessionMap.clear();
     	this.connectionInfos.clear();
+    	this.tempRolCache.clear();
     }
     
     public Map<String, GuardedStreamHolder<FederatedEvent>> getClientStreamMap() {
@@ -67,6 +82,12 @@ public class HubConnectionStore {
     
     public void addRolStream(String id, GuardedStreamHolder<ROL> holder) {
     	this.clientROLStreamMap.put(id, holder);
+    	List<ROL> cachedRol = tempRolCache.get(id);
+    	if (cachedRol != null) {
+    		FederationHubDependencyInjectionProxy.getSpringContext()
+    			.publishEvent(new StreamReadyEvent<ROL>(this, StreamReadyEvent.StreamReadyType.ROL, id, new ArrayList<ROL>(cachedRol)));
+    	}
+    	tempRolCache.remove(id);
     }
     
     public void removeRolStream(String id) {

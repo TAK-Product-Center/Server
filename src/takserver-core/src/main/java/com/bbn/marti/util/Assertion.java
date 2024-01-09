@@ -2,7 +2,7 @@
 
 package com.bbn.marti.util;
 
-import com.bbn.marti.service.DistributedConfiguration;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 /**
  * A simple class for asserting things
@@ -10,7 +10,7 @@ import com.bbn.marti.service.DistributedConfiguration;
  */
 public class Assertion {
 	
-	private static final boolean throwOnAssertionFail = DistributedConfiguration.getInstance().getRemoteConfiguration().getBuffer().getQueue().isThrowOnAssertionFail();
+	private static final boolean throwOnAssertionFail = CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().isThrowOnAssertionFail();
 	
     public static class AssertionException extends RuntimeException {
 

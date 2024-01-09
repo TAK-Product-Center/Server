@@ -7,6 +7,13 @@ import java.util.Locale;
 import java.util.NavigableSet;
 import java.util.Set;
 
+import com.google.common.collect.ComparisonChain;
+
+import io.grpc.ClientCall;
+import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
+import io.micrometer.core.instrument.Metrics;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,13 +29,8 @@ import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
-import com.bbn.marti.service.DistributedConfiguration;
-import com.google.common.collect.ComparisonChain;
 
-import io.grpc.ClientCall;
-import io.grpc.Metadata;
-import io.grpc.MethodDescriptor;
-import io.micrometer.core.instrument.Metrics;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotEventContainer;
@@ -201,7 +203,7 @@ public class FigFederateSubscription extends FederateSubscription {
 
     @Override
     public void submitLocalContact(FederatedEvent e, long hitTime) {
-        if(localContactUid.contains(e.getContact().getUid())) {
+        if (localContactUid.contains(e.getContact().getUid())) {
         	if (logger.isDebugEnabled()) {
         		logger.debug("skipping sending contact: " + e.getContact().getCallsign() + ":" + e.getContact().getOperation());
         	}
@@ -242,7 +244,7 @@ public class FigFederateSubscription extends FederateSubscription {
             return;
         }
         
-        if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null && !DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+        if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null && !CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("data feed federation disabled");
 			}

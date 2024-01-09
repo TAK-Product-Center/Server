@@ -32,7 +32,7 @@ public abstract class AbstractServerProfile implements Comparable<Object>, Compa
 
 	private Integer igniteCommunicationPort;
 	private Integer igniteCommunicationPortCount;
-	
+
 	private final int certHttpsPort;
 	private final int fedHttpsPort;
 	private final int httpPlaintextPort;
@@ -40,8 +40,8 @@ public abstract class AbstractServerProfile implements Comparable<Object>, Compa
 	private final String dbHost;
 
 	public AbstractServerProfile(@NotNull String identifier, @NotNull String url, @Nullable Integer igniteDiscoveryPort, @Nullable Integer igniteDiscoveryPortCount,
-			Integer igniteCommunicationPort, Integer igniteCommunicationPortCount,
-	                             int federationPort, int federationV2Port, int certHttpsPort, int fedHttpsPort, int httpPlaintextPort, int httpsPort, @Nullable String dbHost) {
+								 Integer igniteCommunicationPort, Integer igniteCommunicationPortCount,
+								 int federationPort, int federationV2Port, int certHttpsPort, int fedHttpsPort, int httpPlaintextPort, int httpsPort, @Nullable String dbHost) {
 		this.consistentUniqueReadableIdentifier = identifier;
 		this.url = url;
 		this.igniteDiscoveryPort = igniteDiscoveryPort;
@@ -77,6 +77,10 @@ public abstract class AbstractServerProfile implements Comparable<Object>, Compa
 
 	public String getConfigFilePath() {
 		return TAKCLConfigModule.getInstance().getServerConfigFilepath(this.consistentUniqueReadableIdentifier);
+	}
+
+	public String getTAKIgniteConfigFilePath() {
+		return TAKCLConfigModule.getInstance().getServerTAKIgniteConfigFilepath(this.consistentUniqueReadableIdentifier);
 	}
 
 	public String getUserAuthFilePath() {
@@ -118,7 +122,7 @@ public abstract class AbstractServerProfile implements Comparable<Object>, Compa
 	public final Integer getIgniteDiscoveryPortCount() {
 		return igniteDiscoveryPortCount;
 	}
-	
+
 	@Nullable
 	public final Integer getIgniteCommunicationPort() {
 		return igniteCommunicationPort;

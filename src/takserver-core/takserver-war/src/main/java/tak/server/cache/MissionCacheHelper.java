@@ -33,7 +33,7 @@ public class MissionCacheHelper {
 	private static final AtomicBoolean isInvalidateAllMissionCache = new AtomicBoolean(false);
 
 	private static final Logger logger = LoggerFactory.getLogger(MissionCacheHelper.class);
-
+	
 	public Mission getMission(String missionName, boolean hydrateDetails, boolean skipCache) {
 
 		if (Strings.isNullOrEmpty(missionName)) {
@@ -46,9 +46,7 @@ public class MissionCacheHelper {
 
 		String key = getKey(missionName, hydrateDetails);
 
-		if (logger.isDebugEnabled()) {
-			logger.debug("getMission cache key: " + key);
-		}
+		logger.debug("getMission cache key: {} ", key);
 
 		Mission mission = null;
 
@@ -65,23 +63,29 @@ public class MissionCacheHelper {
 		}
 
 		if (mission == null) {
-
 			if (logger.isDebugEnabled()) {
-				logger.debug("cache miss for " + key);
+				logger.debug("cache miss for {}", key);
 			}
 
 			mission = doMissionQuery(missionName, hydrateDetails);
 
 			if (mission != null) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("Unproxy ExternalMissionData and MapLayer");
+				}
+				
+				UnproxyHelper.unproxyMission(mission);
 
 				// cache the mission with the appropriate key
 				getCache(missionName).put(key, mission);
+
 			}
 
 		} else {
 			if (logger.isDebugEnabled()) {
 				logger.debug("cache hit for " + key);
 			}
+
 		}
 
 		return mission;
@@ -124,6 +128,12 @@ public class MissionCacheHelper {
 			mission = doMissionQueryGuid(guid, hydrateDetails);
 
 			if (mission != null) {
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("Unproxy ExternalMissionData and MapLayer");
+				}
+				
+				UnproxyHelper.unproxyMission(mission);
 
 				// cache the mission with the appropriate key
 				getCache(guid).put(key, mission);
@@ -141,13 +151,17 @@ public class MissionCacheHelper {
 	private Mission doMissionQuery(String missionName, boolean hydrateDetails) {
 
 		Mission mission = missionRepository.getByNameNoCache(missionName);
-
+		
 		if (logger.isTraceEnabled()) {
 			logger.trace("mission {} : {} ", missionName, mission);
 		}
-
-		if (mission != null && hydrateDetails) {
-			missionService.hydrate(mission, hydrateDetails);
+		
+		if (mission != null) {
+			if (hydrateDetails) {
+				missionService.hydrate(mission, hydrateDetails);
+			}else {
+				missionService.hydrateFeedNameForMission(mission);				
+			}
 		}
 
 		return mission;
@@ -161,77 +175,10 @@ public class MissionCacheHelper {
 		
 		if (mission != null && hydrateDetails) {
 			missionService.hydrate(mission, hydrateDetails);
+			missionService.hydrateFeedNameForMission(mission);
 		}
-
+		
 		return mission;
-	}
-
-	public void putMission(Mission mission, boolean isDetailHydrated) {
-
-		if (mission == null) {
-			throw new IllegalArgumentException("null mission");
-		}
-
-
-		if (Strings.isNullOrEmpty(mission.getName())) {
-			throw new IllegalArgumentException("empty mission name");
-		}
-
-		String key = getKey(mission.getName(), isDetailHydrated);
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("put mission key: " + key + " isHydrated: " + isDetailHydrated + " mission: " + mission);
-		}
-
-		getCache(mission.getName()).put(key, mission);
-	}
-
-	public void putMissionIfDirty(Mission mission, boolean isDetailHydrated) {
-
-		if (mission == null) {
-			throw new IllegalArgumentException("null mission");
-		}
-
-
-		if (Strings.isNullOrEmpty(mission.getName())) {
-			throw new IllegalArgumentException("empty mission name");
-		}
-
-		String key = getKey(mission.getName(), isDetailHydrated);
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("putIfDirty cache key: " + key);
-		}
-
-		Object result = getCache(mission.getName()).get(key);
-
-		if (result == null) {
-			if (logger.isDebugEnabled()) {
-				logger.debug("no cache entry for key: " + key + " - putting");
-			}
-
-			getCache(mission.getName()).put(key, mission);
-		}
-	}
-
-	public void clear(Mission mission, boolean isDetailHydrated) {
-
-		if (mission == null) {
-			throw new IllegalArgumentException("null mission - can't remove");
-		}
-
-		if (Strings.isNullOrEmpty(mission.getName())) {
-			throw new IllegalArgumentException("empty mission name");
-		}
-
-		String key = getKey(mission.getName(), isDetailHydrated);
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("clear mission key: " + key + " isHydrated: " + isDetailHydrated);
-		}
-
-		//		getMissionCache(mission.getName()).put(key, "null");
-		getCache(mission.getName()).removeAsync(key);
 	}
 
 	/*
@@ -247,14 +194,13 @@ public class MissionCacheHelper {
 		}
 
 		return ((IgniteCache<Object, Object>) springNativeCache); 
-
 	}
 	
 	/*
 	 * Get the Ignite cache created by the Spring cache manager so that the options will be the same and ensure that it's the same one
 	 */
 	@SuppressWarnings("unchecked")
-	public IgniteCache<Object, Object> getCache(UUID cacheUUID) {
+	private IgniteCache<Object, Object> getCache(UUID cacheUUID) {
 
 		Object springNativeCache = cacheManager.getCache(cacheUUID.toString()).getNativeCache();
 
@@ -266,12 +212,12 @@ public class MissionCacheHelper {
 
 	}
 
-	public String getKey(String missionName, boolean hydrateDetails) {
+	private String getKey(String missionName, boolean hydrateDetails) {
 
 		return "[getMission, " + missionName.toLowerCase() + ", " + (hydrateDetails ? "true, hydrated" : "false") + "]";
 	}
 	
-	public String getKeyGuid(UUID guid, boolean hydrateDetails) {
+	private String getKeyGuid(UUID guid, boolean hydrateDetails) {
 
 		return "[missionguid_" + guid + "_" + (hydrateDetails ? "true, hydrated" : "false") + "]";
 	}

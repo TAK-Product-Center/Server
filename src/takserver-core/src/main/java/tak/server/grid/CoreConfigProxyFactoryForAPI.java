@@ -6,10 +6,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.marti.remote.CoreConfig;
 
-import tak.server.Constants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 public class CoreConfigProxyFactoryForAPI implements FactoryBean<CoreConfig> {
 
@@ -25,7 +24,7 @@ public class CoreConfigProxyFactoryForAPI implements FactoryBean<CoreConfig> {
 			logger.debug("get " + getObjectType().getSimpleName() + " from ignite");
 		}
 				
-		return ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_CONFIGURATION, CoreConfig.class, false);
+		return CoreConfigFacade.getInstance();
 	}
 
 	@Override

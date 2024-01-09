@@ -10,12 +10,10 @@ dependencies {
   implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
   implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
 
-  api 'javax.xml.bind:jaxb-api:' + jaxb_api_version
-
+  //api 'javax.xml.bind:jaxb-api:' + jaxb_api_version
+  api group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: jakarta_xml_bind_api_version
 
   //implementation 'javax.activation:activation:' + javax_activation_version
-
-  implementation 'javax.annotation:javax.annotation-api:' + javax_annotation_api_version
 
   // for netty performance, put javassist on the classpath
   implementation group: 'org.javassist', name: 'javassist', version: javassist_version

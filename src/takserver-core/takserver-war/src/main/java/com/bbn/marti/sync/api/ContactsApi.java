@@ -8,8 +8,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,9 +61,6 @@ public class ContactsApi extends BaseRestController {
 
 	@Autowired
 	private CommonUtil martiUtil;
-	
-	@Autowired
-	CoreConfig coreConfig;
 
 	// GET all subscriptions
 	@RequestMapping(value = "/contacts/all", method = RequestMethod.GET)
@@ -82,8 +80,8 @@ public class ContactsApi extends BaseRestController {
 			Set<Group> groups = martiUtil.getGroupsFromActiveRequest();
 			
 			if (groups != null) {
-				if (!coreConfig.getRemoteConfiguration().getFilter().getContactApi().isEmpty()) {
-					for (ContactApi filter : coreConfig.getRemoteConfiguration().getFilter().getContactApi()) {
+				if (!CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getContactApi().isEmpty()) {
+					for (ContactApi filter : CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getContactApi()) {
 						if (filter.isWriteOnly() && !Strings.isNullOrEmpty(filter.getGroupName())) {
 							if (martiUtil.hasAccessWriteOnly(groups, filter.getGroupName())) {
 								inWriteOnlyFilteredGroups.add(new Group(filter.getGroupName(), Direction.IN));

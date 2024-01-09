@@ -10,13 +10,9 @@ import java.util.List;
 
 public interface MissionInvitationRepository extends JpaRepository<MissionInvitation, String> {
 
-//    List<MissionInvitation> findAllByMissionNameIgnoreCase(String missionName);
-    
     List<MissionInvitation> findAllByMissionId(Long missionId);
-
     
     MissionInvitation findByToken(String token);
-//    MissionInvitation findByMissionNameAndTypeAndInvitee(String missionName, String type, String invitee);
 
     MissionInvitation findByMissionIdAndTypeAndInvitee(Long missionId, String type, String invitee);
 

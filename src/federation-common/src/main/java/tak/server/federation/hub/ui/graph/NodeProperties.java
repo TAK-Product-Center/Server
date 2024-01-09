@@ -58,11 +58,11 @@ public class NodeProperties {
 
     @SuppressWarnings("unchecked")
     private Object nodeToAttributeValue(Map<String, Object> node) {
-        if((node.get("type")).equals("attribute")) {
+        if ((node.get("type")).equals("attribute")) {
             return node.get("value");
-        } else if((node.get("type")).equals("attributes")) {
+        } else if ((node.get("type")).equals("attributes")) {
             return node.get("values");
-        } else if((node.get("type")).equals("nodes")) {
+        } else if ((node.get("type")).equals("nodes")) {
             return attributesToMap((List<Object>) node.get("nodes"));
         }
         return null;

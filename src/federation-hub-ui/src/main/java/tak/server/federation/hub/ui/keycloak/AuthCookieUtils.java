@@ -1,9 +1,9 @@
 package tak.server.federation.hub.ui.keycloak;
 
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.ValidationException;
@@ -11,8 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 
 import tak.server.federation.hub.ui.MartiValidator;
 import tak.server.federation.hub.ui.MartiValidator.Regex;
@@ -56,7 +55,7 @@ public class AuthCookieUtils {
         return createCookie(name, value, maxAge, sameSiteStrict, "/");
     }
 
-    public static void logout(HttpServletRequest request, HttpServletResponse response, DefaultTokenServices defaultTokenServices) {
+    public static void logout(HttpServletRequest request, HttpServletResponse response) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return;
@@ -68,19 +67,15 @@ public class AuthCookieUtils {
         }
 
         for (Cookie cookie : cookies) {
-            if (cookie.getName().compareToIgnoreCase(OAuth2AccessToken.ACCESS_TOKEN) == 0) {
+            if (cookie.getName().compareToIgnoreCase(OAuth2TokenType.ACCESS_TOKEN.getValue()) == 0) {
 
                 String token = cookie.getValue();
-
-                if (defaultTokenServices != null) {
-                    defaultTokenServices.revokeToken(token);
-                }
 
                 response.setHeader("Location", "/");
                 response.setHeader("Cache-Control", "no-store");
                 response.setHeader("Pragma", "no-cache");
                 response.setHeader(HttpHeaders.SET_COOKIE, createCookie(
-                        OAuth2AccessToken.ACCESS_TOKEN, token, 0, true).toString());
+                        OAuth2TokenType.ACCESS_TOKEN.getValue(), token, 0, true).toString());
 
                 response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
                 return;

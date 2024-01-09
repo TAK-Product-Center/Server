@@ -1,0 +1,192 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+  background-color: #FA787E;
+  }
+  input.ng-valid.ng-touched {
+  background-color: white;
+  }
+  .rowHeader {
+  text-align:right;
+  padding-right:5px;
+  width:200px;
+  vertical-align:top;
+  }
+  .rowValue {
+  width:400px;
+  text-align:right;
+  vertical-align:top;
+  }
+  .rowValue select {
+  width:100%;
+  }
+  .rowValue input {
+  width:400px;
+  }
+  .error {
+  color:red;
+  vertical-align:top;
+  }
+  table {
+  border-collapse: separate;
+  border-spacing:10px
+  }
+  .inlineHelp {
+  font:13px arial, sans-serif;
+  font-style:italic;
+  text-align:right;
+  color:green;
+  }
+</style>
+<div>
+  <h3>Edit Outgoing Connection</h3>
+  <div data-ng-show="serviceReportedMessages">
+    <ul>
+      <li class="error" data-ng-repeat="message in messages">{{message}}</li>
+    </ul>
+  </div>
+  <form name="outgoingConnectionForm" novalidate data-ng-submit="outgoingConnectionForm.$valid && saveOutgoingConnection()">
+    <table>
+      <tr>
+        <td sytle="border-bottom:1px solid black" colspan="2">
+          <table>
+            <tr>
+              <td class="rowHeader"><label for="name">*Display Name</label></td>
+              <td class="rowValue">
+                <input type="text" data-ng-model="modifiedOutgoing.displayName" name="displayName" required  maxlength="30" data-ng-pattern="/^[A-Za-z0-9_\s]+$/" data-ng-change="isDisplayNameUnique(modifiedOutgoing)"/>
+                <br/><span class="inlineHelp">Display name may contain upper and lower case letters, numbers, spaces and underscores up to 30 characters.</span>
+              </td>
+              <td class="error">
+                <span data-ng-show="outgoingConnectionForm.$submitted || outgoingConnectionForm.displayName.$touched">
+                <span data-ng-show="outgoingConnectionForm.displayName.$error.required">Display name is required</span>
+                <span data-ng-show="outgoingConnectionForm.displayName.$error.maxLength">Display Name must be between 1 and 30 characters</span>
+                <span data-ng-show="outgoingConnectionForm.displayName.$error.pattern">The Display Name may contain only upper and lower case letters, numbers, spaces and underscores</span>
+                <span data-ng-show="outgoingConnectionForm.displayNameDuplicate.$error.errorflagvalidation">The Display Name you've provided is already in use.</span>
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td class="rowHeader"><label for="group">*Address</label></td>
+              <td class="rowValue">
+                <input type="text" data-ng-model="modifiedOutgoing.address" required name="address" data-ng-pattern="/^[\w\d_\-\.]*$/"/>
+                <br/><span class="inlineHelp">Provide a valid hostname or IPv4 address.</span>
+              </td>
+              <td class="error">
+                <span data-ng-show="outgoingConnectionForm.$submitted || outgoingConnectionForm.address.$touched">
+                <span data-ng-show="outgoingConnectionForm.address.$error.required">Address is required. </span>
+                <span data-ng-show="outgoingConnectionForm.address.$error.pattern">Provide a valid hostname or IPv4 address.</span>
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td class="rowHeader"><label for="port">*Port</label></td>
+              <td class="rowValue">
+                <input type="number" data-ng-model="modifiedOutgoing.port" name="port" required min="1" max="65535" data-ng-pattern="/^[0-9]+$/"/>
+                <br/><span class="inlineHelp">Port must be an integer between 1 and 65535.</span>
+              </td>
+              <td class="error">
+                <span data-ng-show="outgoingConnectionForm.$submitted || outgoingConnectionForm.port.$touched">
+                <span data-ng-show="outgoingConnectionForm.port.$error.required">Port value is required. </span>
+                <span data-ng-show="outgoingConnectionForm.port.$error.min || outgoingConnectionForm.port.$error.max">Port value must be an integer between 1 and 65535. </span>
+                <span data-ng-show="outgoingConnectionForm.port.$error.number">Port value must be an integer. </span>
+                <span data-ng-show="outgoingConnectionForm.port.$error.pattern">Port value may only contain digits. </span>
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td class="rowHeader"><label for="reconnectInterval">*Reconnect Interval</label></td>
+              <td class="rowValue">
+                <input type="number" data-ng-model="modifiedOutgoing.reconnectInterval" name="reconnectInterval" required min="0" data-ng-pattern="/^[0-9]+$/"/>
+                <br/><span class="inlineHelp">The number of seconds between connection attempts. A value of 0 will disable automatic reconnect.</span>
+              </td>
+              <td class="error">
+                <span data-ng-show="outgoingConnectionForm.$submitted || outgoingConnectionForm.reconnectInterval.$touched">
+                <span data-ng-show="outgoingConnectionForm.reconnectInterval.$error.required">Reconnect Interval value is required. </span>
+                <span data-ng-show="outgoingConnectionForm.reconnectInterval.$error.min">Reconnect Interval must be be a positive integer. </span>
+                <span data-ng-show="outgoingConnectionForm.reconnectInterval.$error.number">Reconnect Interval must be an integer. </span>
+                <span data-ng-show="outgoingConnectionForm.reconnectInterval.$error.pattern">Reconnect Interval may only contain digits. </span>
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td class="rowHeader">
+                <label for="unlimtedRetries">Max Retries Unlimited</label>
+                <label for="maxRetries">Max Retries</label>
+              </td>
+              <td class="rowValue">
+                <input type="hidden" data-ng-model="modifiedOutgoing.maxRetriesFallbackError" errorflagvalidation name="fallbackHidden"/>
+                <input type="checkbox" data-ng-model="modifiedOutgoing.unlimitedRetries" name="unlimitedRetries" data-ng-change="checkMaxRetries(modifiedOutgoing)"/>
+                <input type="number" required
+                  data-ng-model="modifiedOutgoing.maxRetries"
+                  name="maxRetries"
+                  data-ng-pattern="/^[0-9]*$/"
+                  min="0"
+                  data-ng-change="checkMaxRetries(modifiedOutgoing)"
+                  data-ng-disabled="modifiedOutgoing.unlimitedRetries"/>
+                <br/><span class="inlineHelp">How many times to retry reconnecting before fallback or stopping. Checking</span>
+              </td>
+              <td class="error">
+                <span>
+                <span data-ng-show="outgoingConnectionForm.maxRetries.$error.required && !modifiedOutgoing.unlimitedRetries">Max Retries value is required.</span>
+                <span data-ng-show="outgoingConnectionForm.maxRetries.$error.min">Max Retries must be a non-negative integer</span>
+                <span data-ng-show="outgoingConnectionForm.maxRetries.$error.number">Max Retries must be an integer. </span>
+                <span data-ng-show="outgoingConnectionForm.maxRetries.$error.pattern">Max Retries may only contain digits.</span>
+                <span data-ng-show="outgoingConnectionForm.fallbackHidden.$error.errorflagvalidation">Max Retries must be finite if there is a fallback</span>
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td class="rowHeader"><label for="enabled">Enabled</label></td>
+              <td class="rowValue">
+                <select name="enabled" data-ng-model="modifiedOutgoing.enabled" required>
+                  <option ng-value="true">True</option>
+                  <option ng-value="false">False</option>
+                </select>
+              </td>
+              <td class="error">
+                <span data-ng-show="outgoingConnectionForm.$submitted || outgoingConnectionForm.enabled.$touched">
+                <span data-ng-show="outgoingConnectionForm.enabled.$error.required">The Enabled flag must be set.</span>
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td class="rowHeader"><label for="protocolVersion">Protocol Version</label></td>
+              <td class="rowValue">
+                <select name="protocolVersion" data-ng-model="modifiedOutgoing.protocolVersion" required>
+                  <option ng-value="2">2 - 1.3.11 and Later (Federated Data Sync Support)</option>
+                  <option ng-value="1">1 - 1.3.10 and Earlier (Legacy Protocol)</option>
+                </select>
+              </td>
+              <td class="error">
+                <span data-ng-show="outgoingConnectionForm.$submitted || outgoingConnectionForm.protocolVersion.$touched">
+                <span data-ng-show="outgoingConnectionForm.protocolVersion.$error.required">The protocol flag must be set.</span>
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td class="rowHeader"><label for="fallback">Fallback Connection</label></td>
+              <td class="rowValue">
+                <select name="fallback"
+                  data-ng-model="modifiedOutgoing.fallback"
+                  data-ng-change="removeFallbacks(modifiedOutgoing)"
+                  data-ng-disabled="modifiedOutgoing.fallback === 'create_new_fallback_connection'">
+                  <option value= >No Fallback</option>
+                  <option data-ng-repeat="og in allOutgoingConnections" data-ng-value="og.displayName">{{ og.displayName }}</option>
+                </select>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    <table>
+      <tr>
+        <td style="text-align:right;">*Required</td>
+        <td style="padding:10px;" align="right">
+          <input type="button" data-ng-click="cancel()" value="Cancel" />&nbsp;
+          <input type="submit" value="Save" data-ng-disabled="submitInProgress" />
+        </td>
+        <!-- <td>&nbsp;</td> -->
+      </tr>
+    </table>
+  </form>
+</div>

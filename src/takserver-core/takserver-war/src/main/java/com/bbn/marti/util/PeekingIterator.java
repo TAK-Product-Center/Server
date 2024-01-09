@@ -78,7 +78,8 @@ public class PeekingIterator<E> implements Iterator<E> {
     if (getIter().hasNext()) {
       head = getIter().next();
       valid = true;
-    } else
+    } else {
       valid = false;
+    }
   }
 }

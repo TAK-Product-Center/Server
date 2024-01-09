@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -47,6 +49,8 @@ public class MessageDeliveryStrategy extends MessageBaseStrategy<CotEventContain
 		currentThreshold = Metrics.gauge(Constants.METRIC_WRITE_ACTIVE_RATE_LIMIT_THRESHOLD, new AtomicInteger(-1)); // default to no rate limit threshold
 
 		// TODO make this adaptive based on memory size
+		CoreConfig config = CoreConfigFacade.getInstance();
+
 		maxCacheSize = config.getRemoteConfiguration().getBuffer().getQueue().getMessageTimestampCacheSizeItems();
 		
 		if (config.getRemoteConfiguration().getFilter() == null) {
@@ -94,7 +98,7 @@ public class MessageDeliveryStrategy extends MessageBaseStrategy<CotEventContain
 		
 		// populate rate limit table
 		// this table is used for rapid lookup of rate limits when client counts change
-		for (RateLimitRule rule : config.getRemoteConfiguration().getFilter().getQos().getDeliveryRateLimiter().getRateLimitRule()) {
+		for (RateLimitRule rule : CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getQos().getDeliveryRateLimiter().getRateLimitRule()) {
 			rateLimits.put(rule.getClientThresholdCount(), rule.getReportingRateLimitSeconds());
 			rateThresholds.add(rule.getClientThresholdCount());
 			
@@ -180,7 +184,7 @@ public class MessageDeliveryStrategy extends MessageBaseStrategy<CotEventContain
 
 	@Override
 	public String toString() {
-		return "MessageDeliveryStrategy [config=" + config + ", cache=" + cache() + ", maxCacheSize=" + maxCacheSize + "]";
+		return "MessageDeliveryStrategy [cache=" + cache() + ", maxCacheSize=" + maxCacheSize + "]";
 	}
 
 	@Override

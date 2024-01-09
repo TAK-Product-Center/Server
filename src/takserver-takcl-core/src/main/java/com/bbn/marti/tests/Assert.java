@@ -9,7 +9,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import static com.bbn.marti.takcl.connectivity.missions.MissionModels.*;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ApiListResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ApiSetResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ApiSingleResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.EnterpriseSyncUploadResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.Mission;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionChange;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.RecursiveMetadata;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ResponseWrapper;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.SubscriptionData;
 
 public class Assert {
 

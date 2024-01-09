@@ -14,26 +14,28 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletInputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.Part;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletInputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import com.bbn.marti.ValidatorUtils;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.sync.Metadata.Field;
 import com.google.common.base.Strings;
 
 /**
  * Servlet that accepts POST requests (only) to upload mission packages to the
- * Enterprise Sync database. 
- * 
+ * Enterprise Sync database.
+ *
  * path: /Marti/sync/missionupload
  *
  */
@@ -41,28 +43,29 @@ public class MissionPackageUploadServlet extends UploadServlet {
 	public static final String SIZE_LIMIT_VARIABLE_NAME = "EnterpriseSyncSizeLimitMB";
 	private static final long serialVersionUID = -1782550124681449153L;
 	private static final String MISSION_PACKAGE_KEYWORD = "missionpackage";
-	private static final String TAG = "Mission Package Upload Servlet: ";	
+	private static final String TAG = "Mission Package Upload Servlet: ";
 	private static Set<String> optionalParameters = new HashSet<String>();
 	private static Set<String> requiredParameters = new HashSet<String>();
 
-	@Autowired
-	private CoreConfig coreConfig;
 
 	private static final org.slf4j.Logger logger = LoggerFactory.getLogger(MissionPackageUploadServlet.class);
 
 	static {
 		// static initializer for all required parameters
 		requiredParameters = new HashSet<String>(PostParameter.values().length);
-		requiredParameters.add("filename");
+		requiredParameters.add(PostParameter.FILENAME.getParameterString());
 
-		optionalParameters.add(Metadata.Field.CreatorUid.toString());
-		optionalParameters.add(Metadata.Field.Tool.toString());
-		optionalParameters.add(Metadata.Field.Hash.toString());
+		// clients may send a locally computed hash value that is ignored by TAK server
+		optionalParameters.add("hash");
+		optionalParameters.add(PostParameter.MIMETYPE.getParameterString());
+		optionalParameters.add(PostParameter.KEYWORD.getParameterString());
+		optionalParameters.add(PostParameter.TOOL.getParameterString());
+		optionalParameters.add(PostParameter.CREATORUID.getParameterString());
 	}
 	/**
 	 * Required parameter enum for posting a mission package.
 	 * the parameter string is the expected URL argument. The metadata field is where the parameter gets mapped to.
-	 * 
+	 *
 	 * A request is queried by iterating over all of the parameter strings in the enum, and emplacing the param value into the metadata field.
 	 * @note One of the parameters MUST map to a metdata uid field - getUid() is used to query the database for potential collisions.
 	 */
@@ -76,7 +79,7 @@ public class MissionPackageUploadServlet extends UploadServlet {
 		private final String param; // string value of the param
 		private final Metadata.Field field; // metadata field that this param is entered into
 		private final boolean comp; // flag for indicating whether the param is to be used for distinguishing db-entries
-		private final String defaultValue; // value to be used for the db entry if a parameter is not given 
+		private final String defaultValue; // value to be used for the db entry if a parameter is not given
 
 		// protected constructor
 		PostParameter(String paramName, Metadata.Field metaField, boolean dbComparisonKey, String defaultValue) {
@@ -114,7 +117,7 @@ public class MissionPackageUploadServlet extends UploadServlet {
 	public void init(final ServletConfig config) throws ServletException {
 		super.init(config);
 
-		uploadSizeLimitMB = coreConfig.getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
+		uploadSizeLimitMB = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
 
 		logger.info("Enterprise Sync upload limit is " + uploadSizeLimitMB + " MB");
 
@@ -133,7 +136,7 @@ public class MissionPackageUploadServlet extends UploadServlet {
 	}
 
 	@Override
-	public void doPost(HttpServletRequest request, HttpServletResponse response) 
+	public void doPost(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
 
 		String groupVector = null;
@@ -157,9 +160,8 @@ public class MissionPackageUploadServlet extends UploadServlet {
 
 			// validate all parameters -- enforces required/optional parameter presence, throws an exception if invalid
 			if (validator != null) {
-				validator.assertValidHTTPRequestParameterSet("Mission package upload", request,
-						requiredParameters,
-						optionalParameters);
+				ValidatorUtils.assertValidHTTPRequestParameterSet("Mission package upload", request.getParameterMap().keySet(), requiredParameters,
+						optionalParameters, validator);
 			}
 
 			InputStream payloadInputStream = null ;
@@ -237,17 +239,23 @@ public class MissionPackageUploadServlet extends UploadServlet {
 
 			// insert row in resource as stream, and use hash as uid (calculated by database)
 			metadataResult = enterpriseSyncService.insertResourceStreamUID(requestMetadata, payloadInputStream, groupVector, false);
-			
+
 			if (logger.isDebugEnabled()) {
 				logger.debug("result hash: " + metadataResult.getHash() + " uid: " + metadataResult.getUid());
 			}
-			
-			// if plugin classname is set, notify the plugin with the file upload event. The notification event will include the Metadata object and will not include the full byte[] payload.
-			String pluginClassnames[] = paramsMap.get(Metadata.Field.PluginClassName.name());
-			if (pluginClassnames != null) {
-				String pluginClassname = pluginClassnames[0]; // To be consistent with UploadServlet where we allow only 1 pluginClassname
-				logger.info("Notifying the plugin {} with file upload event", pluginClassname);
-				pluginManager.onFileUpload(pluginClassname, requestMetadata);
+
+			try {
+				// Notify plugins about the file upload event. The notification event will include the Metadata object and will not include the full byte[] payload.
+				String pluginClassname = null;
+				String pluginClassnames[] = paramsMap.get(Metadata.Field.PluginClassName.name());
+				if (pluginClassnames != null) {
+					pluginClassname = pluginClassnames[0];
+					logger.info("Notifying the plugin {} with file upload event", pluginClassname);
+				}
+
+				pluginManager.onFileUpload(pluginClassname, metadataResult);
+			} catch (Exception e) {
+				logger.error("exception calling pluginManager.onFileUpload", e);
 			}
 
 			// retrieve host name from request

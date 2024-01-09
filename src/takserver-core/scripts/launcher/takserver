@@ -33,6 +33,7 @@ TAK_HOME=/opt/tak
 case "$1" in
      start)
         echo -n "Starting $SERVICE: "
+		    service takserver-config start
 		    service takserver-messaging start
 		    service takserver-api start
 		    service takserver-plugins start
@@ -41,6 +42,7 @@ case "$1" in
     ;;
     stop)
         echo -n "Shutting down $SERVICE: "
+		    service takserver-config stop
     		service takserver-messaging stop
 		    service takserver-api stop
 		    service takserver-plugins stop
@@ -50,6 +52,14 @@ case "$1" in
     ;;
     status)
         RETVAL=0
+        TAK_PID=`pgrep -f "spring.profiles.active=config"`
+        if [ $? -eq 0 ] ; then
+            echo "takserver-config is running with pid ${TAK_PID}"
+        else
+            echo "takserver-config is not running."
+            RETVAL=1
+        fi
+
         TAK_PID=`pgrep -f "spring.profiles.active=messaging"`
         if [ $? -eq 0 ] ; then
             echo "takserver-messaging is running with pid ${TAK_PID}"

@@ -11,7 +11,6 @@ jar {
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
-apply plugin: 'io.spring.dependency-management'
 
 test {
   testLogging.showStandardStreams = true
@@ -56,19 +55,20 @@ dependencies {
   implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
   implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
 
-  // exclude from actuator
   implementation ("org.springframework.boot:spring-boot-starter-actuator:$spring_boot_version") {
     exclude group: 'org.apache.logging.log4j'
     exclude group: 'org.slf4j', module: 'log4j-over-slf4j'
   }
 
   implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
-  implementation group: 'org.springframework', name: 'spring-context'
-
+  implementation group: 'org.springframework', name: 'spring-context', version: spring_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-cache', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-mongodb', version: spring_boot_version
+  api group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeine_version
 
   testImplementation group: 'junit', name: 'junit', version: junit_version
   testImplementation group: 'org.mockito', name: 'mockito-core', version: mockito_version
-  testImplementation("org.springframework.boot:spring-boot-starter-test") {
+  testImplementation("org.springframework.boot:spring-boot-starter-test:$spring_boot_version") {
     exclude group: "com.vaadin.external.google", module:"android-json"
   }
 

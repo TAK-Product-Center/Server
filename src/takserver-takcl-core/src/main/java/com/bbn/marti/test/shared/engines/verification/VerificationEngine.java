@@ -24,12 +24,32 @@ import com.bbn.marti.tests.Assert;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static com.bbn.marti.takcl.connectivity.missions.MissionModels.*;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.EXCEPTION_NOT_NULL;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.EnterpriseSyncUploadResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MISSIONCHANGE_SERVERTIME_PATTERN;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MISSIONCHANGE_TIMESTAMP_PATTERN;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MISSION_GROUPS_PATTERN;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MISSION_UIDS_PATTERN;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MISSION_UID_TIMESTAMPS_PATTERN;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.Mission;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionChange;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionContentDataContainer;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionUserPermission;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionUserRole;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ResponseWrapper;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.SubscriptionData;
 import static com.bbn.marti.tests.Assert.SampleObjects;
 
 /**

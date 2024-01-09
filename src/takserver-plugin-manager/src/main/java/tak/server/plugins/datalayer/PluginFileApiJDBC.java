@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,10 +22,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.Cache.ValueWrapper;
 
-import com.bbn.marti.remote.CoreConfig;
-import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.config.Cluster;
-import com.google.common.base.Strings;
 
 import tak.server.Constants;
 
@@ -40,19 +38,15 @@ public class PluginFileApiJDBC{
 	@Autowired
 	private CacheManager cacheManager;
 	
-	private CoreConfig coreConfig;
-	private Cluster clusterConfig;
 	private boolean esyncEnableCache = false;
 
-	
-	public PluginFileApiJDBC(CoreConfig coreConfig) {
-		
-		clusterConfig = coreConfig.getRemoteConfiguration().getCluster();
-		
+
+	public PluginFileApiJDBC() {
+
 		// 0 means false, disable esync cache
-		if (coreConfig.getRemoteConfiguration().getNetwork().getEsyncEnableCache() == 0) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEsyncEnableCache() == 0) {
 			esyncEnableCache = false;
-		} else if (coreConfig.getRemoteConfiguration().getNetwork().getEsyncEnableCache() > 0) {
+		} else if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEsyncEnableCache() > 0) {
 			// positive value means true, enable cache
 			esyncEnableCache = true;
 		} else {
@@ -141,6 +135,7 @@ public class PluginFileApiJDBC{
 	}
 	
 	private boolean isCacheEsync() {
+		Cluster clusterConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster();
 		return esyncEnableCache || (clusterConfig.isEnabled() && clusterConfig.isKubernetes());
 	}
 

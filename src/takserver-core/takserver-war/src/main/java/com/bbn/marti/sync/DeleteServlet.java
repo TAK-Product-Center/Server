@@ -13,9 +13,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.errors.IntrusionException;
@@ -136,7 +136,7 @@ public class DeleteServlet extends EnterpriseSyncServlet {
 				    // delete by primary key
 				    enterpriseSyncService.delete(toDelete, groupVector);
 				} else {
-					if(log.isLoggable(Level.FINEST)) {
+					if (log.isLoggable(Level.FINEST)) {
 						log.finest("delete by hash" + StringUtils.normalizeSpace(hash));
 					}
 				    // delete by hash

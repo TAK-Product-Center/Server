@@ -5,36 +5,39 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
 import javax.naming.InvalidNameException;
-import javax.servlet.http.HttpServletResponse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.AuthenticationUserDetailsService;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 
+import jakarta.servlet.http.HttpServletResponse;
 import tak.server.federation.hub.ui.jwt.UserService;
 import tak.server.federation.hub.ui.manage.AuthManager;
 import tak.server.federation.hub.ui.manage.AuthorizationFileWatcher;
 
+@Configuration
 @EnableWebSecurity
-public class SecurityConfig extends WebSecurityConfigurerAdapter {
+public class SecurityConfig {
 	private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
-	@Autowired
-	private UserService userService;
+//	@Autowired
+//	private UserService userService;
 
 	@Autowired
 	private JwtTokenFilter jwtTokenFilter;
@@ -42,22 +45,33 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 	@Autowired
 	private AuthorizationFileWatcher authFileWatcher;
 
-	@Override
-	protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-		auth.userDetailsService(username -> {
-			return userService.loadUserByUsername(username);
-		});
+//	@Override
+//	protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+//		auth.userDetailsService(username -> {
+//			return userService.loadUserByUsername(username);
+//		});
+//	}
+	
+	@Bean
+	public AuthenticationManager authenticationManager(UserService userService) {
+		
+		 DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
+		 authenticationProvider.setUserDetailsService(userService);
+		 return new ProviderManager(authenticationProvider);
 	}
 
-	@Override
-	protected void configure(HttpSecurity http) throws Exception {
+	@Bean
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+		
 		http.csrf().disable();
 		
 		http.x509().authenticationUserDetailsService(new X509AuthenticatedUserDetailsService());
 
 		http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.ALWAYS);
 
-		http.authorizeRequests().antMatchers("/error","/oauth/**", "/login**", "/login/**", "/bowerDependencies/**", "/favicon.ico").permitAll()
+//		http.authorizeRequests().antMatchers("/error","/oauth/**", "/login**", "/login/**", "/bowerDependencies/**", "/favicon.ico").permitAll()
+//			.anyRequest().authenticated();
+		http.authorizeHttpRequests().requestMatchers("/error","/oauth/**", "/login**", "/login/**", "/bowerDependencies/**", "/favicon.ico").permitAll()
 			.anyRequest().authenticated();
 
 		http.exceptionHandling().authenticationEntryPoint((request, response, ex) -> {
@@ -65,14 +79,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 		});
 
 		http.addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class);
+		
+		return http.build();
 	}
-
-	@Override
-	@Bean
-	public AuthenticationManager authenticationManagerBean() throws Exception {
-		return super.authenticationManagerBean();
-	}
-
+	
 	private class X509AuthenticatedUserDetailsService implements AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken> {
 
 		@Override

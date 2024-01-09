@@ -23,20 +23,11 @@
       </div>
     </div>
     <div class="form-group">
-      <label for="federationVersion">Federation Version</label>
-      <input type="text" name="federationVersion" class="form-control" ng-model="workflow.version" />
-    </div>
-    <div class="form-group">
-      <label for="federationType">Federation Type</label>
-      <input type="text" name="federationType" class="form-control" ng-model="workflow.type" />
-    </div>
-    <div class="form-group">
       <label for="workflowDescription">Diagram Description</label>
       <input type="text" name="workflowDescription" class="form-control" ng-model="workflow.description" />
     </div>
     <div class="modal-footer">
       <button class="btn btn-primary" type="submit" value="Submit" ng-disabled="workflowForm.$invalid">OK</button>
-      <button class="btn btn-info" type="button" ng-click="useActivePolicy()">Use Active Policy</button>
       <button class="btn btn-warning" type="button" ng-click="cancel()">Cancel</button>
     </div>
   </form>

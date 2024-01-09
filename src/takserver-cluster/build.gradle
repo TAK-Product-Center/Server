@@ -51,12 +51,14 @@ task moveCoreConfig(type: Copy) {
     dependsOn copyClusterProperties
     dependsOn copyClusterConfig
     from project(':takserver-cluster').file('build/takserver-core/CoreConfig.xml')
+    from project(':takserver-cluster').file('build/takserver-core/TAKIgniteConfig.xml')
     into "$buildDir"
 }
 
 task deleteCoreConfig(type: Delete) {
     dependsOn moveCoreConfig
     delete project(':takserver-cluster').file('build/takserver-core/CoreConfig.xml')
+    delete project(':takserver-cluster').file('build/takserver-core/TAKIgniteConfig.xml')
 }
 
 task copyDockerFiles(type: Copy) {

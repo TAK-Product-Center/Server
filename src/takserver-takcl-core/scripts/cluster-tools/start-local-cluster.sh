@@ -7,6 +7,7 @@ MK_DRIVER=docker # or docker, kvm2, virtualbox, qemu, etc. See https://minikube.
 MK_CPU_COUNT=12
 MK_MEMORY=16g
 DOCKER_REGISTRY_PORT=4000
+ENABLE_INGRES=false
 
 if [[ "${TAKCL_SERVER_POSTGRES_PASSWORD}" == "" ]];then
 	echo Please set the environment variable TAKCL_SERVER_POSTGRES_PASSWORD to a password to use this script!
@@ -134,6 +135,9 @@ build_docker() {
 	docker build -t ${PUBLISH_REPO}/takserver-base:${TAG} -f docker-files/Dockerfile.takserver-base .
 	docker push ${PUBLISH_REPO}/takserver-base:${TAG}
 
+	docker build -t ${PUBLISH_REPO}/takserver-config:${TAG} -f docker-files/Dockerfile.takserver-config --build-arg TAKSERVER_IMAGE_REPO=${PUBLISH_REPO}/takserver-base --build-arg TAKSERVER_IMAGE_TAG=${TAG} .
+	docker push ${PUBLISH_REPO}/takserver-config:${TAG}
+
 	docker build -t ${PUBLISH_REPO}/takserver-messaging:${TAG} -f docker-files/Dockerfile.takserver-messaging --build-arg TAKSERVER_IMAGE_REPO=${PUBLISH_REPO}/takserver-base --build-arg TAKSERVER_IMAGE_TAG=${TAG} .
 	docker push ${PUBLISH_REPO}/takserver-messaging:${TAG}
 
@@ -155,6 +159,7 @@ update_core_config() {
 	pushd ${CLUSTER_DIR}
 	if [[ ! -f CoreConfig.default.xml ]];then
 		cp CoreConfig.xml CoreConfig.default.xml
+		cp TAKIgniteConfig.xml TAKIgniteConfig.default.xml
 	fi
 
 	sed "s/DB_URL_PLACEHOLDER/jdbc:postgresql:\/\/${EXTERNAL_IP}:5432\/cot/g" CoreConfig.default.xml > CoreConfig.xml
@@ -175,16 +180,18 @@ deploy_local() {
 	# Start up a new minikube container
 	${MINIKUBE} stop || true
 	${MINIKUBE} delete || true
-	${MINIKUBE} start --memory=${MK_MEMORY} --cpus=${MK_CPU_COUNT} --kubernetes-version=${K8S_VERSION} --insecure-registry=${EXTERNAL_IP}:${DOCKER_REGISTRY_PORT} --driver=${MK_DRIVER}
-#	${MINIKUBE} addons enable ingress
-#	${KUBECTL} patch deployment -n ingress-nginx ingress-nginx-controller --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value":"--enable-ssl-passthrough"}]'  
-
+	${MINIKUBE} start --memory=${MK_MEMORY} --cpus=${MK_CPU_COUNT} --kubernetes-version=${K8S_VERSION} --insecure-registry=${EXTERNAL_IP}:${DOCKER_REGISTRY_PORT} --driver=${MK_DRIVER} --apiserver-port 9210
+	if [[ "${ENABLE_INGRESS}" == "true" ]];then
+		${MINIKUBE} addons enable ingress
+		${KUBECTL} patch deployment -n ingress-nginx ingress-nginx-controller --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value":"--enable-ssl-passthrough"}]'  
+	fi
 
 	# Crate the custom certificate store. Make sure admin.pem exists to ensure the admin user is activated and startup completes successfully!
 	${KUBECTL} create configmap cert-migration --from-file=${TAKSERVER_CERT_SOURCE} --dry-run=client -o yaml > deployments/helm/templates/cert-migration.yaml
 
 	update_core_config
 
+	${KUBECTL} create configmap tak-ignite-config --from-file=${CLUSTER_DIR}/TAKIgniteConfig.xml --dry-run=client -o yaml > deployments/helm/templates/tak-ignite-config.yaml
 	${KUBECTL} create configmap core-config --from-file=${CLUSTER_DIR}/CoreConfig.xml --dry-run=client -o yaml > deployments/helm/templates/core-config.yaml
 	if [[ -f readiness.py ]];then
 		${KUBECTL} create configmap readiness-config --from-file=readiness.py --dry-run=client -o yaml > deployments/helm/templates/readiness-config.yaml
@@ -232,6 +239,19 @@ delete_local_images() {
 }
 
 
+setup_ingress() {
+	if [[ "${ENABLE_INGRESS}" == "true" ]];then
+		${KUBECTL} apply -f minikube-ingress-loadbalancer.yaml
+		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"8443":"takserver/takserver-api-service:8443"}}'
+		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"8444":"takserver/takserver-api-service:8444"}}'
+		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"8446":"takserver/takserver-api-service:8446"}}'
+		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"8089":"takserver/takserver-messaging-service:8090"}}'
+		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"9000":"takserver/takserver-messaging-service:9000"}}'
+		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"9001":"takserver/takserver-messaging-service:9001"}}'
+		${KUBECTL} patch deployment ingress-nginx-controller -n ingress-nginx --patch "$(cat minikube-ingress-patch.yaml)"
+	fi
+}
+
 if [[ "${1}" == "--remove-local-images" ]];then
 	delete_local_images ${2} ${3}
 	exit 0
@@ -247,4 +267,4 @@ update_core_config
 build_docker
 get_dependencies
 deploy_local
-${KUBECTL} config set-context --current --namespace=takserver
+setup_ingress

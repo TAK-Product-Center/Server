@@ -1,7 +1,7 @@
 package com.bbn.marti.util.spring;
 
-import javax.servlet.ServletRequest;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 public class ThreadLocalRequestHolder {
 	

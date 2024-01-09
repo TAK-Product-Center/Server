@@ -3,14 +3,13 @@ package com.bbn.marti.service;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.rmi.RemoteException;
 import java.sql.SQLException;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import javax.activation.MimetypesFileTypeMap;
+import jakarta.activation.MimetypesFileTypeMap;
 import javax.naming.NamingException;
 
 import org.apache.commons.io.FilenameUtils;
@@ -26,7 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.socket.MissionPackageEntry;
 import com.bbn.marti.remote.socket.MissionPackageMessage;
@@ -39,6 +37,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 import tak.server.messaging.Messenger;
 
@@ -60,9 +59,6 @@ public class MissionPackageExtractor {
 
 	@Autowired
 	private Messenger<TakMessage> takMessenger;
-
-	@Autowired
-	private CoreConfig coreConfig;
 
 	public void missionPackageFromCot(CotEventContainer cot, NavigableSet<Group> groups) {
 
@@ -192,7 +188,7 @@ public class MissionPackageExtractor {
 	}
 
 	private void loadSizeLimit() {
-		autoExtractSizeLimitMB = coreConfig.getRemoteConfiguration().getNetwork().getMissionPackageAutoExtractSizeLimitMB();
+		autoExtractSizeLimitMB = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getMissionPackageAutoExtractSizeLimitMB();
 
 		autoExtractSizeLimitBytes = ((long) autoExtractSizeLimitMB) * 1000000L;
 	}

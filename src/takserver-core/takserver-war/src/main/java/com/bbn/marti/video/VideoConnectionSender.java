@@ -13,10 +13,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.Part;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
@@ -27,7 +27,7 @@ import com.bbn.marti.EsapiServlet;
 import com.bbn.marti.remote.SubmissionInterface;
 import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.util.CommonUtil;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 
 //@WebServlet("/vcs/*")
@@ -78,10 +78,10 @@ public class VideoConnectionSender extends EsapiServlet {
     private static String[] getContacts(HttpServletRequest request) throws IOException, ServletException {
 	    // Get the list of people to send an advertisement to (OPTIONAL)
     	String[] contacts = request.getParameterValues("contacts");
-    	if(contacts == null || contacts.length == 0) {
+    	if (contacts == null || contacts.length == 0) {
     		List<String> contactList = new LinkedList<String>();
     			for(Part part : request.getParts()) {
-    				if(part.getName().equalsIgnoreCase("contacts")) {
+    				if (part.getName().equalsIgnoreCase("contacts")) {
     					try(InputStream in = part.getInputStream()) {
 							StringWriter writer = new StringWriter();
 							IOUtils.copy(in, writer);

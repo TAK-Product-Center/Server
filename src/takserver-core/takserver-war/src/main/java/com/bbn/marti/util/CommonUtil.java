@@ -21,9 +21,10 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import javax.xml.transform.stream.StreamResult;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.owasp.esapi.Validator;
@@ -60,8 +61,8 @@ import tak.server.Constants;
 
 /*
  * Shared utility functions
- * 
- * 
+ *
+ *
  */
 public class CommonUtil {
 
@@ -80,9 +81,6 @@ public class CommonUtil {
 	private Marshaller marshaller;
 
 	@Autowired
-	private CoreConfig config;
-
-	@Autowired
 	private Validator validator;
 
 
@@ -99,7 +97,7 @@ public class CommonUtil {
 
 	/*
 	 * Get the group set for the authenticated for an active HttpServletRequest
-	 * 
+	 *
 	 */
 	public NavigableSet<Group> getGroupsFromRequest(HttpServletRequest request) {
 		try {
@@ -112,7 +110,7 @@ public class CommonUtil {
 	/*
 	 * Get the group vector corresponding to the authenticated for the currently
 	 * active HttpServletRequest
-	 * 
+	 *
 	 */
 	public NavigableSet<Group> getGroupsFromActiveRequest() {
 
@@ -128,7 +126,7 @@ public class CommonUtil {
 	/*
 	 * Get the group vector corresponding to the authenticated for the currently
 	 * active HttpServletRequest
-	 * 
+	 *
 	 */
 	public NavigableSet<Group> getGroupsFromSessionId(String sessionId) throws RemoteException {
 
@@ -194,7 +192,7 @@ public class CommonUtil {
 			groups = groupManager.getGroupsByConnectionId(sessionId);
 		}
 
-		if (!config.getRemoteConfiguration().getAuth().isX509UseGroupCache()) {
+		if (!CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509UseGroupCache()) {
 			if (groups.isEmpty()) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("no federate or user groups - using default __ANON__ group");
@@ -231,7 +229,7 @@ public class CommonUtil {
 
 		return getUserClassificationFromSessionId(requestBean.getRequest().getSession().getId());
 	}
-	
+
 	public UserClassification getUserClassificationFromRequest(HttpServletRequest request) throws RemoteException {
 
 		if (request == null) {
@@ -249,14 +247,14 @@ public class CommonUtil {
 
 	/*
 	 * Get the user from the currently active HttpServletRequest
-	 * 
+	 *
 	 */
 	public User getUserFromActiveRequest() throws RemoteException {
 
 		return groupManager.getUserByConnectionId(requestBean.getRequest().getSession().getId());
 	}
-	
-	
+
+
 
 	/*
 	 * Get the group vector corresponding to the authenticated for the currently
@@ -408,7 +406,7 @@ public class CommonUtil {
 		StringBuilder marti = parseAddresses(chat, added);
 		String randomUUID = UUID.randomUUID().toString();
 		String sendCallsign;
-		if(Strings.isNullOrEmpty(chat.getSenderCallsign())){
+		if (Strings.isNullOrEmpty(chat.getSenderCallsign())){
 			sendCallsign = uid;
 		}
 		else{
@@ -454,7 +452,7 @@ public class CommonUtil {
 		AtomicInteger added = new AtomicInteger(0);
 		StringBuilder marti = parseAddresses(chat, added);
 		String sendCallsign;
-		if(Strings.isNullOrEmpty(chat.getSenderCallsign())){
+		if (Strings.isNullOrEmpty(chat.getSenderCallsign())){
 			sendCallsign = uid;
 		}
 		else{
@@ -475,17 +473,17 @@ public class CommonUtil {
 		result += "<remarks time='" + time + "' source='" + uid + "'>" + chat.getBody() + "</remarks>";
 		result += "</detail>"
 				+ "</event>";
-		return result;   	
+		return result;
 	}
 
 	public String getSpecialChatroom(ChatMessage chatMessage){
 		for(String address : chatMessage.getAddresses()){
 			SimpleEntry<String, String> entry = resolveChatAddress(address);
-			if(entry.getKey().equals("chatroom")){
-				if(entry.getValue().equalsIgnoreCase(SpecialChatrooms.ALL_STREAMING.name)){
+			if (entry.getKey().equals("chatroom")){
+				if (entry.getValue().equalsIgnoreCase(SpecialChatrooms.ALL_STREAMING.name)){
 					return SpecialChatrooms.ALL_STREAMING.name;
 				}
-				else if(entry.getValue().equalsIgnoreCase(SpecialChatrooms.ALL_CHAT.name)){
+				else if (entry.getValue().equalsIgnoreCase(SpecialChatrooms.ALL_CHAT.name)){
 					return SpecialChatrooms.ALL_CHAT.name;
 				}
 			}
@@ -495,7 +493,7 @@ public class CommonUtil {
 	public boolean isAllStreamingChat(ChatMessage chat) {
 		for(String address : chat.getAddresses()) {
 			SimpleEntry<String, String> entry = resolveChatAddress(address);
-			if(entry.getKey().equals("chatroom") && entry.getValue().toLowerCase(Locale.ENGLISH).equals("all streaming")) {
+			if (entry.getKey().equals("chatroom") && entry.getValue().toLowerCase(Locale.ENGLISH).equals("all streaming")) {
 				return true;
 			}
 		}
@@ -525,37 +523,37 @@ public class CommonUtil {
 			result += marti.toString();
 		}
 
-		if(sa.getCallsign() != null) {
+		if (sa.getCallsign() != null) {
 			result += "<contact callsign='"+sa.getCallsign() + "' ";
-			if(sa.getPhoneNumber() != null) {
+			if (sa.getPhoneNumber() != null) {
 				result += "phone='" + sa.getPhoneNumber() + "' ";
 			}
-			if(sa.getTakv() != null) {
+			if (sa.getTakv() != null) {
 				result += "endpoint='*:-1:stcp' ";
 			}
 			result += "/>";
 		}
-		if(sa.getGroup() != null) {
+		if (sa.getGroup() != null) {
 			result += "<__group name='" + sa.getGroup() + "' role='" + sa.getRole() + "'/>";
 		}
-		if(sa.getTakv() != null) {
+		if (sa.getTakv() != null) {
 			String platform = sa.getTakv().split(":")[0];
 			String version = sa.getTakv().split(":")[1];
 			result += "<takv platform='" + platform + "' version='" + version + "'/>";
 		}
-		if(sa.getIconsetPath() != null) {
+		if (sa.getIconsetPath() != null) {
 			result += "<usericon iconsetpath='" + sa.getIconsetPath() + "'/>";
 		}
-		if(sa.getColor() != null) {
+		if (sa.getColor() != null) {
 			result += "<color argb='" + sa.getColor() + "' />";
 		}
-		if(sa.getPersistent() != null) {
+		if (sa.getPersistent() != null) {
 			result += "<archive>" + sa.getPersistent() + "<archive>";
 		}
-		if(sa.getRemarks() != null) {
+		if (sa.getRemarks() != null) {
 			result += "<remarks>" + sa.getRemarks() + "</remarks>";
 		}
-		if(sa.getDetailJson() != null && !sa.getDetailJson().equals("")) {
+		if (sa.getDetailJson() != null && !sa.getDetailJson().equals("")) {
 			String detailJson = sa.getDetailJson();
 			//Recursively build XML details
 			result += recursiveXMLDetailBuilder(new JSONObject(detailJson));
@@ -568,7 +566,7 @@ public class CommonUtil {
 
 	private String recursiveXMLDetailBuilder(JSONObject obj) {
 		StringBuilder sb = new StringBuilder();
-		if(obj.names() != null) {
+		if (obj.names() != null) {
 			for (int i = 0; i < obj.names().length(); i++) {
 				String key = obj.names().getString(i);
 				if (obj.optJSONArray(key) != null) {
@@ -590,7 +588,7 @@ public class CommonUtil {
 		List<String> subStrings = new ArrayList<>();
 		sb.append("<" + key);
 		//Special case for LineStyle and PolyStyle for ATAK
-		if(key.equalsIgnoreCase("LineStyle") || key.equalsIgnoreCase("PolyStyle")){
+		if (key.equalsIgnoreCase("LineStyle") || key.equalsIgnoreCase("PolyStyle")){
 			sb.append(">");
 			for(int i = 0; i < obj.names().length(); i++){
 				String name = obj.names().getString(i);

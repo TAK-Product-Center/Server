@@ -157,6 +157,9 @@ chmod 755 /opt/tak/utils
 mkdir -p /opt/tak/logs
 chown tak:tak /opt/tak/logs
 chmod 755 /opt/tak/logs
+if [ -f "/opt/tak/TAKIgniteConfig.xml" ]; then
+    chown -f tak:tak /opt/tak/TAKIgniteConfig.xml 2>/dev/null
+fi
 if [ -f "/opt/tak/CoreConfig.xml" ]; then
     chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
 fi
@@ -215,7 +218,6 @@ if [ -f /etc/debian_version ]; then
     sh /opt/tak/setup-for-extracted-war.sh
 fi
 
-
 sudo /opt/tak/db-utils/takserver-setup-db.sh
 
 echo "By default, TAK Server requires a keystore and truststore (X.509 certificates). Follow the instructions in Appendix B of the configuration guide to create these certificates."
@@ -261,8 +263,10 @@ prePackage.dependsOn copyCoreConfigExample
 prePackage.dependsOn copyCoreScripts
 prePackage.dependsOn copyDbScripts
 prePackage.dependsOn copyDocs
+prePackage.dependsOn copySwagger
 prePackage.dependsOn copyPolicy
 prePackage.dependsOn copyLicense
+prePackage.dependsOn copyConfigScripts
 prePackage.dependsOn copyAPIScripts
 prePackage.dependsOn copyPluginsJar
 prePackage.dependsOn copyPluginsScripts

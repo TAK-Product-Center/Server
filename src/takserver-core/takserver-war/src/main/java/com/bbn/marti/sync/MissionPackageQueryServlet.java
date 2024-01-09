@@ -15,16 +15,17 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.MultipartConfig;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.jetbrains.annotations.NotNull;
 import org.owasp.esapi.errors.ValidationException;
 
+import com.bbn.marti.ValidatorUtils;
 import com.google.common.base.Strings;
 
 /**
@@ -121,9 +122,8 @@ public class MissionPackageQueryServlet extends EnterpriseSyncServlet {
 		    
 			// validate all parameters -- enforces required/optional parameter presence, throws an exception if invalid
     		if (validator != null) {
-    			validator.assertValidHTTPRequestParameterSet("Mission package query", request,
-    					requiredParameters,
-    					optionalParameters);
+    			ValidatorUtils.assertValidHTTPRequestParameterSet("Mission package query", request.getParameterMap().keySet(), requiredParameters,
+    					optionalParameters, validator);
     		}
 
     		// map post parameters to metadata field entries
@@ -213,7 +213,7 @@ public class MissionPackageQueryServlet extends EnterpriseSyncServlet {
         String url = request.getRequestURL().toString();
         URI uri = new URI(url);
         baseUrl = uri.getScheme() + "://" + uri.getHost() + ":";
-        if(uri.getPort() == 8444) {
+        if (uri.getPort() == 8444) {
             baseUrl += 8443;
         } else {
             baseUrl += uri.getPort();

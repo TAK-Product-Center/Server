@@ -3,6 +3,8 @@ package tak.server.config;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -30,7 +32,6 @@ import org.springframework.web.socket.server.standard.ServletServerContainerFact
 
 import com.bbn.marti.nio.websockets.BinaryPayloadWebSocketHandler;
 import com.bbn.marti.nio.websockets.TakProtoWebSocketHandler;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.Resources;
 
 import tak.server.Constants;
@@ -42,8 +43,6 @@ import tak.server.config.websocket.SocketAuthHandshakeInterceptor;
 public class WebSocketConfiguration implements WebSocketConfigurer, WebSocketMessageBrokerConfigurer {
 	private static final Logger logger = LoggerFactory.getLogger(WebSocketConfiguration.class);
 
-	private DistributedConfiguration config = DistributedConfiguration.getInstance();
-
 	public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
 
 		WebSocketHandlerRegistration takProtoHandler = registry.addHandler(new TakProtoWebSocketHandler(), "/takproto/1");
@@ -52,7 +51,11 @@ public class WebSocketConfiguration implements WebSocketConfigurer, WebSocketMes
         		.addHandler(new BinaryPayloadWebSocketHandler(), "/payload/1/*")
         		.addInterceptors(auctionInterceptor());
 
-		if(config.getRemoteConfiguration().getNetwork().isAllowAllOrigins()) {
+        String allowedOrigins = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowOrigins();
+        if (!Strings.isNullOrEmpty(allowedOrigins)) {
+            takProtoHandler.setAllowedOrigins(allowedOrigins);
+            binaryPayloadHandler.setAllowedOrigins(allowedOrigins);
+        } else if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isAllowAllOrigins()) {
             takProtoHandler.setAllowedOrigins("*");
             binaryPayloadHandler.setAllowedOrigins("*");
 		}
@@ -93,7 +96,7 @@ public class WebSocketConfiguration implements WebSocketConfigurer, WebSocketMes
     
     @Override
 	public void configureWebSocketTransport(WebSocketTransportRegistration registry) {
-    	registry.setSendBufferSizeLimit(DistributedConfiguration.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketSendBufferSizeLimit());
+    	registry.setSendBufferSizeLimit(CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketSendBufferSizeLimit());
 	}
 
 	@Override
@@ -104,12 +107,12 @@ public class WebSocketConfiguration implements WebSocketConfigurer, WebSocketMes
     @Bean
     public ServletServerContainerFactoryBean createWebSocketContainer() {
         ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
-        container.setMaxBinaryMessageBufferSize(DistributedConfiguration.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketMaxBinaryMessageBufferSize());
-        container.setMaxTextMessageBufferSize(DistributedConfiguration.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketMaxBinaryMessageBufferSize());
+        container.setMaxBinaryMessageBufferSize(CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketMaxBinaryMessageBufferSize());
+        container.setMaxTextMessageBufferSize(CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketMaxBinaryMessageBufferSize());
         
         // negative value for maxSessionIdTimeout will use default
-        if (DistributedConfiguration.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketMaxSessionIdleTimeout() > 0) {
-        	container.setMaxSessionIdleTimeout(DistributedConfiguration.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketMaxSessionIdleTimeout());
+        if (CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketMaxSessionIdleTimeout() > 0) {
+        	container.setMaxSessionIdleTimeout(CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketMaxSessionIdleTimeout());
         }
         
         return container;

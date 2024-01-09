@@ -16,8 +16,8 @@
 
 package org.springframework.web.multipart.support;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.Part;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Part;
 
 import org.apache.commons.logging.LogFactory;
 

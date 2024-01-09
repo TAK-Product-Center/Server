@@ -68,7 +68,7 @@ public class NioGrpcChannelHandler extends NioNettyTlsServerHandler {
     @Override
     protected void createConnectionInfo() {
         connectionInfo = new ConnectionInfo();
-        connectionInfo.setConnectionId(IgniteHolder.getInstance().getIgniteStringId() + new Integer(stream.hashCode()).toString());
+        connectionInfo.setConnectionId(IgniteHolder.getInstance().getIgniteStringId() + Integer.valueOf(stream.hashCode()).toString());
         connectionInfo.setAddress(remoteSocketAddress.getHostString());
         connectionInfo.setPort(remoteSocketAddress.getPort());
         connectionInfo.setTls(true);
@@ -88,17 +88,20 @@ public class NioGrpcChannelHandler extends NioNettyTlsServerHandler {
 
     }
     
-    private void setReader() {
+    @Override
+    protected void setReader() {
         reader = (msg) -> {};
     }
     
-    private void setWriter() {
+    @Override
+    protected void setWriter() {
         writer = (data) -> {
         	stream.onNext(StreamingProtoBufHelper.cot2protoBuf(data));
         };
     }
     
-    private void setNegotiator() {
+    @Override
+    protected void setNegotiator() {
         negotiator = () -> {};
     }
     

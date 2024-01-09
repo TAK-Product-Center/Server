@@ -1,6 +1,5 @@
 package com.bbn.marti.feeds;
 
-import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -15,12 +14,10 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.repository.query.Param;
 
 import com.bbn.marti.config.AuthType;
-import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.sync.repository.DataFeedRepository;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;

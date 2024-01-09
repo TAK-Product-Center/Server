@@ -15,7 +15,7 @@
 		<%@ page import="java.util.Collections" %>
 		<%@ page import="com.bbn.marti.remote.SubscriptionManagerLite" %>
 		<%@ page import="com.bbn.marti.remote.RemoteSubscription" %>
-		<%@ page import="com.bbn.marti.util.spring.SpringContextBeanForApi" %>
+		<%@ page import="com.bbn.marti.remote.util.SpringContextBeanForApi" %>
 		
 		
 		

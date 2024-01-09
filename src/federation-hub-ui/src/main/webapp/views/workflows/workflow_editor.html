@@ -5,6 +5,21 @@
         <div ng-include="'views/workflows/workflow_editor_sidebar.html'" style="height: 100%; overflow: auto;"></div>
       </div> -->
       <div ui-layout-container min-size="300px" style="overflow: hidden;">
+        <div class="legend">
+          <span>LEGEND</span>
+          <!-- <div class="legendItem">
+            <span>Node Connected:</span>
+            <div class="legendLine legenedConnected"></div>
+          </div> -->
+          <div class="legendItem">
+            <span>Data Flowing:</span>
+            <div class="legendLine legendActive"></div>
+          </div>
+          <div class="legendItem">
+            <span>No Data Flowing:</span>
+            <div class="legendLine legendNotActive"></div>
+          </div>
+        </div>
         <div style="height: 100%; overflow: hidden;">
           <nav class="navbar navbar-inverse nav navbar-top-links" style="margin:0px; white-space:nowrap; background-color: #337ab7; border-color: #337ab7;">
             <div class="container-fluid">

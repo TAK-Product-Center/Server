@@ -38,10 +38,17 @@ public enum ServerProcessDefinition {
 					"t.s.retention.RetentionApplication - Started RetentionApplication"
 			)), null),
 
+	ConfigService("config", !TAKCLCore.disableConfigProcess, "takserver.war", "logs/takserver-config.log",
+			Collections.unmodifiableList(Arrays.asList(
+					"t.s.c.ConfigServiceConfiguration - Setting up local and ignite configuration",
+					"t.s.c.ConfigServiceConfiguration - Setting up distributed configuration",
+					"c.b.m.r.c.DistributedConfiguration - execute method DistributedConfiguration"
+			)),
+			Arrays.asList("-Dspring.profiles.active=config")),
+
 	MessagingService("messaging", !TAKCLCore.disableMessagingProcess, "takserver.war", "logs/takserver-messaging.log",
 			Collections.unmodifiableList(Arrays.asList(
 					"c.b.m.s.DistributedSubscriptionManager - DistributedSubscriptionManager execute",
-					" c.b.m.s.DistributedConfiguration - execute method DistributedConfiguration",
 					"t.s.f.DistributedFederationManager - execute method DistributedFederationManager",
 					"c.b.m.g.DistributedPersistentGroupManager - execute method DistributedPersistentGroupManager",
 					"t.s.profile.DistributedServerInfo - execute method DistributedServerInfo",

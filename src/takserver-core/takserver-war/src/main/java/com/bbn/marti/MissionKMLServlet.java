@@ -41,10 +41,10 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipOutputStream;
 
 import javax.naming.NamingException;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
 import org.owasp.esapi.ESAPI;
@@ -68,8 +68,7 @@ import com.bbn.marti.service.kml.KMLService;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.Coord;
 import com.bbn.marti.util.KmlUtils;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
-import com.bbn.security.web.MartiValidator;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.security.web.MartiValidatorConstants;
 import com.bbn.security.web.MartiValidatorConstants.Regex;
 import com.google.common.base.Strings;
@@ -176,7 +175,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
     	Map<String, String[]> httpParameters = validateParams("MissionKMLServlet", request, response, 
     			requiredHttpParameters, optionalHttpParameters);
 
-    	if(httpParameters == null)
+    	if (httpParameters == null)
     		return;
 
     	String intervalParam = getParameterValue(httpParameters, QueryParameter.interval.name());
@@ -276,7 +275,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
     	AllowedFormat format = AllowedFormat.kml;
     	String formatParam = getParameterValue(httpParameters, QueryParameter.format.name());
 
-    	if(formatParam != null && formatParam.compareToIgnoreCase("kmz") == 0) {
+    	if (formatParam != null && formatParam.compareToIgnoreCase("kmz") == 0) {
     		format = AllowedFormat.kmz;
     	}
 
@@ -348,7 +347,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
     			+ "WHERE servertime BETWEEN ? AND ? and cot_type != 'b-t-f' and cot_type != 'b-f-t-r' and cot_type != 'b-f-t-a'";
 
 
-    	if(uidParam != null) {
+    	if (uidParam != null) {
     		trackQuery += " and uid = ?";
     	}
 
@@ -380,7 +379,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
     			sqlQuery.setTimestamp(1, periodOfInterest.begin);
     			sqlQuery.setTimestamp(2, periodOfInterest.end);
     			
-    			if(uidParam != null) {
+    			if (uidParam != null) {
     				sqlQuery.setString(3, uidParam);
     				sqlQuery.setString(4, filterGroupVector);
     	    	} else {
@@ -488,7 +487,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
     							// progressively build image url list.
     							KmlUtils.getImageUrlList(qrs, images, Constants.KML_MAX_IMAGE_COUNT, imagePath, kmlDao, uids);
     						}
-    						if(uidParam == null) {
+    						if (uidParam == null) {
     							buildMissionFeatures(qrs, doc, seenUrls, periodOfInterest.end, baseUrl, images, format, true, includeExtendedData, multiTrackThresholdAsInteger, optimizeExportAsBoolean);
     						} else {
     							buildMissionFeatures(qrs, doc, seenUrls, periodOfInterest.end, baseUrl, images, format, false, includeExtendedData, multiTrackThresholdAsInteger, optimizeExportAsBoolean);
@@ -503,11 +502,11 @@ public class MissionKMLServlet extends LatestKMLServlet {
 
     				if (qrs != null && !qrs.isEmpty()) {
 
-    					if(format.equals(AllowedFormat.kmz)) {
+    					if (format.equals(AllowedFormat.kmz)) {
     						// progressively build image url list.
     						KmlUtils.getImageUrlList(qrs, images, Constants.KML_MAX_IMAGE_COUNT, imagePath, kmlDao, uids);
     					}
-    					if(uidParam == null) {
+    					if (uidParam == null) {
     						buildMissionFeatures(qrs, doc, seenUrls, periodOfInterest.end, baseUrl, images, format, true, includeExtendedData, multiTrackThresholdAsInteger, optimizeExportAsBoolean);
     					} else {
     						buildMissionFeatures(qrs, doc, seenUrls, periodOfInterest.end, baseUrl, images, format, false, includeExtendedData, multiTrackThresholdAsInteger, optimizeExportAsBoolean);
@@ -531,7 +530,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
     						+ " total duration: " 
     						+ (kmlInitDuration + cotFetchAndDeserializeDuration + dbDuration + kmlDuration + kmlGenDuration));
 
-    				if(format.equals(AllowedFormat.kmz)) {
+    				if (format.equals(AllowedFormat.kmz)) {
     					zip = new ZipOutputStream(responseOutputStream);
 
     					// marshal jak -> doc.kml
@@ -708,7 +707,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
             List<Placemark> ps = buildTimeseriesLineString(qrs, maxStartTime);
             
             for(Placemark p : ps) {
-                if(includeDescription) {
+                if (includeDescription) {
                     p.withDescription(KmlUtils.buildDescription(last, Constants.KML_MAX_IMAGE_COUNT, baseUrl, "", imageTag));
                 }
                 doc.addToFeature(p); 
@@ -721,7 +720,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
             if (format.equals(AllowedFormat.kmz) && imageTag) {
                 p.setName("* " + p.getName());
             }
-            if(includeDescription) {
+            if (includeDescription) {
                 p.withDescription(KmlUtils.buildDescription(last, Constants.KML_MAX_IMAGE_COUNT, baseUrl, "", imageTag));
             }
             doc.addToFeature(p);
@@ -758,7 +757,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
 
         // seek to the first valid query result -- need a baseline uid for comparison
         CotElement cursor = seekValid(results); 
-        if(cursor != null) {
+        if (cursor != null) {
             // didn't reach the end of the row -- get baseline uid out
             String uid = cursor.uid;
             do {
@@ -938,7 +937,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
 
 		// deserialize all cot results
 		CotElement cursor = seekValid(results, queue);
-		if(cursor != null) {
+		if (cursor != null) {
 			// didn't reach the end of the row -- get baseline uid out
 			while(results.next() && (cursor = seekValid(results, queue)) != null);
 		}

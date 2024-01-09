@@ -6,11 +6,15 @@ START=false
 USE_COT_DB=false
 KILL_EXISTING_TAKSERVER=false
 
+START_RETENTION=false
+START_PM=false
+
 SERVER0_DOCKER_DB_IDENTIFIER=TakserverServer0DB
 POSTGRES_USER=martiuser
 POSTGRES_DB=cot
 POSTGRES_PORT=5432
 
+CONFIG_PID=null
 MESSAGING_PID=null
 API_PID=null
 PM_PID=null
@@ -32,10 +36,10 @@ if [[ "${2}" == "" ]];then
   exit 1
 fi
 
-if [[ -d "${2}" ]];then
-  echo The target test environment path should not exist!
-  exit 1
-fi
+#if [[ -d "${2}" ]];then
+#  echo The target test environment path should not exist!
+#  exit 1
+#fi
 
 DEPLOYMENT_DIR=${2}
 mkdir -p ${DEPLOYMENT_DIR}
@@ -48,7 +52,7 @@ JARGS="-Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/
     -Djava.security.egd=file:/dev/./urandom 
     -DIGNITE_UPDATE_NOTIFIER=false 
     -Djdk.tls.client.protocols=TLSv1.2 
-	-Dlogging.level.com.bbn=DEBUG 
+	  -Dlogging.level.com.bbn=DEBUG
     -Dlogging.level.tak=DEBUG 
     -Xmx2000m 
     -XX:+HeapDumpOnOutOfMemoryError"
@@ -84,6 +88,12 @@ ctrl_c() {
 	if [ $MESSAGING_PID != null ];then
 		kill -9 $MESSAGING_PID
 	fi
+
+	sleep 2
+
+	if [ $CONFIG_PID != null ];then
+		kill -9 $CONFIG_PID
+	fi
 }
 
 trap ctrl_c SIGINT
@@ -108,7 +118,7 @@ This script takes a single parameter, which can use a mix of the following chara
 the indicated startup tasks:
 
 \t(b)uild\t\tPerforms \`./gradlew clean buildRpm buildDocker\`
-\t(d)eploy\tDeploys takserver to /opt/tak
+\t(d)eploy\tDeploys takserver to the provided deployment dir
 \tsetup (c)ot databases\t\t Sets up DBs in docker and sets up the test script to use them
 \t(s)tart\t\tStarts the server
 \t(k)ill\t\tKills the currently running takserver, if one is running
@@ -154,7 +164,7 @@ fi
 
 if [ $BUILD == true ];then
 	echo BUILDING...
-	./gradlew clean buildRpm buildDocker
+	./gradlew --parallel clean buildRpm buildDocker
 	echo DONE
 fi
 
@@ -202,6 +212,7 @@ java $DB_JARGS
 
 	if [[ "${SERVER_SRC}" == "${DEFAULT_SERVER_SRC}" ]];then
 		cp "${SERVER_SRC}/CoreConfig.example.xml" "${DEPLOYMENT_DIR}/CoreConfig.xml"
+		cp "${SERVER_SRC}/TAKIgniteConfig.example.xml" "${DEPLOYMENT_DIR}/TAKIgniteConfig.xml"
 		if [[ "${USE_COT_DB}" == "true" ]];then
 			sed -i "s/password=\"\"/password=\"atakatak\"/g" "${DEPLOYMENT_DIR}/CoreConfig.xml"
 			sed -i "s/jdbc:postgresql:\/\/127.0.0.1:5432\/cot/jdbc:postgresql:\/\/${DOCKER0_IP}:5432\/cot/g" ${DEPLOYMENT_DIR}/CoreConfig.xml
@@ -216,8 +227,8 @@ java $DB_JARGS
 	echo DONE
 fi
 
-if [[ "${TAKCL_TEST_CERT_SRC_DIR}" != "" ]] && [[ -d "${TAKCL_TEST_CERT_SRC_DIR}" ]];then
-	cp -r ${TAKCL_TEST_CERT_SRC_DIR} ${DEPLOYMENT_DIR}/certs/files
+if [[ "${TAKSERVER_CERT_SOURCE}" != "" ]] && [[ -d "${TAKSERVER_CERT_SOURCE}" ]];then
+	cp -r ${TAKSERVER_CERT_SOURCE} ${DEPLOYMENT_DIR}/certs/files
 fi
 
 if [ $START == true ];then
@@ -240,21 +251,29 @@ if [ $START == true ];then
 	export JDK_JAVA_OPTIONS=${JARGS}
 
 	sync
-	
-	java -Dspring.profiles.active=messaging -jar takserver.war ${ARGS} &
+
+	java -Dspring.profiles.active=config -jar takserver.war ${ARGS} &
+	CONFIG_PID=$!
+  java -Dspring.profiles.active=messaging -jar takserver.war ${ARGS} &
 	MESSAGING_PID=$!
 	java -Dspring.profiles.active=api -jar takserver.war ${ARGS} &
 	API_PID=$!
-	java -jar takserver-pm.jar ${ARGS} &
-	PM_PID=$!
-	java -jar takserver-retention.jar &
-	RETENTION_PID=$!
+
+	if [[ "${START_PM}" == "true" ]];then
+		java -jar takserver-pm.jar ${ARGS} &
+		PM_PID=$!
+	fi
+
+	if [[ "${START_RETENTION}" == "true" ]];then
+		java -jar takserver-retention.jar &
+		RETENTION_PID=$!
+	fi
 
 
-	if [[ "${TAKCL_TEST_CERT_SRC_DIR}" != "" ]] && [[ -d "${TAKCL_TEST_CERT_SRC_DIR}" ]] &&  [[ "${TAKCL_ADMIN_CERT}" != "" ]] && [[ -f "${TAKCL_ADMIN_CERT}" ]] ;then
+	if [[ "${TAKSERVER_CERT_SOURCE}" != "" ]] && [[ -d "${TAKSERVER_CERT_SOURCE}" ]] && [[ -f "${TAKSERVER_CERT_SOURCE}/admin.pem" ]]; then
 		echo Sleeping 60 seconds before adding admin user...
 		sleep 60
-		java -jar ${DEPLOYMENT_DIR}/utils/UserManager.jar certmod -A ${TAKCL_ADMIN_CERT}
+		java -jar ${DEPLOYMENT_DIR}/utils/UserManager.jar certmod -A "${TAKSERVER_CERT_SOURCE}/admin.pem"
 	fi
 
 	echo DONE
@@ -282,6 +301,10 @@ if [ $START == true ];then
 			kill -9 ${MESSAGING_PID}
 		fi
 
+		if [[ ${CONFIG_PID} != null ]];then
+			echo CONFIG_PID=${CONFIG_PID}
+			kill -9 ${CONFIG_PID}
+		fi
 
 	}
 fi

@@ -8,10 +8,11 @@ import org.eclipse.jetty.util.BlockingArrayQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.marti.config.Buffer.Queue;
+import com.bbn.marti.config.Queue;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.remote.QueueMetric;
-import com.bbn.marti.service.DistributedConfiguration;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 public class FixedSizeBlockingQueue<E> {
 	
@@ -22,12 +23,12 @@ public class FixedSizeBlockingQueue<E> {
 
 	public FixedSizeBlockingQueue() {
 		
-		Configuration config = DistributedConfiguration.getInstance().getRemoteConfiguration();
-		
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
 		Queue queueConfig = config.getBuffer().getQueue();
-		
-     	queue = new BlockingArrayQueue<>(queueConfig.getQueueSizeInitial(), queueConfig.getQueueSizeIncrement(), queueConfig.getCapacity());
-     	queueMetric.capacity.set(queueConfig.getCapacity());
+
+     	queue = new BlockingArrayQueue<>(queueConfig.getQueueSizeInitial(), queueConfig.getQueueSizeIncrement(), queueConfig.getQueueSizeMaxCapacity());
+     	queueMetric.capacity.set(queueConfig.getQueueSizeMaxCapacity());
 	}
 
 	public boolean add(E element) {

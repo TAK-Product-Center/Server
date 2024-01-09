@@ -170,16 +170,16 @@ public class DataFeedStatsHelper  {
             Double latObj = Double.valueOf(dfLat);
             Double lonObj = Double.valueOf(dfLon);
             dfMinLat = ignite.atomicReference(getDataFeedMinLatKey(dfUUID), latObj, true);
-            if(latObj.compareTo(dfMinLat.get()) < 0)
+            if (latObj.compareTo(dfMinLat.get()) < 0)
                 dfMinLat.set(latObj);
             dfMaxLat = ignite.atomicReference(getDataFeedMaxLatKey(dfUUID), latObj, true);
-            if(latObj.compareTo(dfMaxLat.get()) > 0)
+            if (latObj.compareTo(dfMaxLat.get()) > 0)
                 dfMaxLat.set(latObj);
             dfMinLon = ignite.atomicReference(getDataFeedMinLonKey(dfUUID), lonObj, true);
-            if(lonObj.compareTo(dfMinLon.get()) < 0)
+            if (lonObj.compareTo(dfMinLon.get()) < 0)
                 dfMinLon.set(lonObj);
             dfMaxLon = ignite.atomicReference(getDataFeedMaxLonKey(dfUUID), lonObj, true);
-            if(lonObj.compareTo(dfMaxLon.get()) > 0)
+            if (lonObj.compareTo(dfMaxLon.get()) > 0)
                 dfMaxLon.set(lonObj);
         } catch(IgniteException ie) {
             logger.error("Unable to update the min/max for Lat/Lon for Datafeed UUID: {} - {}", dfUUID, ie.getMessage());

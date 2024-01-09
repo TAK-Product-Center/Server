@@ -20,7 +20,6 @@ import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.repeater.RepeaterStore;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.EnterpriseSyncService;
@@ -31,6 +30,7 @@ import com.bbn.marti.sync.repository.MissionRoleRepository;
 import com.bbn.marti.sync.repository.MissionSubscriptionRepository;
 import com.bbn.marti.sync.service.MissionService;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cache.DatafeedCacheHelper;
 import tak.server.cluster.ClusterManager;
@@ -42,9 +42,9 @@ import tak.server.qos.MessageReadStrategy;
 import tak.server.qos.QoSManager;
 
 /*
- * 
+ *
  * Singleton that provides access to Spring context for non Spring-managed objects, and keeps references to other singleton services and utility classes.
- * 
+ *
  */
 public class MessagingDependencyInjectionProxy implements ApplicationContextAware {
 	private static ApplicationContext springContext;
@@ -115,27 +115,27 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return groupStore;
 	}
 
-	private DistributedConfiguration coreConfig = null;
+	private CoreConfig coreConfig = null;
 
-	public DistributedConfiguration coreConfig() {
+	public CoreConfig coreConfig() {
 		if (coreConfig == null) {
 			synchronized (this) {
 				if (coreConfig == null) {
-					coreConfig = springContext.getBean(DistributedConfiguration.class);
+					coreConfig = CoreConfigFacade.getInstance();
 				}
 			}
 		}
 
 		return coreConfig;
 	}
-	
+
 	private CoreConfig simpleCoreConfig = null;
 
 	public CoreConfig simpleCoreConfig() {
 		if (simpleCoreConfig == null) {
 			synchronized (this) {
 				if (simpleCoreConfig == null) {
-					simpleCoreConfig = springContext.getBean(CoreConfig.class);
+					simpleCoreConfig = CoreConfigFacade.getInstance();
 				}
 			}
 		}
@@ -212,7 +212,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 
 		return repeaterStore;
 	}
-	
+
 	private MissionService missionService = null;
 
 	public MissionService missionService() {
@@ -228,7 +228,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 	}
 
 	private FileAuthenticator fileAuthenticator = null;
-	
+
 	public FileAuthenticator fileAuthenticator() {
 		if (fileAuthenticator  == null) {
 			synchronized (this) {
@@ -256,7 +256,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 	}
 	
 	private Messenger<CotEventContainer> cotMessenger = null;
-	
+
 	@SuppressWarnings("unchecked")
 	public Messenger<CotEventContainer> cotMessenger() {
 		if (cotMessenger  == null) {
@@ -269,12 +269,12 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 
 		return cotMessenger;
 	}
-	
+
 	private ClusterManager clusterManager = null;
-	
+
 	public ClusterManager clusterManager() {
 		if (!coreConfig().getRemoteConfiguration().getCluster().isEnabled()) return null;
-		
+
 		if (clusterManager  == null) {
 			synchronized (this) {
 				if (clusterManager  == null) {
@@ -285,13 +285,13 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 
 		return clusterManager;
 	}
-	
+
 	private FederationEventRepository fedEventRepo = null;
-	
+
 	private Object fedEventRepoLock = new Object();
-	
+
 	public FederationEventRepository fedEventRepo() {
-		
+
 		if (fedEventRepo == null) {
 			synchronized (fedEventRepoLock) {
 				if (fedEventRepo  == null) {
@@ -302,11 +302,11 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 
 		return fedEventRepo;
 	}
-	
+
 	private ServerInfo serverInfo = null;
-	
+
 	public ServerInfo serverInfo() {
-		
+
 		if (serverInfo  == null) {
 			synchronized (this) {
 				if (serverInfo  == null) {
@@ -317,7 +317,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 
 		return serverInfo;
 	}
-	
+
 	private MessageDeliveryStrategy mds = null;
 
 	public MessageDeliveryStrategy mds() {
@@ -347,7 +347,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 
 		return mrs;
 	}
-	
+
 	private MessageDOSStrategy mdoss = null;
 
 	public MessageDOSStrategy mdoss() {
@@ -362,11 +362,11 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 
 		return mdoss;
 	}
-	
+
 	private VersionBean vb = null;
-	
+
 	public VersionBean versionBean() {
-		
+
 		if (vb == null) {
 			synchronized (this) {
 				if (vb == null) {
@@ -374,14 +374,14 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 				}
 			}
 		}
-		
+
 		return vb;
 	}
-	
+
 	private QoSManager qm = null;
-	
+
 	public QoSManager qosManager() {
-		
+
 		if (qm == null) {
 			synchronized (this) {
 				if (qm == null) {
@@ -389,18 +389,18 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 				}
 			}
 		}
-		
+
 		return qm;
 	}
-	
+
 	@Autowired
 	private ApplicationEventPublisher aep;
-	
+
 	public ApplicationEventPublisher eventPublisher() {
-		
+
 		return aep;
 	}
-	
+
 	private DataFeedRepository dataFeedRepository = null;
 
 	public DataFeedRepository dataFeedRepository() {
@@ -414,7 +414,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 
 		return dataFeedRepository;
 	}
-	
+
 	private EnterpriseSyncService esyncService = null;
 
 	public EnterpriseSyncService esyncService() {
@@ -427,9 +427,9 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		}
 		return esyncService;
 	}
-					
+
 	private MissionRepository missionRepository = null;
-	
+
 	public MissionRepository missionRepository() {
 		if (missionRepository == null) {
 			synchronized (this) {
@@ -441,9 +441,9 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 
 		return missionRepository;
 	}
-	
+
 	private SubscriptionManagerLite subscriptionManagerLite = null;
-	
+
 	public SubscriptionManagerLite subscriptionManagerLite() {
 		if (subscriptionManagerLite == null) {
 			synchronized (this) {
@@ -455,9 +455,9 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 
 		return subscriptionManagerLite;
 	}
-	
+
 	private MissionRoleRepository missionRoleRepository = null;
-	
+
 	public MissionRoleRepository missionRoleRepository() {
 		if (missionRoleRepository == null) {
 			synchronized (this) {

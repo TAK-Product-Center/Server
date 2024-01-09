@@ -19,10 +19,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang3.StringUtils;
 import org.json.simple.JSONArray;
@@ -34,6 +34,7 @@ import org.postgresql.geometric.PGcircle;
 import org.postgresql.util.PGobject;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.bbn.marti.ValidatorUtils;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.KmlUtils;
 import com.bbn.security.web.MartiValidatorConstants;
@@ -143,9 +144,10 @@ public class SearchServlet extends EnterpriseSyncServlet {
 						"MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
 			}
  
-			validator.assertValidHTTPRequestParameterSet(context, request, 
+			ValidatorUtils.assertValidHTTPRequestParameterSet(context, request.getParameterMap().keySet(),
 					new HashSet<String>(), // no required parameters
-					optionalParameters);
+					optionalParameters, validator);
+			
 			for (String parameterName : request.getParameterMap().keySet()) {
 				for (String parameterValue : request.getParameterValues(parameterName)) {
 					RequestParameters recognizedParameter = RequestParameters.fromString(parameterName);

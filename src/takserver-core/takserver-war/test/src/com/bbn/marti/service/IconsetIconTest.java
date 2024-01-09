@@ -5,8 +5,8 @@ import static org.junit.Assert.assertNotNull;
 
 import java.io.StringReader;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.Unmarshaller;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.Unmarshaller;
 
 import org.junit.Before;
 import org.junit.Test;

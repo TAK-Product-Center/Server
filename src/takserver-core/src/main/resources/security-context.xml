@@ -12,7 +12,6 @@
     xmlns:websocket="http://www.springframework.org/schema/websocket"
     xmlns:util="http://www.springframework.org/schema/util"
     xmlns:aop="http://www.springframework.org/schema/aop"
-	xmlns:oauth="http://www.springframework.org/schema/security/oauth2"
     xsi:schemaLocation="
         http://www.springframework.org/schema/beans     
         http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
@@ -27,28 +26,27 @@
         http://www.springframework.org/schema/util
         http://www.springframework.org/schema/util/spring-util-4.0.xsd
         http://www.springframework.org/schema/aop
-        http://www.springframework.org/schema/aop/spring-aop.xsd
-	    http://www.springframework.org/schema/security/oauth2
-        https://www.springframework.org/schema/security/spring-security-oauth2.xsd">
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
         
         
 
         <!-- Enabled annotation-defined aspects -->           
   	    <aop:aspectj-autoproxy />
-        
-        <bean id="springSecurityFilterChain" class="org.springframework.security.web.FilterChainProxy">
+
+	<bean id="springSecurityFilterChain" class="org.springframework.security.web.FilterChainProxy">
 		<sec:filter-chain-map request-matcher="ant">
-		  <sec:filter-chain pattern="/**" filters="
+			<sec:filter-chain pattern="/**" filters="
 				X509AuthenticationFilter,
 				BasicAuthenticationFilter,
 				BasicAuthenticationExceptionTranslationFilter,
-				takOauth2ProviderFilter,
-				takClientCredentialsTokenEndpointFilter,
 				martiPreAuthenticationFilter,
 				AnonymousAuthenticationFilter,
+				oAuth2TokenEndpointFilter,
+				oAuth2BearerTokenAuthenticationFilter,
 				FilterSecurityInterceptor" />
-		  </sec:filter-chain-map>
-		</bean>
+		</sec:filter-chain-map>
+	</bean>
+
 
         <!-- Add additional entries to this list to require both X509 and BASIC auth for all the specified subpaths (not the query string) -->
         <!-- NB: be careful about specifying very short strings here that could match a lot of paths -->
@@ -76,7 +74,8 @@
 			
 			  <!-- plugin data API -->
 			  <sec:intercept-url pattern="/Marti/api/plugins/*/submit" access="ROLE_ANONYMOUS"/>
-			
+			  <sec:intercept-url pattern="/Marti/api/plugins/*/submit/result" access="ROLE_ANONYMOUS"/>
+
 			  <!-- require admin access for user manager -->
 	  	      <sec:intercept-url pattern="/users/**" access="ROLE_ADMIN" />
 	  	      
@@ -199,11 +198,6 @@
               <sec:intercept-url pattern="/Marti/api/sync/**" access="ROLE_ANONYMOUS" />
               <sec:intercept-url pattern="/Marti/api/cot/**" access="ROLE_ANONYMOUS" />
 			  <sec:intercept-url pattern="/Marti/api/cops/**" access="ROLE_ANONYMOUS" />
-			  <sec:intercept-url pattern="/Marti/api/classification/**" method="GET" access="ROLE_ANONYMOUS" />
-              <sec:intercept-url pattern="/Marti/api/classification/**" method="PUT" access="ROLE_ADMIN" />
-              <sec:intercept-url pattern="/Marti/api/classification/**" method="POST" access="ROLE_ADMIN" />
-              <sec:intercept-url pattern="/Marti/api/classification/**" method="DELETE" access="ROLE_ADMIN" />
-              <sec:intercept-url pattern="/Marti/api/caveat/**" access="ROLE_ADMIN" />
 
               <!--  properties API -->
               <sec:intercept-url pattern="/Marti/api/properties/**" access="ROLE_ANONYMOUS" />
@@ -312,7 +306,7 @@
               <sec:intercept-url pattern="/Marti/api/cop/**" access="ROLE_ANONYMOUS"/>
               <sec:intercept-url pattern="/webtak/**" access="ROLE_WEBTAK"/>
               <sec:intercept-url pattern="/webtak-plugins/**" access="ROLE_WEBTAK"/>
-              <sec:intercept-url pattern="/takproto/**" access="ROLE_WEBTAK" />
+              <sec:intercept-url pattern="/takproto/**" access="ROLE_ANONYMOUS" />
               <sec:intercept-url pattern="/Marti/GeoCache/**" access="ROLE_ANONYMOUS"/>
               <sec:intercept-url pattern="/Marti/async/chat" access="ROLE_ANONYMOUS"/>
        
@@ -333,9 +327,9 @@
 			  <!--  Map Layer Admin tool -->
 			  <sec:intercept-url pattern="/Marti/mla/**" access="ROLE_ADMIN"/>
 
-			  <sec:intercept-url pattern="/oauth/token" access="ROLE_NO_CLIENT_CERT" />
-			  <sec:intercept-url pattern="/oauth/authorize"  access="ROLE_NO_CLIENT_CERT" />
-			  <sec:intercept-url pattern="/oauth/check_token"  access="ROLE_ANONYMOUS" />
+			  <sec:intercept-url pattern="/oauth2/token" access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/oauth2/authorize"  access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/oauth2/check_token"  access="ROLE_ANONYMOUS" />
 
 			  <!-- disallow direct access to login page - needs to pass through a Spring MVC view resolver -->
 				<sec:intercept-url pattern="/login/**" access="ROLE_NO_CLIENT_CERT"/>
@@ -347,8 +341,8 @@
 			  <sec:intercept-url pattern="/schedule/**" access="ROLE_ADMIN"/>
 			  
 			  <sec:intercept-url pattern="/user-management/**" access="ROLE_ADMIN"/>
-			  <sec:intercept-url pattern="/classification/**" access="ROLE_ADMIN"/>
-              <sec:intercept-url pattern="/vbm/**" access="ROLE_ADMIN"/>
+			  <sec:intercept-url pattern="/vbm/api/classification" access="ROLE_ANONYMOUS"/>
+			  <sec:intercept-url pattern="/vbm/**" access="ROLE_ADMIN"/>
 
 			   <!-- static content -->
 			  <sec:intercept-url pattern="/Marti/favicon.ico" access="ROLE_NON_ADMIN_UI" />
@@ -400,25 +394,41 @@
 
 	<bean id="securityContextHolderAwareRequestFilter" class="org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter" />
 
-	<bean id="takTokenStore" class="com.bbn.marti.oauth.TAKTokenStore"/>
-	<bean id="takJwtAccessTokenConverter" class="com.bbn.marti.oauth.TAKJwtAccessTokenConverter"/>
-	<bean id="takClientDetailsService" class="com.bbn.marti.oauth.TAKClientDetailsService"/>
-	<bean id="takTokenServices" class="org.springframework.security.oauth2.provider.token.DefaultTokenServices">
-		<property name="tokenStore" ref="takTokenStore" />
-		<property name="tokenEnhancer" ref="takJwtAccessTokenConverter"/>
-		<property name="clientDetailsService" ref="takClientDetailsService"/>
-		<property name="supportRefreshToken" value="true" />
+	<bean id="passwordGrantAuthenticationConverter" class="com.bbn.marti.oauth.PasswordGrantAuthenticationConverter" />
+	<bean id="inMemoryOAuth2AuthorizationService" class="org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService" />
+	<bean id="nimbusJwtEncoder" class="org.springframework.security.oauth2.jwt.NimbusJwtEncoder">
+		<constructor-arg ref="jwkSource" />
 	</bean>
-	<bean id ="takClientCredentialsTokenEndpointFilter" class="org.springframework.security.oauth2.provider.client.ClientCredentialsTokenEndpointFilter" >
-		<property name="authenticationManager" ref="martiOauthAuthenticationManager"/>
+
+	<bean id="jwtGenerator" class="org.springframework.security.oauth2.server.authorization.token.JwtGenerator" >
+		<constructor-arg ref="nimbusJwtEncoder" />
 	</bean>
-	<oauth:resource-server id="takOauth2ProviderFilter" token-services-ref="takTokenServices" stateless="false" authentication-manager-ref="martiOauthAuthenticationManager"/>
-	<oauth:authorization-server token-services-ref="takTokenServices"  client-details-service-ref="takClientDetailsService" check-token-enabled="true">
-		<oauth:authorization-code />
-		<oauth:refresh-token />
-		<oauth:client-credentials />
-		<oauth:password />
-	</oauth:authorization-server>
+
+	<bean id="passwordGrantAuthenticationProvider" class="com.bbn.marti.oauth.PasswordGrantAuthenticationProvider" >
+		<constructor-arg ref="inMemoryOAuth2AuthorizationService" />
+		<constructor-arg ref="jwtGenerator" />
+		<property name="authenticationProvider" ref="martiAuthenticationProvider" />
+	</bean>
+
+	<sec:authentication-manager id="passwordGrantAuthenticationManager">
+		<sec:authentication-provider ref="passwordGrantAuthenticationProvider" />
+	</sec:authentication-manager>
+
+	<bean id="passwordGrantAuthenticationSuccessHandler" class="com.bbn.marti.oauth.PasswordGrantAuthenticationSuccessHandler" />
+	<bean id="bearerTokenAuthenticationFailureHandler" class="com.bbn.marti.oauth.BearerTokenAuthenticationFailureHandler" />
+
+	<bean id="oAuth2TokenEndpointFilter" class="org.springframework.security.oauth2.server.authorization.web.OAuth2TokenEndpointFilter" >
+		<constructor-arg ref="passwordGrantAuthenticationManager" />
+		<property name="authenticationConverter" ref="passwordGrantAuthenticationConverter" />
+		<property name="authenticationSuccessHandler" ref="passwordGrantAuthenticationSuccessHandler" />
+	</bean>
+
+	<bean id="accessTokenResolver" class="com.bbn.marti.oauth.AccessTokenResolver" />
+	<bean id="oAuth2BearerTokenAuthenticationFilter" class="org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter" >
+		<constructor-arg ref="martiAuthenticationManager" />
+		<property name="bearerTokenResolver" ref="accessTokenResolver" />
+		<property name="authenticationFailureHandler" ref="bearerTokenAuthenticationFailureHandler" />
+	</bean>
 
 	<bean id="X509AuthenticationFilter" class="org.springframework.security.web.authentication.preauth.x509.X509AuthenticationFilter">
 		<property name="authenticationManager" ref="martiAuthenticationManager" />
@@ -461,16 +471,12 @@
 		<property name="roleHierarchy" ref="roleHierarchy" />
 	</bean>
 
-	<sec:authentication-manager id="martiOauthAuthenticationManager">
-		<sec:authentication-provider ref="martiAuthenticationProvider"/>
-	</sec:authentication-manager>
-
 	<sec:authentication-manager id="martiAuthenticationManager">
       <sec:authentication-provider ref="PreAuthenticatedAuthenticationProvider" />
       <sec:authentication-provider ref="martiAuthenticationProvider"/>
       <sec:authentication-provider ref="BasicAuthenticationProvider" />
     </sec:authentication-manager>
-  
+
     <!-- Custom spring security authentication provider that uses Marti auth layer to authenticate. -->
     <bean id="martiAuthenticationProvider" class="com.bbn.marti.util.spring.TakAuthenticationProvider" />
     

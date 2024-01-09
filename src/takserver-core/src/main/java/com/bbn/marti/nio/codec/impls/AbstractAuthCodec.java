@@ -6,9 +6,9 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Unmarshaller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,14 +31,15 @@ import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.SecureXmlParser;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.Subscription;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.marti.util.concurrent.future.AsyncFutures;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.google.common.base.Strings;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 /**
  *         
@@ -47,7 +48,7 @@ import com.google.common.base.Strings;
  */
 public abstract class AbstractAuthCodec implements ByteCodec {
 	
-    protected boolean enableLatestSa = DistributedConfiguration.getInstance().getBuffer().getLatestSA().isEnable();
+    protected boolean enableLatestSa = CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getLatestSA().isEnable();
 
     // auth message buffer size (bytes)
     private static final int BUFFER_SIZE = 1024;
@@ -195,7 +196,7 @@ public abstract class AbstractAuthCodec implements ByteCodec {
                     logger.debug("exception getting trimmed auth message", e);
                 }
             } else {
-                if(authMessageString.contains("<auth>") != true) {
+                if (authMessageString.contains("<auth>") != true) {
                     authStatus.set(AuthStatus.EXCEPTION);
                     ((ChannelHandler) connectionInfo.getHandler()).forceClose();
 
@@ -228,7 +229,7 @@ public abstract class AbstractAuthCodec implements ByteCodec {
 
                     Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
                     Document doc = SecureXmlParser.makeDocument(authMessageStringOnly);
-                    if(doc != null) {
+                    if (doc != null) {
                         authMessage = (AuthMessage) unmarshaller.unmarshal(doc);
                     }
                 } catch (Exception e) {

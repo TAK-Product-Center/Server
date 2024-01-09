@@ -42,7 +42,7 @@
     <!-- endbuild -->
 
 </head>
-<body ng-app="fed" data-ng-controller="ApplicationController" >
+<body ng-app="fed" >
 
 <nav class="navbar navbar-default navbar-fixed-top">
     <div class="container-fluid">
@@ -56,100 +56,6 @@
             <div ncy-breadcrumb></div>
         </div>
         <ul class="nav navbar-top-links navbar-right">
-            <!--<li class="dropdown">-->
-                <!--<a class="dropdown-toggle" data-toggle="dropdown" title="Commander Dashboard" ui-sref="commander-dashboard.editor">-->
-                    <!--<i class="fa fa-tachometer fa-fw"></i>-->
-                <!--</a>-->
-            <!--</li>-->
-            <!-- /.dropdown -->
-            <!--<li class="dropdown">-->
-            <!--<a class="dropdown-toggle" data-toggle="dropdown" title="Diagrams">-->
-            <!--<i class="fa fa-file-o fa-fw"></i>-->
-            <!--<i class="fa fa-caret-down"></i>-->
-            <!--</a>-->
-            <!--<ul class="dropdown-menu dropdown-user">-->
-            <!--<li class="dropdown-header">Diagrams</li>-->
-            <!--<li><a ui-sref="diagrams-new">New</a></li>-->
-            <!--<li><a ui-sref="diagrams-load">Load</a></li>-->
-            <!--<li><a ui-sref="manage.diagrams">Manage</a></li>-->
-            <!--</ul> &lt;!&ndash; /.dropdown-template &ndash;&gt;-->
-            <!--</li>-->
-            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
-
-            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
-            <!--<li class="dropdown">-->
-            <!--<a class="dropdown-toggle" data-toggle="dropdown" title="Instances">-->
-            <!--<i class="fa fa-line-chart fa-fw"></i>-->
-            <!--<i class="fa fa-caret-down"></i>-->
-            <!--</a>-->
-            <!--<ul class="dropdown-menu dropdown-user">-->
-            <!--<li class="dropdown-header">Instances</li>-->
-            <!--<li><a ui-sref="instances-new">New</a></li>-->
-            <!--<li><a ui-sref="instances-load">Load</a></li>-->
-            <!--<li><a ui-sref="manage.instances">Manage</a></li>-->
-            <!--</ul> &lt;!&ndash; /.dropdown-instances &ndash;&gt;-->
-            <!--</li>-->
-            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
-
-            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
-            <!--<li class="dropdown">-->
-            <!--<a class="dropdown-toggle" data-toggle="dropdown" title="Role/Product Sets">-->
-            <!--<i class="fa fa-tree fa-fw"></i>-->
-            <!--<i class="fa fa-caret-down"></i>-->
-            <!--</a>-->
-            <!--<ul class="dropdown-menu dropdown-user">-->
-            <!--<li class="dropdown-header">Role/Product Sets</li>-->
-            <!--<li><a ui-sref="role-product-set-new">New</a>-->
-            <!--<li><a ui-sref="role-product-set-load">Load</a>-->
-            <!--<li><a ui-sref="manage.role-sets">Manage</a>-->
-            <!--</ul> &lt;!&ndash; /.dropdown-instances &ndash;&gt;-->
-            <!--</li>-->
-            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
-
-
-            <!-- /.dropdown -->
-            <!--
-                            <li class="dropdown">
-                                <a class="dropdown-toggle" data-toggle="dropdown" title="Monitor">
-                                    <i class="fa fa-line-chart fa-fw"></i>
-                                    <i class="fa fa-caret-down"></i>
-                                </a>
-                                <ul class="dropdown-menu dropdown-user">
-                                    <li class="dropdown-header">Monitor</li>
-                                    <li><a ui-sref="monitor">Coming Soon</a></li>
-                                </ul>
-                            </li>
-            -->
-            <!-- /.dropdown -->
-
-            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
-            <!--<li class="dropdown">-->
-            <!--<a class="dropdown-toggle" data-toggle="dropdown" title="Manage">-->
-            <!--<i class="fa fa-cogs fa-fw"></i>-->
-            <!--<i class="fa fa-caret-down"></i>-->
-            <!--</a>-->
-            <!--<ul class="dropdown-menu dropdown-user">-->
-            <!--<li class="dropdown-header">Manage</li>-->
-            <!--<li><a ui-sref="manage.assets">Assets</a></li>-->
-            <!--<li><a ui-sref="manage.defaults">Defaults</a></li>-->
-            <!--</ul> &lt;!&ndash; /.dropdown-instance &ndash;&gt;-->
-            <!--</li>-->
-            <!--&lt;!&ndash; /.dropdown &ndash;&gt;-->
-
-            <!-- /.dropdown -->
-            <li class="dropdown">
-                <a class="dropdown-toggle" data-toggle="dropdown" title="Information">
-                    <i class="fa fa-info fa-fw"></i>
-                    <i class="fa fa-caret-down"></i>
-                </a>
-                <ul class="dropdown-menu dropdown-user">
-                    <!--<li><a ui-sref="config">Config</a></li>-->
-                    <!--<li><a ui-sref="about">About</a></li>-->
-                    <li><a ui-sref="help">Help</a></li>
-                </ul> <!-- /.dropdown-info -->
-            </li>
-            <!-- /.dropdown -->
-
         </ul>
     </div>
 </nav>
@@ -219,29 +125,17 @@
 
 <!-- build:js({.tmp,src/webapp}) scripts/scripts.js -->
 <script src="scripts/app.js"></script>
-<script src="modules/core/core_module.js"></script>
-<script src="modules/core/application_controller.js"></script>
 <script src="modules/config/config_module.js"></script>
 <script src="modules/config/config_service.js"></script>
 <script src="modules/config/config_controller.js"></script>
-<script src="modules/authentication/auth_module.js"></script>
-<script src="modules/authentication/auth_controller.js"></script>
-<script src="modules/authentication/auth_services.js"></script>
-<script src="modules/authentication/session_services.js"></script>
-<script src="modules/manage/manage_module.js"></script>
-<script src="modules/manage/manage_controller.js"></script>
-<script src="modules/logout/logout_module.js"></script>
-<script src="modules/logout/logout_controller.js"></script>
 <script src="modules/workflows/workflows_module.js"></script>
 <script src="modules/workflows/workflow_services.js"></script>
-<script src="modules/workflows/asset_services.js"></script>
 <script src="modules/workflows/defaults_services.js"></script>
 <script src="modules/workflows/semantics_service.js"></script>
 <script src="modules/workflows/workflow_critic.js"></script>
 <script src="modules/workflows/workflows_controller.js"></script>
 <script src="modules/workflows/workflows_factory.js"></script>
 <script src="modules/workflows/joint_paper_factory.js"></script>
-<script src="modules/workflows/display_tc_controller.js"></script>
 <script src="modules/workflows/add_bpmn_federate_controller.js"></script>
 <script src="modules/workflows/add_federate_group_controller.js"></script>
 <script src="modules/workflows/add_federation_outgoing_controller.js"></script>
@@ -251,16 +145,9 @@
 <script src="modules/workflows/add_ontology_element_controller.js"></script>
 <script src="modules/workflows/new_workflow_controller.js"></script>
 <script src="modules/workflows/load_workflow_controller.js"></script>
+<script src="modules/workflows/home_controller.js"></script>
 <script src="modules/workflows/add_bpmn_subprocess_controller.js"></script>
-<script src="modules/workflows/add_bpmn_transition_controller.js"></script>
-<script src="modules/workflows/edit_attributes_controller.js"></script>
-<script src="modules/workflows/select_asset_controller.js"></script>
-<script src="modules/workflows/lifecycle_command_controller.js"></script>
-<script src="modules/workflows/attribute_expression_editor_controller.js"></script>
-<script src="modules/workflows/add_policy_filter_controller.js"></script>
 <script src="modules/ontology/ontology_service.js"></script>
-<script src="modules/commander-dashboard/commander_dashboard_module.js"></script>
-<script src="modules/commander-dashboard/commander_dashboard_controller.js"></script>
 <script src="lib/queryBuilder/querybuilder.js"></script>
 <!-- endbuild -->
 <script src="lib/require.js"></script>

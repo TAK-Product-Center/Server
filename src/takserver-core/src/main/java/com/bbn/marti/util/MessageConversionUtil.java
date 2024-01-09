@@ -2,14 +2,6 @@
 
 package com.bbn.marti.util;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -21,12 +13,7 @@ import java.util.UUID;
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Marshaller;
-import javax.xml.bind.Unmarshaller;
 
-import org.apache.commons.io.FileUtils;
 import org.dom4j.Attribute;
 import org.json.JSONObject;
 import org.json.XML;
@@ -49,7 +36,7 @@ import com.bbn.marti.remote.socket.MissionChange;
 import com.bbn.marti.remote.socket.SituationAwarenessMessage;
 import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.service.TransportCotEvent;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
@@ -213,7 +200,7 @@ public class MessageConversionUtil {
         String id = null;
 
         try {
-            id = new Integer(socket.hashCode()).toString();
+            
         } catch (Exception e) {
             logger.debug("exception getting connection id", e);
         }
@@ -225,7 +212,7 @@ public class MessageConversionUtil {
         String id = null;
 
         try {
-            id = new Integer(socket.hashCode()).toString();
+            id = Integer.valueOf(socket.hashCode()).toString();
         } catch (Exception e) {
             logger.debug("exception getting connection id", e);
         }
@@ -247,71 +234,7 @@ public class MessageConversionUtil {
         return ip;
     }
 
-    /**
-     * Parses an XML file to the specified packageName.  It issumes the packageName is valid and that is has been
-     * generated from the schema
-     *
-     * @param xmlFile     The file to open
-     * @param packageName The name of the package that corresponds to the contents of the file
-     * @param <T>         The type corresponding to the packagename
-     * @return The object of type {@link T} if the file exists, null if it does not
-     * @throws FileNotFoundException If the file was not found
-     * @throws JAXBException         If a parsing exception occurs
-     */
-    public static <T> T loadJAXifiedXML(String xmlFile, String packageName) throws FileNotFoundException, JAXBException {
-    	
-        File f = new File(xmlFile);
-        
-        try(InputStream is = new FileInputStream(f)) {
-            JAXBContext jc = JAXBContext.newInstance(packageName);
-            Unmarshaller u = jc.createUnmarshaller();
-            return (T) u.unmarshal(is);
-        }
-        catch (FileNotFoundException ex){
-        	logger.error(xmlFile + " not found.");
-        	return null;
-        } catch (IOException ex){
-        	logger.error("Error loading XML from " + xmlFile, ex);
-        	return null;
-        }
-    }
 
-    /**
-     * Saves The object created with JAXB to an xml file
-     * @param xmlFile The target file
-     * @param obj THe object to serialize
-     * @param createNewIfNecessary If true, a new file will be created if one does not exist
-     * @throws IOException If an IOException occurs. May result in a mangled file
-     * @throws JAXBException If a JAXBException occurs. Will not result in a mangled file
-     */
-    public static void saveJAXifiedObject(String xmlFile, Object obj, boolean createNewIfNecessary) throws IOException, JAXBException {
-        // First write it into a ByteArrayOutputStream so JAXBExceptions don't result in a mangled original file
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        String packageName = obj.getClass().getPackage().getName();
-        JAXBContext jc = JAXBContext.newInstance(packageName, obj.getClass().getClassLoader());
-        Marshaller m = jc.createMarshaller();
-        m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
-        m.marshal(obj, baos);
-
-        // Yay, not JAXBException. Now write to the file
-        File file = new File(xmlFile);
-
-        // Create a new file if necessary and allowed
-        if (!file.exists() && createNewIfNecessary){
-            file.createNewFile();
-        }
-        else{
-            File copied = new File(xmlFile + ".backup");
-            FileUtils.copyFile(file, copied);
-        }
-
-        try(OutputStream fos = new FileOutputStream(file)) {
-            // Write to the file
-            baos.writeTo(fos);
-            fos.flush();
-        }
-    }
-    
     public InputMetric getInputMetric(Input input) {
     	if (input == null) {
     		throw new IllegalArgumentException("null input object");
@@ -330,7 +253,7 @@ public class MessageConversionUtil {
             LdapName ldapName = new LdapName(dn);
 
             for(Rdn rdn : ldapName.getRdns()) {
-                if(rdn.getType().equalsIgnoreCase("CN")) {
+                if (rdn.getType().equalsIgnoreCase("CN")) {
 
                     return rdn.getValue().toString();
                 }
@@ -658,7 +581,7 @@ public class MessageConversionUtil {
 
                         //logger.debug("Chatroom uid: " + chatroom + " == contact uid: " + contact.getUid() );
                         //Next try to match to a uid
-                        if(contact.getUid().equals(chatroom)){
+                        if (contact.getUid().equals(chatroom)){
                             logger.trace("Matched chatroom id to contact uid: " + contact);
                             result.getAddresses().add("uid:" + chatroom);
                             added = true;
@@ -666,7 +589,7 @@ public class MessageConversionUtil {
                         }
                     }
                     //If chatroom id can't be matched to a contact, treat it as an actual chatroom
-                    if(!added){
+                    if (!added){
                         logger.trace("Didn't match chatroom to name or id, treating as normal chatroom");
                         result.getAddresses().add("chatroom:" + chatroom);
                     }

@@ -5,11 +5,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
@@ -22,7 +22,7 @@ import org.springframework.security.core.SpringSecurityCoreVersion;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
+import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
@@ -85,7 +85,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 						String refreshToken = (String) request.getSession().getAttribute(fedHubConfig.getKeycloakRefreshTokenName());
 						if (Strings.isNullOrEmpty(refreshToken)) {
 							SecurityContextHolder.clearContext();
-							AuthCookieUtils.logout(request, response, null);
+							AuthCookieUtils.logout(request, response);
 							return;
 						}
 
@@ -106,7 +106,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 					}
 
 					if (claims == null) {
-						throw new InvalidTokenException("Unable to parse claims from token : " + cookieToken);
+						throw new InvalidBearerTokenException("Unable to parse claims from token : " + cookieToken);
 					}
 										
 					// make sure the keycloak token has an email and contains the admin claim

@@ -27,14 +27,14 @@ public class DropEventFilter implements CotFilter {
 
 	@Override
 	public CotEventContainer filter(CotEventContainer c) {
-		if(type != null && type.compareTo(c.getType()) != 0) {
+		if (type != null && type.compareTo(c.getType()) != 0) {
 			if (log.isDebugEnabled()) {
 				log.debug("cot event type : " + c.getType() + " didnt match filter type : " + type);
 			}
 			return c;
 		}
 
-		if(detail != null && !c.getDetailXml().contains(detail)) {
+		if (detail != null && !c.getDetailXml().contains(detail)) {
 			if (log.isDebugEnabled()) {
 				log.debug("cot detail : " + c.getDetailXml() + " didnt match filter detail: " + detail);
 			}
@@ -46,9 +46,9 @@ public class DropEventFilter implements CotFilter {
 			return null;
 		}
 
-		if(seenList.containsKey(c.getUid())) {
+		if (seenList.containsKey(c.getUid())) {
 			long ctime = System.currentTimeMillis();
-			if((seenList.get(c.getUid()) + threshold) < ctime) {
+			if ((seenList.get(c.getUid()) + threshold) < ctime) {
 				if (log.isDebugEnabled()) {
 					log.debug("threshold exceeded for cot type : " + c.getType() + ", uid : " + c.getUid());
 				}

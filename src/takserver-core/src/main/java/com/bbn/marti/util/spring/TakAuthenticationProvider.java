@@ -4,14 +4,12 @@ package com.bbn.marti.util.spring;
 
 import java.security.cert.X509Certificate;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
-import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.remoting.RemoteLookupFailureException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,13 +19,14 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.oauth2.common.exceptions.OAuth2Exception;
-import org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationDetails;
+import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
+import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.security.web.authentication.session.SessionAuthenticationException;
 
 import com.bbn.marti.exceptions.CoreCommunicationException;
-import com.bbn.marti.remote.CoreConfig;
+
+import com.bbn.marti.remote.exception.RemoteLookupFailureException;
 import com.bbn.marti.remote.groups.AuthResult;
 import com.bbn.marti.remote.groups.AuthStatus;
 import com.bbn.marti.remote.groups.AuthenticatedUser;
@@ -38,6 +37,7 @@ import com.bbn.marti.remote.util.RemoteUtil;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 /*
  * Spring Security authentication provider that delegates authentication to GroupManager, and does authorization based on whatever UserService is available.
@@ -57,10 +57,7 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
     
     @Autowired
     private RolePortUserServiceWrapper rpusw;
-    
-    @Autowired
-    private CoreConfig coreConfig;
-    
+
     private String httpsAndBasicRole;
     
     public UserDetailsService getUserDetailsService() {
@@ -86,8 +83,16 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
         if (PreAuthenticatedAuthenticationToken.class.isAssignableFrom(authentication)) {
             return true;
         }
-        
-        return (UsernamePasswordAuthenticationToken.class.isAssignableFrom(authentication));
+
+        if (UsernamePasswordAuthenticationToken.class.isAssignableFrom(authentication)) {
+            return true;
+        }
+
+        if (BearerTokenAuthenticationToken.class.isAssignableFrom(authentication)) {
+            return true;
+        }
+
+        return false;
     }
 
     @Override
@@ -137,16 +142,20 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
         }
 
         X509Certificate clientCert = null;
-        
+        String token = null;
+
         if (PreAuthenticatedAuthenticationToken.class.isAssignableFrom(authentication.getClass())) {
             if (((PreAuthenticatedAuthenticationToken) authentication).getCredentials() instanceof X509Certificate) {
                 clientCert = (X509Certificate) ((PreAuthenticatedAuthenticationToken) authentication).getCredentials();
                 request.getSession().setAttribute(Constants.X509_CERT, clientCert);
                 request.getSession().setAttribute(Constants.X509_CERT_FP, remoteUtil.getCertSHA256Fingerprint(clientCert));
+            } else if (((PreAuthenticatedAuthenticationToken) authentication).getPrincipal() instanceof String) {
+                token = (String)((PreAuthenticatedAuthenticationToken) authentication).getPrincipal();
             }
         }
-        
+
         User user = new AuthenticatedUser(username, connectionId, ip, clientCert, username, password, "", ConnectionType.WEB);
+        user.setToken(token);
         
         if (logger.isTraceEnabled()) {
         	logger.trace(user.toString());
@@ -159,11 +168,11 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
             authResult = groupManager.authenticate(authenticatorName, user);
         } catch (RemoteLookupFailureException e) {
             throw new CoreCommunicationException("Unable to establish connection with TAK Server core services", e);
-        } catch (OAuth2Exception | JwtException e) {
+        } catch (InvalidBearerTokenException | JwtException e) {
             if (logger.isDebugEnabled()) {
                 logger.debug("{}", e.getMessage(), e);
             }
-            throw e;
+            throw new InvalidBearerTokenException(e.getMessage(), e);
         } catch (Exception e) {
             throw new BadCredentialsException("Exception performing TAK Server authentication", e);
         } 
@@ -174,7 +183,7 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
         		logger.debug("auth success for authentication type " + authentication.getClass());
         	}
             
-            String requestPort = new Integer(request.getLocalPort()).toString();
+            String requestPort = Integer.valueOf(request.getLocalPort()).toString();
 
             if (logger.isDebugEnabled()) {
             	logger.debug("request port " + requestPort);
@@ -231,21 +240,16 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
         try {
             User coreUser = null;
 
-            // X509 and OAuth Authentication will be this type
             if (PreAuthenticatedAuthenticationToken.class.isAssignableFrom(authentication.getClass())) {
-
-                String authenticatorName = "X509";
-                if (OAuth2AuthenticationDetails.class.isAssignableFrom(authentication.getDetails().getClass())) {
-                    authenticatorName = "oauth";
-                }
-
-                coreUser = authenticateCore(authentication, authenticatorName);
-            }  else {
+                coreUser = authenticateCore(authentication, "X509");
+            } else if (BearerTokenAuthenticationToken.class.isAssignableFrom(authentication.getClass())) {
+                coreUser = authenticateCore(authentication, "oauth");
+            } else {
                 try {
-                    coreUser = authenticateCore(authentication, coreConfig.getRemoteConfiguration().getAuth().getDefault());
+                    coreUser = authenticateCore(authentication, CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getDefault());
                 } catch (RemoteLookupFailureException e) {
                     return super.authenticate(authentication);
-                } catch (BadCredentialsException | UsernameNotFoundException | SessionAuthenticationException | OAuth2Exception e) {
+                } catch (BadCredentialsException | UsernameNotFoundException | SessionAuthenticationException | InvalidBearerTokenException e) {
                     throw e;
                 } catch (Exception e) {
                     throw new RuntimeException(e);

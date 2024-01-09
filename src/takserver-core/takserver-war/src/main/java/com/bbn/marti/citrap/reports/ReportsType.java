@@ -10,8 +10,11 @@ package com.bbn.marti.citrap.reports;
 
 import java.util.ArrayList;
 import java.util.List;
-import javax.xml.bind.annotation.*;
-
+import jakarta.xml.bind.annotation.XmlAccessType;
+import jakarta.xml.bind.annotation.XmlAccessorType;
+import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.bind.annotation.XmlType;
 
 /**
  * <p>Java class for reportsType complex type.

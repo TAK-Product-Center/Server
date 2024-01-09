@@ -5,13 +5,12 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.UnknownHostException;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PreDestroy;
 
 import org.apache.log4j.Logger;
 
@@ -23,18 +22,19 @@ import com.bbn.marti.nio.grpc.GrpcStreamingServer;
 import com.bbn.marti.nio.netty.handlers.NioNettyTcpStaticSubHandler;
 import com.bbn.marti.nio.netty.handlers.NioNettyUdpHandler;
 import com.bbn.marti.nio.netty.initializers.NioNettyInitializer;
+import com.bbn.marti.nio.quic.QuicStreamingServer;
 import com.bbn.marti.remote.ConnectionStatus;
 import com.bbn.marti.remote.ConnectionStatusValue;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.User;
-import com.bbn.marti.service.DistributedConfiguration;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.service.Resources;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
 
 import io.micrometer.core.lang.NonNull;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.ChannelFactory;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -69,10 +69,10 @@ public class NioNettyBuilder implements Serializable {
 	private EventLoopGroup udpBossGroup;
 	private EventLoopGroup workerGroup;
 	private EventLoopGroup bossGroup;
-	private final DistributedConfiguration config = DistributedConfiguration.getInstance();
-	private final FederationServer federationServer = config.getRemoteConfiguration().getFederation().getFederationServer();
+	private final FederationServer federationServer = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer();
 	private final Map<Integer, ChannelFuture> portToNettyServer = new ConcurrentHashMap<>();
 	private final Map<Integer, GrpcStreamingServer> portToGrpcServer = new ConcurrentHashMap<>();
+	private final Map<Integer, QuicStreamingServer> portToQuicServer = new ConcurrentHashMap<>();
 	private final Map<Integer, Input> portToInput = new ConcurrentHashMap<>();
 
 	private static NioNettyBuilder instance = null;
@@ -90,7 +90,7 @@ public class NioNettyBuilder implements Serializable {
 	}
 	
 	public NioNettyBuilder() {
-		isEpoll = Epoll.isAvailable() && DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().isUseLinuxEpoll();
+		isEpoll = Epoll.isAvailable() && CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isUseLinuxEpoll();
 		
 		int baselineHighMark = 4096;
 		int baselineMaxOptimalMessagesPerMinute = 250;
@@ -202,20 +202,29 @@ public class NioNettyBuilder implements Serializable {
 	}
 
 	public void buildTlsServer(@NonNull Input input) {
-		startServer(NioNettyInitializer.Pipeline.initializer.tlsServer(input, config.getSecurity().getTls()), input.getPort());
+		startServer(NioNettyInitializer.Pipeline.initializer.tlsServer(input, CoreConfigFacade.getInstance().getRemoteConfiguration().getSecurity().getTls()), input.getPort());
 	}
 	
 	public void buildGrpcServer(@NonNull Input input) {
 		WriteBufferWaterMark waterMark = new WriteBufferWaterMark(lowMark, highMark);
-		SslContext sslContext = NioNettyInitializer.Pipeline.initializer.grpcServer(input, config.getSecurity().getTls()).getSslContext();
+		SslContext sslContext = NioNettyInitializer.Pipeline.initializer.grpcServer(input,
+				CoreConfigFacade.getInstance().getRemoteConfiguration().getSecurity().getTls()).getSslContext();
 		GrpcStreamingServer grpcStreamingServer = new GrpcStreamingServer();
 		grpcStreamingServer.start(input, waterMark, sslContext);
 		portToGrpcServer.put(input.getPort(), grpcStreamingServer);
+	}
+	
+	public void buildQuicServer(@NonNull Input input) {
+		QuicStreamingServer quicServer = new QuicStreamingServer(input, highMark);
+		quicServer.start();
+		portToQuicServer.put(input.getPort(), quicServer);
+		portToInput.put(input.getPort(), input);
 	}
 
 	public void stopServer(int port) {
 		Optional.ofNullable(portToNettyServer.get(port)).ifPresent(future -> future.channel().close());
 		Optional.ofNullable(portToGrpcServer.get(port)).ifPresent(grpcServer -> grpcServer.stop());
+		Optional.ofNullable(portToQuicServer.get(port)).ifPresent(quicServer -> quicServer.stop());
 		portToInput.remove(port);
 		portToGrpcServer.remove(port);
 	}
@@ -253,7 +262,7 @@ public class NioNettyBuilder implements Serializable {
 		startClient(NioNettyInitializer.Pipeline.initializer.federationClient(federationServer, outgoing, status),
 				new InetSocketAddress(InetAddress.getByName(outgoing.getAddress()), outgoing.getPort()),
 				(e) -> {
-					if(status.getConnectionStatusValue() != ConnectionStatusValue.RETRY_SCHEDULED) {
+					if (status.getConnectionStatusValue() != ConnectionStatusValue.RETRY_SCHEDULED) {
 						DistributedFederationManager.getInstance().checkAndSetReconnectStatus(outgoing, e.getMessage());
 					}
 				});

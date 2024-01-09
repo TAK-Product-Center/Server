@@ -3,8 +3,9 @@ package com.bbn.marti.sync.service;
 import java.util.Date;
 import java.util.List;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,22 +20,19 @@ public class MissionCacheWarmer {
 
 	@Autowired
 	private MissionService missionService;
-	
+
 	@Autowired
 	private CommonUtil commonUtil;
-	
+
 	@Autowired
 	private MissionCacheHelper cacheHelper;
-	
-	@Autowired
-	private CoreConfig coreConfig;
-	
+
 	private final Logger logger = LoggerFactory.getLogger(MissionCacheWarmer.class);
-	
+
 	@PostConstruct
 	private void init() {
-		
-		if (coreConfig.getRemoteConfiguration().getBuffer().getQueue().isEnableCacheWarmer()) {
+
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().isEnableCacheWarmer()) {
 
 			try {
 				logger.info("initializing mission cache");
@@ -55,5 +53,5 @@ public class MissionCacheWarmer {
 				logger.error("exception initializing caches", e);
 			}
 		}
-	}	
+	}
 }

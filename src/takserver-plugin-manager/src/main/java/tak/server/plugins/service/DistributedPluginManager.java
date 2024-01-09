@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class DistributedPluginManager implements PluginManager, Service {
 
@@ -328,26 +329,25 @@ public class DistributedPluginManager implements PluginManager, Service {
     @Override
     public void onFileUpload(String pluginClassName, Metadata metadata) {
 
-        if (Strings.isNullOrEmpty(pluginClassName)) {
-            throw new IllegalArgumentException("plugin class name is empty");
-        }
-
         AtomicInteger counter = new AtomicInteger();
 
-        // notify any plugin matching the class name
-        getAllPlugins()
-                .stream()
-                .filter(plugin -> plugin.getPluginInfo().getClassName().equals(pluginClassName))
-                .forEach(plugin -> {
-                    if (plugin.getPluginInfo().isStarted()) {
-                        plugin.onFileUploadEvent(metadata);
-                    } else {
-                        logger.error("Plugin {} is not started", pluginClassName);
-                    }
-                    counter.incrementAndGet();
-                });
+        Stream<PluginLifecycle> plugins = getAllPlugins().stream();
 
-        if (counter.get() == 0) {
+        // if pluginClassName is provided, only notify plugins matching the class name
+        if (pluginClassName != null) {
+            plugins = plugins.filter(plugin -> plugin.getPluginInfo().getClassName().equals(pluginClassName));
+        }
+
+        plugins.forEach(plugin -> {
+            if (plugin.getPluginInfo().isStarted()) {
+                plugin.onFileUploadEvent(metadata);
+            } else {
+                logger.error("Plugin {} is not started", plugin.getPluginInfo().getClassName());
+            }
+            counter.incrementAndGet();
+        });
+
+        if (pluginClassName != null && counter.get() == 0) {
             throw new IllegalArgumentException("no plugin with class name " + pluginClassName + " is currently installed.");
         }
     }

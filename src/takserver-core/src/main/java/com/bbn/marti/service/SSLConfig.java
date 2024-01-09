@@ -45,7 +45,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.marti.config.ConfigHelper;
+import com.bbn.marti.remote.config.ConfigHelper;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.nio.util.SslSource;
 import com.bbn.marti.util.Assertion;

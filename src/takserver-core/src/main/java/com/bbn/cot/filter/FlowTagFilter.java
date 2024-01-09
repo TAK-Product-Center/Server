@@ -42,7 +42,7 @@ public class FlowTagFilter implements CotFilter {
 			// check to make sure detail field exists
 			Element detailElem = c.getDocument().getRootElement()
 					.element("detail");
-			if(detailElem == null)
+			if (detailElem == null)
              {
                 return c;  // invalid CoT, but this isn't the right place to stop it
             }

@@ -1,6 +1,10 @@
 package tak.server.federation.hub.ui.graph;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,9 +22,9 @@ public class FilterUtils {
     public static String filterNodeToString(FilterNode filterNode) {
         if (filterNode.getType().equals(FILTER_TYPE)) {
             return filterToString(filterNode.getFilter());
-        } else if(filterNode.getType().equals(AND_TYPE)) {
+        } else if (filterNode.getType().equals(AND_TYPE)) {
             return andedFiltersToString(filterNode.getNodes());
-        } else if(filterNode.getType().equals(OR_TYPE)) {
+        } else if (filterNode.getType().equals(OR_TYPE)) {
             return oredFiltersToString(filterNode.getNodes());
         }
         return "";
@@ -31,7 +35,7 @@ public class FilterUtils {
         filterStringBuilder.append(edgeFilter.name).append("(");
         for(int i = 0; i < edgeFilter.getArgs().size(); i++) {
             filterStringBuilder.append(valueToString(edgeFilter.getArgs().get(i)));
-            if(isNotLastIndex(edgeFilter.getArgs(), i)) {
+            if (isNotLastIndex(edgeFilter.getArgs(), i)) {
                 filterStringBuilder.append(", ");
             }
         }
@@ -100,15 +104,15 @@ public class FilterUtils {
         filterNodes.stream().filter(node -> node.getType().equals(AND_TYPE)).forEach(andList::add);
         filterNodes.stream().filter(node -> node.getType().equals(OR_TYPE)).forEach(orList::add);
 
-        if(!nodeList.isEmpty()) {
+        if (!nodeList.isEmpty()) {
             nodeList.addAll(andList);
             nodeList.addAll(orList);
             return nodeList;
-        } else if(!andList.isEmpty()) {
+        } else if (!andList.isEmpty()) {
             andList.stream().forEach(node -> nodeList.addAll(node.getNodes()));
             nodeList.addAll(orList);
             return getValidNodeList(nodeList);
-        } else if(!orList.isEmpty()) {
+        } else if (!orList.isEmpty()) {
             return orList;
         }
 
@@ -116,7 +120,7 @@ public class FilterUtils {
     }
 
     private static String valueToString(FilterArgument argument) {
-        if(argument.getType().equals("string")) {
+        if (argument.getType().equals("string")) {
             return "\"" + argument.getValue() + "\"";
         }
         return argument.getValue();

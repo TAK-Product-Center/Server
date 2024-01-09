@@ -7,6 +7,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.log4j.Logger;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
@@ -36,7 +37,7 @@ public class MessageReadStrategy extends MessageBaseStrategy<CotEventContainer> 
 		
 		// populate rate limit table
 		// this table is used for rapid lookup of rate limits when client counts change
-		for (RateLimitRule rule : config.getRemoteConfiguration().getFilter().getQos().getReadRateLimiter().getRateLimitRule()) {
+		for (RateLimitRule rule : CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getQos().getReadRateLimiter().getRateLimitRule()) {
 			rateLimits.put(rule.getClientThresholdCount(), rule.getReportingRateLimitSeconds());
 			rateThresholds.add(rule.getClientThresholdCount());
 			
@@ -48,7 +49,7 @@ public class MessageReadStrategy extends MessageBaseStrategy<CotEventContainer> 
 		// sort rate threshold in descending order, because we will use the first rate that matches client count
 		rateThresholds.sort(Collections.reverseOrder());
 		
-		enabled.set(config.getRemoteConfiguration().getFilter().getQos().getReadRateLimiter().isEnabled());
+		enabled.set(CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getQos().getReadRateLimiter().isEnabled());
         
         isInit.set(true);
 	}
@@ -60,7 +61,7 @@ public class MessageReadStrategy extends MessageBaseStrategy<CotEventContainer> 
 		
 		// populate rate limit table
 		// this table is used for rapid lookup of rate limits when client counts change
-		for (RateLimitRule rule : config.getRemoteConfiguration().getFilter().getQos().getReadRateLimiter().getRateLimitRule()) {
+		for (RateLimitRule rule : CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getQos().getReadRateLimiter().getRateLimitRule()) {
 			rateLimits.put(rule.getClientThresholdCount(), rule.getReportingRateLimitSeconds());
 			rateThresholds.add(rule.getClientThresholdCount());
 			

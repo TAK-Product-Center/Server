@@ -3,12 +3,15 @@ package tak.server.federation.hub.broker;
 import static io.grpc.MethodDescriptor.generateFullMethodName;
 import static java.util.Objects.requireNonNull;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -21,11 +24,15 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import com.atakmap.Tak.BinaryBlob;
 import com.atakmap.Tak.ClientHealth;
 import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederatedChannelGrpc;
@@ -34,6 +41,7 @@ import com.atakmap.Tak.FederatedChannelGrpc.FederatedChannelStub;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.Identity;
 import com.atakmap.Tak.ROL;
+import com.atakmap.Tak.ROL.Builder;
 import com.atakmap.Tak.ServerHealth;
 import com.atakmap.Tak.ServerHealth.ServingStatus;
 import com.atakmap.Tak.Subscription;
@@ -42,6 +50,7 @@ import com.bbn.roger.fig.FigProtocolNegotiator;
 import com.bbn.roger.fig.Propagator;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.ByteString;
 
 import io.grpc.ClientCall;
 import io.grpc.ManagedChannel;
@@ -65,6 +74,7 @@ import tak.server.federation.FederateIdentity;
 import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.GuardedStreamHolder;
 import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
+import tak.server.federation.hub.broker.db.FederationHubMissionDisruptionManager;
 import tak.server.federation.hub.broker.events.HubClientDisconnectEvent;
 import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
 
@@ -75,11 +85,13 @@ import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
  */
 public class HubFigClient implements Serializable {
 
+	private static final long serialVersionUID = 1L;
+
 	private static final Logger logger = LoggerFactory.getLogger(HubFigClient.class);
 
 	private static final int NUM_AVAIL_CORES = Runtime.getRuntime().availableProcessors();
 
-	private static ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+	private ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
 	// shared executor
 	public static final ExecutorService federationGrpcExecutor = newGrpcThreadPoolExecutor("grpc-federation-executor",1, NUM_AVAIL_CORES);
@@ -106,6 +118,7 @@ public class HubFigClient implements Serializable {
 	private FederationHubServerConfig fedHubConfig;
 	private String host;
 	private int port;
+	private X509Certificate[] sessionCerts;
 	private String fedName;
 	private String clientUid = UUID.randomUUID().toString().replace("-", "");
 
@@ -132,8 +145,11 @@ public class HubFigClient implements Serializable {
 	private Subscription serverSubscription;
 	private HubConnectionInfo info;
 	
-	public HubFigClient(FederationHubServerConfig fedHubConfig, FederationOutgoingCell federationOutgoingCell) {
+	private FederationHubMissionDisruptionManager federationHubMissionDisruptionManager;
+	
+	public HubFigClient(FederationHubServerConfig fedHubConfig, FederationHubMissionDisruptionManager federationHubMissionDisruptionManager, FederationOutgoingCell federationOutgoingCell) {
 		this.fedHubConfig = fedHubConfig;
+		this.federationHubMissionDisruptionManager = federationHubMissionDisruptionManager;
 		this.host = federationOutgoingCell.getProperties().getHost();
 		this.port = federationOutgoingCell.getProperties().getPort();
 		this.fedName = federationOutgoingCell.getProperties().getOutgoingName();
@@ -192,7 +208,7 @@ public class HubFigClient implements Serializable {
 				new StreamObserver<FederateGroups>() {
 
 					@Override
-					public void onNext(FederateGroups value) {						
+					public void onNext(FederateGroups value) {
 						// once the group stream is established, we are ready to setup event streaming
 						if (value.getStreamUpdate() != null && value.getStreamUpdate().getStatus() == ServingStatus.SERVING) {
 							setupEventStreamSender();
@@ -295,8 +311,10 @@ public class HubFigClient implements Serializable {
 					@Override
 					public X509Certificate[] propogate(X509Certificate[] certs) {
 						try {
+							sessionCerts = certs;
 							X509Certificate clientCert = certs[0];
 							X509Certificate caCert = certs[1];
+
 							String fingerprint = FederationUtils.getBytesSHA256(clientCert.getEncoded());
 							String issuerDN = clientCert.getIssuerX500Principal().getName();
 							String issuerCN = Optional.ofNullable(FederationHubBrokerImpl.getCN(issuerDN)).map(cn -> cn.toLowerCase()).orElse("");							
@@ -472,7 +490,7 @@ public class HubFigClient implements Serializable {
             FederateEdge edge = fpg.getEdge(otherClientNode, clientNode);
             if (otherClientNode != null && edge != null) {
                 for (FederatedEvent event : otherClient.getCache()) {
-                	if(FederationHubBrokerService.isDestinationReachableByGroupFilter(edge, event.getFederateGroupsList())) {
+                	if (FederationHubBrokerService.isDestinationEdgeReachableByGroupFilter(edge, event.getFederateGroupsList())) {
 	                	eventStreamHolder.send(event);
 	                    if (logger.isDebugEnabled()) {
 	                        logger.debug("Sending v2 cached " + event +
@@ -524,7 +542,31 @@ public class HubFigClient implements Serializable {
                 }, true
             );
 		
+		// get the changes, but don't send till we add the rolStream because the stream will get used
+        // down the line for getting the session id        
+		FederationHubMissionDisruptionManager.OfflineMissionChanges changes = null;
+        if (fedHubConfig.isMissionFederationDisruptionEnabled()) {
+        	changes = federationHubMissionDisruptionManager.getMissionChangesAndTrackConnectEvent(
+            		rolStreamHolder.getFederateIdentity().getFedId(), sessionCerts);
+        }
+		
 		FederationHubDependencyInjectionProxy.getInstance().hubConnectionStore().addRolStream(fedName, rolStreamHolder);
+		
+		AtomicLong delayMs = new AtomicLong(5000l);
+		
+		if (changes != null) {
+			for(final Entry<ObjectId, ROL.Builder> entry: changes.getResourceRols().entrySet()) {
+				FederationHubBrokerService.getInstance().getMfdtScheduler().schedule(() -> {
+					ROL rol = federationHubMissionDisruptionManager.hydrateResourceROL(entry.getKey(), entry.getValue());
+					rolStreamHolder.send(rol);
+				}, delayMs.getAndAdd(500), TimeUnit.MILLISECONDS);
+			}
+			for(final ROL rol: changes.getRols()) {
+				FederationHubBrokerService.getInstance().getMfdtScheduler().schedule(() -> {
+					rolStreamHolder.send(rol);
+				}, delayMs.getAndAdd(100), TimeUnit.MILLISECONDS);
+			}
+		}
 	}
 
 	private final AtomicBoolean hasDisconnected = new AtomicBoolean(false);

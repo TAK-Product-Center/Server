@@ -1,5 +1,6 @@
 package com.bbn.marti.groups;
 
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -15,7 +16,12 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
 import com.google.common.collect.ImmutableSet;
+
+import org.dom4j.DocumentException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +30,7 @@ import com.bbn.cot.filter.FlowTagFilter;
 import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
 import com.bbn.marti.feeds.DataFeedService;
 import com.bbn.marti.nio.channel.ChannelHandler;
+import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
@@ -32,20 +39,22 @@ import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.service.BrokerService;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.FederatedSubscriptionManager;
 import com.bbn.marti.service.Subscription;
 import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.service.DistributedDataFeedCotService;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 import tak.server.Constants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 import tak.server.federation.FederateSubscription;
 import tak.server.federation.FigFederateSubscription;
 import tak.server.federation.RemoteContactWithSA;
+import tak.server.ignite.cache.IgniteCacheHolder;
+import tak.server.messaging.MessageConverter;
 import tak.server.messaging.Messenger;
 
 public class MessagingUtilImpl implements MessagingUtil {
@@ -71,6 +80,9 @@ public class MessagingUtilImpl implements MessagingUtil {
 	@Autowired
 	private FlowTagFilter flowTagFilter;
 	
+	@Autowired
+	private MessageConverter messageConverter;
+
 	private static MessagingUtilImpl instance;
 	
 	public static MessagingUtilImpl getInstance() {
@@ -115,10 +127,6 @@ public class MessagingUtilImpl implements MessagingUtil {
 
 	@Override
 	public void sendLatestReachableSA(User destUser) {
-		// don't send latest SA if we're in vbm mode with sa sharing disabled
-//		if (DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled() && 
-//				DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isDisableSASharing()) return;
-
 		if (destUser == null || groupManager == null || subscriptionManager == null) {
 			throw new IllegalArgumentException("null user, GroupManager or SubscriptionManager");
 		}
@@ -140,11 +148,26 @@ public class MessagingUtilImpl implements MessagingUtil {
 		
 		if (destSubscription instanceof FederateSubscription ) {
 			// make sure if we are sending to a federate, data feed federation is enabled
-			if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
 				sendLatestFeedEventsToSub(destSubscription);
 			}
 		} else {
 			sendLatestFeedEventsToSub(destSubscription);
+		}
+		
+		// Check cluster configuration and if clustered use ignite cache for distributed SAs
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled() && destUser != null) {
+			String groupVector = IgniteCacheHolder.getIgniteUserOutboundGroupCache().get(destUser.getConnectionId());
+			Collection<String> SAs = IgniteCacheHolder.getAllLatestSAsForGroupVector(groupVector);
+			for (String SA : SAs) {
+				try {
+					CotEventContainer saEvent = new CotEventContainer(messageConverter.parseXml(SA));
+					sendLatestSA(saEvent, destSubscription);
+				} catch (DocumentException e){
+					logger.error("Error parsing SA to CoT", e);
+				}
+			}
+			return;
 		}
 
 		Reachability<User> r = new CommonGroupDirectedReachability(groupManager);
@@ -237,7 +260,7 @@ public class MessagingUtilImpl implements MessagingUtil {
 	
 	private void sendLatestFeedEventsToSub(Subscription sub) {
 		try {
-			if (DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled()) return;
+			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled()) return;
 			
 			Set<Group> groups = groupManager.getGroups(sub.getUser());
 			groups = groups.stream().filter(g->g.getDirection() == Direction.OUT).collect(Collectors.toSet());
@@ -264,7 +287,7 @@ public class MessagingUtilImpl implements MessagingUtil {
 	public List<CotEventContainer> getLatestSAForHandler(ChannelHandler handler) {
 		List<CotEventContainer> rval = new LinkedList<>();
 		try {
-			if(federatedSubscriptionManager.getRemoteContactsMapByChannelHandler(handler) == null)
+			if (federatedSubscriptionManager.getRemoteContactsMapByChannelHandler(handler) == null)
 				return rval;
 
 			for (RemoteContactWithSA rc : federatedSubscriptionManager.getRemoteContactsMapByChannelHandler(handler).values()) {

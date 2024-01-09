@@ -60,7 +60,7 @@ public class RemoteContact implements Serializable {
 
     @Override
 	public boolean equals(Object otherContact) {
-		if(otherContact != null && 
+		if (otherContact != null && 
                       otherContact instanceof RemoteContact &&
                       this.uid.equals( ((RemoteContact)otherContact).uid)) 
                 {

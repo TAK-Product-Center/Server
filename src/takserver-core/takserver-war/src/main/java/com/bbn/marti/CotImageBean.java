@@ -335,7 +335,7 @@ public class CotImageBean implements Serializable {
 		// Construct SQL query
 		String sqlQuery = "SELECT id, uid, ST_AsKML(event_pt), ST_AsText(event_pt), cot_type, servertime, detail "
 				+ "FROM cot_router WHERE ";
-		if(sinceTimeMillis > 0) {
+		if (sinceTimeMillis > 0) {
 			sqlQuery += " servertime > ? AND ";
 		}
 		if (shouldGroup) {
@@ -351,7 +351,7 @@ public class CotImageBean implements Serializable {
 
 			int columnIndex = 1;
 
-			if(sinceTimeMillis > 0) {
+			if (sinceTimeMillis > 0) {
 				preparedQuery.setTimestamp(columnIndex++, new Timestamp(sinceTimeMillis));
 			}
 
@@ -389,12 +389,12 @@ public class CotImageBean implements Serializable {
 					// build the String[] for the column
 					String[] row = new String[NUMBER_OF_COLUMNS];
 					for (int i = 0; i < NUMBER_OF_COLUMNS; i++) {
-						if(i == 3) { // Strip out POINT(...)
+						if (i == 3) { // Strip out POINT(...)
 							String s = results.getString(i + 1);
 							row[i] = s.substring(6, s.indexOf(')'));
-						}
-						else
+						} else {
 							row[i] = results.getString(i + 1);
+						}
 					}
 					ret.add(row);
 				}

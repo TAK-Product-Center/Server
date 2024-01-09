@@ -15,7 +15,14 @@ import org.slf4j.LoggerFactory;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.*;
+import java.net.BindException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.MulticastSocket;
+import java.net.Socket;
 
 import static com.bbn.marti.takcl.TAKCLProfilingLogging.DurationLogger;
 import static com.bbn.marti.takcl.TAKCLProfilingLogging.LogActivity;

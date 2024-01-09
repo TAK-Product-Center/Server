@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.sync.repository.ResourceRepository;
 import com.bbn.marti.sync.service.MissionService;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 public class ResourceUtils{
     

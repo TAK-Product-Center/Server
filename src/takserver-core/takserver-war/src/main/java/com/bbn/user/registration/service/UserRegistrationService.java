@@ -1,11 +1,16 @@
 package com.bbn.user.registration.service;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
 
-import javax.mail.internet.MimeMessage;
+import jakarta.mail.internet.MimeMessage;
 
-import org.apache.commons.lang.RandomStringUtils;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +21,6 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import com.bbn.marti.config.Auth;
 import com.bbn.marti.config.Email;
 import com.bbn.marti.config.Whitelist;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -31,9 +35,6 @@ import tak.server.util.PasswordUtils;
 public class UserRegistrationService {
 
     private final org.slf4j.Logger logger = LoggerFactory.getLogger(com.bbn.user.registration.service.UserRegistrationService.class);
-
-    @Autowired
-    CoreConfig coreConfig;
 
     @Autowired
     private TAKUserRepository takUserRepository;
@@ -299,7 +300,7 @@ public class UserRegistrationService {
 
     public synchronized Email getEmailConfig() {
         if (emailConfig == null) {
-            emailConfig = coreConfig.getRemoteConfiguration().getEmail();
+            emailConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getEmail();
         }
 
         return emailConfig;
@@ -307,7 +308,7 @@ public class UserRegistrationService {
 
     private synchronized Auth.Ldap getLdapConfig() {
         if (ldapConfig == null) {
-            ldapConfig = coreConfig.getRemoteConfiguration().getAuth().getLdap();
+            ldapConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap();
         }
 
         return ldapConfig;

@@ -10,6 +10,7 @@ import org.apache.ignite.lang.IgniteBiPredicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.bbn.marti.config.Oauth;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
@@ -33,6 +34,7 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
     private final String sessionId;
     private final String connectionId;
     private final UUID websocketApiNode;
+    private final Oauth oauthConfig;
     private IgniteBiPredicate<UUID, ?> igniteReadListenerPredicate;
     
     private static Input websocketInput = new Input();
@@ -41,7 +43,8 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
     	websocketInput.setProtocol(TransportCotEvent.PROTOTLS.toString());
     }
     
-    public NioWebSocketHandler(UUID websocketApiNode, String sessionId, String connectionId, InetSocketAddress local, InetSocketAddress remote) {
+    public NioWebSocketHandler(UUID websocketApiNode, String sessionId, String connectionId, InetSocketAddress local, InetSocketAddress remote,
+                               Oauth oauthConfig) {
         super(websocketInput);
         protobufSupported.set(true);;
         this.websocketApiNode = websocketApiNode;
@@ -49,6 +52,7 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
         this.remoteSocketAddress = remote;
         this.sessionId = sessionId;
         this.connectionId = connectionId;
+        this.oauthConfig = oauthConfig;
     }
     
     @Override
@@ -92,7 +96,8 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
 
     }
     
-    private void setReader() {
+    @Override
+    protected void setReader() {
     	
         reader = (msg) -> {};
         
@@ -183,14 +188,16 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
         	.localListen("websocket-read-listener-" + connectionId, igniteReadListenerPredicate);
     }
     
-    private void setWriter() {
+    @Override
+    protected void setWriter() {
 
         writer = (data) -> {
             log.info("Websocket Protocol writer is a No-Op, See WebsocketMessagingBroker");
         };
     }
     
-    private void setNegotiator() {
+    @Override
+    protected void setNegotiator() {
 
         negotiator = () -> {};
     }
@@ -203,13 +210,17 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
             if (user == null) {
                 return;
             }
-            
-            if (groupManager.getGroups(user).isEmpty()) {
-                Set<Group> groups = new ConcurrentSkipListSet<>();
-                groups.add(new Group(GroupFederationUtil.ANONYMOUS_DEFAULT_GROUP, Direction.IN));
-                groups.add(new Group(GroupFederationUtil.ANONYMOUS_DEFAULT_GROUP, Direction.OUT));
-                
-                groupManager.updateGroups(user, groups);
+
+            boolean useGroupCache = oauthConfig != null && oauthConfig.isOauthUseGroupCache();
+
+            if (!useGroupCache) {
+                if (groupManager.getGroups(user).isEmpty()) {
+                    Set<Group> groups = new ConcurrentSkipListSet<>();
+                    groups.add(new Group(GroupFederationUtil.ANONYMOUS_DEFAULT_GROUP, Direction.IN));
+                    groups.add(new Group(GroupFederationUtil.ANONYMOUS_DEFAULT_GROUP, Direction.OUT));
+
+                    groupManager.updateGroups(user, groups);
+                }
             }
             
         } catch (Exception e) {

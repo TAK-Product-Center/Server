@@ -22,16 +22,21 @@ import java.util.SimpleTimeZone;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import javax.sql.DataSource;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Marshaller;
-import javax.xml.bind.Unmarshaller;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.Unmarshaller;
 import javax.xml.parsers.SAXParserFactory;
 import javax.xml.transform.Source;
 import javax.xml.transform.sax.SAXSource;
 
+import com.bbn.marti.sync.model.ExternalMissionData;
+import com.bbn.marti.sync.model.Mission;
+import com.bbn.marti.sync.model.MissionPermission;
+import com.bbn.marti.sync.model.MissionRole;
+import com.bbn.marti.sync.model.Resource;
 import com.google.common.base.Strings;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,12 +66,11 @@ import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.Metadata;
-import com.bbn.marti.sync.model.*;
 import com.bbn.marti.sync.service.MissionTokenUtils;
 import com.bbn.marti.sync.repository.MissionRoleRepository;
 import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.service.MissionService;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 import tak.server.Constants;
 

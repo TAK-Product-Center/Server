@@ -17,9 +17,9 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-import javax.xml.bind.JAXBContext;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.xml.bind.JAXBContext;
 
 import com.google.common.base.Strings;
 
@@ -180,7 +180,7 @@ public class IconsetUploadProcessorImpl implements IconsetUploadProcessor {
                                 // Marshaller is also an Unmarshaller
                                 Document doc = SecureXmlParser.makeDocument(new ByteArrayInputStream(os.toByteArray()));
                                 JAXBContext jaxbContext = JAXBContext.newInstance(Iconset.class);
-                                javax.xml.bind.Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+                                jakarta.xml.bind.Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
                                 iconset = (Iconset) unmarshaller.unmarshal(doc);
                             } catch (Exception e) {
                                 logger.error("exception deserializing iconset xml", e);

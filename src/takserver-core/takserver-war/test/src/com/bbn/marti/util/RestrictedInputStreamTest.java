@@ -9,7 +9,6 @@ import java.util.NoSuchElementException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
-import org.hamcrest.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.Matchers.*;

@@ -6,6 +6,7 @@ import com.bbn.marti.takcl.AppModules.OnlineFileAuthModule;
 import com.bbn.marti.takcl.SSLHelper;
 import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.takcl.TestExceptions;
+import com.bbn.marti.takcl.TestLogger;
 import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
 import com.bbn.marti.takcl.connectivity.server.KubernetesHelper;
 import com.bbn.marti.takcl.connectivity.server.RunnableServerManager;
@@ -25,6 +26,7 @@ import com.bbn.marti.test.shared.data.users.AbstractUser;
 import com.bbn.marti.test.shared.data.users.MutableUser;
 import com.bbn.marti.test.shared.engines.state.StateEngine;
 import com.bbn.marti.test.shared.engines.state.UserState;
+import com.google.gson.JsonObject;
 import io.kubernetes.client.openapi.ApiException;
 
 import org.dom4j.Document;
@@ -38,14 +40,24 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.nio.file.Path;
 import java.security.cert.CertificateException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import static com.bbn.marti.takcl.connectivity.missions.MissionModels.*;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.EnterpriseSyncUploadResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionUserRole;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.PutMissionContents;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ResponseWrapper;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.SubscriptionData;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.gson;
 
-import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
+import retrofit2.Response;
 
 /**
  * Used to synchronize actions performed in relation to the server (both online and offline)
@@ -255,7 +267,7 @@ public class ActionEngine implements EngineInterface {
 	private static final double SLEEP_TIME_SEND_MESSAGE_BASE = 1600; // 1400; // 1000; // 400; // 200;
 	private static final double SLEEP_TIME_DISCONNECT_BASE = 1600; // 800; // 400;
 	private static final double SLEEP_TIME_SERVER_START_BASE = 120000;
-	private static final double SLEEP_TIME_SERVER_STOP_BASE = 20000; // 8000; // 4000;
+	private static final double SLEEP_TIME_SERVER_STOP_BASE = 60000; // 30000; // 8000; // 4000;
 	private static final double SLEEP_TIME_GROUP_MANIPULATION_BASE = 2400; // 1200; // 600;
 
 	private static double SLEEP_MULTIPLIER = TAKCLCore.sleepMultiplier;
@@ -594,15 +606,16 @@ public class ActionEngine implements EngineInterface {
 		for (AbstractServerProfile server : servers) {
 			if (serverManager.serverInstanceExists(server)) {
 				serverManager.getServerInstance(server).stopServer(SERVER_KILL_DELAY_MS);
-				sleep(SLEEP_TIME_SERVER_STOP);
+//				sleep(SLEEP_TIME_SERVER_STOP);
 			}
 		}
+		serverManager.awaitServerShutdowns(SLEEP_TIME_SERVER_STOP);
 	}
 
 	@Override
 	public void engineFactoryReset() {
 		serverManager.destroyAllServers(SERVER_KILL_DELAY_MS);
-		sleep(SLEEP_TIME_SERVER_STOP);
+		serverManager.awaitServerShutdowns(SLEEP_TIME_SERVER_STOP);
 
 		// Just in case stray instances are running...
 		if (TAKCLCore.k8sMode) {
@@ -884,6 +897,11 @@ public class ActionEngine implements EngineInterface {
 		client.callResponse = client.mission.fileDownload(hash);
 	}
 
+	public void openApiSpecGet(@NotNull AbstractUser user) {
+		data.engineIterationDataClear();
+		ActionClient client = data.getClient(user);
+		Response<JsonObject> response = client.oas.getOpenApiSpec();
+	}
 
 	@Override
 	public void missionDetailsGet(@NotNull AbstractUser user) {

@@ -27,9 +27,6 @@ import com.google.common.cache.CacheBuilder;
 //import com.google.common.cache.CacheBuilder;
 
 public abstract class MessageBaseStrategy<T> implements MessageStrategy<T> {
-	
-	@Autowired
-	protected CoreConfig config;
 
 	private Cache<String, Long> cache;
 
@@ -80,7 +77,7 @@ public abstract class MessageBaseStrategy<T> implements MessageStrategy<T> {
 
 	@Override
 	public String toString() {
-		return "MessageBaseStrategy [config=" + config + ", cache=" + cache + ", maxCacheSize=" + maxCacheSize + "]";
+		return "MessageBaseStrategy [cache=" + cache + ", maxCacheSize=" + maxCacheSize + "]";
 	}
 	
 	@EventListener

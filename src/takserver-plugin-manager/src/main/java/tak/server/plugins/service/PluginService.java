@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import com.bbn.marti.config.TAKIgniteConfiguration;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.cache.spring.SpringCacheManager;
@@ -25,8 +27,8 @@ import org.springframework.context.annotation.Profile;
 
 import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.marti.config.Cluster;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.ServerInfo;
+import com.bbn.marti.remote.util.LoggingConfigPropertiesSetupUtil;
 import com.zaxxer.hikari.HikariDataSource;
 
 import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
@@ -35,6 +37,7 @@ import tak.server.PluginManager;
 import tak.server.PluginRegistry;
 import tak.server.cache.TakIgniteSpringCacheManager;
 import tak.server.ignite.IgniteConfigurationHolder;
+import tak.server.ignite.IgniteHolder;
 import tak.server.messaging.Messenger;
 import tak.server.plugins.PluginApi;
 import tak.server.plugins.PluginCoreConfigApi;
@@ -84,13 +87,24 @@ public class PluginService implements CommandLineRunner {
 			profiles.add(Constants.CLUSTER_PROFILE_NAME);
 			application.setAdditionalProfiles(profiles.toArray(new String[0]));
 		}
-		
-		ignite =  Ignition.getOrStart(IgniteConfigurationHolder.getInstance().getIgniteConfiguration
-				(PluginManagerConstants.PLUGIN_MANAGER_IGNITE_PROFILE, "127.0.0.1", isCluster, isK8Cluster, false, false, 47500, 100, 47100, 100, 512, 600000, 52428800, 52428800, -1, false, -1.f, false, false, -1, false, 300000, 300000, 600000));
-		
+
+		TAKIgniteConfiguration takIgniteConfiguration = IgniteConfigurationHolder.getInstance().getTAKIgniteConfiguration(
+				"127.0.0.1", isCluster, isK8Cluster, false, false, 47500,
+				100, 47100, 100, 512,
+				600000, 52428800, 52428800, -1,
+				false, -1.f, false, false,
+				-1, false, 300000, 300000,
+				600000);
+		IgniteConfigurationHolder.getInstance().setTAKIgniteConfiguration(takIgniteConfiguration);
+		IgniteConfigurationHolder.getInstance().setIgniteConfiguration(
+				IgniteConfigurationHolder.getInstance().getIgniteConfiguration(PluginManagerConstants.PLUGIN_MANAGER_IGNITE_PROFILE, takIgniteConfiguration));
+		ignite = IgniteHolder.getInstance().getIgnite();
+
 		if (ignite == null) {
 			System.exit(1);
 		}
+
+		LoggingConfigPropertiesSetupUtil.getInstance().setupLoggingConfiguration();
 
 		// start sping boot app
 		application.run(args);
@@ -309,9 +323,9 @@ public class PluginService implements CommandLineRunner {
 	}
 	
 	@Bean
-	public PluginFileApiJDBC pluginFileApiJDBC(CoreConfig coreConfig) {
+	public PluginFileApiJDBC pluginFileApiJDBC() {
 		
-		return new PluginFileApiJDBC(coreConfig);
+		return new PluginFileApiJDBC();
 	}
 	
 	@Bean
@@ -322,24 +336,17 @@ public class PluginService implements CommandLineRunner {
 		return new PluginFileApiImpl(pluginFileApiFromApiProcess, pluginFileApiJDBC);
 	}
 
-    @Bean
-    public CoreConfig coreConfig(Ignite ignite) {
-    	    	    	
-    	return ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_CONFIGURATION, CoreConfig.class, false);
-    
-    }
-	
 	@Bean
-	public HikariDataSource dataSource(CoreConfig coreConfig) {
+	public HikariDataSource dataSource() {
 		
-		return DataSourceUtils.setupDataSourceFromCoreConfig(coreConfig);
+		return DataSourceUtils.setupDataSourceFromCoreConfig();
 	
 	}
 	
 	@Bean
-	CacheManager cacheManager(Ignite ignite, CoreConfig coreConfig) {
+	CacheManager cacheManager() {
 
-		Cluster clusterConfig = coreConfig.getRemoteConfiguration().getCluster();
+		Cluster clusterConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster();
 		
 		SpringCacheManager scm = new TakIgniteSpringCacheManager(ignite);
 
@@ -351,7 +358,7 @@ public class PluginService implements CommandLineRunner {
 
 		}
 
-		scm.setConfiguration(IgniteConfigurationHolder.getInstance().getConfiguration());
+		scm.setConfiguration(IgniteConfigurationHolder.getInstance().getIgniteConfiguration());
 
 		return scm;
 	}

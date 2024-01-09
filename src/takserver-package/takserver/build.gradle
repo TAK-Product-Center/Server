@@ -11,7 +11,7 @@ apply from: "../utils/utils.gradle"
 task copyLauncherScripts(type: Copy) {
     from project(':takserver-core').file('scripts')
     into "$buildDir/takArtifacts"
-    exclude 'utils*', 'messaging*', 'API*', 'plugins*', 'retention*', 'takserver.sh'
+    exclude 'config*', 'utils*', 'messaging*', 'API*', 'plugins*', 'retention*', 'takserver.sh'
 }
 
 // rpm postinstall script
@@ -25,6 +25,11 @@ chown tak:tak /opt/tak
 chmod 644 /opt/tak/logging-restrictsize.xml
 chmod 544 /opt/tak/*.bat
 chmod 544 /opt/tak/*.sh
+
+chmod 544 /opt/tak/config/*.sh
+chmod u+w /opt/tak/config/takserver-config.sh
+cp /opt/tak/config/takserver-config.sh /opt/tak
+chown -f tak:tak /opt/tak/takserver-config.sh 2>/dev/null
 
 chmod 544 /opt/tak/messaging/*.sh
 chmod u+w /opt/tak/messaging/takserver-messaging.sh
@@ -47,6 +52,11 @@ chown -f tak:tak /opt/tak/takserver-retention.sh 2>/dev/null
 
 chmod 500 /opt/tak/certs/*.sh
 chmod 600 /opt/tak/certs/cert-metadata.sh
+
+chown root:root /opt/tak/config/takserver-config
+chmod 755 /opt/tak/config/takserver-config
+cp /opt/tak/config/takserver-config /etc/init.d
+rm -rf /opt/tak/config
 
 chown root:root /opt/tak/messaging/takserver-messaging
 chmod 755 /opt/tak/messaging/takserver-messaging
@@ -106,6 +116,9 @@ chmod 755 /opt/tak/utils
 mkdir -p /opt/tak/logs
 chown tak:tak /opt/tak/logs
 chmod 755 /opt/tak/logs
+if [ -f "/opt/tak/TAKIgniteConfig.xml" ]; then
+    chown -f tak:tak /opt/tak/TAKIgniteConfig.xml 2>/dev/null
+fi
 if [ -f "/opt/tak/CoreConfig.xml" ]; then
     chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
 fi
@@ -208,6 +221,7 @@ prePackage.dependsOn copyJars
 prePackage.dependsOn copyWars
 prePackage.dependsOn copyCoreConfigXSD
 prePackage.dependsOn copyCoreConfigExample
+prePackage.dependsOn copyConfigScripts
 prePackage.dependsOn copyMessagingScripts
 prePackage.dependsOn copyAPIScripts
 prePackage.dependsOn copyPluginsJar

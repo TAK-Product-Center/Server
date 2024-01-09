@@ -4,26 +4,34 @@ import java.io.Serializable;
 import java.util.Date;
 import java.util.Objects;
 
-import javax.persistence.*;
-import javax.xml.bind.annotation.XmlTransient;
+import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.Ordering;
+import jakarta.persistence.Cacheable;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
+import jakarta.xml.bind.annotation.XmlTransient;
 
 import com.bbn.marti.sync.model.Mission;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import org.jetbrains.annotations.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-//import io.swagger.annotations.ApiModel;
 import tak.server.Constants;
 
 @Entity(name = "maplayer")
 @Table(name = "maplayer")
 @Cacheable
-//@ApiModel
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class MapLayer implements Serializable {
+public class MapLayer implements Serializable, Comparable<MapLayer> {
 
 	/**
 	 * 
@@ -59,7 +67,7 @@ public class MapLayer implements Serializable {
     private boolean enabled;
     private boolean ignoreErrors;
     private boolean invertYCoordinate;
-    protected Mission mission;
+    transient protected Mission mission;
 
 
     public MapLayer() {
@@ -436,5 +444,41 @@ public class MapLayer implements Serializable {
         sb.append(", enabled=").append(enabled);
         sb.append('}');
         return sb.toString();
+    }
+
+    @Override
+    public int compareTo(MapLayer that) {
+        return ComparisonChain.start()
+                .compare(this.id, that.id, Ordering.natural().nullsFirst())
+                .compare(this.minZoom, that.minZoom, Ordering.natural().nullsFirst())
+                .compare(this.maxZoom, that.maxZoom, Ordering.natural().nullsFirst())
+                .compare(this.north, that.north, Ordering.natural().nullsFirst())
+                .compare(this.south, that.south, Ordering.natural().nullsFirst())
+                .compare(this.east, that.east, Ordering.natural().nullsFirst())
+                .compare(this.west, that.west, Ordering.natural().nullsFirst())
+                .compare(this.uid, that.uid, Ordering.natural().nullsFirst())
+                .compare(this.creatorUid, that.creatorUid, Ordering.natural().nullsFirst())
+                .compare(this.name, that.name, Ordering.natural().nullsFirst())
+                .compare(this.description, that.description, Ordering.natural().nullsFirst())
+                .compare(this.type, that.type, Ordering.natural().nullsFirst())
+                .compare(this.url, that.url, Ordering.natural().nullsFirst())
+                .compare(this.tileType, that.tileType, Ordering.natural().nullsFirst())
+                .compare(this.serverParts, that.serverParts, Ordering.natural().nullsFirst())
+                .compare(this.backgroundColor, that.backgroundColor, Ordering.natural().nullsFirst())
+                .compare(this.tileUpdate, that.tileUpdate, Ordering.natural().nullsFirst())
+                .compare(this.additionalParameters, that.additionalParameters, Ordering.natural().nullsFirst())
+                .compare(this.coordinateSystem, that.coordinateSystem, Ordering.natural().nullsFirst())
+                .compare(this.version, that.version, Ordering.natural().nullsFirst())
+                .compare(this.layers, that.layers, Ordering.natural().nullsFirst())
+                .compare(this.path, that.path, Ordering.natural().nullsFirst())
+                .compare(this.after, that.after, Ordering.natural().nullsFirst())
+                .compare(this.opacity, that.opacity, Ordering.natural().nullsFirst())
+                .compare(this.createTime, that.createTime, Ordering.natural().nullsFirst())
+                .compare(this.modifiedTime, that.modifiedTime, Ordering.natural().nullsFirst())
+                .compare(this.defaultLayer, that.defaultLayer, Ordering.natural().nullsFirst())
+                .compare(this.enabled, that.enabled, Ordering.natural().nullsFirst())
+                .compare(this.ignoreErrors, that.ignoreErrors, Ordering.natural().nullsFirst())
+                .compare(this.invertYCoordinate, that.invertYCoordinate, Ordering.natural().nullsFirst())
+                .result();
     }
 }

@@ -2,14 +2,17 @@
 
 package com.bbn.marti;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
 public class FileDownloadCounter {
 
 	private static FileDownloadCounter instance = null;
 
 	public static FileDownloadCounter instance() {
-		if(instance == null)
+		if (instance == null)
 			instance = new FileDownloadCounter();
 
 		return instance;
@@ -21,7 +24,7 @@ public class FileDownloadCounter {
 		List<String> downloaders =
 			filesDownloadedByWho.get(filename);
 
-		if(downloaders == null) {
+		if (downloaders == null) {
 			downloaders = new LinkedList<String>();
 			filesDownloadedByWho.put(filename, downloaders);
 		} 

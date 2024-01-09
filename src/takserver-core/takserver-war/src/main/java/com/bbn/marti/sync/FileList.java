@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.naming.NamingException;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.owasp.esapi.ESAPI;
 import org.owasp.esapi.errors.IntrusionException;
@@ -23,7 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.bbn.marti.dao.kml.JDBCCachingKMLDao;
 import com.bbn.marti.sync.Metadata.Field;
 import com.bbn.marti.util.CommonUtil;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.google.common.base.Strings;
 
 // used by EnterpriseSync.jsp
@@ -148,11 +148,11 @@ public class FileList {
 					if (size == null ) {
 						out.write("Unknown");
 					} else {
-						if(size < 1024) {
+						if (size < 1024) {
 							out.write(size + "B");
-                        } else if(size < MBYTES) {
+                        } else if (size < MBYTES) {
 							out.write((size/KBYTES) + "kB");
-                        } else if(size < GBYTES) {
+                        } else if (size < GBYTES) {
 							out.write(size/MBYTES + "MB");
                         } else {
 							out.write(size/GBYTES + "GB");

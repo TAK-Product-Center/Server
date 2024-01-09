@@ -8,10 +8,20 @@ import org.dom4j.Document;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeMap;
 import java.util.regex.Pattern;
 
-import static com.bbn.marti.takcl.connectivity.missions.MissionModels.*;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.DEFAULT_MISSION_USER_ROLE;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.Mission;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionChange;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionChangeType;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionContentDataContainer;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionUserRole;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.SubscriptionData;
 
 public class MissionState implements Comparable<MissionState> {
 	private final AbstractUser missionOwner;

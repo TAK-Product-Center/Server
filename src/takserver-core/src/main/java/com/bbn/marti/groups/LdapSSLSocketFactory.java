@@ -1,7 +1,6 @@
 package com.bbn.marti.groups;
 
 import com.bbn.marti.config.Tls;
-import com.bbn.marti.service.DistributedConfiguration;
 import javax.net.SocketFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
@@ -12,9 +11,11 @@ import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.security.KeyStore;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 public class LdapSSLSocketFactory extends SSLSocketFactory {
 
@@ -37,15 +38,16 @@ public class LdapSSLSocketFactory extends SSLSocketFactory {
         super();
 
         try {
-            DistributedConfiguration config = DistributedConfiguration.getInstance();
-            if (config == null || config.getAuth() == null || config.getAuth().getLdap() == null) {
+            CoreConfigFacade config = CoreConfigFacade.getInstance();
+            if (config.getRemoteConfiguration() == null || config.getRemoteConfiguration().getAuth() == null ||
+                    config.getRemoteConfiguration().getAuth().getLdap() == null) {
                 logger.error("Can't find ldap element in CoreConfig!");
                 return;
             }
 
-            String truststore = config.getAuth().getLdap().getLdapsTruststore();
-            String truststoreFile = config.getAuth().getLdap().getLdapsTruststoreFile();
-            String truststorePass = config.getAuth().getLdap().getLdapsTruststorePass();
+            String truststore = config.getRemoteConfiguration().getAuth().getLdap().getLdapsTruststore();
+            String truststoreFile = config.getRemoteConfiguration().getAuth().getLdap().getLdapsTruststoreFile();
+            String truststorePass = config.getRemoteConfiguration().getAuth().getLdap().getLdapsTruststorePass();
 
             if (truststore == null || truststore.length() == 0 ||
                     truststoreFile == null || truststoreFile.length() == 0 ||

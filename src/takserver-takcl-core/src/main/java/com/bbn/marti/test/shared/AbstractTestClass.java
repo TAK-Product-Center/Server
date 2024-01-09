@@ -2,7 +2,11 @@ package com.bbn.marti.test.shared;
 
 import ch.qos.logback.classic.Level;
 import com.bbn.marti.takcl.AppModules.TAKCLConfigModule;
-import com.bbn.marti.takcl.*;
+import com.bbn.marti.takcl.SSLHelper;
+import com.bbn.marti.takcl.TAKCLCore;
+import com.bbn.marti.takcl.TAKCLogging;
+import com.bbn.marti.takcl.TestConfiguration;
+import com.bbn.marti.takcl.TestLogger;
 import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
@@ -11,7 +15,11 @@ import org.junit.BeforeClass;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Random;
 
 /**
  * Created on 10/26/15.

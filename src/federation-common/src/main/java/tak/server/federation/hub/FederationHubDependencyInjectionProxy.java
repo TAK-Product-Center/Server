@@ -1,11 +1,8 @@
 package tak.server.federation.hub;
 
+import tak.server.federation.hub.broker.*;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
-import tak.server.federation.hub.broker.SSLConfig;
 import tak.server.federation.hub.broker.events.RestartServerEvent;
-import tak.server.federation.hub.broker.FederationHubServerConfig;
-import tak.server.federation.hub.broker.HubConnectionStore;
-import tak.server.federation.hub.broker.FederationHubBroker;
 
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
@@ -79,7 +76,7 @@ public class FederationHubDependencyInjectionProxy implements ApplicationContext
 
         return fedHubServerConfig;
     }
-    
+
     private FederationHubBroker federationHubBroker = null;
 
     public FederationHubBroker federationHubBroker() {
@@ -93,7 +90,20 @@ public class FederationHubDependencyInjectionProxy implements ApplicationContext
 
         return federationHubBroker;
     }
-    
+
+    private FederationHubBrokerMetrics federationHubBrokerMetrics = null;
+
+    public FederationHubBrokerMetrics federationHubBrokerMetrics() {
+        if (federationHubBrokerMetrics == null) {
+            synchronized (this) {
+                if (federationHubBrokerMetrics == null) {
+                    federationHubBrokerMetrics = springContext.getBean(FederationHubBrokerMetrics.class);
+                }
+            }
+        }
+        return federationHubBrokerMetrics;
+    }
+
     private HubConnectionStore hubConnectionStore = null;
 
     public HubConnectionStore hubConnectionStore() {
@@ -107,7 +117,7 @@ public class FederationHubDependencyInjectionProxy implements ApplicationContext
 
         return hubConnectionStore;
     }
-        
+
     public void restartV2Server() {
         springContext.publishEvent(new RestartServerEvent(this));
     }

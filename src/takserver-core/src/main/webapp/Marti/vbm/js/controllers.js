@@ -15,6 +15,9 @@ app.controller('vbmController',
 	            $scope.vbm_enabled = current_config.vbmEnabled;
 	            $scope.sa_disabled = current_config.sadisabled;
 	            $scope.chat_disabled = current_config.chatDisabled;
+	            $scope.ism_strict_enforcing = current_config.ismStrictEnforcing;
+				$scope.ism_url = current_config.ismUrl;
+	            $scope.network_classification = current_config.networkClassification;
 
 	          }, function myError(response) {
 	            alert("Error fetching data from server");
@@ -31,6 +34,9 @@ app.controller('vbmController',
 	            vbmEnabled: $scope.vbm_enabled,
 	            sadisabled: $scope.sa_disabled,
 	            chatDisabled: $scope.chat_disabled,
+				ismStrictEnforcing: $scope.ism_strict_enforcing,
+				ismUrl: $scope.ism_url,
+				networkClassification: $scope.network_classification
        		};	
 
 			$http({

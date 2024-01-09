@@ -1,10 +1,13 @@
 package tak.server.cache;
 
 import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
+import com.bbn.marti.remote.groups.User;
+import com.google.common.collect.Sets;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.slf4j.Logger;
@@ -20,10 +23,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 
@@ -38,9 +40,6 @@ public class ActiveGroupCacheHelper {
     private Ignite ignite;
 
     @Autowired
-    private CoreConfig config;
-
-    @Autowired
     private DataSource ds;
 
 
@@ -48,7 +47,7 @@ public class ActiveGroupCacheHelper {
     public void init() {
         try {
             // restore active group cache from the database
-            if (config.getRemoteConfiguration().getAuth().isX509UseGroupCache()) {
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509UseGroupCache()) {
                 getActiveGroupsCache();
             }
         } catch (Exception e) {
@@ -184,5 +183,62 @@ public class ActiveGroupCacheHelper {
             logger.error("exception in loadActiveGroups!", e);
             return null;
         }
+    }
+
+    public boolean assignGroupsCheckCache(Set<Group> groups, User user, String username) {
+
+        // check to see if we have any cache entries for the current username
+        List<Group> activeGroups = getActiveGroupsForUser(username);
+        if (activeGroups == null) {
+            activeGroups = new LinkedList<>();
+        }
+
+        // recreate as a full LinkedList to support delete (cant delete on list coming from cache)
+        activeGroups = new LinkedList<>(activeGroups);
+
+        // keep track of this user even if there are no groups
+        groupManager.addUser(user);
+
+        // find groups that need to get removed from the cache
+        Set<Group> cacheGroups = new ConcurrentSkipListSet<>(activeGroups);
+        Set<Group> removals = Sets.difference(cacheGroups, groups);
+        activeGroups.removeAll(removals);
+
+        // find groups that need to get added to the cache
+        Set<Group> adds = Sets.difference(groups, cacheGroups);
+        activeGroups.addAll(adds);
+
+        for (Group group : adds) {
+            group.setActive(false);
+        }
+
+        // if we only have one group, make sure its active
+        if (activeGroups.size() == 1) {
+            activeGroups.get(0).setActive(true);
+            // need to check case when size=2 for IN/OUT groups with same name
+        } else if (activeGroups.size() == 2 && activeGroups.get(0).getName().equals(activeGroups.get(1).getName())) {
+            activeGroups.get(0).setActive(true);
+            activeGroups.get(1).setActive(true);
+        }
+
+        // update the cache if required
+        boolean updated = adds.size() > 0 || removals.size() > 0;
+        if (updated) {
+            setActiveGroupsForUser(username, activeGroups);
+        }
+
+        // remove any inactive cache entries prior to push the groups to the user
+        Iterator<Group> activeGroupIter = activeGroups.iterator();
+        while (activeGroupIter.hasNext()) {
+            Group activeGroup = activeGroupIter.next();
+            if (!activeGroup.getActive()) {
+                activeGroupIter.remove();
+            }
+        }
+
+        // do the group updates based on this set of groups
+        groupManager.updateGroups(user, new ConcurrentSkipListSet<>(activeGroups));
+
+        return updated;
     }
 }

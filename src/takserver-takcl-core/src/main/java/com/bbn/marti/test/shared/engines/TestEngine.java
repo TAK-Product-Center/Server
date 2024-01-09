@@ -406,6 +406,11 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		stateEngine.engineFactoryReset();
 	}
 
+	public void openApiSpecGet(@NotNull AbstractUser user) {
+		TestLogger.executeEngineCommand("openApiSpecGet");
+		actionEngine.openApiSpecGet(user);
+	}
+
 	@Override
 	public void missionDetailsGetByName(@Nullable String missionName, @NotNull AbstractUser user) {
 		TestLogger.executeEngineCommand("missionDetailsGetByName");

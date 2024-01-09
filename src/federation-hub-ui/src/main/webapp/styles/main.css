@@ -279,3 +279,44 @@ tr.angular-ui-tree-empty {
     background-color: white;
     color: white;
 }
+
+.legend {
+  font-size: 18px;
+  position: absolute;
+  bottom: 0px;
+  width: 221px;
+  background-color: white;
+  padding: 10px;
+  border-radius: 5px;
+  background-color: #337ab7;
+  color: white;
+}
+
+.legendItem {
+  display: flex;
+    display: -ms-flexbox;
+    background-color: white;
+    color: black;
+    align-items: center;
+    padding: 10px;
+    font-size: 13px;
+}
+
+.legendLine {
+  border-bottom: 5px dashed green;
+    width: 40%;
+    height: 25%;
+    margin-left: 5px;
+}
+
+.legenedConnected {
+  border-bottom: 5px solid rgb(0, 128, 0, .3)
+}
+
+.legendActive {
+  border-bottom: 5px dashed green;
+}
+
+.legendNotActive {
+  border-bottom: 5px solid DarkGray;
+}

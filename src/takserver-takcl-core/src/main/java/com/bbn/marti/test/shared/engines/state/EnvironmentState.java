@@ -8,9 +8,16 @@ import com.bbn.marti.test.shared.engines.ActionEngine;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
-import static com.bbn.marti.takcl.connectivity.missions.MissionModels.*;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.Mission;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionUserPermission;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionUserRole;
 
 /**
  * Created on 1/19/18.

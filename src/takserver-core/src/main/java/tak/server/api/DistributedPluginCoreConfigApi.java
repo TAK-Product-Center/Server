@@ -1,5 +1,6 @@
 package tak.server.api;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.ignite.services.ServiceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +44,7 @@ public class DistributedPluginCoreConfigApi implements PluginCoreConfigApi, org.
 
 	@Override
 	public synchronized Security getSecurity() throws Exception {
-		com.bbn.marti.config.Tls tls = ApiDependencyProxy.getInstance().coreConfig().getRemoteConfiguration().getSecurity().getTls();
+		com.bbn.marti.config.Tls tls = CoreConfigFacade.getInstance().getRemoteConfiguration().getSecurity().getTls();
 		if (security == null) {
 			security = new Security(new Tls(tls.getKeystore(), tls.getKeystoreFile(), tls.getKeystorePass(),
 					tls.getTruststore(), tls.getTruststoreFile(), tls.getTruststorePass(),

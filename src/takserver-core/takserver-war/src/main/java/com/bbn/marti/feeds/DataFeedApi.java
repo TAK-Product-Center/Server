@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -228,7 +228,7 @@ public class DataFeedApi extends BaseRestController {
 			logger.debug("predicate feed id {}", feedId);
 			
 			if (pfeed.getTags() != null && !pfeed.getTags().isEmpty()) {
-        		dataFeedRepository.addDataFeedTags(feedId, pfeed.getTags());
+        		dataFeedRepository.addDataFeedTags(feedId, pfeed.getTags().toArray(String[]::new));
         	}
 			
 			 // Needed for permissions to access data feed
@@ -238,7 +238,7 @@ public class DataFeedApi extends BaseRestController {
 			
 			// default feed to __ANON__ group if none specified
 			
-	        dataFeedRepository.addDataFeedFilterGroups(feedId, pfeed.getFilterGroups());
+	        dataFeedRepository.addDataFeedFilterGroups(feedId, pfeed.getFilterGroups().toArray(String[]::new));
 			
 			logger.info("create new predicate-based data feed: {}", pfeed);
 

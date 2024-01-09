@@ -42,7 +42,7 @@ public class CompoundRoleAssignmentVisitorTests {
     public void execute() throws Exception {
         
         // parse and visit test programs
-        for (File rolFile : com.google.common.io.Files.fileTreeTraverser().preOrderTraversal(new File(getClass().getResource(ASSERTION_EXP_ROL_PATH).toURI()))) {
+        for (File rolFile : com.google.common.io.Files.fileTraverser().depthFirstPreOrder(new File(getClass().getResource(ASSERTION_EXP_ROL_PATH).toURI()))) {
             if (rolFile.isFile() && (rolFile.getName().toLowerCase().equals("role_assign_compound_safety_inspector__or.rol")) ||
                     (rolFile.getName().toLowerCase().equals("role_assign_compound_safety_inspector__and.rol")) ||
                     (rolFile.getName().toLowerCase().equals("role_assign_compound_safety_inspector__paren_or.rol")) ||

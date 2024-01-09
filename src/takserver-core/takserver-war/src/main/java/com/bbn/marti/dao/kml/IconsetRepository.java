@@ -5,7 +5,6 @@ package com.bbn.marti.dao.kml;
 import java.util.Set;
 
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 
@@ -18,10 +17,8 @@ public interface IconsetRepository extends CrudRepository<Iconset, Long> {
     @CacheEvict(value = "iconIconsetCache", allEntries = true)
     void deleteByUid(String uid);
     
-    @Cacheable("iconIconsetCache")
     Iconset findByUid(String uid);
     
-    @Cacheable("iconIconsetCache")
     @Query("select i.uid from Iconset i")
     Set<String> getAllUids();
     

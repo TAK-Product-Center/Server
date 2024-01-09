@@ -18,10 +18,11 @@
 <%@ page import="org.owasp.esapi.ESAPI" %>
 <%@ page import="org.owasp.esapi.errors.IntrusionException" %>
 <%@ page import="org.owasp.esapi.errors.ValidationException" %>
+<%@ page import="com.bbn.marti.remote.util.SpringContextBeanForApi" %>
 <%
 	final String context = "trackExport.jsp";
 	Logger log = Logger.getLogger(context);
-    Validator validator = com.bbn.marti.util.spring.SpringContextBeanForApi.getSpringContext().getBean(Validator.class);
+    Validator validator = SpringContextBeanForApi.getSpringContext().getBean(Validator.class);
 	SimpleDateFormat sqlDateFormat = new SimpleDateFormat(Constants.SQL_DATE_FORMAT);
 	SimpleDateFormat cotDateFormat = new SimpleDateFormat(Constants.COT_DATE_FORMAT);
 
@@ -76,10 +77,10 @@
 		}
 		sqlString += "uid=? ORDER BY servertime ASC;";
 		
-		try (java.sql.Connection connection =  com.bbn.marti.util.spring.SpringContextBeanForApi.getSpringContext().getBean(javax.sql.DataSource.class).getConnection(); java.sql.PreparedStatement sqlQuery = com.bbn.marti.util.spring.SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.JDBCQueryAuditLogHelper.class).prepareStatement(sqlString, connection)) {
+		try (java.sql.Connection connection =  SpringContextBeanForApi.getSpringContext().getBean(javax.sql.DataSource.class).getConnection(); java.sql.PreparedStatement sqlQuery = SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.JDBCQueryAuditLogHelper.class).prepareStatement(sqlString, connection)) {
 		
 		sqlQuery.setString(1, uid);
-		try (ResultSet results = com.bbn.marti.util.spring.SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.JDBCQueryAuditLogHelper.class).doQuery(sqlQuery)) {
+		try (ResultSet results = SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.JDBCQueryAuditLogHelper.class).doQuery(sqlQuery)) {
 		if(results == null || results.isClosed()) {
 	// do proper error handling... later..
 		}

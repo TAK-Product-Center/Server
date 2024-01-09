@@ -9,6 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.bbn.cluster.ClusterGroupDefinition;
+import com.bbn.marti.config.TAKIgniteConfiguration;
+import com.bbn.marti.remote.config.DistributedConfiguration;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.configuration.IgniteConfiguration;
@@ -28,7 +31,7 @@ import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.api.PropertiesApi;
 import com.bbn.marti.sync.service.PropertiesService;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,12 +43,14 @@ import ch.qos.logback.classic.PatternLayout;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 import tak.server.ignite.IgniteConfigurationHolder;
+import tak.server.ignite.IgniteHolder;
 import tak.server.messaging.MessageConverter;
 
 @Configuration
 public class TakServerTestApplicationConfig {
 
 	public static final String JARG_KEY_IGNITE_TEST_LOG_FILE = "tak.server.test.logging.targetPath";
+	private static final org.slf4j.Logger logger = LoggerFactory.getLogger(TakServerTestApplicationConfig.class);
 
 	@Bean
 	Marshaller jaxbMarshaller() {
@@ -70,6 +75,14 @@ public class TakServerTestApplicationConfig {
 	MessageConverter clusterMessageConverter() {
 		return new MessageConverter();
 	}
+
+	@Bean
+	public DistributedConfiguration getDistributedConfiguration() {
+		DistributedConfiguration distributedConfiguration = DistributedConfiguration.getInstance();
+
+		return distributedConfiguration;
+	}
+
 
 	@MockBean
 	GroupManager groupManager;
@@ -129,9 +142,69 @@ public class TakServerTestApplicationConfig {
 	
 	@Bean 
 	Ignite ignite() {
-		IgniteConfigurationHolder.getInstance().setConfiguration(IgniteConfigurationHolder.getInstance().getIgniteConfiguration(Constants.MESSAGING_PROFILE_NAME, "127.0.0.1", false, false, true, false, 47500, 100, 47100, 100, 0, 600000, 524288000, 524288000));
-		IgniteConfiguration igniteConfiguration = IgniteConfigurationHolder.getInstance().getConfiguration();
+
+		/**
+		 * Now that there is a separate configuration microservice, it needs to be loaded first, followed by the messaging
+		 * microservice. Specifically, we have to load the DistributedConfiguration as a reference in Ignite to be
+		 * used by the CoreConfigFacade when invoked by the Messaging Microservice.
+		 */
+		// setup the configuration service in Ignite
+		TAKIgniteConfiguration takIgniteConfiguration =	IgniteConfigurationHolder.getInstance().getTAKIgniteConfiguration(
+				"127.0.0.1", false, false, true,
+				false, 47500, 100,
+				47100,100, 0, 600000,
+				524288000,	524288000);
+		IgniteConfiguration igniteConfiguration = IgniteConfigurationHolder.getInstance().getIgniteConfiguration(Constants.CONFIG_PROFILE_NAME, takIgniteConfiguration);
 		String logPath = System.getProperty(JARG_KEY_IGNITE_TEST_LOG_FILE, null);
+
+		if (logPath != null && new File(logPath).isDirectory()) {
+			logPath = Paths.get(logPath).resolve(Constants.CONFIG_PROFILE_NAME + "-ignite.log").toAbsolutePath().toString();
+			LoggerFactory.getLogger(TakServerTestApplicationConfig.class).warn("Redirecting ignite logs to '" + logPath + "'.");
+
+			Logger logger = (Logger) LoggerFactory.getLogger("org.apache.ignite");
+			LoggerContext lc = logger.getLoggerContext();
+
+			FileAppender<ILoggingEvent> fileAppender = new FileAppender<>();
+			fileAppender.setPrudent(true);
+			fileAppender.setFile(logPath);
+			fileAppender.setContext(lc);
+
+			PatternLayout pl = new PatternLayout();
+			pl.setPattern("%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %logger{36} - %msg%n");
+			pl.setContext(lc);
+			pl.start();
+
+			fileAppender.setLayout(pl);
+			fileAppender.start();
+
+			logger.setAdditive(false);
+			logger.addAppender(fileAppender);
+
+			igniteConfiguration.setGridLogger(new Slf4jLogger(logger));
+		}
+
+		Ignite ignite = null;
+
+		try {
+			// start the config microservice
+			ignite = Ignition.getOrStart(igniteConfiguration);
+		}
+		catch(Exception e1) {
+			logger.error("Error starting up the Configuration Ignite cluster.", e1);
+		}
+
+		try {
+			// load the distributed
+			ignite.services(ClusterGroupDefinition.getConfigClusterDeploymentGroup(ignite)).deployNodeSingleton(
+					Constants.DISTRIBUTED_CONFIGURATION, getDistributedConfiguration());
+		}
+		catch(Exception e2) {
+			logger.error("Error deploying the Distributed Configuration to the Configuration Ignite cluster.", e2);
+		}
+
+		igniteConfiguration = IgniteConfigurationHolder.getInstance().getIgniteConfiguration(
+				Constants.MESSAGING_PROFILE_NAME, takIgniteConfiguration);
+		IgniteConfigurationHolder.getInstance().setIgniteConfiguration(igniteConfiguration);
 
 		if (logPath != null && new File(logPath).isDirectory()) {
 			logPath = Paths.get(logPath).resolve(Constants.MESSAGING_PROFILE_NAME + "-ignite.log").toAbsolutePath().toString();
@@ -159,7 +232,15 @@ public class TakServerTestApplicationConfig {
 			igniteConfiguration.setGridLogger(new Slf4jLogger(logger));
 		}
 
-		return Ignition.getOrStart(igniteConfiguration);
+		try {
+			ignite = IgniteHolder.getInstance().getIgnite();
+		}
+		catch(Exception e3) {
+			logger.error("Error starting up the Messaging Ignite cluster.", e3);
+		}
+
+
+		return ignite;
 	}
 	
 	@Bean 
@@ -179,7 +260,7 @@ public class TakServerTestApplicationConfig {
 
 			@Override
 			public Map<String, Collection<String>> getKeyValuesByUid(String uid) {
-				if(uid == "1234") {
+				if (uid == "1234") {
 					Multimap<String, String> uidKvMap = new ConcurrentMultiHashMap<String, String>();
 					uidKvMap.put("Key1", "value1");
 					uidKvMap.put("Key1", "value2");
@@ -193,7 +274,7 @@ public class TakServerTestApplicationConfig {
 
 			@Override
 			public List<String> getValuesByKeyAndUid(String uid, String key) {
-				if(uid == "1234" && key == "Key1") {
+				if (uid == "1234" && key == "Key1") {
 					List<String> values = new ArrayList<String>();
 					values.add("value1");
 					values.add("value2");

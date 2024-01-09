@@ -55,7 +55,7 @@ public class CotElement implements Serializable {
 	 * Returns the callsign from a Query Result, if present, or the uid, if it is not.
 	 */
 	public String getCallsign() {
-		if(callsign == null || callsign.isEmpty() || callsign.equals(errorMessage))
+		if (callsign == null || callsign.isEmpty() || callsign.equals(errorMessage))
 			return uid;
 		return callsign;
 	}

@@ -37,7 +37,7 @@ public class OperationConstraintsVisitorTests {
     public void execute() throws Exception {
         
         // parse and visit test programs
-        for (File rolFile : com.google.common.io.Files.fileTreeTraverser().preOrderTraversal(new File(getClass().getResource(CONSTRAINTS_ROL_PATH).toURI()))) {
+        for (File rolFile : com.google.common.io.Files.fileTraverser().depthFirstPreOrder(new File(getClass().getResource(CONSTRAINTS_ROL_PATH).toURI()))) {
             if (rolFile.isFile() && rolFile.getName().toLowerCase().endsWith(".rol")) {
                 
                 logger.debug("Testing ROL program: " + rolFile.getName() + " " + Files.toString(rolFile, Charsets.UTF_8));

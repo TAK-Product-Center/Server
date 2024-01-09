@@ -8,14 +8,12 @@ import org.apache.ignite.services.ServiceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.marti.config.Cluster;
 import com.bbn.marti.config.Configuration;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.ServerInfo;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.google.common.base.Strings;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
 
@@ -34,17 +32,13 @@ public final class DistributedServerInfo implements ServerInfo, Service {
 
 	private boolean isCluster = false;
 
-	public DistributedServerInfo(Ignite ignite, CoreConfig config) {
+	public DistributedServerInfo(Ignite ignite) {
 
 		if (logger.isDebugEnabled()) {
 			logger.debug("DistributedServerInfo contructor " + System.identityHashCode(this));
 		}
 
-		this.config = DistributedConfiguration.getInstance();
 	}
-
-	private CoreConfig config;
-
 
 	@Override
 	public void cancel(ServiceContext ctx) {
@@ -74,7 +68,7 @@ public final class DistributedServerInfo implements ServerInfo, Service {
 				if (serverId == null) {
 					try {
 
-						Configuration conf = config.getRemoteConfiguration();
+						Configuration conf = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
 						String id = conf.getNetwork().getServerId();
 
@@ -112,8 +106,8 @@ public final class DistributedServerInfo implements ServerInfo, Service {
 		String id = UUID.randomUUID().toString().replace("-", "");
 
 		try {
-			config.getRemoteConfiguration().getNetwork().setServerId(id);
-			config.saveChangesAndUpdateCache();
+			CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().setServerId(id);
+			CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
 
 		} catch (Exception e) {
 			logger.warn("execption saving server ID to configuration", e);
@@ -138,19 +132,19 @@ public final class DistributedServerInfo implements ServerInfo, Service {
 
 	@Override
 	public boolean isCluster() {
-		Cluster cluster = config.getRemoteConfiguration().getCluster();
+		Cluster cluster = CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster();
 		return cluster == null ? false : cluster.isEnabled(); 
 	}
 
 	@Override
 	public String getNatsURL() {
-		Cluster cluster = config.getRemoteConfiguration().getCluster();
+		Cluster cluster = CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster();
 		return cluster == null ? "" : cluster.getNatsURL(); 
 	}
 
 	@Override
 	public String getNatsClusterId() {
-		Cluster cluster = config.getRemoteConfiguration().getCluster();
-		return cluster == null ? "" : cluster.getNatsClusterID(); 
+		Cluster cluster = CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster();
+		return cluster == null ? "" : cluster.getNatsClusterID();
 	}
 }

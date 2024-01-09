@@ -3,6 +3,7 @@ package tak.server.federation;
 import java.io.File;
 import java.rmi.RemoteException;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,18 +16,15 @@ public class FederationConfigManager implements FederationConfigInterface {
 
     private static final long serialVersionUID = 2880902388047468469L;
 
-    public FederationConfigManager(CoreConfig coreConfig) throws RemoteException {
-        this.config = coreConfig;
+    public FederationConfigManager() throws RemoteException {
     }
-
-    private final CoreConfig config;
 
     private static final Logger logger = LoggerFactory.getLogger(FederationConfigManager.class);
 
 
     @Override
     public FederationConfigInfo getFederationConfig() throws RemoteException {
-        Federation fedConfig = config.getRemoteConfiguration().getFederation();
+        Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
         if (fedConfig.getFederationServer().getFederationPort().isEmpty()) {
             Federation.FederationServer.FederationPort p = new Federation.FederationServer.FederationPort();
             p.setPort(fedConfig.getFederationServer().getPort());
@@ -65,10 +63,10 @@ public class FederationConfigManager implements FederationConfigInterface {
 
     @Override
     public void modifyFederationConfig(FederationConfigInfo info) throws RemoteException {
-        Federation fedConfig = config.getRemoteConfiguration().getFederation();
+        Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
         if (logger.isDebugEnabled()) {
-            logger.debug("config ident: " + System.identityHashCode(config));
+            logger.debug("config ident: " + System.identityHashCode(CoreConfigFacade.getInstance()));
         }
 
         fedConfig.setEnableFederation(info.isEnabled());
@@ -108,7 +106,7 @@ public class FederationConfigManager implements FederationConfigInterface {
         if (logger.isDebugEnabled()) {
             logger.debug("is federation enabled? " + info.isEnabled() + ", " + fedConfig.isEnableFederation());
         }
-        config.setAndSaveFederation(fedConfig);
+        CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
         if (logger.isDebugEnabled()) {
             logger.debug("changes saved?");
         }
@@ -116,7 +114,7 @@ public class FederationConfigManager implements FederationConfigInterface {
 
     @Override
     public boolean verifyFederationTruststore() throws RemoteException {
-        Federation fedConfig = config.getRemoteConfiguration().getFederation();
+        Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
         String fileName = fedConfig.getFederationServer().getTls().getTruststoreFile();
         File truststoreFileObj = new File(fileName);
