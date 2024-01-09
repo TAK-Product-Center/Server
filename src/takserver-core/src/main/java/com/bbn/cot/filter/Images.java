@@ -17,11 +17,11 @@ import org.apache.log4j.Logger;
 import org.dom4j.Element;
 
 import com.bbn.marti.remote.ImagePref;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.util.Iterables;
 import com.bbn.marti.util.Assertion;
-import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.Tuple;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 /**
  * This has been changed innto a static class of
@@ -330,7 +330,7 @@ public class Images {
 			throw new Exception(
 					"At least one dimension is invalid.  No image writen to message.");
 		}
-		int pixels = DistributedConfiguration.getInstance().getFilter().getThumbnail().getPixels();
+		int pixels = CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getThumbnail().getPixels();
 		if (width > height) { // Ensure ratio is kept
 			height = (int) ((double) (height) / (width) * pixels);
 			width = pixels;

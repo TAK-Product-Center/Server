@@ -2,21 +2,31 @@
 
 package com.bbn.marti.remote;
 
+import java.rmi.RemoteException;
+import java.util.List;
 import java.util.Set;
+
+import org.jetbrains.annotations.NotNull;
 
 import com.bbn.marti.config.Auth;
 import com.bbn.marti.config.Auth.Ldap;
 import com.bbn.marti.config.Buffer.LatestSA;
 import com.bbn.marti.config.CertificateSigning;
 import com.bbn.marti.config.Configuration;
+import com.bbn.marti.remote.groups.ConnectionModifyResult;
+import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.FederationServer;
+import com.bbn.marti.config.Input;
 import com.bbn.marti.config.Qos;
 import com.bbn.marti.config.Repository;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.config.Vbm;
+import com.bbn.marti.remote.groups.NetworkInputAddResult;
 
 public interface CoreConfig {
+
+    static final String DEFAULT_TRUSTSTORE = "certs/files/fed-truststore.jks";
 
     void saveChanges();
 
@@ -48,4 +58,32 @@ public interface CoreConfig {
     boolean isContactApiFilter();
     
     Set<String> getContactApiWriteOnlyGroups();
+
+    NetworkInputAddResult addInputAndSave(@NotNull Input input);
+
+    void removeInputAndSave(String name) throws RemoteException;
+
+    List<Input> getNetworkInputs();
+
+    List<DataFeed> getNetworkDataFeeds();
+
+    Input getInputByName(@NotNull String inputName);
+
+    ConnectionModifyResult updateInputGroupsNoSave(String inputName, String[] groupList) throws RemoteException;
+
+    ConnectionModifyResult setArchiveFlagNoSave(String inputName, boolean desiredState);
+
+    ConnectionModifyResult setArchiveOnlyFlagNoSave(String inputName, boolean desiredState);
+
+    ConnectionModifyResult setFederatedFlagNoSave(String inputName, boolean desiredState);
+
+    ConnectionModifyResult updateTagsNoSave(String inputName, List<String> newTagList) throws RemoteException;
+
+    ConnectionModifyResult setSyncCacheRetentionSeconds(String inputName, int desiredState);
+
+    ConnectionModifyResult setSyncFlagNoSave(String dataFeedName, boolean desiredState);
+
+    void removeDataFeedAndSave(String name) throws RemoteException;
+
+    boolean isCluster();
 }

@@ -11,12 +11,13 @@ import org.eclipse.jetty.util.BlockingArrayQueue;
 
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.remote.QueueMetric;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.util.Assertion;
 import com.bbn.marti.util.Tuple;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.marti.util.concurrent.future.AsyncFutureImpl;
 import com.bbn.marti.util.concurrent.future.AsyncFutureTask;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 /**
 * An OrderedExecutor implementation that provides "ordered views" to those who request them
@@ -432,20 +433,20 @@ public class SizableOrderedExecutor implements OrderedExecutor {
 	*/
 	public OrderedExecutorView createOrderedView() {
 		
-		Configuration config = DistributedConfiguration.getInstance().getRemoteConfiguration();
-			
-		com.bbn.marti.config.Buffer.Queue queueConfig = config.getBuffer().getQueue();
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
+		com.bbn.marti.config.Queue queueConfig = config.getBuffer().getQueue();
 				
-		return new ClientExecutorView(new BlockingArrayQueue<>(queueConfig.getQueueSizeInitial(), queueConfig.getQueueSizeIncrement(), queueConfig.getCapacity()));
+		return new ClientExecutorView(new BlockingArrayQueue<>(queueConfig.getQueueSizeInitial(), queueConfig.getQueueSizeIncrement(), queueConfig.getQueueSizeMaxCapacity()));
 	}
 	
 	public OrderedExecutorView createOrderedView(int capacity) {
 		
-Configuration config = DistributedConfiguration.getInstance().getRemoteConfiguration();
-		
-        com.bbn.marti.config.Buffer.Queue queueConfig = config.getBuffer().getQueue();
+Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
+		com.bbn.marti.config.Queue queueConfig = config.getBuffer().getQueue();
       		
-		return new ClientExecutorView(new BlockingArrayQueue<>(queueConfig.getQueueSizeInitial(), queueConfig.getQueueSizeIncrement(), queueConfig.getCapacity()));
+		return new ClientExecutorView(new BlockingArrayQueue<>(queueConfig.getQueueSizeInitial(), queueConfig.getQueueSizeIncrement(), queueConfig.getQueueSizeMaxCapacity()));
 	}
 	
 	public String toString() {

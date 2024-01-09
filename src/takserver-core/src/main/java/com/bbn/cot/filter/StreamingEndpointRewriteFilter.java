@@ -2,7 +2,6 @@
 
 package com.bbn.cot.filter;
 
-import javax.naming.ldap.LdapName;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -13,6 +12,8 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 
+import javax.naming.ldap.LdapName;
+
 import org.dom4j.Element;
 import org.dom4j.Node;
 import org.slf4j.Logger;
@@ -21,14 +22,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
 import com.atakmap.Tak.ROL;
-import tak.server.federation.DistributedFederationManager;
+import com.bbn.marti.config.Configuration;
 import com.bbn.marti.nio.channel.ChannelHandler;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.sync.MissionMetadata;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.RepositoryService;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.Subscription;
@@ -36,12 +37,12 @@ import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.model.MissionPermission;
 import com.bbn.marti.sync.model.MissionSubscription;
-import com.bbn.marti.sync.repository.MissionSubscriptionRepository;
 import com.bbn.marti.sync.service.MissionService;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
+import tak.server.federation.DistributedFederationManager;
 
 public class StreamingEndpointRewriteFilter implements CotFilter {
 
@@ -64,9 +65,6 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
   	private static final Logger logger = LoggerFactory.getLogger(StreamingEndpointRewriteFilter.class);
 
   	@Autowired
-  	private DistributedConfiguration config;
-
-  	@Autowired
   	private SubscriptionManager subscriptionManager;
 
   	@Autowired
@@ -81,8 +79,8 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
    	@Autowired
    	ApplicationContext context;
 
-	@Autowired
-	private MissionSubscriptionRepository missionSubscriptionRepository;
+//	@Autowired
+//	private MissionSubscriptionRepository missionSubscriptionRepository;
 
 	private MissionService missionService;
 	
@@ -96,6 +94,7 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 	@SuppressWarnings("unchecked")
     @Override
 	public CotEventContainer filter(final CotEventContainer cot) {
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
 		if (logger.isTraceEnabled()) {
 			logger.trace("StreamingEndpointFilter start");
@@ -152,13 +151,13 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 				for (Node destElem : destList) {
 					Element detached = (Element) destElem.detach();
 
-					if(detached.attribute(CALLSIGN_ATTR) != null) {
+					if (detached.attribute(CALLSIGN_ATTR) != null) {
 						callsignList.add(detached.attributeValue(CALLSIGN_ATTR));
-					} else if(detached.attribute(PUBLISH_ATTR) != null) {
+					} else if (detached.attribute(PUBLISH_ATTR) != null) {
 						publishList.add(detached.attributeValue(PUBLISH_ATTR));
-					} else if(detached.attribute(UID_ATTR) != null) {
+					} else if (detached.attribute(UID_ATTR) != null) {
 						uids.add(detached.attributeValue(UID_ATTR));
-					} else if(detached.attribute(MISSION_ATTR) != null) {
+					} else if (detached.attribute(MISSION_ATTR) != null) {
 					    missionNames.add(detached.attributeValue(MISSION_ATTR));
 				        logger.debug("mission destination specified in message: " + detached.attributeValue(MISSION_ATTR));
 
@@ -199,8 +198,8 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 						MissionSubscription missionSubscription = null;
 						User user = (User) cot.getContextValue(Constants.USER_KEY);
 						if (user != null) {
-							missionSubscription = missionSubscriptionRepository
-									.findByMissionNameAndClientUidAndUsernameNoMission(
+							missionSubscription = missionService
+									.getMissionSubcriptionByMissionNameAndClientUidAndUsernameNoMission(
 									missionName, clientUid, user.getName());
 
 							if (missionSubscription == null
@@ -209,13 +208,13 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 								String cn = new LdapName(user.getCert().getSubjectX500Principal().getName())
 										.getRdns().stream().filter(i -> i.getType().equalsIgnoreCase("CN"))
 											.findFirst().get().getValue().toString();
-								missionSubscription = missionSubscriptionRepository
-										.findByMissionNameAndClientUidAndUsernameNoMission(
+								missionSubscription = missionService
+										.getMissionSubcriptionByMissionNameAndClientUidAndUsernameNoMission(
 										missionName, clientUid, cn);
 							}
 
 						} else {
-							missionSubscription = missionSubscriptionRepository.findByMissionNameAndClientUidNoMission(
+							missionSubscription = missionService.getMissionSubscriptionByMissionNameAndClientUidNoMission(
 									missionName, clientUid);
 						}
 					
@@ -285,8 +284,8 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 								}
 							}
 							
-							if (config.getRemoteConfiguration().getFederation().isEnableFederation()
-									&&	config.getRemoteConfiguration().getFederation().isAllowMissionFederation()) {
+							if (config.getFederation().isEnableFederation()
+									&&	config.getFederation().isAllowMissionFederation()) {
 								// federate this mission update (subject to group filtering)
 								try {
 
@@ -328,11 +327,11 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 										}
 
 										
-										if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions()) {
+										if (config.getFederation().isFederateOnlyPublicMissions()) {
 											if ("public".equals(mission.getTool())) {
 												// allow public. no action needed as of now
 											} else if (config.getNetwork().getMissionCopTool().equals(mission.getTool())) {
-												if (!DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
+												if (!config.getVbm().isEnabled()) {
 													logger.debug("not federating vbm mission action for mission " + missionName + " since vbm is disabled");
 													return;
 												}

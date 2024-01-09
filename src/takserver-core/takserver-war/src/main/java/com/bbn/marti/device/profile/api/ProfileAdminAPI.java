@@ -7,8 +7,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
 import org.jetbrains.annotations.NotNull;
@@ -47,7 +47,7 @@ import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.api.MissionApi;
 import com.bbn.marti.util.CommonUtil;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 import tak.server.Constants;
 

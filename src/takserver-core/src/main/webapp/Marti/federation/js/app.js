@@ -40,6 +40,10 @@ app.config(['$routeProvider',
 			templateUrl: 'partials/newOutgoingConnection.html',
 			controller: 'OutgoingConnectionCreationCtrl'
 		    }).
+		    when('/modifyOutgoingConnection/:id', {
+			templateUrl: 'partials/modifyOutgoingConnection.html',
+			controller: 'OutgoingConnectionModificationCtrl'
+		    }).
 		    when('/listFederates', {
 			templateUrl: 'partials/federates.html',
 			controller: 'FederatesListCtrl'

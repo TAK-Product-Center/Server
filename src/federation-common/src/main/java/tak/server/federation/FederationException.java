@@ -24,7 +24,7 @@ public class FederationException extends Exception {
     @Override
     public String toString() {
         Throwable cause = this.getCause();
-        if(cause == null) {
+        if (cause == null) {
             return this.getMessage();
         } else if (this.additionalInformation == null) {
             return cause.toString();

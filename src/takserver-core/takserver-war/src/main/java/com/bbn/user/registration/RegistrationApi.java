@@ -2,8 +2,8 @@ package com.bbn.user.registration;
 
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.hibernate.validator.constraints.Email;
 import org.jetbrains.annotations.NotNull;

@@ -3,8 +3,9 @@ package com.bbn.marti.config;
 import java.rmi.RemoteException;
 import java.util.List;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,9 +23,6 @@ public class ConfigAPI extends BaseRestController {
     private static final Logger logger = LoggerFactory.getLogger(ConfigAPI.class);
 
     @Autowired
-    private CoreConfig coreConfig;
-
-    @Autowired
     private CommonUtil martiUtil;
 
     @RequestMapping(value = "/config", method = RequestMethod.GET)
@@ -36,9 +34,9 @@ public class ConfigAPI extends BaseRestController {
             return null;
         }
 
-        return coreConfig.getRemoteConfiguration();
+        return CoreConfigFacade.getInstance().getRemoteConfiguration();
     }
-    
+
     @RequestMapping(value = "/cachedConfig", method = RequestMethod.GET)
     Configuration getCachedCoreConfig(HttpServletResponse response) throws RemoteException {
 
@@ -48,9 +46,9 @@ public class ConfigAPI extends BaseRestController {
             return null;
         }
 
-        return coreConfig.getCachedConfiguration();
+        return CoreConfigFacade.getInstance().getCachedConfiguration();
     }
-    
+
     @RequestMapping(value = "/cachedInputConfig", method = RequestMethod.GET)
     List<Input> getCachedInputConfig(HttpServletResponse response) throws RemoteException {
 
@@ -60,6 +58,6 @@ public class ConfigAPI extends BaseRestController {
             return null;
         }
 
-        return coreConfig.getCachedConfiguration().getNetwork().getInput();
+        return CoreConfigFacade.getInstance().getCachedConfiguration().getNetwork().getInput();
     }
 }

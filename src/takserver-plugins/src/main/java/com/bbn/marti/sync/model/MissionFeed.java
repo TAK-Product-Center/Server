@@ -1,8 +1,16 @@
 package com.bbn.marti.sync.model;
 
-import javax.persistence.*;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlTransient;
+import jakarta.persistence.Cacheable;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlTransient;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.Ordering;
 
 import org.json.simple.JSONArray;
 import org.slf4j.Logger;
@@ -36,7 +45,7 @@ public class MissionFeed implements Serializable, Comparable<MissionFeed> {
     protected String filterPolygon;
     protected String filterCotTypesSerialized;
     protected String filterCallsign;
-    protected Mission mission;
+    transient protected Mission mission;
     @Transient protected String name;
 
     public MissionFeed() {
@@ -137,9 +146,9 @@ public class MissionFeed implements Serializable, Comparable<MissionFeed> {
         return ComparisonChain.start()
                 .compare(this.uid, that.uid)
                 .compare(this.dataFeedUid, that.dataFeedUid)
-                .compare(this.filterPolygon, that.filterPolygon)
-                .compare(this.filterCotTypesSerialized, that.filterCotTypesSerialized)
-                .compare(this.filterCallsign, that.filterCallsign)
+                .compare(this.filterPolygon, that.filterPolygon, Ordering.natural().nullsFirst())
+                .compare(this.filterCotTypesSerialized, that.filterCotTypesSerialized, Ordering.natural().nullsFirst())
+                .compare(this.filterCallsign, that.filterCallsign, Ordering.natural().nullsFirst())
                 .result();
     }
 

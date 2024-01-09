@@ -1,0 +1,7 @@
+FROM mongo:6.0
+
+COPY tak/federation-hub/scripts/db /opt/tak/federation-hub/scripts/db
+
+RUN mkdir -p /var/lib/mongodb
+
+ENTRYPOINT ["/bin/sh","-c","/opt/tak/federation-hub/scripts/db/configureInDocker.sh && tail -f /dev/null"]

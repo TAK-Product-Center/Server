@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.naming.NamingException;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -54,6 +55,7 @@ import mil.af.rl.rol.RolLexer;
 import mil.af.rl.rol.RolParser;
 import mil.af.rl.rol.value.DataFeedMetadata;
 import mil.af.rl.rol.value.MissionMetadata;
+import tak.server.federation.rol.MissionEnterpriseSyncRolVisitor;
 import tak.server.feeds.DataFeedDTO;
 import tak.server.feeds.DataFeed.DataFeedType;
 
@@ -67,18 +69,15 @@ public class FederationROLHandler {
 
 	protected RemoteUtil remoteUtil;
 
-	protected CoreConfig coreConfig;
-	
 	protected DataFeedRepository dataFeedRepository;
-	
-	@Autowired
-    private InputManager inputManager;
 
-	public FederationROLHandler(MissionService missionService, EnterpriseSyncService syncService, RemoteUtil remoteUtil, CoreConfig coreConfig, DataFeedRepository dataFeedRepository) throws RemoteException {
+	@Autowired
+	private InputManager inputManager;
+
+	public FederationROLHandler(MissionService missionService, EnterpriseSyncService syncService, RemoteUtil remoteUtil, DataFeedRepository dataFeedRepository) throws RemoteException {
 		this.missionService = missionService;
 		this.syncService = syncService;
 		this.remoteUtil = remoteUtil;
-		this.coreConfig = coreConfig;
 		this.dataFeedRepository = dataFeedRepository;
 	}
 
@@ -138,16 +137,16 @@ public class FederationROLHandler {
 
 		FederationProcessor<ROL> newProcessor(String resource, String operation, Object parameters, NavigableSet<Group> groups) {
 			switch (Resource.valueOf(resource.toUpperCase())) {
-			case PACKAGE:
-				throw new UnsupportedOperationException("federated mission package processing occurs in core - this ROL should not have been sent");
-			case MISSION:
-				return new FederationMissionProcessor(resource, operation, parameters, groups);
-			case DATA_FEED:
-				return new FederationDataFeedProcessor(resource, operation, parameters, groups);
-			case RESOURCE:
-				return new FederationSyncResourceProcessor(resource, operation, (com.bbn.marti.sync.model.Resource) parameters, groups);
-			default:
-				throw new IllegalArgumentException("invalid federation processor kind " + resource);
+				case PACKAGE:
+					throw new UnsupportedOperationException("federated mission package processing occurs in core - this ROL should not have been sent");
+				case MISSION:
+					return new FederationMissionProcessor(resource, operation, parameters, groups);
+				case DATA_FEED:
+					return new FederationDataFeedProcessor(resource, operation, parameters, groups);
+				case RESOURCE:
+					return new FederationSyncResourceProcessor(resource, operation, (com.bbn.marti.sync.model.Resource) parameters, groups);
+				default:
+					throw new IllegalArgumentException("invalid federation processor kind " + resource);
 			}
 		}
 	}
@@ -167,6 +166,8 @@ public class FederationROLHandler {
 		@Override
 		public void process(ROL rol) {
 
+			CoreConfig coreConfig = CoreConfigFacade.getInstance();
+
 			if (!coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("mission federation disabled in config");
@@ -175,24 +176,24 @@ public class FederationROLHandler {
 			}
 
 			switch (op.toLowerCase(Locale.ENGLISH)) {
-			case "create":
-				processCreate(rol);
-				break;
-			case "delete":
-				if (requireNonNull(coreConfig.getRemoteConfiguration().getFederation(), "federation CoreConfig").isAllowFederatedDelete()) {
-					processDelete(rol);
-				} else {
-					logger.info("ignoring federated 'delete mission' command: federated delete is disabled in CoreConfig");
-				}
+				case "create":
+					processCreate(rol);
+					break;
+				case "delete":
+					if (requireNonNull(coreConfig.getRemoteConfiguration().getFederation(), "federation CoreConfig").isAllowFederatedDelete()) {
+						processDelete(rol);
+					} else {
+						logger.info("ignoring federated 'delete mission' command: federated delete is disabled in CoreConfig");
+					}
 
-				break;
-			case "update":
-				processUpdate(rol);
-				break;
-			case "assign":
-				processAssign(rol);
-				break;
-			default:
+					break;
+				case "update":
+					processUpdate(rol);
+					break;
+				case "assign":
+					processAssign(rol);
+					break;
+				default:
 			}
 		}
 
@@ -205,16 +206,16 @@ public class FederationROLHandler {
 			if (parameters instanceof MissionMetadata) {
 				MissionMetadata md = (MissionMetadata) parameters;
 				int defaultRoleId = (int) md.getDefaultRoleId();
-				
+
 				MissionRole missionRole = null;
 				if (defaultRoleId > 0) {
 					Role defaultRole = MissionRole.Role.values()[defaultRoleId - 1];
 					missionRole = new MissionRole(defaultRole);
 					missionRole.setId(md.getDefaultRoleId());
 				}
-				
+
 				if (!missionService.exists(md.getName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)))) {
-					missionService.createMission(md.getName(), md.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), 
+					missionService.createMission(md.getName(), md.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)),
 							md.getDescription(), md.getChatRoom(), md.getBaseLayer(), md.getBbox(), md.getPath(), md.getClassification(), md.getTool(),
 							md.getPasswordHash(), missionRole, md.getExpiration(), md.getBoundingPolygon(), md.getInviteOnly());
 				}
@@ -268,92 +269,94 @@ public class FederationROLHandler {
 					logger.debug("mission update details: " + mud);
 				}
 
+				CoreConfig coreConfig = CoreConfigFacade.getInstance();
+
 				switch (requireNonNull(mud.getChangeType(), "mission update change type")) {
-				case ADD_CONTENT:
+					case ADD_CONTENT:
 
-					if (!missionService.exists(mud.getMissionName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)))) {
-						missionService.createMission(mud.getMissionName(), mud.getMissionCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), mud.getMissionDescription(), mud.getMissionChatRoom(), null, null, null, null, mud.getMissionTool(), null, null, null, null, false);
-					}
-
-					if (logger.isDebugEnabled()) {
-						logger.debug("adding mission content");
-					}
-					missionService.addMissionContent(mud.getMissionName(), mud.getContent(), mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
-
-					if (logger.isDebugEnabled()) {
-						logger.debug("adding mission content complete");
-					}
-					break;
-				case REMOVE_CONTENT:
-					try {
-						if (requireNonNull(coreConfig.getRemoteConfiguration().getFederation(), "federation CoreConfig").isAllowFederatedDelete()) {
-
-							String hash = null;
-							String uid = null;
-
-							if (!mud.getContent().getHashes().isEmpty()) {
-								hash = mud.getContent().getHashes().get(0);
-							}
-
-							if (!mud.getContent().getUids().isEmpty()) {
-								uid = mud.getContent().getUids().get(0);
-							}
-
-							missionService.deleteMissionContent(mud.getMissionName(), hash, uid, mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
-
-						} else {
-							logger.info("ignoring federated delete content - disabled in CoreConfig");
+						if (!missionService.exists(mud.getMissionName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)))) {
+							missionService.createMission(mud.getMissionName(), mud.getMissionCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), mud.getMissionDescription(), mud.getMissionChatRoom(), null, null, null, null, mud.getMissionTool(), null, null, null, null, false);
 						}
-					} catch (Exception e) {
-						logger.warn("exception accessing remote CoreConfig", e);
-					}
-					break;
-				default:
-					throw new IllegalArgumentException("invalid mission change type: " + mud.getChangeType());
+
+						if (logger.isDebugEnabled()) {
+							logger.debug("adding mission content");
+						}
+						missionService.addMissionContent(mud.getMissionName(), mud.getContent(), mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
+
+						if (logger.isDebugEnabled()) {
+							logger.debug("adding mission content complete");
+						}
+						break;
+					case REMOVE_CONTENT:
+						try {
+							if (requireNonNull(coreConfig.getRemoteConfiguration().getFederation(), "federation CoreConfig").isAllowFederatedDelete()) {
+
+								String hash = null;
+								String uid = null;
+
+								if (!mud.getContent().getHashes().isEmpty()) {
+									hash = mud.getContent().getHashes().get(0);
+								}
+
+								if (!mud.getContent().getUids().isEmpty()) {
+									uid = mud.getContent().getUids().get(0);
+								}
+
+								missionService.deleteMissionContent(mud.getMissionName(), hash, uid, mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
+
+							} else {
+								logger.info("ignoring federated delete content - disabled in CoreConfig");
+							}
+						} catch (Exception e) {
+							logger.warn("exception accessing remote CoreConfig", e);
+						}
+						break;
+					default:
+						throw new IllegalArgumentException("invalid mission change type: " + mud.getChangeType());
 				}
 			} else if (parameters instanceof MissionUpdateDetailsForMapLayer) {
-				
+
 				MissionUpdateDetailsForMapLayer mud = (MissionUpdateDetailsForMapLayer) parameters;
 
 				if (logger.isDebugEnabled()) {
 					logger.debug("MissionUpdateDetailsForMapLayer: " + mud);
 				}
-				
+
 				if (mud.getType() == MissionUpdateDetailsForMapLayerType.ADD_MAPLAYER_TO_MISSION) {
 					missionService.addMapLayerToMission(mud.getMissionName(), mud.getCreatorUid(), mud.getMission(), mud.getMapLayer());
-					
+
 				} else if (mud.getType() ==  MissionUpdateDetailsForMapLayerType.UPDATE_MAPLAYER) {
 					missionService.updateMapLayer(mud.getMissionName(), mud.getCreatorUid(), mud.getMission(), mud.getMapLayer());
-					
+
 				} else if (mud.getType() == MissionUpdateDetailsForMapLayerType.REMOVE_MAPLAYER_FROM_MISSION) {
 					missionService.removeMapLayerFromMission(mud.getMissionName(), mud.getCreatorUid(), mud.getMission(), mud.getMapLayer().getUid());
-				
+
 				} else {
 					throw new IllegalArgumentException("invalid MissionUpdateDetailsForMapLayerType: " + mud.getType());
 				}
 			} else if (parameters instanceof MissionUpdateDetailsForMissionLayer){
-				
+
 				MissionUpdateDetailsForMissionLayer mud = (MissionUpdateDetailsForMissionLayer) parameters;
 
 				if (logger.isDebugEnabled()) {
 					logger.debug("MissionUpdateDetailsForMissionLayer: " + mud);
 				}
-				
+
 				if (mud.getType() == MissionUpdateDetailsForMissionLayerType.ADD_MISSION_LAYER_TO_MISSION) {
 					String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
 					missionService.addMissionLayer(mud.getMissionName(), mud.getMission(), mud.getUid(), mud.getName(), mud.getMissionLayerType(), mud.getParentUid(), mud.getAfter(), mud.getCreatorUid(), groupVector);
-					
+
 				} else if (mud.getType() == MissionUpdateDetailsForMissionLayerType.REMOVE_MISSION_LAYER_FROM_MISSION) {
 					String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
 					missionService.removeMissionLayer(mud.getMissionName(), mud.getMission(), mud.getLayerUid(), mud.getCreatorUid(), groupVector);
 				} else {
 					throw new IllegalArgumentException("invalid MissionUpdateDetailsForMissionLayerType: " + mud.getType());
-				}		
-				
+				}
+
 			} else {
 				throw new IllegalArgumentException("invalid parameters object type for mission update action: " + parameters.getClass().getSimpleName());
 			}
-			
+
 		}
 
 		private void processAssign(ROL rol) {
@@ -373,19 +376,19 @@ public class FederationROLHandler {
 							remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
 				}
 			}else if (parameters instanceof MissionExpiration) {
-				
+
 				MissionExpiration missionExpiration = (MissionExpiration) parameters;
-				
-				missionService.setExpiration(missionExpiration.getMissionName(), missionExpiration.getMissionExpiration(), 
+
+				missionService.setExpiration(missionExpiration.getMissionName(), missionExpiration.getMissionExpiration(),
 						remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
-				
+
 			}else {
 				throw new IllegalArgumentException("ROL assign mission does not have correct parameters");
 			}
-			
+
 		}
 	}
-	
+
 	private class FederationDataFeedProcessor implements FederationProcessor<ROL> {
 
 		private final String op;
@@ -399,7 +402,10 @@ public class FederationROLHandler {
 		}
 
 		@Override
-		public void process(ROL rol) {			
+		public void process(ROL rol) {
+
+			CoreConfig coreConfig = CoreConfigFacade.getInstance();
+
 			if (!coreConfig.getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("data feed federation disabled in config");
@@ -408,21 +414,21 @@ public class FederationROLHandler {
 			}
 
 			switch (op.toLowerCase(Locale.ENGLISH)) {
-			case "create":
-				processCreate(rol);
-				break;
-			case "update":
-				processUpdate(rol);
-				break;
-			case "delete":
-				if (requireNonNull(coreConfig.getRemoteConfiguration().getFederation(), "federation CoreConfig").isAllowFederatedDelete()) {
-					processDelete(rol);
-				} else {
-					logger.info("ignoring federated 'delete mission feed' command: federated delete is disabled in CoreConfig");
-				}
+				case "create":
+					processCreate(rol);
+					break;
+				case "update":
+					processUpdate(rol);
+					break;
+				case "delete":
+					if (requireNonNull(coreConfig.getRemoteConfiguration().getFederation(), "federation CoreConfig").isAllowFederatedDelete()) {
+						processDelete(rol);
+					} else {
+						logger.info("ignoring federated 'delete mission feed' command: federated delete is disabled in CoreConfig");
+					}
 
-				break;
-			default:
+					break;
+				default:
 			}
 		}
 
@@ -433,34 +439,34 @@ public class FederationROLHandler {
 
 			if (parameters instanceof DataFeedMetadata) {
 				DataFeedMetadata meta = (DataFeedMetadata) parameters;
-				
+
 				String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
-					
+
 				// add a federated data feed to the data feeds table if it doesn't exist
 				List<DataFeedDTO> datafeeds = dataFeedRepository.getDataFeedByUUID(meta.getDataFeedUid());
 				if (datafeeds == null || datafeeds.size() == 0) {
-					long dataFeedId = dataFeedRepository.addDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
-							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, meta.isSync(), 
+					long dataFeedId = dataFeedRepository.addDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(),
+							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, meta.isSync(),
 							meta.getSyncCacheRetentionSeconds(), groupVector, true, false, null, null, null, null);
-					
+
 					if (meta.getTags() != null && meta.getTags().size() > 0)
-						dataFeedRepository.addDataFeedTags(dataFeedId, meta.getTags());
-					
+						dataFeedRepository.addDataFeedTags(dataFeedId, meta.getTags().toArray(String[]::new));
+
 					// add/update the input metrics for this feed so we can track it in the UI
 					DataFeed dataFeedConfig = dataFeedRepository.getDataFeedByUUID(meta.getDataFeedUid()).get(0).toInput();
 					inputManager.updateFederationDataFeed(dataFeedConfig);
 				}
-				
+
 				Mission mission = missionService.getMission(meta.getMissionName(), groupVector);
-				// check mission exists before making feed					
+				// check mission exists before making feed
 				if (mission != null) {
 					// create mission feed association
-					missionService.addFeedToMission(meta.getMissionFeedUid(), meta.getMissionName(), "", mission, meta.getDataFeedUid(), meta.getFilterPolygon(), 
+					missionService.addFeedToMission(meta.getMissionFeedUid(), meta.getMissionName(), "", mission, meta.getDataFeedUid(), meta.getFilterPolygon(),
 							meta.getFilterCotTypes(), meta.getFilterCallsign());
 				}
 			}
 		}
-		
+
 		private void processUpdate(ROL rol) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("recieved ROL update feed from core " + rol);
@@ -468,49 +474,49 @@ public class FederationROLHandler {
 
 			if (parameters instanceof DataFeedMetadata) {
 				DataFeedMetadata meta = (DataFeedMetadata) parameters;
-				
+
 				String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
-					
+
 				// add a federated data feed to the data feeds table, or update if it exists
 				List<DataFeedDTO> datafeeds = dataFeedRepository.getDataFeedByUUID(meta.getDataFeedUid());
 				if (datafeeds == null || datafeeds.size() == 0) {
-					long dataFeedId = dataFeedRepository.addDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
-							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, meta.isSync(), 
+					long dataFeedId = dataFeedRepository.addDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(),
+							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, meta.isSync(),
 							meta.getSyncCacheRetentionSeconds(), groupVector, true, false, null, null, null, null);
-					dataFeedRepository.addDataFeedTags(dataFeedId, meta.getTags());
+					dataFeedRepository.addDataFeedTags(dataFeedId, meta.getTags().toArray(String[]::new));
 				} else {
 					DataFeedDTO dataFeed = datafeeds.get(0);
-					
+
 					// TODO: update this to support predicate data feeds
-					dataFeedRepository.updateDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(), 
-							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null, 
+					dataFeedRepository.updateDataFeed(meta.getDataFeedUid(), meta.getFeedName(), DataFeedType.Federation.ordinal(),
+							meta.getAuthType(), -1, false, null, null, null, meta.isArchive(), false, meta.isArchiveOnly(), 2, null,
 							meta.isSync(), meta.getSyncCacheRetentionSeconds(), true, false, null, null, null, null);
-					
+
 					dataFeedRepository.removeAllDataFeedTagsById(dataFeed.getId());
-					
+
 					if (meta.getTags() != null && meta.getTags().size() > 0)
-						dataFeedRepository.addDataFeedTags(dataFeed.getId(), meta.getTags());
+						dataFeedRepository.addDataFeedTags(dataFeed.getId(), meta.getTags().toArray(String[]::new));
 				}
-				
+
 				// add/update the input metrics for this feed so we can track it in the UI
 				DataFeed dataFeedConfig = dataFeedRepository.getDataFeedByUUID(meta.getDataFeedUid()).get(0).toInput();
 				inputManager.updateFederationDataFeed(dataFeedConfig);
 			}
 		}
-		
+
 		private void processDelete(ROL rol) {
 
 			if (logger.isDebugEnabled()) {
 				logger.debug("recieved ROL delete mission feed from core " + rol);
 			}
-			
+
 			if (parameters instanceof DataFeedMetadata) {
 				DataFeedMetadata meta = (DataFeedMetadata) parameters;
-				
+
 				String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
-				
-				// if there is a mission in the delete request, remove the mission feed	
-				if (!Strings.isNullOrEmpty(meta.getMissionName())) {	
+
+				// if there is a mission in the delete request, remove the mission feed
+				if (!Strings.isNullOrEmpty(meta.getMissionName())) {
 					Mission mission = missionService.getMission(meta.getMissionName(), groupVector);
 					missionService.removeFeedFromMission(meta.getMissionName(), "", mission, meta.getMissionFeedUid());
 				}
@@ -546,15 +552,15 @@ public class FederationROLHandler {
 		public void process(ROL rol) {
 
 			switch (op.toLowerCase(Locale.ENGLISH)) {
-			case "create":
-				processCreate(rol);
-				break;
-			case "delete":
-				processDelete(rol);
-				break;
-			case "update":
-				processUpdate(rol);
-			default:
+				case "create":
+					processCreate(rol);
+					break;
+				case "delete":
+					processDelete(rol);
+					break;
+				case "update":
+					processUpdate(rol);
+				default:
 			}
 		}
 
@@ -595,6 +601,8 @@ public class FederationROLHandler {
 				logger.debug("recieved ROL delete resource from core " + rol);
 			}
 
+			CoreConfig coreConfig = CoreConfigFacade.getInstance();
+
 			if (!coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("mission federation disabled in config");
@@ -624,6 +632,8 @@ public class FederationROLHandler {
 				logger.debug("recieved ROL update resource from core " + rol);
 			}
 
+			CoreConfig coreConfig = CoreConfigFacade.getInstance();
+
 			if (!coreConfig.getRemoteConfiguration().getFederation().isAllowMissionFederation()) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("mission federation disabled in config");
@@ -641,7 +651,7 @@ public class FederationROLHandler {
 							remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
 				}
 			} catch (IllegalArgumentException | IntrusionException | IllegalStateException | SQLException
-					| NamingException | ValidationException e) {
+					 | NamingException | ValidationException e) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("exception executing federated enterprise sync update", e);
 				}
@@ -651,13 +661,15 @@ public class FederationROLHandler {
 	}
 
 	private boolean isMissionAllowed(String tool) {
+
+		CoreConfig coreConfig = CoreConfigFacade.getInstance();
 		tool = tool == null ? "public" : tool;
 		boolean onlyFederatePublic = coreConfig.getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions();
 		boolean isVBM = coreConfig.getRemoteConfiguration().getVbm().isEnabled();
-		
+
 		if (tool.equals("public")) {
 			return true;
-		} else if(tool.equals(coreConfig.getRemoteConfiguration().getNetwork().getMissionCopTool()) && onlyFederatePublic) {
+		} else if (tool.equals(coreConfig.getRemoteConfiguration().getNetwork().getMissionCopTool()) && onlyFederatePublic) {
 			return isVBM;
 		} else {
 			if (onlyFederatePublic) return false;

@@ -4,20 +4,22 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.UUID;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.web.filter.GenericFilterBean;
 
-import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.logging.AuditLogUtil;
 import com.bbn.marti.remote.exception.MissionDeletedException;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.sync.model.Mission;
@@ -39,9 +41,6 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 	@Autowired
 	private CommonUtil martiUtil;
 
-	@Autowired
-	private CoreConfig config;
-
 	private final String apiMissions = "/api/missions/";
 	private final String copMissions = "/api/cops/";
 
@@ -54,14 +53,35 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 		HttpServletResponse resp = (HttpServletResponse) servletResponse;
 
 		if (servletRequest.getLocalPort() != 8080
-				&& config.getRemoteConfiguration().getNetwork().isEnableHSTS()) {
+				&& CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isEnableHSTS()) {
 			resp.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
 		}
 
-		if (config.getRemoteConfiguration().getNetwork().isAllowAllOrigins()) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isAllowAllOrigins()) {
 			resp.setHeader("Access-Control-Allow-Origin", "*");
 			resp.setHeader("Access-Control-Allow-Headers", "*");
 			resp.setHeader("Access-Control-Allow-Methods", "*");
+		} else if (!Strings.isNullOrEmpty(
+				CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowOrigins())) {
+
+			resp.setHeader("Access-Control-Allow-Origin",
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowOrigins());
+
+			if (!Strings.isNullOrEmpty(
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowHeaders())) {
+				resp.setHeader("Access-Control-Allow-Headers",
+						CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowHeaders());
+			}
+
+			if (!Strings.isNullOrEmpty(
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowMethods())) {
+				resp.setHeader("Access-Control-Allow-Methods",
+						CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowMethods());
+			}
+
+			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isAllowCredentials()) {
+				resp.setHeader("Access-Control-Allow-Credentials", "true");
+			}
 		}
 
 		String path = req.getRequestURI();
@@ -74,9 +94,15 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 		}
 
 		if (logger.isDebugEnabled()) {
-			
+
 			// NB this can act as a request logger
 			logger.debug("path: " + path);
+		}
+
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getLogging() != null &&
+				CoreConfigFacade.getInstance().getRemoteConfiguration().getLogging().isAuditLoggingEnabled()) {
+			AuditLogUtil.setMdc(req, resp);
+			logger.info("doFilter request path: " + path);
 		}
 
 		if (missionStart != -1) {
@@ -88,7 +114,7 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 				missionEnd = path.length();
 
 				if (req.getMethod().equals("PUT") || req.getMethod().equals("POST")
-				|| (req.getMethod().equals("OPTIONS") && config.getRemoteConfiguration().getNetwork().isAllowAllOrigins())) {
+						|| (req.getMethod().equals("OPTIONS") && CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isAllowAllOrigins())) {
 					missionCreate = true;
 				}
 			}
@@ -103,12 +129,12 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 				// ignore /missions endpoints that don't refer to an individual mission
 				//
 				if (missionName.compareTo("all") != 0
-				&& 	missionName.compareTo("logs") != 0
-				&& 	missionName.compareTo("invitations") != 0
-				&& 	missionName.compareTo("hierarchy") != 0) {
-					
+						&& 	missionName.compareTo("logs") != 0
+						&& 	missionName.compareTo("invitations") != 0
+						&& 	missionName.compareTo("hierarchy") != 0) {
+
 					String missionGuid = null;
-					
+
 					try {
 						String[] parts = path.split("/", 0);
 
@@ -120,30 +146,30 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 					} catch (Exception e) {
 						logger.warn("error getting mission guid from path", e);
 					}
-					
+
 					logger.debug("mission guid {}", missionGuid);
-					
+
 					//
 					// get the mission
 					//
 					Mission mission = null;
-					
+
 					logger.debug("mission name (can be guid) : {}", missionName);
 
 					try {
-						
+
 						// for guid case, the missonName looks like 'guid' here
 						if (missionName != null && missionName.toLowerCase().equals("guid") && !Strings.isNullOrEmpty(missionGuid)) {
-							
+
 							logger.debug("getting mission by guid {}", missionGuid);
-							
+
 							UUID missionUuid = UUID.fromString(missionGuid);
-							
+
 							mission = missionService.getMissionNoContentByGuid(missionUuid, martiUtil.getGroupVectorBitString(req.getSession().getId()));
 						} else {
-							
+
 							logger.debug("getting mission by name {}", missionName);
-							
+
 							mission = missionService.getMissionNoContent(missionName, martiUtil.getGroupVectorBitString(req.getSession().getId()));
 						}
 
@@ -157,7 +183,7 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 
 						req.setAttribute(MissionRole.class.getName(), role);
 
-						if (config.getRemoteConfiguration().getVbm().isEnabled()) {
+						if (CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
 							if (!missionService.validateAccess(mission, req)) {
 								((HttpServletResponse) servletResponse).setStatus(HttpServletResponse.SC_NOT_FOUND);
 								return;
@@ -181,6 +207,11 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 							return;
 						}
 					} catch (IllegalArgumentException e) {
+
+						if (CoreConfigFacade.getInstance().getRemoteConfiguration().getLogging().isAuditLoggingEnabled()) {
+							logger.error("invalid mission UUID: " + missionGuid);
+						}
+
 						throw new IllegalArgumentException("invalid mission UUID");
 					} catch (Exception e) {
 						logger.warn("exception assigning mission role", e);
@@ -193,6 +224,10 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 			logger.debug("RequestHolderFilterBean doFilter: " + servletRequest);
 		}
 
-		filterChain.doFilter(servletRequest, servletResponse);
+		try {
+			filterChain.doFilter(servletRequest, servletResponse);
+		} finally {
+			MDC.clear();
+		}
 	}
 }

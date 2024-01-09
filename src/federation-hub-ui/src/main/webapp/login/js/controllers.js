@@ -31,7 +31,7 @@ loginControllers.controller('loginController', ['$scope', '$location', '$window'
         $scope.onSubmit = async function () {
             console.log(username.value, password.value)
 
-            $http.post('/oauth/token', {
+            $http.post('/oauth2/token', {
                 username: username.value,
                 password: password.value
             })

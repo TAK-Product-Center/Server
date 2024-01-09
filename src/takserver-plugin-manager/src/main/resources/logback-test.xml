@@ -1,14 +1,37 @@
 <configuration scan="true" scanPeriod="30 seconds">
-        <appender name="plugins_application_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
-            <file>logs/takserver-plugins.log</file>
-            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-                <fileNamePattern>logs/takserver-plugins.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
-                <maxHistory>90</maxHistory>
-            </rollingPolicy>
-            <encoder>
-                <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %logger{36} - %msg%n</pattern>
-            </encoder>
-        </appender>
+    <springProperty name="JSON_FORMAT_ENABLED" source="logging.json.enabled" defaultValue="false" />
+    <springProperty name="AUDIT_ENABLED" source="logging.audit.enabled" defaultValue="false" />
+    <springProperty name="PRETTY_PRINT" source="logging.pretty.enabled" defaultValue="false" />
+
+    <if condition='${AUDIT_ENABLED}'>
+        <then><property name="JSON_LAYOUT" value="com.bbn.marti.remote.AuditLogJsonLayout" /></then>
+        <else><property name="JSON_LAYOUT" value="ch.qos.logback.contrib.json.classic.JsonLayout" /></else>
+    </if>
+
+    <appender name="plugins_application_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/takserver-plugins.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/takserver-plugins.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+        <if condition="${JSON_FORMAT_ENABLED}">
+            <then>
+                <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+                    <layout class="${JSON_LAYOUT}">
+                        <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter">
+                            <prettyPrint>${PRETTY_PRINT}</prettyPrint>
+                        </jsonFormatter>
+                        <timestampFormat>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampFormat>
+                    </layout>
+                </encoder>
+            </then>
+            <else>
+                <encoder>
+                    <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %logger{36} - %msg%n</pattern>
+                </encoder>
+            </else>
+        </if>
+    </appender>
     <root level="INFO">
         <appender-ref ref="plugins_application_log" />
     </root>

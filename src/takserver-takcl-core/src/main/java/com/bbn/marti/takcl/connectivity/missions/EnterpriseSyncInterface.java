@@ -4,8 +4,12 @@ import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import retrofit2.Call;
-import retrofit2.http.*;
 import com.bbn.marti.takcl.connectivity.missions.MissionModels.EnterpriseSyncUploadResponse;
+import retrofit2.http.Body;
+import retrofit2.http.GET;
+import retrofit2.http.Header;
+import retrofit2.http.POST;
+import retrofit2.http.Query;
 
 public interface EnterpriseSyncInterface {
 	@POST("Marti/sync/upload")

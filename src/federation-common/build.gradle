@@ -8,6 +8,7 @@ dependencies {
   implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
   implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
 
+  implementation(project(':takserver-common'))
   api project(':takserver-fig-core')
 
   // Apache Ignite (cache and distributed service grid).
@@ -15,7 +16,7 @@ dependencies {
 //  implementation group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
   implementation group: 'org.springframework', name: 'spring-beans', version: spring_version
   implementation group: 'org.springframework', name: 'spring-context', version: spring_version
-
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-mongodb', version: spring_boot_version
 
   implementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
   implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version

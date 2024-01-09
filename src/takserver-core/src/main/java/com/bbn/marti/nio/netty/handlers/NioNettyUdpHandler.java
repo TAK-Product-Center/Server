@@ -6,6 +6,14 @@ import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.base.Strings;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.socket.DatagramPacket;
+import io.netty.handler.codec.MessageToMessageDecoder;
+import io.netty.util.CharsetUtil;
+
 import org.apache.log4j.Logger;
 import org.dom4j.Document;
 
@@ -24,20 +32,13 @@ import com.bbn.marti.nio.protocol.connections.SingleProtobufOrCotProtocol;
 import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.GroupManager;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.TransportCotEvent;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
-import com.google.common.base.Strings;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.socket.DatagramPacket;
-import io.netty.handler.codec.MessageToMessageDecoder;
-import io.netty.util.CharsetUtil;
 import tak.server.cot.CotEventContainer;
 import tak.server.cot.CotParser;
 import tak.server.federation.DistributedFederationManager;
@@ -46,7 +47,6 @@ import tak.server.qos.MessageDeliveryStrategy;
 public class NioNettyUdpHandler extends MessageToMessageDecoder<DatagramPacket> {
 	private final static Logger log = Logger.getLogger(NioNettyUdpHandler.class);
 	protected MessagingUtilImpl messagingUtil;
-	protected DistributedConfiguration config;
 	protected Protocol<CotEventContainer> protocol;
 	protected volatile CotParser parser;
 	protected Input input;

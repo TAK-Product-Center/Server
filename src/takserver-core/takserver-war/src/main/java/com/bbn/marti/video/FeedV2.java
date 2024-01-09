@@ -6,16 +6,15 @@
 
 package com.bbn.marti.video;
 
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlTransient;
+import jakarta.xml.bind.annotation.XmlAttribute;
+import jakarta.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.bind.annotation.XmlTransient;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.owasp.esapi.*;
+import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.bbn.security.web.MartiValidator;
 import com.bbn.security.web.MartiValidatorConstants;
 
 @XmlRootElement(name = "feed")

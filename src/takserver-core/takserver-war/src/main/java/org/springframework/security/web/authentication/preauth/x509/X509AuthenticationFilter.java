@@ -3,11 +3,11 @@ package org.springframework.security.web.authentication.preauth.x509;
 import java.io.IOException;
 import java.security.cert.X509Certificate;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.security.web.authentication.preauth.AbstractPreAuthenticatedProcessingFilter;
 
@@ -35,7 +35,7 @@ public class X509AuthenticationFilter extends AbstractPreAuthenticatedProcessing
 
 	private X509Certificate extractClientCertificate(HttpServletRequest request) {
 		X509Certificate[] certs = (X509Certificate[]) request
-				.getAttribute("javax.servlet.request.X509Certificate");
+				.getAttribute("jakarta.servlet.request.X509Certificate");
 
 		if (certs != null && certs.length > 0) {
 			if (logger.isDebugEnabled()) {
@@ -60,6 +60,7 @@ public class X509AuthenticationFilter extends AbstractPreAuthenticatedProcessing
      * Try to authenticate a pre-authenticated user with Spring Security if the user has
      * not yet been authenticated.
      */
+	@Override
     public void doFilter(ServletRequest request, ServletResponse response,
             FilterChain chain) throws IOException, ServletException {
     	

@@ -1,5 +1,6 @@
 package com.bbn.user.registration;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.bbn.marti.remote.CoreConfig;
@@ -9,10 +10,8 @@ public class UserManagementAuthorizationProvider {
 
     private final org.slf4j.Logger logger = LoggerFactory.getLogger(com.bbn.user.registration.UserManagementAuthorizationProvider.class);
 
-    @Autowired
-    CoreConfig coreConfig;
-
     public synchronized String getRole() {
+        CoreConfig coreConfig = CoreConfigFacade.getInstance();
         try {
             if (coreConfig == null
                     || coreConfig.getRemoteConfiguration() == null

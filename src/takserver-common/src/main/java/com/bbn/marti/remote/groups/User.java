@@ -37,9 +37,13 @@ public abstract class User implements Node, Comparable<User>, Serializable {
     protected final Date created;
     protected final X509Certificate cert;
     protected final Set<String> authorities;
+
     @JsonIgnore
     protected final UUID originNode;
-    
+
+    @JsonIgnore
+    protected String token;
+
     public User(@NotNull String id, @NotNull String connectionId, @NotNull ConnectionType type, @NotNull String name, @NotNull String address, @Nullable X509Certificate cert) {
         
         // allowing empty string address
@@ -102,6 +106,10 @@ public abstract class User implements Node, Comparable<User>, Serializable {
     public Set<String> getAuthorities() {
         return authorities;
     }
+
+    public void setToken(String token) { this.token = token; }
+
+    public String getToken() { return token; }
 
     // User nodes are always leaves
     @Override

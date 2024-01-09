@@ -4,27 +4,27 @@ import java.io.ByteArrayInputStream;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.GeneratedMessageV3;
-import org.apache.log4j.Logger;
+
+import io.micrometer.core.instrument.Metrics;
+
 import org.dom4j.Document;
 import org.dom4j.io.SAXReader;
+import org.apache.log4j.Logger;
+
+import atakmap.commoncommo.protobuf.v1.Takmessage.TakMessage;
 
 import com.bbn.marti.config.Network;
 import com.bbn.marti.nio.channel.ChannelHandler;
-import com.bbn.marti.nio.channel.connections.TcpChannelHandler;
 import com.bbn.marti.nio.protocol.ProtocolInstantiator;
 import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
-import com.bbn.marti.nio.util.ConnectionState;
 import com.bbn.marti.remote.groups.AuthenticatedUser;
-import com.bbn.marti.remote.groups.ConnectionInfo;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.util.Assertion;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
-import com.google.protobuf.CodedOutputStream;
 
-import atakmap.commoncommo.protobuf.v1.Takmessage.TakMessage;
-import io.micrometer.core.instrument.Metrics;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 import tak.server.proto.StreamingProtoBufHelper;
@@ -158,7 +158,7 @@ public class StreamingProtoBufProtocol extends AbstractBroadcastingProtocol<CotE
     private static TakMessage createFileTransferRequest(CotEventContainer data) {
         try {
             // set the download url
-            Network network = DistributedConfiguration.getInstance().getNetwork();
+            Network network = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork();
             if (network == null || network.getTakServerHost() == null || network.getTakServerHost().length() == 0
                 || network.getConnector() == null || network.getConnector().size() == 0) {
                 log.error("createFileTransferRequest failed, need to set takServerHost and connector in CoreConfig <network/> ");
@@ -214,7 +214,7 @@ public class StreamingProtoBufProtocol extends AbstractBroadcastingProtocol<CotE
 				Metrics.counter(Constants.METRIC_MESSAGE_PRECONVERT_COUNT, "takserver", "messaging").increment();
             }
 
-            if(buffer == null) {
+            if (buffer == null) {
                 return null;
             };
 
@@ -228,6 +228,9 @@ public class StreamingProtoBufProtocol extends AbstractBroadcastingProtocol<CotE
 
     public static ByteBuffer convertGeneratedMessageV3ToProtoBufBytes(GeneratedMessageV3 message) {
         try {
+            //
+            // allocate a buffer for the message
+            //
             int messageSize = message.getSerializedSize();
             int sizeOfSize = CodedOutputStream.computeUInt32SizeNoTag(messageSize);
             ByteBuffer buffer = ByteBuffer.allocate(1 + sizeOfSize + messageSize);
@@ -248,7 +251,7 @@ public class StreamingProtoBufProtocol extends AbstractBroadcastingProtocol<CotE
         }
     }
 
-    public static ByteBuffer convertCotToProtoBufBytes(CotEventContainer data) {
+    public static ByteBuffer convertCotToProtoBufBytes(CotEventContainer data, boolean sendLargeMessages) {
         ByteBuffer buffer = null;
         try {
             //
@@ -260,27 +263,26 @@ public class StreamingProtoBufProtocol extends AbstractBroadcastingProtocol<CotE
                 return null;
             }
 
-            //
-            // allocate a buffer for the message
-            //
-            int takMessageSize = takMessage.getSerializedSize();
-            if (takMessageSize > MAX_SIZE) {
-                String xml = data.asXml();
-                if (xml.length() > MAX_LOG_SIZE) {
-                    xml = xml.substring(0, MAX_LOG_SIZE) + "...";
-                }
+            if (!sendLargeMessages) {
+                int takMessageSize = takMessage.getSerializedSize();
+                if (takMessageSize > MAX_SIZE) {
+                    String xml = data.asXml();
+                    if (xml.length() > MAX_LOG_SIZE) {
+                        xml = xml.substring(0, MAX_LOG_SIZE) + "...";
+                    }
 
-                if (log.isDebugEnabled()) {
-                	log.debug("Attempt to write message greater than max size : " + takMessageSize + ", " + xml);
-                } else {
-                	log.error("Attempt to write message greater than max size : " + takMessageSize);
-                }
+                    if (log.isDebugEnabled()) {
+                        log.debug("Attempt to write message greater than max size : " + takMessageSize + ", " + xml);
+                    } else {
+                        log.error("Attempt to write message greater than max size : " + takMessageSize);
+                    }
 
-                // overwrite the failed message with a file transfer request, and write it out instead
-                takMessage = createFileTransferRequest(data);
-                if (takMessage == null) {
-                    log.error("createFileTransferRequest failed!");
-                    return null;
+                    // overwrite the failed message with a file transfer request, and write it out instead
+                    takMessage = createFileTransferRequest(data);
+                    if (takMessage == null) {
+                        log.error("createFileTransferRequest failed!");
+                        return null;
+                    }
                 }
             }
 
@@ -291,6 +293,10 @@ public class StreamingProtoBufProtocol extends AbstractBroadcastingProtocol<CotE
         }
 
         return buffer;
+    }
+
+    public static ByteBuffer convertCotToProtoBufBytes(CotEventContainer data) {
+        return convertCotToProtoBufBytes(data, false);
     }
 
     /**

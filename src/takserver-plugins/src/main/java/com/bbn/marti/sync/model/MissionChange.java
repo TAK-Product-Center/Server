@@ -5,23 +5,23 @@ package com.bbn.marti.sync.model;
 import java.io.Serializable;
 import java.util.Date;
 
-import javax.persistence.Cacheable;
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
-import javax.persistence.Transient;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlTransient;
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import jakarta.persistence.Cacheable;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.bind.annotation.XmlTransient;
+import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -72,7 +72,7 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
     protected String missionFeedUid;
     protected String mapLayerUid;
 
-    protected Mission mission;
+    transient protected Mission mission;
     protected String missionName; // mission name is denormalized here to track all event by mission name, even deletions (because if the mission id foreign key was joined on, the mission name would be lost when the mission record is deleted.
                                   // Mission change records will not be deleted at the application layer
 
@@ -326,13 +326,16 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
 
     @Override
 	public String toString() {
-		return "MissionChange [id=" + id + ", type=" + type + ", contentHash=" + contentHash + ", contentUid="
-				+ contentUid + ", externalDataUid=" + externalDataUid + ", externalDataName=" + externalDataName
-				+ ", externalDataTool=" + externalDataTool + ", externalDataToken=" + externalDataToken
-				+ ", externalDataNotes=" + externalDataNotes + ", mission=" + mission + ", missionName=" + missionName
-				+ ", timestamp=" + timestamp + ", servertime=" + servertime + ", creatorUid=" + creatorUid
-				+ ", uidDetails=" + uidDetails + ", externalMissionData=" + externalMissionData + ", tempResource="
-				+ tempResource + ", tempLogEntry=" + tempLogEntry + "]";
+		return "MissionChange [id=" + id + ", isFederatedChange=" + isFederatedChange + ", type=" + type
+				+ ", contentHash=" + contentHash + ", contentUid=" + contentUid + ", externalDataUid=" + externalDataUid
+				+ ", externalDataName=" + externalDataName + ", externalDataTool=" + externalDataTool
+				+ ", externalDataToken=" + externalDataToken + ", externalDataNotes=" + externalDataNotes
+				+ ", missionFeedUid=" + missionFeedUid + ", mapLayerUid=" + mapLayerUid + ", mission=" + mission
+				+ ", missionName=" + missionName + ", timestamp=" + timestamp + ", servertime=" + servertime
+				+ ", creatorUid=" + creatorUid + ", uidDetails=" + uidDetails + ", externalMissionData="
+				+ externalMissionData + ", tempResource=" + tempResource + ", tempLogEntry=" + tempLogEntry
+				+ ", tempExternalMissionData=" + tempExternalMissionData + ", mapLayer=" + mapLayer + ", missionFeed="
+				+ missionFeed + ", contentResource=" + contentResource + "]";
 	}
 
     @Override

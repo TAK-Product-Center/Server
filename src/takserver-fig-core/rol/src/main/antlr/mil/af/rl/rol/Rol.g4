@@ -53,7 +53,7 @@ valuearray : LSBRACKET value (',' value)* RSBRACKET | LSBRACKET RSBRACKET ;
 value : STRING | IDENT | NUMBER | parameters | valuearray | 'true' | 'false' ;
 
 // identifier
-IDENT : [a-zA-Z0-9_\.]+ ;
+IDENT : [a-zA-Z0-9_.]+ ;
 
 // primitive types
 STRING :  DBLQUOTE (ESC | ~["\\])* DBLQUOTE ;

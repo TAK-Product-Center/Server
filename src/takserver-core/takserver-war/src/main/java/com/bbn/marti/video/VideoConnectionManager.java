@@ -10,13 +10,13 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringWriter;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Marshaller;
-import javax.xml.bind.Unmarshaller;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.Unmarshaller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +53,7 @@ public class VideoConnectionManager extends EsapiServlet {
 
     	//String xml = org.apache.commons.io.IOUtils.toString(request.getInputStream());
 		org.w3c.dom.Document doc = SecureXmlParser.makeDocument(request.getInputStream());
-		if(doc != null) {
+		if (doc != null) {
 			JAXBContext jaxbContext = JAXBContext.newInstance(VideoConnections.class, Feed.class);
 			Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
 

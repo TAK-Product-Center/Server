@@ -3,6 +3,8 @@ package com.bbn.marti.nio.websockets;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import io.micrometer.core.instrument.Metrics;
+
 import org.apache.ignite.Ignite;
 import org.apache.ignite.cluster.ClusterGroup;
 import org.apache.ignite.events.DiscoveryEvent;
@@ -21,14 +23,13 @@ import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorato
 
 import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.marti.remote.SubscriptionManagerLite;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.WebsocketMessagingBroker.WebsocketMessageTransporter;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
-import io.micrometer.core.instrument.Metrics;
 import tak.server.Constants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.ignite.IgniteHolder;
 import tak.server.ignite.grid.SubscriptionManagerProxyHandler;
 import tak.server.qos.MessageDeliveryStrategy;
@@ -60,7 +61,7 @@ public class BinaryPayloadWebSocketHandler extends BinaryWebSocketHandler {
 		
 	public BinaryPayloadWebSocketHandler() {
 
-		if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
 			setupIgniteListeners();
 		}
 		
@@ -106,9 +107,9 @@ public class BinaryPayloadWebSocketHandler extends BinaryWebSocketHandler {
 		if (logger.isTraceEnabled()) {
 			logger.trace("afterConnectionEstablished " + hashCode(session));
 		}
-		ConcurrentWebSocketSessionDecorator concurrentSession = new ConcurrentWebSocketSessionDecorator(session, 
-				DistributedConfiguration.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketSendTimeoutMs(), 
-				DistributedConfiguration.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketSendBufferSizeLimit(),
+		ConcurrentWebSocketSessionDecorator concurrentSession = new ConcurrentWebSocketSessionDecorator(session,
+				CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketSendTimeoutMs(),
+				CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getWebsocketSendBufferSizeLimit(),
 				OverflowStrategy.DROP);
 		
 		websocketMap.put(hashCode(session), concurrentSession);

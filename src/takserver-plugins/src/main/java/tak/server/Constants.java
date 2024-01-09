@@ -62,6 +62,9 @@ public class Constants {
 
 	public static final String XML_HEADER = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>";
 
+	// Pub/Sub topics
+	public static final String CONFIG_TOPIC_KEY = "CONFIG_TOPIC_KEY";
+
 	// Attribute keys for objects kept in the WebSocket session
     public static final String SOCKET_TOPIC_KEY = "SOCKET_TOPIC";
     public static final String SOCKET_SESSION_KEY = "SOCKET_MARTI_SESSION_ID";
@@ -115,6 +118,7 @@ public class Constants {
 	public static final String FEDERATION_OUTGOING_CACHE = "federation-outgoing-cache";
 	public static final String IGNITE_SUBSCRIPTION_UID_TRACKER_CACHE = "ignite-subscription-uid-tacker-cache";
 	public static final String IGNITE_SUBSCRIPTION_CLIENTUID_TRACKER_CACHE = "ignite-subscription-clientuid-tacker-cache";
+	public static final String INGITE_LATEST_SA_CONNECTION_UID_CACHE = "ignite-latest-sa-connection-uid-cache";
 	public static final String IGNITE_USER_OUTBOUND_GROUP_CACHE = "ignite-user-outbound-group-cache";
 	public static final String IGNITE_USER_INBOUND_GROUP_CACHE = "ignite-user-inbound-group-cache";
 	public static final String LATEST_COT_CACHE = "latest-cot-cache";
@@ -136,6 +140,7 @@ public class Constants {
 	public static final String CLUSTER_PROFILE_NAME = "cluster";
 	public static final String MESSAGING_PROFILE_NAME = "messaging";	// messaging process
 	public static final String API_PROFILE_NAME = "api";				// API process
+	public static final String CONFIG_PROFILE_NAME = "config";				// Config process
 	public static final String HTTP_UI_PROFILE_NAME = "http-ui"; 		// reserved for future use
 	public static final String MONOLITH_PROFILE_NAME = "monolith"; 		// single-process execution
 	public static final String PLUGINS_ENABLED_PROFILE_NAME = "plugins"; 		// plugins enabled

@@ -25,7 +25,12 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-
+import org.apache.ignite.IgniteCache;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Splitter;
+import com.google.common.base.Strings;
+import com.google.common.collect.Multimap;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +44,7 @@ import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
+import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.groups.AuthenticatedUser;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.Direction;
@@ -48,26 +54,23 @@ import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.DateUtil;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.FederatedSubscriptionManager;
 import com.bbn.marti.service.SSLConfig;
 import com.bbn.marti.service.Subscription;
 import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.util.MessageConversionUtil;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
-import com.google.common.collect.Multimap;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 import mil.af.rl.rol.value.ResourceDetails;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 import tak.server.federation.FederateSubscription;
 import tak.server.federation.FigFederateSubscription;
 import tak.server.federation.MissionPackageAnnounce;
 import tak.server.federation.MissionPackageDestinations;
+import tak.server.ignite.cache.IgniteCacheHolder;
 
 /*
  * Utility class for groups and federation
@@ -171,12 +174,19 @@ public class GroupFederationUtil {
             throw new IllegalArgumentException("null subscription or cot");
         }
         
+        logger.debug("trackLatestSA called with sub: " + subscription.toString() + " and cot: " + cot.asXml());
+        
 		cot.setStored(true);
 
         if (cot.getUid() != null && subscription.clientUid != null && (force || cot.getUid().equals(subscription.clientUid))) {
-
+        	
             // save a defensive copy of this cot object
-            subscription.setLatestSA(cot.copy());      
+            subscription.setLatestSA(cot.copy());   
+            // Only utilize Ignite cache if running in clustered mode
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled() && subscription.getUser().getConnectionId() != null) {
+            	IgniteCacheHolder.getIgniteLatestSAConnectionUidCache().put(subscription.getUser().getConnectionId(), cot.asXml());
+            }
+            
         }
     }
     
@@ -424,7 +434,7 @@ public class GroupFederationUtil {
     
 	public MissionPackageAnnounce createPackageAnnounceCot(ResourceDetails dt) {
 		
-		final String baseUrl = DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getWebBaseUrl();
+		final String baseUrl = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getWebBaseUrl();
 
 		String localMpUrl = baseUrl + "/sync/content?hash=" + dt.getSha256();
 		
@@ -726,7 +736,7 @@ public class GroupFederationUtil {
 	public boolean isRemoteCASelfCA(X509Certificate remote) {
 		if (remote == null) return false;
 		try {
-			SSLConfig sslConfig = SSLConfig.getInstance(DistributedConfiguration.getInstance()
+			SSLConfig sslConfig = SSLConfig.getInstance(CoreConfigFacade.getInstance()
 					.getRemoteConfiguration()
 					.getFederation()
 					.getFederationServer()

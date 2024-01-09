@@ -1,6 +1,6 @@
 package com.bbn.marti.network;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 

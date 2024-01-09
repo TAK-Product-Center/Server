@@ -3,8 +3,9 @@ package tak.server.cache;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -17,12 +18,8 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 public class ContactCacheHelper {
 
 	private static final Logger log = Logger.getLogger(ContactCacheHelper.class);
-	
+
 	private Cache<String, List<ClientEndpoint>> contactCache;
-
-
-	@Autowired
-	private CoreConfig config;
 
 	@PostConstruct
 	public void init() {
@@ -30,10 +27,10 @@ public class ContactCacheHelper {
 		if (log.isDebugEnabled()) {
 			log.debug("in init");
 		}
-		
+
 		contactCache = Caffeine.newBuilder()
-				  .expireAfterWrite(config.getCachedConfiguration().getBuffer().getQueue().getContactCacheUpdateRateLimitSeconds() * 4, TimeUnit.SECONDS)
-				  .build();
+				.expireAfterWrite(CoreConfigFacade.getInstance().getCachedConfiguration().getBuffer().getQueue().getContactCacheUpdateRateLimitSeconds() * 4, TimeUnit.SECONDS)
+				.build();
 	}
 
 	// invalidate the contact cache 
@@ -41,13 +38,13 @@ public class ContactCacheHelper {
 
 		// concurrently hitting this block can result in concurrent invalidations - this is intentional
 		try {
-			
+
 			if (contactCache != null) {
 				contactCache.invalidateAll();
 			}
 		} catch (Exception e) {
 			throw new TakException(e);
-		} 
+		}
 	}
 
 	public Cache<String, List<ClientEndpoint>> getContactsCache() {

@@ -2,7 +2,11 @@ package com.bbn.marti.injector;
 
 import java.io.Serializable;
 import java.rmi.RemoteException;
-import java.util.*;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 
 import com.bbn.marti.config.Filter;
 import com.bbn.marti.config.Injectionfilter;
@@ -14,22 +18,21 @@ import org.dom4j.Node;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.UidInject;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.injector.Injector;
 import com.bbn.marti.remote.injector.InjectorConfig;
 import com.bbn.marti.remote.util.ConcurrentMultiHashMap;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.google.common.base.Strings;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.Multimap;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 
 /*
@@ -44,9 +47,6 @@ public class UidCotTagInjector implements Injector<RemoteSubscription, CotEventC
 	    
     private final Multimap<String, Element> uidInjectStringMap;
 
-    @Autowired
-    private CoreConfig coreConfig;
-    
     public UidCotTagInjector() throws RemoteException {
         super();
         uidInjectStringMap = new ConcurrentMultiHashMap<>();
@@ -71,12 +71,12 @@ public class UidCotTagInjector implements Injector<RemoteSubscription, CotEventC
 
     private void loadUidInjects() {
         try {
-            if (coreConfig == null) {
+            if (CoreConfigFacade.getInstance() == null) {
                 logger.error("coreConfig is null in loadUidInjects");
                 return;
             }
 
-            Configuration configuration = coreConfig.getRemoteConfiguration();
+            Configuration configuration = CoreConfigFacade.getInstance().getRemoteConfiguration();
             if (configuration == null
                     || configuration.getFilter() == null
                     || configuration.getFilter().getInjectionfilter() == null) {
@@ -97,15 +97,15 @@ public class UidCotTagInjector implements Injector<RemoteSubscription, CotEventC
     }
 
     protected void saveUidInject(UidInject uidInject) {
-        if (coreConfig == null) {
+        if (CoreConfigFacade.getInstance() == null) {
             logger.error("coreConfig is null in saveUidInject");
             return;
         }
 
-        Filter filter = coreConfig.getRemoteConfiguration().getFilter();
+        Filter filter = CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter();
         if (filter == null) {
             filter = new Filter();
-            coreConfig.getRemoteConfiguration().setFilter(filter);
+            CoreConfigFacade.getInstance().getRemoteConfiguration().setFilter(filter);
         }
 
         Injectionfilter injectionfilter = filter.getInjectionfilter();
@@ -117,16 +117,16 @@ public class UidCotTagInjector implements Injector<RemoteSubscription, CotEventC
         injectionfilter.setEnable(true);
         injectionfilter.getUidInject().add(uidInject);
 
-        coreConfig.saveChangesAndUpdateCache();
+        CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
     }
 
     protected void deleteUidInject(String uid, String toInject) {
-        if (coreConfig == null) {
+        if (CoreConfigFacade.getInstance() == null) {
             logger.error("coreConfig is null in deleteUidInject");
             return;
         }
 
-        Filter filter = coreConfig.getRemoteConfiguration().getFilter();
+        Filter filter = CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter();
         if (filter == null) {
             return;
         }
@@ -145,7 +145,7 @@ public class UidCotTagInjector implements Injector<RemoteSubscription, CotEventC
             }
         }
 
-        coreConfig.saveChangesAndUpdateCache();
+        CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
     }
 
     private static UidCotTagInjector instance = null; 

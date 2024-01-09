@@ -20,6 +20,7 @@ import com.bbn.marti.remote.ConnectionStatus;
 import com.bbn.marti.remote.ConnectionStatusValue;
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.cache.IgniteCacheHolder;
 
 /**
  *  

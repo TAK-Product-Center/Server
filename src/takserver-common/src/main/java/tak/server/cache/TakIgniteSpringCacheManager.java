@@ -19,19 +19,16 @@ import org.apache.ignite.configuration.CacheConfiguration;
 import org.apache.ignite.configuration.NearCacheConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.support.SimpleValueWrapper;
 import org.springframework.context.event.ContextRefreshedEvent;
 
 import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 import tak.server.Constants;
 
 public class TakIgniteSpringCacheManager extends SpringCacheManager {
-
-	@Autowired
-	CoreConfig config;
 
 	private static final Logger logger = LoggerFactory.getLogger(TakIgniteSpringCacheManager.class);
 
@@ -84,6 +81,7 @@ public class TakIgniteSpringCacheManager extends SpringCacheManager {
 		if (cache == null) {
 
 			CacheConfiguration<Object, Object> cacheConfig = new CacheConfiguration<>(name);
+			CoreConfig config = CoreConfigFacade.getInstance();
 
 			if (config.getRemoteConfiguration().getBuffer().getQueue().isEnableCacheGroupPerName()) {
 				cacheConfig.setGroupName("takserver-cache-group-" + name);

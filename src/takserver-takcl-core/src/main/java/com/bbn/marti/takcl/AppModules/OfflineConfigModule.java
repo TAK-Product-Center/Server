@@ -12,33 +12,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import javax.xml.bind.JAXBException;
+import jakarta.xml.bind.JAXBException;
 
-import com.bbn.marti.takcl.TAKCLCore;
-import org.apache.commons.io.FileUtils;
+import com.bbn.marti.config.*;
+import com.bbn.marti.takcl.config.common.TakclRunMode;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import com.bbn.marti.config.Auth;
-import com.bbn.marti.config.AuthType;
-import com.bbn.marti.config.Buffer;
-import com.bbn.marti.config.Configuration;
-import com.bbn.marti.config.DataFeed;
-import com.bbn.marti.config.Docs;
-import com.bbn.marti.config.Federation;
-import com.bbn.marti.config.Input;
-import com.bbn.marti.config.Network;
-import com.bbn.marti.config.Repository;
-import com.bbn.marti.config.Subscription;
-import com.bbn.marti.config.Tls;
+import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.takcl.SSLHelper;
-import com.bbn.marti.takcl.Util;
 import com.bbn.marti.takcl.AppModules.generic.ServerAppModuleInterface;
 import com.bbn.marti.takcl.cli.simple.Command;
-import com.bbn.marti.takcl.config.common.TakclRunMode;
 import com.bbn.marti.test.shared.data.connections.AbstractConnection;
 import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
+import tak.server.util.JAXBUtils;
 
 /**
  * Used to modify the server CoreConfig.xml file offline. If this is used while the server is running, the changes will not take effect, and may cause undesirable behavior.
@@ -50,6 +38,10 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 	private AbstractServerProfile server;
 
 	private String fileLocation = null;
+
+	private TAKIgniteConfiguration takIgniteConfiguration;
+
+	private String takIgniteConfigFileLocation = null;
 
 	public OfflineConfigModule() {
 	}
@@ -85,7 +77,21 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 				Files.copy(Paths.get(TAKCLConfigModule.getInstance().getCleanConfigFilepath()), Paths.get(fileLocation), StandardCopyOption.REPLACE_EXISTING);
 			}
 
-			this.configuration = Util.loadJAXifiedXML(fileLocation, Configuration.class.getPackage().getName());
+			this.configuration = JAXBUtils.loadJAXifiedXML(fileLocation, Configuration.class.getPackage().getName());
+
+		} catch (IOException | JAXBException e) {
+			throw new RuntimeException(e);
+		}
+
+		try {
+			takIgniteConfigFileLocation = server.getTAKIgniteConfigFilePath();
+			Path takIgniteConfigPath = Paths.get(takIgniteConfigFileLocation);
+
+			if (!Files.exists(takIgniteConfigPath)) {
+				Files.copy(Paths.get(TAKCLConfigModule.getInstance().getCleanTAKIgniteConfigFilepath()), Paths.get(takIgniteConfigFileLocation), StandardCopyOption.REPLACE_EXISTING);
+			}
+
+			this.takIgniteConfiguration = JAXBUtils.loadJAXifiedXML(takIgniteConfigFileLocation, com.bbn.marti.config.TAKIgniteConfiguration.class.getPackage().getName());
 
 		} catch (IOException | JAXBException e) {
 			throw new RuntimeException(e);
@@ -112,10 +118,19 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 			}
 			Files.copy(Paths.get(conf.getCleanConfigFilepath()), Paths.get(fileLocation), StandardCopyOption.REPLACE_EXISTING);
 
+			configPath = Paths.get(takIgniteConfigFileLocation);
+
+			if (Files.exists(configPath)) {
+				Files.copy(Paths.get(takIgniteConfigFileLocation), Paths.get(takIgniteConfigFileLocation + ".bak"), StandardCopyOption.REPLACE_EXISTING);
+			}
+			Files.copy(Paths.get(conf.getCleanTAKIgniteConfigFilepath()), Paths.get(takIgniteConfigFileLocation), StandardCopyOption.REPLACE_EXISTING);
+
 			init(server);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
+
+
 	}
 
 	public List<Input> getInputs() {
@@ -128,7 +143,12 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 
 	public void saveChanges() {
 		try {
-			Util.saveJAXifiedObject(fileLocation, configuration, true);
+			JAXBUtils.saveJAXifiedObject(fileLocation, configuration, true);
+		} catch (IOException | JAXBException e) {
+			throw new RuntimeException(e);
+		}
+		try {
+			JAXBUtils.saveJAXifiedObject(takIgniteConfigFileLocation, takIgniteConfiguration, true);
 		} catch (IOException | JAXBException e) {
 			throw new RuntimeException(e);
 		}
@@ -336,22 +356,6 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 	}
 
 	@Command
-	public void setIgnitePortRange(@Nullable Integer discoveryPort, @Nullable Integer discoveryPortCount) {
-		Buffer buffer = configuration.getBuffer();
-		if (buffer == null) {
-			buffer = new Buffer();
-			configuration.setBuffer(buffer);
-		}
-		if (discoveryPort != null) {
-			buffer.setIgniteNonMulticastDiscoveryPort(discoveryPort);
-			if (discoveryPortCount != null) {
-				buffer.setIgniteNonMulticastDiscoveryPortCount(discoveryPortCount);
-			}
-		}
-		saveChanges();
-	}
-
-	@Command
 	public void setFedHttpsPort(@NotNull Integer port) {
 		setConnectorConfigurationAndSave("fed_https", port, true, null, null);
 	}
@@ -377,7 +381,7 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 	}
 
 	private void setConnectorConfigurationAndSave(@NotNull String name, @NotNull Integer port, @Nullable Boolean useFedTrustStore,
-	                                              @Nullable String clientAuth, @Nullable Boolean tls) {
+												  @Nullable String clientAuth, @Nullable Boolean tls) {
 		Network.Connector connector = null;
 
 		Network n = configuration.getNetwork();
@@ -537,6 +541,7 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 		}
 
 		Federation.Federate newFederate = new Federation.Federate();
+		newFederate.setFallbackWhenNoGroupMappings(true);
 		federateList.add(newFederate);
 		newFederate.setName(federateServer.getConsistentUniqueReadableIdentifier());
 		newFederate.setId(SSLHelper.getInstance().getServerFingerprint(federateServer.getConsistentUniqueReadableIdentifier()));
@@ -659,4 +664,18 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 
 		throw new RuntimeException("Cannot add inbound group for " + server.getConsistentUniqueReadableIdentifier() + "because the federate " + federate.getConsistentUniqueReadableIdentifier() + " has not been added!");
 	}
+
+	@Command
+	public void setIgnitePortRange(@Nullable Integer discoveryPort, @Nullable Integer discoveryPortCount) {
+
+		if (discoveryPort != null) {
+			takIgniteConfiguration.setIgniteNonMulticastDiscoveryPort(discoveryPort);
+			if (discoveryPortCount != null) {
+				takIgniteConfiguration.setIgniteNonMulticastDiscoveryPortCount(discoveryPortCount);
+			}
+		}
+
+		saveChanges();
+	}
+
 }

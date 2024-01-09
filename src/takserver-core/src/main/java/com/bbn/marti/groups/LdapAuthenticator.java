@@ -4,7 +4,14 @@ package com.bbn.marti.groups;
 
 import java.io.Serializable;
 import java.rmi.RemoteException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -41,10 +48,11 @@ import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.GroupNameExtractor;
-import com.bbn.marti.service.DistributedConfiguration;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.xml.bindings.UserAuthenticationFile;
+
 import tak.server.cache.ActiveGroupCacheHelper;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 public class LdapAuthenticator extends AbstractAuthenticator implements Serializable {
 
@@ -67,6 +75,8 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
     // attributes to apply to the user object, which will return only attributes indicating group membership.
     private final String[] groupUserAttrs = {"memberOf", "ntUserWorkstations"};
     private final String[] distinguishedNameAttr = {"distinguishedName"};
+    private final String[] sAMAccountNameAttr = {"sAMAccountName"};
+    private final String[] uidAttr = {"uid"};
 
     private final boolean debug = false;
 
@@ -100,7 +110,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
 
     public LdapAuthenticator(GroupManager groupManager, ActiveGroupCacheHelper activeGroupCacheHelper) throws NamingException, RemoteException {
         
-    	conf = DistributedConfiguration.getInstance().getAuth().getLdap();
+    	conf = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap();
     	
     	if (groupManager == null) {
             throw new IllegalArgumentException("null groupManager");
@@ -453,8 +463,8 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         		logger.debug("exception getting user info", e);
         	}
         } finally {
-            if(results != null) { try { results.close(); } catch(NamingException ne) {} }
-            if(c != null) { try { c.close(); } catch(NamingException ne) {} }
+            if (results != null) { try { results.close(); } catch(NamingException ne) {} }
+            if (c != null) { try { c.close(); } catch(NamingException ne) {} }
         }
 
         return groupAttrs;
@@ -491,7 +501,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         		logger.debug("exception getting user info", e);
         	}
         } finally {
-            if(results != null) { try { results.close(); } catch(NamingException ne) {} }
+            if (results != null) { try { results.close(); } catch(NamingException ne) {} }
         }
 
         return groupAttrs;
@@ -564,7 +574,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         } catch (Exception e) {
             logger.error("exception in getPasswordExpiration!", e);
         } finally {
-            if(results != null) { try { results.close(); } catch(NamingException ne) {} }
+            if (results != null) { try { results.close(); } catch(NamingException ne) {} }
         }
 
         return null;
@@ -635,8 +645,10 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             distinguishedName = groupAttrs.get("distinguishedName0");
 
         } finally {
-            if(results != null) { try { results.close(); } catch(NamingException ne) {} }
+            if (results != null) { try { results.close(); } catch(NamingException ne) {} }
         }
+
+        distinguishedName = distinguishedName.replace("\\", "\\\\");
 
         return distinguishedName;
     }
@@ -651,19 +663,34 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             ctx = groupManager.connectLdap();
 
             SearchControls controls = new SearchControls();
-            String[] logonNameAttr = { "sAMAccountName" };
+            String[] logonNameAttr = null;
+
+            switch(getConf().getStyle()) {
+                case AD : {
+                    logonNameAttr = sAMAccountNameAttr;
+                    break;
+                }
+                case DS : {
+                    logonNameAttr = uidAttr;
+                    break;
+                }
+            }
+
             controls.setReturningAttributes(logonNameAttr);
 
             controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
             String filter = "(mail=" + email + ")";
-            results = ctx.search("", filter, controls);
+
+            String userBaseRDN = conf.getUserBaseRDN() != null ? conf.getUserBaseRDN() : "";
+            results = ctx.search(userBaseRDN, filter, controls);
 
             Map<String, String> groupAttrs = new ConcurrentHashMap<>();
             getGroupAttrs(results, groupAttrs);
-            return groupAttrs.get("sAMAccountName0");
+
+            return groupAttrs.get(logonNameAttr[0] + "0");
 
         } finally {
-            if(results != null) {
+            if (results != null) {
                 try {
                     results.close();
                 } catch(NamingException e) {

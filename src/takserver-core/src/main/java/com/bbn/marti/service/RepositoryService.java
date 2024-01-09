@@ -22,9 +22,15 @@ import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import javax.naming.NamingException;
-import javax.xml.bind.DatatypeConverter;
+import jakarta.xml.bind.DatatypeConverter;
+
+import com.bbn.marti.config.Configuration;
+import com.google.common.base.Strings;
+import com.zaxxer.hikari.HikariDataSource;
+
+import io.micrometer.core.instrument.Metrics;
 
 import org.apache.log4j.Logger;
 import org.dom4j.Element;
@@ -53,11 +59,9 @@ import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.remote.util.SecureXmlParser;
 import com.bbn.marti.util.FixedSizeBlockingQueue;
 import com.bbn.marti.util.Iterables;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
-import com.google.common.base.Strings;
-import com.zaxxer.hikari.HikariDataSource;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
-import io.micrometer.core.instrument.Metrics;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cache.CoTCacheHelper;
 import tak.server.cache.MissionCacheResolver;
@@ -68,8 +72,6 @@ import tak.server.ignite.IgniteHolder;
 public class RepositoryService extends BaseService {
 
 	public static String CALLSIGN_DEST_XPATH = "/event/detail/marti/dest[@callsign]";
-
-	private DistributedConfiguration config = DistributedConfiguration.getInstance();
 
 	@Autowired
 	private SubscriptionManager subscriptionManager;
@@ -107,7 +109,7 @@ public class RepositoryService extends BaseService {
 	@PostConstruct
 	public void init() {
 
-		Repository repository = config.getRepository();
+		Repository repository = CoreConfigFacade.getInstance().getRemoteConfiguration().getRepository();
 		dateFormat.setTimeZone(new SimpleTimeZone(0, "UTC"));
 
 		INSERTION_BATCH_SIZE = repository.getInsertionBatchSize();
@@ -281,7 +283,7 @@ public class RepositoryService extends BaseService {
 
 								final boolean[] fgroupBitVector = groupsBitVector;
 
-								if (config.getRemoteConfiguration().getBuffer().getQueue().isCacheCotInRepository()) {
+								if (CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().isCacheCotInRepository()) {
 									// cache latest CoT for each uid
 									Resources.messageCacheProcessor.execute(() -> {
 										cotCacheHelper.cacheCoT(event, RemoteUtil.getInstance().bitVectorToString(fgroupBitVector));
@@ -769,6 +771,7 @@ public class RepositoryService extends BaseService {
 	 */
 	public void auditCallsignUIDEventAsync(String callsign, String uid, String username, ConnectionEventTypeValue eventType, String groupVector) {
 
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 		if (!config.getRepository().isEnable()) {
 			return;
 		}
@@ -847,6 +850,8 @@ public class RepositoryService extends BaseService {
 
 	//    @CacheEvict(value = Constants.CONTACTS_CACHE, allEntries = true)
 	public void closeOpenCallsignAudits() {
+
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
     	if (!config.getRepository().isEnable()) {
 			return;
@@ -1012,6 +1017,8 @@ public class RepositoryService extends BaseService {
 	}
 
 	public int getMaxConnections() {
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
 	    if (!config.getRepository().isEnable()) {
 	        log.info("the repository is not enabled in CoreConfig.xml");
 	        return 1;
@@ -1032,12 +1039,14 @@ public class RepositoryService extends BaseService {
 	}
 
 	public void reinitializeConnectionPool() {
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
 	    if (!config.getRepository().isEnable()) {
 	        log.info("the repository is not enabled in CoreConfig.xml");
 	        return;
 	    }
 	    log.info("reinitialize the connection pool");
-	    Repository repository = this.config.getRepository();
+	    Repository repository = config.getRepository();
         int numDbConnections;
         if (repository.isConnectionPoolAutoSize()) {
             numDbConnections = 200 + (int) Math.min(845, (Runtime.getRuntime().availableProcessors() - 4) * 9.2);
@@ -1058,7 +1067,7 @@ public class RepositoryService extends BaseService {
 	}
 
 	public String getServerVersion() {
-	    if (!config.getRepository().isEnable()) {
+	    if (!CoreConfigFacade.getInstance().getRemoteConfiguration().getRepository().isEnable()) {
 	        log.info("the repository is not enabled in CoreConfig.xml");
 	        return "";
 	    }

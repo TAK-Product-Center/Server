@@ -48,16 +48,16 @@ public class FederationConfigApi extends BaseRestController{
     public ResponseEntity<ApiResponse<String>> modifyFederationConfig(@RequestBody FederationConfigInfo info){
         try {
         	File truststoreFileObj = new File(info.getTruststorePath());
-        	if(!truststoreFileObj.exists()) {
+        	if (!truststoreFileObj.exists()) {
         		return new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, FederationConfigInfo.class.getName(), "Failed to modify Federation config - Truststore File specified does not exist"),
         				HttpStatus.BAD_REQUEST);
         	}
-        	if(!FilenameUtils.getExtension(info.getTruststorePath()).equals("jks")) {
+        	if (!FilenameUtils.getExtension(info.getTruststorePath()).equals("jks")) {
         		return new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, FederationConfigInfo.class.getName(), "Failed to modify Federation config - Truststore File specified is not a .jks file"),
         				HttpStatus.BAD_REQUEST);
         	}
             federationInterface.modifyFederationConfig(info);
-			MessagingIgniteBroker.brokerVoidServiceCalls((s) -> ((FederationManager) s).reconfigureFederation(), Constants.DISTRIBUTED_FEDERATION_MANAGER, FederationManager.class);
+            MessagingIgniteBroker.brokerVoidServiceCalls((s) -> ((FederationManager) s).reconfigureFederation(), Constants.DISTRIBUTED_FEDERATION_MANAGER, FederationManager.class);
             return new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, FederationConfigInfo.class.getName(), "Successfully modified Federation config"), HttpStatus.OK);
         }
         catch (Exception e){

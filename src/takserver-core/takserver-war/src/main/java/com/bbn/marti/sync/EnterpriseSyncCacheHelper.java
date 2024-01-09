@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,9 +33,6 @@ public class EnterpriseSyncCacheHelper {
 
 	private com.github.benmanes.caffeine.cache.Cache<String, FileWrapper> caffeineFileCache = null;
 
-	@Autowired
-	private CoreConfig config;
-
 	private org.springframework.cache.Cache springFileCache = null;
 
 	@Autowired
@@ -55,13 +53,13 @@ public class EnterpriseSyncCacheHelper {
 	@EventListener({ContextRefreshedEvent.class})
 	public void init() {
 
-		clusterConfig = config.getRemoteConfiguration().getCluster();
+		clusterConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster();
 
 		// 0 means false, disable esync cache
-		if (config.getRemoteConfiguration().getNetwork().getEsyncEnableCache() == 0) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEsyncEnableCache() == 0) {
 			esyncEnableCache = false;
 			logger.info("file cache explicity disabled.");
-		} else if (config.getRemoteConfiguration().getNetwork().getEsyncEnableCache() > 0) {
+		} else if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEsyncEnableCache() > 0) {
 			// positive value means true, enable cache
 			esyncEnableCache = true;
 			logger.info("file cache explicity enabled.");
@@ -78,11 +76,12 @@ public class EnterpriseSyncCacheHelper {
 			springFileCache = cacheManager.getCache(Constants.ENTERPRISE_SYNC_CACHE_NAME);
 		} else {
 			caffeineFileCache = Caffeine.newBuilder()
-					.expireAfterWrite(config.getCachedConfiguration().getBuffer().getQueue().getCaffeineFileCacheSeconds(), TimeUnit.SECONDS)
+					.expireAfterWrite(CoreConfigFacade.getInstance().getCachedConfiguration().getBuffer().getQueue().getCaffeineFileCacheSeconds(), TimeUnit.SECONDS)
 					.build();
 		}
 
-		logger.info("Initialzed EnterpriseSyncCacheHelper with file cache TTL {} seconds. Implementation: {}", String.valueOf(config.getCachedConfiguration().getBuffer().getQueue().getCaffeineFileCacheSeconds()), isCacheSpring() ? "ignite" : "caffeine");
+		logger.info("Initialzed EnterpriseSyncCacheHelper with file cache TTL {} seconds. Implementation: {}",
+				String.valueOf(CoreConfigFacade.getInstance().getCachedConfiguration().getBuffer().getQueue().getCaffeineFileCacheSeconds()), isCacheSpring() ? "ignite" : "caffeine");
 	}
 
 	// get file. If not found, query the database to fetch it.
@@ -108,7 +107,7 @@ public class EnterpriseSyncCacheHelper {
 		}
 
 		Semaphore lock = null;
-		
+
 		try {
 			// only lock on cache miss. block to acquire semaphore.
 			lock = getResourceLock(hash);
@@ -150,7 +149,7 @@ public class EnterpriseSyncCacheHelper {
 
 	// get from cache, if miss return null
 	private FileWrapper getFileFromCache(String hash) {
-		
+
 		// spring (ignite) cache 
 		if (isCacheSpring()) {
 			ValueWrapper valueWrapper = springFileCache.get(hash);
@@ -163,7 +162,7 @@ public class EnterpriseSyncCacheHelper {
 
 			if (value instanceof FileWrapper) {
 				return (FileWrapper) value;
-			} 
+			}
 
 			throw new IllegalArgumentException("invalid cached object type " + value.getClass().toString());
 		}
@@ -182,7 +181,7 @@ public class EnterpriseSyncCacheHelper {
 
 		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement(
 				"SELECT data, groups FROM resource r WHERE hash = ? ORDER BY submissionTime;", connection)) {
-			
+
 			query.setString(1, hash.toLowerCase());
 			logger.debug("getFileFromDB Executing SQL: {}",  query.toString());
 

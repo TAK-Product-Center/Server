@@ -38,6 +38,22 @@
           <input data-ng-disabled="!vbm_enabled" type="checkbox" class="custom-control-input" id="customSwitch3" ng-model="chat_disabled" >
           <label class="custom-control-label" for="customSwitch3"> Disable Chat Sharing </label>
         </div>
+
+        <div class="custom-control custom-switch">
+            <input data-ng-disabled="!vbm_enabled" type="checkbox" class="custom-control-input" id="customSwitch4" ng-model="ism_strict_enforcing" >
+            <label class="custom-control-label" for="customSwitch4"> ISM Strict Enforcing </label>
+        </div>
+
+        <div>
+            <input data-ng-disabled="!vbm_enabled" type="text" size="25"  id="customText1" ng-model="ism_url" >
+            <label> ISM URL </label>
+        </div>
+
+        <div>
+            <input data-ng-disabled="!vbm_enabled" type="text" size="25"  id="customText2" ng-model="network_classification" >
+            <label> Network Classification </label>
+        </div>
+
         <button class="btn btn-primary" style="margin-top:20px;" ng-click="save_changes()"> Save changes </button>
     </div>
     <div data-ng-include="'../footer.jsp'"></div>

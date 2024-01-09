@@ -1,13 +1,36 @@
 <configuration scan="true" scanPeriod="30 seconds">
     <include resource="org/springframework/boot/logging/logback/defaults.xml" />
     <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator" />
-    
+
+    <springProperty name="JSON_FORMAT_ENABLED" source="logging.json.enabled" defaultValue="false" />
+    <springProperty name="AUDIT_ENABLED" source="logging.audit.enabled" defaultValue="false" />
+    <springProperty name="PRETTY_PRINT" source="logging.pretty.enabled" defaultValue="false" />
+
+    <if condition='${AUDIT_ENABLED}'>
+        <then><property name="JSON_LAYOUT" value="com.bbn.marti.remote.AuditLogJsonLayout" /></then>
+        <else><property name="JSON_LAYOUT" value="ch.qos.logback.contrib.json.classic.JsonLayout" /></else>
+    </if>
+
     <springProfile name="!duplicatelogs">
     	<turboFilter class="ch.qos.logback.classic.turbo.DuplicateMessageFilter">
         	<AllowedRepetitions>1</AllowedRepetitions>
     	</turboFilter>
     </springProfile>
-    
+
+    <springProfile name="config">
+        <appender name="application_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/takserver-config.log</file>
+            <filter class="com.bbn.marti.logging.AuditLogMarkerExcludingRootLoggerThresholdFilter" />
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>logs/takserver-config.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+                <maxHistory>90</maxHistory>
+            </rollingPolicy>
+            <encoder>
+                <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
     <springProfile name="api">
         <appender name="application_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
             <file>logs/takserver-api.log</file>
@@ -16,9 +39,23 @@
                 <fileNamePattern>logs/takserver-api.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
                 <maxHistory>90</maxHistory>
             </rollingPolicy>
-            <encoder>
-                <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
-            </encoder>
+            <if condition="${JSON_FORMAT_ENABLED}">
+                <then>
+                    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+                        <layout class="${JSON_LAYOUT}">
+                            <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter">
+                                <prettyPrint>${PRETTY_PRINT}</prettyPrint>
+                            </jsonFormatter>
+                            <timestampFormat>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampFormat>
+                        </layout>
+                    </encoder>
+                </then>
+                <else>
+                    <encoder>
+                        <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+                    </encoder>
+                </else>
+            </if>
         </appender>
     </springProfile>
     <springProfile name="messaging">
@@ -29,9 +66,23 @@
                 <fileNamePattern>logs/takserver-messaging.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
                 <maxHistory>90</maxHistory>
             </rollingPolicy>
-            <encoder>
-                <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
-            </encoder>
+            <if condition="${JSON_FORMAT_ENABLED}">
+                <then>
+                    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+                        <layout class="${JSON_LAYOUT}">
+                            <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter">
+                                <prettyPrint>${PRETTY_PRINT}</prettyPrint>
+                            </jsonFormatter>
+                            <timestampFormat>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampFormat>
+                        </layout>
+                    </encoder>
+                </then>
+                <else>
+                    <encoder>
+                        <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+                    </encoder>
+                </else>
+            </if>
         </appender>
     </springProfile>
     <springProfile name="monolith">
@@ -42,9 +93,23 @@
                 <fileNamePattern>logs/takserver.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
                 <maxHistory>90</maxHistory>
             </rollingPolicy>
-            <encoder>
-                <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
-            </encoder>
+            <if condition="${JSON_FORMAT_ENABLED}">
+                <then>
+                    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+                        <layout class="${JSON_LAYOUT}">
+                            <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter">
+                                <prettyPrint>${PRETTY_PRINT}</prettyPrint>
+                            </jsonFormatter>
+                            <timestampFormat>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampFormat>
+                        </layout>
+                    </encoder>
+                </then>
+                <else>
+                    <encoder>
+                        <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+                    </encoder>
+                </else>
+            </if>
         </appender>
     </springProfile>
     <!-- TAK Server database access / change audit log. The default level is "off" - only audit log markers will appear in this log -->
@@ -57,10 +122,25 @@
             <fileNamePattern>logs/takserver-db-audit.%d{yyyy-MM-dd-HH}.log.gz</fileNamePattern>
             <maxHistory>90</maxHistory>
         </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} %msg%n</pattern>
-        </encoder>
+        <if condition="${JSON_FORMAT_ENABLED}">
+            <then>
+                <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+                    <layout class="${JSON_LAYOUT}">
+                        <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter">
+                            <prettyPrint>${PRETTY_PRINT}</prettyPrint>
+                        </jsonFormatter>
+                        <timestampFormat>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampFormat>
+                    </layout>
+                </encoder>
+            </then>
+            <else>
+                <encoder>
+                    <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+                </encoder>
+            </else>
+        </if>
     </appender>
+
     <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
@@ -83,7 +163,7 @@
     </logger>
     <logger name="org.hibernate.engine.jdbc.spi.SqlExceptionHelper" level="OFF"/>
     <logger name="org.springframework.web.socket.config.WebSocketMessageBrokerStats" level="OFF"/>
-    <logger name="tak.server.ServerConfiguration" level="WARN"/>
+    <logger name="tak.server.ServerConfiguration" level="INFO"/>
     <logger name="org.springframework" level="WARN"/>
     <logger name="org.apache" level="WARN"/>
     <logger name="org.hibernate" level="WARN"/>

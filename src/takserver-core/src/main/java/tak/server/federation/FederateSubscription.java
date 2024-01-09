@@ -10,18 +10,10 @@ import java.util.Set;
 
 import javax.naming.NamingException;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpVersion;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.ResponseHandler;
-import org.apache.http.client.fluent.Executor;
-import org.apache.http.client.fluent.FederateHttpClientExecutor;
-import org.apache.http.client.fluent.Request;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.mime.HttpMultipartMode;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.entity.mime.content.ByteArrayBody;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.google.common.base.Strings;
+import com.google.common.io.ByteStreams;
+
 import org.dom4j.Attribute;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
@@ -35,12 +27,23 @@ import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.nio.channel.connections.TcpChannelHandler;
 import com.bbn.marti.nio.protocol.Protocol;
 import com.bbn.marti.remote.exception.TakException;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.RepositoryService;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.Subscription;
-import com.google.common.base.Strings;
-import com.google.common.io.ByteStreams;
+
+import org.apache.hc.client5.http.fluent.Executor;
+import org.apache.hc.client5.http.fluent.Request;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpVersion;
+import org.apache.hc.client5.http.ClientProtocolException;
+import org.apache.hc.client5.http.entity.mime.ByteArrayBody;
+import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
+import org.apache.hc.client5.http.entity.mime.HttpMultipartMode;
+import org.apache.hc.core5.http.io.HttpClientResponseHandler;
+
 
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotEventContainer;
@@ -183,7 +186,7 @@ public class FederateSubscription extends Subscription {
                     throw new TakException("invalid mission package announce CoT message - empty hash or filename");
                 }
 
-                final int port = DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getHttpsPort();
+                final int port = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getHttpsPort();
 
                 String missionPackageUrl = "";
 
@@ -204,11 +207,13 @@ public class FederateSubscription extends Subscription {
                     }
 
                     missionPackageUrl = federateHttpConnectionPool.execute(
-                            Request.Get(fedGetMissionPackageUrl).useExpectContinue().version(HttpVersion.HTTP_1_1))
-                            .handleResponse(new ResponseHandler<String>() { @Override public String handleResponse(HttpResponse response) throws ClientProtocolException, IOException {
+                            Request.get(fedGetMissionPackageUrl).useExpectContinue().version(HttpVersion.HTTP_1_1))
+                            .handleResponse(new HttpClientResponseHandler<String>() { @Override public String handleResponse(ClassicHttpResponse response) throws ClientProtocolException, IOException {
 
-                                int code = response.getStatusLine().getStatusCode();
-                                String reason = response.getStatusLine().getReasonPhrase();
+                                //int code = response.getStatusLine().getStatusCode();
+                                int code = response.getCode();
+                                //String reason = response.getStatusLine().getReasonPhrase();
+                                String reason = response.getReasonPhrase();
                                 String body = new String(ByteStreams.toByteArray(response.getEntity().getContent()));
 
                                 if (logger.isDebugEnabled()) {
@@ -245,17 +250,19 @@ public class FederateSubscription extends Subscription {
 
                                     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
                                     builder.setContentType(ContentType.MULTIPART_FORM_DATA);
-                                    builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+                                    builder.setMode(HttpMultipartMode.LEGACY);
                                     builder.addPart("assetfile", bodyPart); // use the same part name that android uses - "assetfile"
                                     HttpEntity entity = builder.build();
 
                                     // now post the mission package to the federate, as a multi-part mime file
-                                    String result = federateHttpConnectionPool.execute(Request.Post(fedPostMissionPackageUrl)
+                                    String result = federateHttpConnectionPool.execute(Request.post(fedPostMissionPackageUrl)
                                             .useExpectContinue()
                                             .version(HttpVersion.HTTP_1_1)
-                                            .body(entity)).handleResponse(new ResponseHandler<String>() { @Override public String handleResponse(HttpResponse response) throws ClientProtocolException, IOException {
-                                        int code = response.getStatusLine().getStatusCode();
-                                        String reason = response.getStatusLine().getReasonPhrase();
+                                            .body(entity)).handleResponse(new HttpClientResponseHandler<String>() { @Override public String handleResponse(ClassicHttpResponse response) throws ClientProtocolException, IOException {
+                                        //int code = response.getStatusLine().getStatusCode();
+                                        int code = response.getCode();
+                                        //String reason = response.getStatusLine().getReasonPhrase();
+                                        String reason = response.getReasonPhrase();
                                         String body = new String(ByteStreams.toByteArray(response.getEntity().getContent()));
 
                                         if (logger.isDebugEnabled()) {
@@ -318,7 +325,7 @@ public class FederateSubscription extends Subscription {
     }
     
     protected Configuration getConfiguration() {
-    	return DistributedConfiguration.getInstance().getRemoteConfiguration();
+    	return CoreConfigFacade.getInstance().getRemoteConfiguration();
     }
     
     //TODO maintain a local mapping structure for federate to federateId that gets reset when the cache updates so we dont have to loop the list each time

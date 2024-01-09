@@ -1,6 +1,7 @@
 imagePullSecret: reg-cred
 certConfigMapName: cert-migration
 coreConfigMapName: core-config
+takIgniteConfigMapName: tak-ignite-config
 
 takserver:
   ingress:
@@ -30,6 +31,18 @@ takserver:
       fedv2:
         annotations: {}
         host: ""
+  config:
+    image:
+      repository: LOCAL_REPO/takserver-cluster/takserver-config
+      tag: LOCAL_TAG
+    replicas: 1
+    resources:
+      requests:
+        cpu: 1
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 1Gi
   messaging:
     image:
       repository: LOCAL_REPO/takserver-cluster/takserver-messaging

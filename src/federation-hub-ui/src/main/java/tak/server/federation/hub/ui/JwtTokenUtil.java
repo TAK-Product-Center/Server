@@ -19,8 +19,8 @@ import java.util.Date;
 import java.util.Enumeration;
 
 import javax.crypto.spec.SecretKeySpec;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -35,7 +35,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.OkHttp3ClientHttpRequestFactory;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
@@ -148,7 +148,7 @@ public class JwtTokenUtil {
         // store the access token in a cookie
         String access_token = (String)tokenJson.get(fedHubConfig.getKeycloakAccessTokenName());
         response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
-                OAuth2AccessToken.ACCESS_TOKEN, access_token, -1, true).toString());
+                OAuth2TokenType.ACCESS_TOKEN.getValue(), access_token, -1, true).toString());
 
         // store the refresh token in the session, if we have one
         if (tokenJson.containsKey(fedHubConfig.getKeycloakRefreshTokenName())) {

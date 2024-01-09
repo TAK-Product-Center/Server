@@ -8,9 +8,9 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 import javax.naming.NamingException;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
 import org.slf4j.Logger;
@@ -35,16 +35,16 @@ public class DBAdminServlet extends EsapiServlet {
 		initAuditLog(request);
 
 		for(String s : request.getParameterMap().keySet()) {
-			if(s.compareToIgnoreCase("vacuum") == 0) {
+			if (s.compareToIgnoreCase("vacuum") == 0) {
 				sql = "VACUUM";
 				break;
-			} else if(s.compareToIgnoreCase("reindex") == 0) {
+			} else if (s.compareToIgnoreCase("reindex") == 0) {
 				sql = "REINDEX DATABASE cot";
 				break;
 			}
 		}
 
-		if(sql == null) {
+		if (sql == null) {
 
 			String msg = "Invalid parameters";
 

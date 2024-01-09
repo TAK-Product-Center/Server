@@ -109,7 +109,7 @@ public interface DataFeedRepository extends JpaRepository<DataFeedDTO, Integer> 
 
     @CacheEvict(value = Constants.DATA_FEED_CACHE, allEntries = true)
     @Query(value = "SELECT count(*) FROM insert_data_feed_tags(:id, :tags);", nativeQuery = true)
-    Long addDataFeedTags(@Param("id") Long id, @Param("tags") List<String> tags);
+    Long addDataFeedTags(@Param("id") Long id, @Param("tags") String tags[]);
 
     @CacheEvict(value = Constants.DATA_FEED_CACHE, allEntries = true)
     @Query(value = "delete from data_feed_tag where data_feed_id = :data_feed_id returning data_feed_id", nativeQuery = true)
@@ -120,8 +120,8 @@ public interface DataFeedRepository extends JpaRepository<DataFeedDTO, Integer> 
 
     @CacheEvict(value = Constants.DATA_FEED_CACHE, allEntries = true)
     @Query(value = "SELECT count(*) FROM insert_data_feed_filter_groups(:id, :filterGroups);", nativeQuery = true)
-    Long addDataFeedFilterGroups(@Param("id") Long id, @Param("filterGroups") List<String> filterGroups);
-    
+    Long addDataFeedFilterGroups(@Param("id") Long id, @Param("filterGroups") String filterGroups[]);
+
     @CacheEvict(value = Constants.DATA_FEED_CACHE, allEntries = true)
     @Query(value = "delete from data_feed_filter_group where data_feed_id = :data_feed_id returning data_feed_id", nativeQuery = true)
     List<Long> removeAllDataFeedFilterGroupsById(@Param("data_feed_id") Long id);

@@ -8,7 +8,10 @@ public class VBMConfigurationModel {
 	private boolean vbmEnabled;
 	private boolean saDisabled;
 	private boolean chatDisabled;
-	
+	private boolean ismStrictEnforcing;
+	private String ismUrl;
+	private String networkClassification;
+
 	public VBMConfigurationModel() {
 		this.vbmEnabled = false;
 	}
@@ -35,5 +38,29 @@ public class VBMConfigurationModel {
 
 	public void setSADisabled(boolean saDisabled) {
 		this.saDisabled = saDisabled;
+	}
+
+	public boolean isIsmStrictEnforcing() {
+		return ismStrictEnforcing;
+	}
+
+	public void setIsmStrictEnforcing(boolean ismStrictEnforcing) {
+		this.ismStrictEnforcing = ismStrictEnforcing;
+	}
+
+	public String getIsmUrl() {
+		return ismUrl;
+	}
+
+	public void setIsmUrl(String ismUrl) {
+		this.ismUrl = ismUrl;
+	}
+
+	public String getNetworkClassification() {
+		return networkClassification;
+	}
+
+	public void setNetworkClassification(String networkClassification) {
+		this.networkClassification = networkClassification;
 	}
 }

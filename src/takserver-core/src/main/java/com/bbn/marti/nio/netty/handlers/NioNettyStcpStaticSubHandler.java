@@ -138,7 +138,7 @@ public class NioNettyStcpStaticSubHandler extends NioNettyHandlerBase {
 			}
 		}
 
-		if(channelHandler != null) {
+		if (channelHandler != null) {
 			submissionService().handleChannelDisconnect(channelHandler);
 			protocolListeners.forEach(listener -> listener.onOutboundClose(channelHandler, protocol));
 		}

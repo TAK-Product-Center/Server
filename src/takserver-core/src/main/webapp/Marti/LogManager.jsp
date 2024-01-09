@@ -1,7 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="java.util.*" %>
 <%@ page import="org.springframework.context.ApplicationContext" %>
-<%@ page import="com.bbn.marti.util.spring.SpringContextBeanForApi" %>
+<%@ page import="com.bbn.marti.remote.util.SpringContextBeanForApi" %>
 <%@ page import="com.bbn.marti.logs.Log" %>
 <%@ page import="com.bbn.marti.logs.PersistenceStore" %>
 <%@ page import="org.owasp.esapi.ESAPI" %>

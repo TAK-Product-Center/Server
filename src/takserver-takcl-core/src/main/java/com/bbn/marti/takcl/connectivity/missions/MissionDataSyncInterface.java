@@ -4,12 +4,28 @@ import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import retrofit2.Call;
-import retrofit2.http.*;
+import retrofit2.http.Body;
+import retrofit2.http.DELETE;
+import retrofit2.http.GET;
+import retrofit2.http.Header;
+import retrofit2.http.Headers;
+import retrofit2.http.POST;
+import retrofit2.http.PUT;
+import retrofit2.http.Path;
+import retrofit2.http.Query;
 
 import java.util.Date;
 import java.util.List;
 
-import static com.bbn.marti.takcl.connectivity.missions.MissionModels.*;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ApiListResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ApiSetResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ApiSingleResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.LogEntry;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.Mission;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionChange;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionUserRole;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.PutMissionContents;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.SubscriptionData;
 
 public interface MissionDataSyncInterface {
 

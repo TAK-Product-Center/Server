@@ -1,5 +1,6 @@
 package com.bbn.marti.device.profile.service;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.google.common.base.Strings;
 
 import java.io.File;
@@ -20,8 +21,8 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.UUID;
 import java.util.zip.ZipException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.DirectoryWalker;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
@@ -66,9 +67,6 @@ public class ProfileService {
     private ProfileDirectoryRepository profileDirectoryRepository;
 
     @Autowired
-    CoreConfig coreConfig;
-
-    @Autowired
     private CommonUtil martiUtil;
 
     @Autowired
@@ -100,7 +98,7 @@ public class ProfileService {
         }
 
         if (applyOnEnrollment) {
-            Auth.Ldap ldap = coreConfig.getRemoteConfiguration().getAuth().getLdap();
+            Auth.Ldap ldap = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap();
 
             // if we've got any of the user attributes set, go ahead and build the user preferences
             if (ldap != null &&
@@ -116,7 +114,7 @@ public class ProfileService {
             }
 
             // is the X509GroupCache enabled on this server?
-            if (coreConfig.getRemoteConfiguration().getAuth().isX509UseGroupCache()) {
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509UseGroupCache()) {
                 files.add(getX509GroupCachePreference(host));
             }
         }
@@ -341,7 +339,7 @@ public class ProfileService {
             throws IOException, NotFoundException {
 
         List<ProfileDirectoryContent> results = new LinkedList<>();
-        final int uploadSizeLimitMB = coreConfig.getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
+        final int uploadSizeLimitMB = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
 
         for (ProfileDirectory profileDirectory : directories) {
 

@@ -36,7 +36,7 @@ public class Association<K,V> implements Serializable {
 	
 	@Override
 	public boolean equals(Object other) {
-		if(this != other) {
+		if (this != other) {
 			if (other != null && other instanceof Association) {
 				Association that = (Association) other;
 				return getKey().equals(that.getKey());

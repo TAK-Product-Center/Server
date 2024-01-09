@@ -13,9 +13,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-import javax.persistence.Query;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,7 +67,7 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 						values.addAll(Lists.newArrayList((String[]) value.getArray()));
 					}
 				}
-				if(values.size() == 0) {
+				if (values.size() == 0) {
 					values.add("none");
 				}
 				return values;
@@ -80,24 +80,24 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 				   + "from resource where 'missionpackage' = ANY(keywords) AND " + RemoteUtil.getInstance().getGroupClause();
 		List<Object> params = new ArrayList<>();
 		params.add(groupVector);
-		if(!name.isBlank()) {
+		if (!name.isBlank()) {
 			sql = sql + "and name like ? ";
 			params.add("%"+name+"%");
 		}
 		// If Limit is 0, do not page
 		if (limit == 0) {
-			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+			if (!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
 				sql = sql + "order by " + getResourceColumnName(sort) + " ";
-				if(ascending) {
+				if (ascending) {
 					sql = sql + "asc ";
 				} else {
 					sql = sql + "desc ";
 				}
 			}
 		} else {
-			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+			if (!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
 				sql = sql + "order by " + getResourceColumnName(sort) + " ";
-				if(ascending) {
+				if (ascending) {
 					sql = sql + "asc ";
 				} else {
 					sql = sql + "desc ";
@@ -118,18 +118,18 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 		params.add(groupVector);
 		// If Limit is 0, do not page
 		if (limit == 0) {
-			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+			if (!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
 				sql = sql + "order by " + getResourceColumnName(sort) + " ";
-				if(ascending) {
+				if (ascending) {
 					sql = sql + "asc ";
 				} else {
 					sql = sql + "desc ";
 				}
 			}
 		} else {
-			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+			if (!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
 				sql = sql + "order by " + getResourceColumnName(sort) + " ";
-				if(ascending) {
+				if (ascending) {
 					sql = sql + "asc ";
 				} else {
 					sql = sql + "desc ";
@@ -148,24 +148,24 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 				   + "from resource where " + RemoteUtil.getInstance().getGroupClause();;
 		List<Object> params = new ArrayList<>();
 		params.add(groupVector);
-		if(!name.isBlank()) {
+		if (!name.isBlank()) {
 			sql = sql + "and name like ? ";
 			params.add("%"+name+"%");
 		}
 		// If Limit is 0, do not page
 		if (limit == 0) {
-			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+			if (!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
 				sql = sql + "order by " + getResourceColumnName(sort) + " ";
-				if(ascending) {
+				if (ascending) {
 					sql = sql + "asc ";
 				} else {
 					sql = sql + "desc ";
 				}
 			}
 		} else {
-			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+			if (!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
 				sql = sql + "order by " + getResourceColumnName(sort) + " ";
-				if(ascending) {
+				if (ascending) {
 					sql = sql + "asc ";
 				} else {
 					sql = sql + "desc ";
@@ -188,24 +188,24 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 		List<Object> params = new ArrayList<>();
 		params.add(mission);
 		params.add(groupVector);
-		if(!name.isBlank()) {
+		if (!name.isBlank()) {
 			sql = sql + "and r.name like ? ";
 			params.add("%"+name+"%");
 		}
 		// If Limit is 0, do not page
 		if (limit == 0) {
-			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+			if (!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
 				sql = sql + "order by " + getResourceColumnName(sort) + " ";
-				if(ascending) {
+				if (ascending) {
 					sql = sql + "asc ";
 				} else {
 					sql = sql + "desc ";
 				}
 			}
 		} else {
-			if(!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
+			if (!sort.isBlank() && !getResourceColumnName(sort).isBlank()) {
 				sql = sql + "order by " + getResourceColumnName(sort) + " ";
-				if(ascending) {
+				if (ascending) {
 					sql = sql + "asc ";
 				} else {
 					sql = sql + "desc ";

@@ -97,21 +97,21 @@ public class CotParser {
                 reader.setErrorHandler(new ErrorHandler() {
                     @Override
                     public void warning(SAXParseException exception) throws SAXException {
-                        if(errorCallback != null)
+                        if (errorCallback != null)
                             errorCallback.onValidationError(ErrorLevel.WARNING, exception);
                         throw exception;
                     }
 
                     @Override
                     public void fatalError(SAXParseException exception) throws SAXException {
-                        if(errorCallback != null)
+                        if (errorCallback != null)
                             errorCallback.onValidationError(ErrorLevel.FATAL, exception);
                         throw exception;
                     }
 
                     @Override
                     public void error(SAXParseException exception) throws SAXException {
-                        if(errorCallback != null)
+                        if (errorCallback != null)
                             errorCallback.onValidationError(ErrorLevel.ERROR, exception);
                         throw exception;
                     }

@@ -4,11 +4,13 @@ import java.rmi.RemoteException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 
-import javax.servlet.MultipartConfigElement;
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
-import javax.servlet.http.HttpSessionListener;
+import jakarta.servlet.MultipartConfigElement;
+import jakarta.servlet.ServletContextEvent;
+import jakarta.servlet.ServletContextListener;
+import jakarta.servlet.http.HttpSessionListener;
 import javax.sql.DataSource;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.apache.ignite.Ignite;
 import org.slf4j.Logger;
@@ -30,6 +32,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -82,22 +85,18 @@ import com.bbn.marti.network.SecurityAuthenticationApi;
 import com.bbn.marti.network.SubmissionApi;
 import com.bbn.marti.network.UIDSearchApi;
 import com.bbn.marti.oauth.OAuthApi;
-import com.bbn.marti.oauth.TokenApi;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationConfigInterface;
 import com.bbn.marti.remote.groups.FileUserManagementInterface;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.service.RetentionQueryService;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.repeater.RepeaterApi;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.DistributedFederationHttpConnectorManager;
 import com.bbn.marti.service.DistributedRetentionQueryManager;
 import com.bbn.marti.service.FederationHttpConnectorManager;
 import com.bbn.marti.service.RepositoryService;
 import com.bbn.marti.sync.ContentServlet;
 import com.bbn.marti.sync.DeleteServlet;
-import com.bbn.marti.sync.EnterpriseSyncCacheHelper;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.FileList;
 import com.bbn.marti.sync.JDBCEnterpriseSyncService;
@@ -107,7 +106,6 @@ import com.bbn.marti.sync.MissionPackageQueryServlet;
 import com.bbn.marti.sync.MissionPackageUploadServlet;
 import com.bbn.marti.sync.SearchServlet;
 import com.bbn.marti.sync.UploadServlet;
-import com.bbn.marti.sync.api.ClassificationApi;
 import com.bbn.marti.sync.api.ContactsApi;
 import com.bbn.marti.sync.api.CopViewApi;
 import com.bbn.marti.sync.api.CotApi;
@@ -126,7 +124,7 @@ import com.bbn.marti.sync.service.PropertiesServiceDefaultImpl;
 import com.bbn.marti.util.IconsetDirWatcher;
 import com.bbn.marti.util.VersionApi;
 import com.bbn.marti.util.spring.HttpSessionCreatedEventListener;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.util.spring.TakAuthSessionDestructionListener;
 import com.bbn.marti.video.VideoConnectionManager;
 import com.bbn.marti.video.VideoConnectionManagerV2;
@@ -150,12 +148,13 @@ import com.bbn.user.registration.RegistrationApi;
 import com.bbn.user.registration.service.UserRegistrationService;
 import com.bbn.useraccountmanagement.FileUserAccountManagementApi;
 import com.bbn.vbm.VBMConfigurationApi;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 
 import tak.server.Constants;
 import tak.server.api.DistributedPluginCoreConfigApi;
 import tak.server.api.DistributedPluginFileApi;
 import tak.server.api.DistributedPluginMissionApi;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cache.ContactCacheHelper;
 import tak.server.cache.MissionCacheResolver;
 import tak.server.cache.MissionLayerCacheResolver;
@@ -195,7 +194,7 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	private String compatServletPath;
 
 	@Bean
-	public FederationHttpConnectorManager distributedFederationHttpConnectorManager(Ignite ignite, CoreConfig config) {
+	public FederationHttpConnectorManager distributedFederationHttpConnectorManager(Ignite ignite) {
 		DistributedFederationHttpConnectorManager distributedFederationHttpConnectorManager =  new DistributedFederationHttpConnectorManager();
 		ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite))
 			.deployNodeSingleton(Constants.DISTRIBUTED_FEDERATION_HTTP_CONNECTOR_SERVICE, distributedFederationHttpConnectorManager);
@@ -232,12 +231,12 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Bean
 	public MultipartConfigElement multipartConfigElement() {
 
-		DistributedConfiguration config = DistributedConfiguration.getInstance();
+		CoreConfigFacade config = CoreConfigFacade.getInstance();
 
 		MultipartConfigFactory factory = new MultipartConfigFactory();
 
-		factory.setMaxFileSize(DataSize.ofBytes(config.getNetwork().getEnterpriseSyncSizeLimitMB() * 1024 * 1024));
-		factory.setMaxRequestSize(DataSize.ofBytes(config.getNetwork().getEnterpriseSyncSizeLimitMB() * 1024 * 1024));
+		factory.setMaxFileSize(DataSize.ofBytes(config.getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB() * 1024 * 1024));
+		factory.setMaxRequestSize(DataSize.ofBytes(config.getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB() * 1024 * 1024));
 
 		return factory.createMultipartConfig();
 	}
@@ -441,11 +440,6 @@ public class ApiConfiguration implements WebMvcConfigurer {
 		registry.addRedirectViewController("/locate/", "/locate/index.html");
 		registry.setOrder(Ordered.HIGHEST_PRECEDENCE);
 	}
-	
-	@Bean
-	CoreConfig coreConfig() {
-		return DistributedConfiguration.getInstance();
-	}
 
 	@Bean
 	CertManagerService certManagerService() {
@@ -601,8 +595,8 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	}
 
 	@Bean
-	public FederationConfigInterface federationConfigManager(CoreConfig coreConfig) throws RemoteException {
-		return new FederationConfigManager(coreConfig);
+	public FederationConfigInterface federationConfigManager() throws RemoteException {
+		return new FederationConfigManager();
 	}
 
 	@Bean
@@ -748,11 +742,6 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	}
 
 	@Bean
-	public ClassificationApi classificationApi() {
-		return new ClassificationApi();
-	}
-
-	@Bean
 	public SequenceApi sequenceApi() {
 		return new SequenceApi();
 	}
@@ -790,11 +779,6 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Bean
 	public InjectionApi injectionApi() {
 		return new InjectionApi();
-	}
-
-	@Bean
-	public TokenApi oAuth2AdminApi() {
-		return new TokenApi();
 	}
 
 	@Bean
@@ -840,7 +824,7 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Override
 	public void addCorsMappings(CorsRegistry registry) {
 		try {
-			if (coreConfig().getRemoteConfiguration().getNetwork().isAllowAllOrigins()) {
+			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isAllowAllOrigins()) {
 				registry.addMapping("/**").allowedMethods("OPTIONS", "HEAD", "GET", "PUT", "POST", "DELETE", "PATCH");
 			}
 		} catch (Exception e) {
@@ -935,13 +919,13 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	}
 	
 	@Bean
-	public ContactCacheHelper contactCacheHelper(CoreConfig conf) {
+	public ContactCacheHelper contactCacheHelper() {
 		return new ContactCacheHelper();
 	}
 	
 	@Bean
-	public ExecutorSource executorSource(CoreConfig conf) {
-		return new ExecutorSource(conf);
+	public ExecutorSource executorSource() {
+		return new ExecutorSource();
 	}
 
 	@Bean
@@ -987,4 +971,8 @@ public class ApiConfiguration implements WebMvcConfigurer {
 		return new FileManagerServiceDefaultImpl(dataSource);
 	}
 
+	@Override
+	public void configurePathMatch(PathMatchConfigurer configurer) {
+		configurer.setUseTrailingSlashMatch(true);
+	}
 }

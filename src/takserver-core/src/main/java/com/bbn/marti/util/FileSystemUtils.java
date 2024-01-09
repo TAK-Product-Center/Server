@@ -21,14 +21,14 @@ public class FileSystemUtils {
 			.getSimpleName());
 
 	public static String md5sumFile(String path){
-		if(path == null || path.length() < 1)
+		if (path == null || path.length() < 1)
 			return null;
 
 		return md5sumFile(new File(path));
 	}
 
 	public static String md5sumFile(File file){ 
-		if(file == null || !file.exists())
+		if (file == null || !file.exists())
 			return null;
 
 		try {
@@ -41,7 +41,7 @@ public class FileSystemUtils {
 	}
 
 	public static String md5sumContent(String content){
-		if(content == null || content.length() < 1)
+		if (content == null || content.length() < 1)
 			return null;
 		try {
 			return md5sum(new ByteArrayInputStream(content.getBytes("UTF-8")));
@@ -57,7 +57,7 @@ public class FileSystemUtils {
 	public static String md5sum(InputStream input){
 		String checksum = null;
 
-		if(input == null)
+		if (input == null)
 			return checksum;
 
 		try {
@@ -77,7 +77,7 @@ public class FileSystemUtils {
 		} catch (NoSuchAlgorithmException ex) {
 			log.warn("Error computing md5sum", ex);
 		} finally{
-			if(input != null)
+			if (input != null)
 			{
 				try {
 					input.close();

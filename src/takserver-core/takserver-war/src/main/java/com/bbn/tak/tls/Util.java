@@ -4,7 +4,7 @@ package com.bbn.tak.tls;
 
 import sun.security.pkcs10.PKCS10;
 
-import javax.xml.bind.DatatypeConverter;
+import jakarta.xml.bind.DatatypeConverter;
 import java.io.StringWriter;
 import java.security.PrivateKey;
 import java.security.cert.CertificateEncodingException;

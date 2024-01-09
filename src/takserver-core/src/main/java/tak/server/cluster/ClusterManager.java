@@ -3,10 +3,13 @@ package tak.server.cluster;
 import static java.util.Objects.requireNonNull;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import com.google.common.base.Strings;
+import io.nats.client.Connection;
+import io.nats.client.Nats;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
@@ -24,28 +27,27 @@ import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
 
+import atakmap.commoncommo.protobuf.v1.Missionannouncement.MissionAnnouncement;
+
 import com.atakmap.Tak.ROL;
+
+import tak.server.util.ActiveProfiles;
 import com.bbn.marti.config.Cluster;
 import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.exception.NotFoundException;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.DistributedSubscriptionManager;
-import com.bbn.marti.service.LocalConfiguration;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.Subscription;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
-import com.google.common.base.Strings;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
-import atakmap.commoncommo.protobuf.v1.Missionannouncement.MissionAnnouncement;
-import io.micrometer.core.instrument.Metrics;
-import io.nats.client.Connection;
-import io.nats.client.Dispatcher;
-import io.nats.client.Nats;
+
 import mil.af.rl.rol.RolLexer;
 import mil.af.rl.rol.RolParser;
+
 import tak.server.CommonConstants;
 import tak.server.Constants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 import tak.server.messaging.MessageConverter;
 import tak.server.qos.MessageBaseStrategy;
@@ -60,7 +62,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 
 	private static ClusterManager instance;
 
-	private final DistributedConfiguration coreConfig = DistributedConfiguration.getInstance();
+	private final CoreConfigFacade coreConfig = CoreConfigFacade.getInstance();
 
 	private final Cluster config = coreConfig.getRemoteConfiguration().getCluster();
 	
@@ -115,7 +117,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 		}
 		
 
-		if (LocalConfiguration.getInstance().isMessagingProfileActive()) {
+		if (ActiveProfiles.getInstance().isMessagingProfileActive()) {
 			Resources.clusterStateProcessor.execute(() -> {
 				try {
 					natsConnection.createDispatcher().subscribe(Constants.CLUSTER_DATA_MESSAGE, m -> {

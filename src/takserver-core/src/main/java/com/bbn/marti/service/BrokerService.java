@@ -18,8 +18,9 @@ import com.bbn.marti.nio.protocol.connections.StreamingProtoBufProtocol;
 import com.bbn.marti.remote.QueueMetric;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.util.FixedSizeBlockingQueue;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 
@@ -150,7 +151,7 @@ public class BrokerService extends BaseService {
 	public void processMessage(CotEventContainer cot) {
 		try {
 
-			if(VBMSASharingFilter.getInstance().filter(cot) == null) return;
+			if (VBMSASharingFilter.getInstance().filter(cot) == null) return;
 			
 			long hitTime = System.currentTimeMillis();
 
@@ -215,7 +216,7 @@ public class BrokerService extends BaseService {
 
 			if (!websocketHits.isEmpty()) {
 				WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, cot,
-						DistributedConfiguration.getInstance().getNetwork().getServerId());
+						CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId());
 			}
 
 			// clear the sub list from the cot message - so it can be garbage-collected

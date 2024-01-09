@@ -6,9 +6,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.logging.Logger;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import com.bbn.marti.util.KmlUtils;
 
@@ -66,7 +66,7 @@ public class KmlMasterSaServlet extends EsapiServlet
     int secAgo, boolean visible, String baseurl) {
     
     int refreshInterval = 60;
-    if(secAgo > 0) {
+    if (secAgo > 0) {
       refreshInterval = secAgo;
     }
     

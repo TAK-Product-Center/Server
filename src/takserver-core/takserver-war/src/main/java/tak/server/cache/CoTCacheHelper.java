@@ -4,12 +4,20 @@ import java.sql.Array;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import javax.sql.DataSource;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
@@ -59,9 +67,6 @@ public class CoTCacheHelper {
 	@Autowired
 	private DataSource dataSource;
 
-	@Autowired
-	private CoreConfig coreConfig;
-
 	private boolean messagingProfileActive = false;
 
 	private int maxCacheSize;
@@ -70,7 +75,7 @@ public class CoTCacheHelper {
 
 	@PostConstruct
 	private void postConstruct() {
-		maxCacheSize = coreConfig.getRemoteConfiguration().getBuffer().getQueue().getCotCacheMaxSize();
+		maxCacheSize = CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getCotCacheMaxSize();
 	}
 
 	private IgniteCache<Object, Object> getCoTCache() {
@@ -91,6 +96,7 @@ public class CoTCacheHelper {
 			}
 		}
 
+		CoreConfig coreConfig = CoreConfigFacade.getInstance();
 		// use on-heap memory
 		boolean onHeapEnabled = coreConfig.getRemoteConfiguration().getBuffer().getQueue().isOnHeapEnabled();
 		cacheConfig.setOnheapCacheEnabled(onHeapEnabled);
@@ -443,7 +449,7 @@ public class CoTCacheHelper {
 		getCoTCache().putAll(cachePutMap);
 
 		for (Object val : cacheWrapperMap.values()) {
-			
+
 			if (addDetails || remoteUtil.isGroupVectorAllowed(groupVector, ((CotCacheWrapper) val).getGroupsBitVectorString())) {
 				results.add((CotCacheWrapper) val);
 			}
@@ -474,41 +480,41 @@ public class CoTCacheHelper {
 							uid,
 							groupVector},
 					new ResultSetExtractor<CotElement>() {
-				@Override
-				public CotElement extractData(ResultSet results) throws SQLException {
-					if (results == null) {
-						throw new IllegalStateException("null result set");
-					}
+						@Override
+						public CotElement extractData(ResultSet results) throws SQLException {
+							if (results == null) {
+								throw new IllegalStateException("null result set");
+							}
 
-					if (results.next()) {
-						CotElement cotElement = new CotElement();
-						cotElement.uid = results.getString(1);
-						cotElement.lon = results.getDouble(2);
-						cotElement.lat = results.getDouble(3);
-						cotElement.hae = results.getString(4);
-						cotElement.cottype = results.getString(5);
-						cotElement.servertime = results.getTimestamp(6);
-						cotElement.le = results.getDouble(7);
-						cotElement.detailtext = results.getString(8);
-						cotElement.cotId = results.getLong(9);
-						cotElement.how = results.getString(10);
-						cotElement.staletime = results.getTimestamp(11);
-						cotElement.ce = results.getDouble(12);
-						cotElement.groupString = results.getString(13);
+							if (results.next()) {
+								CotElement cotElement = new CotElement();
+								cotElement.uid = results.getString(1);
+								cotElement.lon = results.getDouble(2);
+								cotElement.lat = results.getDouble(3);
+								cotElement.hae = results.getString(4);
+								cotElement.cottype = results.getString(5);
+								cotElement.servertime = results.getTimestamp(6);
+								cotElement.le = results.getDouble(7);
+								cotElement.detailtext = results.getString(8);
+								cotElement.cotId = results.getLong(9);
+								cotElement.how = results.getString(10);
+								cotElement.staletime = results.getTimestamp(11);
+								cotElement.ce = results.getDouble(12);
+								cotElement.groupString = results.getString(13);
 
-						return cotElement;
-					} 
+								return cotElement;
+							}
 
-					return null;
-				}
-			});
+							return null;
+						}
+					});
 
 		} catch (Exception e) {
 			logger.error("sql exception in getLatestCotForUids! " + e.getMessage());
 			return null;
 		}
 	}
-	
+
 	private Collection<CotElement> queryLatestCotElementsForUids(Set<String> uids, String groupVector) {
 
 		try (Connection connection = dataSource.getConnection()) {
@@ -526,44 +532,44 @@ public class CoTCacheHelper {
 			return new JdbcTemplate(dataSource).query(sql,
 					new Object[] {
 							uidArray
-			},
+					},
 					new ResultSetExtractor<List<CotElement>>() {
-				@Override
-				public List<CotElement> extractData(ResultSet results) throws SQLException {
-					if (results == null) {
-						throw new IllegalStateException("null result set");
-					}
+						@Override
+						public List<CotElement> extractData(ResultSet results) throws SQLException {
+							if (results == null) {
+								throw new IllegalStateException("null result set");
+							}
 
-					LinkedList<CotElement> cotElements = new LinkedList<>();
-					while (results.next()) {
-						CotElement cotElement = new CotElement();
-						cotElement.uid = results.getString(1);
-						cotElement.lon = results.getDouble(2);
-						cotElement.lat = results.getDouble(3);
-						cotElement.hae = results.getString(4);
-						cotElement.cottype = results.getString(5);
-						cotElement.servertime = results.getTimestamp(6);
-						cotElement.le = results.getDouble(7);
-						cotElement.detailtext = results.getString(8);
-						cotElement.cotId = results.getLong(9);
-						cotElement.how = results.getString(10);
-						cotElement.staletime = results.getTimestamp(11);
-						cotElement.ce = results.getDouble(12);
-						cotElement.groupString = results.getString(13);
+							LinkedList<CotElement> cotElements = new LinkedList<>();
+							while (results.next()) {
+								CotElement cotElement = new CotElement();
+								cotElement.uid = results.getString(1);
+								cotElement.lon = results.getDouble(2);
+								cotElement.lat = results.getDouble(3);
+								cotElement.hae = results.getString(4);
+								cotElement.cottype = results.getString(5);
+								cotElement.servertime = results.getTimestamp(6);
+								cotElement.le = results.getDouble(7);
+								cotElement.detailtext = results.getString(8);
+								cotElement.cotId = results.getLong(9);
+								cotElement.how = results.getString(10);
+								cotElement.staletime = results.getTimestamp(11);
+								cotElement.ce = results.getDouble(12);
+								cotElement.groupString = results.getString(13);
 
-						cotElements.add(cotElement);
-					}
+								cotElements.add(cotElement);
+							}
 
-					return cotElements;
-				}
-			});
+							return cotElements;
+						}
+					});
 
 		} catch (Exception e) {
 			logger.error("exception in getLatestCotForUids ", e);
 			return null;
 		}
 	}
-	
+
 
 	private boolean isDisabled() {
 		return maxCacheSize < 1;

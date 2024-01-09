@@ -8,6 +8,9 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,14 +34,13 @@ import com.bbn.marti.remote.groups.FederateUser;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.concurrent.executor.OrderedExecutor;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.marti.util.concurrent.future.AsyncFutures;
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 /**
  *
@@ -51,7 +53,7 @@ public class FederateSslPreAuthCodec extends AbstractAuthCodec implements ByteCo
 
     private final static DistributedFederationManager fedManager = DistributedFederationManager.getInstance();
     
-    private final static Federation config = DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation();
+    private final static Federation config = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
     
     public final static ByteCodecFactory codecFactory = new ByteCodecFactory() {
     	
@@ -132,10 +134,9 @@ public class FederateSslPreAuthCodec extends AbstractAuthCodec implements ByteCo
 		    X509Certificate cert = connectionInfo.getCert();
 		    String principalDN = cert.getSubjectX500Principal().getName();
 		    String issuerDN = cert.getIssuerX500Principal().getName();
-		    javax.security.cert.X509Certificate caCert = null;
 
 		    String caCertFingerprint = "";
-		    if(connectionInfo.getCaCert() != null){
+		    if (connectionInfo.getCaCert() != null){
 		        caCertFingerprint = RemoteUtil.getInstance().getCertSHA256Fingerprint(connectionInfo.getCaCert());
 		    }
 		    //logger.warn("Cert name: " + cn.substring(3, cn.indexOf(',')) + "; issuer name: " + issuer.substring(3, issuer.indexOf(',')));

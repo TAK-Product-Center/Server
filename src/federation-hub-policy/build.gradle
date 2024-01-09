@@ -11,7 +11,6 @@ jar {
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
-apply plugin: 'io.spring.dependency-management'
 
 jar {
     enabled = false
@@ -36,7 +35,6 @@ dependencies {
   implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
   implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
 
-  // exclude log4j from fed common
    implementation(project(':federation-common')) {
     exclude group: 'log4j', module: 'log4j'
     exclude group: 'org.apache.logging.log4j'
@@ -50,13 +48,13 @@ dependencies {
   implementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
   implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
 
-  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: spring_boot_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
-  implementation group: 'org.springframework', name: 'spring-context'
+  implementation group: 'org.springframework', name: 'spring-context', version: spring_version
 
   testImplementation group: 'junit', name: 'junit', version: junit_version
   testImplementation group: 'org.mockito', name: 'mockito-core', version: mockito_version
-  testImplementation("org.springframework.boot:spring-boot-starter-test") {
+  testImplementation("org.springframework.boot:spring-boot-starter-test:$spring_boot_version") {
     exclude group: "com.vaadin.external.google", module:"android-json"
   }
 

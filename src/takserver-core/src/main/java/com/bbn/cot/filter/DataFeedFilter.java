@@ -22,17 +22,14 @@ import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.exception.TakException;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.model.MinimalMission;
 import com.bbn.marti.sync.model.MinimalMissionFeed;
-import com.bbn.marti.sync.model.MissionFeed;
 import com.bbn.marti.sync.service.DistributedDataFeedCotService;
-import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.GeomUtils;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -40,6 +37,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 import tak.server.federation.FigFederateSubscription;
 import tak.server.feeds.DataFeedDTO;
@@ -117,7 +115,7 @@ public class DataFeedFilter {
 						
 			// if vbm is enabled, only broker messages to clients subscribed to a mission that is linked to this data feed	
 			// this is achieved by adding an explicit endpoint for the cot, meaning it won't hit implicit brokering
-			if (DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
+			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
 
 				String dataFeedUuid = (String) cot.getContextValue(Constants.DATA_FEED_UUID_KEY);
 				
@@ -144,11 +142,11 @@ public class DataFeedFilter {
 								
 				if (logger.isDebugEnabled()) {
 					logger.debug("deserialized " + feedMissions.size() + " feed missions from JSON");
-					logger.debug("DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool(): {}", DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool());
+					logger.debug("CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool(): {}", CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool());
 				}
 				
 				// if there was a vbm match and we're mission federating, pass the data feed message to each fig client
-				boolean vbmMatch = feedMissions.stream().anyMatch(m -> DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool().equals(m.getTool().toLowerCase()));
+				boolean vbmMatch = feedMissions.stream().anyMatch(m -> CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool().equals(m.getTool().toLowerCase()));
 				if (vbmMatch && isMissionDataFeedFederation()) {
 					
 					DataFeedDTO dataFeedDao = dataFeedService.getDataFeedByUid(dataFeed.getUuid());
@@ -429,12 +427,12 @@ public class DataFeedFilter {
 	}
 	
 	private boolean isVbm() {
-		return DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled();
+		return CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled();
 	}
 	
 	private boolean isMissionDataFeedFederation() {
-		return DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowMissionFederation()
-				&& DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation();
+		return CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowMissionFederation()
+				&& CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation();
 	}
 
 }

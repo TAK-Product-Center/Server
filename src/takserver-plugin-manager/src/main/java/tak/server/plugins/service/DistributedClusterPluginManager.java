@@ -33,7 +33,7 @@ public class DistributedClusterPluginManager extends DistributedPluginManager {
     	// initialize plugins only if they arent in the cache    		
     	getAllPlugins()
     		.stream()
-    		.forEach(plugin -> getPluginStartedCache().putIfAbsent(plugin.getPluginInfo().getName(), new Boolean(plugin.getPluginInfo().isStarted())));
+    		.forEach(plugin -> getPluginStartedCache().putIfAbsent(plugin.getPluginInfo().getName(), Boolean.valueOf(plugin.getPluginInfo().isStarted())));
     	
     	// pull the most up to date plugin status from cache and set them
     	getAllPlugins()

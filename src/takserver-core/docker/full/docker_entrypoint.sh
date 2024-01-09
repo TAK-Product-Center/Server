@@ -5,7 +5,8 @@ set -e
 TR=/opt/tak
 CR=${TR}/certs
 CONFIG=${TR}/data/CoreConfig.xml
-
+TAKIGNITECONFIG=${TR}/data/TAKIgniteConfig.xml
+CONFIG_PID=null
 MESSAGING_PID=null
 API_PID=null
 PM_PID=null
@@ -20,6 +21,11 @@ check_env_var() {
 
 kill() {
 	echo Please wait a moment. It may take serveral seconds to fully shut down TAKServer.
+
+    if [ $CONFIG_PID != null ];then
+        kill $CONFIG_PID
+    fi
+
     if [ $MESSAGING_PID != null ];then
         kill $MESSAGING_PID
     fi
@@ -31,6 +37,7 @@ kill() {
     if [ $PM_PID != null ];then
         kill $PM_PID
     fi
+
 }
 
 trap kill SIGINT
@@ -75,6 +82,19 @@ if [[ ! -f "${CONFIG}" ]];then
 	fi
 else
 	echo Using existing CoreConfig.xml.
+fi
+
+# Seed initial TAKIgniteConfig.xml if necessary
+if [[ ! -f "${TAKIGNITECONFIG}" ]];then
+	echo Copying initial TAKIgniteConfig.xml
+	if [[ -f "${TR}/TAKIgniteConfig.xml" ]];then
+		cp ${TR}/TAKIgniteConfig.xml ${TAKIGNITECONFIG}
+		mv ${TR}/TAKIgniteConfig.xml ${TR}/CoreConfig.xml.orig
+	else
+		cp ${TR}/TAKIgniteConfig.example.xml ${TAKIGNITECONFIG}
+	fi
+else
+	echo Using existing TAKIgniteConfig.xml.
 fi
 
 # Symlink the log directory
@@ -123,6 +143,8 @@ cd ${TR}
 
 . ./setenv.sh
 
+java -jar -Xmx${CONFIG_MAX_HEAP}m -Dspring.profiles.active=config takserver.war &
+CONFIG_PID=$!
 java -jar -Xmx${MESSAGING_MAX_HEAP}m -Dspring.profiles.active=messaging takserver.war &
 MESSAGING_PID=$!
 java -jar -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api -Dkeystore.pkcs12.legacy takserver.war &
@@ -135,8 +157,12 @@ echo  -e "\033[33;5mWAITING FOR THE SERVER TO START UP BEFORE ADDING THE ADMIN U
 
 # Give some time for the server to start up
 sleep 44
-TAKCL_CORECONFIG_PATH="${CONFIG}" java -jar /opt/tak/utils/UserManager.jar certmod -A "/opt/tak/certs/files/${ADMIN_CERT_NAME}.pem"
+TAKCL_CORECONFIG_PATH="${CONFIG}"
+TAKCL_TAKIGNITECONFIG_PATH="${TAKIGNITECONFIG}"
+java -jar /opt/tak/utils/UserManager.jar certmod -A "/opt/tak/certs/files/${ADMIN_CERT_NAME}.pem"
 
 echo ADMIN USER ADDED
 
-sleep infinity
+# Doing a wait is cleaner than using sleep and will simply exit as soon the PluginManager
+# process completes.   No need to "kill" the process.
+wait $PM_PID

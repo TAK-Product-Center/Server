@@ -109,6 +109,20 @@
   				</span>
 			</td>
 		</tr>
+
+    <tr>
+      <td class="rowHeader"><label for="fallbackWhenNoGroupMappings">*Fallback When No Group Mappings</label></td>
+      <td class="rowValue">
+        <select name="fallbackWhenNoGroupMappings" data-ng-model="federateDetails.fallbackWhenNoGroupMappings" required data-ng-options="boolToStr(item) for item in [true, false]">
+        </select>
+      </td>
+      <td class="error">
+          <span data-ng-show="federateDetailsForm.$submitted || federateDetailsForm.fallbackWhenNoGroupMappings.$touched">
+            <span data-ng-show="federateDetailsForm.fallbackWhenNoGroupMappings.$error.required">The Fallback When No Group Mappings flag must be set.</span>
+          </span>
+      </td>
+    </tr>
+
     <tr>
       <td class="rowHeader"><label for="maxHops">*Max Hops</label></td>
       <td class="rowValue">

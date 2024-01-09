@@ -3,6 +3,7 @@ package com.bbn.locate;
 import com.bbn.marti.config.Locate;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.SubmissionInterface;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
@@ -19,11 +20,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.util.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.Date;
+import java.util.NavigableSet;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 @Validated
@@ -48,9 +54,6 @@ public class LocateApi {
     private MissionService missionService;
 
     @Autowired
-    CoreConfig coreConfig;
-
-    @Autowired
     private Validator validator = new MartiValidator();
 
 
@@ -64,16 +67,16 @@ public class LocateApi {
         boolean status = true;
         try {
 
-            if (coreConfig == null || coreConfig.getRemoteConfiguration() == null) {
+            if (CoreConfigFacade.getInstance() == null || CoreConfigFacade.getInstance().getRemoteConfiguration() == null) {
                 throw new TakException("Unable to find coreConfig");
             }
 
-            if (coreConfig.getRemoteConfiguration().getLocate() == null ||
-                    !coreConfig.getRemoteConfiguration().getLocate().isEnabled()) {
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getLocate() == null ||
+                    !CoreConfigFacade.getInstance().getRemoteConfiguration().getLocate().isEnabled()) {
                 throw new TakException("locate element is missing from coreConfig or is not enabled");
             }
 
-            Locate locateConfig = coreConfig.getRemoteConfiguration().getLocate();
+            Locate locateConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getLocate();
 
             // validate inputs
             validator.getValidInput("LocateApi", Double.toString(latitude),

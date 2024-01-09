@@ -2,7 +2,14 @@ package com.bbn.marti.takcl.connectivity.missions;
 
 import com.bbn.marti.takcl.TestExceptions;
 import com.bbn.marti.tests.Assert;
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonPrimitive;
 import org.dom4j.Document;
 import org.dom4j.Element;
 import org.jetbrains.annotations.NotNull;
@@ -15,7 +22,16 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 public class MissionModels {
@@ -412,7 +428,7 @@ public class MissionModels {
 					}
 
 					if (EXCEPTION_NOT_NULL.equals(expectedFieldObject)) {
-						if(actualFieldObject == null) {
+						if (actualFieldObject == null) {
 							Assert.assertRecursiveFailure(fieldMetadata, "The expected value cannot be null!");
 						}
 						continue;
@@ -452,7 +468,7 @@ public class MissionModels {
 									throw new RuntimeException("Generic type " + typeArgument + " not currently supported for comparison!");
 								}
 
-							} else if(rawType instanceof Class && ((Class<?>)rawType).isAssignableFrom(List.class)) {
+							} else if (rawType instanceof Class && ((Class<?>)rawType).isAssignableFrom(List.class)) {
 								if (typeArgument == String.class) {
 									result = result && assertListsEqual(fieldMetadata, (List) expectedFieldObject,
 											(List) actualFieldObject, expectationOverrides);
@@ -490,7 +506,7 @@ public class MissionModels {
 											(AssertableObject) expectedFieldObject, fieldMetadata, expectationOverrides);
 								}
 
-							} else if(fieldType instanceof Class && ((Class<?>)fieldType).isEnum()) {
+							} else if (fieldType instanceof Class && ((Class<?>)fieldType).isEnum()) {
 								assertEnumsEqual(fieldMetadata, expectedFieldObject, actualFieldObject);
 
 							} else {

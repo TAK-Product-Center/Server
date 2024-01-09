@@ -5,7 +5,6 @@ package com.bbn.marti.nio.util;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.net.StandardSocketOptions;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.NetworkChannel;
@@ -21,9 +20,10 @@ import org.apache.log4j.Logger;
 
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.remote.groups.ConnectionInfo;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.util.Assertion;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 public class NetUtils {
     private final static Logger log = Logger.getLogger(NetUtils.class);
@@ -89,9 +89,9 @@ public class NetUtils {
         
         try {
             channel = DatagramChannel.open();
-            if(address.getAddress().isMulticastAddress()) {
+            if (address.getAddress().isMulticastAddress()) {
                 channel.setOption(StandardSocketOptions.IP_MULTICAST_TTL,
-                        DistributedConfiguration.getInstance().getNetwork().getMulticastTTL());
+                        CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getMulticastTTL());
 
                 if (iface != null && !iface.isEmpty()) {
                     NetworkInterface networkInterface = NetworkInterface.getByName(iface);

@@ -28,7 +28,7 @@ public interface MapLayerRepository extends JpaRepository<MapLayer, Long> {
 
     @Modifying
     @Transactional
-    @Query(value = "update maplayer set default_layer = false")
+    @Query(value = "update maplayer set default_layer = false", nativeQuery = true)
     void unsetDefault();
 
     @Modifying

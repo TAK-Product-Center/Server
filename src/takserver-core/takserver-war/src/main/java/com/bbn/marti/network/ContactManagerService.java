@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import javax.sql.DataSource;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +27,7 @@ import com.bbn.security.web.MartiValidatorConstants;
 import tak.server.cache.ContactCacheHelper;
 
 /**
- * 
+ *
  *
  */
 public class ContactManagerService {
@@ -35,9 +36,6 @@ public class ContactManagerService {
 
 	@Autowired
 	private DataSource dataSource;
-
-	@Autowired
-	private CoreConfig config;
 
 	@Autowired
 	private ContactCacheHelper contactCache;
@@ -49,19 +47,20 @@ public class ContactManagerService {
 		try {
 
 
-			boolean skipCache = !config.getCachedConfiguration().getBuffer().getQueue().isEnableClientEndpointCache();
+			boolean skipCache = !CoreConfigFacade.getInstance().getCachedConfiguration().getBuffer().getQueue().isEnableClientEndpointCache();
 
 			List<ClientEndpoint> result = null;
 
 			String key = contactCache.getKeyGetCachedClientEndpointData(connected, recent, secAgo);
 
-			result = (List<ClientEndpoint>) contactCache.getContactsCache().getIfPresent(key); 
+			result = (List<ClientEndpoint>) contactCache.getContactsCache().getIfPresent(key);
 
 			if (logger.isDebugEnabled()) {
 				logger.debug("got cache result " + key + " of size " + (result == null ? "null" : result.size()));
 			}
 
-			if (result == null || result.isEmpty() || lastUpdateMillis.get() == -1L || (System.currentTimeMillis() - lastUpdateMillis.get() >= (config.getCachedConfiguration().getBuffer().getQueue().getContactCacheUpdateRateLimitSeconds() * 1000))) {
+			if (result == null || result.isEmpty() || lastUpdateMillis.get() == -1L ||
+					(System.currentTimeMillis() - lastUpdateMillis.get() >= (CoreConfigFacade.getInstance().getCachedConfiguration().getBuffer().getQueue().getContactCacheUpdateRateLimitSeconds() * 1000))) {
 
 				synchronized(this) {
 
@@ -69,13 +68,13 @@ public class ContactManagerService {
 						logger.debug("contact cache miss - querying contacts");
 					}
 
-					result = (List<ClientEndpoint>) contactCache.getContactsCache().getIfPresent(key); 
+					result = (List<ClientEndpoint>) contactCache.getContactsCache().getIfPresent(key);
 
 					if (logger.isDebugEnabled()) {
 						logger.debug("got cache result " + key + " of size " + (result == null ? "null" : result.size()));
 					}
 
-					if (result == null || (System.currentTimeMillis() - lastUpdateMillis.get() >= (config.getCachedConfiguration().getBuffer().getQueue().getContactCacheUpdateRateLimitSeconds() * 1000))) {
+					if (result == null || (System.currentTimeMillis() - lastUpdateMillis.get() >= (CoreConfigFacade.getInstance().getCachedConfiguration().getBuffer().getQueue().getContactCacheUpdateRateLimitSeconds() * 1000))) {
 
 						result = queryClientEndpointData(connected, recent, groupVector, secAgo);
 
@@ -114,7 +113,7 @@ public class ContactManagerService {
 
 			groupFilteredResult.removeIf(ce -> ce.getGroups() == null || !RemoteUtil.getInstance().isGroupVectorAllowed(groupVector, ce.getGroups()));
 
-			return groupFilteredResult;		
+			return groupFilteredResult;
 
 		} catch (Exception e) {
 			logger.error("exception getting non-cached contacts", e);
@@ -162,7 +161,7 @@ public class ContactManagerService {
 		if (logger.isDebugEnabled()) {
 			logger.debug("executing client endpoints query");
 		}
-		
+
 		if (logger.isTraceEnabled()) {
 			logger.trace("client endpoints query: " + query + " secAgo: " + secAgo);
 		}
@@ -172,7 +171,7 @@ public class ContactManagerService {
 		if (secAgo > 0) {
 
 			return jdbcTemplate.query(query, arguments, new ClientEndpointResultSetExtractor());
-		} 
+		}
 
 		return jdbcTemplate.query(query, new ClientEndpointResultSetExtractor());
 	}

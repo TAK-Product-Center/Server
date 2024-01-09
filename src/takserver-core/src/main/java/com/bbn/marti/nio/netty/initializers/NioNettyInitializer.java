@@ -9,6 +9,8 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 
+import io.netty.incubator.codec.quic.QuicSslContext;
+import io.netty.incubator.codec.quic.QuicSslContextBuilder;
 import org.apache.log4j.Logger;
 
 import com.bbn.marti.config.Federation.FederationOutgoing;
@@ -40,6 +42,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProvider;
+import org.springframework.boot.web.server.Ssl;
 import tak.server.cot.CotEventContainer;
 
 /*
@@ -221,6 +224,15 @@ public abstract class NioNettyInitializer extends ChannelInitializer<SocketChann
 				protected void initChannel(SocketChannel ch) throws Exception {}
 			};
 		}
+
+		public NioNettyInitializer quicServer(Input input, Tls tls) {
+			return new NioNettyInitializer() {
+				SslContext sslContext = buildQuicServerSslContext(input, tls);
+
+				@Override
+				protected void initChannel(SocketChannel channel) throws Exception {}
+			};
+		}
 	}
 	
 	public Input getInput() {
@@ -298,6 +310,24 @@ public abstract class NioNettyInitializer extends ChannelInitializer<SocketChann
         return sslContext;
 	}
 
+	protected SslContext buildQuicServerSslContext(Input input, Tls tls) {
+		try {
+			initTrust(tls);
+		} catch (Exception e) {
+			if (log.isDebugEnabled()) {
+				log.debug("Could not init trust ", e);
+			}
+		}
+
+		sslContext =  QuicSslContextBuilder.forServer(keyMgrFactory, tls.getKeystorePass())
+				.trustManager(trustMgrFactory)
+				.clientAuth(ClientAuth.REQUIRE)
+				.applicationProtocols("takstream")
+				.earlyData(true)
+				.build();
+
+		return sslContext;
+	}
 	
 	private void initTrust(Tls tls) throws Exception {
 		String keyManager = tls.getKeymanager();

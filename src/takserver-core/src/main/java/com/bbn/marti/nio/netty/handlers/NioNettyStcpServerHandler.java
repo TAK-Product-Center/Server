@@ -68,7 +68,7 @@ public class NioNettyStcpServerHandler extends NioNettyHandlerBase {
 	
 	@Override
 	public void channelUnregistered(ChannelHandlerContext ctx) {
-		if(channelHandler != null) {			
+		if (channelHandler != null) {			
 			submissionService().handleChannelDisconnect(channelHandler);
 			protocolListeners.forEach(listener -> listener.onOutboundClose(channelHandler, protocol));
 		}
@@ -93,7 +93,7 @@ public class NioNettyStcpServerHandler extends NioNettyHandlerBase {
 				msgBuf = authCodec.decode(msgBuf);
 			}
 			
-			if(msgBuf == null || msgBuf.remaining() == 0) return;
+			if (msgBuf == null || msgBuf.remaining() == 0) return;
 			
 			StreamingCotProtocol
 				.add(builder, Charsets.UTF_8.decode(msgBuf), cotParser(), channelHandler)
@@ -143,7 +143,7 @@ public class NioNettyStcpServerHandler extends NioNettyHandlerBase {
 			authCodec = new LdapAuthCodec(createAdaptedNettyPipelineContext());
 		 	authCodec.setConnectionInfo(connectionInfo);
 			authCodec.onConnect();
-		} else if(authenticationType == AuthType.ANONYMOUS) {
+		} else if (authenticationType == AuthType.ANONYMOUS) {
 			authCodec = new AnonymousAuthCodec(createAdaptedNettyPipelineContext(), input);
 			authCodec.setConnectionInfo(connectionInfo);
 			authCodec.onConnect();

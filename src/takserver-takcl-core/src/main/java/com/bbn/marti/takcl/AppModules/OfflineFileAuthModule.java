@@ -10,13 +10,14 @@ import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.xml.bindings.Role;
 import com.bbn.marti.xml.bindings.UserAuthenticationFile;
 
+import tak.server.util.JAXBUtils;
 import tak.server.util.PasswordUtils;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 
-import javax.xml.bind.JAXBException;
+import jakarta.xml.bind.JAXBException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -25,7 +26,11 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Used to manage the user authentication file in offline mode. Using it in online mode will likely have no effect, but could cause other unforseen issues.
@@ -52,7 +57,7 @@ public class OfflineFileAuthModule implements ServerAppModuleInterface, Advanced
 			File f = new File(fileLocation);
 			if (f.exists()) {
 				try {
-					this.authenticationFile = Util.loadJAXifiedXML(fileLocation, UserAuthenticationFile.class.getPackage().getName());
+					this.authenticationFile = JAXBUtils.loadJAXifiedXML(fileLocation, UserAuthenticationFile.class.getPackage().getName());
 				} catch (JAXBException e) {
 					throw new EndUserReadableException("The existing user authentication file at '" +
 							f.getAbsolutePath() + "' appears to be improperly formatted!", e);
@@ -79,7 +84,7 @@ public class OfflineFileAuthModule implements ServerAppModuleInterface, Advanced
 
 	private synchronized void saveChanges() {
 		try {
-			Util.saveJAXifiedObject(fileLocation, authenticationFile, true);
+			JAXBUtils.saveJAXifiedObject(fileLocation, authenticationFile, true);
 		} catch (IOException | JAXBException e) {
 			throw new RuntimeException(e);
 		}
@@ -203,7 +208,7 @@ public class OfflineFileAuthModule implements ServerAppModuleInterface, Advanced
 	public static UserAuthenticationFile readCurrentConfigFromDisk(@NotNull AbstractServerProfile serverIdentifier) {
 		try {
 			String fileLocation = serverIdentifier.getUserAuthFilePath();
-			return Util.loadJAXifiedXML(fileLocation, UserAuthenticationFile.class.getPackage().getName());
+			return JAXBUtils.loadJAXifiedXML(fileLocation, UserAuthenticationFile.class.getPackage().getName());
 		} catch (FileNotFoundException | JAXBException e) {
 			throw new RuntimeException(e);
 		}

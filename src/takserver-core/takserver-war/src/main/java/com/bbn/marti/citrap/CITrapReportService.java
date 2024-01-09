@@ -15,11 +15,11 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-import javax.xml.bind.DatatypeConverter;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Marshaller;
-import javax.xml.bind.Unmarshaller;
+import jakarta.xml.bind.DatatypeConverter;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.Unmarshaller;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -39,7 +39,7 @@ import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.util.SecureXmlParser;
 import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.service.MissionService;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 public class CITrapReportService {
 

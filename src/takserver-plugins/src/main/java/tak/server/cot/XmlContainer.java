@@ -44,7 +44,7 @@ public class XmlContainer
   }
 
   public boolean matchXPath(String b) {
-    if(doc != null) {
+    if (doc != null) {
       XPath xpath = DocumentHelper.createXPath(b);
       return xpath.booleanValueOf(doc);
     }

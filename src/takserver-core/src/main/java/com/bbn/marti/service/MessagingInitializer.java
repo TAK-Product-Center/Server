@@ -2,6 +2,7 @@
 package com.bbn.marti.service;
 
 
+import com.bbn.marti.config.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,21 +10,18 @@ import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 
-import com.bbn.marti.config.Buffer.Queue;
+import com.bbn.marti.config.Queue;
 import com.bbn.marti.injector.InjectionManager;
 import com.bbn.marti.injector.UidCotTagInjector;
 import com.bbn.marti.remote.exception.DuplicateFederateException;
 import com.bbn.marti.remote.groups.GroupManager;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 
 public class MessagingInitializer {
 
     private static final Logger logger = LoggerFactory.getLogger(MessagingInitializer.class);
-    
-    // creation of this bean will force a load of config files
-    @Autowired
-    private DistributedConfiguration config;
     
     @Autowired
     private SubmissionService submissionService;
@@ -52,6 +50,8 @@ public class MessagingInitializer {
     	for (String profile : environment.getActiveProfiles()) {
     		logger.debug("active profile: " + profile);
     	}
+
+        Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
     	// Use the first command-line argument that doesn't start with -- as the CoreConfig filename
         if (config.getRepository().isEnable()) {
@@ -97,14 +97,13 @@ public class MessagingInitializer {
             brokerService.startService();
             repositoryService.startService();
             repeaterService.startService();
-            
-            
-            Queue queue = config.getRemoteConfiguration().getBuffer().getQueue();
+
+            Queue queue = config.getBuffer().getQueue();
             
             // if old default queue capacity is set, use the default instead
-            if (queue.getCapacity() == 10) {
-            	queue.setCapacity(null);
-            	config.saveChanges();
+            if (queue.getQueueSizeMaxCapacity() == 10) {
+            	queue.setQueueSizeMaxCapacity(null);
+                CoreConfigFacade.getInstance().saveChanges();
             }
            
             if (config.getNetwork().getAnnounce().isEnable()) {

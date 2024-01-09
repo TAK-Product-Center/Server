@@ -11,7 +11,6 @@ jar {
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
-apply plugin: 'io.spring.dependency-management'
 
 apply plugin: 'war'
 
@@ -75,14 +74,8 @@ dependencies {
   implementation group: 'org.springframework.security', name: 'spring-security-config', version: spring_security_version
   implementation group: 'org.springframework.security', name: 'spring-security-messaging', version: spring_security_version
   implementation group: 'org.springframework.security', name: 'spring-security-web', version: spring_security_version
-
-  api group: 'org.springframework.security.oauth', name: 'spring-security-oauth2', version: spring_security_oauth_version
-  
-  implementation ("org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure:$spring_security_oauth2_autoconfigure_version") {
-    exclude group: 'log4j', module: 'log4j'
-    exclude group: 'org.apache.logging.log4j'
-    exclude group: 'org.slf4j', module: 'log4j-over-slf4j'
-  }
+  implementation group: 'org.springframework.security', name: 'spring-security-oauth2-authorization-server', version: spring_security_oauth2_authorization_server_version
+  implementation group: 'org.springframework.security', name: 'spring-security-oauth2-core', version: spring_security_version
 
   implementation(project(':federation-common')) {
     exclude group: 'log4j', module: 'log4j'
@@ -101,28 +94,35 @@ dependencies {
   implementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
   implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
 
-  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: spring_boot_version
+  implementation group: 'io.micrometer', name: 'micrometer-core', version: micrometer_version
 
   implementation ("org.springframework.boot:spring-boot-loader:$spring_boot_version") {
     exclude group: 'log4j', module: 'log4j'
     exclude group: 'org.apache.logging.log4j', module: 'log4j-to-slf4j'
   }
-  
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: spring_boot_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-jetty', version: spring_boot_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-security', version: spring_boot_version
   implementation group: 'org.springframework', name: 'spring-web', version: spring_version
+  
+  implementation group: 'org.eclipse.jetty', name: 'jetty-server', version: jetty_server_version
+  implementation group: 'jakarta.servlet', name: 'jakarta.servlet-api', version: jakarta_servlet_api_version
 
   testImplementation group: 'junit', name: 'junit', version: junit_version
   testImplementation group: 'org.mockito', name: 'mockito-core', version: mockito_version
-  testImplementation("org.springframework.boot:spring-boot-starter-test") {
+  testImplementation("org.springframework.boot:spring-boot-starter-test:$spring_boot_version") {
     exclude group: "com.vaadin.external.google", module:"android-json"
   }
 
-  implementation group: 'commons-fileupload', name: 'commons-fileupload', version: commons_fileupload_version
+  //implementation group: 'commons-fileupload', name: 'commons-fileupload', version: commons_fileupload_version
   implementation group: 'com.squareup.okhttp3', name: 'okhttp', version: okhttp3_version
 
   testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  
+  // This one is used in MartiValidator. We should find a way to remove this and use jakarta.servlet instead
+  compileOnly group: 'javax.servlet', name: 'servlet-api', version: javax_servlet_version
+  
 }
 
 compileJava {

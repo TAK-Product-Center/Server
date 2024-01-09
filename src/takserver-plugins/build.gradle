@@ -28,16 +28,19 @@ dependencies {
 
   implementation group: 'org.yaml', name: 'snakeyaml', version: snake_yaml_version
   implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
 
   api(project(':takserver-protobuf')) {
     exclude group: 'io.grpc'
     exclude group: 'io.netty'
   }
 
-  implementation group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
+  implementation group: 'org.hibernate.orm', name: 'hibernate-core', version: hibernate_version
   implementation group: 'com.googlecode.json-simple', name: 'json-simple', version: json_simple_version
-  implementation group: 'javax.xml.bind', name: 'jaxb-api', version: jaxb_api_version
-  implementation group: 'javax.persistence', name: 'javax.persistence-api', version: javax_persistence_api_version
+  //implementation group: 'javax.xml.bind', name: 'jaxb-api', version: jaxb_api_version
+  implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: jakarta_xml_bind_api_version
+  //implementation group: 'javax.persistence', name: 'javax.persistence-api', version: javax_persistence_api_version
+  implementation group: 'jakarta.persistence', name: 'jakarta.persistence-api', version: jakarta_persistence_api_version
   implementation group: 'com.intellij', name: 'annotations', version: intellij_annotations_version // IntelliJ @NotNull annotation
   implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jackson_version
   implementation group: 'joda-time', name: 'joda-time', version: joda_version
@@ -72,5 +75,11 @@ sourceSets {
         java {
 	     srcDir 'build/src-generated'
         }
+    }
+}
+
+configurations {
+    all {
+        exclude group: 'ch.qos.logback', module: 'logback-classic'
     }
 }

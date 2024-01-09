@@ -63,13 +63,14 @@ public interface FederationManager {
 
 	// will throw exception if output with same name already exists
 	void addOutgoingConnection(String name, String host, int port, int reconnect, int maxRetries, boolean unlimitedRetries, boolean enable, int protocolVersion, String fallback);
+	void updateOutgoingConnection(Federation.FederationOutgoing original, Federation.FederationOutgoing update);
 	void removeOutgoing(String name);
 
 	List<X509Certificate> getCAList();
 	void addCA(X509Certificate ca);
 	void removeCA(X509Certificate ca);
 
-	void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, String notes, int maxHops);
+	void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, boolean fallbackWhenNoGroupMappings, String notes, int maxHops);
 	void removeFederate(String federateId);
 
 	List<Federate> getConfiguredFederates();

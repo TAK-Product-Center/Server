@@ -4,17 +4,16 @@ import static org.junit.Assert.assertNotNull;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.junit.Test;
-import com.google.common.base.Charsets;
-import com.google.common.io.Files;
 
 import mil.af.rl.rol.value.Parameters;
+
+import tak.server.federation.rol.MissionRolVisitor;
 
 public class DataFeedRolTests {
 		  
@@ -23,7 +22,7 @@ public class DataFeedRolTests {
 	    @Test
 	    public void execute() throws Exception {
 	        // parse and visit test programs
-	        for (File rolFile : com.google.common.io.Files.fileTreeTraverser().preOrderTraversal(new File(getClass().getResource(ROL_RESOURCE_DATA_FEED_PATH).toURI()))) {
+	        for (File rolFile : com.google.common.io.Files.fileTraverser().depthFirstPreOrder(new File(getClass().getResource(ROL_RESOURCE_DATA_FEED_PATH).toURI()))) {
 	            if (rolFile.isFile() && (rolFile.getName().toLowerCase().endsWith(".rol"))) {
 
 	                RolLexer lexer = new RolLexer(new ANTLRInputStream(new FileInputStream(rolFile)));

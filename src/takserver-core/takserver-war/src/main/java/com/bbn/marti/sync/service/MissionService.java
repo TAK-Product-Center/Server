@@ -8,9 +8,10 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.UUID;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.repository.query.Param;
 import org.springframework.jdbc.core.ResultSetExtractor;
 
 import com.bbn.marti.config.GeospatialFilter;
@@ -284,4 +285,23 @@ public interface MissionService {
 	boolean validateAccess(Mission mission, HttpServletRequest request);
 
     List<String> getAllCotForString(String uidSearch, String groupVector);
+    
+    void hydrateFeedNameForMission(Mission mission);
+    
+    void hydrateMissionChangesForMission(Mission mission);
+    
+    void hydrateMissionChange(MissionChange missionChange);
+    
+    MissionSubscription getMissionSubcriptionByMissionNameAndClientUidAndUsernameNoMission(String missionName, String clientUid, String username);
+    
+    MissionSubscription getMissionSubscriptionByMissionNameAndClientUidNoMission(String missionName, String clientUid);
+    
+    MissionSubscription getMissionSubscriptionByMissionNameAndUsernameNoMission(String missionName, String username);
+    
+    MissionSubscription getMissionSubscriptionByUidAndMissionNameNoMission(String uid, String missionName);
+    
+    List<MissionSubscription> getMissionSubscriptionsByMissionNameNoMission(String missionName);
+    
+    List<MissionSubscription> getMissionSubscriptionsByMissionNameNoMissionNoToken(String missionName);
+    
 }

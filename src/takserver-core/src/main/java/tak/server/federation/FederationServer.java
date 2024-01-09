@@ -9,7 +9,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -51,6 +50,33 @@ import javax.naming.ldap.Rdn;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.google.common.base.Charsets;
+import com.google.common.base.Strings;
+import com.google.common.collect.ComparisonChain;
+import com.google.common.hash.Hashing;
+import com.google.common.primitives.Longs;
+
+import io.grpc.Context;
+import io.grpc.Contexts;
+import io.grpc.Grpc;
+import io.grpc.Metadata;
+import io.grpc.Server;
+import io.grpc.ServerCall;
+import io.grpc.ServerCallHandler;
+import io.grpc.ServerInterceptor;
+import io.grpc.ServerInterceptors;
+import io.grpc.Status;
+import io.grpc.netty.NettyServerBuilder;
+import io.grpc.stub.StreamObserver;
+import io.micrometer.core.instrument.Metrics;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.netty.util.internal.logging.Slf4JLoggerFactory;
+
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -67,7 +93,6 @@ import com.atakmap.Tak.ClientHealth;
 import com.atakmap.Tak.ContactListEntry;
 import com.atakmap.Tak.Empty;
 import com.atakmap.Tak.FederateGroups;
-import com.atakmap.Tak.FederateHops;
 import com.atakmap.Tak.FederatedChannelGrpc;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.Identity;
@@ -96,54 +121,31 @@ import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.FederatedSubscriptionManager;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.federation.FederationROLHandler;
 import com.bbn.marti.util.MessageConversionUtil;
+import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.roger.fig.FederationUtils;
 import com.bbn.roger.fig.model.FigServerConfig;
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.google.common.base.Charsets;
-import com.google.common.base.Strings;
-import com.google.common.collect.ComparisonChain;
-import com.google.common.hash.Hashing;
-import com.google.common.primitives.Longs;
 
-import io.grpc.Context;
-import io.grpc.Contexts;
-import io.grpc.Grpc;
-import io.grpc.Metadata;
-import io.grpc.Server;
-import io.grpc.ServerCall;
-import io.grpc.ServerCallHandler;
-import io.grpc.ServerInterceptor;
-import io.grpc.ServerInterceptors;
-import io.grpc.Status;
-import io.grpc.netty.NettyServerBuilder;
-import io.grpc.stub.StreamObserver;
-import io.micrometer.core.instrument.Metrics;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.util.internal.logging.InternalLoggerFactory;
-import io.netty.util.internal.logging.Slf4JLoggerFactory;
 import mil.af.rl.rol.FederationProcessor;
-import mil.af.rl.rol.MissionRolVisitor;
 import mil.af.rl.rol.Resource;
 import mil.af.rl.rol.ResourceOperationParameterEvaluator;
 import mil.af.rl.rol.RolLexer;
 import mil.af.rl.rol.RolParser;
 import mil.af.rl.rol.value.Parameters;
 import mil.af.rl.rol.value.ResourceDetails;
+
 import tak.server.Constants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 import tak.server.federation.message.AddressableEntity;
 import tak.server.federation.message.Message;
+import tak.server.federation.rol.MissionRolVisitor;
 import tak.server.messaging.Messenger;
 
 
@@ -209,7 +211,7 @@ public class FederationServer {
 	private MissionDisruptionManager mdm;
 
 	private Configuration coreConfig() {
-		return DistributedConfiguration.getInstance().getRemoteConfiguration();
+		return CoreConfigFacade.getInstance().getRemoteConfiguration();
 	}
 
 	private Federation fedConfig() {
@@ -260,8 +262,8 @@ public class FederationServer {
 						String fedTruststore = fedTls.getTruststoreFile();
 
 						if (fedTruststore != null && fedTruststore.equals("certs/files/truststore-root.jks")) {
-							fedTls.setTruststoreFile(DistributedConfiguration.DEFAULT_TRUSTSTORE);
-							DistributedConfiguration.getInstance().saveChanges();
+							fedTls.setTruststoreFile(CoreConfigFacade.DEFAULT_TRUSTSTORE);
+							CoreConfigFacade.getInstance().saveChanges();
 						}
 					}
 				}
@@ -712,16 +714,64 @@ public class FederationServer {
 
 				ConnectionInfo connection = new ConnectionInfo();
 				connection.setConnectionId(getCurrentSessionId());
+				
+				final String sessionId = getCurrentSessionId();
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("FederationServer sessionId: " + sessionId);
+				}
+
+				com.bbn.marti.config.Federation.Federate federate = federationManager.getFederate(serverFederateMap.get(sessionId));
+				
+				if (federate == null) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("can't send federation changes - null federate");
+						return;
+					}
+				}
+				
+				if (Strings.isNullOrEmpty(federate.getId())) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("can't send federation changes - empty federate id");
+						return;
+					}
+				}
+
+				ConnectionInfo connectionInfo = new ConnectionInfo();
+				FigServerFederateSubscription fedSubscription = null;
 
 				try {
+					connectionInfo.setConnectionId(sessionId);
+					fedSubscription = (FigServerFederateSubscription) federatedSubscriptionManager.getFederateSubscription(connectionInfo);
+				} catch (Exception e) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("exception getting subscription", e);
+					}
+				}
+				
+				Set<String> outGroups = null;
+				if (federate.isFederatedGroupMapping()) {
+					NavigableSet<Group> groups = groupManager.getGroups(fedSubscription.getUser());
+					outGroups = GroupFederationUtil.getInstance().filterFedOutboundGroups(federate.getOutboundGroup(), groups, federate.getId());
+				}
+
+				final Set<String> fOutGroups = outGroups;
+				
+				try {
 					// send out data feeds to federate
-					if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
-						List<ROL> feedMessages = mdm.getDataFeedEventsForFederatedDataFeedOnly();
+					if (CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+						List<ROL> feedMessages = mdm.getDataFeedEventsForFederatedDataFeedOnly(federate);
 						
 						AtomicLong delayMs = new AtomicLong(100L);										
 						for (final ROL feedMessage : feedMessages) {
 							Resources.scheduledClusterStateExecutor.schedule(() -> {
 								try {
+									ROL modifiedFeedMessage = feedMessage;
+									if (federate.isFederatedGroupMapping() && fOutGroups != null && fOutGroups.size() > 0) {
+										ROL.Builder changeBuilder = modifiedFeedMessage.toBuilder();
+										changeBuilder.addAllFederateGroups(fOutGroups);
+										modifiedFeedMessage = changeBuilder.build();
+									}
 									rolStreamHolder.send(feedMessage);
 								} catch (Exception e) {
 									logger.error("exception federating data feed", e);
@@ -738,63 +788,22 @@ public class FederationServer {
 				if (fedConfig().isEnableMissionFederationDisruptionTolerance()) {
 
 					try {
-
 						if (logger.isDebugEnabled()) {
 							logger.debug("mission federation disruption tolerance enabled");
 						}
 						
-						final String sessionId = getCurrentSessionId();
-						
-						if (logger.isDebugEnabled()) {
-							logger.debug("FederationServer sessionId: " + sessionId);
-						}
-
-						com.bbn.marti.config.Federation.Federate federate = federationManager.getFederate(serverFederateMap.get(sessionId));
-						
-						if (federate == null) {
-							if (logger.isDebugEnabled()) {
-								logger.debug("can't send federation changes - null federate");
-								return;
-							}
-						}
-						
-						if (Strings.isNullOrEmpty(federate.getId())) {
-							if (logger.isDebugEnabled()) {
-								logger.debug("can't send federation changes - empty federate id");
-								return;
-							}
-						}
+						final FigServerFederateSubscription sub = fedSubscription;
 
 						Resources.fedReconnectThreadPool.schedule(() -> {
 
 							try {
-
-								ConnectionInfo connectionInfo = new ConnectionInfo();
-								FigServerFederateSubscription fedSubscription = null;
-
-								try {
-									connectionInfo.setConnectionId(sessionId);
-									fedSubscription = (FigServerFederateSubscription) federatedSubscriptionManager.getFederateSubscription(connectionInfo);
-								} catch (Exception e) {
-									if (logger.isDebugEnabled()) {
-										logger.debug("exception getting subscription", e);
-									}
-								}
-								List<ROL> missionChanges = mdm.getMissionChangesAndTrackConnectEvent(federate, federate.getName(), fedSubscription);
+								List<ROL> missionChanges = mdm.getMissionChangesAndTrackConnectEvent(federate, federate.getName(), sub);
 
 								if (logger.isTraceEnabled()) {
 									logger.trace("mission disruption changes to send: " + missionChanges);
 								}
 
 								final AtomicInteger changeCount = new AtomicInteger(0);
-
-								Set<String> outGroups = null;
-								if (federate.isFederatedGroupMapping()) {
-									NavigableSet<Group> groups = groupManager.getGroups(fedSubscription.getUser());
-									outGroups = GroupFederationUtil.getInstance().filterFedOutboundGroups(federate.getOutboundGroup(), groups, federate.getId());
-								}
-
-								final Set<String> fOutGroups = outGroups;
 
 								final List<ROL> changeMessages = new CopyOnWriteArrayList<>();
 
@@ -803,7 +812,7 @@ public class FederationServer {
 									if (federate.isFederatedGroupMapping() && fOutGroups != null && fOutGroups.size() > 0) {
 										ROL.Builder changeBuilder = change.toBuilder();
 										changeBuilder.addAllFederateGroups(fOutGroups);
-										changeMessages.add(changeBuilder.build());
+										change = changeBuilder.build();
 									}
 
 									changeMessages.add(change);
@@ -836,7 +845,8 @@ public class FederationServer {
 								logger.warn("error sending mission disruption changes to federate client", e);
 							}
 
-						}, DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getHealthCheckIntervalSeconds(), TimeUnit.SECONDS);
+						}, CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getHealthCheckIntervalSeconds(),
+								TimeUnit.SECONDS);
 					} catch (Exception e) {
 						logger.warn("exception getting or sending federation changes", e);
 					}
@@ -852,6 +862,21 @@ public class FederationServer {
 		 */
 		@Override
 		public StreamObserver<ROL> serverROLStream(StreamObserver<Subscription> responseObserver) {
+			String sessionId = getCurrentSessionId();
+            
+        	Subscription subscription = Subscription.newBuilder()
+        			.setFilter("")
+        			.setIdentity(
+        					Identity.newBuilder()
+        						.setType(Identity.ConnectionType.FEDERATION_TAK_SERVER)
+        						.setServerId(MessagingDependencyInjectionProxy.getInstance().serverInfo().getServerId())
+        						.setName(sessionId)
+        						.setUid(sessionId)
+        						.build())
+        			.build();
+        	
+        	responseObserver.onNext(subscription);
+        	
 			return new StreamObserver<ROL>() {
 				
 				{
@@ -1040,7 +1065,8 @@ public class FederationServer {
                         
         	Subscription subscription = Subscription.newBuilder()
         			.setFilter("")
-        			.setIdentity(Identity.newBuilder().setType(Identity.ConnectionType.FEDERATION_TAK_SERVER).setServerId(DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getServerId()).setName(sessionId).setUid(sessionId).build())
+        			.setIdentity(Identity.newBuilder().setType(Identity.ConnectionType.FEDERATION_TAK_SERVER).setServerId(
+							CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId()).setName(sessionId).setUid(sessionId).build())
         			.build();
         	
         	responseObserver.onNext(subscription);
@@ -1092,8 +1118,10 @@ public class FederationServer {
 							federate = new Federate();
 							federate.setId(fingerprint);
 							federate.setName(certName);
-							federate.setFederatedGroupMapping(DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isFederatedGroupMapping());
-							federate.setAutomaticGroupMapping(DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAutomaticGroupMapping());
+							federate.setFederatedGroupMapping(
+									CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isFederatedGroupMapping());
+							federate.setAutomaticGroupMapping(
+									CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAutomaticGroupMapping());
 
 							if (caCert != null) {
 								for (FederateCA ca : fedConfig().getFederateCA()) {
@@ -1382,6 +1410,21 @@ public class FederationServer {
 		}
 
 		public StreamObserver<FederateGroups> clientFederateGroupsStream(StreamObserver<Subscription> responseObserver) {
+			String sessionId = getCurrentSessionId();
+            
+        	Subscription subscription = Subscription.newBuilder()
+        			.setFilter("")
+        			.setIdentity(
+        					Identity.newBuilder()
+        						.setType(Identity.ConnectionType.FEDERATION_TAK_SERVER)
+        						.setServerId( MessagingDependencyInjectionProxy.getInstance().serverInfo().getServerId())
+        						.setName(sessionId)
+        						.setUid(sessionId)
+        						.build())
+        			.build();
+        	
+        	responseObserver.onNext(subscription);
+        	
 			return new StreamObserver<FederateGroups>() {
 				@Override
 				public void onNext(FederateGroups value) {
@@ -1548,10 +1591,12 @@ public class FederationServer {
 								groups = groupFederationUtil.addFederateGroupMapping(federationManager.getInboundGroupMap(federate.getId()),
 										clientROL.getFederateGroupsList());
 							}
-						}
-
-						// fall back if no matches on the mapping
-						if (groups == null || groups.isEmpty()) {
+							
+							if ((groups == null || groups.isEmpty()) && federate.isFallbackWhenNoGroupMappings()) {
+								NavigableSet<Group> allGroups = groupManager.getGroups(sub.getUser());
+								groups = groupFederationUtil.filterGroupDirection(Direction.IN, allGroups);
+							}
+						} else {
 							NavigableSet<Group> allGroups = groupManager.getGroups(sub.getUser());
 							groups = groupFederationUtil.filterGroupDirection(Direction.IN, allGroups);
 						}
@@ -1625,10 +1670,12 @@ public class FederationServer {
 							groups = groupFederationUtil.addFederateGroupMapping(federationManager.getInboundGroupMap(federate.getId()),
 									rol.getFederateGroupsList());
 						}
-					}
-
-					// fall back if no matches on the mapping
-					if (groups == null || groups.isEmpty()) {
+						
+						if ((groups == null || groups.isEmpty()) && federate.isFallbackWhenNoGroupMappings()) {
+							NavigableSet<Group> allGroups = groupManager.getGroups(sub.getUser());
+							groups = groupFederationUtil.filterGroupDirection(Direction.IN, allGroups);
+						}
+					} else {
 						NavigableSet<Group> allGroups = groupManager.getGroups(sub.getUser());
 						groups = groupFederationUtil.filterGroupDirection(Direction.IN, allGroups);
 					}
@@ -1743,7 +1790,7 @@ public class FederationServer {
 			LdapName ldapName = new LdapName(dn);
 
 			for(Rdn rdn : ldapName.getRdns()) {
-				if(rdn.getType().equalsIgnoreCase("CN")) {
+				if (rdn.getType().equalsIgnoreCase("CN")) {
 
 					return rdn.getValue().toString();
 				}
@@ -1878,7 +1925,7 @@ public class FederationServer {
 		        	}
 		        }
 
-				if (DistributedConfiguration.getInstance().getRemoteConfiguration().getSubmission().isIgnoreStaleMessages()) {
+				if (CoreConfigFacade.getInstance().getRemoteConfiguration().getSubmission().isIgnoreStaleMessages()) {
 					if (MessageConversionUtil.isStale(cot)) {
 						if (logger.isDebugEnabled()) {
 							logger.debug("ignoring stale FIG federated message: " + cot);
@@ -1895,7 +1942,7 @@ public class FederationServer {
 				// for mission filtering						
 				String feedUuid = (String) cot.getContextValue(Constants.DATA_FEED_UUID_KEY);
 				if (!Strings.isNullOrEmpty(feedUuid)) {
-					if (!DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation())
+					if (!CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation())
 						return;
 					DataFeedFilter.getInstance().filterFederatedDataFeed(cot);
 				}
@@ -1912,12 +1959,16 @@ public class FederationServer {
 							groups = groupFederationUtil.addFederateGroupMapping(federationManager.getInboundGroupMap(user.getId()),
 									fedEvent.getFederateGroupsList());
 						}
-					}
-                    // fall back if no matches on the mapping
-					if (groups == null || groups.isEmpty()) {
+						
+						if ((groups == null || groups.isEmpty()) && federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())).isFallbackWhenNoGroupMappings()) {
+							NavigableSet<Group> allGroups = groupManager.getGroups(federateSubscription.getUser());
+							groups = groupFederationUtil.filterGroupDirection(Direction.IN, allGroups);
+						}
+					} else {
 						NavigableSet<Group> allGroups = groupManager.getGroups(federateSubscription.getUser());
 						groups = groupFederationUtil.filterGroupDirection(Direction.IN, allGroups);
 					}
+					
 					if (groups != null) {
 						if (logger.isTraceEnabled()) {
 							logger.trace("marking groups in FIG federated message: " + groups);
@@ -1957,7 +2008,7 @@ public class FederationServer {
 
 				// store for latestSA
 				ConcurrentHashMap<String, RemoteContactWithSA> remoteContacts = federatedSubscriptionManager.getRemoteContactsMapByChannelHandler(handler);
-				if(remoteContacts != null && remoteContacts.containsKey(cot.getUid())) {
+				if (remoteContacts != null && remoteContacts.containsKey(cot.getUid())) {
 					remoteContacts.get(cot.getUid()).setLastSA(cot);
 				}
 			} catch (Exception e) {
@@ -1983,10 +2034,10 @@ public class FederationServer {
 
 			try {
 				ContactListEntry contact = fedEvent.getContact();
-				if(contact.getOperation() == CRUD.DELETE) {
+				if (contact.getOperation() == CRUD.DELETE) {
 					CotEventContainer e = ProtoBufHelper.getInstance().protoBuf2delContact(contact);
 					Collection<com.bbn.marti.service.Subscription> reachable = groupFederationUtil.getReachableSubscriptions(federateSubscription);
-					if(reachable.contains(federateSubscription)) {
+					if (reachable.contains(federateSubscription)) {
 						logger.warn("reachable contained self!");
 						reachable.remove(federateSubscription);
 					}
@@ -2086,7 +2137,7 @@ public class FederationServer {
 		}
 		for (Map.Entry<String, GuardedStreamHolder<FederatedEvent>> clientStreamEntry : clientStreamMap.entrySet()) {
 
-			if(!clientStreamEntry.getValue().isClientHealthy(config.getClientTimeoutTime())) {
+			if (!clientStreamEntry.getValue().isClientHealthy(config.getClientTimeoutTime())) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("Detected FederatedEvent client stream {} inactivity", clientStreamEntry.getValue().getFederateIdentity());
 				}
@@ -2098,7 +2149,7 @@ public class FederationServer {
 
 		for (Map.Entry<String, GuardedStreamHolder<ROL>> rolStreamEntry : clientROLStreamMap.entrySet()) {
 
-			if(!rolStreamEntry.getValue().isClientHealthy(config.getClientTimeoutTime())) {
+			if (!rolStreamEntry.getValue().isClientHealthy(config.getClientTimeoutTime())) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("Detected ROL client stream {} inactivity", rolStreamEntry.getValue().getFederateIdentity());
 				}

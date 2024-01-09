@@ -53,6 +53,11 @@ public class ClusterGroupDefinition {
 		return ignite.cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.RETENTION_PROFILE_NAME);
 	}
 
+	public static ClusterGroup getConfigClusterDeploymentGroup(Ignite ignite) {
+		return getClusterGroup(ignite, ignite.cluster(), Constants.CONFIG_PROFILE_NAME);
+	}
+
+
 	private static ClusterGroup getClusterGroup(Ignite ignite, ClusterGroup cluster, String requestedProfile) {
 		// all takserver ignite nodes will be clients in the cluster
 		if (isCluster) {

@@ -1,6 +1,6 @@
 package com.bbn.marti.email;
 
-import javax.mail.internet.MimeMessage;
+import jakarta.mail.internet.MimeMessage;
 import java.util.HashMap;
 import java.util.Map;
 

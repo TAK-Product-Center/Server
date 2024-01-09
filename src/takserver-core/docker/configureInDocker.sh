@@ -6,6 +6,7 @@ fi
 
 cd /opt/tak
 . ./setenv.sh
+java -jar -Xmx${CONFIG_MAX_HEAP}m -Dspring.profiles.active=config takserver.war &
 java -jar -Xmx${MESSAGING_MAX_HEAP}m -Dspring.profiles.active=messaging takserver.war &
 java -jar -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api -Dkeystore.pkcs12.legacy takserver.war &
 java -jar -Xmx${RETENTION_MAX_HEAP}m takserver-retention.jar &

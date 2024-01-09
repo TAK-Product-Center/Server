@@ -1,6 +1,7 @@
+
 # TAK Server Federation Hub
 
-*Requires Java 11.*
+*Requires Java 17.*
 
 ## Description
 
@@ -37,18 +38,97 @@ To build the .rpm for the Federation Hub, run:
 2. broker 
 3. UI (optional)
 
-## Install and Run
+## Install and Run RHEL7
+Update yum
+
+```
+sudo yum update -y
+```
+
+Install Java 17
+```
+sudo yum install wget -y
+sudo wget https://download.oracle.com/java/17/latest/jdk-17_linux-x64_bin.rpm
+sudo yum install -y ./jdk-17_linux-x64_bin.rpm
+```
 
 To install from the .rpm, run:
 
 ```
-sudo yum install federation-hub-*.noarch.rpm
+sudo rpm -ivh takserver-fed-hub-*.noarch.rpm --nodeps
 ```
+
+## Install and Run RHEL8
+Update yum
+
+```
+sudo dnf update -y
+```
+
+Install Java 17
+```
+sudo dnf install java-17-openjdk-devel -y
+```
+
+To install from the .rpm, run:
+
+```
+sudo yum install takserver-fed-hub-*.noarch.rpm -y
+```
+
+Add and Apply SELinux
+```
+sudo dnf install checkpolicy
+cd /opt/tak/federation-hub && sudo ./apply-selinux.sh && sudo semodule -l | grep takserver
+```
+
+## Install Mongo
+Make sure /opt/tak/federation-hub/configs/federation-hub-broker.yml has your database credentials defined. Defaults will be generated otherwise
+```
+dbUsername: martiuser
+dbPassword: pass4marti
+```
+
+Mongo Setup
+```
+sudo yum install -y mongodb-org
+sudo systemctl daemon-reload
+sudo systemctl enable mongod
+sudo systemctl restart mongod
+sudo /opt/tak/federation-hub/scripts/db/configure.sh
+```
+
+## Update from RPM
+Before updating the Federation Hub, you should back up the policy file and list of authorized users:
+
+```
+mv /opt/tak/federation-hub/ui_generated_policy.json /tmp
+mv /opt/tak/federation-hub/authorized_users.yml /tmp
+```
+
+RHEL7
+```
+sudo rpm -Uvh takserver-fed-hub-*.noarch.rpm --nodeps
+```
+
+RHEL8
+```
+sudo yum upgrade takserver-fed-hub-*.noarch.rpm
+```
+
+The policy and authorized can then be replaced:
+```
+mv /tmp/ui_generated_policy.json /opt/tak/federation-hub/
+mv /tmp/authorized_users.yml /opt/tak/federation-hub/
+```
+
+## Configuration
+**The Federation Hub authenticates clients using TLS with X.509 client certificates. Scripts for generating a private security enclave, including a Certificate Authority (CA), and certs for use by the Federation Hub are in the TAK server documentation. See the TAK server configuration guide (docs/TAK_Server_Configuration_Guide.pdf) for additional information.**
 
 The Federation Hub can then be started as a system service (and enabled to run on boot):
 
 ```
-sudo systemctl start federation-hub
+sudo systemctl restart federation-hub
 sudo systemctl enable federation-hub
 ```
 
@@ -63,8 +143,6 @@ sudo ./federation-hub-ui/scripts/federation-hub-ui.sh
 The Federation Hub consists of three processes: a policy manager, an administrative UI, and a messaging broker. The system service runs all three simultaneously.
 
 ## Client Authentication and Authorization
-
-The Federation Hub authenticates clients using TLS with X.509 client certificates. Scripts for generating a private security enclave, including a Certificate Authority (CA), and certs for use by the Federation Hub are in the TAK server documentation. See the TAK server configuration guide (docs/TAK_Server_Configuration_Guide.pdf) for additional information.
 
 To authorize clients to act as administrators and enable access to the admin UI, use `federation-hub-manager.jar`:
 

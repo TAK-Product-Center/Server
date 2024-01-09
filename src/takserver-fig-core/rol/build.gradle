@@ -28,15 +28,18 @@ apply plugin: 'idea'
 //apply plugin: 'com.github.johnrengelman.shadow'
 
 dependencies {
+
     implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
 
     // antlr dependencies
     antlr 'org.antlr:antlr4:' + antlr_version
 
     // test dependencies
+    testImplementation project(':federation-common')
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jackson_version
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jackson_version
     testImplementation 'junit:junit:' + junit_version
     testImplementation('ch.qos.logback:logback-classic:' + logback_version)
-    testImplementation 'com.google.guava:guava:' +  guava_version
 
     // main dependencies
     api 'com.google.code.gson:gson:' + gson_version
@@ -44,8 +47,6 @@ dependencies {
     api group: 'com.google.code.gson', name: 'gson', version:gson_version
     compileOnly 'org.slf4j:slf4j-api:' + slf4j_version
 
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jackson_version
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jackson_version
 }
 
 def od = new File("${project.buildDir}/generated-src/antlr/main".toString())

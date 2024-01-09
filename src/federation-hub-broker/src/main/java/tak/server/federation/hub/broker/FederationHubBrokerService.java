@@ -5,6 +5,7 @@ import static java.util.Objects.requireNonNull;
 import java.io.FileInputStream;
 import java.math.BigInteger;
 import java.net.SocketAddress;
+import java.rmi.RemoteException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.cert.Certificate;
@@ -47,8 +48,8 @@ import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.apache.ignite.Ignite;
-import org.apache.ignite.binary.BinaryObjectException;
 import org.apache.ignite.cache.query.ContinuousQuery;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;
@@ -105,7 +106,6 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProvider;
 import mil.af.rl.rol.FederationProcessor;
-import mil.af.rl.rol.MissionRolVisitor;
 import mil.af.rl.rol.ResourceOperationParameterEvaluator;
 import mil.af.rl.rol.RolLexer;
 import mil.af.rl.rol.RolParser;
@@ -118,16 +118,19 @@ import tak.server.federation.FederationNode;
 import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.GuardedStreamHolder;
 import tak.server.federation.hub.FederationHubCache;
+import tak.server.federation.hub.broker.db.FederationHubMissionDisruptionManager;
 import tak.server.federation.hub.broker.events.BrokerServerEvent;
 import tak.server.federation.hub.broker.events.HubClientDisconnectEvent;
 import tak.server.federation.hub.broker.events.RestartServerEvent;
+import tak.server.federation.hub.broker.events.StreamReadyEvent;
 import tak.server.federation.hub.broker.events.UpdatePolicy;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
 import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
 import tak.server.federation.hub.ui.graph.PolicyObjectCell;
+import tak.server.federation.rol.MissionRolVisitor;
 
 public class FederationHubBrokerService implements ApplicationListener<BrokerServerEvent> {
-	
+
 	private final Ignite ignite;
 
     private static final String SSL_SESSION_ID = "sslSessionId";
@@ -135,10 +138,15 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 
     private static final Logger logger = LoggerFactory.getLogger(FederationHubBrokerService.class);
 
+    private FederationHubBrokerMetrics fedHubBrokerMetrics;
     private HubConnectionStore hubConnectionStore;
     private FederationHubServerConfig fedHubConfig;
     private FederationHubPolicyManager fedHubPolicyManager;
+    private FederationHubMissionDisruptionManager federationHubMissionDisruptionManager;
     private SSLConfig sslConfig;
+
+    private int numThreads = Runtime.getRuntime().availableProcessors() + 1;
+	private ScheduledExecutorService mfdtScheduler = Executors.newScheduledThreadPool(1);
 
     /* v1 variables. */
     private final Map<String, NioNettyFederationHubServerHandler> v1ClientStreamMap = new ConcurrentHashMap<>();
@@ -151,6 +159,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 
     private SyncService syncService = new FileCacheSyncService();
     private final FederationProcessorFactory federationProcessorFactory = new FederationProcessorFactory();
+    private final FederationHubROLHandler federationHubROLHandler;
 
     private final AtomicBoolean keepRunning = new AtomicBoolean(true);
 
@@ -158,7 +167,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             .newBuilder()
             .setStatus(ServerHealth.ServingStatus.SERVING)
             .build();
-    
+
     private static ServerHealth notConnected = ServerHealth
             .newBuilder()
             .setStatus(ServerHealth.ServingStatus.NOT_CONNECTED)
@@ -167,24 +176,34 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
     // Count messages from all clients, over the lifetime of the server.
     private static final AtomicLong clientMessageCounter = new AtomicLong();
     private static final AtomicLong clientByteAccumulator = new AtomicLong();
-    
+
     private static FederationHubBrokerService instance = null;
-    
+
     public static FederationHubBrokerService getInstance() {
     	return instance;
     }
-    
-    private ContinuousQuery<String, FederationPolicyGraph> continuousConfigurationQuery = new ContinuousQuery<>();
 
-    public FederationHubBrokerService(Ignite ignite, SSLConfig sslConfig, FederationHubServerConfig fedHubConfig, FederationHubPolicyManager fedHubPolicyManager, HubConnectionStore hubConnectionStore) {
+    public ScheduledExecutorService getMfdtScheduler() {
+		return mfdtScheduler;
+	}
+    
+	private ContinuousQuery<String, FederationPolicyGraph> continuousConfigurationQuery = new ContinuousQuery<>();
+
+    public FederationHubBrokerService(Ignite ignite, SSLConfig sslConfig, FederationHubServerConfig fedHubConfig, FederationHubPolicyManager fedHubPolicyManager, HubConnectionStore hubConnectionStore, FederationHubMissionDisruptionManager federationHubMissionDisruptionManager,
+                                      FederationHubBrokerMetrics fedHubBrokerMetrics) {
     	instance = this;
     	this.ignite = ignite;
     	this.sslConfig = sslConfig;
     	this.fedHubConfig = fedHubConfig;
     	this.fedHubPolicyManager = fedHubPolicyManager;
     	this.hubConnectionStore = hubConnectionStore;
+        this.fedHubBrokerMetrics = fedHubBrokerMetrics;
+    	this.federationHubMissionDisruptionManager = federationHubMissionDisruptionManager;
+
+    	federationHubROLHandler = new FederationHubROLHandler(federationHubMissionDisruptionManager);
+
     	setupFederationServers();
-    	
+
     	// rather than hitting ignite every time we need the policy graph,
     	// use event driven approach to always have the updated graph
     	// available here for instant access
@@ -193,16 +212,16 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 	     		federationPolicyGraph = e.getValue();
 	     	}
     	});
-    	
+
     	FederationHubCache.getFederationHubPolicyStoreCache(ignite).query(continuousConfigurationQuery);
     }
-    
+
     private FederationPolicyGraph federationPolicyGraph;
-    
+
     public FederationPolicyGraph getFederationPolicyGraph() {
     	if (federationPolicyGraph == null)
     		federationPolicyGraph = fedHubPolicyManager.getPolicyGraph();
-    	
+
     	return federationPolicyGraph;
     }
 
@@ -217,7 +236,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                     logger.debug("Detected FederatedEvent client stream {} inactivity",
                         clientStreamEntry.getValue().getFederateIdentity());
                 }
-                
+
                 clientStreamEntry.getValue().throwDeadlineExceptionToClient();
                 hubConnectionStore.clearIdFromAllStores(clientStreamEntry.getKey());
             }
@@ -239,20 +258,20 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             channelFuture = null;
         }
     }
-    
+
     public boolean addV1ConnectionInfo(String sessionId, HubConnectionInfo info) {
     	Federate clientNode = getFederationPolicyGraph().getFederate(info.getConnectionId());
         if (clientNode == null) {
         	logger.info("Permission Denied. Federate/CA Group not found in the policy graph: " + info.getConnectionId());
         	return false;
         }
-    	
+
     	info.setGroupIdentities(getFederationPolicyGraph().getFederate(info.getConnectionId()).getGroupIdentities());
         hubConnectionStore.addConnectionInfo(sessionId, info);
-        
+
         return true;
     }
-    
+
     public void removeV1Connection(String sessionId) {
     	v1ClientStreamMap.remove(sessionId);
         hubConnectionStore.clearIdFromAllStores(sessionId);
@@ -394,7 +413,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                                 );
 
                                 v1ClientStreamMap.put(sessionId, handler);
-                                
+
                                 channel.pipeline()
                                     .addLast("ssl", sslHandler)
                                     .addLast(new ByteArrayDecoder())
@@ -499,7 +518,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
     	if (event instanceof HubClientDisconnectEvent) {
     		outgoingClientMap.remove(((HubClientDisconnectEvent) event).getHubId());
     	}
-    	
+
     	if (event instanceof RestartServerEvent) {
     		if (fedHubConfig.isV2Enabled()) {
                 logger.info("Restarting V2 federation server after truststore update");
@@ -516,49 +535,49 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                 sslConfig.initSslContext(fedHubConfig);
                 setupFederationV2Server();
             }
-    		
+
     		Collection<PolicyObjectCell> cells = fedHubPolicyManager.getPolicyCells();
-    		
+
     		List<FederationOutgoingCell> outgoings = new ArrayList<>();
     		if (cells != null) {
     			cells.stream().filter(cell -> cell instanceof FederationOutgoingCell).forEach( cell -> {
     				outgoings.add((FederationOutgoingCell) cell);
     	        });
        		}
-    		
+
     		updateOutgoingConnections(outgoings);
     	}
-    	
+
         if (event instanceof UpdatePolicy) {
         	// when the policy gets updated, the federate nodes from currently connected spokes will be cleared from the graph
         	// they will not get re-added to the graph until a messages comes over the federate. to get around this,
         	// we can re-add them based on their active sessions
-        	
+
         	hubConnectionStore.getClientStreamMap().entrySet().forEach(entry -> {
         		SSLSession session = hubConnectionStore.getSessionMap().get(entry.getKey());
         		if (session != null && session.isValid()) {
         			addFederateToGroupPolicyIfMissingV2(hubConnectionStore.getSessionMap().get(entry.getKey()) ,entry.getValue());
-        			
+
         			// check if the currently connected spoke is still allowed to be connected after the policy change
         			FederationPolicyGraph fpg = getFederationPolicyGraph();
                     Federate clientNode = checkFederateExistsInPolicy(entry.getValue(), session, fpg);
                     if (clientNode == null) {
                      	logger.info("Permission Denied. Federate/CA Group not found in the policy graph: " + entry.getValue().getFederateIdentity());
                      	entry.getValue().throwPermissionDeniedToClient();
-                     	
+
                      	HubFigClient client = outgoingClientMap.get(entry.getKey());
                      	if (client != null)
                      		client.processDisconnect();
-                     	
+
                      	return;
                     }
-        			
+
         		} else {
         			hubConnectionStore.removeSession(entry.getKey());
         		}
         	});
-        	
-        	v1ClientStreamMap.entrySet().forEach(entry -> {	
+
+        	v1ClientStreamMap.entrySet().forEach(entry -> {
     			// check if the currently connected spoke is still allowed to be connected after the policy change
     			FederationPolicyGraph fpg = getFederationPolicyGraph();
                 Federate clientNode = getFederationPolicyGraph().getFederate(entry.getValue().getFederateIdentity());
@@ -568,10 +587,35 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                 }
         	});
 
-        	updateOutgoingConnections(((UpdatePolicy) event).getOutgoings());	
+        	updateOutgoingConnections(((UpdatePolicy) event).getOutgoings());
+        }
+
+        if (event instanceof StreamReadyEvent) {
+        	@SuppressWarnings("rawtypes")
+			StreamReadyEvent streamReadyEvent = (StreamReadyEvent) event;
+
+        	switch (streamReadyEvent.getType()) {
+			case EVENT:
+			{
+				break;
+			}
+			case GROUPS:
+			{
+				break;
+			}
+			case ROL:
+			{
+				@SuppressWarnings("unchecked")
+				List<ROL> rolEvents = streamReadyEvent.getEvents();
+				rolEvents.forEach(r -> this.parseRol(r, streamReadyEvent.getStreamKey()));
+				break;
+			}
+			default:
+				break;
+			}
         }
     }
-    
+
     Map<String, FederationOutgoingCell> outgoingConfigMap = new HashMap<>();
     Map<String, HubFigClient> outgoingClientMap = new HashMap<>();
     Map<String, ScheduledFuture<?>> outgoingClientRetryMap = new HashMap<>();
@@ -584,49 +628,49 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
     			.stream()
     			.filter(future -> future != null)
     			.forEach(future -> future.cancel(true));
-    		
+
     		outgoingClientRetryMap.clear();
-            
+
     		// create a temp map for the updated outgoings
     		Map<String, FederationOutgoingCell> updatedOutgoing = new HashMap<>();
     		outgoings.forEach(outgoing -> {
     			updatedOutgoing.put(outgoing.getProperties().getOutgoingName(), outgoing);
     		});
-           
-            
+
+
             // check existing outgoings against updated outgoings for ones that got deleted
             Iterator<Entry<String, FederationOutgoingCell>> itr = outgoingConfigMap.entrySet().iterator();
             while(itr.hasNext()) {
             	Entry<String, FederationOutgoingCell> outgoing = itr.next();
-            	
+
             	if (updatedOutgoing.get(outgoing.getKey()) == null) {
             		HubFigClient client = outgoingClientMap.get(outgoing.getKey());
             		outgoingClientMap.remove(outgoing.getKey());
-            		
+
             		if (client != null) {
             			client.processDisconnect();
             		}
             	}
             }
-            
+
             // replace the old outgoings configs with the new ones
             outgoingConfigMap.clear();
             outgoingConfigMap.putAll(updatedOutgoing);
-            
+
             // if a new outgoing already has a client, lets stop it so it can be restarted with the updated config
             for (String key: outgoingConfigMap.keySet()) {
             	if (outgoingClientMap.containsKey(key)) {
             		outgoingClientMap.get(key).processDisconnectWithoutRetry();
             	}
             }
-            
+
             // start all the outgoings defined in the policy
             outgoingConfigMap.entrySet().forEach(e -> {
             	try {
             		if (e.getValue().getProperties().isOutgoingEnabled()) {
-            			HubFigClient client = new HubFigClient(fedHubConfig, e.getValue());
+            			HubFigClient client = new HubFigClient(fedHubConfig, federationHubMissionDisruptionManager, e.getValue());
                 		client.start();
-                		outgoingClientMap.put(e.getKey(), client);	
+                		outgoingClientMap.put(e.getKey(), client);
             		}
 				} catch (Exception e1) {
 					logger.error("Error creating hub client", e);
@@ -637,7 +681,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 			logger.error("Error trying to update outgoing connections", e);
 		}
     }
-    
+
     public void scheduleRetry(String name) {
     	fedHubPolicyManager.getPolicyCells().forEach(cell -> {
     		if (cell instanceof FederationOutgoingCell) {
@@ -648,28 +692,28 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
     		}
     	});
     }
-    
+
     public void scheduleRetry(String name, FederationOutgoingCell outgoing) {
     	if (outgoingClientRetryMap.get(name) != null)
     		outgoingClientRetryMap.get(name).cancel(true);
-    	
+
     	if (fedHubConfig.getOutgoingReconnectSeconds() > 0 && outgoing.getProperties().isOutgoingEnabled()) {
     		logger.info("Connection for {} failed. Trying again in {} seconds.", name, fedHubConfig.getOutgoingReconnectSeconds());
     		ScheduledFuture<?> future = retryScheduler.scheduleAtFixedRate(() -> {
         		attemptRetry(name, outgoing);
     		}, fedHubConfig.getOutgoingReconnectSeconds(), fedHubConfig.getOutgoingReconnectSeconds(), TimeUnit.SECONDS);
-        	
+
     		outgoingClientRetryMap.put(name, future);
     	} else {
     		logger.info("Not attempting a retry for {} because the Outgoing Reconnect is not > 0", name);
     	}
     }
-    
+
     private void attemptRetry(String name, FederationOutgoingCell outgoing) {
     	try {
-			HubFigClient client = new HubFigClient(fedHubConfig, outgoing);
+			HubFigClient client = new HubFigClient(fedHubConfig, federationHubMissionDisruptionManager, outgoing);
     		client.start();
-    		outgoingClientMap.put(name, client);	
+    		outgoingClientMap.put(name, client);
     		outgoingClientRetryMap.get(name).cancel(true);
     		outgoingClientRetryMap.remove(name);
 		} catch (Exception e) {
@@ -677,7 +721,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 			attemptRetry(name, outgoing);
 		}
     }
-    
+
     public void setupFederationServers() {
         sslConfig.initSslContext(fedHubConfig);
 
@@ -688,7 +732,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
         if (fedHubConfig.isV1Enabled()) {
             setupFederationV1Server();
         }
-        
+
         retryScheduler.schedule(() -> {
         	 // try to initialize outgoing connections from the saved policy
             List<FederationOutgoingCell> outgoings = fedHubPolicyManager.getPolicyCells()
@@ -696,8 +740,8 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             		.filter(c -> c instanceof FederationOutgoingCell)
             		.map(c -> (FederationOutgoingCell) c)
             		.collect(Collectors.toList());
-            	            	
-            this.updateOutgoingConnections(outgoings); 
+
+            this.updateOutgoingConnections(outgoings);
         }, 5, TimeUnit.SECONDS);
     }
 
@@ -715,7 +759,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
         }
     }
 
-    public void addCaFederateToPolicyGraph(FederateIdentity federateIdentity, Certificate[] caCertArray) {    	
+    public void addCaFederateToPolicyGraph(FederateIdentity federateIdentity, Certificate[] caCertArray) {
         List<String> caCertNames = new LinkedList<>();
 
         /*
@@ -736,9 +780,8 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                 if (logger.isDebugEnabled()) {
                     logger.debug("addCaFederateToPolicyGraph issuerName: " + issuerName);
                 }
-                
-                String groupName = issuerName + "-" +
-                    FederationUtils.getBytesSHA256(caCertArray[i].getEncoded());
+
+                String groupName = issuerName + "-" + FederationUtils.getBytesSHA256(caCertArray[i].getEncoded());
                 caCertNames.add(groupName);
             } catch (CertificateEncodingException e) {
                 logger.error("Could not encode certificate", e);
@@ -758,13 +801,13 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             addCaFederateToPolicyGraph(federateIdentity, certArray);
         }
     }
-    
+
     public void addFederateToGroupPolicyIfMissingV2(SSLSession session, GuardedStreamHolder holder) {
     	hubConnectionStore.addSession(new BigInteger(session.getId()).toString(), session);
         String fedId = holder.getFederateIdentity().getFedId();
-        
+
         FederationPolicyGraph fpg = getFederationPolicyGraph();
-        
+
         if (fpg.getNode(fedId) == null) {
             try {
                 Certificate[] certArray = session.getPeerCertificates();
@@ -774,18 +817,18 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             }
         }
     }
-    
+
     // collect all groups for federates connected to the hub that can reach the given federate
     public FederateGroups getFederationHubGroups(String selfId) {
     	try {
     		// find receivable federates for the given federate
-			Collection<String> receivableFederates = 
+			Collection<String> receivableFederates =
 					getFederationPolicyGraph()
 						.allReceivableFederates(selfId)
 						.stream()
 						.map(f -> f.getFederateIdentity().getFedId())
 						.collect(Collectors.toCollection(HashSet::new));
-						
+
 	    	List<FederateGroups> federatedGroups = hubConnectionStore.getClientGroupStreamMap().entrySet()
 	    			.stream()
 	    			// ignore self groups
@@ -812,7 +855,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 	    				if (federateHops != null) {
 	    					long maxHops = federateHops.getMaxHops();
 	    		    		long currentHops = federateHops.getCurrentHops() + 1;
-	    		    		    		
+
 	    		    		if (currentHops >= maxHops && maxHops != -1) {
 	    		    			return false;
 	    		    		}
@@ -826,29 +869,29 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 	    						.toBuilder()
 	    						.setCurrentHops(g.getFederateHops().getCurrentHops() + 1)
 	    						.build();
-	    				
+
 	    				builder.setFederateHops(hops);
 	    				return builder.build();
 	    			})
 	    			.collect(Collectors.toList());
-	    	
+
 	    		// the reason we must use nested groups here is to maintain the hop limit of each individual FederateGroups object.
 	    	    // all of the group name strings will still be added to getFederateGroupsList() as usual. TAK Servers will still only look at
-	    	    // the getFederateGroupsList(). but federation hubs will look at getNestedGroupsList() before sending to ensure the 
+	    	    // the getFederateGroupsList(). but federation hubs will look at getNestedGroupsList() before sending to ensure the
 	    	    // hop limit has not been reached. (TAK Servers are end of line, so they don't need to check)
 	    		FederateGroups.Builder builder = FederateGroups.newBuilder();
-	    		
+
 	    		federatedGroups.forEach(g -> builder.addNestedGroups(g));
-	    		
-	    		Set<String> federatedGroupsNameSet = 
+
+	    		Set<String> federatedGroupsNameSet =
 	    				federatedGroups
 	    					.stream()
 	    					.map(g->g.getFederateGroupsList())
 	    					.flatMap(list -> list.stream())
 	    					.collect(Collectors.toCollection(HashSet::new));
-	    		
+
 	    		builder.addAllFederateGroups(federatedGroupsNameSet);
-	    			    			
+
 	    		return builder.build();
 		} catch (FederationException e) {
 			logger.error("Could not get Federation Hub Groups", e);
@@ -860,8 +903,8 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 
 		private final FederationHubBrokerService broker = FederationHubBrokerService.this;
         AtomicReference<Long> start = new AtomicReference<>();
-        
-        
+
+
 
 		@Override
 		public void serverFederateGroupsStream(Subscription request, StreamObserver<FederateGroups> responseObserver) {
@@ -874,7 +917,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 				if (clientCertArray.length == 0) {
 					throw new IllegalArgumentException("Client certificate not available");
 				}
-				
+
 				GuardedStreamHolder<FederateGroups> streamHolder = new GuardedStreamHolder<FederateGroups>(
 						responseObserver, request.getIdentity().getName(),
 						FederationUtils.getBytesSHA256(clientCertArray[0].getEncoded()), session, request,
@@ -884,27 +927,27 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 								return ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result();
 							}
 						}, true);
-				
+
 				addFederateToGroupPolicyIfMissingV2(session, streamHolder);
-								
+
                 FederationPolicyGraph fpg = getFederationPolicyGraph();
-	            requireNonNull(fpg, "federation policy graph object");                  
-                
+	            requireNonNull(fpg, "federation policy graph object");
+
 	            Federate clientNode = checkFederateExistsInPolicy(streamHolder, session, fpg);
                 if (clientNode == null) {
                 	responseObserver.onError(new StatusRuntimeException(Status.PERMISSION_DENIED));
                 	return;
                 }
-                
+
 				hubConnectionStore.addGroupStream(id, streamHolder);
 
 				// when a client connects to the hub, indicate a serving status and send it the
 				// current list of groups
-				FederateGroups federateGroups = 
+				FederateGroups federateGroups =
 						 getFederationHubGroups(streamHolder.getFederateIdentity().getFedId()).toBuilder()
 						.setStreamUpdate(ServerHealth.newBuilder().setStatus(ServerHealth.ServingStatus.SERVING).build())
 						.build();
-								
+
 				// do not use the stream holder to send the initial groups.
 				// since this is a handshake, we are expecting groups back,
 				// and the stream holder will attach the provenance, causing
@@ -922,17 +965,17 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 				public void onNext(FederateGroups fedGroups) {
 					SSLSession session = (SSLSession)sslSessionKey.get(Context.current());
 					String id = new BigInteger(session.getId()).toString();
-					
+
 					GuardedStreamHolder<FederatedEvent> holder = hubConnectionStore.getClientStreamMap().get(id);
                 	if (holder != null) {
                 		addFederateToGroupPolicyIfMissingV2(session, hubConnectionStore.getClientStreamMap().get(id));
                 	}
-                	
+
                 	GuardedStreamHolder<FederateGroups> groupHolder = hubConnectionStore.getClientGroupStreamMap().get(id);
                 	if (groupHolder != null) {
                 		addFederateToGroupPolicyIfMissingV2(session, hubConnectionStore.getClientGroupStreamMap().get(id));
                 	}
-                	
+
 					addFederateGroups(id, fedGroups);
 				}
 
@@ -947,10 +990,10 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 
 				@Override
 				public void onCompleted() { }
-				
+
 			};
 		}
-        
+
         @Override
         public void sendOneEvent(FederatedEvent clientEvent, io.grpc.stub.StreamObserver<Empty> emptyReseponse) {
             if (logger.isDebugEnabled()) {
@@ -1041,7 +1084,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             int streamCount = clientEventStreamCounter.incrementAndGet();
 
             SSLSession session = (SSLSession) sslSessionKey.get(Context.current());
-            
+
             GuardedStreamHolder<FederatedEvent> streamHolder = null;
 
             if (!Strings.isNullOrEmpty(subscription.getFilter())) {
@@ -1062,7 +1105,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                 if (clientCertArray.length == 0) {
                     throw new IllegalArgumentException("Client certificate not available");
                 }
-                
+
                 streamHolder = new GuardedStreamHolder<FederatedEvent>(clientStream,
                     clientName, FederationUtils.getBytesSHA256(clientCertArray[0].getEncoded()),
                     session, subscription, new Comparator<FederatedEvent>() {
@@ -1072,19 +1115,19 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                         }
                     }, true
                 );
-                
+
 				addFederateToGroupPolicyIfMissingV2(session, streamHolder);
-                
+
                 FederationPolicyGraph fpg = getFederationPolicyGraph();
-	            requireNonNull(fpg, "federation policy graph object");                  
-                
+	            requireNonNull(fpg, "federation policy graph object");
+
                 Federate clientNode = checkFederateExistsInPolicy(streamHolder, session, fpg);
                 if (clientNode == null) {
                 	logger.info("Permission Denied. Federate/CA Group not found in the policy graph: " + streamHolder.getFederateIdentity());
                 	clientStream.onError(new StatusRuntimeException(Status.PERMISSION_DENIED));
                 	return;
                 }
-                
+
                 // Send contact messages from other clients back to this new client.
                 for (GuardedStreamHolder<FederatedEvent> otherClient : hubConnectionStore.getClientStreamMap().values()) {
 
@@ -1100,7 +1143,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                     FederateEdge edge = fpg.getEdge(otherClientNode, clientNode);
                     if (otherClientNode != null && edge != null) {
                         for (FederatedEvent event : otherClient.getCache()) {
-                        	if (isDestinationReachableByGroupFilter(edge, event.getFederateGroupsList())) {
+                        	if (isDestinationEdgeReachableByGroupFilter(edge, event.getFederateGroupsList())) {
 	                            streamHolder.send(event);
 	                            if (logger.isDebugEnabled()) {
 	                                logger.debug("Sending v2 cached " + event +
@@ -1125,7 +1168,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                  * a new session id.
                  */
             	String sessionId = new BigInteger(session.getId()).toString();
-            	
+
             	HubConnectionInfo info = new HubConnectionInfo();
             	info.setConnectionId(streamHolder.getFederateIdentity().getFedId());
             	info.setRemoteServerId(subscription.getIdentity().getServerId());
@@ -1133,21 +1176,21 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             	info.setLocalConnectionType(Identity.ConnectionType.FEDERATION_HUB_SERVER.toString());
             	info.setFederationProtocolVersion(2);
             	info.setGroupIdentities(getFederationPolicyGraph().getFederate(streamHolder.getFederateIdentity().getFedId()).getGroupIdentities());
-            	
+
             	SocketAddress socketAddress = getCurrentSocketAddress();
-				
+
 				if (socketAddress != null) {
 					info.setRemoteAddress(socketAddress.toString().replace("/", ""));
 				} else {
 					info.setRemoteAddress("");
 				}
-            	
+
                 hubConnectionStore.addConnectionInfo(sessionId, info);
             	hubConnectionStore.addClientStreamHolder(sessionId, streamHolder);
-                
+
                 // send a dummy message to make sure things are initialized
                 streamHolder.send(FederatedEvent.newBuilder().build());
-                
+
                 // if groups for this connection exist, send them here as well incase it failed
                 if (hubConnectionStore.getClientToGroupsMap().get(sessionId) != null) {
                     addFederateGroups(sessionId, hubConnectionStore.getClientToGroupsMap().get(sessionId));
@@ -1202,21 +1245,46 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                         }
                     }, true
                 );
-                
+
 				addFederateToGroupPolicyIfMissingV2(session, rolStreamHolder);
-                
+
                 FederationPolicyGraph fpg = getFederationPolicyGraph();
-	            requireNonNull(fpg, "federation policy graph object");                  
-                
+	            requireNonNull(fpg, "federation policy graph object");
+
 	            Federate clientNode = checkFederateExistsInPolicy(rolStreamHolder, session, fpg);
                 if (clientNode == null) {
                 	clientStream.onError(new StatusRuntimeException(Status.PERMISSION_DENIED));
                 	return;
                 }
-                
+
+                // get the changes, but don't send till we add the rolStream because the stream will get used
+                // down the line for getting the session id
+                FederationHubMissionDisruptionManager.OfflineMissionChanges changes = null;
+
+                if (fedHubConfig.isMissionFederationDisruptionEnabled()) {
+                	changes = federationHubMissionDisruptionManager.getMissionChangesAndTrackConnectEvent(
+                    		rolStreamHolder.getFederateIdentity().getFedId(), session.getPeerCertificates());
+                }
+
                 /* Keep track of client stream and its associated federate identity. */
                 String id = new BigInteger(session.getId()).toString();
                 hubConnectionStore.addRolStream(id, rolStreamHolder);
+
+                AtomicLong delayMs = new AtomicLong(0L);
+                if (changes != null) {
+        			
+        			for(final Entry<ObjectId, ROL.Builder> entry: changes.getResourceRols().entrySet()) {
+        				mfdtScheduler.schedule(() -> {
+        					ROL rol = federationHubMissionDisruptionManager.hydrateResourceROL(entry.getKey(), entry.getValue());
+        					rolStreamHolder.send(rol);
+        				}, delayMs.getAndAdd(500), TimeUnit.MILLISECONDS);
+        			}
+        			for(final ROL rol: changes.getRols()) {
+        				mfdtScheduler.schedule(() -> {
+        					rolStreamHolder.send(rol);
+        				}, delayMs.getAndAdd(100), TimeUnit.MILLISECONDS);
+        			}
+        		}
 
                 logger.info("Client ROL stream added. Count: " + broker.hubConnectionStore.getClientROLStreamMap().size());
 
@@ -1228,23 +1296,29 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
         @Override
         public StreamObserver<ROL> serverROLStream(StreamObserver<Subscription> responseObserver) {
             return new StreamObserver<ROL>() {
-
                 @Override
                 public void onNext(ROL clientROL) {
                 	try {
                         if (logger.isDebugEnabled()) {
                             logger.debug("ROL from client: " + clientROL.getProgram());
                         }
-                                                
+
                         requireNonNull(clientROL, "ROL message from client");
                         requireNonNull(clientROL.getProgram(), "ROL program from client");
-                        
+
                         SSLSession session = (SSLSession) sslSessionKey.get(Context.current());
 
                         String sessionId = new BigInteger(session.getId()).toString();
                         addFederateToGroupPolicyIfMissingV2(session, hubConnectionStore.getClientStreamMap().get(sessionId));
-                        
-                        parseRol(clientROL, sessionId);
+
+                        GuardedStreamHolder<ROL> streamHolder = hubConnectionStore.getClientROLStreamMap().get(sessionId);
+                        // sometimes rol comes in before we're completely ready.
+                        // temporarily cache rol until the stream holder gets added
+                        if (streamHolder == null) {
+                        	hubConnectionStore.cacheRol(clientROL, sessionId);
+                        } else {
+                        	parseRol(clientROL, sessionId);
+                        }
                 	} catch (Exception e) {
 						logger.error("Error with Rol read",e);
 					}
@@ -1272,12 +1346,12 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
         public StreamObserver<FederatedEvent> serverEventStream(StreamObserver<Subscription> responseObserver) {
         	SSLSession session = (SSLSession)sslSessionKey.get(Context.current());
             String id = new BigInteger(session.getId()).toString();
-                        
+
         	Subscription subscription = Subscription.newBuilder()
         			.setFilter("")
         			.setIdentity(Identity.newBuilder().setServerId(fedHubConfig.getFullId()).setType(Identity.ConnectionType.FEDERATION_HUB_SERVER).setName(id).setUid(id).build())
         			.build();
-        	
+
         	responseObserver.onNext(subscription);
 
             return new StreamObserver<FederatedEvent>() {
@@ -1286,7 +1360,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                 public void onNext(FederatedEvent fe) {
                     clientMessageCounter.incrementAndGet();
                     clientByteAccumulator.addAndGet(fe.getSerializedSize());
-                    
+
                     // Add federate to group in case policy was updated during connection
                     GuardedStreamHolder<FederatedEvent> holder = hubConnectionStore.getClientStreamMap().get(id);
                 	if (holder != null) {
@@ -1354,14 +1428,14 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             }
         }
     }
-    
+
     public Federate checkFederateExistsInPolicy(GuardedStreamHolder<?> streamHolder, SSLSession session, FederationPolicyGraph fpg) {
     	Federate clientNode = null;
         try {
             String fedId = streamHolder.getFederateIdentity().getFedId();
-            
+
             clientNode = fpg.getFederate(fedId);
-            
+
             if (logger.isDebugEnabled()) {
                 logger.debug("New client federated event stream client node id: " +
                     streamHolder.getFederateIdentity().getFedId() + " " +
@@ -1387,16 +1461,16 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 
                 SSLSession sslSession = call.getAttributes().get(Grpc.TRANSPORT_ATTR_SSL_SESSION);
                 SocketAddress socketAddress = call.getAttributes().get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR);
-                
+
                 Context context = Context.current()
                 		.withValue(sslSessionKey, sslSession)
                 		.withValue(remoteAddressKey, socketAddress);
-                
+
                 return Contexts.interceptCall(context, call, requestHeaders, next);
             }
         };
     }
-    
+
     private SocketAddress getCurrentSocketAddress() {
     	return remoteAddressKey.get(Context.current());
 	}
@@ -1411,31 +1485,43 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             message.getDestinations().add(new AddressableEntity<>(node.getFederateIdentity()))
         );
     }
-    
+
     public void assignGroupFilteredMessageSourceAndDestinationsFromPolicy(Message message, List<String> groups,
             FederateIdentity federateIdentity) throws FederationException{
     	assignGroupFilteredMessageSourceAndDestinationsFromPolicy(message, groups, federateIdentity,
                 getFederationPolicyGraph());
     }
-    
+
     private void assignGroupFilteredMessageSourceAndDestinationsFromPolicy(Message message, List<String> groups,
             FederateIdentity federateIdentity, FederationPolicyGraph policyGraph)
-            throws FederationException {    	    	
-    	
+            throws FederationException {
+
         message.setSource(new AddressableEntity<FederateIdentity>(federateIdentity));
-        
+
+        getGroupFilteredDestinations(groups, federateIdentity, policyGraph).forEach(node -> {
+        	message.getDestinations().add(new AddressableEntity<>(node.getFederateIdentity()));
+        });
+
+    }
+
+    public static Set<Federate> getGroupFilteredDestinations(List<String> groups,
+            FederateIdentity federateIdentity, FederationPolicyGraph policyGraph)
+            throws FederationException {
+
+    	Set<Federate> reachableGroupFilteredFederates = new HashSet<>();
+
         Set<Federate> destinationNodes = policyGraph.allReachableFederates(federateIdentity.getFedId()).federates;
         Map<FederationNode, FederateEdge> destinationToFederateEdges = policyGraph.allReachableFederates(federateIdentity.getFedId()).getDestinationToFederateEdgeMappings();
         Map<FederationNode, Set<FederateEdge>> destinationToFederateGroupEdges = policyGraph.allReachableFederates(federateIdentity.getFedId()).getDestinationToFederateGroupEdgeMappings();
-        
+
         destinationNodes.stream().forEach(node -> {
-        	// direct edge between two nodes takes top priority for group filtereing
+        	// direct edge between two nodes takes top priority for group filtering
         	if (destinationToFederateEdges.containsKey(node)) {
         		FederateEdge edge = destinationToFederateEdges.get(node);
-        		if (!isDestinationReachableByGroupFilter(edge, groups))
+        		if (!isDestinationEdgeReachableByGroupFilter(edge, groups))
         			return;
         	}
-        	
+
         	// edge between nodes where the source is a CA group takes second priority
         	// if there are multiple CA groups for some reason (intermediate certs?)
         	// make sure all the edges pass
@@ -1443,20 +1529,21 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
         		// if any edges are false, fail the check
         		boolean isNotReachableByGroupsForAllEdges = destinationToFederateGroupEdges.get(node)
         			.stream()
-        			.map(edge -> isDestinationReachableByGroupFilter(edge, groups))
+        			.map(edge -> isDestinationEdgeReachableByGroupFilter(edge, groups))
         			.anyMatch(isDestinationReachableByGroupFilter -> !isDestinationReachableByGroupFilter);
 
         		if (isNotReachableByGroupsForAllEdges)
         			return;
         	}
-        	        	
+
         	// if no edges, they must be interconnected, so skip group filtering
-        	message.getDestinations().add(new AddressableEntity<>(node.getFederateIdentity()));
-        	
+        	reachableGroupFilteredFederates.add(node);
         });
+
+        return reachableGroupFilteredFederates;
     }
-    
-    public static boolean isDestinationReachableByGroupFilter(FederateEdge edge, List<String> groups) {
+
+    public static boolean isDestinationEdgeReachableByGroupFilter(FederateEdge edge, List<String> groups) {
     	// if no groups are attached, and the group filtering isn't set to
     	// allow all messages through, drop the message
     	if (groups == null || groups.isEmpty()) {
@@ -1466,9 +1553,9 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
     			return false;
     		}
     	}
-    	
+
     	Set<String> groupSet = new HashSet<>(groups);
-    	
+
 		switch (edge.getFilterType()) {
 		case ALL: {
 			return true;
@@ -1480,7 +1567,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 			return Sets.intersection(groupSet, edge.getDisallowedGroups()).isEmpty();
 		}
 		case ALLOWED_AND_DISALLOWED: {
-			return !Sets.intersection(groupSet, edge.getAllowedGroups()).isEmpty() && 
+			return !Sets.intersection(groupSet, edge.getAllowedGroups()).isEmpty() &&
 					Sets.intersection(groupSet, edge.getDisallowedGroups()).isEmpty();
 		}
 		default:
@@ -1518,6 +1605,8 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             if (entity.getEntity() instanceof FederateIdentity) {
                 FederateIdentity src = (FederateIdentity)message.getSource().getEntity();
                 FederateIdentity dest = (FederateIdentity)entity.getEntity();
+
+                if (src == dest) continue;
 
                 FederationPolicyGraph policyGraph = getFederationPolicyGraph();
 
@@ -1608,6 +1697,8 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 
                     /* Track message sends for metrics. */
                     clientMessageCounter.incrementAndGet();
+                    recordBrokerMetrics(src, dest, message);
+
                     clientByteAccumulator.addAndGet(event.getSerializedSize());
                 } catch (Exception ex) {
                     logger.error("Exception sending message to client stream", ex);
@@ -1666,12 +1757,12 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                 /* Validate src/dest and nodes. */
                 FederateEdge edge = policyGraph.getEdge(srcNode, destNode);
 
-                
+
                 deliver(message, src, dest);
             }
         }
     }
-    
+
     private void deliverGroup(Message message, FederateIdentity src, FederateIdentity dest) {
         for (Entry<String, GuardedStreamHolder<FederateGroups>> entry : hubConnectionStore.getClientGroupStreamMap().entrySet()) {
             if (entry.getValue().getFederateIdentity().equals(dest)) {
@@ -1691,7 +1782,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             }
         }
     }
-    
+
     private void sendFederatedGroup(Message message) {
         for (AddressableEntity<?> entity : message.getDestinations()) {
             if (entity.getEntity() instanceof FederateIdentity) {
@@ -1709,8 +1800,8 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 
 				FederateGroups updatedGroups = getFederationHubGroups(dest.getFedId()).toBuilder()
 						.addAllFederateProvenance(groups.getFederateProvenanceList())
-						.build();	
-				
+						.build();
+
 				deliverGroup(new Message(new HashMap<>(), new FederatedGroupPayload(updatedGroups)), src, dest);
             }
         }
@@ -1731,7 +1822,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             sendRolMessage(message);
         } else if (message.getPayload().getContent() instanceof FederateGroups) {
         	sendFederatedGroup(message);
-        } 
+        }
         else {
             logger.info("Not handling send to client of " +
                 message.getPayload().getContent().getClass().getSimpleName() +
@@ -1746,7 +1837,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
         	}
     		return;
         }
-    	
+
         Message federatedMessage = new Message(new HashMap<>(),
             new BinaryBlobPayload(event));
         federatedMessage.setMetadataValue(SSL_SESSION_ID, streamKey);
@@ -1764,6 +1855,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                     getFederationPolicyGraph());
 
                 sendMessage(federatedMessage);
+
             } catch (FederationException e) {
                 logger.error("Could not get destinations from policy graph", e);
             }
@@ -1771,21 +1863,12 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
     }
 
     public void handleRead(ROL event, String streamKey) {
-    	if (hasAlreadySeenMessage(event)) {
-    		if (logger.isDebugEnabled()) {
-        		logger.debug("Stopping circular event " + event);
-        	}
-
-    		return;
-        }
-        
         Message federatedMessage = new Message(new HashMap<>(),
             new ROLPayload(event));
         federatedMessage.setMetadataValue(SSL_SESSION_ID, streamKey);
         GuardedStreamHolder<ROL> streamHolder = hubConnectionStore.getClientROLStreamMap().get(streamKey);
         if (streamHolder != null) {
-            federatedMessage.setMetadataValue(FEDERATED_ID_KEY,
-                streamHolder.getFederateIdentity());
+            federatedMessage.setMetadataValue(FEDERATED_ID_KEY, streamHolder.getFederateIdentity());
             try {
             	assignGroupFilteredMessageSourceAndDestinationsFromPolicy(federatedMessage, event.getFederateGroupsList(),
                     streamHolder.getFederateIdentity(),
@@ -1795,10 +1878,10 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                 logger.error("Could not get destinations from policy graph", e);
             }
         } else {
-            logger.error("Could not find stream holder for streamkey: {}", streamKey);   
+            logger.error("Could not find stream holder for streamkey: {}", streamKey);
         }
     }
-    
+
     public void handleRead(FederatedEvent event, String streamKey) {
     	if (hasAlreadySeenMessage(event)) {
     		if (logger.isDebugEnabled()) {
@@ -1806,10 +1889,10 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
         	}
     		return;
         }
-    	
+
         Message federatedMessage = new Message(new HashMap<>(),
             new FederatedEventPayload(event));
-        
+
         federatedMessage.setMetadataValue(SSL_SESSION_ID, streamKey);
 
         GuardedStreamHolder<FederatedEvent> streamHolder = hubConnectionStore.getClientStreamMap().get(streamKey);
@@ -1824,7 +1907,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                             getFederationPolicyGraph());
 
                     sendMessage(federatedMessage);
-                	
+
                     streamHolder.getCache().add(event);
                     if (logger.isDebugEnabled()) {
                         logger.debug("caching " + event +
@@ -1843,45 +1926,45 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                 logger.error("Exception sending message", e);
             }
         } else {
-        	if (logger.isDebugEnabled()) 
+        	if (logger.isDebugEnabled())
         		logger.debug("StreamHolder is null");
         }
     }
-    
+
     private boolean hasAlreadySeenMessage(Object event) {
     	try {
     		List<FederateProvenance> federateProvenances = null;
-        	
-        	
+
+
         	if (event instanceof FederatedEvent) {
         		federateProvenances = ((FederatedEvent) event).getFederateProvenanceList();
         	}
-        	
+
         	if (event instanceof FederateGroups) {
         		federateProvenances = ((FederateGroups) event).getFederateProvenanceList();
         	}
-        	
+
         	if (event instanceof BinaryBlob) {
         		federateProvenances = ((BinaryBlob) event).getFederateProvenanceList();
         	}
-        	
+
         	if (event instanceof ROL) {
         		federateProvenances = ((ROL) event).getFederateProvenanceList();
         	}
-        	
+
         	if (federateProvenances == null) return false;
-        	
+
         	Set<String> visitedHubs = federateProvenances
             		.stream()
             		.map(prov -> prov.getFederationServerId())
             		.collect(Collectors.toSet());
-            
+
            	return visitedHubs.contains(fedHubConfig.getFullId());
     	} catch (Exception e) {
 			return false;
 		}
     }
-    
+
     public void addFederateGroups(String sourceId, FederateGroups groups) {
     	if (hasAlreadySeenMessage(groups)) {
     		if (logger.isDebugEnabled()) {
@@ -1890,12 +1973,12 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 
     		return;
         }
-    	
+
     	hubConnectionStore.putFederateGroups(sourceId, groups);
-        
+
         Message federatedMessage = new Message(new HashMap<>(),new FederatedGroupPayload(groups));
         federatedMessage.setMetadataValue(SSL_SESSION_ID, sourceId);
-        
+
         GuardedStreamHolder<?> holder = hubConnectionStore.getClientGroupStreamMap().containsKey(sourceId) ?
         		hubConnectionStore.getClientGroupStreamMap().get(sourceId) : hubConnectionStore.getClientStreamMap().get(sourceId);
         FederateIdentity ident = holder.getFederateIdentity();
@@ -1909,8 +1992,22 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             logger.error("Could not get destinations from policy graph", e);
         }
     }
-    
-    public void parseRol(ROL clientROL, String id) {
+
+    public void parseRol(ROL clientROL, String streamKey) {
+    	if (hasAlreadySeenMessage(clientROL)) {
+    		if (logger.isDebugEnabled()) {
+        		logger.debug("Stopping circular event " + clientROL);
+        	}
+
+    		return;
+        }
+
+    	handleRead(clientROL, streamKey);
+
+    	// no need to process rol any further if mfd is disabled
+    	if (!fedHubConfig.isMissionFederationDisruptionEnabled())
+    		return;
+
 		try {
             /* Interpret and execute the ROL program. */
             RolLexer lexer = new RolLexer(new ANTLRInputStream(clientROL.getProgram()));
@@ -1935,8 +2032,8 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                     resource.set(res);
                     operation.set(op);
                     parameters.set(params);
-                    
-                    logger.info("Evaluating " + op + " on " + resource + " given " + params);
+
+                    logger.info("Evaluating " + op + " on " + resource);
 
                     return res;
                 }
@@ -1945,9 +2042,11 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             requireNonNull(resource.get(), "resource");
             requireNonNull(operation.get(), "operation");
 
+            GuardedStreamHolder<ROL> streamHolder = hubConnectionStore.getClientROLStreamMap().get(streamKey);
+
             /* Create a federation processor for this ROL type, and process the ROL program. */
             federationProcessorFactory.newProcessor(resource.get(), operation.get(),
-                parameters.get(), id).process(clientROL);
+                parameters.get(), streamKey, streamHolder.getFederateIdentity().getFedId()).process(clientROL);
 
         } catch (Exception e) {
         	logger.error("Exception in ROL parsing " + e.getClass().getName(), e);
@@ -1955,26 +2054,67 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 	}
 
     private class FederationProcessorFactory {
-        FederationProcessor<ROL> newProcessor(String resource, String operation, Parameters parameters, String sessionId) {
-        	return new FederationDefaultProcessor(resource, operation, sessionId);
+		FederationProcessor<ROL> newProcessor(String resource, String operation, Parameters parameters, String streamKey, String federateServerId) {
+			return new FederationMissionProcessor(streamKey, federateServerId);
+		}
+	}
+
+    private class FederationMissionProcessor implements FederationProcessor<ROL> {
+    	private final String streamKey;
+		private final String federateServerId;
+
+		FederationMissionProcessor(String streamKey, String federateServerId) {
+			this.streamKey = streamKey;
+			this.federateServerId = federateServerId;
+		}
+
+		@Override
+		public void process(ROL rol) {
+			try {
+
+				if (federationHubROLHandler != null) {
+					federationHubROLHandler.onNewEvent(rol, streamKey, federateServerId);
+				}
+
+			} catch (RemoteException e) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("exception submitting ROL", e);
+				}
+			}
+		}
+	}
+
+    private void recordBrokerMetrics(FederateIdentity src, FederateIdentity dest, Message message) {
+        FederationPolicyGraph fpg = getFederationPolicyGraph();
+        Federate srcFederate = fpg.getFederate(src.getFedId());
+        Federate destFederate = fpg.getFederate(dest.getFedId());
+        Set<FederateIdentity> srcFederateIdentities = srcFederate.getGroupIdentities();
+        Set<FederateIdentity> destFederateIdentities = destFederate.getGroupIdentities();
+        String srcCert = null;
+        if (!srcFederateIdentities.isEmpty()) {
+            Iterator<FederateIdentity> it = srcFederateIdentities.iterator();
+            srcCert = it.next().getFedId();
+        } else {
+            logger.warn("Failed to get cert for src.");
         }
-        
-        
-        private class FederationDefaultProcessor implements FederationProcessor<ROL> {
-            private final String res;
-            private final String op;
-            private final String sessionId;
-
-            FederationDefaultProcessor(String res, String op, String sessionId) {
-                this.res = res;
-                this.op = op;
-                this.sessionId = sessionId;
+        String destCert = null;
+        if (!destFederateIdentities.isEmpty()) {
+            Iterator<FederateIdentity> it = destFederateIdentities.iterator();
+            destCert = it.next().getFedId();
+        } else {
+            logger.warn("Failed to get cert for dest.");
+        }
+        Payload<?> messagePayload = message.getPayload();
+        long messageLength = -1;
+        if (messagePayload != null) {
+            byte[] messageBytes = messagePayload.getBytes();
+            if (messageBytes != null) {
+                messageLength = messageBytes.length;
             }
-
-            @Override
-            public void process(ROL rol) {
-            	handleRead(rol, sessionId);
-            }
+        }
+        if (srcCert != null && destCert != null && messageLength != -1) {
+            fedHubBrokerMetrics.incrementChannelWrite(src.getFedId(), srcCert, dest.getFedId(), destCert, messageLength);
+            fedHubBrokerMetrics.incrementChannelRead(src.getFedId(), srcCert, dest.getFedId(), destCert, messageLength);
         }
     }
 }

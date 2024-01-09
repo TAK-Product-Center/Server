@@ -4,19 +4,16 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.model.Mission;
-import com.bbn.marti.sync.model.Resource;
-
-import tak.server.cache.MissionCacheResolver;
 
 public interface MissionRepository extends JpaRepository<Mission, Long> {
 	
@@ -25,19 +22,11 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
     @Query(value = missionAttributes + " from mission where lower(name) = lower(:name) order by id desc limit 1", nativeQuery = true)
     Mission getByNameNoCache(@Param("name") String name);
 
-    @Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER,  key="{#root.args[0] + '-byGuid'}", sync = true)
-    @Query(value = missionAttributes + " from mission where lower(name) = lower(:name) order by id desc limit 1", nativeQuery = true)
-    Mission getByName(@Param("name") String name);
-    
     @Query(value = missionAttributes + " from mission where guid = :guid", nativeQuery = true)
     Mission getByGuidNoCache(@Param("guid") UUID guid);
 
-    @Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER,  key="{#root.args[0] + '-byGuid'}", sync = true)
-    @Query(value = missionAttributes + " from mission where guid = :guid", nativeQuery = true)
-    Mission getByGuid(@Param("guid") UUID missionGuid);
-
     Long findMissionIdByName(String name);
-    
+        
     void deleteByName(String name);
     
     @Query(value = "insert into mission_resource (mission_id, resource_id, resource_hash) values (:mission_id, :resource_id, :hash) returning resource_hash", nativeQuery = true)
@@ -84,10 +73,11 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
             + "delete from mission_layer cascade where mission_id = :id ;"
             + "delete from maplayer cascade where mission_id = :id ;"
             + "delete from mission_feed cascade where mission_id = :id ;"
-            + "delete from mission cascade where id = :id returning id;", nativeQuery = true)
+            + "delete from mission cascade where id = :id ;", nativeQuery = true)
+    @Modifying // necessary so that spring doesn't expect a result from the query
+    @Transactional
     void deleteMission(@Param("id") Long missionId);
 
-    @Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, key="{#root.methodName, #root.args[0]}")
     @Query(value = "select uid from mission_uid mu inner join mission m on m.id = mu.mission_id where lower(m.name) = lower(?)", nativeQuery = true)
     List<String> getMissionUids(String missionName);
     

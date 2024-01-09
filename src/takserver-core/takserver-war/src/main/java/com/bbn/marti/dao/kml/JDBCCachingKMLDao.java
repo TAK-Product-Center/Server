@@ -100,7 +100,7 @@ public class JDBCCachingKMLDao implements KMLDao {
 //        if (secAgo > 600) {
 //            slfLogger.debug("secAgo value greater than 10 minutes. Limiting cache TTL to 10 minutes");
 //            ttl = 600;
-//        } else if(secAgo == 0) {
+//        } else if (secAgo == 0) {
 //            ttl = 60;
 //        }
 
@@ -613,13 +613,13 @@ public class JDBCCachingKMLDao implements KMLDao {
     public static void ParseDetailText(CotElement cotElement) {
         slfLogger.debug("cotElement: " + cotElement);
 
-        if(cotElement.detailtext != null) {
+        if (cotElement.detailtext != null) {
             cotElement.hasImage = cotElement.detailtext.contains("image");
-            if(cotElement.detailtext.contains("contact") && cotElement.detailtext.contains(" callsign=\"")) {
+            if (cotElement.detailtext.contains("contact") && cotElement.detailtext.contains(" callsign=\"")) {
                 cotElement.callsign = cotElement.detailtext.substring(
                         cotElement.detailtext.indexOf(" callsign=\"") + " callsign=\"".length(),
                         cotElement.detailtext.indexOf("\"", cotElement.detailtext.indexOf(" callsign=\"") + " callsign=\"".length()));
-            } else if(cotElement.detailtext.contains("contact") && cotElement.detailtext.contains(" callsign=\'")) {
+            } else if (cotElement.detailtext.contains("contact") && cotElement.detailtext.contains(" callsign=\'")) {
                 cotElement.callsign = cotElement.detailtext.substring(
                         cotElement.detailtext.indexOf(" callsign=\'") + " callsign=\'".length(),
                         cotElement.detailtext.indexOf("\'", cotElement.detailtext.indexOf(" callsign=\'") + " callsign=\'".length()));
@@ -808,7 +808,7 @@ public class JDBCCachingKMLDao implements KMLDao {
             cotElement.lon = results.getDouble(2);
             cotElement.lat = results.getDouble(3);
 
-            if(cotElement.lon == 0 && cotElement.lat == 0 && !(results.getString(5).equals("b-m-r"))) {
+            if (cotElement.lon == 0 && cotElement.lat == 0 && !(results.getString(5).equals("b-m-r"))) {
                 // filter out non-routes at 0,0
                 return null;
             }
@@ -1111,12 +1111,12 @@ public class JDBCCachingKMLDao implements KMLDao {
 
     @Override
     public @NotNull String latestCallsign(String uid) {
-        if(uid == null) { return ""; }
+        if (uid == null) { return ""; }
 
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         String query = "SELECT callsign FROM client_endpoint WHERE uid= ? ORDER BY id DESC";
         List<String> results = jdbcTemplate.query(query, new Object[] { uid }, new StringListResultSetExtractor());
-        if(results != null && !results.isEmpty()) {
+        if (results != null && !results.isEmpty()) {
             return results.get(0);
         }
         return "";

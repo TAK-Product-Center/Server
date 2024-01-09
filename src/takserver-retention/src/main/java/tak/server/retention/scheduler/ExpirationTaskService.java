@@ -67,7 +67,7 @@ public class ExpirationTaskService {
     // Remove scheduled task
     public void cancelFutureScheduledTask(String id) {
         ScheduledFuture<?> scheduledTask = scheduledTasks.get(id);
-        if(scheduledTask != null) {
+        if (scheduledTask != null) {
             scheduledTask.cancel(true);
             logger.info("scheduledTask is being cancelled = " + scheduledTask + " the id is " + id);
 

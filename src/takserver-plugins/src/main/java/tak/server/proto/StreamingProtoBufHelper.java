@@ -4,7 +4,10 @@ import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
 import java.util.Date;
 
-import org.dom4j.*;
+import org.dom4j.Attribute;
+import org.dom4j.Document;
+import org.dom4j.DocumentHelper;
+import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -578,7 +581,7 @@ public class StreamingProtoBufHelper {
 
                         // if we see one of the currently defined detail types appear in the xmlDetail section
                         // then the xmlDetail contents shall override whatever appeared in the proto message.
-                        if(0 == name.compareTo(CONTACT)
+                        if (0 == name.compareTo(CONTACT)
                         || 0 == name.compareTo(GROUP)
                         || 0 == name.compareTo(PRECISION_LOCATION)
                         || 0 == name.compareTo(STATUS)

@@ -15,8 +15,10 @@
       <xs:attribute name="modelServerDir" type="xs:string" use="required"/>
       <xs:attribute name="jarName" type="xs:string" use="required"/>
       <xs:attribute name="configFile" type="xs:string" default="CoreConfig.xml"/>
+      <xs:attribute name="TAKIgniteConfigFile" type="xs:string" default="TAKIgniteConfig.xml"/>
       <xs:attribute name="userFile" type="xs:string" default="UserAuthenticationFile.xml"/>
       <xs:attribute name="cleanConfigFile" type="xs:string" default="CoreConfig.example.xml"/>
+      <xs:attribute name="cleanTAKIgniteConfigFile" type="xs:string" default="TAKIgniteConfig.example.xml"/>
       <xs:attribute name="serverFarmDir" type="xs:string" use="required"/>
       <xs:attribute name="certificateDirectory" type="xs:string" use="required"/>
       <xs:attribute name="certToolDirectory" type="xs:string"/>

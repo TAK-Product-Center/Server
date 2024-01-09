@@ -2,7 +2,13 @@
 
 package com.bbn.marti.groups;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
@@ -328,7 +334,7 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         	logger.trace("post-removal " + group + " members: " + group.getNeighbors());
         }
 
-        if(userGroups != null) {
+        if (userGroups != null) {
             // remove group from user -> group map
             userGroups.remove(group);
         }
@@ -561,11 +567,17 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
     }
 
     @Override
-    public void authenticateCoreUsers(String type, String username) {
+    public void authenticateCoreUsers(String username) {
         try {
             for (User user : getAllUsers()) {
                 if (user.getConnectionType() == ConnectionType.CORE && user.getName().equals(username)) {
                     try {
+
+                        String type = "X509";
+                        if (user.getCert() == null) {
+                            type = "oauth";
+                        }
+
                         authenticate(type, user);
                     } catch (Exception e) {
                         logger.error("exception in authenticateCoreUsers for user : " + username, e);
@@ -1018,9 +1030,9 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         
         // duplicate user a
         User b;
-        if(a instanceof AuthenticatedUser) {
+        if (a instanceof AuthenticatedUser) {
             b = new AuthenticatedUser((AuthenticatedUser)a);
-        } else if(a instanceof FederateUser) {
+        } else if (a instanceof FederateUser) {
             b = new FederateUser((FederateUser)a);
         } else {
             logger.error("Got user of unknown type");

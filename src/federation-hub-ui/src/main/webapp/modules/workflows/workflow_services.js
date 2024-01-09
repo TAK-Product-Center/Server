@@ -633,6 +633,17 @@ angular.module('roger_federation.Workflows')
           });
   };
 
+  workflowService.getDataFlowStats = function() {
+    return $http.get(
+      ConfigService.getServerBaseUrlStrV2() + 'getBrokerMetrics/').then(
+        function(res) {
+            return res.data;
+        },
+        function(reason) {
+            throw reason;
+        });
+  };
+
   workflowService.deleteGroupCa = function(ca) {
       return $http.delete(
           ConfigService.getServerBaseUrlStrV2() + 'deleteGroupCa/' + ca).then(

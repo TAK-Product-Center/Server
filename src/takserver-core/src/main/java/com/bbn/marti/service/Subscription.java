@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.collect.Lists;
 import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +17,6 @@ import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.cot.filter.DropEventFilter;
 import com.bbn.cot.filter.GeospatialEventFilter;
 import com.bbn.marti.config.Configuration;
-import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.nio.codec.Codec;
 import com.bbn.marti.nio.protocol.Protocol;
@@ -27,10 +27,9 @@ import com.bbn.marti.util.Tuple;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessageConversionUtil.CotEndpoint;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
-import com.google.common.collect.Lists;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
-import tak.server.Constants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotEventContainer;
 import tak.server.ignite.IgniteHolder;
@@ -40,13 +39,14 @@ public class Subscription extends RemoteSubscription {
 	
 	private static final Logger log = LoggerFactory.getLogger(Subscription.class);
 	
-	protected final Queue<CotEventContainer> messageWriteQueueSize = new CircularFifoQueue<>(DistributedConfiguration.getInstance().getBuffer().getQueue().getMessageWriteQueueSize());
+	protected final Queue<CotEventContainer> messageWriteQueueSize = new CircularFifoQueue<>(
+			CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getMessageWriteQueueSize());
 
 	protected final AtomicBoolean writeComplete = new AtomicBoolean(true);
 
 	private static final String className = Subscription.class.getSimpleName();
 
-	protected final Configuration config = DistributedConfiguration.getInstance().getRemoteConfiguration();
+	protected final Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
 	public static String getClassName() {
 		return className;
@@ -126,7 +126,7 @@ public class Subscription extends RemoteSubscription {
 	}
 
 	public Subscription(CotEndpoint endpoint, int ttl) throws IOException {
-		if(endpoint == null) {
+		if (endpoint == null) {
 			throw new IOException("Error parsing CoT endpoint: " + endpoint);
 		}
 
@@ -232,7 +232,7 @@ public class Subscription extends RemoteSubscription {
 				}
 			}
 		} catch (Exception e) {
-			if(message.getType().compareTo("t-x-d-d") == 0) {
+			if (message.getType().compareTo("t-x-d-d") == 0) {
 				if (log.isTraceEnabled()) {
 					log.trace("Write disconnect to subscription " + this.uid + " failed, cleaning up");
 				}

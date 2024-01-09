@@ -162,7 +162,7 @@ public interface GroupManager {
     /*
      * Finds all active Core users for the current username and reauthenticates them
      */
-    void authenticateCoreUsers(String type, String username);
+    void authenticateCoreUsers(String username);
 
     /**
      * Searches ldap groups (e.g., to help user configure items that require a group distinguished name reference)

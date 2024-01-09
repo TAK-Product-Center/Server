@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
@@ -27,14 +28,12 @@ import org.ism.model.CanAccessResponse;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.groups.UserClassification;
 import tak.server.cache.classification.ClassificationCacheHelper;
+import tak.server.cot.CotEventContainer;
 
 
 public class ClassificationServiceImpl implements ClassificationService {
 
     private static final Logger logger = LoggerFactory.getLogger(ClassificationServiceImpl.class);
-
-    @Autowired
-    private CoreConfig config;
 
     @Autowired
     private ClassificationCacheHelper classificationCacheHelper;
@@ -43,12 +42,26 @@ public class ClassificationServiceImpl implements ClassificationService {
 
 
     public boolean canAccess(UserClassification userClassification, String itemClassification) {
+
+        // if we don't have the item's classification, fallback to network classification
+        if (Strings.isNullOrEmpty(itemClassification)) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("itemClassification not found, using network classification");
+            }
+
+            CoreConfig config = CoreConfigFacade.getInstance();
+            if (config.getRemoteConfiguration().getVbm() != null
+                    && config.getRemoteConfiguration().getVbm().isEnabled()) {
+                itemClassification = config.getRemoteConfiguration().getVbm().getNetworkClassification();
+            }
+       }
+
         // if we don't have enough input, deny access if strict mode enabled
         if (userClassification == null || Strings.isNullOrEmpty(itemClassification)) {
             if (logger.isDebugEnabled()) {
-                logger.debug(("userClassification or itemClassification not found"));
+                logger.debug(("userClassification and/or itemClassification not found"));
             }
-            return !config.getRemoteConfiguration().getVbm().isIsmStrictEnforcing();
+            return !CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isIsmStrictEnforcing();
         }
 
         // see if we have an item itemClassification result for this userClassification
@@ -96,12 +109,31 @@ public class ClassificationServiceImpl implements ClassificationService {
         return result;
     }
 
+    public boolean canAccess(UserClassification userClassification, CotEventContainer cotEventContainer) {
+
+        String itemClassification = null;
+
+        if (!Strings.isNullOrEmpty(cotEventContainer.getAccess())) {
+            itemClassification = cotEventContainer.getAccess();
+
+            if (!Strings.isNullOrEmpty(cotEventContainer.getCaveat())) {
+                itemClassification += "//" + cotEventContainer.getCaveat();
+            }
+
+            if (!Strings.isNullOrEmpty(cotEventContainer.getReleaseableTo())) {
+                itemClassification += "//" + cotEventContainer.getReleaseableTo();
+            }
+        }
+
+        return canAccess(userClassification, itemClassification);
+    }
+
     private Boolean ismCanAccess(UserClassification userClassification, String itemClassification) {
-        if (Strings.isNullOrEmpty(config.getRemoteConfiguration().getVbm().getIsmUrl())) {
+        if (Strings.isNullOrEmpty(CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().getIsmUrl())) {
             if (logger.isDebugEnabled()) {
                 logger.debug("ismUrl is not set");
             }
-            return !config.getRemoteConfiguration().getVbm().isIsmStrictEnforcing();
+            return !CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isIsmStrictEnforcing();
         }
 
         User ismUser = new User();
@@ -132,18 +164,18 @@ public class ClassificationServiceImpl implements ClassificationService {
         if (ismApi == null) {
             RestTemplateBuilder restTemplateBuilder = new RestTemplateBuilder();
 
-            if (config.getRemoteConfiguration().getVbm().getIsmConnectTimeoutSeconds() != -1) {
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().getIsmConnectTimeoutSeconds() != -1) {
                 restTemplateBuilder.setConnectTimeout(Duration.ofSeconds(
-                        config.getRemoteConfiguration().getVbm().getIsmConnectTimeoutSeconds()));
+                        CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().getIsmConnectTimeoutSeconds()));
             }
 
-            if (config.getRemoteConfiguration().getVbm().getIsmReadTimeoutSeconds() != -1) {
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().getIsmReadTimeoutSeconds() != -1) {
                 restTemplateBuilder.setReadTimeout(Duration.ofSeconds(
-                        config.getRemoteConfiguration().getVbm().getIsmReadTimeoutSeconds()));
+                        CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().getIsmReadTimeoutSeconds()));
             }
 
             ApiClient apiClient = new ApiClient(restTemplateBuilder.build());
-            apiClient.setBasePath(config.getRemoteConfiguration().getVbm().getIsmUrl());
+            apiClient.setBasePath(CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().getIsmUrl());
 
             ismApi = new DefaultApi(apiClient);
         }

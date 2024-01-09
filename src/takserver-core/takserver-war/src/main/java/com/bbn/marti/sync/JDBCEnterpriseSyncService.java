@@ -36,6 +36,7 @@ import java.util.logging.Logger;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.commons.lang.StringUtils;
 import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.IntrusionException;
@@ -82,13 +83,10 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	private CacheManager cacheManager;
 
 	@Autowired
-	private CoreConfig coreConfig;
-
-	@Autowired
 	private CommonUtil commonUtil;
 
 	private Cluster clusterConfig;
-	
+
 	@Autowired
 	private RemoteUtil remoteUtil;
 
@@ -96,19 +94,19 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 	@Autowired(required = false)
 	private RetentionPolicyConfig retentionPolicyConfig;
-	
+
 	@Autowired
-	private EnterpriseSyncCacheHelper enterpriseSyncCacheHelper; 
+	private EnterpriseSyncCacheHelper enterpriseSyncCacheHelper;
 
 	@EventListener({ContextRefreshedEvent.class})
 	public void init() throws RemoteException {
-		clusterConfig = coreConfig.getRemoteConfiguration().getCluster();
+		clusterConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster();
 
 		// 0 means false, disable esync cache
-		if (coreConfig.getRemoteConfiguration().getNetwork().getEsyncEnableCache() == 0) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEsyncEnableCache() == 0) {
 			esyncEnableCache = false;
 			logger.info("file cache explicity disabled.");
-		} else if (coreConfig.getRemoteConfiguration().getNetwork().getEsyncEnableCache() > 0) {
+		} else if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEsyncEnableCache() > 0) {
 			// positive value means true, enable cache
 			esyncEnableCache = true;
 			logger.info("file cache explicity enabled.");
@@ -144,7 +142,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		octet_length(StoredType.integer),
 		creatoruid(StoredType.string),
 		tool(StoredType.string),
-	    expiration(StoredType.integer);
+		expiration(StoredType.integer);
 
 		public final StoredType type;
 
@@ -335,10 +333,10 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 			content = validator.getValidFileContent("Storing resource content to DB", content, content.length, false);
 		}
 
-		if (coreConfig.getRemoteConfiguration().getNetwork().isEsyncEnableCotFilter()) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isEsyncEnableCotFilter()) {
 			try {
 				if (Arrays.asList(metadata.getKeywords()).contains("missionpackage")) {
-					String cotFilter = coreConfig.getRemoteConfiguration().getNetwork().getEsyncCotFilter();
+					String cotFilter = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEsyncCotFilter();
 					if (!Strings.isNullOrEmpty(cotFilter)) {
 						content = DataPackageFileBlocker.blockCoT(metadata, content, cotFilter);
 						if (content == null) {
@@ -351,7 +349,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 			}
 		}
 
-		if(metadata.getHash().isEmpty()) {
+		if (metadata.getHash().isEmpty()) {
 			log.fine("No Hash provided, generating one.");
 			// Compute the SHA-256 hash
 			MessageDigest msgDigest = null;
@@ -460,69 +458,69 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 				int columnIndex = 2;
 				for (TypeValuePair toStore : metadataColumns) {
 					switch (toStore.type) {
-					case decimal:
-						if (toStore.value == null) {
-							statement.setNull(columnIndex, java.sql.Types.DECIMAL);
-						} else {
-							double number = Double.parseDouble(((String[])toStore.value)[0]);
-							statement.setDouble(columnIndex, number);
-						}
-						break;
-					case geometry:
-						// Should not be present in columnToFieldMap, so forget it
-						break;
-					case integer:
-						if (toStore.value == null) {
-							statement.setNull(columnIndex, java.sql.Types.INTEGER);
-						} else {
-							statement.setInt(columnIndex, Integer.parseInt(((String[])toStore.value)[0]));
-						}
-						break;
-					case string:
-						if (toStore.value == null) {
-							statement.setNull(columnIndex, java.sql.Types.VARCHAR);
-						} else {
-							statement.setString(columnIndex, ((String[])toStore.value)[0]);
-						}
-						break;
-					case stringArray:
-						if (toStore.value == null) {
-							statement.setNull(columnIndex, java.sql.Types.ARRAY);
-						} else {
-							statement.setArray(columnIndex,
-									queryHelper.createArrayOf("varchar", (String[])toStore.value, connection));
-						}
-						break;
-					case timestamp:
-						if (toStore.value == null) {
-							statement.setNull(columnIndex, java.sql.Types.TIMESTAMP);
-						} else {
-
-							SimpleDateFormat sdf = new SimpleDateFormat(Constants.COT_DATE_FORMAT);
-
-							sdf.setTimeZone(new SimpleTimeZone(0, "UTC"));
-
-							try {
-
-								if (logger.isDebugEnabled()) {
-									logger.debug("timestamp type " + toStore.value.getClass().getName() + " value: " + toStore.value);
-								}
-
-								String submissionTime = ((String[]) toStore.value)[0];
-
-								if (!Strings.isNullOrEmpty(submissionTime)) {
-
-									Timestamp ts = new Timestamp(sdf.parse(submissionTime).getTime());
-
-									statement.setTimestamp(columnIndex, ts);
-								}
-							} catch (Exception e) {
-								log.fine("exception storing timestamp " + e.getMessage());
+						case decimal:
+							if (toStore.value == null) {
+								statement.setNull(columnIndex, java.sql.Types.DECIMAL);
+							} else {
+								double number = Double.parseDouble(((String[])toStore.value)[0]);
+								statement.setDouble(columnIndex, number);
 							}
-						}
-						break;
-					default:
-						throw new IllegalArgumentException("Cannot store type " + toStore.type.toString());
+							break;
+						case geometry:
+							// Should not be present in columnToFieldMap, so forget it
+							break;
+						case integer:
+							if (toStore.value == null) {
+								statement.setNull(columnIndex, java.sql.Types.INTEGER);
+							} else {
+								statement.setInt(columnIndex, Integer.parseInt(((String[])toStore.value)[0]));
+							}
+							break;
+						case string:
+							if (toStore.value == null) {
+								statement.setNull(columnIndex, java.sql.Types.VARCHAR);
+							} else {
+								statement.setString(columnIndex, ((String[])toStore.value)[0]);
+							}
+							break;
+						case stringArray:
+							if (toStore.value == null) {
+								statement.setNull(columnIndex, java.sql.Types.ARRAY);
+							} else {
+								statement.setArray(columnIndex,
+										queryHelper.createArrayOf("varchar", (String[])toStore.value, connection));
+							}
+							break;
+						case timestamp:
+							if (toStore.value == null) {
+								statement.setNull(columnIndex, java.sql.Types.TIMESTAMP);
+							} else {
+
+								SimpleDateFormat sdf = new SimpleDateFormat(Constants.COT_DATE_FORMAT);
+
+								sdf.setTimeZone(new SimpleTimeZone(0, "UTC"));
+
+								try {
+
+									if (logger.isDebugEnabled()) {
+										logger.debug("timestamp type " + toStore.value.getClass().getName() + " value: " + toStore.value);
+									}
+
+									String submissionTime = ((String[]) toStore.value)[0];
+
+									if (!Strings.isNullOrEmpty(submissionTime)) {
+
+										Timestamp ts = new Timestamp(sdf.parse(submissionTime).getTime());
+
+										statement.setTimestamp(columnIndex, ts);
+									}
+								} catch (Exception e) {
+									log.fine("exception storing timestamp " + e.getMessage());
+								}
+							}
+							break;
+						default:
+							throw new IllegalArgumentException("Cannot store type " + toStore.type.toString());
 					}
 					columnIndex++;
 				}
@@ -649,7 +647,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		}
 
 		commonUtil.validateMetadata(metadata);
-		
+
 		try {
 			StringBuilder queryBuilder = new StringBuilder();
 			List<TypeValuePair> metadataColumns = new LinkedList<TypeValuePair>();
@@ -1075,7 +1073,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 				if (spatialConstraints != null) {
 					if (atleastOne) {
 						sqlQuery.append("AND ");
-                    }
+					}
 					if (spatialConstraints instanceof PGbox) {
 						PGpoint[] points = ((PGbox) spatialConstraints).point;
 						sqlQuery.append("ST_SetSRID(ST_MakeBox2D(ST_Point(");
@@ -1333,16 +1331,16 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		if (Strings.isNullOrEmpty(groupVector)) {
 			throw new IllegalArgumentException("empty group vector");
 		}
-		
+
 		FileWrapper file = enterpriseSyncCacheHelper.getFileByHash(hash);
-		
+
 		logger.debug("get file {} {} ", hash, (file == null || file.getContents() == null) ? "not found" : (file.getContents().length + " bytes"));
-		
+
 		// not found
 		if (file == null || file.getContents() == null) {
 			return null;
 		}
-		
+
 		if (Strings.isNullOrEmpty(file.getGroupVector())) {
 			throw new IllegalArgumentException("empty group vector in file for hash " + hash);
 		}
@@ -1351,11 +1349,11 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 			// not allowed
 			return null;
 		}
-		
+
 		// found and allowed
 		return file.getContents();
 	}
-	
+
 	/**
 	 * Gets the content of an Enterprise Sync object. This searches the full resource table vs the latest resource
 	 * view. Latest resource is used to back the getContentByHash function and will only return a match for a hash
@@ -1658,5 +1656,5 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	private boolean isCacheEsync() {
 		return esyncEnableCache || (clusterConfig.isEnabled() && clusterConfig.isKubernetes());
 	}
-	
+
 }

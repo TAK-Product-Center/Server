@@ -4,14 +4,16 @@ package com.bbn.marti;
 
 import java.io.IOException;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.Validator;
@@ -73,14 +75,15 @@ public abstract class EsapiServlet extends HttpServlet {
 
 		String parameterName = null;
 		try {
-			validator.assertValidHTTPRequestParameterSet(context, request, requiredHttpParameters.keySet(), 
-					optionalHttpParameters.keySet());
+			ValidatorUtils.assertValidHTTPRequestParameterSet(context, request.getParameterMap().keySet(), requiredHttpParameters.keySet(),
+					optionalHttpParameters.keySet(), validator);
+			
 			Enumeration<String> parameters = request.getParameterNames();
 			while (parameters.hasMoreElements()) {
 				parameterName = parameters.nextElement();
 				boolean required = true;
 				HttpParameterConstraints parameter = requiredHttpParameters.get(parameterName);
-				if(parameter == null) {
+				if (parameter == null) {
 					parameter = optionalHttpParameters.get(parameterName);
 					required = false;
 				}

@@ -9,21 +9,22 @@ import java.util.EventListener;
 import java.util.Map;
 import java.util.Set;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterRegistration;
-import javax.servlet.RequestDispatcher;
-import javax.servlet.Servlet;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRegistration;
-import javax.servlet.SessionCookieConfig;
-import javax.servlet.SessionTrackingMode;
-import javax.servlet.ServletRegistration.Dynamic;
-import javax.servlet.descriptor.JspConfigDescriptor;
+import jakarta.servlet.Filter;
+import jakarta.servlet.FilterRegistration;
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.Servlet;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRegistration;
+import jakarta.servlet.SessionCookieConfig;
+import jakarta.servlet.SessionTrackingMode;
+import jakarta.servlet.ServletRegistration.Dynamic;
+import jakarta.servlet.descriptor.JspConfigDescriptor;
 
 import org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.embedded.EmbeddedWebServerFactoryCustomizerAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.autoconfigure.websocket.servlet.WebSocketMessagingAutoConfiguration;
 import org.springframework.boot.autoconfigure.websocket.servlet.WebSocketServletAutoConfiguration;
@@ -46,7 +47,7 @@ import tak.server.Constants;
  * services that are only used in separate messaging process
  */
 @Configuration
-@EnableAutoConfiguration(exclude = {WebMvcAutoConfiguration.class, WebSocketMessagingAutoConfiguration.class, WebSocketServletAutoConfiguration.class, SecurityAutoConfiguration.class, ManagementWebSecurityAutoConfiguration.class})
+@EnableAutoConfiguration(exclude = {WebMvcAutoConfiguration.class, WebSocketMessagingAutoConfiguration.class, WebSocketServletAutoConfiguration.class, SecurityAutoConfiguration.class, ManagementWebSecurityAutoConfiguration.class, EmbeddedWebServerFactoryCustomizerAutoConfiguration.class})
 @Profile({Constants.MESSAGING_PROFILE_NAME})
 public class MessagingOnlyConfiguration {
 
@@ -142,26 +143,26 @@ public class MessagingOnlyConfiguration {
 				return null;
 			}
 
-			@Override
-			public Servlet getServlet(String name) throws ServletException {
-				return null;
-			}
-
-			@Override
-			public Enumeration<Servlet> getServlets() {
-				return null;
-			}
-
-			@Override
-			public Enumeration<String> getServletNames() {
-				return null;
-			}
+//			@Override
+//			public Servlet getServlet(String name) throws ServletException {
+//				return null;
+//			}
+//
+//			@Override
+//			public Enumeration<Servlet> getServlets() {
+//				return null;
+//			}
+//
+//			@Override
+//			public Enumeration<String> getServletNames() {
+//				return null;
+//			}
 
 			@Override
 			public void log(String msg) { }
 
-			@Override
-			public void log(Exception exception, String msg) { }
+//			@Override
+//			public void log(Exception exception, String msg) { }
 
 			@Override
 			public void log(String message, Throwable throwable) { }
@@ -248,17 +249,17 @@ public class MessagingOnlyConfiguration {
 			}
 
 			@Override
-			public javax.servlet.FilterRegistration.Dynamic addFilter(String filterName, String className) {
+			public jakarta.servlet.FilterRegistration.Dynamic addFilter(String filterName, String className) {
 				return null;
 			}
 
 			@Override
-			public javax.servlet.FilterRegistration.Dynamic addFilter(String filterName, Filter filter) {
+			public jakarta.servlet.FilterRegistration.Dynamic addFilter(String filterName, Filter filter) {
 				return null;
 			}
 
 			@Override
-			public javax.servlet.FilterRegistration.Dynamic addFilter(String filterName, Class<? extends Filter> filterClass) {
+			public jakarta.servlet.FilterRegistration.Dynamic addFilter(String filterName, Class<? extends Filter> filterClass) {
 
 				return null;
 			}

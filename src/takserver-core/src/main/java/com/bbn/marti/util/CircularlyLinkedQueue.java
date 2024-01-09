@@ -355,7 +355,7 @@ public class CircularlyLinkedQueue<E> implements List<E> {
 	*/
 	@Override
 	public boolean addAll(int index, Collection<? extends E> coll) {
-		if(index < 0 || index > size()) throw new IndexOutOfBoundsException();
+		if (index < 0 || index > size()) throw new IndexOutOfBoundsException();
 		else if (index == size()) return addAll(coll); // defer to simple tail append
 
 		// build new circular queue, returns tail

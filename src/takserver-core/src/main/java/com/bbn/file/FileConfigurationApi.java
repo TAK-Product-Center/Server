@@ -8,7 +8,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.bbn.marti.service.DistributedConfiguration;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+
 
 @Validated
 @RestController
@@ -21,7 +22,7 @@ public class FileConfigurationApi {
     public FileConfigurationModel getFileConfiguration() {
     	
     	try {
-    		int uploadSizeLimit = DistributedConfiguration.getInstance().getNetwork().getEnterpriseSyncSizeLimitMB();
+    		int uploadSizeLimit = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
     		FileConfigurationModel config = new FileConfigurationModel();
     		config.setUploadSizeLimit(uploadSizeLimit);			
 			return config;
@@ -39,8 +40,8 @@ public class FileConfigurationApi {
     	}
     	
     	try {
-			DistributedConfiguration.getInstance().getNetwork().setEnterpriseSyncSizeLimitMB(fileConfigurationModel.getUploadSizeLimit());
-			DistributedConfiguration.getInstance().saveChangesAndUpdateCache();
+			CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().setEnterpriseSyncSizeLimitMB(fileConfigurationModel.getUploadSizeLimit());
+			CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
 		} catch (Exception e) {
 			logger.error("Error in setFileConfiguration: ", e);
 			throw new RuntimeException(e);

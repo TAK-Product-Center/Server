@@ -5,8 +5,6 @@ package com.bbn.marti.groups;
 import java.io.Serializable;
 import java.security.cert.CertificateParsingException;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -16,11 +14,14 @@ import javax.naming.NamingException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 
+import com.google.common.base.Strings;
+
 import io.jsonwebtoken.JwtException;
+
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.oauth2.common.exceptions.OAuth2Exception;
+import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 
 import com.bbn.marti.config.Auth.Ldap;
 import com.bbn.marti.config.Input;
@@ -38,15 +39,13 @@ import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.remote.util.X509UsernameExtractor;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.Resources;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.xml.bindings.UserAuthenticationFile;
 import com.bbn.tak.tls.TakCert;
 import com.bbn.tak.tls.repository.TakCertRepository;
-import com.google.common.base.Strings;
-import com.google.common.collect.Sets;
 
 import tak.server.cache.ActiveGroupCacheHelper;
 
@@ -68,9 +67,10 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
 
     TakCertRepository takCertRepository;
 
-    Ldap ldapConf = DistributedConfiguration.getInstance().getAuth().getLdap();
+    Ldap ldapConf = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap();
 
-    private final X509UsernameExtractor usernameExtractor = new X509UsernameExtractor(DistributedConfiguration.getInstance().getAuth().getDNUsernameExtractorRegex());
+    private final X509UsernameExtractor usernameExtractor = new X509UsernameExtractor(
+            CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getDNUsernameExtractorRegex());
     
 
     public static synchronized X509Authenticator getInstance() {
@@ -126,8 +126,8 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
             String certFingerprint = RemoteUtil.getInstance().getCertSHA256Fingerprint(user.getCert());
 
         	TakCert cert = null;
-            if (DistributedConfiguration.getInstance().getAuth().isX509CheckRevocation() ||
-                DistributedConfiguration.getInstance().getAuth().isX509TokenAuth()) {
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509CheckRevocation() ||
+                    CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509TokenAuth()) {
                 cert = takCertRepository.findOneByHash(certFingerprint);
                 if (cert != null && cert.getRevocationDate() != null) {
                     throw new RevokedException("Attempt to use revoked certificate : " +
@@ -135,12 +135,12 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                 }
             }
 
-            if (DistributedConfiguration.getInstance().getAuth().isX509TokenAuth() &&
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509TokenAuth() &&
                     cert != null && cert.token != null && cert.token.length() > 0) {
                 user.setName(cert.token);
                 try {
                     groupManager.authenticate("oauth", user);
-                } catch (OAuth2Exception | JwtException e) {
+                } catch (InvalidBearerTokenException | JwtException e) {
                     if (logger.isDebugEnabled()) {
                         logger.debug("{} {} ", e.getMessage(), cert.token);
                     }
@@ -179,7 +179,7 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                 }
             }
 
-            switch (DistributedConfiguration.getInstance().getRemoteConfiguration().getAuth().getDefault().toLowerCase(Locale.ENGLISH)) {
+            switch (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getDefault().toLowerCase(Locale.ENGLISH)) {
             case "file": 
             case "ldap":
 
@@ -189,11 +189,11 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
 
                 // enable group cache if enabled by the admin in CoreConfig and the client certificate
                 // contains the channels ext key usage attribute (using Challenge Password OID)
-                if (DistributedConfiguration.getInstance().getAuth().isX509UseGroupCache()) {
+                if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509UseGroupCache()) {
                     try {
                         useGroupCache =
                                 user.getCert().getExtendedKeyUsage().contains("1.2.840.113549.1.9.7") ||
-                                !DistributedConfiguration.getInstance().getAuth().isX509UseGroupCacheRequiresExtKeyUsage();
+                                !CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509UseGroupCacheRequiresExtKeyUsage();
                     } catch (CertificateParsingException cpe) {
                         logger.error("exception getting cert's extendedKeyUsage", cpe);
                     }
@@ -224,7 +224,18 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                             for (Group group : groups) {
                                 hydrated.add(groupManager.hydrateGroup(group));
                             }
-                            assignGroupsCheckCache(hydrated, user, username);
+
+                            if (activeGroupCacheHelper.assignGroupsCheckCache(hydrated, user, username)) {
+                                // notify the user that their cache has been updated
+                                try {
+                                    DistributedSubscriptionManager.getInstance().sendGroupsUpdatedMessage(username, null);
+                                } catch (Exception e) {
+                                    if (logger.isDebugEnabled()) {
+                                        logger.debug("exception calling sendGroupsUpdatedMessage!", e);
+                                    }
+                                }
+                            }
+
                         } else {
                             groupManager.updateGroups(user, groups);
                         }
@@ -234,7 +245,7 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                 // Assign LDAP groups for this users based on LDAP lookup by username.
                 // if the LDAP authenticator is configured, use it to assign groups for the user, using the service credentials. Can be disabled by setting the x509groups option to false.
                 try {
-                    if (ldapConf != null && DistributedConfiguration.getInstance().getAuth().isX509Groups() && ldapConf.isX509Groups()) {
+                    if (ldapConf != null && CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509Groups() && ldapConf.isX509Groups()) {
 
                         try {
                             String cn = usernameExtractor.extractUsername(user.getCert());
@@ -297,7 +308,16 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                                     readOnly = LdapAuthenticator.getInstance().groupNamesToGroups(
                                             groupNames, ldapGroups);
 
-                                    assignGroupsCheckCache(ldapGroups, user, username);
+                                    if (activeGroupCacheHelper.assignGroupsCheckCache(ldapGroups, user, username)) {
+                                        // notify the user that their cache has been updated
+                                        try {
+                                            DistributedSubscriptionManager.getInstance().sendGroupsUpdatedMessage(username, null);
+                                        } catch (Exception e) {
+                                            if (logger.isDebugEnabled()) {
+                                                logger.debug("exception calling sendGroupsUpdatedMessage!", e);
+                                            }
+                                        }
+                                    }
 
                                 } else {
                                     readOnly = LdapAuthenticator.getInstance().assignGroups(
@@ -310,7 +330,7 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                             }
 
                             if (ldapConf.isX509AddAnonymous() &&
-                                    DistributedConfiguration.getInstance().getAuth().isX509AddAnonymous()) {
+                                    CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509AddAnonymous()) {
                             	doAnonAssignment(user, readOnly);
                             }
 
@@ -326,7 +346,7 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                     try {
                         if (groupManager.getGroups(user).isEmpty()) {
 
-                            if (DistributedConfiguration.getInstance().getAuth().isX509GroupsDefaultRDN()) {
+                            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509GroupsDefaultRDN()) {
                                 doRDNAssignment(user);
                             }
 
@@ -352,7 +372,7 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
 
                 break;
             default:
-                throw new UnsupportedOperationException("default auth method " + DistributedConfiguration.getInstance().getRemoteConfiguration().getAuth().getDefault() + " not supported");
+                throw new UnsupportedOperationException("default auth method " + CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getDefault() + " not supported");
             }
         } catch (IllegalStateException e) {
 
@@ -403,69 +423,6 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
         } catch (Exception e) {
             logger.error("exception in doRDNAssignment", e);
         }
-    }
-
-    public void assignGroupsCheckCache(Set<Group> groups, User user, String username) {
-
-        // check to see if we have any cache entries for the current username
-        List<Group> activeGroups = activeGroupCacheHelper.getActiveGroupsForUser(username);
-        if (activeGroups == null) {
-            activeGroups = new LinkedList<>();
-        }
-
-        // recreate as a full LinkedList to support delete (cant delete on list coming from cache)
-        activeGroups = new LinkedList<>(activeGroups);
-
-        // keep track of this user even if there are no groups
-        groupManager.addUser(user);
-
-        // find groups that need to get removed from the cache
-        Set<Group> cacheGroups = new ConcurrentSkipListSet<>(activeGroups);
-        Set<Group> removals = Sets.difference(cacheGroups, groups);
-        activeGroups.removeAll(removals);
-
-        // find groups that need to get added to the cache
-        Set<Group> adds = Sets.difference(groups, cacheGroups);
-        activeGroups.addAll(adds);
-
-        for (Group group : adds) {
-            group.setActive(false);
-        }
-
-        // if we only have one group, make sure its active
-        if (activeGroups.size() == 1) {
-            activeGroups.get(0).setActive(true);
-            // need to check case when size=2 for IN/OUT groups with same name
-        } else if (activeGroups.size() == 2 && activeGroups.get(0).getName().equals(activeGroups.get(1).getName())) {
-            activeGroups.get(0).setActive(true);
-            activeGroups.get(1).setActive(true);
-        }
-
-        // update the cache if required
-        if (adds.size() > 0 || removals.size() > 0) {
-            activeGroupCacheHelper.setActiveGroupsForUser(username, activeGroups);
-
-            // notify the user that their cache has been updated
-            try {
-                DistributedSubscriptionManager.getInstance().sendGroupsUpdatedMessage(username, null);
-            } catch (Exception e) {
-                if (logger.isDebugEnabled()) {
-                    logger.debug("exception calling sendGroupsUpdatedMessage!", e);
-                }
-            }
-        }
-
-        // remove any inactive cache entries prior to push the groups to the user
-        Iterator<Group> activeGroupIter = activeGroups.iterator();
-        while (activeGroupIter.hasNext()) {
-            Group activeGroup = activeGroupIter.next();
-            if (!activeGroup.getActive()) {
-                activeGroupIter.remove();
-            }
-        }
-
-        // do the group updates based on this set of groups
-        groupManager.updateGroups(user, new ConcurrentSkipListSet<>(activeGroups));
     }
 
     // Using the superclass only for its thread pool

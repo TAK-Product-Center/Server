@@ -40,6 +40,10 @@ TAK_CLUSTER_NODE_COUNT = os.environ['TAK_CLUSTER_NODE_COUNT']
 AWS_ECR_URI = ''
 TAK_PLUGINS = os.environ['TAK_PLUGINS']
 
+# How many pods to multiply the count by for all tak services
+TAK_POD_MULTIPLIER = 3
+# The percentage of pods to allocate to the messaging service
+TAK_POD_MESSAGING_PERCENTAGE = .667
 
 # RDS DB Config
 TAK_DB_USERNAME = os.environ['TAK_DB_USERNAME']
@@ -157,9 +161,10 @@ def modEksClusterConfig():
 	save_yaml(CLUSTER_CONFIG_FILE, eks_yaml)
 
 def adjustDeploymentsByNumberOfNodes():
-	max_tak_pods = int(TAK_CLUSTER_NODE_COUNT) * 3
+	max_tak_pods = int(TAK_CLUSTER_NODE_COUNT) * TAK_POD_MULTIPLIER
 
-	total_msg = math.floor(max_tak_pods * .667)
+	# Negating one to account for configuration pod
+	total_msg = math.floor(max_tak_pods * TAK_POD_MESSAGING_PERCENTAGE - 1)
 	total_loadbalancer = int(round(total_msg / 5, 0))
 
 	loadbalancer_yaml = load_yaml(LOAD_BALANCER_DEPLOYMENT_FILE)
@@ -453,13 +458,22 @@ def generateTakseverCertificates():
 def addCoreConfigMap():
 	fp = os.path.join(CLUSTER_HOME_DIR, 'CoreConfig.xml')
 	if not os.path.isfile(fp):
-		printJson('No CoreConfig.source.xml found. It should be located in the root of the cluster directory!')
+		printJson('No CoreConfig.xml found. It should be located in the root of the cluster directory!')
 		sys.exit(1)
 
-	print('Loading CoreConfig.source.xml found in cluster root into the cluster ConfigMap.')
+	print('Loading CoreConfig.xml found in cluster root into the cluster ConfigMap.')
 	config_map_cmd = 'kubectl create configmap core-config --from-file="' + fp + '" --dry-run=client -o yaml >' + CLUSTER_HOME_DIR +  '/deployments/helm/templates/core-config.yaml'
 	runCmd(config_map_cmd)
 
+def addIgniteConfigMap():
+	fp = os.path.join(CLUSTER_HOME_DIR, 'TAKIgniteConfig.xml')
+	if not os.path.isfile(fp):
+		printJson('No TAKIgniteConfig.xml found. It should be located in the root of the cluster directory!')
+		sys.exit(1)
+
+	print('Loading TAKIgniteConfig.xml found in cluster root into the cluster ConfigMap.')
+	config_map_cmd = 'kubectl create configmap tak-ignite-config --from-file="' + fp + '" --dry-run=client -o yaml >' + CLUSTER_HOME_DIR +  '/deployments/helm/templates/tak-ignite-config.yaml'
+	runCmd(config_map_cmd)
 
 # Deploy Takserver Core
 def publishTakserverCoreImages():
@@ -470,6 +484,7 @@ def publishTakserverCoreImages():
 	if cmd_status == 0:
 		build_dependent_dockerfiles_cmd = ('cd ' + CLUSTER_HOME_DIR + ' && docker build -t ' + AWS_ECR_URI + ':messaging-provisioned -f docker-files/Dockerfile.takserver-messaging --build-arg TAKSERVER_IMAGE_REPO=' + AWS_ECR_URI + ' .'
 						  + ' && docker build -t ' + AWS_ECR_URI + ':api-provisioned -f docker-files/Dockerfile.takserver-api --build-arg TAKSERVER_IMAGE_REPO=' + AWS_ECR_URI + ' .'
+						  + ' && docker build -t ' + AWS_ECR_URI + ':config-provisioned -f docker-files/Dockerfile.takserver-config --build-arg TAKSERVER_IMAGE_REPO=' + AWS_ECR_URI + ' .'
 						 + ' && docker push ' + AWS_ECR_URI + ' --all-tags')
 
 		build_dependent_dockerfiles_cmd_status = runCmd(build_dependent_dockerfiles_cmd)
@@ -657,10 +672,18 @@ def validate_helm_deployment():
 	installHelmChart(True)
 
 def installHelmChart(dry_run=False):
-	max_tak_pods = int(TAK_CLUSTER_NODE_COUNT) * 3
+	max_tak_pods = int(TAK_CLUSTER_NODE_COUNT) * TAK_POD_MULTIPLIER
 
-	total_msg = math.floor(max_tak_pods * .667)
-	total_api = max_tak_pods - total_msg
+	# Negating one to account for configuration pod
+	total_msg = math.floor(max_tak_pods * TAK_POD_MESSAGING_PERCENTAGE - 1)
+
+	# If plugins are enabled negate one more pod from the msg process to account for it
+	if TAK_PLUGINS == '1':
+		total_msg = total_msg - 1
+
+	# Allocate the remaining pods to api minus one for the config service
+	total_api = max_tak_pods - total_msg - 1
+
 	total_ignite = max(1, int(round(total_msg / 5, 0)))
 	total_nats = max(1, int(round(total_msg / 5, 0)))
 	password = runCmd("aws ecr get-login-password")
@@ -686,8 +709,10 @@ def installHelmChart(dry_run=False):
 	        + ' -f ' + PROPERTIES_FILE
 			+ ' --set certConfigMapName=' + configmap
 			+ ' --set takserver.plugins.enabled=' + str(TAK_PLUGINS == '1')
+			+ ' --set takserver.config.replicas=1'
 			+ ' --set takserver.messaging.replicas=' + str(total_msg)
 			+ ' --set takserver.api.replicas=' + str(total_api)
+			+ ' --set takserver.config.image.repository=' + AWS_ECR_URI
 			+ ' --set takserver.messaging.image.repository=' + AWS_ECR_URI
 			+ ' --set takserver.api.image.repository=' + AWS_ECR_URI
 			+ ' --set takserver.plugins.image.repository=' + AWS_ECR_URI
@@ -726,6 +751,8 @@ if __name__ == '__main__':
 		generateTakseverCertificates()
 		print("\n---------- Adding CoreConfigMap ----------")
 		addCoreConfigMap()
+		print("\n---------- Adding IgniteConfigMap ----------")
+		addIgniteConfigMap()
 		print("\n---------- Publishing Takserver Core Docker Images ----------")
 		publishTakserverCoreImages()
 		if TAK_PLUGINS == '1':

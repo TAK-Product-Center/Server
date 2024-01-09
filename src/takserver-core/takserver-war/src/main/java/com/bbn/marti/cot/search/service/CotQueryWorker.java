@@ -32,7 +32,7 @@ import com.bbn.marti.cot.search.model.CotSearchStatus;
 import com.bbn.marti.cot.search.model.query.Column;
 import com.bbn.marti.cot.search.model.query.DeliveryProtocol;
 import com.bbn.marti.cot.search.model.query.ImageOption;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.google.common.base.Strings;
 
 /**

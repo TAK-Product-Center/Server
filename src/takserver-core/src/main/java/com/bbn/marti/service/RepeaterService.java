@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.concurrent.TimeUnit;
 
+import com.bbn.marti.config.Configuration;
 import org.apache.log4j.Logger;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
@@ -16,7 +17,6 @@ import org.dom4j.Node;
 import org.dom4j.XPath;
 
 import com.bbn.marti.config.Repeater;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -25,6 +25,7 @@ import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.repeater.DistributedRepeaterManager;
 import com.bbn.marti.util.Tuple;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 
@@ -58,7 +59,6 @@ public class RepeaterService extends BaseService {
 	// ** internal logic
 	private DistributedRepeaterManager repeaterManager;
 	private BrokerService brokerService;
-	private CoreConfig coreConfig;
 	private GroupManager groupManager;
 
 	// ** configuration driven
@@ -67,13 +67,12 @@ public class RepeaterService extends BaseService {
 	private Map<String, Tuple<String, String>> repeatableTypes = new HashMap<String, Tuple<String, String>>();
 	private ThreadLocal<HashMap<String, XPath>> xpathMap = new ThreadLocal<HashMap<String, XPath>>();
 
-	public RepeaterService(CoreConfig coreConfig, BrokerService brokerService, GroupManager groupManager, DistributedRepeaterManager repeaterMgr) {
+	public RepeaterService(BrokerService brokerService, GroupManager groupManager, DistributedRepeaterManager repeaterMgr) {
 		this.brokerService = brokerService;
-		this.coreConfig = coreConfig;
 		this.groupManager = groupManager;
 		this.repeaterManager = repeaterMgr;
 
-		Repeater repeater = DistributedConfiguration.getInstance().getRepeater();
+		Repeater repeater = CoreConfigFacade.getInstance().getRemoteConfiguration().getRepeater();
 		maxAllowedRepeatables = repeater.getMaxAllowedRepeatables();
 		repeaterManager.setPeriodMillis(repeater.getPeriodMillis());
 
@@ -85,7 +84,7 @@ public class RepeaterService extends BaseService {
 	}
 
 	private void loadRepeatableTypesFromConfig() {
-		List<Repeater.RepeatableType> repeatableTypeObjects = coreConfig.getRemoteConfiguration().getRepeater().getRepeatableType();
+		List<Repeater.RepeatableType> repeatableTypeObjects = CoreConfigFacade.getInstance().getRemoteConfiguration().getRepeater().getRepeatableType();
 		for(Repeater.RepeatableType repeatableType : repeatableTypeObjects) {
 			String initiateTest = repeatableType.getInitiateTest();
 			String cancelTest = repeatableType.getCancelTest();
@@ -140,7 +139,7 @@ public class RepeaterService extends BaseService {
 		// ** not. An applicable message is one that either initiates a repeating treatment, or cancels such treatment.
 		// ** All other messages are ignored by this service.
 		Tuple<Boolean, String> isInitiateMsg = isRepeatInitiatorMessage(cotMsg);
-		if(isInitiateMsg.left()) {
+		if (isInitiateMsg.left()) {
 
 
 
@@ -168,7 +167,7 @@ public class RepeaterService extends BaseService {
 		        throw new TakException(e);
 		    }
 
-			if(hasRoomInQueueFor(cotMsg)) {
+			if (hasRoomInQueueFor(cotMsg)) {
 				repeaterManager.addMessage(cotMsg, isInitiateMsg.right());
 				return true;
 			} else {
@@ -180,8 +179,8 @@ public class RepeaterService extends BaseService {
 				LOGGER.error("No room to store received repeatable message of type: " + isInitiateMsg.right() + ". Details follow: " + safeMessage);
 				return false;
 			}
-		} else if(isRepeatCancellationMessage(cotMsg)) {
-			if(repeaterManager.removeMessage(cotMsg.getUid(), false)) {
+		} else if (isRepeatCancellationMessage(cotMsg)) {
+			if (repeaterManager.removeMessage(cotMsg.getUid(), false)) {
 				LOGGER.debug("Cancelling repeater treatment for " + cotMsg.getUid());
 				return true;
 			} else {
@@ -270,11 +269,12 @@ public class RepeaterService extends BaseService {
 	 * This is the core logic that is executed on a periodic basis. It results in all repeatable messages being disseminated.
 	 */
 	private void executePeriodicTask() {
-		if (active && coreConfig.getRemoteConfiguration().getRepeater().isEnable()) {
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+		if (active && config.getRepeater().isEnable()) {
 			for (CotEventContainer cotMsg : repeaterManager.getMessages()) {
 				long now = System.currentTimeMillis();
 				cotMsg.setTime(DateUtil.toCotTime(now));
-				cotMsg.setStale(DateUtil.toCotTime(now + coreConfig.getRemoteConfiguration().getRepeater().getStaleDelayMillis()));
+				cotMsg.setStale(DateUtil.toCotTime(now + config.getRepeater().getStaleDelayMillis()));
 
 				if (LOGGER.isDebugEnabled()) {
 					LOGGER.debug("submitted repeated message to broker service: " + cotMsg);
@@ -301,7 +301,7 @@ public class RepeaterService extends BaseService {
 
 				long now = System.currentTimeMillis();
 				cotMsg.setTime(DateUtil.toCotTime(now));
-				cotMsg.setStale(DateUtil.toCotTime(now + coreConfig.getRemoteConfiguration().getRepeater().getStaleDelayMillis()));
+				cotMsg.setStale(DateUtil.toCotTime(now + config.getRepeater().getStaleDelayMillis()));
 				cotMsg.setType("b-a-o-can");
 
 				String callsign = cotMsg.getCallsign();

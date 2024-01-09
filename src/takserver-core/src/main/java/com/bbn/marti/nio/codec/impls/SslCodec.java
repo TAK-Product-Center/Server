@@ -21,6 +21,9 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 
+import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.Lists;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +41,6 @@ import com.bbn.marti.remote.ConnectionStatus;
 import com.bbn.marti.remote.ConnectionStatusValue;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.ConnectionInfo;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SSLConfig;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.util.Assertion;
@@ -49,8 +51,8 @@ import com.bbn.marti.util.concurrent.future.AsyncFutures;
 import com.bbn.marti.util.concurrent.future.SettableAsyncFuture;
 import com.bbn.roger.fig.FederationUtils;
 
-import com.google.common.collect.ComparisonChain;
-import com.google.common.collect.Lists;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+
 /**
 * An implementation of SSL over TCP, implemented at the application layer
 *
@@ -366,7 +368,7 @@ public class SslCodec implements ByteCodec, Comparable<SslCodec> {
 
 	        List<ByteBuffer> reads = new LinkedList<ByteBuffer>();
 			ByteBuffer incoming;
-			if(leftovers == null) {
+			if (leftovers == null) {
 				incoming = buf;
 			} else {
 				incoming = ByteUtils.concat(leftovers, buf);
@@ -383,7 +385,7 @@ public class SslCodec implements ByteCodec, Comparable<SslCodec> {
 	            } catch (Exception e) {
 	                //log.warn("Exception encountered in ssl codec -- read", spelunkToBottomOfExceptionChain(e));
 	                Exception root = spelunkToBottomOfExceptionChain(e);
-					if(root instanceof javax.crypto.BadPaddingException) {
+					if (root instanceof javax.crypto.BadPaddingException) {
 						leftovers = incoming;
 					} else {
 						trySetFederateDisabled(e);
@@ -692,7 +694,6 @@ public class SslCodec implements ByteCodec, Comparable<SslCodec> {
     private X509Certificate getPeerCert() throws SSLPeerUnverifiedException {
 
         java.security.cert.Certificate[] certs = sslEngine.getSession().getPeerCertificates();
-        javax.security.cert.X509Certificate[] certChain = sslEngine.getSession().getPeerCertificateChain();
 
         if (certs == null || certs.length == 0) {
             log.warn("no local client client certs available from SSLEngine");
@@ -707,7 +708,7 @@ public class SslCodec implements ByteCodec, Comparable<SslCodec> {
         // pick the first cert
 
         Certificate cert = certs[0];
-        if(certs.length > 1) {
+        if (certs.length > 1) {
 			connectionInfo.setCaCert((X509Certificate) certs[1]);
 		}
         // The SSLEngine (always?) produces certs as the "lightly" deprecated  javax.security.cert.X509Certificate type.  Convert these to the newer java.security.cert.X509Certificate type instead.
@@ -742,7 +743,7 @@ public class SslCodec implements ByteCodec, Comparable<SslCodec> {
 
 	public Exception spelunkToBottomOfExceptionChain(Throwable e) {
 	    
-		if(e.getCause() != null) {
+		if (e.getCause() != null) {
 			return spelunkToBottomOfExceptionChain(e.getCause());
 		}
 		return (Exception) e;
@@ -773,7 +774,7 @@ public class SslCodec implements ByteCodec, Comparable<SslCodec> {
 	        }
 	        
 	        // detect whether this is a federate based on which TLS config object is used
-	        if (tlsConfig.equals(DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getTls())) {
+	        if (tlsConfig.equals(CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getTls())) {
 	            DistributedFederationManager fedManager = DistributedFederationManager.getInstance();
 
 	            List<FederationOutgoing> outgoings = fedManager.getOutgoingConnections(connectionInfo.getAddress(), connectionInfo.getPort());;
