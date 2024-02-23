@@ -1,15 +1,37 @@
 package com.bbn.marti.takcl.AppModules;
 
 import com.bbn.marti.takcl.AppModules.generic.AppModuleInterface;
-import com.bbn.marti.takcl.*;
+import com.bbn.marti.takcl.TAKCLCore;
+import com.bbn.marti.takcl.TakclIgniteHelper;
+import com.bbn.marti.takcl.TestConfiguration;
+import com.bbn.marti.takcl.TestExceptions;
+import com.bbn.marti.takcl.TestLogger;
 import com.bbn.marti.takcl.cli.EndUserReadableException;
 import com.bbn.marti.takcl.cli.simple.Command;
 import com.bbn.marti.takcl.config.common.TakclRunMode;
 import com.bbn.marti.test.shared.AbstractSingleServerTestClass;
 import com.bbn.marti.test.shared.AbstractTestClass;
-import com.bbn.marti.tests.*;
+import com.bbn.marti.tests.FedHubTests;
+import com.bbn.marti.tests.FederationV1Tests;
+import com.bbn.marti.tests.FederationV2Tests;
+import com.bbn.marti.tests.GeneralTests;
+import com.bbn.marti.tests.GenerateOpenApiSpec;
+import com.bbn.marti.tests.InputTests;
+import com.bbn.marti.tests.PluginStartupTests;
+import com.bbn.marti.tests.PointToPointTests;
+import com.bbn.marti.tests.StartupTests;
+import com.bbn.marti.tests.StreamingDataFeedsTests;
+import com.bbn.marti.tests.SubscriptionTests;
+import com.bbn.marti.tests.UserManagementTests;
+import com.bbn.marti.tests.WebsocketsFederationTests;
+import com.bbn.marti.tests.WebsocketsTests;
 import com.bbn.marti.tests.federationmissions.FederationEnterpriseFileSync;
-import com.bbn.marti.tests.missions.*;
+import com.bbn.marti.tests.missions.EnterpriseFileSync;
+import com.bbn.marti.tests.missions.MissionAddRetrieveRemove;
+import com.bbn.marti.tests.missions.MissionDataFlowTests;
+import com.bbn.marti.tests.missions.MissionFileSync;
+import com.bbn.marti.tests.missions.MissionUserCustomRolesTests;
+import com.bbn.marti.tests.missions.MissionUserDefaultRolesTests;
 import com.cloudbees.junit.runner.App;
 import org.apache.commons.io.IOUtils;
 import org.apache.tools.ant.taskdefs.optional.junit.XMLJUnitResultFormatter;
@@ -35,11 +57,22 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static com.bbn.marti.takcl.config.common.TakclRunMode.*;
+import static com.bbn.marti.takcl.config.common.TakclRunMode.LOCAL_SERVER_INTERACTION;
+import static com.bbn.marti.takcl.config.common.TakclRunMode.REMOTE_SERVER_INTERACTION;
+import static com.bbn.marti.takcl.config.common.TakclRunMode.LOCAL_SOURCE_INTERACTION;
 
 /**
  * Created on 6/16/16.
@@ -56,6 +89,7 @@ public class TestRunnerModule implements AppModuleInterface {
 			FederationV1Tests.class,
 			FederationV2Tests.class,
 			GeneralTests.class,
+			GenerateOpenApiSpec.class,
 			InputTests.class,
 			StartupTests.class,
 			PluginStartupTests.class,

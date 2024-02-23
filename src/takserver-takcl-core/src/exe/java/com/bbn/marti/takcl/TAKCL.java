@@ -1,6 +1,16 @@
 package com.bbn.marti.takcl;
 
-import com.bbn.marti.takcl.AppModules.*;
+import com.bbn.marti.takcl.AppModules.BashHelperModule;
+import com.bbn.marti.takcl.AppModules.CotGeneratorModule;
+import com.bbn.marti.takcl.AppModules.EnvironmentHelperModule;
+import com.bbn.marti.takcl.AppModules.OfflineConfigModule;
+import com.bbn.marti.takcl.AppModules.OfflineFileAuthModule;
+import com.bbn.marti.takcl.AppModules.OnlineFileAuthModule;
+import com.bbn.marti.takcl.AppModules.OnlineInputModule;
+import com.bbn.marti.takcl.AppModules.TAKCLConfigModule;
+import com.bbn.marti.takcl.AppModules.TAKClientModule;
+import com.bbn.marti.takcl.AppModules.TestEnumGeneratorModule;
+import com.bbn.marti.takcl.AppModules.TestRunnerModule;
 import com.bbn.marti.takcl.AppModules.generic.BaseAppModuleInterface;
 import com.bbn.marti.takcl.cli.simple.SimpleMain;
 

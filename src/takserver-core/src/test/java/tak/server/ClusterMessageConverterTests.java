@@ -89,7 +89,7 @@ public class ClusterMessageConverterTests {
 
 		byte[] clusterMessageBytes = converter.cotToDataMessage(chatCot);
 
-		CotEventContainer chatCotDeserialized = converter.dataMessageToCot(clusterMessageBytes);
+		CotEventContainer chatCotDeserialized = converter.dataMessageToCot(clusterMessageBytes, false);
 
 		org.junit.Assert.assertTrue("GeoChat.ANDROID-358982072593830.Green.2b4fb2c4-300d-41e6-9df3-f21b597b87e3".equals(chatCotDeserialized.getUid()));
 	}

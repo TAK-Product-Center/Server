@@ -60,13 +60,14 @@ dependencies {
   implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
 
   implementation group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: jaxb_glassfish_version
-  implementation group: 'org.glassfish.jaxb', name: 'jaxb-core', version: jaxb_glassfish_core_version
-  implementation group: 'javax.activation', name: 'activation', version: javax_activation_version
+  implementation group: 'org.glassfish.jaxb', name: 'jaxb-core', version: jaxb_glassfish_version
+  //implementation group: 'javax.activation', name: 'activation', version: javax_activation_version
 
   jaxb group: 'org.glassfish.jaxb', name: 'jaxb-xjc', version: jaxb_glassfish_version
-  jaxb group: 'org.glassfish.jaxb', name: 'jaxb-core', version: jaxb_glassfish_core_version
+  jaxb group: 'org.glassfish.jaxb', name: 'jaxb-core', version: jaxb_glassfish_version
   jaxb group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: jaxb_glassfish_version
-  jaxb group: 'javax.activation', name: 'activation', version: javax_activation_version
+  //jaxb group: 'javax.activation', name: 'activation', version: javax_activation_version
+  jaxb group: 'jakarta.activation', name: 'jakarta.activation-api', version: jakarta_activation_api_version
 
   api group: 'com.google.guava', name: 'guava', version: guava_version
   api group: 'com.intellij', name: 'annotations', version: intellij_annotations_version // IntelliJ @NotNull annotation
@@ -74,7 +75,10 @@ dependencies {
   implementation group: 'jaxen', name: 'jaxen', version: jaxen_version
   implementation group: 'joda-time', name: 'joda-time', version: joda_version
   implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+  implementation group: 'ch.qos.logback.contrib', name: 'logback-json-classic', version: logback_jackson_version
   api group: 'org.springframework', name: 'spring-context', version: spring_version
+
+  api group: 'commons-io', name: 'commons-io', version: commons_io_version
 
   // apache ignite (cache and distributed service grid)
   api group: 'org.apache.ignite', name: 'ignite-indexing', version: ignite_version
@@ -93,6 +97,12 @@ dependencies {
   // grab the xerces sax parser
   testImplementation group: 'xerces', name: 'xercesImpl', version: xerces_version
   testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  
+  implementation group: 'jakarta.persistence', name: 'jakarta.persistence-api', version: jakarta_persistence_api_version
+
+  implementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
+  api group: 'com.beust', name: 'jcommander', version: jcommander_version
+
 }
 
 sourceSets {

@@ -212,9 +212,7 @@ public class Component extends AbstractComponent
         {
             slotElement.addElement( "put" ).setText( url.toExternalForm() );
             slotElement.addElement( "get" ).setText( url.toExternalForm() );
-        }
-        else
-        {
+        } else {
             slotElement.addElement( "put" ).addAttribute( "url", url.toExternalForm() );
             slotElement.addElement( "get" ).addAttribute( "url", url.toExternalForm() );
         }

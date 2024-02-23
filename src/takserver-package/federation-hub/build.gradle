@@ -49,6 +49,7 @@ task copyFedHubJars(type: Copy) {
 task copyFedHubScripts(type: Copy) {
     from getRootProject().subprojects.collect { "${it.projectDir}/scripts" }
     include 'federation-hub*'
+    include 'db/'
     into "$buildDir/artifacts/scripts"
 }
 
@@ -56,6 +57,18 @@ task copyFedHubScripts(type: Copy) {
 task copyCertScripts(type: Copy) {
     from project(':takserver-core').file('scripts/certs')
     into "$buildDir/artifacts/certs"
+}
+
+task copySELinuxPolicy(type: Copy) {
+    from project(':takserver-core').file('scripts/utils')
+    include 'takserver-policy.te'
+    into "$buildDir/artifacts"
+}
+
+task copySELinuxScript(type: Copy) {
+    from project(':takserver-core').file('scripts')
+    include 'apply-selinux.sh'
+    into "$buildDir/artifacts"
 }
 
 // RPM pre-install script.
@@ -90,6 +103,7 @@ if [ -d "/opt/tak/federation-hub/configs" ] ; then
     mkdir -p /opt/tak/federation-hub/backup-configs
     cp -fr /opt/tak/federation-hub/configs/* /opt/tak/federation-hub/backup-configs/
 fi
+
 '''
 
 // RPM post-install script.
@@ -104,12 +118,18 @@ fi
 
 chown -fR tak:tak /opt/tak/federation-hub/configs
 
+# Set permissions on selinux configuration files and scripts.
+chmod 544 /opt/tak/federation-hub/*.sh
+
 # Set permissions on configuration files and scripts.
 chmod 644 /opt/tak/federation-hub/configs/*.xml 
 chmod 644 /opt/tak/federation-hub/configs/*.yml
 
 chmod 544 /opt/tak/federation-hub/scripts/*.sh
 chmod u+w /opt/tak/federation-hub/scripts/*.sh
+
+chmod 544 /opt/tak/federation-hub/scripts/db/*.sh
+chmod u+w /opt/tak/federation-hub/scripts/db/*.sh
 
 # Set permissions on certificate scripts.
 chmod 500 /opt/tak/federation-hub/certs/*.sh
@@ -128,6 +148,9 @@ cp /opt/tak/federation-hub/scripts/federation-hub /etc/init.d
 cp /opt/tak/federation-hub/scripts/federation-hub-broker /etc/init.d
 cp /opt/tak/federation-hub/scripts/federation-hub-policy /etc/init.d
 cp /opt/tak/federation-hub/scripts/federation-hub-ui /etc/init.d
+
+# Add mongo repo to yum
+cp /opt/tak/federation-hub/scripts/db/mongodb-org.repo /etc/yum.repos.d/mongodb-org.repo
 
 # Set up logging directory.
 mkdir -p /opt/tak/federation-hub/logs
@@ -174,7 +197,8 @@ case "$1" in
  0|remove)
         # Delete user if TAK server is not running.
         if [ `service --status-all | grep -Fc 'takserver-messaging'` -eq 0 ] && \
-           [ `service --status-all | grep -Fc 'takserver-api'` -eq 0 ]
+           [ `service --status-all | grep -Fc 'takserver-api'` -eq 0 ] && \
+           [ `service --status-all | grep -Fc 'takserver-config'` -eq 0 ]
         then
             echo "Deleting tak user"
             userdel tak
@@ -208,7 +232,7 @@ boundaries of different networks participating in a TAK deployment. It can be ru
 with or without a co-located TAK server.
 '''
     license = '(c)2013-2021 Raytheon BBN. Licensed to US Government with unlimited rights.'
-    url = 'https://atakmap.com'
+    url = 'https://tak.gov'
     summary = 'Team Awareness Kit (TAK) Federation Hub'
 
     preInstall preinstall_script_federation_hub
@@ -237,6 +261,8 @@ prePackage.dependsOn copyFedHubJars
 prePackage.dependsOn copyFedHubScripts
 prePackage.dependsOn copyCertScripts
 prePackage.dependsOn copyLicense
+prePackage.dependsOn copySELinuxPolicy
+prePackage.dependsOn copySELinuxScript
 
 buildRpm.dependsOn prePackage
 
@@ -275,6 +301,11 @@ task createFedhubDockerLogDir() {
     }
 }
 
+task deleteNonDockerFedhubBrokerConfig(type : Delete) {
+    delete "$buildDir/artifacts/configs/federation-hub-broker.yml"
+    delete "$buildDir/artifacts/configs/federation-hub-broker-docker.yml"
+}
+
 def copyFedhubVersionFile = copyFedhubVersionFileDef()
 def copyFedhubResources = copyFedhubResourcesDef()
 def copyFedhubDocker = copyFedhubDockerDef()
@@ -286,7 +317,7 @@ task constructFedhubDockerZip(type: Zip) {
     dependsOn createVersionFile
     dependsOn createFedhubDockerLogDir
     dependsOn buildRpm
-
+   
     archiveName 'takserver-fedhub-docker-' + version + '.zip'
     duplicatesStrategy 'fail'
     destinationDir(file("$buildDir/distributions"))
@@ -298,4 +329,12 @@ task constructFedhubDockerZip(type: Zip) {
     with copyFedhubDocker.into('docker')
     with copyCertsSetup.into('tak/certs')
     with copyDocsToTopLevel.into('./')
+    
+    dependsOn deleteNonDockerFedhubBrokerConfig
+    
+    from(project(':federation-hub-broker').file('src/main/resources')) {
+    	include('federation-hub-broker-docker.yml')
+		rename('federation-hub-broker-docker.yml', 'federation-hub-broker.yml')
+		into('tak/federation-hub/configs')
+	}
 }

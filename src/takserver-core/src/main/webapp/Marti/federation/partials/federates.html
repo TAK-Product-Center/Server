@@ -110,6 +110,7 @@
 	    <td data-ng-bind="og.protocolVersion"></td>
 	    <td data-ng-bind="og.connectionInfoSummary.connectionStatusValue"></td>
 	    <td data-ng-bind="og.connectionInfoSummary.lastError"></td>
+	    <td><a class="nav" href="#!/modifyOutgoingConnection/{{og.displayName | encodeURIComponent}}">Edit</a></td>
 	    <td><a class="nav" data-ng-click="deleteOutgoingConnection(og.displayName)">Delete</a></td>
 	  </tr>
 	</tbody>

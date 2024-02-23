@@ -17,12 +17,13 @@ import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.Part;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.util.CommonUtil;
 import org.apache.commons.io.IOUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,18 +36,15 @@ import com.google.common.base.Strings;
 
 /**
  * Servlet that accepts POST requests (only) to upload mission packages to the
- * Enterprise Sync database. 
+ * Enterprise Sync database.
  *
  * Requires the parameters "senderuid", "hash", and "filename".
  */
 public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 	public static final String SIZE_LIMIT_VARIABLE_NAME = "EnterpriseSyncSizeLimitMB";
 	private static final long serialVersionUID = -1782550124681449153L;
-	private static final String TAG = "Mission Package Creator Servlet: ";	
+	private static final String TAG = "Mission Package Creator Servlet: ";
 	private final static org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MissionPackageCreatorServlet.class);
-
-	@Autowired
-	private CoreConfig coreConfig;
 
 	@Autowired
 	private SubmissionInterface submission;
@@ -54,7 +52,7 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 	/**
 	 * Required parameter enum for posting a mission package.
 	 * the parameter string is the expected URL argument. The metadata field is where the parameter gets mapped to.
-	 * 
+	 *
 	 * A request is queried by iterating over all of the parameter strings in the enum, and emplacing the param value into the metadata field.
 	 * @note One of the parameters MUST map to a metdata uid field - getUid() is used to query the database for potential collisions.
 	 */
@@ -64,7 +62,7 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 		private final String param; // string value of the param
 		private final Metadata.Field field; // metadata field that this param is entered into
 		private final boolean comp; // flag for indicating whether the param is to be used for distinguishing db-entries
-		private final String defaultValue; // value to be used for the db entry if a parameter is not given 
+		private final String defaultValue; // value to be used for the db entry if a parameter is not given
 
 		// protected constructor
 		PostParameter(String paramName, Metadata.Field metaField, boolean dbComparisonKey, String defaultValue) {
@@ -101,7 +99,7 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 	@Override
 	public void init(final ServletConfig config) throws ServletException {
 		super.init(config);
-		uploadSizeLimitMB = coreConfig.getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
+		uploadSizeLimitMB = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
 	}
 
 	@Override
@@ -117,7 +115,7 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 	}
 
 	private static String ensureEndsIn(final String str, final String end) {
-		if(!str.endsWith(end))
+		if (!str.endsWith(end))
 			return str + end;
 		return str;
 	}
@@ -149,10 +147,10 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 	private static String[] getContacts(HttpServletRequest request) throws IOException, ServletException {
 		// Get the list of people to send an advertisement to (OPTIONAL)
 		String[] contacts = request.getParameterValues("contacts");
-		if(contacts == null || contacts.length == 0) {
+		if (contacts == null || contacts.length == 0) {
 			List<String> contactList = new LinkedList<String>();
 			for(Part part : request.getParts()) {
-				if(part.getName().equalsIgnoreCase("contacts")) {
+				if (part.getName().equalsIgnoreCase("contacts")) {
 					try(InputStream in = part.getInputStream()) {
 						StringWriter writer = new StringWriter();
 						IOUtils.copy(in, writer);
@@ -166,8 +164,8 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 	}
 
 	@Override
-	public void doPost(HttpServletRequest request, HttpServletResponse response) 
-			throws ServletException, IOException 
+	public void doPost(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException
 	{
 
 		String groupVector = null;
@@ -196,13 +194,13 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 			logger.debug("Uploading multi-part content with " + parts.size() + " parts.");
 			String firstFilename = null;
 			for(Part part : parts) {
-				if("assetfile".equalsIgnoreCase(part.getName()) ||
+				if ("assetfile".equalsIgnoreCase(part.getName()) ||
 						"resource".equalsIgnoreCase(part.getName()))
 				{
 					try (InputStream payloadIn = part.getInputStream()){
 						String filename = getFileNameFromPart(part);
-						if(firstFilename == null) firstFilename = filename;
-						if(filename != null && filename.length() > 0 && payloadIn != null) {
+						if (firstFilename == null) firstFilename = filename;
+						if (filename != null && filename.length() > 0 && payloadIn != null) {
 							zip.putNextEntry(new ZipEntry(filename));
 							IOUtils.copy(payloadIn, zip);
 							payloadIn.close();
@@ -257,7 +255,7 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 
 			// Make sure the ZIP file ends in .zip
 			String zipFileName = toStore.getFirst(Metadata.Field.Name);
-			if(zipFileName == null || zipFileName.isEmpty()) {
+			if (zipFileName == null || zipFileName.isEmpty()) {
 				zipFileName = firstFilename + ".zip";
 			}
 			zipFileName = ensureEndsIn(zipFileName, ".zip");
@@ -276,7 +274,7 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 			// Get contacts to send to
 			String[] contacts = getContacts(request);
 
-			if(contacts != null && contacts.length > 0) {
+			if (contacts != null && contacts.length > 0) {
 				logger.debug("Sending to the following contacts: " );
 				for(String contact : contacts) {
 					logger.debug(" `- " + contact);
@@ -285,9 +283,9 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 				// Generate the CoT message
 				String cotMessage = CommonUtil.getFileTransferCotMessage(
 						/*String uid*/ shaHash, // yes: set the UID to be the hash, this makes it consistent with ATAK-generated mission packages
-						/*String shaHash*/ shaHash, 
+						/*String shaHash*/ shaHash,
 						/*String callsign*/  SecurityContextHolder.getContext().getAuthentication().getName(),
-						/*String filename*/ uploadedMetadata.getFirst(Metadata.Field.Name), 
+						/*String filename*/ uploadedMetadata.getFirst(Metadata.Field.Name),
 						/*String url*/ url,
 						/*long sizeInBytes*/ zippedBytes.length,
 						/*String[] contacts*/ contacts);
@@ -301,7 +299,7 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 
 					logger.error("error submitting mission package announce message " + exi.getMessage());
 
-					response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
+					response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
 							"Could not connect to Marti Core to send Mission Package to desired contacts.");
 					exi.printStackTrace();
 					return;

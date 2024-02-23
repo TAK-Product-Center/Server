@@ -5,7 +5,10 @@ import tak.server.federation.hub.ui.GroupHolder;
 import tak.server.federation.hub.ui.StringEdge;
 import tak.server.federation.hub.ui.UidHolder;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class FederationPolicy {

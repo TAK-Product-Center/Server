@@ -20,7 +20,7 @@ public class IgniteHolder {
 	private String igniteStringId = null;
 	
 	private IgniteHolder() {
-		ignite = Ignition.getOrStart(IgniteConfigurationHolder.getInstance().getConfiguration());
+		ignite = Ignition.getOrStart(IgniteConfigurationHolder.getInstance().getIgniteConfiguration());
 
 		ignite.cluster().active(true);
 	}

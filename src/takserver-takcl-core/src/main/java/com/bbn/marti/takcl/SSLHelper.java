@@ -5,6 +5,9 @@ import com.bbn.marti.takcl.AppModules.TAKCLConfigModule;
 import com.bbn.marti.takcl.cli.EndUserReadableException;
 import com.bbn.marti.test.shared.data.users.AbstractUser;
 import com.bbn.marti.test.shared.data.users.BaseUsers;
+
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -14,9 +17,20 @@ import org.slf4j.LoggerFactory;
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
-import javax.net.ssl.*;
-import javax.xml.bind.DatatypeConverter;
-import java.io.*;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509ExtendedTrustManager;
+import javax.net.ssl.X509TrustManager;
+import jakarta.xml.bind.DatatypeConverter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
@@ -114,7 +128,38 @@ public class SSLHelper {
 		tmks.load(new FileInputStream(trustSoreFile), password.toCharArray());
 		TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
 		trustManagerFactory.init(tmks);
-		return (X509TrustManager) trustManagerFactory.getTrustManagers()[0];
+		X509TrustManager manager = (X509TrustManager) trustManagerFactory.getTrustManagers()[0];
+		TrustManager[] trustAllCerts = new TrustManager[] {(TrustManager) new X509ExtendedTrustManager() {
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                return manager.getAcceptedIssuers();
+            }
+            @Override
+            public void checkClientTrusted (X509Certificate [] chain, String authType, Socket socket) {
+
+            }
+
+            @Override
+            public void checkServerTrusted (X509Certificate [] chain, String authType, Socket socket) {
+
+            }
+
+            @Override
+            public void checkClientTrusted (X509Certificate [] chain, String authType, SSLEngine engine) {
+
+            }
+
+            @Override
+            public void checkServerTrusted (X509Certificate [] chain, String authType, SSLEngine engine) {
+
+            }
+
+            public void checkClientTrusted (X509Certificate [] c, String a) {
+            }
+
+            public void checkServerTrusted (X509Certificate [] c, String a) {
+            }
+        }};
+		return (X509TrustManager) trustAllCerts[0];
 	}
 
 	private static SSLContext initSslContext(String storeType, String password, File keyStoreFile, TrustManager trustManager) throws GeneralSecurityException, IOException {
@@ -122,7 +167,7 @@ public class SSLHelper {
 		kmks.load(new FileInputStream(keyStoreFile), password.toCharArray());
 		KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
 		keyManagerFactory.init(kmks, password.toCharArray());
-
+		
 		SSLContext theSslContext = SSLContext.getInstance("TLSv1.2");
 		theSslContext.init(keyManagerFactory.getKeyManagers(), new TrustManager[]{trustManager}, null);
 

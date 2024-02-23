@@ -44,10 +44,9 @@ import com.bbn.marti.remote.groups.FederateUser;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.ConcurrentMultiHashMap;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.google.common.collect.Multimap;
 
-import io.grpc.stub.StreamObserver;
 import tak.server.Constants;
 import tak.server.federation.FederateSubscription;
 import tak.server.federation.FederationSubscriptionCacheDAO;

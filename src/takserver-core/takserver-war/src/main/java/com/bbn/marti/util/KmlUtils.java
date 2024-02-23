@@ -2,12 +2,12 @@
 
 package com.bbn.marti.util;
 
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.sql.Timestamp;
 import java.text.DateFormat;
@@ -25,12 +25,31 @@ import java.util.TimeZone;
 import java.util.logging.Logger;
 
 import javax.imageio.ImageIO;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
 
 import com.atakmap.coremap.maps.coords.DistanceCalculations;
-import de.micromata.opengis.kml.v_2_2_0.*;
+import de.micromata.opengis.kml.v_2_2_0.AltitudeMode;
+import de.micromata.opengis.kml.v_2_2_0.BasicLink;
+import de.micromata.opengis.kml.v_2_2_0.Boundary;
 import de.micromata.opengis.kml.v_2_2_0.Container;
+import de.micromata.opengis.kml.v_2_2_0.Document;
+import de.micromata.opengis.kml.v_2_2_0.ExtendedData;
+import de.micromata.opengis.kml.v_2_2_0.Feature;
+import de.micromata.opengis.kml.v_2_2_0.Folder;
+import de.micromata.opengis.kml.v_2_2_0.Geometry;
+import de.micromata.opengis.kml.v_2_2_0.IconStyle;
+import de.micromata.opengis.kml.v_2_2_0.Kml;
+import de.micromata.opengis.kml.v_2_2_0.LabelStyle;
+import de.micromata.opengis.kml.v_2_2_0.LineString;
+import de.micromata.opengis.kml.v_2_2_0.LineStyle;
+import de.micromata.opengis.kml.v_2_2_0.LinearRing;
+import de.micromata.opengis.kml.v_2_2_0.Placemark;
+import de.micromata.opengis.kml.v_2_2_0.PolyStyle;
+import de.micromata.opengis.kml.v_2_2_0.Polygon;
+import de.micromata.opengis.kml.v_2_2_0.SchemaData;
+import de.micromata.opengis.kml.v_2_2_0.Style;
+import de.micromata.opengis.kml.v_2_2_0.TimeSpan;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
 import org.springframework.core.io.Resource;
@@ -40,7 +59,6 @@ import org.springframework.http.MediaType;
 
 import com.atakmap.android.icons.Icon2525bTypeResolver;
 import com.bbn.marti.dao.kml.KMLDao;
-import com.google.common.base.Charsets;
 import com.google.common.base.Strings;
 
 import de.micromata.opengis.kml.v_2_2_0.gx.MultiTrack;
@@ -49,7 +67,6 @@ import de.micromata.opengis.kml.v_2_2_0.gx.Track;
 import tak.server.Constants;
 import tak.server.cot.CotElement;
 import tak.server.util.Association;
-import de.micromata.opengis.kml.v_2_2_0.Polygon;
 
 public class KmlUtils {
     public static final double MAX_VALID_ALTITUDE_METERS = 1000000d; // The atmosphere is about 1000 km thick
@@ -88,11 +105,11 @@ public class KmlUtils {
     public static String rgbToKmlHex(int r, int g, int b) {
         Color c = new Color(r,g,b);
         String rr = Integer.toHexString(c.getRed());
-        if(rr.length() < 2) { rr = "0" + rr; }
+        if (rr.length() < 2) { rr = "0" + rr; }
         String gg = Integer.toHexString(c.getGreen());
-        if(gg.length() < 2) { gg = "0" + gg; }
+        if (gg.length() < 2) { gg = "0" + gg; }
         String bb = Integer.toHexString(c.getBlue());
-        if(bb.length() < 2) { bb = "0" + bb; }
+        if (bb.length() < 2) { bb = "0" + bb; }
         return "8f" + bb + gg + rr;
     }
 
@@ -259,7 +276,7 @@ public class KmlUtils {
 
         log.fine("building style for cottype: " + type + " CotElement " + qr);
 
-        if(type.startsWith("b-m-r")) {
+        if (type.startsWith("b-m-r")) {
             // route
             s = buildStyle(qr.styleUrl, qr.iconUrl, "7fffaaff", rgbToKmlHex(0, 255, 0), 4);
         } else if (type.startsWith("u-d-r")) {
@@ -276,9 +293,9 @@ public class KmlUtils {
             String labelColor, String lineColor, int lineWidth) {
         Style s = new Style();
 
-        if(labelColor == null)
+        if (labelColor == null)
             labelColor = "7fffaaff";
-        if(lineColor == null)
+        if (lineColor == null)
             lineColor = "8fffffff";
 
         s.withId(styleUrl)
@@ -300,9 +317,9 @@ public class KmlUtils {
             String labelColor, String lineColor, int lineWidth) {
         Style s = new Style();
 
-        if(labelColor == null)
+        if (labelColor == null)
             labelColor = "7fffaaff";
-        if(lineColor == null)
+        if (lineColor == null)
             lineColor = "8fffffff";
 
         s.withId(styleUrl)
@@ -795,17 +812,17 @@ public class KmlUtils {
             throw new IllegalArgumentException("empty CoT type");
         }
         
-        if(cotType.equals("b-m-p-s-p-i")) {
+        if (cotType.equals("b-m-p-s-p-i")) {
             iconUrl = "icons/bmpspi.png";
-        } else if(cotType.startsWith("b-m-p-j")) {
+        } else if (cotType.startsWith("b-m-p-j")) {
             iconUrl = "icons/dip.png";
-        } else if(cotType.startsWith("b-m-p") || cotType.startsWith("u-d-p") || cotType.startsWith("b-m-r") || cotType.startsWith("b-l")) {
+        } else if (cotType.startsWith("b-m-p") || cotType.startsWith("u-d-p") || cotType.startsWith("b-m-r") || cotType.startsWith("b-l")) {
             iconUrl = "icons/bmpw.png";
-        } else if(cotType.startsWith("b-i-v")) {
+        } else if (cotType.startsWith("b-i-v")) {
             iconUrl = "icons/video.png";
-        } else if(cotType.startsWith("b-d")) {
+        } else if (cotType.startsWith("b-d")) {
             iconUrl = "icons/b.png";
-        } else if(cotType.contains("radsensor")) {
+        } else if (cotType.contains("radsensor")) {
             iconUrl = "icons/radsensor.png";
         } else {
             try {
@@ -825,7 +842,7 @@ public class KmlUtils {
                             }
                         }
                     }
-                    if(iconUrl.isEmpty()) {
+                    if (iconUrl.isEmpty()) {
                         shrinkingType = shrinkingType.substring(0, shrinkingType.length() - 2);
                         if (shrinkingType.length() < 4) {
                             iconUrl = "icons/b.png";

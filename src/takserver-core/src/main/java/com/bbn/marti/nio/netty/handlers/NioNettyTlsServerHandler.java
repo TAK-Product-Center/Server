@@ -4,6 +4,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -71,6 +72,13 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 	protected Counter watermarkSkipCounter = null;
 	protected Counter readCounter = null;
 	protected Counter queueFullCounter = null;
+
+	private ThreadLocal<ExecutorService> readParseProcessor =
+			new ThreadLocal<ExecutorService>() {
+				@Override public ExecutorService initialValue() {
+					return Resources.newExecutorService("readParseProcessor", 1, 1);
+				}
+			};
 	
 	public NioNettyTlsServerHandler(Input input) {
 		this.input = input;
@@ -144,44 +152,61 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 
 	@Override
 	public void channelUnregistered(ChannelHandlerContext ctx) {
-		if (connectionInfo != null) {
-			if (connectionInfo.getConnectionId() != null) {
-				AtomicBoolean cancelFlag = GroupFederationUtil.getInstance().updateCancelMap.get(connectionInfo.getConnectionId());
+		try {
+			if (connectionInfo != null) {
+				if (connectionInfo.getConnectionId() != null) {
+					AtomicBoolean cancelFlag = GroupFederationUtil.getInstance().updateCancelMap.get(connectionInfo.getConnectionId());
 
-				if (cancelFlag != null) {
-					cancelFlag.set(true);
+					if (cancelFlag != null) {
+						cancelFlag.set(true);
+					}
 				}
 			}
+		} catch (Exception e) {
+			log.error("exception resetting cancel flag", e);
 		}
 
-		if(channelHandler != null) {
-			submissionService().handleChannelDisconnect(channelHandler);
-			protocolListeners.forEach(listener -> listener.onOutboundClose(channelHandler, protocol));
-		}
-		
-		if (authCodec != null) {
-			authCodec.onInboundClose();
-			authCodec.onOutboundClose();
+		try {
+			if (channelHandler != null) {
+				submissionService().handleChannelDisconnect(channelHandler);
+				protocolListeners.forEach(listener -> listener.onOutboundClose(channelHandler, protocol));
+			}
+		} catch (Exception e) {
+			log.error("exception handling the channel disconnect", e);
 		}
 
-		if (ctx != null) {
-			ctx.close();
+		try {
+			if (authCodec != null) {
+				authCodec.onInboundClose();
+				authCodec.onOutboundClose();
+			}
+		} catch (Exception e) {
+			log.error("exception closing authCodec", e);
 		}
-		
+
+		try {
+			if (ctx != null) {
+				ctx.close();
+			}
+		} catch (Exception e) {
+			log.error("exception closing context", e);
+		}
+
 		super.channelUnregistered(ctx);
 	}
 
-	private void setReader() {
+	protected void setReader() {
 		reader = (msgBytes) -> {
 			try {				
-				Resources.readParseProcessor.execute(() -> {
+				readParseProcessor.get().execute(() -> {
 					
 					readCounter.increment();
 
 					ByteBuffer msgBuf = authCodec.decode(ByteBuffer.wrap(msgBytes));
 
-					if (msgBuf == null || msgBuf.remaining() == 0)
+					if (msgBuf == null || msgBuf.remaining() == 0) {
 						return;
+					}
 
 					if (protobufSupported.get()) {
 						convertAndSubmitProtoBufBytesAsCot(msgBuf);
@@ -197,7 +222,7 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 		};
 	}
 	
-	private void setWriter() {
+	protected void setWriter() {
 		writer = (data) -> {
 			try {
 				if (nettyContext.channel().isWritable()) {				
@@ -258,7 +283,7 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 	}
 
 
-	private void setNegotiator() {
+	protected void setNegotiator() {
 		negotiator = () -> {
 			// we only need to negotiate cot proto tls inputs 			
 			if (transport == TransportCotEvent.COTPROTOTLS) {
@@ -422,7 +447,7 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 			authCodec = new X509AuthCodec(createAdaptedNettyPipelineContext());
 			authCodec.setConnectionInfo(connectionInfo);
 			authCodec.onConnect();
-		} else if(authenticationType == AuthType.ANONYMOUS) {
+		} else if (authenticationType == AuthType.ANONYMOUS) {
 			authCodec = new AnonymousAuthCodec(createAdaptedNettyPipelineContext(), input);
 			authCodec.setConnectionInfo(connectionInfo);
 			authCodec.onConnect();

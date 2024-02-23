@@ -11,7 +11,11 @@ import com.bbn.marti.test.shared.data.users.BaseUsers;
 import com.bbn.marti.test.shared.data.users.MutableUser;
 import org.junit.Test;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Random;
 
 /**
  * Created on 10/26/15.

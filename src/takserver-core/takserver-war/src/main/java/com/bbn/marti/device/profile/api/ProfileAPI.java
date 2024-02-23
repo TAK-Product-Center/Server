@@ -10,6 +10,7 @@ import com.bbn.marti.network.BaseRestController;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.SubscriptionManagerLite;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -21,8 +22,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.rmi.RemoteException;
 import java.util.List;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.jetbrains.annotations.NotNull;
 import org.owasp.esapi.Validator;
@@ -31,7 +32,11 @@ import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
@@ -65,14 +70,12 @@ public class ProfileAPI extends BaseRestController {
     @Autowired
     private GroupManager groupManager;
 
-    @Autowired
-    CoreConfig coreConfig;
 
 
     private String getGroupVectorFromStreamingClient(String clientUid, String groupVector) {
         try {
-            if (coreConfig.getRemoteConfiguration().getProfile() != null &&
-                    coreConfig.getRemoteConfiguration().getProfile().isUseStreamingGroup()) {
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getProfile() != null &&
+                    CoreConfigFacade.getInstance().getRemoteConfiguration().getProfile().isUseStreamingGroup()) {
                 RemoteSubscription subscription = subscriptionManager.getRemoteSubscriptionByClientUid(clientUid);
                 if (subscription != null) {
                     String groupVectorTmp = groupManager.getCachedOutboundGroupVectorByConnectionId(

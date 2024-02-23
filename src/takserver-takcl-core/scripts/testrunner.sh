@@ -3,16 +3,10 @@
 set -e
 
 TAKCL_SERVER_LOG_LEVEL_OVERRIDES="com.bbn=TRACE tak=TRACE ${TAKCL_SERVER_LOG_LEVEL_OVERRIDES}"
-
+DB0_EXTERNAL_PORT=32445
+DB1_EXTERNAL_PORT=32446
+DB2_EXTERNAL_PORT=32447
 DOCKER_IMAGE='eclipse-temurin:17-jammy'
-
-# Rebuild and redeploy the test harness
-REDEPLOY_TAKCL=true
-
-# Rebuild and redeploy the UserManager, SchemaManager, PluginManager, and RetentionService
-REDEPLOY_AUXILLARY=false
-
-REDEPLOY_FEDHUB=false
 
 ping() {
 	set -e
@@ -26,6 +20,9 @@ kill_db() {
 	fi
 	if [[ "`docker ps | grep ${SERVER1_DOCKER_DB_IDENTIFIER}`" != "" ]];then
 		docker stop ${SERVER1_DOCKER_DB_IDENTIFIER}
+	fi
+	if [[ "`docker ps | grep ${SERVER2_DOCKER_DB_IDENTIFIER}`" != "" ]];then
+		docker stop ${SERVER2_DOCKER_DB_IDENTIFIER}
 	fi
 
 }
@@ -45,19 +42,40 @@ if [[ ! -d "takserver-takcl-core" ]];then
 	exit 1
 fi
 
-ARTIFACT_SRC="$(pwd)/takserver-package/build/takArtifacts"
 LOG_TARGET=$(pwd)/TESTRUNNER_RESULTS
 SERVER0_DOCKER_DB_IDENTIFIER=TakserverTestDB0
 SERVER1_DOCKER_DB_IDENTIFIER=TakserverTestDB1
+SERVER2_DOCKER_DB_IDENTIFIER=TakserverTestDB2
 USE_DB=false
 POSTGRES_USER=martiuser
 POSTGRES_DB=cot
 POSTGRES_PORT=5432
 
-if [[ ! -f "${ARTIFACT_SRC}/takserver.war" ]];then
+ARTIFACT_TEMPLATE_DIR="$(pwd)/takserver-package/build/takArtifacts"
+ARTIFACT_SRC="$(pwd)/takserver-package/build/testrunnerArtifacts"
+
+if [[ ! -f "${ARTIFACT_TEMPLATE_DIR}/takserver.war" ]] || [[ ! -d "takserver-package/federation-hub/build/artifacts/jars" ]] || [[ ! -d "takserver-package/federation-hub/build/artifacts/configs" ]];then
 	echo Please build the project with './gradlew clean buildDocker buildRpm' to populate the tak root source! Future executions will automatically update takserver.war but require setting variables at the top of this script to true for everything else!
 	exit 1
 fi
+
+if [[ -d "${ARTIFACT_SRC}" ]];then
+  rm -r "${ARTIFACT_SRC}"
+fi
+
+mkdir "${ARTIFACT_SRC}"
+
+if [[ ! -d "${ARTIFACT_SRC}/federation-hub" ]];then
+  mkdir "${ARTIFACT_SRC}/federation-hub"
+fi
+
+cp -r ${ARTIFACT_TEMPLATE_DIR}/* ${ARTIFACT_SRC}/
+cp takserver-package/federation-hub/build/artifacts/jars/* "${ARTIFACT_SRC}/federation-hub/"
+cp -r takserver-package/federation-hub/build/artifacts/configs "${ARTIFACT_SRC}/federation-hub/configs"
+cp federation-hub-broker/src/main/resources/federation-hub-broker.yml "${ARTIFACT_SRC}/federation-hub/configs/"
+cp takserver-takcl-core/plugin-test-libs/* "${ARTIFACT_SRC}/lib/"
+
+
 
 
 if [[ "${1}" == "run" ]];then
@@ -76,37 +94,18 @@ if [[ "${1}" == "run" ]];then
 		USE_DB=true
 	fi
 
-	if [[ -d "${LOG_TARGET}" ]];then
+	if [[ -d "${LOG_TARGET}" ]] && [[ "${3}" != "--unsafe-mode" ]];then
 		echo Please remove the existing "${LOG_TARGET}" directory to continue!
 		exit 1
-	elif postgresql_running;then
+	fi
+
+	if postgresql_running;then
 		echo A local postgresql instance is already running! Please shut it down before proceeding!
 		exit 1
 	elif takserver_running;then
 		echo A local takserver instance is already running! Please shut it down before proceeding!
 		exit 1
 	fi
-
-
-	GRADLE_ARGS=" --parallel takserver-takcl-core:devDeployCore"
-	if [[ "${REDEPLOY_AUXILLARY}" == "true" ]];then
-		GRADLE_ARGS="${GRADLE_ARGS} takserver-takcl-core:devDeployAux"
-	else
-		echo OPEN SCRIPT AND set REDEPLOY_AUXILLARY=true TO BUILD PLUGIN MANAGER, RETENTION SERVICE, AND SCHEMA MANAGER!
-	fi
-
-	if [[ "${REDEPLOY_FEDHUB}" == "true" ]];then
-		GRADLE_ARGS="${GRADLE_ARGS} takserver-takcl-core:devDeployFedHub"
-	else
-		echo OPEN SCRIPT AND set REDEPLOY_FEDHUB=true TO BUILD FEDHUB!
-	fi
-
-	if [[ "${REDEPLOY_TAKCL}" == "true" ]];then
-		GRADLE_ARGS="${GRADLE_ARGS} takserver-takcl-core:devDeployTakcl"
-	fi
-
-	echo ./gradlew ${GRADLE_ARGS}
-	./gradlew ${GRADLE_ARGS}
 
 	mkdir -p ${LOG_TARGET}
 
@@ -128,7 +127,8 @@ else
 	CMD="
 	mkdir -p /opt/tak;
 	cp -R /opt/takbase/* /opt/tak/;
-	cp /opt/tak/CoreConfig.example.xml /opt/tak/CoreConfig.xml;"
+	cp /opt/tak/CoreConfig.example.xml /opt/tak/CoreConfig.xml;
+	cp /opt/tak/TAKIgniteConfig.example.xml /opt/tak/TAKIgniteConfig.xml; "
 
 	if [[ "${USE_DB}" == "true" ]];then
 		# Kill existing database instance
@@ -144,6 +144,7 @@ else
 				--env POSTGRES_HOST_AUTH_METHOD=trust \
 				--env POSTGRES_USER=${POSTGRES_USER} \
 				--env POSTGRES_DB=${POSTGRES_DB} \
+				-p ${DB0_EXTERNAL_PORT}:5432 \
 				postgis/postgis:15-3.3
 		fi
 
@@ -153,6 +154,17 @@ else
 				--env POSTGRES_HOST_AUTH_METHOD=trust \
 				--env POSTGRES_USER=${POSTGRES_USER} \
 				--env POSTGRES_DB=${POSTGRES_DB} \
+				-p ${DB1_EXTERNAL_PORT}:5432 \
+				postgis/postgis:15-3.3
+		fi
+
+		if [[ "`docker ps | grep ${SERVER2_DOCKER_DB_IDENTIFIER}`" == "" ]];then
+			docker run -it -d --rm --name ${SERVER2_DOCKER_DB_IDENTIFIER} \
+				--env POSTGRES_PASSWORD=${TAKCL_SERVER_POSTGRES_PASSWORD} \
+				--env POSTGRES_HOST_AUTH_METHOD=trust \
+				--env POSTGRES_USER=${POSTGRES_USER} \
+				--env POSTGRES_DB=${POSTGRES_DB} \
+				-p ${DB2_EXTERNAL_PORT}:5432 \
 				postgis/postgis:15-3.3
 		fi
 
@@ -160,22 +172,27 @@ else
 		# Get instance details and set them as necessary
 		DOCKER0_IP=`docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${SERVER0_DOCKER_DB_IDENTIFIER}`
 		DOCKER1_IP=`docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${SERVER1_DOCKER_DB_IDENTIFIER}`
-		JARGS="${JARGS} -Dcom.bbn.marti.takcl.server0DbHost=${DOCKER0_IP} -Dcom.bbn.marti.takcl.server1DbHost=${DOCKER1_IP}"
+		DOCKER2_IP=`docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${SERVER2_DOCKER_DB_IDENTIFIER}`
+		JARGS="${JARGS} -Dcom.bbn.marti.takcl.server0DbHost=${DOCKER0_IP} -Dcom.bbn.marti.takcl.server1DbHost=${DOCKER1_IP} -Dcom.bbn.marti.takcl.server2DbHost=${DOCKER2_IP}"
 
 #		CMD="${CMD}
-#		sed -i 's|<connection url=\"jdbc:postgresql://127.0.0.1:5432/cot\" username=\"martiuser\" password=\"\" />|<connection url=\"jdbc:postgresql://${DOCKER0_IP}:5432/cot\" username=\"${POSTGRES_USER}\" password=\"${TAKCL_SERVER_POSTGRES_PASSWORD}\"/>|g' /opt/tak/CoreConfig.xml;"
+#		 sed -i 's|<connection url=\"jdbc:postgresql://127.0.0.1:5432/cot\" username=\"martiuser\" password=\"\" />|<connection url=\"jdbc:postgresql://${DOCKER0_IP}:5432/cot\" username=\"${POSTGRES_USER}\" password=\"${TAKCL_SERVER_POSTGRES_PASSWORD}\"/>|g' /opt/tak/CoreConfig.xml;"
 
 		echo Waiting for DB to settle...
 		sleep 20
-		echo Locally executing "java -jar ${ARTIFACT_SRC}/db-utils/SchemaManager.jar -url jdbc:postgresql://${DOCKER0_IP}:5432/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade"
-		java -jar ${ARTIFACT_SRC}/db-utils/SchemaManager.jar -url jdbc:postgresql://${DOCKER0_IP}:5432/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade
-		echo Locally executing "java -jar ${ARTIFACT_SRC}/db-utils/SchemaManager.jar -url jdbc:postgresql://${DOCKER1_IP}:5432/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade"
-		java -jar ${ARTIFACT_SRC}/db-utils/SchemaManager.jar -url jdbc:postgresql://${DOCKER1_IP}:5432/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade
+		echo Locally executing "java -jar ${ARTIFACT_SRC}/db-utils/SchemaManager.jar -url jdbc:postgresql://127.0.0.1:${DB0_EXTERNAL_PORT}/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade"
+		java -jar ${ARTIFACT_SRC}/db-utils/SchemaManager.jar -url jdbc:postgresql://127.0.0.1:${DB0_EXTERNAL_PORT}/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade
+
+		echo Locally executing "java -jar ${ARTIFACT_SRC}/db-utils/SchemaManager.jar -url jdbc:postgresql://127.0.0.1:${DB1_EXTERNAL_PORT}/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade"
+		java -jar ${ARTIFACT_SRC}/db-utils/SchemaManager.jar -url jdbc:postgresql://127.0.0.1:${DB1_EXTERNAL_PORT}/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade
+
+		echo Locally executing "java -jar ${ARTIFACT_SRC}/db-utils/SchemaManager.jar -url jdbc:postgresql://127.0.0.1:${DB2_EXTERNAL_PORT}/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade"
+		java -jar ${ARTIFACT_SRC}/db-utils/SchemaManager.jar -url jdbc:postgresql://127.0.0.1:${DB2_EXTERNAL_PORT}/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade
+
 
 	else
 		JARGS="${JARGS} -Dcom.bbn.marti.takcl.dbEnabled=false"
-		CMD="${CMD}
-		sed -i 's/<repository enable=\"true\"/<repository enable=\"false\"/g' /opt/tak/CoreConfig.xml;"
+		CMD="${CMD}	sed -i 's/<repository enable=\"true\"/<repository enable=\"false\"/g' /opt/tak/CoreConfig.xml;"
 	fi
 
 	CMD="${CMD}

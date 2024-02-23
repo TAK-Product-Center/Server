@@ -2,13 +2,13 @@ package org.springframework.security.web.authentication.preauth;
 
 import java.io.IOException;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
@@ -144,7 +144,7 @@ public abstract class AbstractPreAuthenticatedProcessingFilter extends GenericFi
 			return false;
 		}
 
-		if(logger.isDebugEnabled()) {
+		if (logger.isDebugEnabled()) {
 			logger.debug("Pre-authenticated principal has changed to " + principal + " and will be reauthenticated");
 		}
 		return true;
@@ -200,7 +200,7 @@ public abstract class AbstractPreAuthenticatedProcessingFilter extends GenericFi
 			return false;
 		}
 
-		if(!principalChanged(request, currentUser)) {
+		if (!principalChanged(request, currentUser)) {
 			return false;
 		}
 
@@ -237,7 +237,7 @@ public abstract class AbstractPreAuthenticatedProcessingFilter extends GenericFi
 					authResult, this.getClass()));
 		}
 
-		if(authenticationSuccessHandler != null) {
+		if (authenticationSuccessHandler != null) {
 			authenticationSuccessHandler.onAuthenticationSuccess(request, response, authResult);
 		}
 	}
@@ -257,7 +257,7 @@ public abstract class AbstractPreAuthenticatedProcessingFilter extends GenericFi
 		}
 		request.setAttribute(WebAttributes.AUTHENTICATION_EXCEPTION, failed);
 
-		if(authenticationFailureHandler != null) {
+		if (authenticationFailureHandler != null) {
 			authenticationFailureHandler.onAuthenticationFailure(request, response, failed);
 		}
 	}

@@ -1,9 +1,9 @@
 keystoreType: JKS
-keystoreFile: /opt/tak/certs/files/takserver.jks
+keystoreFile: /opt/tak/federation-hub/certs/files/takserver.jks
 keystorePassword: atakatak
 
 truststoreType: JKS
-truststoreFile: /opt/tak/certs/files/fed-truststore.jks
+truststoreFile: /opt/tak/federation-hub/certs/files/fed-truststore.jks
 truststorePassword: atakatak
 
 keyManagerType: SunX509
@@ -23,9 +23,24 @@ tlsVersions:
 # v2 federation only.
 v2Enabled: true
 v2Port: 9102
-maxMessageSizeBytes: 67108864
+maxMessageSizeBytes: 268435456
 metricsLogIntervalSeconds: 5
 clientTimeoutTime: 15
 clientRefreshTime: 5
 enableHealthCheck: true
 useCaGroups: true
+
+dbUsername: martiuser
+dbPassword:
+
+dbPort: 27017
+dbHost: localhost
+dbConnectionTimeoutMS: 5000
+
+# mission federation DB retention days - how long to keep mission events in the database before permanently deleting them 
+missionFederationDBRetentionDays: 7
+# mission federation recency seconds - how far back to look for offline changes (default 12 hours)
+missionFederationRecencySeconds: 43200
+missionFederationDisruptionEnabled: false
+missionFederationDisruptionMaxFileSizeBytes: 200
+

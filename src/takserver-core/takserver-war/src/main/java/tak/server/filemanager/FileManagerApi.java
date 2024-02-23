@@ -1,22 +1,16 @@
 package tak.server.filemanager;
 
 import java.rmi.RemoteException;
-import java.text.ParseException;
 import java.time.Instant;
-import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Map.Entry;
 
-import javax.naming.NamingException;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
-import org.eclipse.jetty.http.MimeTypes;
 import org.owasp.esapi.ESAPI;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
@@ -24,23 +18,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 
 import com.bbn.marti.sync.model.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bbn.marti.cot.search.model.ApiResponse;
@@ -55,7 +42,7 @@ import com.bbn.marti.sync.Metadata.Field;
 import com.bbn.marti.sync.repository.ResourceRepository;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.spring.RequestHolderBean;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
@@ -122,43 +109,43 @@ public class FileManagerApi extends BaseRestController {
 		 try {
 			 String resourceSort = getResourceColumnName(sort);
 			 List<Resource> files = null;
-			 if(mission.isBlank() && !missionPackage) {
-				 if(page == -1 || limit == -1) {
-				 	if(name.isBlank()) {
+			 if (mission.isBlank() && !missionPackage) {
+				 if (page == -1 || limit == -1) {
+				 	if (name.isBlank()) {
 				 		files = fileManagerService.findAllFiles(0, 0, resourceSort, ascending, groupVector);
 				 	} else {
 				 		files = fileManagerService.findByName(0, 0, resourceSort, ascending, name, groupVector);
 				 	}
 				 } else {
-					 if(name.isBlank()) {
+					 if (name.isBlank()) {
 						 files = fileManagerService.findAllFiles(limit, (page * limit), resourceSort, ascending, groupVector);
 					 } else {
 						 files = fileManagerService.findByName(limit, (page * limit), resourceSort, ascending, name, groupVector);
 					 }
 				 }
 			 } else if (mission.isBlank() && missionPackage) {
-				 if(page == -1 || limit == -1) {
-					 if(sort.isBlank()) {
+				 if (page == -1 || limit == -1) {
+					 if (sort.isBlank()) {
 						 files = fileManagerService.getMissionPackageResources(0, 0, "", true, name, groupVector);
 					 } else {
 						 files = fileManagerService.getMissionPackageResources(0, 0, resourceSort, ascending, name, groupVector);
 					 }
 				 }else {
-					 if(sort.isBlank()) {
+					 if (sort.isBlank()) {
 						 files = fileManagerService.getMissionPackageResources(limit, (page * limit), "", true, name, groupVector);
 					 } else {
 						 files = fileManagerService.getMissionPackageResources(limit, (page * limit), resourceSort, ascending, name, groupVector);
 					 }
 				 }
 			 }	else{
-				 if(page == -1 || limit == -1) {
-					 if(sort.isBlank()) {
+				 if (page == -1 || limit == -1) {
+					 if (sort.isBlank()) {
 						 files = fileManagerService.getResourcesByMission(mission, 0, 0,"", true, name, groupVector);
 					 } else {
 						 files = fileManagerService.getResourcesByMission(mission, 0, 0, resourceSort, ascending, name, groupVector);
 					 }
 				 }else {
-					 if(sort.isBlank()) {
+					 if (sort.isBlank()) {
 						 files = fileManagerService.getResourcesByMission(mission, limit, (page * limit), "", true, name, groupVector);
 					 } else {
 						 files = fileManagerService.getResourcesByMission(mission, limit, (page * limit), resourceSort, ascending, name, groupVector);
@@ -184,7 +171,7 @@ public class FileManagerApi extends BaseRestController {
 	 throws RemoteException{
 		 Integer count = 0;
 		 try {
-			 if(mission.isBlank() && !missionPackage) {
+			 if (mission.isBlank() && !missionPackage) {
 				 count = (int) resourceRepository.count();
 			 } else if (mission.isBlank() && missionPackage) {
 				 count = fileManagerService.getPackageResourceCount();
@@ -255,7 +242,7 @@ public class FileManagerApi extends BaseRestController {
 		 }
 		 
 		 try {
-			 if(!hash.isEmpty()) {
+			 if (!hash.isEmpty()) {
 				 persistenceStore.delete(hash, groupVector);
 			 }
 			 
@@ -350,11 +337,11 @@ public class FileManagerApi extends BaseRestController {
 			 if (size == null ) {
 				entry.put("Size","Unknown");
 			 } else {
-				if(size < 1024) {
+				if (size < 1024) {
 					entry.put("Size", size + "B");
-			 } else if(size < MBYTES) {
+			 } else if (size < MBYTES) {
 				entry.put("Size", (size/KBYTES) + "kB");
-			 } else if(size < GBYTES) {
+			 } else if (size < GBYTES) {
 				entry.put("Size", size/MBYTES + "MB");
 			 } else {
 				entry.put("Size", size/GBYTES + "GB");
@@ -366,7 +353,7 @@ public class FileManagerApi extends BaseRestController {
 			 entry.put("MimeType", metadata.getFirstSafely(Metadata.Field.MIMEType));
 			 
 			 String[] keywordsArray = metadata.getKeywords();
-			 if(keywordsArray != null) {
+			 if (keywordsArray != null) {
 				 String keywords = String.join(",", metadata.getKeywords());
 				 entry.put("Keywords",keywords);
 			 } else {
@@ -406,11 +393,11 @@ public class FileManagerApi extends BaseRestController {
 			 if (size == null ) {
 				entry.put("Size","Unknown");
 			 } else {
-				if(size < 1024) {
+				if (size < 1024) {
 					entry.put("Size", size + "B");
-			 } else if(size < MBYTES) {
+			 } else if (size < MBYTES) {
 				entry.put("Size", (size/KBYTES) + "kB");
-			 } else if(size < GBYTES) {
+			 } else if (size < GBYTES) {
 				entry.put("Size", size/MBYTES + "MB");
 			 } else {
 				entry.put("Size", size/GBYTES + "GB");
@@ -423,7 +410,7 @@ public class FileManagerApi extends BaseRestController {
 			 
 			 resource.setKeywords(fileManagerService.getKeywordsForResource(resource.getHash()));
 			 List<String> keywordsArray = resource.getKeywords();
-			 if(keywordsArray != null) {
+			 if (keywordsArray != null) {
 				 String keywords = String.join(",", resource.getKeywords());
 				 entry.put("Keywords",keywords);
 			 } else {
@@ -447,7 +434,7 @@ public class FileManagerApi extends BaseRestController {
 					resource.getGroupVector(), groups));
 			
 			NavigableSet<String> groupsArray = resource.getGroups();
-			if(groupsArray != null) {
+			if (groupsArray != null) {
 				 String groupString = String.join(",", groupsArray);
 				 entry.put("Groups",groupString);
 			 } else {

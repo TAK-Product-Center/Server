@@ -8,7 +8,7 @@
 
 package com.bbn.marti.util.missionpackage;
 
-import javax.xml.bind.annotation.XmlRegistry;
+import jakarta.xml.bind.annotation.XmlRegistry;
 
 
 /**

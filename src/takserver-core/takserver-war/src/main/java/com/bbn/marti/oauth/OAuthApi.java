@@ -9,10 +9,11 @@ import java.util.Base64;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import com.bbn.marti.config.Tls;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.google.common.base.Strings;
 import okhttp3.OkHttpClient;
 
@@ -23,14 +24,23 @@ import org.owasp.esapi.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.OkHttp3ClientHttpRequestFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.view.InternalResourceView;
@@ -38,7 +48,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import com.bbn.marti.config.Oauth;
 import com.bbn.marti.cot.search.model.ApiResponse;
-import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.util.spring.MartiSocketUserDetailsImpl;
 import com.bbn.security.web.MartiValidatorConstants;
 import tak.server.Constants;
 
@@ -47,9 +57,6 @@ import tak.server.Constants;
 public class OAuthApi {
 
     protected static final Logger logger = LoggerFactory.getLogger(OAuthApi.class);
-
-    @Autowired
-    CoreConfig coreConfig;
 
     @Autowired
     private Validator validator;
@@ -129,7 +136,7 @@ public class OAuthApi {
                     }
             };
 
-            Tls tlsConfig = coreConfig.getRemoteConfiguration().getSecurity().getTls();
+            Tls tlsConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getSecurity().getTls();
             SSLContext sslContext = SSLContext.getInstance(tlsConfig.getContext());
             sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
 
@@ -164,7 +171,7 @@ public class OAuthApi {
         // store the access token in a cookie
         String access_token = (String)tokenJson.get(authServer.getAccessTokenName());
         response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
-                OAuth2AccessToken.ACCESS_TOKEN, access_token, -1, true).toString());
+                OAuth2TokenType.ACCESS_TOKEN.getValue(), access_token, -1, true).toString());
 
         // store the refresh token in the session, if we have one
         if (tokenJson.containsKey(authServer.getRefreshTokenName())) {
@@ -238,27 +245,24 @@ public class OAuthApi {
     public ModelAndView handleRefresh(
             HttpServletRequest request, HttpServletResponse response) {
         try {
-            // get the auth server config
             Oauth.AuthServer authServer = getAuthServerConfig();
-            if (authServer == null) {
-                throw new IllegalStateException("missing auth server config");
+            if (authServer != null) {
+                String refreshToken = (String) request.getSession().getAttribute(authServer.getRefreshTokenName());
+                if (Strings.isNullOrEmpty(refreshToken)) {
+                    SecurityContextHolder.clearContext();
+                    AuthCookieUtils.logout(request, response);
+                    return new ModelAndView(new InternalResourceView("/Marti/login/redirect.html"));
+                }
+
+                // build up the parameters for the token request
+                MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<String, String>();
+                requestBody.add("grant_type", "refresh_token");
+                requestBody.add("refresh_token", refreshToken);
+                requestBody.add("client_id", authServer.getClientId());
+                requestBody.add("client_secret", authServer.getSecret());
+
+                processAuthServerRequest(requestBody, request, response);
             }
-
-            String refreshToken = (String) request.getSession().getAttribute(authServer.getRefreshTokenName());
-            if (Strings.isNullOrEmpty(refreshToken)) {
-                SecurityContextHolder.clearContext();
-                AuthCookieUtils.logout(request, response, null);
-                return new ModelAndView(new InternalResourceView("/Marti/login/redirect.html"));
-            }
-
-            // build up the parameters for the token request
-            MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<String, String>();
-            requestBody.add("grant_type", "refresh_token");
-            requestBody.add("refresh_token", refreshToken);
-            requestBody.add("client_id", authServer.getClientId());
-            requestBody.add("client_secret", authServer.getSecret());
-
-            processAuthServerRequest(requestBody, request, response);
 
             return new ModelAndView(new InternalResourceView("/Marti/login/redirect.html"));
 
@@ -285,14 +289,31 @@ public class OAuthApi {
                 new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), name), status);
     }
 
+    @RequestMapping(value = "/logout", method = { RequestMethod.GET, RequestMethod.POST })
+    public void logout(HttpServletRequest request, HttpServletResponse response) {
+        AuthCookieUtils.logout(request, response);
+    }
+
+    @RequestMapping(value = "/token/access", method = RequestMethod.GET)
+    public ApiResponse<String> getAccessToken(HttpServletRequest request) {
+        if (logger.isDebugEnabled()) {
+            logger.debug("in getAccessToken");
+        }
+
+        String token = ((MartiSocketUserDetailsImpl)SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal()).getToken();
+
+        return new ApiResponse<String>(Constants.API_VERSION, String.class.getSimpleName(), token);
+    }
+
     private Oauth.AuthServer getAuthServerConfig() {
-        if (coreConfig != null &&
-                coreConfig.getRemoteConfiguration() != null &&
-                coreConfig.getRemoteConfiguration().getAuth() != null &&
-                coreConfig.getRemoteConfiguration().getAuth().getOauth() != null &&
-                coreConfig.getRemoteConfiguration().getAuth().getOauth().getAuthServer() != null &&
-                !coreConfig.getRemoteConfiguration().getAuth().getOauth().getAuthServer().isEmpty()) {
-            return coreConfig.getRemoteConfiguration().getAuth().getOauth().getAuthServer().get(0);
+        if (CoreConfigFacade.getInstance() != null &&
+                CoreConfigFacade.getInstance().getRemoteConfiguration() != null &&
+                CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth() != null &&
+                CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth() != null &&
+                CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getAuthServer() != null &&
+                !CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getAuthServer().isEmpty()) {
+            return CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getAuthServer().get(0);
         }
         return null;
     }

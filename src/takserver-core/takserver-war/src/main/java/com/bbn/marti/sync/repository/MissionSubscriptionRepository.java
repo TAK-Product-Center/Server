@@ -1,17 +1,18 @@
 package com.bbn.marti.sync.repository;
 
-import com.bbn.marti.sync.model.MissionSubscription;
+import java.util.Date;
+import java.util.List;
+
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
-import tak.server.Constants;
 
-import java.util.Date;
-import java.util.List;
+import com.bbn.marti.sync.model.MissionSubscription;
+
+import tak.server.Constants;
 
 public interface MissionSubscriptionRepository extends JpaRepository<MissionSubscription, String> {
 
@@ -39,37 +40,30 @@ public interface MissionSubscriptionRepository extends JpaRepository<MissionSubs
 
     @Query(value = "select ms.uid, ms.token, null as mission_id, ms.client_uid, ms.username,  ms.create_time, ms.role_id from mission m " +
             "inner join mission_subscription ms on m.id = ms.mission_id where ms.client_uid = :clientUid and lower(m.name) = lower(:missionName)", nativeQuery = true)
-    @Cacheable(Constants.MISSION_SUBSCRIPTION_CACHE)
     MissionSubscription findByMissionNameAndClientUidNoMission(@Param("missionName") String missionName, @Param("clientUid") String clientUid);
 
     @Query(value = "select ms.uid, ms.token, null as mission_id, ms.client_uid, ms.username,  ms.create_time, ms.role_id from mission m " +
             "inner join mission_subscription ms on m.id = ms.mission_id where ms.user_name = :username and lower(m.name) = lower(:missionName)", nativeQuery = true)
-    @Cacheable(Constants.MISSION_SUBSCRIPTION_CACHE)
     MissionSubscription findByMissionNameAndUsernameNoMission(@Param("missionName") String missionName, @Param("username") String username);
 
-    @Query(value = "select ms.uid, ms.username, ms.token, null as mission_id, ms.client_uid, ms.username, ms.create_time, ms.role_id from mission m " +
+    @Query(value = "select ms.uid, ms.token, null as mission_id, ms.client_uid, ms.username, ms.create_time, ms.role_id from mission m " +
             "inner join mission_subscription ms on m.id = ms.mission_id where ms.client_uid = :clientUid and ( ms.username is null or ms.username = :username ) and lower(m.name) = lower(:missionName)", nativeQuery = true)
-    @Cacheable(Constants.MISSION_SUBSCRIPTION_CACHE)
     MissionSubscription findByMissionNameAndClientUidAndUsernameNoMission(@Param("missionName") String missionName, @Param("clientUid") String clientUid, @Param("username") String username);
 
     @Query(value = "select ms.uid, ms.token, null as mission_id, ms.client_uid, ms.username, ms.create_time, ms.role_id from mission m " +
             "inner join mission_subscription ms on m.id = ms.mission_id where lower(m.name) = lower(:missionName) and ms.uid = :uid", nativeQuery = true)
-    @Cacheable(Constants.MISSION_SUBSCRIPTION_CACHE)
     MissionSubscription findByUidAndMissionNameNoMission(@Param("uid") String uid, @Param("missionName") String missionName);
 
     @Query(value = "select ms.uid, ms.token, null as mission_id, ms.client_uid, ms.username, ms.create_time, ms.role_id from mission m " +
             "inner join mission_subscription ms on m.id = ms.mission_id where lower(m.name) = lower(:missionName)", nativeQuery = true)
-    @Cacheable(Constants.MISSION_SUBSCRIPTION_CACHE)
     List<MissionSubscription> findAllByMissionNameNoMission(@Param("missionName") String missionName);
 
     @Query(value = "select ms.uid, null as token, null as mission_id, ms.client_uid, ms.username, ms.create_time, ms.role_id from mission m " +
             "inner join mission_subscription ms on m.id = ms.mission_id where m.name = :missionName", nativeQuery = true)
-    @Cacheable(Constants.MISSION_SUBSCRIPTION_CACHE)
     List<MissionSubscription> findAllByMissionNameNoMissionNoToken(@Param("missionName") String missionName);
 
     @Query(value = "select ms.uid, ms.token, m.id as mission_id, ms.client_uid, ms.username, ms.create_time, ms.role_id from mission m " +
             "inner join mission_subscription ms on m.id = ms.mission_id where m.tool = 'public' ", nativeQuery = true)
-    @Cacheable(Constants.MISSION_SUBSCRIPTION_CACHE)
     List<MissionSubscription> findAll();
 }
 

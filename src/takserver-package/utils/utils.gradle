@@ -21,7 +21,7 @@ task copyWars(type: Copy) {
 	exclude 'takserver-war*', 'takserver-war-*.war'
 }
 
-// Get CoreConfig.xsd, other XSDs
+// Get CoreConfig.xsd and other XSDs including the TAKIgniteConfig.xsd
 task copyCoreConfigXSD(type: Copy) {
 	from project(':takserver-common').file('src/main/xsd')
 	include '*.xsd'
@@ -31,7 +31,7 @@ task copyCoreConfigXSD(type: Copy) {
 // Get CoreConfig.example.xml
 task copyCoreConfigExample(type: Copy) {
 	from project(':takserver-core').file('example/')
-	include 'CoreConfig.example.xml', 'logging-restrictsize.xml'
+	include 'TAKIgniteConfig.example.xml', 'CoreConfig.example.xml', 'logging-restrictsize.xml'
 	into "$buildDir/takArtifacts"
 }
 
@@ -39,7 +39,7 @@ task copyCoreConfigExample(type: Copy) {
 task copyCoreScripts(type: Copy) {
 	from project(':takserver-core').file('scripts')
 	into "$buildDir/takArtifacts"
-	exclude 'utils','messaging*', 'API*', 'plugins*', 'retention*', "launcher*", 'takserver.sh'
+	exclude 'config*', 'utils','messaging*', 'API*', 'plugins*', 'retention*', "launcher*", 'takserver.sh'
 }
 
 // Copy docs
@@ -47,6 +47,13 @@ task copyDocs(type: Copy) {
 	from getRootProject().file('docs')
 	include '*.pdf'
 	into "$buildDir/takArtifacts/docs"
+}
+
+// Copy swagger files
+task copySwagger(type: Copy) {
+	from project(':takserver-core').file('oas')
+	include '*.html'
+	into "$buildDir/takArtifacts/oas"
 }
 
 // Copy selinux policy
@@ -108,22 +115,29 @@ task copyJarsNoDb(type: Copy) {
 			'federation-hub-*', 'federation-common-*', 'takserver-protobuf-*'
 }
 
-// Copy scripts
+// Copy Configuration Microervice scripts
+task copyConfigScripts(type: Copy) {
+	from project(':takserver-core').file('scripts')
+	into "$buildDir/takArtifacts"
+	exclude 'utils*', 'messaging*', 'API*', 'plugins*', 'retention*', 'launcher*', 'takserver.sh'
+}
+
+// Copy API Microervice scripts
 task copyAPIScripts(type: Copy) {
 	from project(':takserver-core').file('scripts')
 	into "$buildDir/takArtifacts"
-	exclude 'utils*', 'messaging*', 'plugins*', 'retention*', 'launcher*', 'takserver.sh'
+	exclude 'config*', 'utils*', 'messaging*', 'plugins*', 'retention*', 'launcher*', 'takserver.sh'
 }
 
-// Copy scripts
+// Copy Messaging Microervice scripts
 task copyMessagingScripts(type: Copy) {
 	from project(':takserver-core').file('scripts')
 	into "$buildDir/takArtifacts"
-	exclude 'utils*', 'API*', 'launcher*', 'plugins*', 'retention*', 'takserver.sh'
+	exclude 'config*', 'utils*', 'API*', 'launcher*', 'plugins*', 'retention*', 'takserver.sh'
 }
 
 // Copy scripts
-task copyLauncherAndMessagingScripts(type: Copy) {
+task copyLauncherAndConfigAndMessagingScripts(type: Copy) {
 	from project(':takserver-core').file('scripts')
 	into "$buildDir/takArtifacts"
 	exclude 'utils*', 'API*', 'plugins*', 'retention*', 'takserver.sh'
@@ -245,7 +259,7 @@ task createDockerDirs() {
 def copyCoreDockerFilesSpec() {
 	return from('build/takArtifacts') {
 		exclude('db-utils/pg_hba.conf', 'db-utils/postgresql.conf',
-				'CoreConfig.example.xml', 'takserver-plugins.sh', 'takserver-plugins-cluster.sh',
+				'TAKIgniteConfig.example.xml', 'CoreConfig.example.xml', 'takserver-plugins.sh', 'takserver-plugins-cluster.sh',
 				'takserver-plugins', 'takserver-pm.jar', 'takserver-retention.jar', 'mission-archive', 'retention')
 	}
 }
@@ -300,7 +314,7 @@ task constructDockerZip(type: Zip) {
 	dependsOn (':takserver-package:prePackage')
 	dependsOn copyCoreScripts
 	dependsOn copyDbScripts
-	dependsOn copyLauncherAndMessagingScripts
+	dependsOn copyLauncherAndConfigAndMessagingScripts
 	dependsOn createVersionFile
 
 	archiveName 'takserver-docker-' + version + '.zip'
@@ -310,7 +324,7 @@ task constructDockerZip(type: Zip) {
 
 	from('build/takArtifacts') {
 		exclude('db-utils/pg_hba.conf', 'db-utils/postgresql.conf',
-				'CoreConfig.example.xml', 'takserver-plugins.sh', 'takserver-plugins-cluster.sh',
+				'TAKIgniteConfig.example.xml', 'CoreConfig.example.xml', 'takserver-plugins.sh', 'takserver-plugins-cluster.sh',
 				'takserver-plugins', 'takserver-pm.jar', 'takserver-retention.jar', 'mission-archive', 'retention')
 		into('tak')
 	}
@@ -349,8 +363,10 @@ task constructDockerZip(type: Zip) {
 
 	// Include the standard docker CoreConfig.xml
 	from(project(':takserver-core').file('example')) {
+		include('TAKIgniteConfig.example.xml')
 		include('CoreConfig.example.docker.xml')
 		rename('CoreConfig.example.docker.xml', 'tak/CoreConfig.example.xml')
+		rename('TAKIgniteConfig.example.xml', 'tak/TAKIgniteConfig.example.xml')
 	}
 
 	from(project(':takserver-core').file('docker')) {
@@ -380,7 +396,7 @@ task constructIronbankDBZip(type: Zip) {
 	dependsOn createDockerDirs
 	dependsOn createVersionFile
 	dependsOn fetchRpmsForHardenedDocker
-	dependsOn copyLauncherAndMessagingScripts
+	dependsOn copyLauncherAndConfigAndMessagingScripts
 
 	archiveName 'takserver-ironbank-db-' + version + '.zip'
 	duplicatesStrategy 'fail'
@@ -402,6 +418,7 @@ task constructIronbankDBZip(type: Zip) {
 
 	// Include the hardened docker CoreConfig.xml
 	from(project(':takserver-core').file('example')) {
+		include('TAKIgniteConfig.example.xml')
 		include('CoreConfig.example.docker-hardened.xml')
 		rename('CoreConfig.example.docker-hardened.xml', 'CoreConfig.example.xml')
 	}
@@ -418,7 +435,7 @@ task constructHardenedDockerZip(type: Zip) {
 	dependsOn createDockerDirs
 	dependsOn createVersionFile
 	dependsOn fetchRpmsForHardenedDocker
-	dependsOn copyLauncherAndMessagingScripts
+	dependsOn copyLauncherAndConfigAndMessagingScripts
 
 
 	archiveName 'takserver-docker-hardened-' + version + '.zip'
@@ -428,7 +445,7 @@ task constructHardenedDockerZip(type: Zip) {
 
 	from('build/takArtifacts') {
 		exclude('db-utils/pg_hba.conf', 'db-utils/postgresql.conf',
-				'CoreConfig.example.xml', 'takserver-plugins.sh', 'takserver-plugins-cluster.sh',
+				'TAKIgniteConfig.example.xml', 'CoreConfig.example.xml', 'takserver-plugins.sh', 'takserver-plugins-cluster.sh',
 				'takserver-plugins', 'takserver-pm.jar', 'takserver-retention.jar', 'mission-archive', 'retention', 'db-utils/takserver-setup-db.sh')
 		into('tak')
 	}
@@ -465,10 +482,12 @@ task constructHardenedDockerZip(type: Zip) {
 		into('tak')
 	}
 
-	// Include the hardened CoreConfig.xml
+	// Include the hardened CoreConfig.xml and TAKIgniteConfig.example.xml
 	from(project(':takserver-core').file('example')) {
+		include('TAKIgniteConfig.example.xml')
 		include('CoreConfig.example.docker-hardened.xml')
 		rename('CoreConfig.example.docker-hardened.xml', 'tak/CoreConfig.example.xml')
+		rename('TAKIgniteConfig.example.xml', 'tak/TAKIgniteConfig.example.xml')
 	}
 
 	from(project(':takserver-core').file('docker')) {
@@ -499,7 +518,7 @@ task constructHardenedDockerZip(type: Zip) {
 
 task constructFullDockerZip(type: Zip) {
 	dependsOn createDockerDirs
-	dependsOn copyLauncherAndMessagingScripts
+	dependsOn copyLauncherAndConfigAndMessagingScripts
 	dependsOn createVersionFile
 	dependsOn (':takserver-package:prePackage')
 
@@ -512,7 +531,7 @@ task constructFullDockerZip(type: Zip) {
 
 	from('build/takArtifacts') {
 		exclude('db-utils/pg_hba.conf', 'db-utils/postgresql.conf',
-				'CoreConfig.example.xml', 'takserver-plugins.sh', 'takserver-plugins-cluster.sh',
+				'TAKIgniteConfig.example.xml', 'CoreConfig.example.xml', 'takserver-plugins.sh', 'takserver-plugins-cluster.sh',
 				'takserver-plugins', 'takserver-pm.jar', 'takserver-retention.jar', 'mission-archive', 'retention')
 		into('tak')
 	}
@@ -553,10 +572,12 @@ task constructFullDockerZip(type: Zip) {
 		into('tak')
 	}
 
-	// Include the standard docker CoreConfig.xml
+	// Include the standard docker CoreConfig.xml and TAKIgniteConfig.example.xml
 	from(project(':takserver-core').file('example')) {
+		include('TAKIgniteConfig.example.xml')
 		include('CoreConfig.example.docker.xml')
-		rename('(.*)', 'tak/CoreConfig.example.xml')
+ 		rename('CoreConfig.example.docker.xml', 'tak/CoreConfig.example.xml')
+		rename('TAKIgniteConfig.example.xml', 'tak/TAKIgniteConfig.example.xml')
 	}
 
 	from(project(':takserver-core').file('docker')) {
@@ -589,7 +610,7 @@ task constructFullDockerZip(type: Zip) {
 
 task constructHardenedFullDockerZip(type: Zip) {
 	dependsOn createDockerDirs
-	dependsOn copyLauncherAndMessagingScripts
+	dependsOn copyLauncherAndConfigAndMessagingScripts
 	dependsOn createVersionFile
 	dependsOn fetchRpmsForHardenedDocker
 	dependsOn createLogDir
@@ -604,7 +625,7 @@ task constructHardenedFullDockerZip(type: Zip) {
 
 	from('build/takArtifacts') {
 		exclude('db-utils/pg_hba.conf', 'db-utils/postgresql.conf',
-				'CoreConfig.example.xml', 'takserver-plugins.sh', 'takserver-plugins-cluster.sh',
+				'TAKIgniteConfig.example.xml', 'CoreConfig.example.xml', 'takserver-plugins.sh', 'takserver-plugins-cluster.sh',
 				'takserver-plugins', 'takserver-pm.jar', 'takserver-retention.jar', 'mission-archive', 'retention')
 		into('tak')
 	}
@@ -633,10 +654,12 @@ task constructHardenedFullDockerZip(type: Zip) {
 		into('tak')
 	}
 
-	// Include the standard docker CoreConfig.xml
+	// Include the standard docker CoreConfig.xml and TAKIgniteConfig.example.xml
 	from(project(':takserver-core').file('docker/hardened/full')) {
+		include('TAKIgniteConfig.example.xml')
 		include('CoreConfig.example.docker-hardened-full.xml')
-		rename('(.*)', 'tak/CoreConfig.example.xml')
+		rename('CoreConfig.example.docker-hardened-full.xml', 'tak/CoreConfig.example.xml')
+		rename('TAKIgniteConfig.example.xml', 'tak/TAKIgniteConfig.example.xml')
 	}
 
 	from(project(':takserver-core').file('docker')) {

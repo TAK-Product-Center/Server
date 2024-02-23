@@ -17,7 +17,7 @@ import tak.server.messaging.MessageConverter;
 public class WebsocketMessagingBroker {
 	
 	public static void brokerTargetedWebSocketMessage(Set<String> websocketConnectionIds, CotEventContainer data, UUID websocketApiId) {
-		ByteBuffer message = StreamingProtoBufProtocol.convertCotToProtoBufBytes(data);
+		ByteBuffer message = StreamingProtoBufProtocol.convertCotToProtoBufBytes(data, true);
 		
 		IgniteHolder.getInstance()
 			.getIgnite()
@@ -36,7 +36,7 @@ public class WebsocketMessagingBroker {
 					.message(IgniteHolder.getInstance().getIgnite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.API_PROFILE_NAME))
 					.send("websocket-payload-write-listener", new WebsocketMessageTransporter(websocketConnectionIds, message.array(), data.getUid(), data.getType()));
 		} else {
-			ByteBuffer message = StreamingProtoBufProtocol.convertCotToProtoBufBytes(data);
+			ByteBuffer message = StreamingProtoBufProtocol.convertCotToProtoBufBytes(data, true);
 
 			IgniteHolder.getInstance()
 					.getIgnite()

@@ -1,9 +1,10 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
          pageEncoding="UTF-8"%>
 <%@ page import="java.util.*" %>
+<%@ page import="com.bbn.marti.remote.config.CoreConfigFacade" %>
 <%@ page import="com.bbn.marti.sync.FileList" %>
 <%@ page import="org.springframework.context.ApplicationContext" %>
-<%@ page import="com.bbn.marti.util.spring.SpringContextBeanForApi" %>
+<%@ page import="com.bbn.marti.remote.util.SpringContextBeanForApi" %>
 <%@ page import="tak.server.Constants" %>
 <%@ page import="javax.naming.NamingException" %>
 <%@ page import="javax.naming.InitialContext" %>
@@ -188,7 +189,7 @@
 
 <hr>
 <%
-	int uploadSizeLimitMB = ((com.bbn.marti.remote.CoreConfig) SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.remote.CoreConfig.class)).getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
+	int uploadSizeLimitMB = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB();
 %>
 <p><a href="upload.jsp">Upload a file (limit <%=uploadSizeLimitMB%> MB)</a></p>
     <a href="javascript:selectAll()">Select all</a>&nbsp;

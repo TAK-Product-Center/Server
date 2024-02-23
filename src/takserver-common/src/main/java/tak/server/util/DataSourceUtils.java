@@ -4,12 +4,12 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.util.Properties;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.config.Repository;
 import com.bbn.marti.config.Connection;
-import com.bbn.marti.remote.CoreConfig;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -18,9 +18,9 @@ public class DataSourceUtils {
 	
 	private static final Logger logger = LoggerFactory.getLogger(DataSourceUtils.class);
 
-	public static HikariDataSource setupDataSourceFromCoreConfig(CoreConfig coreConfig) {
+	public static HikariDataSource setupDataSourceFromCoreConfig() {
 		
-	    Repository repository = coreConfig.getRemoteConfiguration().getRepository();
+	    Repository repository = CoreConfigFacade.getInstance().getRemoteConfiguration().getRepository();
 	    Connection coreDbConnection = repository.getConnection();
 
         int max_connections = 0;
@@ -50,7 +50,7 @@ public class DataSourceUtils {
         // cpus (c5.24xlarge) (max is 1045 regardless)
         int numDbConnections;
         if (repository.isConnectionPoolAutoSize()) {
-            numDbConnections = coreConfig.getRemoteConfiguration().getRepository().getPoolScaleFactor() + (int) Math.min(845, (Runtime.getRuntime().availableProcessors() - 4) * 9.2);
+            numDbConnections = repository.getPoolScaleFactor() + (int) Math.min(845, (Runtime.getRuntime().availableProcessors() - 4) * 9.2);
             numDbConnections = Math.min(Math.max(1, (max_connections - 2) / 2), numDbConnections);
         } else {
             numDbConnections = repository.getNumDbConnections();

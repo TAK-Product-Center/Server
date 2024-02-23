@@ -35,8 +35,10 @@ export JDK_JAVA_OPTIONS="${JDK_JAVA_OPTIONS}
 --add-opens=java.base/java.security=ALL-UNNAMED
 --add-opens=java.base/java.security.ssl=ALL-UNNAMED
 --add-opens=java.base/java.security.cert=ALL-UNNAMED
+--add-opens=java.base/sun.security.provider.certpath=ALL-UNNAMED
 --add-opens=java.base/sun.security.rsa=ALL-UNNAMED
 --add-opens=java.base/sun.security.ssl=ALL-UNNAMED
+--add-opens=java.base/sun.security.validator=ALL-UNNAMED
 --add-opens=java.base/sun.security.x500=ALL-UNNAMED
 --add-opens=java.base/sun.security.pkcs12=ALL-UNNAMED
 --add-opens=java.base/sun.security.provider=ALL-UNNAMED
@@ -50,6 +52,11 @@ TOTALRAMBYTES=`awk '/MemTotal/ {print $2}' /proc/meminfo`
 
 # convert from KiB to MB"
 #TOTAL=$(($TOTARAMBYTES * 1024 * 25 / 1000 / 1000 / 100))
+
+# set CONFIG max if not set already
+if [ -z "$CONFIG_MAX_HEAP" ]; then
+  export CONFIG_MAX_HEAP=$(($TOTALRAMBYTES / 35000))
+fi
 
 # set API max if not set already
 if [ -z "$API_MAX_HEAP" ]; then
@@ -72,6 +79,7 @@ if [ -z "$RETENTION_MAX_HEAP" ]; then
 fi
 
 echo "TOTALRAMBYTES : "$TOTALRAMBYTES
+echo "CONFIG_MAX_HEAP (MB) : "$CONFIG_MAX_HEAP
 echo "API_MAX_HEAP (MB) : "$API_MAX_HEAP
 echo "MESSAGING_MAX_HEAP (MB) : "$MESSAGING_MAX_HEAP
 echo "PLUGIN_MANAGER_MAX_HEAP (MB) : "$PLUGIN_MANAGER_MAX_HEAP

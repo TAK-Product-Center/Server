@@ -20,6 +20,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ssl.SSLPeerUnverifiedException;
 
+import com.google.common.base.Strings;
+
+import io.micrometer.core.instrument.Metrics;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.ssl.SslHandler;
+
 import org.apache.log4j.Logger;
 
 import com.bbn.marti.config.DataFeed;
@@ -40,7 +47,6 @@ import com.bbn.marti.nio.server.Server;
 import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.GroupManager;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SubmissionService;
@@ -48,13 +54,9 @@ import com.bbn.marti.service.Subscription;
 import com.bbn.marti.service.TransportCotEvent;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
-import com.google.common.base.Strings;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
-import io.micrometer.core.instrument.Metrics;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.ssl.SslHandler;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 import tak.server.cot.CotParser;
@@ -117,8 +119,8 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 		return MessagingUtilImpl.getInstance();
 	}
 	
-	protected DistributedConfiguration config() {
-		return DistributedConfiguration.getInstance();
+	protected CoreConfigFacade config() {
+		return CoreConfigFacade.getInstance();
 	}
 	
 	private ThreadLocal<CotParser> cotParser = new ThreadLocal<>();
@@ -403,7 +405,7 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 			SslHandler sslhandler = (SslHandler) nettyContext.channel().pipeline().get("ssl");
 			cert = (X509Certificate) sslhandler.engine().getSession().getPeerCertificates()[index];
 		} catch (SSLPeerUnverifiedException e) {
-			if(log.isDebugEnabled()) {
+			if (log.isDebugEnabled()) {
 				log.debug("Could not get cert at from chain at index " + index, e);
 			}
 		}
@@ -462,7 +464,7 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 
 	public Exception spelunkToBottomOfExceptionChain(Throwable e) {
 
-		if(e.getCause() != null) {
+		if (e.getCause() != null) {
 			return spelunkToBottomOfExceptionChain(e.getCause());
 		}
 		return (Exception) e;
@@ -581,7 +583,7 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 				lastMessageCountResetTime.set(curtime);
 			}
 
-		}, 0, config().getBuffer().getQueue().getFlushInterval(), TimeUnit.MILLISECONDS);
+		}, 0, config().getRemoteConfiguration().getBuffer().getQueue().getFlushInterval(), TimeUnit.MILLISECONDS);
 	}
 
 	@Override

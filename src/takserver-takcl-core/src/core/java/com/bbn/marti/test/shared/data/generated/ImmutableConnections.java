@@ -2,7 +2,9 @@ package com.bbn.marti.test.shared.data.generated;
 
 import com.bbn.marti.config.AuthType;
 import com.bbn.marti.test.shared.data.GroupSetProfiles;
-import com.bbn.marti.test.shared.data.connections.*;
+import com.bbn.marti.test.shared.data.connections.AbstractConnection;
+import com.bbn.marti.test.shared.data.connections.BaseConnections;
+import com.bbn.marti.test.shared.data.connections.ConnectionFilter;
 import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;

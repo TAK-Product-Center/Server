@@ -219,12 +219,13 @@ dependencies {
     implementation group: 'com.squareup.retrofit2', name: 'converter-scalars', version: '2.9.0'
 	// Keep the logging-interceptor in sync with the retrofit dependencies!
 	implementation group: 'com.squareup.okhttp3', name: 'logging-interceptor', version: '3.14.9'
-	implementation group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.4.0'
+	implementation group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.5.0'
     implementation group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
 
     implementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
     implementation group: 'commons-io', name: 'commons-io', version: commons_io_version
-    implementation group: 'org.apache.httpcomponents', name: 'httpclient', version: httpcomponents_version
+    //implementation group: 'org.apache.httpcomponents', name: 'httpclient', version: httpcomponents_version
+    implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: httpcomponents_version
     implementation group: 'org.dom4j', name: 'dom4j', version: dom4j_version
     implementation group: 'junit', name: 'junit', version: junit_version
     api group: 'com.google.code.gson', name: 'gson', version: gson_version
@@ -259,6 +260,8 @@ dependencies {
 
     cursedtakImplementation 'com.googlecode.lanterna:lanterna:3.0.1'
 	cursedtakImplementation group: 'xerces', name: 'xercesImpl', version: xerces_version
+	
+	implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: jakarta_xml_bind_api_version
 }
 
 

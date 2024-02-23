@@ -24,6 +24,7 @@ cd /init_files
 if [[ -f "takserver-base.rpm" ]];then
   rpm2cpio takserver-base.rpm | cpio -idm
   cp /init_files/opt/tak/CoreConfig.example.xml /init_files/opt/tak/CoreConfig.xml
+  cp /init_files/opt/tak/TAKIgniteConfig.example.xml /init_files/opt/tak/TAKIgniteConfig.xml
 fi
 
 sudo -u postgres /usr/pgsql-15/bin/psql --host=127.0.0.1 --port=5432 -U postgres -c "CREATE ROLE martiuser LOGIN ENCRYPTED PASSWORD 'md564d5850dcafc6b4ddd03040ad1260bc2' SUPERUSER INHERIT CREATEDB NOCREATEROLE;"

@@ -1,11 +1,18 @@
 package com.bbn.marti.sync.api;
 
 import java.rmi.RemoteException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.NavigableSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathFactory;
 
@@ -20,7 +27,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
 
 import com.bbn.marti.config.Filter;
 import com.bbn.marti.cot.search.model.ApiResponse;
@@ -35,11 +41,16 @@ import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.util.CommonUtil;
-import com.bbn.security.web.MartiValidator;
 import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 import com.google.common.collect.ComparisonChain;
 
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import tak.server.CommonConstants;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
@@ -196,7 +207,7 @@ public class SubscriptionApi extends BaseRestController {
             String xpathString = tmpSub.xpath.replaceAll("\\s", "");
             //If user enters blank (or spaces) for xpath set it to null in sub object
             //null xpath means it is set to * in subscriptionManager.initializeStaticSubscription
-            if(xpathString.equals("")){
+            if (xpathString.equals("")){
                 remoteSubscription.xpath = null;
             }
             else {
@@ -209,7 +220,7 @@ public class SubscriptionApi extends BaseRestController {
             }
 
             List<String> filterGroupsList;
-            if(!tmpSub.filterGroups.replaceAll("\\s", "").equals("")){
+            if (!tmpSub.filterGroups.replaceAll("\\s", "").equals("")){
                 //Remove leading and trailing whitespace from all elements in filterGroups list
                 filterGroupsList = Arrays.asList(tmpSub.filterGroups.split(","));
                 filterGroupsList.replaceAll(String::trim);
@@ -244,7 +255,7 @@ public class SubscriptionApi extends BaseRestController {
             logger.info("Attempting to delete " + uid);
             boolean deleted = subscriptionManager.deleteSubscriptionFromUI(uid);
           
-            if(deleted){
+            if (deleted){
                 return new ResponseEntity<ApiResponse<String>>(
                         new ApiResponse<String>(Constants.API_VERSION, String.class.getSimpleName(), "Successfully deleted subscription with uid: " + uid), new HttpHeaders(), HttpStatus.OK);
             }
@@ -258,7 +269,7 @@ public class SubscriptionApi extends BaseRestController {
                     new ApiResponse<String>(Constants.API_VERSION, String.class.getSimpleName(), "Error deleting subscription with uid: " + uid), new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-
+    
     @RequestMapping(value = "/subscriptions/incognito/{uid}", method = RequestMethod.POST)
     public ResponseEntity toggleIncognito(@PathVariable(value = "uid") String uid){
         try{
@@ -937,7 +948,7 @@ public class SubscriptionApi extends BaseRestController {
         activeGroupCacheHelper.setActiveGroupsForUser(username, activeGroups);
 
         // reauthenticate currently connected streaming clients for this username
-        groupManager.authenticateCoreUsers("X509", username);
+        groupManager.authenticateCoreUsers(username);
 
         subscriptionManager.sendLatestReachableSA(username);
 
@@ -999,7 +1010,7 @@ public class SubscriptionApi extends BaseRestController {
     public ResponseEntity groupsUpdated(@PathVariable(value = "username") String username) {
         try {
             // reauthenticate currently connected streaming clients for this username
-            groupManager.authenticateCoreUsers("X509", username);
+            groupManager.authenticateCoreUsers(username);
 
             // notify the clients of the group update so they can update their group selection UI
             subscriptionManager.sendGroupsUpdatedMessage(username, null);

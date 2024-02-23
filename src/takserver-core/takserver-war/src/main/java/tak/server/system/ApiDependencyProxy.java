@@ -18,8 +18,8 @@ import tak.server.PluginManager;
 import tak.server.cache.CoTCacheHelper;
 
 public class ApiDependencyProxy implements ApplicationContextAware {
-	
-	
+
+
 	private static ApplicationContext springContext;
 
 	private static ApiDependencyProxy instance = null;
@@ -59,7 +59,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 
 		return serverInfo;
 	}
-	
+
 	private MissionRoleRepository missionRoleRepository = null;
 
 	public MissionRoleRepository missionRoleRepository() {
@@ -87,7 +87,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 
 		return enterpriseSyncService;
 	}
-	
+
 	private CoTCacheHelper cotCacheHelper = null;
 
 	public CoTCacheHelper cotCacheHelper() {
@@ -101,9 +101,9 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 
 		return cotCacheHelper;
 	}
-	
+
 	private MissionRepository missionRepository = null;
-	
+
 	public MissionRepository missionRepository() {
 		if (missionRepository == null) {
 			synchronized (this) {
@@ -115,9 +115,9 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 
 		return missionRepository;
 	}
-	
+
 	private SubscriptionManagerLite subscriptionManagerLite = null;
-	
+
 	public SubscriptionManagerLite subscriptionManagerLite() {
 		if (subscriptionManagerLite == null) {
 			synchronized (this) {
@@ -129,7 +129,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 
 		return subscriptionManagerLite;
 	}
-	
+
 	private MissionService missionService = null;
 
 	public MissionService missionService() {
@@ -143,7 +143,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 
 		return missionService;
 	}
-	
+
 	private GroupManager groupManager = null;
 
 	public GroupManager groupManager() {
@@ -157,7 +157,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 
 		return groupManager;
 	}
-	
+
 	private PluginManager pluginManager = null;
 
 	public PluginManager pluginManager() {
@@ -171,7 +171,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 
 		return pluginManager;
 	}
-	
+
 	private CommonUtil commonUtil = null;
 
 	public CommonUtil commonUtil() {
@@ -184,18 +184,5 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		}
 
 		return commonUtil;
-	}
-
-	private CoreConfig coreConfig = null;
-
-	public CoreConfig coreConfig() {
-		if (coreConfig == null) {
-			synchronized (this) {
-				if (coreConfig == null) {
-					coreConfig = springContext.getBean(CoreConfig.class);
-				}
-			}
-		}
-		return coreConfig;
 	}
 }

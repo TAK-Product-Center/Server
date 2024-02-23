@@ -49,7 +49,7 @@ public class BadgeOfShame implements Serializable {
 		if (content != null) {
 			this.cot = content;
 		}
-		if(source != null) {
+		if (source != null) {
 		  this.source = source;
 		}
 		this.exception = exception;

@@ -311,7 +311,7 @@ public abstract class AbstractBroadcastingChannelHandler implements ChannelHandl
 	
 	@Override
 	public String identityHash() {
-		return new Integer(System.identityHashCode(this)).toString();
+		return Integer.valueOf(System.identityHashCode(this)).toString();
 	}
     
     

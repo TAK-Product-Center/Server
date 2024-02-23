@@ -3,7 +3,6 @@ package tak.server.federation;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -12,7 +11,10 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import javax.persistence.Tuple;
+import jakarta.persistence.Tuple;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Strings;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,10 +27,8 @@ import com.bbn.marti.remote.FederationManager;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
-import com.bbn.marti.remote.sync.MissionChangeType;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.federation.MissionActionROLConverter;
 import com.bbn.marti.sync.model.Mission;
@@ -36,11 +36,12 @@ import com.bbn.marti.sync.model.MissionChange;
 import com.bbn.marti.sync.model.MissionFeed;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.base.Strings;
 
 import mil.af.rl.rol.value.DataFeedMetadata;
 import mil.af.rl.rol.value.MissionMetadata;
+import tak.server.Constants;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 /*
  */
@@ -68,7 +69,7 @@ public class MissionDisruptionManager {
 		
 		List<ROL> rols = new CopyOnWriteArrayList<>();
 		
-		if (!DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowMissionFederation()) return rols;
+		if (!CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowMissionFederation()) return rols;
 
 		try {
 			
@@ -119,7 +120,7 @@ public class MissionDisruptionManager {
 			
 			fedManager.trackConnectEventForFederate(federate.getId(), fedName, false);
 
-			long recencySecs = DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().getMissionFederationDisruptionToleranceRecencySeconds();
+			long recencySecs = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getMissionFederationDisruptionToleranceRecencySeconds();
 			long maxRecencyMillis;
 			if (recencySecs == -1) {
 			    maxRecencyMillis = lastEventTime.getTime();
@@ -162,11 +163,11 @@ public class MissionDisruptionManager {
 			// get enterprise sync changes as ROL
 			List<String> fileUids = new ArrayList<>();
 			
-			if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions()) {
+			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions()) {
 				fileUids.addAll(MessagingDependencyInjectionProxy.getInstance().fedEventRepo().getMissionResourceHashesForToolForTimeInterval("public", new Date(bestRecencyMillis), now));
 				// only federating public, but make an exception for cops if vbm is enabled
-				if (DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
-					String tool = DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool();
+				if (CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
+					String tool = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool();
 					fileUids.addAll(MessagingDependencyInjectionProxy.getInstance().fedEventRepo().getMissionResourceHashesForToolForTimeInterval(tool, new Date(bestRecencyMillis), now));
 				}
 			} else {
@@ -203,7 +204,7 @@ public class MissionDisruptionManager {
 			});
 
 			Map<String, Long> missionRecencySeconds = new HashMap<String, Long>();
-			Federation.MissionDisruptionTolerance mdt = DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().getMissionDisruptionTolerance();
+			Federation.MissionDisruptionTolerance mdt = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getMissionDisruptionTolerance();
 			if (mdt != null) {
 			    for (Federation.MissionDisruptionTolerance.Mission missionInterval : mdt.getMission()) {
 			        missionRecencySeconds.put(missionInterval.getName(), missionInterval.getRecencySeconds());
@@ -212,11 +213,11 @@ public class MissionDisruptionManager {
 			
 			List<Mission> fedMissions = new ArrayList<>();
 			
-			if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions()) {
+			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isFederateOnlyPublicMissions()) {
 				fedMissions.addAll(missionService.getAllMissions(true, true, "public", outboundGroups));
 				// only federating public, but make an exception for cops if vbm is enabled
-				if (DistributedConfiguration.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
-					String tool = DistributedConfiguration.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool();
+				if (CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
+					String tool = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getMissionCopTool();
 					fedMissions.addAll(missionService.getAllMissions(true, true, tool, outboundGroups));
 				}
 			} else {
@@ -319,10 +320,10 @@ public class MissionDisruptionManager {
 
 						break;
 					case CREATE_DATA_FEED: {
-						if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+						if (CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
 							MissionFeed createdMissionFeed = missionService.getMissionFeed(change.getMissionFeedUid());
 							if (createdMissionFeed != null) {
-								DataFeed dataFeed = DistributedConfiguration.getInstance()
+								DataFeed dataFeed = CoreConfigFacade.getInstance()
 										.getRemoteConfiguration()
 				    					.getNetwork()
 				    					.getDatafeed()
@@ -357,11 +358,11 @@ public class MissionDisruptionManager {
 						break;
 					}
 					case DELETE_DATA_FEED: {
-						if (DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+						if (CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
 							MissionFeed deleteMissionFeed = missionService.getMissionFeed(change.getMissionFeedUid());
 							
 							if (deleteMissionFeed != null) {
-								DataFeed dataFeed = DistributedConfiguration.getInstance()
+								DataFeed dataFeed = CoreConfigFacade.getInstance()
 										.getRemoteConfiguration()
 				    					.getNetwork()
 				    					.getDatafeed()
@@ -411,14 +412,32 @@ public class MissionDisruptionManager {
 		return rols;
 	}
 	
-	public List<ROL> getDataFeedEventsForFederatedDataFeedOnly() {
-		List<ROL> rols = new CopyOnWriteArrayList<>();
+	public List<ROL> getDataFeedEventsForFederatedDataFeedOnly(Federate federate) {
+		NavigableSet<String> outboundGroups = new ConcurrentSkipListSet<>(federate.getOutboundGroup()
+				.stream()
+				.map(og -> groupManager.getGroup(og, Direction.OUT))
+				.map(og -> og.getName())
+				.collect(Collectors.toSet()));
 		
-		DistributedConfiguration.getInstance()
+		List<ROL> rols = new CopyOnWriteArrayList<>();
+
+		CoreConfigFacade.getInstance()
 				.getRemoteConfiguration()
 				.getNetwork()
 				.getDatafeed()
 				.stream()
+				.filter(datafeed -> {
+					List<String> filterGroups = new ArrayList<>(datafeed.getFiltergroup());
+					if (datafeed.isAnongroup())
+						filterGroups.add(Constants.ANON_GROUP);
+					
+					for (String group: filterGroups) {
+						if (outboundGroups.contains(group))
+							return true;
+					}
+					
+					return false;
+				})
 				.forEach(dataFeed -> {
 					try {
 						

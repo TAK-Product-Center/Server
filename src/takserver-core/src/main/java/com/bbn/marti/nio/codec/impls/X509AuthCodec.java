@@ -7,6 +7,9 @@ import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.List;
 
+import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,11 +30,10 @@ import com.bbn.marti.remote.groups.AuthenticatedUser;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.X509UsernameExtractor;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.util.concurrent.executor.OrderedExecutor;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 /**
  *
@@ -42,7 +44,8 @@ public class X509AuthCodec extends AbstractAuthCodec implements ByteCodec {
 
     private static final Logger logger = LoggerFactory.getLogger(X509AuthCodec.class);
 
-    private final X509UsernameExtractor usernameExtractor = new X509UsernameExtractor(DistributedConfiguration.getInstance().getAuth().getDNUsernameExtractorRegex());
+    private final X509UsernameExtractor usernameExtractor = new X509UsernameExtractor(
+            CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getDNUsernameExtractorRegex());
 
     private long lastAuthTime = -1L;
     private long updateIntervalMilliseconds = -1L;
@@ -181,12 +184,13 @@ public class X509AuthCodec extends AbstractAuthCodec implements ByteCodec {
             return updateIntervalMilliseconds;
         }
 
-        if (DistributedConfiguration.getInstance() != null &&
-            DistributedConfiguration.getInstance().getAuth() != null &&
-            DistributedConfiguration.getInstance().getAuth().getLdap() != null &&
-            DistributedConfiguration.getInstance().getAuth().getLdap().getUpdateinterval() != null) {
+        if (CoreConfigFacade.getInstance() != null &&
+                CoreConfigFacade.getInstance().getRemoteConfiguration() != null &&
+                CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth() != null &&
+                CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap() != null &&
+                CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap().getUpdateinterval() != null) {
             updateIntervalMilliseconds =
-                    DistributedConfiguration.getInstance().getAuth().getLdap().getUpdateinterval() * 1000;
+                    CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap().getUpdateinterval() * 1000;
         } else {
             updateIntervalMilliseconds = updateIntervalMillisecondsDefault;
         }

@@ -26,7 +26,7 @@ loginControllers.controller('loginController', ['$scope', '$location', 'loginSer
 
         $scope.onSubmit = async function() {
             var xhr = new XMLHttpRequest();
-            var url = "/oauth/token?grant_type=password" +
+            var url = "/oauth2/token?grant_type=password" +
                 "&username=" + encodeURIComponent(username.value) +
                 "&password=" + encodeURIComponent(password.value);
             xhr.responseType = 'json';

@@ -3,17 +3,123 @@
 'use strict';
 
 angular.module('roger_federation.Workflows')
-.controller('WorkflowsController', ['$scope', '$rootScope', '$window', '$state', '$stateParams', '$timeout', '$uibModal',
-  '$log', '$http', 'uuid4', 'growl', 'WorkflowService', 'OntologyService', 'JointPaper', 'SemanticsService', workflowsController
+.controller('WorkflowsController', ['$scope', '$rootScope', '$window', '$state', '$stateParams', '$interval', '$timeout', '$uibModal',
+  '$log', '$http', 'uuid4', 'growl', 'WorkflowService', 'OntologyService', 'JointPaper', workflowsController
   ]);
 
-function workflowsController($scope, $rootScope, $window, $state, $stateParams, $timeout, $uibModal, $log, $http, uuid4, growl, WorkflowService, OntologyService, JointPaper, SemanticsService) {
+function workflowsController($scope, $rootScope, $window, $state, $stateParams, $interval, $timeout, $uibModal, $log, $http, uuid4, growl, WorkflowService, OntologyService, JointPaper) {
   $scope.JointPaper = JointPaper;
   $scope.criticResults = [];
 
   $scope.data = "{users: 'Joe'}";
+  $state.fkdi = ""
+  $state.tids = {}
+  $state.cache = {}
+
+  function translateIds(){
+    if (JointPaper.paper &&  JointPaper.paper._views) {
+      var nodeKeys = Object.keys(JointPaper.paper._views);
+      for (var i = 0; i < nodeKeys.length; i++) {
+        let cellView = JointPaper.paper._views[nodeKeys[i]]
+        if (cellView.model.attributes.graphType === "GroupCell") {
+          if (cellView.model.attributes.roger_federation.name in $state.tids) {
+            continue;
+          }
+          else {
+            $state.tids[cellView.model.attributes.id] = cellView.model.attributes.roger_federation.name;
+          }
+        }
+      }
+    }
+  }
+
+  function getRandomInt(max) {
+    return Math.floor(Math.random() * max);
+  }
+
 
   pollActiveConnections()
+  $timeout(AnimateDataFlow, getRandomInt(5000))
+
+  function pollDataFlowStats(){
+     WorkflowService.getDataFlowStats().then(function(dataFlows) {
+        var timestamp = new Date().getTime();
+        translateIds();
+        animateDataFlows(dataFlows.channelInfos, timestamp)
+      }).catch(e => animateDataFlows([])) 
+  }
+
+  function findDataFlow(dataFlows, source, target){
+    var decodedSource = $state.tids[source];
+    var decodedTarget = $state.tids[target];
+    for(var flow of dataFlows){
+      if(flow["sourceCert"] == decodedSource && flow["targetCert"] == decodedTarget){
+        return flow;
+      }
+    }
+
+    return undefined;
+  }
+
+  function animateDataFlows(dataFlows, timestamp){
+    if(dataFlows == [])
+      return
+
+    if (JointPaper.paper &&  JointPaper.paper._views) {
+      var nodeKeys = Object.keys(JointPaper.paper._views);
+      for (var i = 0; i < nodeKeys.length; i++) {
+        let cellView = JointPaper.paper._views[nodeKeys[i]]
+
+        if (cellView.model.attributes.graphType === "EdgeCell") {
+          var thisFlow = findDataFlow(dataFlows, cellView.model.attributes.source.id, cellView.model.attributes.target.id);
+          var key = cellView.model.attributes.source.id + cellView.model.attributes.target.id;
+          var flow = 0;
+
+          if(key in $state.cache){
+            flow = thisFlow["messagesWritten"] - $state.cache[key];
+            $state.cache[key] = thisFlow["messagesWritten"];
+          }
+          else {
+            $state.cache[key] = thisFlow["messagesWritten"];
+          }
+          if(thisFlow != undefined){
+            drawFlow(flow, cellView)
+            cellView.update()
+          }
+        }
+      }
+    }
+  }
+
+  function drawFlow(flow, cellView){
+    if(flow > 0){
+      cellView.model.attributes.attrs['.connection']['stroke'] = 'green'
+      cellView.model.attributes.attrs['.connection']["stroke-dasharray"] = "4,4"
+      cellView.model.attributes.attrs['.marker-target']['fill'] = 'green'
+
+      if(flow < 3){
+        cellView.model.attributes.attrs['.connection']['stroke-width'] = 3
+      }
+      else if (flow > 6){
+        cellView.model.attributes.attrs['.connection']['stroke-width'] = 6
+      }
+      else {
+        cellView.model.attributes.attrs['.connection']['stroke-width'] = flow
+      }
+    }
+    else {
+      cellView.model.attributes.attrs['.connection']['stroke'] = 'DarkGray'
+      cellView.model.attributes.attrs['.connection']['stroke-width'] = 2
+      cellView.model.attributes.attrs['.marker-target']['fill'] = 'DarkGray'
+      cellView.model.attributes.attrs['.connection']["stroke-dasharray"] = ""
+    }
+  }
+
+  function AnimateDataFlow(){
+    if($state.fkdi == ""){
+      $state.fkdi = $interval(pollDataFlowStats, 5000);
+    }
+  }
 
   function pollActiveConnections() {
     WorkflowService.getActiveConnections().then(function(activeConnections) {
@@ -27,7 +133,6 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
   }
 
   function setNodeStatus(activeConnections) {
-    // console.log(JointPaper.paper)
     if (JointPaper.paper &&  JointPaper.paper._views) {
       var nodeKeys = Object.keys(JointPaper.paper._views);
       for (var i = 0; i < nodeKeys.length; i++) {
@@ -38,7 +143,6 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
           + cellView.model.attributes.roger_federation.host + ':' + cellView.model.attributes.roger_federation.port
           
           let foundConnection = undefined
-          
           activeConnections.forEach(activeConnection => {
             if (activeConnection.connectionId === cellView.model.attributes.roger_federation.name)
               foundConnection = activeConnection

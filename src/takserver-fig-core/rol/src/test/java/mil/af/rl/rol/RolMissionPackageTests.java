@@ -42,7 +42,7 @@ public class RolMissionPackageTests {
 
         int count = 0;
 
-        for (File rolFile : com.google.common.io.Files.fileTreeTraverser().preOrderTraversal(rolDir)) {
+        for (File rolFile : com.google.common.io.Files.fileTraverser().depthFirstPreOrder(rolDir)) {
             if (rolFile.isFile() && rolFile.getName().toLowerCase().endsWith(".rol")) {
 
                 RolLexer lexer = new RolLexer(new ANTLRInputStream(new FileInputStream(rolFile)));

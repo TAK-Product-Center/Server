@@ -4,13 +4,14 @@ import java.util.Locale;
 import java.util.NavigableSet;
 import java.util.Set;
 
+import io.micrometer.core.instrument.Metrics;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import tak.server.Constants;
-import tak.server.cot.CotEventContainer;
 
 import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Federation.Federate;
@@ -18,11 +19,11 @@ import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubscriptionStore;
 
-import io.grpc.stub.StreamObserver;
-import io.micrometer.core.instrument.Metrics;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import tak.server.Constants;
+import tak.server.cot.CotEventContainer;
 
 import static java.util.Objects.requireNonNull;
 
@@ -112,7 +113,7 @@ public class FigServerFederateSubscription extends FigFederateSubscription {
 			return;
 		}
 		
-		if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null && !DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+		if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null && !CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("data feed federation disabled");
 			}

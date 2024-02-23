@@ -666,9 +666,7 @@ public class BlockingArrayQueue<E> extends AbstractList<E> implements BlockingQu
                     {
                         System.arraycopy(_elements,1,_elements,0,tail);
                         --_indexes[TAIL_OFFSET];
-                    }
-                    else
-                    {
+                    } else {
                         _indexes[TAIL_OFFSET] = capacity - 1;
                     }
                     _elements[_indexes[TAIL_OFFSET]] = null;
@@ -708,9 +706,7 @@ public class BlockingArrayQueue<E> extends AbstractList<E> implements BlockingQu
                     if (head < tail)
                     {
                         System.arraycopy(_elements,head,elements,0,tail - head);
-                    }
-                    else
-                    {
+                    } else {
                         int chunk = _elements.length - head;
                         System.arraycopy(_elements,head,elements,0,chunk);
                         System.arraycopy(_elements,0,elements,chunk,tail);
@@ -791,9 +787,7 @@ public class BlockingArrayQueue<E> extends AbstractList<E> implements BlockingQu
                     int cut = capacity - head;
                     System.arraycopy(_elements,head,elements,0,cut);
                     System.arraycopy(_elements,0,elements,cut,tail);
-                }
-                else
-                {
+                } else {
                     newTail = 0;
                 }
 

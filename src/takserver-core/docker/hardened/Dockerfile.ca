@@ -1,9 +1,32 @@
-# need java for keytool
-FROM eclipse-temurin:17-jammy
-RUN apt update && \
-	apt install -y apt-utils && \
-    apt install -y openssl && \
-    apt install -y vim
+## Environment variables outside image context. These will be available until the first FROM statement.
+ARG BASE_REGISTRY=registry1.dso.mil
+ARG BASE_DEPLOY_IMAGE=ironbank/redhat/openjdk/openjdk17
+ARG BASE_DEPLOY_TAG=1.17
+
+####################################################################################################
+
+## Base deploy image
+FROM ${BASE_REGISTRY}/${BASE_DEPLOY_IMAGE}:${BASE_DEPLOY_TAG} as deploy_container
+
+USER root
+
+# Upgrade first
+RUN dnf -y upgrade --nodocs \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+COPY tak/security/*.rpm .
+# Install EPEL 8 repo
+RUN rpm -Uvh epel-release-latest-8.noarch.rpm
+
+# Install dependencies
+RUN dnf update -y --disableplugin=subscription-manager --nodocs \
+    && dnf install -y --disableplugin=subscription-manager --nodocs \
+           openssl \
+           vim \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
 
 RUN useradd -g 0 -u 1001 tak \
     && usermod -a -G root tak

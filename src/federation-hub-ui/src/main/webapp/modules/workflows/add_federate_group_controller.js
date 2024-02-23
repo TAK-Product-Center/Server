@@ -2,9 +2,9 @@
 "use strict";
 
 angular.module('roger_federation.Workflows')
-    .controller('AddFederateGroupController', ['$rootScope', '$scope', '$state', '$http', '$stateParams', '$modalInstance', '$timeout', '$log', '$cookieStore', 'growl', 'WorkflowTemplate', 'WorkflowService', 'OntologyService', 'JointPaper', addFederateGroupController]);
+    .controller('AddFederateGroupController', ['$rootScope', '$scope', '$state', '$http', '$stateParams', '$modalInstance', '$timeout', '$log', '$cookieStore', 'growl', 'WorkflowTemplate', 'WorkflowService', 'OntologyService', 'JointPaper', 'ConfigService', addFederateGroupController]);
 
-function addFederateGroupController($rootScope, $scope, $state, $http, $stateParams, $modalInstance, $timeout, $log, $cookieStore, growl, WorkflowTemplate, WorkflowService, OntologyService, JointPaper) {
+function addFederateGroupController($rootScope, $scope, $state, $http, $stateParams, $modalInstance, $timeout, $log, $cookieStore, growl, WorkflowTemplate, WorkflowService, OntologyService, JointPaper, ConfigService) {
 
     $scope.editorTitle = "Add";
     $scope.editExisting = false;
@@ -89,7 +89,7 @@ function addFederateGroupController($rootScope, $scope, $state, $http, $statePar
         if (file == null) {
             alert("Please provide a valid certificate file before submitting.");
         } else {
-            var uploadUrl = "/fig/addNewGroupCa";
+            var uploadUrl = ConfigService.getServerBaseUrlStrV2() + "addNewGroupCa";
 
             $scope.submitInProgress = true;
 

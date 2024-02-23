@@ -1,9 +1,9 @@
 keystoreType: JKS
-keystoreFile: /opt/tak/certs/files/takserver.jks
+keystoreFile: /opt/tak/federation-hub/certs/files/takserver.jks
 keystorePassword: atakatak
 
 truststoreType: JKS
-truststoreFile: /opt/tak/certs/files/fed-truststore.jks
+truststoreFile: /opt/tak/federation-hub/certs/files/fed-truststore.jks
 truststorePassword: atakatak
 
 keyAlias: takserver

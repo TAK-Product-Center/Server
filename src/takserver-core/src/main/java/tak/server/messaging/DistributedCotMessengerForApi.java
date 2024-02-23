@@ -1,11 +1,11 @@
 package tak.server.messaging;
 
+import com.bbn.marti.config.Configuration;
 import org.apache.ignite.Ignite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.nio.channel.ChannelHandler;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.service.Subscription;
@@ -15,18 +15,21 @@ import com.google.common.collect.ImmutableSet;
 import tak.server.CommonConstants;
 import tak.server.Constants;
 import tak.server.cluster.ClusterManager;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 
 public class DistributedCotMessengerForApi implements Messenger<CotEventContainer> {
 
-	public DistributedCotMessengerForApi(Ignite ignite, SubscriptionStore subscriptionStore, ServerInfo serverInfo, MessageConverter messageConverter, CoreConfig config) {
+	public DistributedCotMessengerForApi(Ignite ignite, SubscriptionStore subscriptionStore, ServerInfo serverInfo, MessageConverter messageConverter) {
 		this.ignite = ignite;
 		this.subscriptionStore = subscriptionStore;
 		this.serverInfo = serverInfo;
 		this.messageConverter = messageConverter;
-		
-		this.isCluster = config.getRemoteConfiguration().getCluster() != null && config.getRemoteConfiguration().getCluster().isEnabled();
-		this.isPlugins = config.getRemoteConfiguration().getPlugins().isUsePluginMessageQueue();
+
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
+		this.isCluster = config.getCluster() != null && config.getCluster().isEnabled();
+		this.isPlugins = config.getPlugins().isUsePluginMessageQueue();
 	}
 
 	private final Ignite ignite;

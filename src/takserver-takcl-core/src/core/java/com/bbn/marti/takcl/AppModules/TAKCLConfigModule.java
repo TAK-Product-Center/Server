@@ -13,8 +13,9 @@ import com.bbn.marti.takcl.taka.config.TAKAConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import tak.server.util.JAXBUtils;
 
-import javax.xml.bind.JAXBException;
+import jakarta.xml.bind.JAXBException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -128,6 +129,10 @@ public class TAKCLConfigModule implements AppModuleInterface {
 		return Paths.get(getTakServerPath(), fileRouter.getRunnableServerConfig().getCleanConfigFile()).toString();
 	}
 
+	public String getCleanTAKIgniteConfigFilepath() {
+		return Paths.get(getTakServerPath(), fileRouter.getRunnableServerConfig().getCleanTAKIgniteConfigFile()).toString();
+	}
+
 	/**
 	 * Sets the location the the server. This is used to indicate where the CoreConfig.xml is and other related files
 	 * modified by TAKCL
@@ -137,7 +142,7 @@ public class TAKCLConfigModule implements AppModuleInterface {
 	 */
 	@Command(description = "Sets the location of the server and CoreConfig.xml.")
 	public void setTAKServerPath(String path) {
-        fileRouter.getRunnableServerConfig().setModelServerDir(path);
+		fileRouter.getRunnableServerConfig().setModelServerDir(path);
 		saveChanges();
 	}
 
@@ -210,8 +215,16 @@ public class TAKCLConfigModule implements AppModuleInterface {
 		return Paths.get(getTakServerPath(), fileRouter.getRunnableServerConfig().getConfigFile()).toString();
 	}
 
+	public String getServerTAKIgniteConfigFilepath() {
+		return Paths.get(getTakServerPath(), fileRouter.getRunnableServerConfig().getTAKIgniteConfigFile()).toString();
+	}
+
 	public String getServerConfigFilepath(@NotNull String serverIdentifier) {
 		return Paths.get(getTakServerPath(serverIdentifier), fileRouter.getRunnableServerConfig().getConfigFile()).toString();
+	}
+
+	public String getServerTAKIgniteConfigFilepath(@NotNull String serverIdentifier) {
+		return Paths.get(getTakServerPath(serverIdentifier), fileRouter.getRunnableServerConfig().getTAKIgniteConfigFile()).toString();
 	}
 
 	public String getServerUserFile() {
@@ -331,32 +344,32 @@ public class TAKCLConfigModule implements AppModuleInterface {
 
 				String sysPropConfigFilepath = TAKCLCore.TakclOption.TakclConfigPath.getStringOrNull();
 				if (sysPropConfigFilepath != null) {
-					sysPropTakclConfiguration = Util.loadJAXifiedXML(sysPropConfigFilepath, TAKCLConfiguration.class.getPackage().getName());
+					sysPropTakclConfiguration = JAXBUtils.loadJAXifiedXML(sysPropConfigFilepath, TAKCLConfiguration.class.getPackage().getName());
 				} else {
 					sysPropTakclConfiguration = null;
 				}
 
 				if (Files.exists(configFilepath = Paths.get(workingPath, DEFAULT_LOCAL_CONFIG_FILE_LOCATION))) {
-					takclConfiguration = Util.loadJAXifiedXML(configFilepath.toString(), TAKCLConfiguration.class.getPackage().getName());
+					takclConfiguration = JAXBUtils.loadJAXifiedXML(configFilepath.toString(), TAKCLConfiguration.class.getPackage().getName());
 
 				} else if (Files.exists(configFilepath = Paths.get(localPath, DEFAULT_LOCAL_CONFIG_FILE_LOCATION))) {
-					takclConfiguration = Util.loadJAXifiedXML(configFilepath.toString(), TAKCLConfiguration.class.getPackage().getName());
+					takclConfiguration = JAXBUtils.loadJAXifiedXML(configFilepath.toString(), TAKCLConfiguration.class.getPackage().getName());
 
 				} else if (Files.exists(configFilepath = Paths.get(workingPath, DEFAULT_TAKA_CONFIG_FILE_LOCATION))) {
-					takaConfiguration = Util.loadJAXifiedXML(configFilepath.toString(), TAKAConfiguration.class.getPackage().getName());
+					takaConfiguration = JAXBUtils.loadJAXifiedXML(configFilepath.toString(), TAKAConfiguration.class.getPackage().getName());
 
 				} else if (Files.exists(configFilepath = Paths.get(workingPath, DEFAULT_CONFIG_FILE_LOCATION))) {
-					takclConfiguration = Util.loadJAXifiedXML(configFilepath.toString(), TAKCLConfiguration.class.getPackage().getName());
+					takclConfiguration = JAXBUtils.loadJAXifiedXML(configFilepath.toString(), TAKCLConfiguration.class.getPackage().getName());
 
 				} else if (Files.exists(configFilepath = Paths.get(localPath, DEFAULT_TAKA_CONFIG_FILE_LOCATION))) {
-					takaConfiguration = Util.loadJAXifiedXML(configFilepath.toString(), TAKAConfiguration.class.getPackage().getName());
+					takaConfiguration = JAXBUtils.loadJAXifiedXML(configFilepath.toString(), TAKAConfiguration.class.getPackage().getName());
 
 				} else if (Files.exists(configFilepath = Paths.get(localPath, DEFAULT_CONFIG_FILE_LOCATION))) {
-					takclConfiguration = Util.loadJAXifiedXML(configFilepath.toString(), TAKCLConfiguration.class.getPackage().getName());
+					takclConfiguration = JAXBUtils.loadJAXifiedXML(configFilepath.toString(), TAKCLConfiguration.class.getPackage().getName());
 				} else {
 					InputStream takclConfigStream = TAKCLConfigModule.class.getClassLoader().getResourceAsStream("TAKCLConfig.xml");
 					if (takclConfigStream != null) {
-						takclConfiguration = Util.loadJAXifiedXML(takclConfigStream, TAKCLConfiguration.class.getPackage().getName());
+						takclConfiguration = JAXBUtils.loadJAXifiedXML(takclConfigStream, TAKCLConfiguration.class.getPackage().getName());
 					}
 				}
 
@@ -506,11 +519,11 @@ public class TAKCLConfigModule implements AppModuleInterface {
 		public void saveChanges() {
 			try {
 				if (takclConfiguration != null) {
-					Util.saveJAXifiedObject(configFilepath, takclConfiguration, true);
+					JAXBUtils.saveJAXifiedObject(configFilepath, takclConfiguration, true);
 				}
 
 				if (takaConfiguration != null) {
-					Util.saveJAXifiedObject(configFilepath, takaConfiguration, true);
+					JAXBUtils.saveJAXifiedObject(configFilepath, takaConfiguration, true);
 				}
 			} catch (IOException | JAXBException e) {
 				throw new RuntimeException(e);

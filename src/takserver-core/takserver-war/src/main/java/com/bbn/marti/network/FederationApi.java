@@ -16,8 +16,8 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import javax.servlet.http.HttpServletResponse;
-import javax.xml.bind.DatatypeConverter;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.xml.bind.DatatypeConverter;
 
 import org.jetbrains.annotations.NotNull;
 import org.owasp.esapi.Validator;
@@ -344,7 +344,7 @@ public class FederationApi extends BaseRestController {
 				Validator validator = MartiValidator.getInstance();
 				if (groupsInbound != null && !groupsInbound.isEmpty()) {
 					for (String group : groupsInbound){
-						if(validator.isValidInput("Federate group", group, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
+						if (validator.isValidInput("Federate group", group, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
 							federateGroupAssociations.add(new FederateGroupAssociation(federateId, group, DirectionValue.INBOUND));
 						}
 					}
@@ -352,7 +352,7 @@ public class FederationApi extends BaseRestController {
 
 				if (groupsOutbound != null && !groupsOutbound.isEmpty()) {
 					for (String group : groupsOutbound) {
-						if(validator.isValidInput("Federate group", group, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
+						if (validator.isValidInput("Federate group", group, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
 							federateGroupAssociations.add(new FederateGroupAssociation(federateId, group, DirectionValue.OUTBOUND));
 						}
 					}
@@ -625,7 +625,7 @@ public class FederationApi extends BaseRestController {
 		List<FederateCAGroupAssociation> federateCAGroupAssociations = new ArrayList<FederateCAGroupAssociation>();
 
 		try{
-			if(caId == null || caId.trim().length() == 0){
+			if (caId == null || caId.trim().length() == 0){
 				result = new ResponseEntity<ApiResponse<List<FederateCAGroupAssociation>>>(new ApiResponse<List<FederateCAGroupAssociation>>(Constants.API_VERSION, FederateCAGroupAssociation.class.getName(), null),
 						HttpStatus.BAD_REQUEST);
 			}
@@ -635,13 +635,13 @@ public class FederationApi extends BaseRestController {
 
 				Validator validator = MartiValidator.getInstance();
 				for(String groupName : inboundGroups){
-					if(validator.isValidInput("Federate CA group", groupName, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
+					if (validator.isValidInput("Federate CA group", groupName, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
 						federateCAGroupAssociations.add(new FederateCAGroupAssociation(caId, groupName, DirectionValue.INBOUND));
 					}
 				}
 
 				for(String groupName : outboundGroups){
-					if(validator.isValidInput("Federate CA group", groupName, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
+					if (validator.isValidInput("Federate CA group", groupName, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
 						federateCAGroupAssociations.add(new FederateCAGroupAssociation(caId, groupName, DirectionValue.OUTBOUND));
 					}
 				}
@@ -654,7 +654,7 @@ public class FederationApi extends BaseRestController {
 			logger.error("Exception getting federate CA groups", e);
 		}
 
-		if(result == null){
+		if (result == null){
 			result = new ResponseEntity<ApiResponse<List<FederateCAGroupAssociation>>>(new ApiResponse<List<FederateCAGroupAssociation>>(Constants.API_VERSION, FederateCAGroupAssociation.class.getName(),
 					null), HttpStatus.INTERNAL_SERVER_ERROR);
 		}
@@ -670,14 +670,14 @@ public class FederationApi extends BaseRestController {
 
 		try{
 			errors = getValidationErrors(federateCAGroupAssociation);
-			if(errors.isEmpty()){
+			if (errors.isEmpty()){
 				Set<String> groups = new HashSet<String>(1);
 				groups.add(federateCAGroupAssociation.getGroup());
 				logger.debug("Federate CA Group Association: " + federateCAGroupAssociation);
-				if(federateCAGroupAssociation.getDirection() == DirectionValue.INBOUND){
+				if (federateCAGroupAssociation.getDirection() == DirectionValue.INBOUND){
 					federationInterface.addInboundGroupToCA(federateCAGroupAssociation.getCaId(), groups);
 				}
-				else if(federateCAGroupAssociation.getDirection() == DirectionValue.OUTBOUND){
+				else if (federateCAGroupAssociation.getDirection() == DirectionValue.OUTBOUND){
 					federationInterface.addOutboundGroupToCA(federateCAGroupAssociation.getCaId(), groups);
 				}
 				else{
@@ -697,7 +697,7 @@ public class FederationApi extends BaseRestController {
 			errors.add(e.getMessage());
 		}
 
-		if(result == null){
+		if (result == null){
 			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), null, errors),
 					HttpStatus.INTERNAL_SERVER_ERROR);
 		}
@@ -714,14 +714,14 @@ public class FederationApi extends BaseRestController {
 			FederateCAGroupAssociation federateCAGroupAssociation = new FederateCAGroupAssociation(caId, group, directionValue);
 			logger.debug("DELETE FederateCAGroupAssociation: " + federateCAGroupAssociation);
 			errors = getValidationErrors(federateCAGroupAssociation);
-			if(errors.isEmpty()){
+			if (errors.isEmpty()){
 				Set<String> groups = new HashSet<String>(1);
 				groups.add(federateCAGroupAssociation.getGroup());
 
-				if(federateCAGroupAssociation.getDirection() == DirectionValue.INBOUND){
+				if (federateCAGroupAssociation.getDirection() == DirectionValue.INBOUND){
 					federationInterface.removeInboundGroupFromCA(federateCAGroupAssociation.getCaId(), groups);
 				}
-				else if(federateCAGroupAssociation.getDirection() == DirectionValue.OUTBOUND){
+				else if (federateCAGroupAssociation.getDirection() == DirectionValue.OUTBOUND){
 					federationInterface.removeOutboundGroupFromCA(federateCAGroupAssociation.getCaId(), groups);
 				}
 				else{
@@ -742,7 +742,7 @@ public class FederationApi extends BaseRestController {
 
 		}
 
-		if(result ==  null){
+		if (result ==  null){
 			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), null, errors),
 					HttpStatus.INTERNAL_SERVER_ERROR);
 		}
@@ -765,7 +765,7 @@ public class FederationApi extends BaseRestController {
 			errors.add(e.getMessage());
 		}
 
-		if(result == null){
+		if (result == null){
 			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), null, errors),
 					HttpStatus.INTERNAL_SERVER_ERROR);
 		}
@@ -814,6 +814,41 @@ public class FederationApi extends BaseRestController {
 		return result;
 	}
 
+	@RequestMapping(value = "/outgoingconnections", method = RequestMethod.PUT)
+	public ResponseEntity<ApiResponse<Federation.FederationOutgoing>> updateOutgoingConnection(@RequestBody Map<String, Federation.FederationOutgoing> outgoingConnections) {		
+		ResponseEntity<ApiResponse<Federation.FederationOutgoing>> result = null;
+
+		List<String> errors = null;
+		try {
+			Federation.FederationOutgoing original = outgoingConnections.get("original");
+			Federation.FederationOutgoing update = outgoingConnections.get("update");
+			
+			errors = getValidationErrors(update);
+			if (errors.isEmpty()) {
+				federationInterface.updateOutgoingConnection(original, update);
+
+				result = new ResponseEntity<ApiResponse<Federation.FederationOutgoing>>(new ApiResponse<Federation.FederationOutgoing>(Constants.API_VERSION,
+						Federation.FederationOutgoing.class.getName(), update), HttpStatus.OK);
+			} else {
+				result = new ResponseEntity<ApiResponse<Federation.FederationOutgoing>>(new ApiResponse<Federation.FederationOutgoing>(Constants.API_VERSION,
+						Federation.FederationOutgoing.class.getName(), update, errors), HttpStatus.BAD_REQUEST);
+			}
+		} catch (Exception e) {
+			logger.error("Exception editing outgoing connection.", e);
+			//The types of errors we'll see here concern missing cert files or lack of root access
+			//for lower port numbers the user has provided.
+			errors.add(e.getMessage());
+		}
+		
+		if (result == null) {
+			//This would be an error condition (not an empty input list or bad request)
+			result = new ResponseEntity<ApiResponse<Federation.FederationOutgoing>>(new ApiResponse<Federation.FederationOutgoing>(Constants.API_VERSION,
+					Federation.FederationOutgoing.class.getName(), null, errors), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+	
 	@RequestMapping(value = "/outgoingconnections/{name}", method = RequestMethod.GET)
 	public ResponseEntity<ApiResponse<Federation.FederationOutgoing>> getOutgoingConnection(@PathVariable("name") String name, HttpServletResponse response) {
 
@@ -990,7 +1025,7 @@ public class FederationApi extends BaseRestController {
 			errors = getValidationErrors(federate);
 			if (errors.isEmpty()) {
 				federationInterface.updateFederateDetails(federate.getId(), federate.isArchive(), federate.isShareAlerts(),
-						federate.isFederatedGroupMapping(), federate.isAutomaticGroupMapping(), federate.getNotes(), federate.getMaxHops());
+						federate.isFederatedGroupMapping(), federate.isAutomaticGroupMapping(), federate.isFallbackWhenNoGroupMappings(), federate.getNotes(), federate.getMaxHops());
 
 				result = new ResponseEntity<ApiResponse<Federate>>(new ApiResponse<Federate>(Constants.API_VERSION,
 						Federate.class.getName(), federate), HttpStatus.OK);
@@ -1088,20 +1123,20 @@ public class FederationApi extends BaseRestController {
 	private List<String> getValidationErrors(FederateCAGroupAssociation federateCAGroupAssociation){
 		List<String> errors = new ArrayList<String>();
 
-		if(federateCAGroupAssociation.getCaId() == null || federateCAGroupAssociation.getCaId().trim().length() == 0){
+		if (federateCAGroupAssociation.getCaId() == null || federateCAGroupAssociation.getCaId().trim().length() == 0){
 			errors.add("Certificate Authority ID must not be null or a zero length string.");
 		}
 		else{
 			federateCAGroupAssociation.setCaId(federateCAGroupAssociation.getCaId().trim());
 		}
 
-		if(federateCAGroupAssociation.getGroup() == null || federateCAGroupAssociation.getGroup().trim().length() == 0){
+		if (federateCAGroupAssociation.getGroup() == null || federateCAGroupAssociation.getGroup().trim().length() == 0){
 			errors.add("Group must not be null or a zero length string.");
 		}
 		else{
 			federateCAGroupAssociation.setGroup(federateCAGroupAssociation.getGroup().trim());
 
-			if(federateCAGroupAssociation.getGroup().length() > FEDERATE_GROUP_NAME_MAX_LENGTH){
+			if (federateCAGroupAssociation.getGroup().length() > FEDERATE_GROUP_NAME_MAX_LENGTH){
 				errors.add("Group name must not be longer than " + FEDERATE_GROUP_NAME_MAX_LENGTH + " characters.");
 			}
 

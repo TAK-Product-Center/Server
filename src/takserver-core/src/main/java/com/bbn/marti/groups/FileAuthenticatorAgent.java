@@ -7,11 +7,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 
+import tak.server.util.ActiveProfiles;
 import com.bbn.marti.groups.value.FileAuthenticatorControl;
-import com.bbn.marti.service.DistributedConfiguration;
-import com.bbn.marti.service.LocalConfiguration;
-import com.bbn.marti.util.MessageConversionUtil;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
 
@@ -52,8 +51,8 @@ public class FileAuthenticatorAgent {
 						break;
 					}
 					
-					if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled() 
-							|| (IgniteHolder.getInstance().areTakserverIgnitesLocal() && LocalConfiguration.getInstance().isMessagingProfileActive())) {
+					if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()
+							|| (IgniteHolder.getInstance().areTakserverIgnitesLocal() && ActiveProfiles.getInstance().isMessagingProfileActive())) {
 						FileAuthenticator.getInstance().saveChanges(null);
 					} 
 				}

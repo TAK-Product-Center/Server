@@ -48,7 +48,7 @@ public class NioNettyFederationServerHandler extends NioNettyHandlerBase {
 				.addListener(new GenericFutureListener<Future<Channel>>() {
 					@Override
 					public void operationComplete(Future<Channel> future) throws Exception {
-						if(future.isSuccess()) {							
+						if (future.isSuccess()) {							
 							remoteSocketAddress = (InetSocketAddress) ctx.channel().remoteAddress();
 							localSocketAddress = (InetSocketAddress) ctx.channel().localAddress();
 							nettyContext = ctx;				
@@ -188,7 +188,7 @@ public class NioNettyFederationServerHandler extends NioNettyHandlerBase {
 
 	@Override
 	public void channelUnregistered(ChannelHandlerContext ctx) {
-		if(connectionInfo != null && channelHandler != null && alreadyClosed.compareAndSet(false, true) == true) {
+		if (connectionInfo != null && channelHandler != null && alreadyClosed.compareAndSet(false, true) == true) {
 			messagingUtil().processFederateClose(connectionInfo, channelHandler, SubscriptionStore.getInstance().getByHandler(channelHandler));
 		}
 		ctx.close();

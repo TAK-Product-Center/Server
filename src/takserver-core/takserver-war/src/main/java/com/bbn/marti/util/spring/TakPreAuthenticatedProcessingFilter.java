@@ -4,7 +4,7 @@ import org.springframework.security.web.authentication.preauth.AbstractPreAuthen
 
 import tak.server.Constants;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 public class TakPreAuthenticatedProcessingFilter extends AbstractPreAuthenticatedProcessingFilter  {
 

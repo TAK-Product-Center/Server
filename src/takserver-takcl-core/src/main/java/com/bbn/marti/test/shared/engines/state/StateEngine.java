@@ -21,7 +21,10 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.TreeSet;
 
-import static com.bbn.marti.takcl.connectivity.missions.MissionModels.*;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.Mission;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionContentDataContainer;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionUserRole;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.SubscriptionData;
 
 /**
  * Created on 9/7/16.

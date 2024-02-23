@@ -9,7 +9,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.jetbrains.annotations.NotNull;
@@ -190,6 +196,12 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 			if (!Files.exists(coreConfigTargetPath)) {
 				Files.copy(Paths.get(serverIdentifier.getConfigFilePath()), coreConfigTargetPath);
 			}
+
+			Path coreTAKIgniteConfigTargetPath = logPath.resolve(serverName + "-TAKIgniteConfig.xml");
+			if (!Files.exists(coreTAKIgniteConfigTargetPath)) {
+				Files.copy(Paths.get(serverIdentifier.getTAKIgniteConfigFilePath()), coreTAKIgniteConfigTargetPath);
+			}
+
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}

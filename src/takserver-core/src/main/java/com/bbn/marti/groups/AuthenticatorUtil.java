@@ -2,14 +2,15 @@ package com.bbn.marti.groups;
 
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.slf4j.Logger;
 
 import com.bbn.marti.config.Network.Connector;
 import com.bbn.marti.remote.groups.User;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.util.spring.ThreadLocalRequestHolder;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 public class AuthenticatorUtil {
 
@@ -36,7 +37,7 @@ public class AuthenticatorUtil {
                 logger.debug("requestPort: {}", requestPort);
             }
 
-            List<Connector> connectors = DistributedConfiguration.getInstance().getNetwork().getConnector();
+            List<Connector> connectors = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getConnector();
 
             Connector configConnectorOnTheRequestedPort = null;
             for (Connector connector : connectors) {

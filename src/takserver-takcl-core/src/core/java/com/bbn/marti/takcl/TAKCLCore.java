@@ -40,9 +40,12 @@ public class TAKCLCore {
 	public static final boolean igniteScanInterfaces;
 	@Nullable
 	public static final String coreConfigPath;
+	@Nullable
+	public static final String takIgniteConfigPath;
 	public static final boolean cliIgnoreCoreConfig;
 	public static final long igniteManualRetryTimeout;
 	public static boolean useTakclIgniteConfig;
+	public static final boolean disableConfigProcess;
 	public static final boolean disableMessagingProcess;
 	public static final boolean disableApiProcess;
 
@@ -87,11 +90,13 @@ public class TAKCLCore {
 		IgnitePortRangeOverride(SYSARG_PREFIX + "ignitePortRangeOverride", "TAKCL_IGNITE_PORT_RANGE_OVERRIDE", null, false),
 		IgniteIpAddressOverride(SYSARG_PREFIX + "igniteIpAddressOverride", "TAKCL_IGNITE_IP_ADDRESS_OVERRIDE", null, false),
 		CoreConfigPath(SYSARG_PREFIX + "coreConfigPath", "TAKCL_CORECONFIG_PATH", null, false),
+		TakIgniteConfigPath(SYSARG_PREFIX + "takIgniteConfigPath", "TAKCL_TAKIGNITECONFIG_PATH", null, false),
 		UserManagerTimeout("com.bbn.marti.usermanager.timeout", "USERMANAGER_TIMEOUT", "120000", false),
 		CliIgnoreCoreConfig(SYSARG_PREFIX + "ignoreCoreConfig", "TAKCL_CLI_IGNORE_CORE_CONFIG", "false", true),
 		TakclConfigPath(SYSARG_PREFIX + "config.filepath", "TAKCL_CONFIG_PATH", null, false),
 		// TODO: This is a hack. We should figure out why the tests don't like the ConfigurationHolder from takserver-common
 		UseTakclIgniteConfig(SYSARG_PREFIX + "takclIgniteConfig", "TAKCL_IGNITE_CONFIG", "true", true),
+		DisableConfigProcess(SYSARG_PREFIX + "disableConfigProcess", "TAKCL_DISABLE_CONFIG_PROCESS", "false", true),
 		DisableMessagingProcess(SYSARG_PREFIX + "disableMessagingProcess", "TAKCL_DISABLE_MESSAGING_PROCESS", "false", true),
 		DisableApiProcess(SYSARG_PREFIX + "disableApiProcess", "TAKCL_DISABLE_API_PROCESS", "false", true),
 		DisableFederationHubProcess(SYSARG_PREFIX + "disableFederationHubProcess", "TAKCL_DISABLE_FEDERATION_HUB_PROCESS", "true", true),
@@ -237,9 +242,11 @@ public class TAKCLCore {
 		ignitePortOverride = TakclOption.IgnitePortOverride.getIntegerOrNull();
 		ignitePortRangeOverride = TakclOption.IgnitePortRangeOverride.getIntegerOrNull();
 		igniteIpAddressOverride = TakclOption.IgniteIpAddressOverride.getStringOrNull();
+		takIgniteConfigPath = TakclOption.TakIgniteConfigPath.getStringOrNull();
 		coreConfigPath = TakclOption.CoreConfigPath.getStringOrNull();
 		cliIgnoreCoreConfig = TakclOption.CliIgnoreCoreConfig.getBoolean();
 		useTakclIgniteConfig = TakclOption.UseTakclIgniteConfig.getBoolean() && TestExceptions.USE_TAKCL_IGNITE_CONFIGURATION_AS_INDICATED;
+		disableConfigProcess = TakclOption.DisableConfigProcess.getBoolean();
 		disableMessagingProcess = TakclOption.DisableMessagingProcess.getBoolean();
 		disableApiProcess = TakclOption.DisableApiProcess.getBoolean();
 		disableFederationHubProcess = TakclOption.DisableFederationHubProcess.getBoolean();

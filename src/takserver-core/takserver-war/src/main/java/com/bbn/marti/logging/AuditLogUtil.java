@@ -2,31 +2,32 @@
 
 package com.bbn.marti.logging;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.security.cert.X509Certificate;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import javax.security.auth.x500.X500Principal;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.catalina.Role;
+import org.apache.commons.io.IOUtils;
 import org.owasp.esapi.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.slf4j.MarkerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 
-import com.bbn.security.web.MartiValidator;
 import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 
+import org.springframework.web.util.ContentCachingResponseWrapper;
 import tak.server.Constants;
 
 /*
@@ -95,7 +96,7 @@ public class AuditLogUtil {
 
                 sb.append(", " + role.getRolename());
             }
-
+            MDC.put("roles", (sb.length() > 0 ? sb.substring(2) : ""));
             rolesThreadLocal.set((sb.length() > 0 ? sb.substring(2) : ""));
         } else if (principal instanceof org.springframework.security.authentication.AbstractAuthenticationToken) {
             AbstractAuthenticationToken token = (AbstractAuthenticationToken) principal;
@@ -105,9 +106,84 @@ public class AuditLogUtil {
             for (GrantedAuthority authority : token.getAuthorities()) {
                 sb.append(", " + authority.getAuthority());
             }
-            
+            MDC.put("roles", (sb.length() > 0 ? sb.substring(2) : ""));
             rolesThreadLocal.set((sb.length() > 0 ? sb.substring(2) : ""));
         }
+    }
+
+    private static void setMdcRoles(Principal principal) {
+        if (principal == null) {
+            return;
+        }
+
+        if (principal instanceof org.apache.catalina.users.AbstractUser) {
+
+            Iterator<Role> roles = ((org.apache.catalina.users.AbstractUser) principal).getRoles();
+            StringBuilder sb = new StringBuilder();
+
+            while (roles.hasNext()) {
+                Role role = roles.next();
+
+                sb.append(", " + role.getRolename());
+            }
+            MDC.put("roles", (sb.length() > 0 ? sb.substring(2) : ""));
+        } else if (principal instanceof org.springframework.security.authentication.AbstractAuthenticationToken) {
+            AbstractAuthenticationToken token = (AbstractAuthenticationToken) principal;
+
+            StringBuilder sb = new StringBuilder();
+
+            for (GrantedAuthority authority : token.getAuthorities()) {
+                sb.append(", " + authority.getAuthority());
+            }
+            MDC.put("roles", (sb.length() > 0 ? sb.substring(2) : ""));
+        }
+    }
+
+    public static void setMdc(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        // request
+        setMdcUsernameAndRoles(req);
+
+        Collections.list(req.getHeaderNames())
+                .forEach(name -> MDC.put((String) name, (String) req.getHeader((String) name)));
+        MDC.put("source-ip", req.getRemoteAddr());
+        MDC.put("session", req.getRequestedSessionId());
+        MDC.put("method", req.getMethod());
+        MDC.put("request-body", IOUtils.toString(req.getInputStream(), StandardCharsets.UTF_8));
+
+        // response
+        MDC.put("response-status", String.valueOf(resp.getStatus()));
+        resp.getHeaderNames().forEach(name -> MDC.put("response-"+(String) name, (String) resp.getHeader((String) name)));
+        MDC.put("response-body", IOUtils.toString(new ContentCachingResponseWrapper(resp).getContentInputStream(), StandardCharsets.UTF_8));
+    }
+
+    private static void setMdcUsernameAndRoles(HttpServletRequest request) {
+
+        if (request == null) {
+            return;
+        }
+        if (usernameThreadLocal.get() != null) {
+            return;
+        }
+
+        // first, try to get the username from the Principal object
+        Principal principal = request.getUserPrincipal();
+
+        if (principal != null) {
+            MDC.put("username", principal.getName());
+            if (rolesThreadLocal.get() == null) {
+                setMdcRoles(principal);
+            }
+            return;
+        }
+
+        // if that fails, get the username from the client cert
+        String username = getUsernameFromClientCert(request);
+
+        if (Strings.isNullOrEmpty(username)) {
+            username = ANON_USERNAME;
+        }
+
+        MDC.put("username", username);
     }
 
     public static void auditLog(String sqlQuery) {
@@ -191,6 +267,7 @@ public class AuditLogUtil {
 
         if (principal != null) {
             usernameThreadLocal.set(principal.getName());
+            MDC.put("username", principal.getName());
             setRoles(principal);
             return;
         }
@@ -251,9 +328,9 @@ public class AuditLogUtil {
 
     private static String getUsernameFromClientCert(HttpServletRequest request) {
         // if the principal was not present in the request (will occur for resources that do not require authentication), get the principal name directly from the SSL cert, if that is present.
-        X509Certificate[] certs = (X509Certificate[])request.getAttribute("javax.servlet.request.X509Certificate");
+        X509Certificate[] certs = (X509Certificate[])request.getAttribute("jakarta.servlet.request.X509Certificate");
 
-        if(certs == null || certs.length == 0) {
+        if (certs == null || certs.length == 0) {
             return "";
         }
 

@@ -4,7 +4,8 @@ import static org.junit.Assert.assertNotNull;
 import java.io.File;
 import java.io.FileInputStream;
 
-import mil.af.rl.rol.value.Parameters;
+import com.google.common.base.Charsets;
+import com.google.common.io.Files;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
@@ -14,8 +15,10 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Charsets;
-import com.google.common.io.Files;
+import mil.af.rl.rol.value.Parameters;
+
+import tak.server.federation.rol.MissionRolVisitor;
+
 
 /*
  *
@@ -35,7 +38,7 @@ public class MissionPackageRolTests {
     public void execute() throws Exception {
 
         // parse and visit test programs
-        for (File rolFile : com.google.common.io.Files.fileTreeTraverser().preOrderTraversal(new File(getClass().getResource(ROL_RESOURCE_MP_PATH).toURI()))) {
+        for (File rolFile : com.google.common.io.Files.fileTraverser().depthFirstPreOrder(new File(getClass().getResource(ROL_RESOURCE_MP_PATH).toURI()))) {
             if (rolFile.isFile() && (rolFile.getName().toLowerCase().endsWith(".rol"))) {
 
                 logger.debug("Testing ROL program: " + rolFile.getName() + " " + Files.toString(rolFile, Charsets.UTF_8));

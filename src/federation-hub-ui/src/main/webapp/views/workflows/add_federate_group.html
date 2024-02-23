@@ -164,14 +164,22 @@
         </div>
 
         <div class="row form-group">
-            <label class="col-sm-3">CA Group</label>
+            <label class="col-sm-3">CA Group (issuer)</label>
             <div class="col-sm-9">
                 <select class="form-control" ng-model="roger_federation.name">
-                    <option ng-repeat="ca in knownCas" value="{{ca.uid}}">{{ca.uid}}</option>
+                    <option ng-repeat="ca in knownCas" value="{{ca.uid}}">{{ca.issuer}}</option>
                 </select>
             </div>
         </div>
 
+        <div class="row form-group">
+            <label class="col-sm-3">CA Group (subject)</label>
+            <div class="col-sm-9">
+                <select class="form-control" ng-model="roger_federation.name">
+                    <option ng-repeat="ca in knownCas" value="{{ca.uid}}">{{ca.subject}}</option>
+                </select>
+            </div>
+        </div>
 
         <div class="row form-group">
             <label class="col-sm-3">Interconnected</label>

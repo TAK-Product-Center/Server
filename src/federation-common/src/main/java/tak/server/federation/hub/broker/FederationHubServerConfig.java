@@ -43,7 +43,7 @@ public class FederationHubServerConfig {
     /* For v2 federation only. */
     private boolean v2Enabled;
     private Integer v2Port;
-    private int maxMessageSizeBytes = 67108864;
+    private int maxMessageSizeBytes = 268435456;
     private int metricsLogIntervalSeconds = 5;
     private int clientTimeoutTime = 15;
     private int clientRefreshTime = 5;
@@ -59,6 +59,18 @@ public class FederationHubServerConfig {
     private String nonce;
     @JsonIgnore
     private String fullId;
+    
+    private String dbUsername = "martiuser";
+    private String dbPassword = "";
+    private int dbPort = 27017;
+    private String dbHost = "localhost";
+    private long dbConnectionTimeoutMS = 5000;
+    
+    private long missionFederationDBRetentionDays = 7;
+    
+    private long missionFederationRecencySeconds = 43200;
+    private long missionFederationDisruptionMaxFileSizeBytes = 268435456;
+    private boolean missionFederationDisruptionEnabled = false;
     
     public int getOutgoingReconnectSeconds() {
 		return outgoingReconnectSeconds;
@@ -267,19 +279,95 @@ public class FederationHubServerConfig {
         this.useCaGroups = useCaGroups;
     }
 	
+	public String getDbUsername() {
+		return dbUsername;
+	}
+
+	public void setDbUsername(String dbUsername) {
+		this.dbUsername = dbUsername;
+	}
+
+	public String getDbPassword() {
+		return dbPassword;
+	}
+
+	public void setDbPassword(String dbPassword) {
+		this.dbPassword = dbPassword;
+	}
+
+	public int getDbPort() {
+		return dbPort;
+	}
+
+	public void setDbPort(int dbPort) {
+		this.dbPort = dbPort;
+	}
+
+	public String getDbHost() {
+		return dbHost;
+	}
+
+	public void setDbHost(String dbHost) {
+		this.dbHost = dbHost;
+	}
+
+	public long getDbConnectionTimeoutMS() {
+		return dbConnectionTimeoutMS;
+	}
+
+	public void setDbConnectionTimeoutMS(long dbConnectionTimeoutMS) {
+		this.dbConnectionTimeoutMS = dbConnectionTimeoutMS;
+	}
+
+	public long getMissionFederationRecencySeconds() {
+		return missionFederationRecencySeconds;
+	}
+
+	public void setMissionFederationRecencySeconds(long missionFederationRecencySeconds) {
+		this.missionFederationRecencySeconds = missionFederationRecencySeconds;
+	}
+
+	public boolean isMissionFederationDisruptionEnabled() {
+		return missionFederationDisruptionEnabled;
+	}
+
+	public void setMissionFederationDisruptionEnabled(boolean missionFederationDisruptionEnabled) {
+		this.missionFederationDisruptionEnabled = missionFederationDisruptionEnabled;
+	}
+
+	public long getMissionFederationDBRetentionDays() {
+		return missionFederationDBRetentionDays;
+	}
+
+	public void setMissionFederationDBRetentionDays(long missionFederationDBRetentionDays) {
+		this.missionFederationDBRetentionDays = missionFederationDBRetentionDays;
+	}
+
+	public long getMissionFederationDisruptionMaxFileSizeBytes() {
+		return missionFederationDisruptionMaxFileSizeBytes;
+	}
+
+	public void setMissionFederationDisruptionMaxFileSizeBytes(long missionFederationDisruptionMaxFileSizeBytes) {
+		this.missionFederationDisruptionMaxFileSizeBytes = missionFederationDisruptionMaxFileSizeBytes;
+	}
+
 	@Override
 	public String toString() {
 		return "FederationHubServerConfig [keystoreType=" + keystoreType + ", keystoreFile=" + keystoreFile
-				+ ", keystorePassword=" + keystorePassword + ", truststoreType=" + truststoreType + ", truststoreFile="
-				+ truststoreFile + ", truststorePassword=" + truststorePassword + ", keyManagerType=" + keyManagerType
-				+ ", v1Enabled=" + v1Enabled + ", v1Port=" + v1Port + ", context=" + context + ", useEpoll=" + useEpoll
-				+ ", allow128cipher=" + allow128cipher + ", allowNonSuiteB=" + allowNonSuiteB + ", enableOCSP="
-				+ enableOCSP + ", tlsVersions=" + tlsVersions + ", v2Enabled=" + v2Enabled + ", v2Port=" + v2Port
-				+ ", maxMessageSizeBytes=" + maxMessageSizeBytes + ", metricsLogIntervalSeconds="
+				+ ", truststoreType=" + truststoreType + ", truststoreFile=" + truststoreFile + ", keyManagerType="
+				+ keyManagerType + ", v1Enabled=" + v1Enabled + ", v1Port=" + v1Port + ", context=" + context
+				+ ", useEpoll=" + useEpoll + ", allow128cipher=" + allow128cipher + ", allowNonSuiteB=" + allowNonSuiteB
+				+ ", enableOCSP=" + enableOCSP + ", tlsVersions=" + tlsVersions + ", v2Enabled=" + v2Enabled
+				+ ", v2Port=" + v2Port + ", maxMessageSizeBytes=" + maxMessageSizeBytes + ", metricsLogIntervalSeconds="
 				+ metricsLogIntervalSeconds + ", clientTimeoutTime=" + clientTimeoutTime + ", clientRefreshTime="
 				+ clientRefreshTime + ", maxConcurrentCallsPerConnection=" + maxConcurrentCallsPerConnection
 				+ ", enableHealthCheck=" + enableHealthCheck + ", useCaGroups=" + useCaGroups + ", serverName="
 				+ serverName + ", outgoingReconnectSeconds=" + outgoingReconnectSeconds + ", id=" + id + ", nonce="
-				+ nonce + ", fullId=" + fullId + "]";
+				+ nonce + ", fullId=" + fullId + ", dbUsername=" + dbUsername + ", dbPort=" + dbPort + ", dbHost="
+				+ dbHost + ", dbConnectionTimeoutMS=" + dbConnectionTimeoutMS + ", missionFederationDBRetentionDays="
+				+ missionFederationDBRetentionDays + ", missionFederationRecencySeconds="
+				+ missionFederationRecencySeconds + ", missionFederationDisruptionMaxFileSizeBytes="
+				+ missionFederationDisruptionMaxFileSizeBytes + ", missionFederationDisruptionEnabled="
+				+ missionFederationDisruptionEnabled + "]";
 	}
 }

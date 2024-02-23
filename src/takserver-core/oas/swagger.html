@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TAK Server SwaggerUI</title>
+    <link rel="stylesheet" href="http://unpkg.com/swagger-ui-dist@4.4.1/swagger-ui.css"/>
+    <script src="http://unpkg.com/swagger-ui-dist@4.4.1/swagger-ui-bundle.js"></script>
+    <script src="http://unpkg.com/swagger-ui-dist@4.4.1/swagger-ui-standalone-preset.js"></script>
+</head>
+<body>
+    <div id="root" class="swagger-ui"/>
+
+    <!-- Expects openapispec.json in same directory as this html file -->
+    <script>
+        const ui = SwaggerUIBundle({
+          url: 'openapispec.json',
+          supportedSubmitMethods: [],
+          dom_id: '#root'
+        });
+    </script>
+</body>
+</html>

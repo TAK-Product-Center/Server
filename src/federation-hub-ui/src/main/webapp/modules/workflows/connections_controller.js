@@ -13,15 +13,35 @@ function connectionsController($rootScope, $scope, $http, $stateParams, $modalIn
     $scope.filteredActiveConnections = [];
     $scope.selectedCa = $rootScope.selectedCa ? $rootScope.selectedCa : 'All';
     $scope.knownCas = [];
+    $scope.flows = [];
     var cellView;
 
     pollActiveConnections()
     getCaGroups();
+    pollDataFlows();
 
     function filterActiveConnections() {
         let connections = []
         $scope.activeConnections.forEach(activeConnection => {
             activeConnection.groupIdentitiesSet = new Set(activeConnection.groupIdentities)
+            activeConnection["bRead"] = 0
+            activeConnection["reads"] = 0
+            activeConnection["bWritten"] = 0
+            activeConnection["writes"] = 0
+            if($scope.flows != []){
+                var _flows = $scope.flows;
+                for(var flow of _flows){
+                    console.log(activeConnection.connectionId);
+                    console.log(flow["targetId"]);
+                    if(flow["sourceId"] == activeConnection.connectionId){
+                        activeConnection["bWritten"] = activeConnection["bWritten"] + flow["bytesWritten"]
+                        activeConnection["writes"] = activeConnection["writes"] + flow["messagesWritten"]
+                        activeConnection["bRead"] = activeConnection["bRead"] + flow["bytesRead"]
+                        activeConnection["reads"] = activeConnection["reads"] + flow["messagesRead"]
+                    }
+                }
+            }
+
             if ($scope.selectedCa === 'All') {
                 connections.push(activeConnection)
             } else {
@@ -30,6 +50,13 @@ function connectionsController($rootScope, $scope, $http, $stateParams, $modalIn
             }
         })
         $scope.filteredActiveConnections = connections
+    }
+
+    function pollDataFlows() {
+        WorkflowService.getDataFlowStats().then(function(dataFlows) {
+            $scope.flows = dataFlows.channelInfos;
+          });
+        $timeout(pollDataFlows, 2000);
     }
 
     function pollActiveConnections() {

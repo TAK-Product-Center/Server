@@ -19,10 +19,10 @@ import com.bbn.marti.remote.RepeaterManager;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.User;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 
 import tak.server.Constants;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 import tak.server.cot.CotParser;
 
@@ -147,11 +147,11 @@ public class DistributedRepeaterManager implements RepeaterManager, org.apache.i
 	}
 
 	public Integer getPeriodMillis() {
-		return DistributedConfiguration.getInstance().getRepeater().getPeriodMillis();
+		return CoreConfigFacade.getInstance().getRemoteConfiguration().getRepeater().getPeriodMillis();
 	}
 
 	public void setPeriodMillis(Integer periodMillis) {
-		DistributedConfiguration.getInstance().getRepeater().setPeriodMillis(periodMillis);
+		CoreConfigFacade.getInstance().getRemoteConfiguration().getRepeater().setPeriodMillis(periodMillis);
 	}
 
 	public Map<String, CotEventContainer> getCancelledMessages() {

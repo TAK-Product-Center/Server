@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 import javax.security.auth.x500.X500Principal;
-import javax.xml.bind.JAXBException;
+import jakarta.xml.bind.JAXBException;
 
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
@@ -32,6 +32,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 
 import com.bbn.cluster.ClusterGroupDefinition;
+import tak.server.util.ActiveProfiles;
 import com.bbn.marti.config.Auth;
 import com.bbn.marti.groups.value.FileAuthenticatorControl;
 import com.bbn.marti.remote.groups.AuthCallback;
@@ -44,8 +45,6 @@ import com.bbn.marti.remote.groups.SimpleGroupWithUsersModel;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.groups.FileUserManagementInterface;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.service.DistributedConfiguration;
-import com.bbn.marti.service.LocalConfiguration;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.xml.bindings.Role;
 import com.bbn.marti.xml.bindings.UserAuthenticationFile;
@@ -53,8 +52,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.collect.Sets;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
+import tak.server.util.JAXBUtils;
 
 /**
  * Created on 9/10/15.
@@ -83,14 +84,14 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
     		logger.debug("FileAuthenticator construct");
     	}
     	
-    	if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+    	if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
     		CacheConfiguration<String, UserAuthenticationFile.User> cfg = new CacheConfiguration<>();
 			cfg.setName(Constants.USER_AUTH_CACHE_NAME);
 			cfg.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);
 			userFileCache = IgniteHolder.getInstance().getIgnite().getOrCreateCache(cfg);
     	}
 
-        if (LocalConfiguration.getInstance().isMessagingProfileActive()) {
+        if (ActiveProfiles.getInstance().isMessagingProfileActive()) {
             initFile();
         }
     }
@@ -116,7 +117,7 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
     	}
     	
     	// try to get the auth file from the messaging
-    	if (LocalConfiguration.getInstance().isApiProfileActive()) {
+    	if (ActiveProfiles.getInstance().isApiProfileActive()) {
     		try {
     			Ignite ignite = IgniteHolder.getInstance().getIgnite();
     			UserAuthenticationFile tempAuth = ignite
@@ -125,7 +126,9 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
     				.getUserAuthenticationFile();
     			
     			if (tempAuth != null) {
-    				MessageConversionUtil.saveJAXifiedObject(DistributedConfiguration.getInstance().getAuth().getFile().getLocation(), tempAuth, true);
+    				JAXBUtils.saveJAXifiedObject(
+                            CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getFile().getLocation(),
+                            tempAuth, true);
     			}
    			} catch (Exception e) {
 				e.printStackTrace();
@@ -153,7 +156,7 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
     }
     
     public synchronized void initFile() {
-    	Auth.File authFileConfig = DistributedConfiguration.getInstance().getAuth().getFile();
+    	Auth.File authFileConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getFile();
 
     	if (authFileConfig == null || Strings.isNullOrEmpty(authFileConfig.getLocation())) {
     		throw new IllegalArgumentException("null or empty authentication file config or uri");
@@ -164,7 +167,7 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
     	UserAuthenticationFile tmpAuth;
 
     	try {
-    		tmpAuth = MessageConversionUtil.loadJAXifiedXML(authFileName,
+    		tmpAuth = JAXBUtils.loadJAXifiedXML(authFileName,
     				UserAuthenticationFile.class.getPackage().getName());
 
     	} catch (FileNotFoundException fnfe) {
@@ -616,7 +619,7 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
     	}
     	
     	try {
-    		MessageConversionUtil.saveJAXifiedObject(authFileName, authFile, true);
+    		JAXBUtils.saveJAXifiedObject(authFileName, authFile, true);
 		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {
     			logger.debug("exception saving auth file", e);

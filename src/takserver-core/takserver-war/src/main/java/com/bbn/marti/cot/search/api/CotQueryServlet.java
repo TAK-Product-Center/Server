@@ -14,10 +14,10 @@ import java.util.Map;
 import java.util.SimpleTimeZone;
 import java.util.logging.Logger;
 
-import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -119,7 +119,7 @@ public class CotQueryServlet extends EsapiServlet {
         Map<String, String[]> httpParameters = validateParams(esapiContext, request, response, 
                 requiredHttpParameters, optionalHttpParameters);
 
-        if(httpParameters == null) {
+        if (httpParameters == null) {
             return;
         }
         String hostName = getParameterValue(httpParameters, CotQueryParameter.hostName.name());

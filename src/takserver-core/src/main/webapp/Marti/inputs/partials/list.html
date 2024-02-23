@@ -41,7 +41,7 @@
 						<td data-ng-bind="x.input.protocol"></td>
 						<td data-ng-bind="x.input.port"></td>
 						<td data-ng-bind="x.input.coreVersion"></td>
-						<td>{{x.input.protocol === 'tls' ? (x.input.coreVersion == 2
+						<td>{{ (x.input.protocol === 'tls' || x.input.protocol === 'quic') ? (x.input.coreVersion == 2
 							? x.input.coreVersion2TlsVersions : secConfig.tlsVersion) : ''}}</td>
 						<td data-ng-bind="x.input.group"></td>
 						<td data-ng-bind="x.input.iface"></td>

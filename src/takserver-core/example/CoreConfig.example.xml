@@ -7,8 +7,8 @@
 		<!-- <input _name="stdudp" protocol="udp" port="8087" auth="anonymous"/> -->
 		<!-- <input _name="streamtcp" protocol="stcp" port="8088" auth="anonymous"/> -->
 		<!-- <input _name="stdtcp" protocol="tcp" port="8087" auth="anonymous"/> -->
-		<!-- <input _name="SAproxy" protocol="mcast" group="239.2.3.1" port="6969" proxy="true" auth="anonymous" /> -->
-		<!-- <input _name="GeoChatproxy" protocol="mcast" group="224.10.10.1" port="17012" proxy="true" auth="anonymous" /> -->
+		<!-- <input _name="SAproxy" protocol="mcast" group="239.2.3.1" port="6969" auth="anonymous" /> -->
+		<!-- <input _name="GeoChatproxy" protocol="mcast" group="224.10.10.1" port="17012" auth="anonymous" /> -->
 		<!--<announce enable="true" uid="Marti1" group="239.2.3.1" port="6969" interval="1" ip="192.168.1.137" />-->
 		 <!--<input _name="stdssl" protocol="tls" port="8089"/>-->
 		 <!--<input _name="sslauth" protocol="tls" port="8090" auth="ldap"/> -->

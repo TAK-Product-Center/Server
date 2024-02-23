@@ -16,25 +16,23 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.owasp.esapi.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -47,6 +45,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.view.InternalResourceView;
@@ -57,10 +56,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.base.Strings;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import tak.server.federation.FederateGroup;
 import tak.server.federation.FederationException;
 import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.hub.broker.FederationHubBroker;
+import tak.server.federation.hub.broker.FederationHubBrokerMetrics;
 import tak.server.federation.hub.broker.HubConnectionInfo;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
 import tak.server.federation.hub.policy.FederationPolicy;
@@ -75,30 +77,36 @@ import tak.server.federation.hub.ui.jwt.AuthResponse;
 import tak.server.federation.hub.ui.keycloak.AuthCookieUtils;
 
 @RequestMapping("/")
-public class FederationHubUIService {
+@RestController
+@Order(Ordered.LOWEST_PRECEDENCE)
+public class FederationHubUIService implements ApplicationListener<ContextRefreshedEvent> {
 
     private static final Logger logger = LoggerFactory.getLogger(FederationHubUIService.class);
-    
+
     private static final int CERT_FILE_UPLOAD_SIZE = 1048576;
 
     private String activePolicyName = null;
     private Map<String, FederationPolicyModel> cachedPolicies = new HashMap<>();
 
     private Validator validator = new MartiValidator();
-    
     @Autowired
     private FederationHubPolicyManager fedHubPolicyManager;
-
     @Autowired
     private FederationHubBroker fedHubBroker;
-    
+
     @Autowired AuthenticationManager authManager;
-	
+
     @Autowired JwtTokenUtil jwtUtil;
-    
+
     @Autowired
     FederationHubUIConfig fedHubConfig;
     
+    @Override
+    public void onApplicationEvent(ContextRefreshedEvent event) {
+    	// hydrate cache
+    	getActivePolicy();
+    }
+
     @RequestMapping(value = "/login", method = RequestMethod.GET)
 	public ModelAndView getLoginPage() {
 		return new ModelAndView(new InternalResourceView("/login/index.html"));
@@ -106,21 +114,21 @@ public class FederationHubUIService {
 
     @RequestMapping(value = "/login/authserver", method = RequestMethod.GET)
     public ResponseEntity<String>  getAuthServerName() {
-        
+
         if (fedHubConfig.isAllowOauth()) {
         	return new ResponseEntity<>("{\"data\":\"" + fedHubConfig.getKeycloakServerName() + "\"}", new HttpHeaders(), HttpStatus.OK);
         } else {
         	return new ResponseEntity<>(null, new HttpHeaders(), HttpStatus.NOT_FOUND);
         }
     }
-    
+
     @RequestMapping(value = "/login/auth", method = RequestMethod.GET)
     public void handleAuthRequest(HttpServletResponse response) {
         try {
             // get the auth server config
-            if (!fedHubConfig.isAllowOauth() || 
-            		Strings.isNullOrEmpty(fedHubConfig.getKeycloakAuthEndpoint()) || 
-            		 Strings.isNullOrEmpty(fedHubConfig.getKeycloakTokenEndpoint()) || 
+            if (!fedHubConfig.isAllowOauth() ||
+            		Strings.isNullOrEmpty(fedHubConfig.getKeycloakAuthEndpoint()) ||
+            		 Strings.isNullOrEmpty(fedHubConfig.getKeycloakTokenEndpoint()) ||
             		 Strings.isNullOrEmpty(fedHubConfig.getKeycloakrRedirectUri())) {
             	throw  new IllegalStateException("missing auth server config");
             }
@@ -157,7 +165,7 @@ public class FederationHubUIService {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
     }
-    
+
     @RequestMapping(value = "/login/redirect", method = RequestMethod.GET)
     public ModelAndView handleRedirect(
             @RequestParam(value = "code", required = true) String code,
@@ -206,7 +214,7 @@ public class FederationHubUIService {
             return null;
         }
     }
-		
+
     // TODO use this if we ever support plain username + password auth from a db or file
     @PostMapping("/oauth/token")
     public ResponseEntity<?> login(@RequestBody AuthRequest request) {
@@ -214,23 +222,23 @@ public class FederationHubUIService {
             Authentication authentication = authManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
             );
-             
+
             User user = (User) authentication.getPrincipal();
             String accessToken = jwtUtil.generateAccessToken(request.getUsername());
             AuthResponse authResponse = new AuthResponse(user.getUsername(), accessToken);
-            
+
             ResponseCookie.ResponseCookieBuilder responseCookieBuilder = ResponseCookie
                     .from("hubState", authResponse.getAccessToken())
                     .secure(true)
                     .httpOnly(true)
                     .path("/")
                     .maxAge(86400);
-            
+
             HttpHeaders responseHeaders = new HttpHeaders();
             responseHeaders.set(HttpHeaders.SET_COOKIE, responseCookieBuilder.build().toString());
-                         
+
             return ResponseEntity.ok().headers(responseHeaders).body(authResponse);
-             
+
         } catch (BadCredentialsException ex) {
         	logger.error("Bad credentials", ex);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -241,12 +249,6 @@ public class FederationHubUIService {
 		}
     }
 
-
-    @RequestMapping(value = "/home", method = RequestMethod.GET)
-    public String getHome() {
-        return "home";
-    }
-
     @RequestMapping(value = "/fig/saveFederation", method = RequestMethod.POST)
     @ResponseBody
     public FederationPolicyModel saveFederation(RequestEntity<FederationPolicyModel> requestEntity) {
@@ -254,7 +256,7 @@ public class FederationHubUIService {
         if (policy != null) {
         	this.cachedPolicies.put(policy.getName(), policy);
         }
-        
+
         return policy;
     }
 
@@ -327,7 +329,7 @@ public class FederationHubUIService {
                         fedHubPolicyManager.setPolicyGraph(policyModel, null);
                         activePolicyName = policyModel.getName();
                     }
-                    
+
                     fedHubBroker.updatePolicy(policyModel);
 
                     return new ResponseEntity<>(new HttpHeaders(), HttpStatus.OK);
@@ -356,9 +358,9 @@ public class FederationHubUIService {
                             policyModel.getFederationPolicyObjectFromModel());
                         activePolicyName = policyModel.getName();
                     }
-                    
+
                     fedHubBroker.updatePolicy(policyModel);
-                    
+
                     return new ResponseEntity<>(new HttpHeaders(), HttpStatus.OK);
                 } catch (FederationException e) {
                     logger.error("Could not save the policy graph to the federation manager", e);
@@ -371,7 +373,7 @@ public class FederationHubUIService {
     }
 
     @RequestMapping(value = "/fig/getKnownCaGroups", method = RequestMethod.GET)
-    public ResponseEntity<List<GroupHolder>> getKnownCaGroups(HttpServletRequest request) {	
+    public ResponseEntity<List<RemoteGroup>> getKnownCaGroups(HttpServletRequest request) {
         if (isUpdateActiveFederation()) {
             return new ResponseEntity<>(
                 federateGroupsToGroupHolders(fedHubPolicyManager.getCaGroups()),
@@ -380,12 +382,12 @@ public class FederationHubUIService {
         }
         return new ResponseEntity<>(new HttpHeaders(), HttpStatus.FORBIDDEN);
     }
-    
+
     @RequestMapping(value = "/fig/getKnownGroupsForGraphNode/{graphNodeId}", method = RequestMethod.GET)
     @ResponseBody
     public ResponseEntity<List<String>> getKnownGroupsForGraphNode(@PathVariable String graphNodeId) {
     	List<String> groupsForNode = new ArrayList<>();
-    	
+
     	FederationPolicyModel activePolicy = getActivePolicyAsPolicyModel();
     	activePolicy.getCells().forEach(cell -> {
     		if (cell.getId().equals(graphNodeId)) {
@@ -403,13 +405,18 @@ public class FederationHubUIService {
     			}
     		}
     	});
-    	
+
         return new ResponseEntity<List<String>>(groupsForNode, new HttpHeaders(), HttpStatus.OK);
     }
-    
+
     @RequestMapping(value = "/fig/getActiveConnections", method = RequestMethod.GET)
     public ResponseEntity<List<HubConnectionInfo>> getActiveConnections() {
     	return new ResponseEntity<List<HubConnectionInfo>>(fedHubBroker.getActiveConnections(), new HttpHeaders(), HttpStatus.OK);
+    }
+
+    @RequestMapping(value = "/fig/getBrokerMetrics", method = RequestMethod.GET)
+    public ResponseEntity<FederationHubBrokerMetrics> getFederationHubBrokerMetrics() {
+        return new ResponseEntity<FederationHubBrokerMetrics>(fedHubBroker.getFederationHubBrokerMetrics(), new HttpHeaders(), HttpStatus.OK);
     }
 
     @RequestMapping(value = "/fig/addNewGroupCa", method = RequestMethod.POST)
@@ -436,7 +443,7 @@ public class FederationHubUIService {
         }
         return new ResponseEntity<>(new HttpHeaders(), HttpStatus.FORBIDDEN);
     }
-    
+
     @RequestMapping(value = "/fig/deleteGroupCa/{uid}", method = RequestMethod.DELETE)
     public ResponseEntity<Void> deleteGroupCa(@PathVariable("uid") String uid) {
     	try {
@@ -454,13 +461,13 @@ public class FederationHubUIService {
     		return new ResponseEntity<>(new HttpHeaders(), HttpStatus.BAD_REQUEST);
 		}
     }
-    
+
     private String sha256(String input) throws UnsupportedEncodingException, NoSuchAlgorithmException {
         byte[] bytes = input.getBytes("US-ASCII");
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         return Base64.getUrlEncoder().withoutPadding().encodeToString(md.digest(bytes));
     }
-    
+
     private boolean isUpdateActiveFederation() {
         /* TODO do we really need to configure this? */
         return true;
@@ -474,8 +481,8 @@ public class FederationHubUIService {
         // Production code.
         FederationPolicyGraph activePolicy = fedHubPolicyManager.getPolicyGraph();
         Map<String, Object> additionalData = activePolicy.getAdditionalData();
-        
-   
+
+
         // UI Test code.
         //FederationPolicyGraph testActualPolicy = cachedPolicys.values().iterator().next().getPolicyGraphFromModel();
         //Map<String, Object> additionalData =  testActualPolicy.getAdditionalData();
@@ -484,12 +491,49 @@ public class FederationHubUIService {
         return mapper.convertValue(additionalData.get("uiData"), FederationPolicyModel.class);
     }
 
-    private List<GroupHolder> federateGroupsToGroupHolders(Collection<FederateGroup> groups) {
-        List<GroupHolder> groupList = new LinkedList<>();
+    private List<RemoteGroup> federateGroupsToGroupHolders(Collection<FederateGroup> groups) {
+    	Map<String, X509Certificate> cas = fedHubBroker.getCAsFromFile();
+        List<RemoteGroup> groupList = new LinkedList<>();
         for (FederateGroup group : groups) {
-            GroupHolder groupHolder = new GroupHolder(group.getFederateIdentity().getFedId());
-            groupList.add(groupHolder);
+            String fedId = group.getFederateIdentity().getFedId();
+
+            RemoteGroup remoteGroup = new RemoteGroup();
+        	remoteGroup.setUid(fedId);
+            if (cas.containsKey(fedId)) {
+            	X509Certificate ca = cas.get(fedId);
+            	remoteGroup.setIssuer(ca.getIssuerX500Principal().getName());
+            	remoteGroup.setSubject(ca.getSubjectX500Principal().getName());
+            }
+
+            groupList.add(remoteGroup);
         }
         return groupList;
+    }
+
+    private class RemoteGroup {
+    	private String uid;
+    	private String issuer;
+    	private String subject;
+
+    	public String getUid() {
+			return uid;
+		}
+		public void setUid(String uid) {
+			this.uid = uid;
+		}
+		public String getIssuer() {
+			return issuer;
+		}
+		public void setIssuer(String issuer) {
+			this.issuer = issuer;
+		}
+		public String getSubject() {
+			return subject;
+		}
+		public void setSubject(String subject) {
+			this.subject = subject;
+		}
+
+
     }
 }

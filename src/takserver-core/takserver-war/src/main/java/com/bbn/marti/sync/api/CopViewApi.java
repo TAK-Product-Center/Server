@@ -6,9 +6,10 @@ import java.util.List;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.Logger;
@@ -56,8 +57,6 @@ public class CopViewApi extends BaseRestController {
 	@Autowired
 	private CommonUtil martiUtil;
 
-	@Autowired
-	private CoreConfig config;
 
 	private static String mcsCopTool = "";
 
@@ -125,7 +124,7 @@ public class CopViewApi extends BaseRestController {
 	public String getDefaultMcsTool() {
 		if (Strings.isNullOrEmpty(mcsCopTool)) {
 			try {
-				Configuration conf = config.getRemoteConfiguration();
+				Configuration conf = CoreConfigFacade.getInstance().getRemoteConfiguration();
 				mcsCopTool = conf.getNetwork().getMissionCopTool();
 			} catch(Exception ex) {
 				logger.info("Failed to get default mission cop tool. Using \"vbm\"");

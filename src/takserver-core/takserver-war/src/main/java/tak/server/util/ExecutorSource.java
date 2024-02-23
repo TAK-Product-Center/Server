@@ -16,11 +16,12 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import com.bbn.marti.config.Buffer.Queue;
+import com.bbn.marti.config.Queue;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.remote.CoreConfig;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -45,9 +46,9 @@ public class ExecutorSource {
 	
 	public final ExecutorService missionRepositoryProcessor;
 	
-	public ExecutorSource(CoreConfig coreConfig) {
+	public ExecutorSource() {
 		
-		config = coreConfig.getRemoteConfiguration();
+		config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
 		queue = config.getBuffer().getQueue();
 

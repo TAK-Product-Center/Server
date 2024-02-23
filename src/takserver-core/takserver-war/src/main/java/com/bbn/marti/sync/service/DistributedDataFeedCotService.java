@@ -12,7 +12,7 @@ import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.remote.DataFeedCotService;
 import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionFeed;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 import tak.server.cache.DataFeedCotCacheHelper;
 import tak.server.cot.CotEventContainer;
@@ -28,7 +28,7 @@ public class DistributedDataFeedCotService implements DataFeedCotService, Servic
 	private static final long serialVersionUID = 1022295969715185278L;
 
 	private static final Logger logger = LoggerFactory.getLogger(DistributedDataFeedCotService.class);
-	
+
 	private static DistributedDataFeedCotService instance;
 	public static DistributedDataFeedCotService getInstance() {
 		if (instance == null) {
@@ -40,8 +40,8 @@ public class DistributedDataFeedCotService implements DataFeedCotService, Servic
 		}
 		return instance;
 	}
-	
-	
+
+
 	@Override
 	public void cancel(ServiceContext ctx) {
 		if (logger.isDebugEnabled()) {
@@ -62,7 +62,7 @@ public class DistributedDataFeedCotService implements DataFeedCotService, Servic
 			logger.debug("execute method " + getClass().getSimpleName());
 		}
 	}
-	
+
 	private static MissionService missionService;
 	public static MissionService missionService() {
 		if (missionService == null) {
@@ -74,17 +74,17 @@ public class DistributedDataFeedCotService implements DataFeedCotService, Servic
 		}
 		return missionService;
 	}
-	
+
 	@Override
 	public void sendLatestFeedEvents(Mission mission, MissionFeed missionFeed, List<String> clientUidList, String groupVector) {
-		 missionService().sendLatestFeedEvents(mission, missionFeed, clientUidList, groupVector);
+		missionService().sendLatestFeedEvents(mission, missionFeed, clientUidList, groupVector);
 	}
-	
+
 	@Override
 	public void cacheDataFeedEvent(DataFeed dataFeed, CotEventContainer data) {
 		DataFeedCotCacheHelper.getInstance().cacheDataFeedEvent(dataFeed, data);
 	}
-	
+
 	@Override
 	public Collection<CotEventContainer> getCachedDataFeedEvents(String dataFeedUid) {
 		return DataFeedCotCacheHelper.getInstance().getCachedDataFeedEvents(dataFeedUid);

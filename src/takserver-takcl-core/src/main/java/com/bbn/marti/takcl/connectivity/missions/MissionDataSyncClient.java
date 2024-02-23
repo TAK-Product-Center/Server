@@ -19,7 +19,17 @@ import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 
-import static com.bbn.marti.takcl.connectivity.missions.MissionModels.*;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ApiListResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ApiSetResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ApiSingleResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.EnterpriseSyncUploadResponse;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.Mission;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionChange;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionUserRole;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.PutMissionContents;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.ResponseWrapper;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.SubscriptionData;
+import static com.bbn.marti.takcl.connectivity.missions.MissionModels.gson;
 
 public class MissionDataSyncClient {
 
@@ -37,7 +47,7 @@ public class MissionDataSyncClient {
 		this.baseUrl = user.getServer().getMissionBaseUrl();
 	}
 
-	private synchronized <T> T createApi(Class<T> interfaceClass) {
+	protected synchronized <T> T createApi(Class<T> interfaceClass) {
 		try {
 			if (_retrofit == null) {
 				SSLHelper.TakClientSslContext tcsc = new SSLHelper.TakClientSslContext(user);

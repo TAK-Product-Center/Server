@@ -1,6 +1,7 @@
 package com.bbn.marti.takcl.cli.advanced;
 
 import com.bbn.marti.config.Configuration;
+import com.bbn.marti.config.TAKIgniteConfiguration;
 import com.bbn.marti.takcl.AppModules.generic.AppModuleInterface;
 import com.bbn.marti.takcl.AppModules.generic.BaseAppModuleInterface;
 import com.bbn.marti.takcl.AppModules.generic.ServerAppModuleInterface;
@@ -8,14 +9,17 @@ import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.takcl.TakclIgniteHelper;
 import com.bbn.marti.takcl.Util;
 import com.bbn.marti.takcl.cli.EndUserReadableException;
-import com.bbn.marti.takcl.cli.InvalidArgumentValueException;
-import com.bbn.marti.takcl.cli.NoSuchCommandArgumentException;
-import com.bbn.marti.takcl.cli.NoSuchCommandException;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static com.bbn.marti.takcl.cli.CommandCommon.output;
 
@@ -109,9 +113,9 @@ public class AdvancedCliMainHelper {
 			// Construct server instance
 			AbstractServerProfile spi = ImmutableServerProfiles.DEFAULT_LOCAL_SERVER;
 
-			Configuration localConfig = Util.getCoreConfig();
-			if (localConfig != null && !TAKCLCore.cliIgnoreCoreConfig) {
-				TakclIgniteHelper.overrideServerConfigurationFromCoreConfig(spi, localConfig);
+			TAKIgniteConfiguration localTAKIgniteConfig = Util.getTAKIgniteConfig();
+			if (localTAKIgniteConfig != null && !TAKCLCore.cliIgnoreCoreConfig) {
+				TakclIgniteHelper.overrideServerConfigurationFromCoreConfig(spi, localTAKIgniteConfig);
 			} else {
 				System.err.println("WARNING: No CoreConfig could be found. The default server configuration details will be used instead!");
 			}

@@ -1,6 +1,6 @@
 package tak.server.config;
 
-import javax.servlet.annotation.WebListener;
+import jakarta.servlet.annotation.WebListener;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;

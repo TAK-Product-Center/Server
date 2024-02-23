@@ -3,6 +3,8 @@ package tak.server.config;
 import java.util.concurrent.Executor;
 
 import org.apache.ignite.Ignite;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -11,6 +13,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration;
 import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.embedded.EmbeddedWebServerFactoryCustomizerAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +28,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.marti.config.Auth;
 import com.bbn.marti.groups.DistributedPersistentGroupManager;
 import com.bbn.marti.groups.GroupDao;
@@ -33,7 +37,6 @@ import com.bbn.marti.groups.InMemoryGroupStore;
 import com.bbn.marti.groups.LdapAuthenticator;
 import com.bbn.marti.groups.PersistentGroupDao;
 import com.bbn.marti.remote.ContactManager;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.RepeaterManager;
 import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -46,6 +49,7 @@ import com.bbn.marti.util.spring.RequestHolderBean;
 import com.bbn.marti.util.spring.MissionRoleAssignmentRequestHolderFilterBean;
 import com.bbn.metrics.MetricsCollector;
 import com.bbn.metrics.service.DatabaseMetricsService;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 import tak.server.CommonConstants;
 import tak.server.Constants;
@@ -53,7 +57,6 @@ import tak.server.cache.ActiveGroupCacheHelper;
 import tak.server.cache.classification.ClassificationCacheHelper;
 import tak.server.cot.CotEventContainer;
 import tak.server.grid.ContactManagerProxyFactory;
-import tak.server.grid.CoreConfigProxyFactoryForAPI;
 import tak.server.grid.DistributedDatafeedCotServiceProxyFactory;
 import tak.server.grid.FederationManagerProxyFactory;
 import tak.server.grid.GroupManagerProxyFactory;
@@ -75,8 +78,10 @@ import tak.server.qos.MessageDeliveryStrategy;
  */
 @Configuration
 @Profile({Constants.API_PROFILE_NAME})
-@SpringBootApplication(exclude = {MongoAutoConfiguration.class, MongoDataAutoConfiguration.class, ErrorMvcAutoConfiguration.class, SecurityAutoConfiguration.class, ManagementWebSecurityAutoConfiguration.class})
+@SpringBootApplication(exclude = {MongoAutoConfiguration.class, MongoDataAutoConfiguration.class, ErrorMvcAutoConfiguration.class, SecurityAutoConfiguration.class, ManagementWebSecurityAutoConfiguration.class, EmbeddedWebServerFactoryCustomizerAutoConfiguration.class})
 public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
+
+	private static final Logger logger = LoggerFactory.getLogger(tak.server.config.ApiOnlyConfiguration.class);
 
 	@Bean
 	public FederationManagerProxyFactory federationManagerProxyFactory() {
@@ -131,8 +136,8 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 	}
 
 	@Bean(Constants.DISTRIBUTED_COT_MESSENGER)
-	public Messenger<CotEventContainer> messenger(Ignite ignite, SubscriptionStore subscriptionStore, ServerInfo serverInfo, MessageConverter messageConverter, CoreConfig config) {
-		return new DistributedCotMessengerForApi(ignite, subscriptionStore, serverInfo,  messageConverter, config);
+	public Messenger<CotEventContainer> messenger(Ignite ignite, SubscriptionStore subscriptionStore, ServerInfo serverInfo, MessageConverter messageConverter) {
+		return new DistributedCotMessengerForApi(ignite, subscriptionStore, serverInfo,  messageConverter);
 	}
 
 	@Bean
@@ -144,18 +149,6 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 	@Bean
 	public ContactManagerProxyFactory contactManagerProxyFactory() {
 		return new ContactManagerProxyFactory();
-	}
-
-	// dependency injection to address Spring bean instantiation
-	@Bean
-	@Primary
-	public CoreConfig coreConfig(CoreConfigProxyFactoryForAPI coreConfigProxyFactoryForAPI) throws Exception {
-		return coreConfigProxyFactory().getObject();
-	}
-
-	@Bean
-	public CoreConfigProxyFactoryForAPI coreConfigProxyFactory() {
-		return new CoreConfigProxyFactoryForAPI();
 	}
 
 	@Bean
@@ -178,8 +171,8 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 
 	@Bean
 	@Primary
-	public ServerInfo serverInfo(Ignite ignite, CoreConfig config) throws Exception {
-		return new DistributedServerInfo(ignite, config);
+	public ServerInfo serverInfo(Ignite ignite) throws Exception {
+		return new DistributedServerInfo(ignite);
 	}
 
 	@Bean
@@ -242,8 +235,8 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 	}
 
     @Bean
-    public LdapAuthenticator ldapAuthenticator(CoreConfig config, GroupManager groupManager) {
-        Auth.Ldap ldapConfig = config.getRemoteConfiguration().getAuth().getLdap();
+    public LdapAuthenticator ldapAuthenticator(GroupManager groupManager) {
+        Auth.Ldap ldapConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap();
 
         if (ldapConfig == null) {
             return null;

@@ -169,13 +169,13 @@ public class ProtoBufHelper {
 				}
 
 				List<String> callsignList = (List<String>) cot.getContextValue("explicitBrokeringCallsign");
-				if(callsignList != null) {
+				if (callsignList != null) {
 					for(String s : callsignList) {
 						geoBuilder.addPtpCallsigns(s);
 					}
 				}
 				List<String> uidList = (List<String>) cot.getContextValue("explicitBrokeringUid");
-				if(uidList != null) {
+				if (uidList != null) {
 					for(String s : uidList) {
 						geoBuilder.addPtpUids(s);
 					}
@@ -221,7 +221,7 @@ public class ProtoBufHelper {
 		.addAttribute("hae", Double.toString(geo.getHae()))
 		.addAttribute("ce", Double.toString(geo.getCe()))
 		.addAttribute("le", Double.toString(geo.getLe()));
-		if(!Strings.isNullOrEmpty(geo.getOther())) {
+		if (!Strings.isNullOrEmpty(geo.getOther())) {
 			try {
 				Document otherDoc = DocumentHelper.parseText(geo.getOther());
 				Element detailE = otherDoc.getRootElement();
@@ -233,7 +233,7 @@ public class ProtoBufHelper {
 				detailE.addElement("precisionlocation")
 				.addAttribute("geopointsrc", geo.getPloc())
 				.addAttribute("altsrc", geo.getPalt());
-				if(geo.hasBinary() && geo.getBinary().getType() == BINARY_TYPES.IMAGE &&
+				if (geo.hasBinary() && geo.getBinary().getType() == BINARY_TYPES.IMAGE &&
 						detailE.element("image") != null) {
 					detailE.element("image").setText(
 							Base64.encodeBase64String(geo.getBinary().getData().toByteArray()));
@@ -248,7 +248,7 @@ public class ProtoBufHelper {
 
 		CotEventContainer rval = new CotEventContainer(event);
 
-		if(geo.getPtpCallsignsCount() > 0) {
+		if (geo.getPtpCallsignsCount() > 0) {
 			List<String> l = new LinkedList<String>();
 			for(int i = 0; i < geo.getPtpCallsignsCount(); ++i) {
 				l.add(geo.getPtpCallsigns(i));
@@ -256,7 +256,7 @@ public class ProtoBufHelper {
 			rval.setContextValue("explicitBrokeringCallsign", l);
 		}
 
-		if(geo.getPtpUidsCount() > 0) {
+		if (geo.getPtpUidsCount() > 0) {
 			List<String> l = new LinkedList<String>();
 			for(int i = 0; i < geo.getPtpUidsCount(); ++i) {
 				l.add(geo.getPtpUids(i));

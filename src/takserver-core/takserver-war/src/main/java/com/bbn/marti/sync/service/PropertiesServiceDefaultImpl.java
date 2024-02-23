@@ -4,7 +4,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -18,7 +17,6 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import com.bbn.marti.remote.util.ConcurrentMultiHashMap;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.google.common.collect.Multimap;
 
 public class PropertiesServiceDefaultImpl  implements PropertiesService {

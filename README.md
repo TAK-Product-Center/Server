@@ -56,7 +56,7 @@ This is the CoreConfig that takserver war will look for when running from the ta
 
 See appendix B in src/docs/TAK_Server_Configuration_Guide.pdf for cert generation instructions.
 
-### Build and run TAK server locally for development
+### Build TAK server to run locally for development
 
 Note that due to Java 17, there are a lot of '--add-opens' arguments in the JDK_JAVA_OPTIONS
 ```
@@ -67,20 +67,30 @@ export IGNITE_HOME="$PWD/ignite"
 export JDK_JAVA_OPTIONS="-Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/ -Djava.net.preferIPv4Stack=true -Djava.security.egd=file:/dev/./urandom -DIGNITE_UPDATE_NOTIFIER=false -DIGNITE_QUIET=true -Dio.netty.tmpdir=$PWD -Djava.io.tmpdir=$PWD -Dio.netty.native.workdir=$PWD -Djdk.tls.client.protocols=TLSv1.2  --add-opens=java.base/sun.security.pkcs=ALL-UNNAMED --add-opens=java.base/sun.security.pkcs10=ALL-UNNAMED --add-opens=java.base/sun.security.util=ALL-UNNAMED --add-opens=java.base/sun.security.x509=ALL-UNNAMED --add-opens=java.base/sun.security.tools.keytool=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-opens=jdk.internal.jvmstat/sun.jvmstat.monitor=ALL-UNNAMED --add-opens=java.base/sun.reflect.generics.reflectiveObjects=ALL-UNNAMED --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.math=ALL-UNNAMED --add-opens=java.sql/java.sql=ALL-UNNAMED --add-opens=java.base/javax.net.ssl=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=jdk.unsupported/sun.misc=ALL-UNNAMED --add-opens=java.base/java.lang.ref=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.security=ALL-UNNAMED --add-opens=java.base/java.security.ssl=ALL-UNNAMED --add-opens=java.base/java.security.cert=ALL-UNNAMED --add-opens=java.base/sun.security.rsa=ALL-UNNAMED --add-opens=java.base/sun.security.ssl=ALL-UNNAMED --add-opens=java.base/sun.security.x500=ALL-UNNAMED --add-opens=java.base/sun.security.pkcs12=ALL-UNNAMED --add-opens=java.base/sun.security.provider=ALL-UNNAMED --add-opens=java.base/javax.security.auth.x500=ALL-UNNAMED"
 
 ```
+### Running TAK server locally for development
 
-TAK server consists of two processes: Messaging and API. The messaging process can run independently, but the API process needs to connect to the ignite server that runs as a part of the messaging process. For both processes, -Xmx should always be specified.
+TAK server consists of three processes: Configuration, Messaging and API. 
 
-Run Messaging (note - this command and the following one to run api include the **duplicatelogs** profile. This turns off the filter that blocks duplicated log messages that cause log spam in operational deployments of TAK Server.
+The configuration process needs to be running first in order for the Messaging, API or any other services to retrieve the centralized configuration.  This is separate from the TAKIgniteConfiguration that is loaded **per service** using defaults or the overridden values in TAKIgniteConfig.xml.  
+
+The messaging process can run independently, but the API process may need to connect to the ignite server that runs as a part of the messaging process if it is not configured to run its own Ignite server. For both processes, -Xmx should always be specified.
+
+Note - These commands include the **duplicatelogs** profile. This turns off the filter that blocks duplicated log messages that cause log spam in operational deployments of TAK Server.
+
+#### Run Configuration Microservice
+```
+java -server -XX:+AlwaysPreTouch -XX:+UseG1GC -XX:+ScavengeBeforeFullGC -XX:+DisableExplicitGC -Xmx<value> -Dspring.profiles.active=config,duplicatelogs -jar ../build/libs/takserver-core-xyz.war
+```
+#### Run Messaging Microservice
 ```
 java -server -XX:+AlwaysPreTouch -XX:+UseG1GC -XX:+ScavengeBeforeFullGC -XX:+DisableExplicitGC -Xmx<value> -Dspring.profiles.active=messaging,duplicatelogs -jar ../build/libs/takserver-core-xyz.war
 ```
-
-Run API
+#### Run API Microservice
 ```
 java -server -XX:+AlwaysPreTouch -XX:+UseG1GC -XX:+ScavengeBeforeFullGC -XX:+DisableExplicitGC -Xmx<value> -Dspring.profiles.active=api,duplicatelogs -Dkeystore.pkcs12.legacy -jar ../build/libs/takserver-core-xyz.war
 ```
 
-Run Plugin Manager (useful when working on plugin capability)
+#### Run Plugin Manager Microservice (optional - useful when working on plugin capability)
 ```
 java -server -XX:+AlwaysPreTouch -XX:+UseG1GC -XX:+ScavengeBeforeFullGC -XX:+DisableExplicitGC -Xmx<value> -jar ../../takserver-plugin-manager/build/libs/takserver-plugin-manager-xyz.jar 
 ```
@@ -150,10 +160,12 @@ i.e.
 
 The TAK Server log files can be found in the _logs_ subdirectory:
 
-1. _takserver-messaging.log_ - Execution-level information about the messaging process, including client connection events, error messages and warnings.
-2. _takserver-api.log_ - Execution-level information about the API process, including error messages and warnings.
-3. _takserver-messaging-console.log_ - Java Virtual Machine (JVM) informational messages and errors, for the messaging process.
-4. _takserver-api-console.log_ - Java Virtual Machine (JVM) informational messages and errors, for the API process.
+1. _takserver-config.log_ - Execution-level information about the configuration process including setup, error messages and warnings.
+2. _takserver-messaging.log_ - Execution-level information about the messaging process, including client connection events, error messages and warnings.
+3. _takserver-api.log_ - Execution-level information about the API process, including error messages and warnings.
+4. _takserver-config-console.log_ - Java Virtual Machine (JVM) informational messages and errors, for the config process.
+5. _takserver-messaging-console.log_ - Java Virtual Machine (JVM) informational messages and errors, for the messaging process.
+6. _takserver-api-console.log_ - Java Virtual Machine (JVM) informational messages and errors, for the API process.
 
 ## Swagger
 https://localhost:8443/swagger-ui.html

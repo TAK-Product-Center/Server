@@ -7,13 +7,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
@@ -24,8 +23,8 @@ import org.springframework.security.core.userdetails.UserDetailsByNameServiceWra
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import com.bbn.marti.config.Network.Connector;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.exception.TakException;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.beust.jcommander.internal.Lists;
 import com.google.common.base.Strings;
 
@@ -38,9 +37,6 @@ import com.google.common.base.Strings;
 public class RolePortUserServiceWrapper extends UserDetailsByNameServiceWrapper {
 
     private static final Logger logger = LoggerFactory.getLogger(RolePortUserServiceWrapper.class);
-
-    @Autowired
-    CoreConfig config;
 
     // This is defined in security-context.xml
     @Resource(name="httpsBasicPaths")
@@ -92,7 +88,7 @@ public class RolePortUserServiceWrapper extends UserDetailsByNameServiceWrapper 
         }
 
         if (portRoleMap.containsKey(requestPort)) {
-
+            
             String role = portRoleMap.get(requestPort);
             
             if (logger.isDebugEnabled()) {
@@ -104,7 +100,7 @@ public class RolePortUserServiceWrapper extends UserDetailsByNameServiceWrapper 
 
             try {
                 // Get Configuration on the requestPort
-                List<Connector> connectors = config.getRemoteConfiguration().getNetwork().getConnector();
+                List<Connector> connectors = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getConnector();
                 Connector configConnectorOnTheRequestedPort = null;
                 for (Connector connector : connectors) {
                     if (requestPort.equals(String.valueOf(connector.getPort()))) {

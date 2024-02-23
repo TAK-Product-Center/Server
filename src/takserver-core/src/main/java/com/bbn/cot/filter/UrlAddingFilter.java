@@ -5,15 +5,15 @@ package com.bbn.cot.filter;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.bbn.marti.config.Configuration;
 import org.apache.log4j.Logger;
 import org.dom4j.Attribute;
 import org.dom4j.Element;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import com.bbn.cot.filter.Images.ImageData;
 import com.bbn.marti.config.Urladd;
-import com.bbn.marti.service.DistributedConfiguration;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 
 /**
@@ -26,15 +26,13 @@ import tak.server.cot.CotEventContainer;
  */
 public class UrlAddingFilter implements CotFilter {
 	
-	@Autowired
-	private DistributedConfiguration config;
-	
 	private static final Logger log = Logger.getLogger(UrlAddingFilter.class);
 
 	public UrlAddingFilter() { }
 
 	public CotEventContainer filter(CotEventContainer cot) {
-		// make sure there's a database			
+		// make sure there's a database
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
 		// if we don't have a database, or we don't have any images
 		if (!config.getRepository().isEnable() || !cot.hasContextKey(CotEventContainer.IMAGE_KEY)) {
@@ -89,7 +87,7 @@ public class UrlAddingFilter implements CotFilter {
 	* by annotating (mutating) the image element
 	*/
 	public void annotateImageData(ImageData imageData) {
-		Urladd urladd = config.getFilter().getUrladd();
+		Urladd urladd = CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getUrladd();
 		Element imageElem = imageData.element();
 		
 		//Construct URL

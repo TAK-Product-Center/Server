@@ -10,7 +10,6 @@ import java.nio.file.Paths
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
-apply plugin: 'io.spring.dependency-management'
 
 group = 'tak'
 
@@ -63,6 +62,14 @@ dependencies {
   implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
   implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
 
+  // required for audit log custom logging layout
+  implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  implementation group: 'ch.qos.logback.contrib', name: 'logback-jackson', version: logback_jackson_version
+  implementation group: 'ch.qos.logback.contrib', name: 'logback-json-classic', version: logback_jackson_version
+  // https://mvnrepository.com/artifact/org.codehaus.janino/janino License: BSD 3-Clause
+  // required for conditional processing of logback configuration
+  implementation group: 'org.codehaus.janino', name: 'janino', version: janino_version
+
   implementation(project(':takserver-common')) {
     exclude group: 'io.micrometer', module:'micrometer-registry-cloudwatch'
     exclude group: 'pull-parser'
@@ -80,7 +87,7 @@ dependencies {
    // nats message queue
   implementation group: 'io.nats', name: 'jnats', version: nats_version
 
-  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: spring_boot_version
 //  implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
 //  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-jdbc', version: spring_boot_version
   implementation group: 'org.springframework', name: 'spring-context'
@@ -89,15 +96,17 @@ dependencies {
 
   implementation group: 'org.postgresql', name: 'postgresql', version: postgres_version
 
-  implementation group: 'org.hibernate', name: 'hibernate-spatial', version: hibernate_version
+  implementation group: 'org.hibernate.orm', name: 'hibernate-spatial', version: hibernate_version
 
     testImplementation group: 'junit', name: 'junit', version: junit_version
   testImplementation group: 'org.mockito', name: 'mockito-core', version: mockito_version
-  testImplementation("org.springframework.boot:spring-boot-starter-test") {
+  testImplementation("org.springframework.boot:spring-boot-starter-test:$spring_boot_version") {
     exclude group: "com.vaadin.external.google", module:"android-json"
   }
 
   testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+  
+  implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: jakarta_xml_bind_api_version
 
 }
 

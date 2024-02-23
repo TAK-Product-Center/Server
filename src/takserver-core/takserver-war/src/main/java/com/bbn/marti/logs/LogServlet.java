@@ -1,27 +1,32 @@
 package com.bbn.marti.logs;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-import javax.mail.internet.MimeMessage;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
-import com.bbn.marti.config.Email;
 import com.bbn.marti.email.EmailClient;
-import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.codec.Base64;
 
 import com.bbn.marti.EsapiServlet;
@@ -33,9 +38,6 @@ public class LogServlet extends EsapiServlet {
 	
 	@Autowired
 	private PersistenceStore persistenceStore;
-
-	@Autowired
-	CoreConfig coreConfig;
 
 	public enum QueryParameter {
 		id,
@@ -119,7 +121,7 @@ public class LogServlet extends EsapiServlet {
             Map<String, String[]> httpParameters = validateParams("Log", request, response,
             		requiredPostParameters, optionalPostParameters);
 
-            if(httpParameters == null)
+            if (httpParameters == null)
                 return;
     		
 	      	String uid = getParameterValue(httpParameters, QueryParameter.uid.name());
@@ -148,10 +150,10 @@ public class LogServlet extends EsapiServlet {
 				log.setFilename(missionPackageEntry.getKey());
 				persistenceStore.addLog(log);
 
-				if (coreConfig.getRemoteConfiguration().getEmail() != null &&
-					coreConfig.getRemoteConfiguration().getEmail().isLogAlertsEnabled()) {
+				if (CoreConfigFacade.getInstance().getRemoteConfiguration().getEmail() != null &&
+						CoreConfigFacade.getInstance().getRemoteConfiguration().getEmail().isLogAlertsEnabled()) {
 
-					for (String extension : coreConfig.getRemoteConfiguration().getEmail().getLogAlertsExtension()) {
+					for (String extension : CoreConfigFacade.getInstance().getRemoteConfiguration().getEmail().getLogAlertsExtension()) {
 						if (log.getFilename().endsWith(extension)) {
 							sendLogAlert(log.getContents());
 							break;
@@ -170,7 +172,7 @@ public class LogServlet extends EsapiServlet {
     }
 
     private void sendLogAlert(byte[] feedback) {
-		if (coreConfig.getRemoteConfiguration().getEmail() == null) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getEmail() == null) {
 			logger.error("missing email configuration in sendLogAlert");
 			return;
 		}
@@ -207,10 +209,10 @@ public class LogServlet extends EsapiServlet {
 
 		if (body != null) {
 			EmailClient.sendEmail(
-					coreConfig.getRemoteConfiguration().getEmail(),
-					coreConfig.getRemoteConfiguration().getEmail().getLogAlertsSubject(),
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getEmail(),
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getEmail().getLogAlertsSubject(),
 					body,
-					coreConfig.getRemoteConfiguration().getEmail().getLogAlertsTo(),
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getEmail().getLogAlertsTo(),
 					cc, logAsZip);
 		}
 	}
@@ -225,7 +227,7 @@ public class LogServlet extends EsapiServlet {
             Map<String, String[]> httpParameters = validateParams("Log", request, response,
             		requiredGetParameters, optionalGetParameters);
 
-            if(httpParameters == null)
+            if (httpParameters == null)
                 return;
     		
 	      	String id = getParameterValue(httpParameters, QueryParameter.id.name());

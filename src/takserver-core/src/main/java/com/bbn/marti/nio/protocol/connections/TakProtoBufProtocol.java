@@ -56,7 +56,7 @@ public class TakProtoBufProtocol extends AbstractBroadcastingProtocol<FederatedE
         //long start = System.currentTimeMillis();
         //log.warn("new read: " + buffer.remaining() + " bytes");
 
-        if(leftovers == null) {
+        if (leftovers == null) {
             fullBuf = buffer;
         } else {
             int binaryLength = buffer.remaining();
@@ -71,8 +71,8 @@ public class TakProtoBufProtocol extends AbstractBroadcastingProtocol<FederatedE
         boolean breakout = false;
         while(fullBuf.remaining() > 0 && !breakout) {
             //log.warn("looping: " + nextSize);
-            if(nextSize == -1) {
-                if(fullBuf.remaining() > INTBYTES) {
+            if (nextSize == -1) {
+                if (fullBuf.remaining() > INTBYTES) {
                     nextSize = fullBuf.getInt();
                     //log.warn("getting new event: " + nextSize);
                 } else {
@@ -85,7 +85,7 @@ public class TakProtoBufProtocol extends AbstractBroadcastingProtocol<FederatedE
                 }
             }
 
-            if(fullBuf.remaining() < nextSize) {
+            if (fullBuf.remaining() < nextSize) {
                 //log.warn("not a full event, waiting for more data.  remaining: " + fullBuf.remaining() + " needed: " + nextSize);
                 leftovers = ByteBuffer.allocate(fullBuf.remaining());
                 leftovers.put(fullBuf);
@@ -97,7 +97,7 @@ public class TakProtoBufProtocol extends AbstractBroadcastingProtocol<FederatedE
             byte [] eventBytes = new byte[nextSize];
             nextSize = -1;
             fullBuf.get(eventBytes);
-            if(fullBuf.remaining() == 0) {
+            if (fullBuf.remaining() == 0) {
                 leftovers = null; // just to be sure
             }
             //log.warn(" leftover bytes: " + fullBuf.remaining());

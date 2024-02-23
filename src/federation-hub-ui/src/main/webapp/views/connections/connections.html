@@ -38,6 +38,10 @@
                 <thead>
                   <tr>
                     <th>Connection Id</th>
+                    <th>Reads</th>
+                    <th>BytesRead</th>
+                    <th>Writes</th>
+                    <th>BytesWritten</th>
                     <th>Local Connection Type</th>
                     <th>Remote Connection Type</th>
                     <th>Remote Address</th>
@@ -49,6 +53,10 @@
                 <tbody>
                   <tr data-ng-repeat="ac in filteredActiveConnections">
                     <td data-ng-bind="ac.connectionId"></td>
+                    <td data-ng-bind="ac.reads"></td>
+                    <td data-ng-bind="ac.bRead"></td>
+                    <td data-ng-bind="ac.writes"></td>
+                    <td data-ng-bind="ac.bWritten"></td>
                     <td data-ng-bind="ac.localConnectionType"></td>
                     <td data-ng-bind="ac.remoteConnectionType"></td>
                     <td data-ng-bind="ac.remoteAddress"></td>

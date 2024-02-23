@@ -3,15 +3,25 @@ package com.bbn.marti.jwt;
 import com.bbn.marti.config.MissionTls;
 import com.bbn.marti.config.Oauth;
 import com.bbn.marti.remote.CoreConfig;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
-import io.jsonwebtoken.*;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.security.*;
+import java.security.Key;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
@@ -28,8 +38,6 @@ public class JwtUtils {
     private PublicKey publicKey = null;
     private boolean keysLoaded = false;
     private boolean keysGenerated = false;
-    CoreConfig coreConfig;
-
     private static JwtUtils instance = null;
 
     private KeyPair loadKeyPair(String keyStoreType, String keyStoreFile, String keyStorePass) {
@@ -70,9 +78,10 @@ public class JwtUtils {
             //
             // load keys from tls keystore
             //
-            String keyStoreType = coreConfig().getRemoteConfiguration().getSecurity().getTls().getKeystore();
-            String keyStoreFile = coreConfig().getRemoteConfiguration().getSecurity().getTls().getKeystoreFile();
-            String keyStorePass = coreConfig().getRemoteConfiguration().getSecurity().getTls().getKeystorePass();
+            CoreConfig coreConfig = CoreConfigFacade.getInstance();
+            String keyStoreType = coreConfig.getRemoteConfiguration().getSecurity().getTls().getKeystore();
+            String keyStoreFile = coreConfig.getRemoteConfiguration().getSecurity().getTls().getKeystoreFile();
+            String keyStorePass = coreConfig.getRemoteConfiguration().getSecurity().getTls().getKeystorePass();
 
             KeyPair keyPair = loadKeyPair(keyStoreType, keyStoreFile, keyStorePass);
             if (keyPair == null) {
@@ -169,7 +178,7 @@ public class JwtUtils {
 
     public List<RSAPublicKey> getExternalVerifiers() {
         try {
-            Oauth oAuth = coreConfig().getRemoteConfiguration().getAuth().getOauth();
+            Oauth oAuth = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth();
             if (oAuth == null) {
                 logger.error("OAuth config not found");
                 return null;
@@ -244,7 +253,7 @@ public class JwtUtils {
         jwtParsers.add(getParser(SignatureAlgorithm.HS256, privateKey));
 
         try {
-            for (MissionTls missionTls : coreConfig().getRemoteConfiguration().getSecurity().getMissionTls()) {
+            for (MissionTls missionTls : CoreConfigFacade.getInstance().getRemoteConfiguration().getSecurity().getMissionTls()) {
                 KeyPair keyPair = loadKeyPair(
                         missionTls.getKeystore(), missionTls.getKeystoreFile(), missionTls.getKeystorePass());
                 jwtParsers.add(Jwts.parser().setSigningKey(keyPair.getPrivate().getEncoded()));
@@ -254,19 +263,6 @@ public class JwtUtils {
         }
 
         return parseClaims(token, jwtParsers);
-    }
-
-    private CoreConfig coreConfig() {
-        if (coreConfig == null) {
-            synchronized(this) {
-                if (coreConfig == null) {
-                    if (SpringContextBeanForApi.getSpringContext() != null) {
-                        coreConfig = SpringContextBeanForApi.getSpringContext().getBean(CoreConfig.class);
-                    }
-                }
-            }
-        }
-        return coreConfig;
     }
 
 }

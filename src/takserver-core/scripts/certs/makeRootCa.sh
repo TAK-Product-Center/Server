@@ -13,9 +13,15 @@ if [ -e ca.pem ]; then
   exit -1
 fi
 
-if [ ${#} == 2 ] && [ "${1}" == "--ca-name" ];then
-  CA_NAME=${2}
-else
+CA_NAME=""
+for (( i=1; i <= "$#"; i++ )); do
+  if [ "${!i}" == "--ca-name" ];then
+    NEXT_VAL=$(($i + 1))
+    CA_NAME=${!NEXT_VAL}
+  fi
+done
+
+if [ -z "${CA_NAME}" ]; then
   echo "Please give a name for your CA (no spaces).  It should be unique.  If you don't enter anything, or try something under 5 characters, I will make one for you"
   read CA_NAME
 fi
@@ -25,18 +31,32 @@ if [[ "$canamelen" -lt 5 ]]; then
   CA_NAME=`date +%N`
 fi
 
+CRYPTO_SETTINGS=""
+
 openssl list -providers 2>&1 | grep "\(invalid command\|unknown option\)" >/dev/null
 if [ $? -ne 0 ] ; then
   echo "Using legacy provider"
-  LEGACY_PROVIDER="-legacy"
+  CRYPTO_SETTINGS="-legacy"
 fi
+
+fips=false
+for var in "$@"
+do
+    if [ "$var" == "-fips" ] || [ "$var" == "--fips" ];then
+      fips=true
+    	CRYPTO_SETTINGS='-macalg SHA256 -aes256 -descert -keypbe AES-256-CBC -certpbe AES-256-CBC'
+    fi
+done
 
 SUBJ=$SUBJBASE"CN=$CA_NAME"
 echo "Making a CA for " $SUBJ
 openssl req -new -sha256 -x509 -days 3652 -extensions v3_ca -keyout ca-do-not-share.key -out ca.pem -passout pass:${CAPASS} -config ../config.cfg -subj "$SUBJ"
 openssl x509 -in ca.pem  -addtrust clientAuth -addtrust serverAuth -setalias "${CA_NAME}" -out ca-trusted.pem
 
-openssl pkcs12 ${LEGACY_PROVIDER} -export -in ca-trusted.pem -out truststore-root.p12 -nokeys -caname "${CA_NAME}" -passout pass:${CAPASS}
+if [ "$fips" = true ];then
+  openssl pkcs12 -legacy -export -in ca-trusted.pem -out truststore-root-legacy.p12 -nokeys -caname "${CA_NAME}" -passout pass:${CAPASS}
+fi
+openssl pkcs12 ${CRYPTO_SETTINGS} -export -in ca-trusted.pem -out truststore-root.p12 -nokeys -caname "${CA_NAME}" -passout pass:${CAPASS}
 keytool -import -trustcacerts -file ca.pem -keystore truststore-root.jks -alias "${CA_NAME}" -storepass "${CAPASS}" -noprompt
 cp truststore-root.jks fed-truststore.jks
 

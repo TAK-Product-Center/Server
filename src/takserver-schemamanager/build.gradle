@@ -33,6 +33,8 @@ dependencies {
   implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
   implementation group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
   implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
+  
+  implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: jakarta_xml_bind_api_version
 }
 
 

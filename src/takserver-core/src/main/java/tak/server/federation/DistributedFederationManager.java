@@ -61,6 +61,7 @@ import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
 import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.cot.filter.GeospatialEventFilter;
+import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
 import com.bbn.marti.config.Federation.Federate.Mission;
@@ -82,9 +83,9 @@ import com.bbn.marti.nio.protocol.Protocol;
 import com.bbn.marti.nio.util.CodecSource;
 import com.bbn.marti.remote.ConnectionStatus;
 import com.bbn.marti.remote.ConnectionStatusValue;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationManager;
 import com.bbn.marti.remote.RemoteContact;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.DuplicateFederateException;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.ConnectionInfo;
@@ -94,7 +95,7 @@ import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.service.DistributedConfiguration;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.FederatedSubscriptionManager;
 import com.bbn.marti.service.Resources;
@@ -103,7 +104,6 @@ import com.bbn.marti.service.Subscription;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
 import com.bbn.roger.fig.FederationUtils;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
@@ -128,14 +128,6 @@ public class DistributedFederationManager implements FederationManager, Service 
 	private static final long serialVersionUID = -8858646520017672442L;
 	private static final String OUTGOING_DELETED_FROM_UI = "Outgoing deleted from UI";
 
-	public DistributedFederationManager(Ignite ignite, CoreConfig coreConfig) {
-		this.coreConfig = DistributedConfiguration.getInstance();
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("DistributedFederationManager constructor. coreConfig: " + coreConfig);
-		}
-	}
-
 	private static AtomicBoolean outgoingsInitiated = new AtomicBoolean();
 
 	private static final Logger logger = LoggerFactory.getLogger(DistributedFederationManager.class);
@@ -144,14 +136,19 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	private static final String SSL_TRUSTSTORE_KEY = "fed-ssl-truststore";
 
-	private CoreConfig coreConfig;
-
 	private final AtomicReference<Messenger<CotEventContainer>> cotMessenger = new AtomicReference<>();
 
 	private final AtomicInteger counter = new AtomicInteger();
 
 	private ContinuousQuery<String, SSLConfig> continuousTrustStoreQuery = new ContinuousQuery<>();
-	
+
+    public DistributedFederationManager(Ignite ignite) {
+
+        if (logger.isDebugEnabled()) {
+            logger.debug("DistributedFederationManager constructor.");
+        }
+    }
+    
 	@SuppressWarnings("unchecked")
 	private Messenger<CotEventContainer> messenger() {
 		if (cotMessenger.get() == null) {
@@ -193,28 +190,20 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public void init(ServiceContext ctx) throws Exception {
+
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
 		if (logger.isDebugEnabled()) {
 			logger.debug("init method DistributedFederationManager");
 		}
 
 		// This occurs in WebSocketTest
-		if (coreConfig == null || coreConfig.getRemoteConfiguration() == null
-				|| coreConfig.getRemoteConfiguration().getFederation() == null) {
+		if (config == null || config.getFederation() == null) {
 			return;
 		}
 
 		getSSLCache().putIfAbsent(SSL_TRUSTSTORE_KEY,
-				SSLConfig.getInstance(coreConfig.getRemoteConfiguration().getFederation().getFederationServer().getTls()));
-
-		continuousTrustStoreQuery.setLocalListener((evts) -> {
-   	    	saveTruststoreFile();
-			// reload the trust store from disk, and
-   	    	Tls tlsConfig = coreConfig.getRemoteConfiguration().getFederation().getFederationServer().getTls();
-   	    	tak.server.federation.FederationServer.refreshServer();
-			SSLConfig.getInstance(tlsConfig).refresh();
-     	 });
-
-		getSSLCache().query(continuousTrustStoreQuery);
+				SSLConfig.getInstance(config.getFederation().getFederationServer().getTls()));
 	}
 
 	@Override
@@ -242,7 +231,8 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	// start or restart the federation server
 	private void startListening() {
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+		Federation fedConfig = config.getFederation();
 
 		if (fedConfig.getFederationServer().getFederationPort().isEmpty()) { // this will update old CoreConfig to the new format
 			if (logger.isDebugEnabled()) {
@@ -256,7 +246,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 			fedConfig.getFederationServer().getFederationPort().add(p);
 
 			try {
-				coreConfig.setAndSaveFederation(fedConfig);
+				CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 			} catch (Exception e) {
 				logger.warn("exception trying to update CoreConfig.xml to new format." + e.getMessage(), e);
 			}
@@ -272,13 +262,13 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@EventListener({ ContextRefreshedEvent.class })
 	private void onContextRefreshed() {
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 		// This occurs in WebSocketTest
-		if (coreConfig == null || coreConfig.getRemoteConfiguration() == null
-				|| coreConfig.getRemoteConfiguration().getFederation() == null) {
+		if (config == null	|| config.getFederation() == null) {
 			return;
 		}
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		if (!fedConfig.isEnableFederation()) {
 
@@ -309,7 +299,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 			logger.warn("FAIL" + e);
 		}
 
-		if (DistributedConfiguration.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
 			setupIgniteListeners();
 		}
 		
@@ -330,8 +320,9 @@ public class DistributedFederationManager implements FederationManager, Service 
 			// temporary set to check outgoing name uniqueness
 			Set<String> names = new HashSet<>();
 			Set<String> hostports = new HashSet<>();
+			Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
-			for (FederationOutgoing outgoing : coreConfig.getRemoteConfiguration().getFederation().getFederationOutgoing()) {
+			for (FederationOutgoing outgoing : config.getFederation().getFederationOutgoing()) {
 				// validate configuration
 				if (names.contains(outgoing.getDisplayName().toLowerCase())) {
 					throw new DuplicateFederateException("invalid configuration: multiple outgoing federates named " + outgoing.getDisplayName());
@@ -368,11 +359,11 @@ public class DistributedFederationManager implements FederationManager, Service 
 		}
 	}
 
-	private IgniteCache<String, SSLConfig>  sslCache = null;
+	private Map<String, SSLConfig>  sslCache = new ConcurrentHashMap<>();
 
-	private IgniteCache<String, SSLConfig> getSSLCache() {
+	private Map<String, SSLConfig> getSSLCache() {
 		if (sslCache == null) {
-			sslCache = IgniteHolder.getInstance().getIgnite().getOrCreateCache("sslCache");
+			sslCache = new ConcurrentHashMap<>();
 		}
 
 		return sslCache;
@@ -415,11 +406,9 @@ public class DistributedFederationManager implements FederationManager, Service 
 						Ignite ignite = IgniteHolder.getInstance().getIgnite();
 						// if the orphaned node is null - no other node has handled this event - so lets do it here.
 						if (handlingNodeId == null) {
-
+							Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 							// TODO: check usage of forClients() below - is this only for cluster?
-							DistributedConfiguration.getInstance()
-								.getRemoteConfiguration()
-								.getFederation()
+							config.getFederation()
 								.getFederationOutgoing()
 								.stream()
 								.filter(o -> o.isEnabled())
@@ -476,8 +465,8 @@ public class DistributedFederationManager implements FederationManager, Service 
 	}
 
 	private void disableAllOutgoing() {
-		for (FederationOutgoing outgoing : coreConfig.getRemoteConfiguration()
-				.getFederation()
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+		for (FederationOutgoing outgoing : config.getFederation()
 				.getFederationOutgoing()) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("disabling outgoing connection: " + outgoing.getDisplayName());
@@ -488,7 +477,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public List<Federate> getAllFederates() {
-		return coreConfig.getRemoteConfiguration().getFederation().getFederate();
+		return CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederate();
 	}
 
 	/*
@@ -496,12 +485,12 @@ public class DistributedFederationManager implements FederationManager, Service 
 	 *
 	 */
 	public void addFederateToConfig(@NotNull Federate federate) {
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		fedConfig.getFederate().add(federate);
 
 		try {
-			coreConfig.setAndSaveFederation(fedConfig);
+			CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("Remote Exception saving federate config", e);
@@ -511,7 +500,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public Federate getFederate(String federateUID) {
-		List<Federate> federates = coreConfig.getRemoteConfiguration().getFederation().getFederate();
+		List<Federate> federates = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederate();
 		for (Federate f : federates) {
 			if (f != null && f.getId() != null && f.getId().equals(federateUID)) {
 				return f;
@@ -522,7 +511,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public List<String> getGroupsInbound(String federateUID) {
-		List<Federate> federates = coreConfig.getRemoteConfiguration().getFederation().getFederate();
+		List<Federate> federates = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederate();
 		for (Federate f : federates) {
 			if (f.getId().compareTo(federateUID) == 0) {
 				return f.getInboundGroup();
@@ -533,7 +522,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public Multimap<String, String> getInboundGroupMap(@NotNull String federateUID) {
-		List<Federate> federates = coreConfig.getRemoteConfiguration().getFederation().getFederate();
+		List<Federate> federates = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederate();
 		SortedSetMultimap<String, String> inboundMap = TreeMultimap.create();
 		for (Federate f : federates) {
 			if (f.getId().compareTo(federateUID) == 0) {
@@ -558,7 +547,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public List<String> getGroupsOutbound(String federateUID) {
-		List<Federate> federates = coreConfig.getRemoteConfiguration().getFederation().getFederate();
+		List<Federate> federates = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederate();
 		for (Federate f : federates) {
 			if (f.getId().compareTo(federateUID) == 0) {
 				return f.getOutboundGroup();
@@ -583,7 +572,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public List<String> getCAGroupsInbound(String caID) {
-		List<Federation.FederateCA> federateCAs = coreConfig.getRemoteConfiguration().getFederation().getFederateCA();
+		List<Federation.FederateCA> federateCAs = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederateCA();
 		for (Federation.FederateCA ca : federateCAs) {
 			if (ca.getFingerprint().compareTo(caID) == 0) {
 				return ca.getInboundGroup();
@@ -594,7 +583,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public List<String> getCAGroupsOutbound(@NotNull String caID) {
-		List<Federation.FederateCA> federateCAs = coreConfig.getRemoteConfiguration().getFederation().getFederateCA();
+		List<Federation.FederateCA> federateCAs = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederateCA();
 		for (Federation.FederateCA ca : federateCAs) {
 			if (ca.getFingerprint().compareTo(caID) == 0) {
 				return ca.getOutboundGroup();
@@ -605,7 +594,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public int getCAMaxHops(@NotNull String caID) {
-		List<Federation.FederateCA> federateCAs = coreConfig.getRemoteConfiguration().getFederation().getFederateCA();
+		List<Federation.FederateCA> federateCAs = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederateCA();
 		for (Federation.FederateCA ca : federateCAs) {
 			if (ca.getFingerprint().compareTo(caID) == 0) {
 				return ca.getMaxHops();
@@ -617,7 +606,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	@Override
 	public void addFederateToGroupsInbound(String federateUID, Set<String> localGroupNames) {
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		List<Federate> federates = fedConfig.getFederate();
 		
@@ -644,8 +633,8 @@ public class DistributedFederationManager implements FederationManager, Service 
 		} catch (Exception e) {
 			logger.warn("error updating federation user group config", e);
 		}
-		
-		coreConfig.setAndSaveFederation(fedConfig);
+
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 
 		clusterAddFederateUsersToGroups(federateUID, localGroupNames, Direction.IN, true);
 	}
@@ -653,7 +642,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	@Override
 	public void addFederateToGroupsOutbound(String federateUID, Set<String> localGroupNames) {
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		List<Federate> federates = fedConfig.getFederate();
 		
@@ -683,7 +672,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 		
 		updateFederateGroups(federateConfig);
 
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 
 		clusterAddFederateUsersToGroups(federateUID, localGroupNames, Direction.OUT, true);
 	}
@@ -735,7 +724,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	@Override
 	public void addFederateGroupsInboundMap(@NotNull String federateUID, @NotNull String remoteGroup,
 			@NotNull String localGroup) {
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 		List<Federate> federates = fedConfig.getFederate();
 
 		for (Federate f : federates) {
@@ -746,13 +735,13 @@ public class DistributedFederationManager implements FederationManager, Service 
 				break;
 			}
 		}
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
 
 	@Override
 	public synchronized void addInboundGroupToCA(@NotNull String caID, @NotNull Set<String> localGroupNames) {
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		List<Federation.FederateCA> federateCAs = fedConfig.getFederateCA();
 		boolean foundCA = false;
@@ -783,22 +772,22 @@ public class DistributedFederationManager implements FederationManager, Service 
 			}
 		}
 
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
 
 	@Override
 	public synchronized void addOutboundGroupToCA(@NotNull String caID, @NotNull Set<String> localGroupNames) {
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
-		List<Federation.FederateCA> federateCAs = coreConfig.getRemoteConfiguration().getFederation().getFederateCA();
+		List<Federation.FederateCA> federateCAs = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederateCA();
 		boolean foundCA = false;
 		for (Federation.FederateCA ca : federateCAs) {
 			if (ca.getFingerprint().compareTo(caID) == 0) {
 				foundCA = true;
 				for (String gname : localGroupNames) {
 					ca.getOutboundGroup().add(gname);
-					coreConfig.setAndSaveFederation(fedConfig);
+					CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 				}
 				break;
 			}
@@ -819,13 +808,13 @@ public class DistributedFederationManager implements FederationManager, Service 
 			}
 		}
 
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
 
 	@Override
 	public synchronized void removeFederateFromGroupsInbound(String federateUID, Set<String> localGroupNames) {
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		List<Federate> federates = fedConfig.getFederate();
 		for (Federate f : federates) {
@@ -837,7 +826,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 			}
 		}
 
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 
 		clusterRemoveFederateUsersToGroups(federateUID, localGroupNames, Direction.IN, true);
 	}
@@ -845,7 +834,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	@Override
 	public void removeFederateFromGroupsOutbound(String federateUID, Set<String> localGroupNames) {
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		Federate federateConfig = null;
 		List<Federate> federates = fedConfig.getFederate();
@@ -861,7 +850,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 		
 		updateFederateGroups(federateConfig);
 
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 
 		clusterRemoveFederateUsersToGroups(federateUID, localGroupNames, Direction.OUT, true);
 	}
@@ -891,7 +880,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	@Override
 	public void removeFederateInboundGroupsMap(@NotNull String federateUID, @NotNull String remoteGroup,
 			@NotNull String localGroup) {
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 		List<Federate> federates = fedConfig.getFederate();
 
 		Set localGroupSet = new HashSet<String>(1);
@@ -903,13 +892,13 @@ public class DistributedFederationManager implements FederationManager, Service 
 				break;
 			}
 		}
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
 
 	@Override
 	public synchronized void removeInboundGroupFromCA(@NotNull String caID, @NotNull Set<String> localGroupNames) {
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		List<Federation.FederateCA> federateCAs = fedConfig.getFederateCA();
 		for (Federation.FederateCA ca : federateCAs) {
@@ -921,13 +910,13 @@ public class DistributedFederationManager implements FederationManager, Service 
 			}
 		}
 
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
 
 	@Override
 	public synchronized void removeOutboundGroupFromCA(@NotNull String caID, @NotNull Set<String> localGroupNames) {
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		List<Federation.FederateCA> federateCAs = fedConfig.getFederateCA();
 		for (Federation.FederateCA ca : federateCAs) {
@@ -939,12 +928,12 @@ public class DistributedFederationManager implements FederationManager, Service 
 			}
 		}
 
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
 	
 	@Override
 	public synchronized void addMaxHopsToCA(@NotNull String caID, int maxHops) {
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		List<Federation.FederateCA> federateCAs = fedConfig.getFederateCA();
 		boolean foundCA = false;
@@ -971,13 +960,13 @@ public class DistributedFederationManager implements FederationManager, Service 
 			}
 		}
 
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
 
 	@Override
 	public List<Federation.FederationOutgoing> getOutgoingConnections() {
 
-		List<FederationOutgoing> result = coreConfig.getRemoteConfiguration().getFederation().getFederationOutgoing();
+		List<FederationOutgoing> result = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationOutgoing();
 
 		if (logger.isTraceEnabled()) {
 			logger.trace("outgoing connections: " + result);
@@ -1052,7 +1041,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 		List<FederationOutgoing> result = new ArrayList<>();
 
-		for (FederationOutgoing outgoing : coreConfig.getRemoteConfiguration()
+		for (FederationOutgoing outgoing : CoreConfigFacade.getInstance().getRemoteConfiguration()
 				.getFederation()
 				.getFederationOutgoing()) {
 			if (outgoing.getAddress().equalsIgnoreCase(address) && outgoing.getPort().equals(port)) {
@@ -1065,7 +1054,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	public FederationOutgoing getOutgoingConnection(String name) {
 
-		for (FederationOutgoing outgoing : coreConfig.getRemoteConfiguration()
+		for (FederationOutgoing outgoing : CoreConfigFacade.getInstance().getRemoteConfiguration()
 				.getFederation()
 				.getFederationOutgoing()) {
 			if (outgoing.getDisplayName().equalsIgnoreCase(name)) {
@@ -1222,14 +1211,14 @@ public class DistributedFederationManager implements FederationManager, Service 
 	}
 
 	private void saveOutgoing(FederationOutgoing outgoing, boolean enabled) {
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		for (FederationOutgoing fo : fedConfig.getFederationOutgoing()) {
 			if (fo != null && fo.getDisplayName() != null && fo.getDisplayName().equals(outgoing.getDisplayName())) {
 				fo.setEnabled(enabled);
 			}
 		}
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
 
 	@Override
@@ -1287,11 +1276,11 @@ public class DistributedFederationManager implements FederationManager, Service 
 		outgoing.setMaxRetries(maxRetries);
 		outgoing.setUnlimitedRetries(unlimitedRetries);
 
-		Federation federationConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation federationConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		federationConfig.getFederationOutgoing().add(outgoing);
 
-		coreConfig.setAndSaveFederation(federationConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(federationConfig);
 
 		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingNumRetries(name);
 		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingRetryScheduled(name);
@@ -1313,21 +1302,110 @@ public class DistributedFederationManager implements FederationManager, Service 
 					.getAndPutFederateOutgoingStatus(outgoing.getDisplayName(), new ConnectionStatus(ConnectionStatusValue.DISABLED));
 		}
 	}
+	
+	@Override
+	public synchronized void updateOutgoingConnection(Federation.FederationOutgoing original, Federation.FederationOutgoing update) {
+		boolean wasNameChange = false;
+		
+		// if the name is being updated, make sure the new name isn't taken
+		if (!original.getDisplayName().equals(update.getDisplayName())) {
+			// check for dupes by name in the cache
+			if (SubscriptionStore.getInstanceFederatedSubscriptionManager().getCachedFederationConnectionStatus(update.getDisplayName()) != null) {
+				throw new DuplicateFederateException("outgoing " + update.getDisplayName() + " already exists");
+			}
+			wasNameChange = true;
+		}
+		
+		// if port / address has changed, make sure it doesn't already exist
+		if (!original.getPort().equals(update.getPort()) || !original.getAddress().equals(update.getAddress())) {
+			if (!getOutgoingConnections(update.getAddress(), update.getPort()).isEmpty()) {
+				throw new DuplicateFederateException("outgoing for " + update.getAddress() + ", " + update.getPort() + " already exists");
+			}
+		}
+
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+		
+		for (Federation.FederationOutgoing f : config.getFederation().getFederationOutgoing()) {
+			if (f.getDisplayName().compareTo(original.getDisplayName()) == 0) {
+
+				Federation federationConfig = config.getFederation();
+
+				f.setEnabled(update.isEnabled());
+				f.setAddress(update.getAddress());
+				f.setDisplayName(update.getDisplayName());
+				f.setPort(update.getPort());
+				f.setReconnectInterval(update.getReconnectInterval());
+				f.setProtocolVersion(update.getProtocolVersion());
+				f.setFallback(update.getFallback());
+				f.setMaxRetries(update.getMaxRetries());
+				f.setUnlimitedRetries(update.isUnlimitedRetries());
+
+				CoreConfigFacade.getInstance().setAndSaveFederation(federationConfig);
+
+				break;
+			}
+		}
+		
+		// clear old
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().removeOutgoingNumRetries(original.getDisplayName());
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().removeOutgoingRetryScheduled(original.getDisplayName());
+		
+		// add new
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingNumRetries(update.getDisplayName());
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingRetryScheduled(update.getDisplayName());
+		
+		// if the original and the updated are disabled, just update cache incase the name changed
+		if (!original.isEnabled() && !update.isEnabled()) {
+			ConnectionStatus status = new ConnectionStatus(ConnectionStatusValue.DISABLED);
+			SubscriptionStore.getInstanceFederatedSubscriptionManager().getAndPutFederateOutgoingStatus(update.getDisplayName(), status);
+		}
+		// if the original was enabled and the updated is disabled, nothing to do other than disable
+		else if (original.isEnabled() && !update.isEnabled()) {
+			// disable the original outgoing connection
+			disableOutgoing(original);
+		}
+		// if the original was disabled and the updated is enabled, initiate the outgoing
+		else if (!original.isEnabled() && update.isEnabled()) {
+			ConnectionStatus status = new ConnectionStatus(ConnectionStatusValue.CONNECTING);
+			SubscriptionStore.getInstanceFederatedSubscriptionManager().getAndPutFederateOutgoingStatus(update.getDisplayName(), status);
+			initiateOutgoing(update, status);
+		}
+		// if the display name, address, port or protocol version has changed, we need to restart the connection
+		// otherwise we can just update the config and keep it connected
+		else if (original.isEnabled() && update.isEnabled()) {
+			if (!original.getDisplayName().equals(update.getDisplayName()) || !original.getPort().equals(update.getPort()) || 
+					!original.getAddress().equals(update.getAddress()) || original.getProtocolVersion() != update.getProtocolVersion()) {
+				
+				// disable the original outgoing connection
+				disableOutgoing(original);
+				
+				// re-enable with the new outgoing connection
+				ConnectionStatus status = new ConnectionStatus(ConnectionStatusValue.CONNECTING);
+				SubscriptionStore.getInstanceFederatedSubscriptionManager().getAndPutFederateOutgoingStatus(update.getDisplayName(), status);
+				initiateOutgoing(update, status);
+			}
+		} 
+		
+		// remove references to old name		
+		if (wasNameChange) {
+			SubscriptionStore.getInstanceFederatedSubscriptionManager().removeFederateOutgoingStatus(original.getDisplayName());
+		}
+	}
 
 	@Override
 	public void removeOutgoing(String name) {
 		disableOutgoingForNode(name);
 
-		for (Federation.FederationOutgoing f : coreConfig.getRemoteConfiguration()
+		for (Federation.FederationOutgoing f : CoreConfigFacade.getInstance().getRemoteConfiguration()
 				.getFederation()
 				.getFederationOutgoing()) {
 			if (f.getDisplayName().compareTo(name) == 0) {
 
-				Federation federationConfig = coreConfig.getRemoteConfiguration().getFederation();
+				Federation federationConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 				federationConfig.getFederationOutgoing().remove(f); // avoid concurrentmodification with the break
 
-				coreConfig.setAndSaveFederation(federationConfig);
+				CoreConfigFacade.getInstance().setAndSaveFederation(federationConfig);
 
 				ConnectionStatus status = SubscriptionStore.getInstanceFederatedSubscriptionManager().removeFederateOutgoingStatus(f.getDisplayName());
 				SubscriptionStore.getInstanceFederatedSubscriptionManager().removeOutgoingNumRetries(f.getDisplayName());
@@ -1365,7 +1443,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	public List<X509Certificate> getCALocalList() {
 		List<X509Certificate> certs = new LinkedList<>();
 		try {
-			Enumeration<String> aliases = SSLConfig.getInstance(coreConfig.getRemoteConfiguration().getFederation().getFederationServer().getTls()).getTrust().aliases();
+			Enumeration<String> aliases = SSLConfig.getInstance(CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getTls()).getTrust().aliases();
 			while (aliases.hasMoreElements()) {
 				String s = aliases.nextElement();
 				KeyStore.Entry entry = getSSLCache().get(SSL_TRUSTSTORE_KEY).getTrust().getEntry(s, null);
@@ -1420,7 +1498,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	}
 
 	private synchronized void saveTruststoreFile() {
-		Tls tlsConfig = coreConfig.getRemoteConfiguration().getFederation().getFederationServer().getTls();
+		Tls tlsConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getTls();
 		try (FileOutputStream fos = new FileOutputStream(tlsConfig.getTruststoreFile())) {
 			getSSLCache().get(SSL_TRUSTSTORE_KEY).getTrust()
 				.store(fos, tlsConfig.getTruststorePass().toCharArray());
@@ -1613,7 +1691,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 			try {
 				CotEventContainer cot = ProtoBufHelper.getInstance().proto2cot(data.getEvent());
 
-				if (coreConfig.getRemoteConfiguration().getSubmission().isIgnoreStaleMessages()) {
+				if (CoreConfigFacade.getInstance().getRemoteConfiguration().getSubmission().isIgnoreStaleMessages()) {
 					if (MessageConversionUtil.isStale(cot)) {
 						if (logger.isDebugEnabled()) {
 							logger.debug("ignoring stale federated message: " + cot);
@@ -1768,7 +1846,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 			DistributedSubscriptionManager.getInstance().addRawSubscription(subscription);
 
-			if (MessagingDependencyInjectionProxy.getInstance().coreConfig().getBuffer().getLatestSA().isEnable()) {
+			if (MessagingDependencyInjectionProxy.getInstance().coreConfig().getRemoteConfiguration().getBuffer().getLatestSA().isEnable()) {
 				try {
 					MessagingUtilImpl.getInstance().sendLatestReachableSA(user);
 				} catch (Exception e) {
@@ -2065,9 +2143,9 @@ public class DistributedFederationManager implements FederationManager, Service 
 	}
 
 	@Override
-	public void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, String notes, int maxHops) {
+	public void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, boolean fallbackWhenNoGroupMappings, String notes, int maxHops) {
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		List<Federate> federates = fedConfig.getFederate();
 
@@ -2077,12 +2155,13 @@ public class DistributedFederationManager implements FederationManager, Service 
 				f.setShareAlerts(shareAlerts);
 				f.setFederatedGroupMapping(federatedGroupMapping);
 				f.setAutomaticGroupMapping(automaticGroupMapping);
+				f.setFallbackWhenNoGroupMappings(fallbackWhenNoGroupMappings);
 				f.setNotes(notes);
 				f.setMaxHops(maxHops);
 				break;
 			}
 		}
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 		
 		// dynamically update maxHops to active connections
 		SubscriptionStore.getInstanceFederatedSubscriptionManager().getFederateSubscriptions().forEach(sub -> {
@@ -2108,7 +2187,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	@Override
 	public void removeFederate(String federateId) {
 
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		List<Federate> federates = fedConfig.getFederate();
 
@@ -2119,17 +2198,17 @@ public class DistributedFederationManager implements FederationManager, Service 
 			}
 		}
 
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
 
 	@Override
 	public List<Federate> getConfiguredFederates() {
-		if (coreConfig.getRemoteConfiguration().getFederation() == null
-				|| coreConfig.getRemoteConfiguration().getFederation().getFederate() == null) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation() == null
+				|| CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederate() == null) {
 			return new ArrayList<>();
 		}
 
-		return coreConfig.getRemoteConfiguration().getFederation().getFederate();
+		return CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederate();
 	}
 	
 	@Override
@@ -2166,6 +2245,8 @@ public class DistributedFederationManager implements FederationManager, Service 
 							// use the file hash to load the file from db / cache
 							byte[] fileBytes = MessagingDependencyInjectionProxy.getInstance().esyncService().getContentByHash(fileHash, groupVector);
 							
+							
+							
 							if (logger.isDebugEnabled()) {
 								if (fileBytes == null) {
 									logger.debug("null bytes for file " + fileHash);
@@ -2176,17 +2257,21 @@ public class DistributedFederationManager implements FederationManager, Service 
 								}
 							}
 							
-							BinaryBlob filePayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(fileBytes))).build();
+							if (fileBytes.length > CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getMaxMessageSizeBytes()) {
+								logger.info("File payload size " + fileBytes.length + " exceeds the max size! Not attaching file to " + rol);
+							} else {
+								BinaryBlob filePayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(fileBytes))).build();
 
-							ROL.Builder rolBuilder = rol.toBuilder();
-							
-							rolBuilder.addPayload(filePayload);
-							
-							if (logger.isDebugEnabled()) {
-								logger.debug("Added file payload size " + fileBytes.length + " bytes to rol");
+								ROL.Builder rolBuilder = rol.toBuilder();
+								
+								rolBuilder.addPayload(filePayload);
+								
+								if (logger.isDebugEnabled()) {
+									logger.debug("Added file payload size " + fileBytes.length + " bytes to rol");
+								}
+								
+								finalRol = rolBuilder.build();
 							}
-							
-							finalRol = rolBuilder.build();
 							
 						}
 					} catch (Exception e) {
@@ -2422,7 +2507,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public void reconfigureFederation() {
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 		if (fedConfig.isEnableFederation()) {
 			logger.info("starting federation.");
 			if (fedConfig.getFederationServer().isV2Enabled()) {
@@ -2479,7 +2564,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public void updateFederateMissionSettings(String federateUID, boolean missionFederateDefault, List<Mission> federateMissions) {
-		Federation fedConfig = coreConfig.getRemoteConfiguration().getFederation();
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 		
 		List<Federate> federates = fedConfig.getFederate();
 
@@ -2491,6 +2576,6 @@ public class DistributedFederationManager implements FederationManager, Service 
 				break;
 			}
 		}
-		coreConfig.setAndSaveFederation(fedConfig);
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
 }

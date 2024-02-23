@@ -21,7 +21,15 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -154,6 +162,8 @@ public abstract class AbstractRunnableServer {
 
 		logger.info("Stopping server " + serverIdentifier + "...");
 
+		updateEnabledProcessStates();
+
 		try {
 			// Since stopping the process will kill the container logs must be collected before shutdown
 			if (TAKCLCore.k8sMode) {
@@ -195,6 +205,7 @@ public abstract class AbstractRunnableServer {
 			offlineFileAuthtModule.halt();
 
 			serverState = ServerState.STOPPED;
+			updateEnabledProcessStates();
 
 			if (igniteException != null) {
 				throw new RuntimeException(igniteException);

@@ -69,13 +69,13 @@ public class MetricSubscription extends RemoteSubscription {
 			this.writeQueueDepth = subscription.writeQueueDepth;
 			this.xpath = subscription.xpath;
 			
-			if(subscription.getUser() != null) {
+			if (subscription.getUser() != null) {
 				this.address = subscription.getUser().getAddress();
 				this.displayName = subscription.getUser().getDisplayName();
 				this.name = subscription.getUser().getName();
 			}
 			
-			if(subscription.getHandler() != null && subscription.getHandler() instanceof TcpChannelHandler) {
+			if (subscription.getHandler() != null && subscription.getHandler() instanceof TcpChannelHandler) {
 				TcpChannelHandler handler = (TcpChannelHandler) subscription.getHandler();
 				this.totalTcpBytesRead = handler.totalTcpBytesRead;
 				this.totalTcpBytesWritten = handler.totalTcpBytesWritten;

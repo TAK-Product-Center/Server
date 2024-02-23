@@ -60,6 +60,8 @@ public class ImmutableServerProfiles extends AbstractServerProfile {
 			public String getConfigFilePath() {
 				return Util.getCoreConfigPath().toString();
 			}
+
+			public String getTAKIgniteConfigFilePath() { return Util.getTAKIgniteConfigPath().toString(); }
 		};
 	}
 

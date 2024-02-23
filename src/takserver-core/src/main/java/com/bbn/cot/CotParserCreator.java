@@ -2,7 +2,7 @@
 
 package com.bbn.cot;
 
-import com.bbn.marti.service.DistributedConfiguration;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 import tak.server.cot.CotParser;
 
@@ -11,6 +11,6 @@ public class CotParserCreator {
 		
 	public static CotParser newInstance() {
 		
-		return new CotParser(DistributedConfiguration.getInstance().getRemoteConfiguration().getSubmission() == null ? false : DistributedConfiguration.getInstance().getRemoteConfiguration().getSubmission().isValidateXml());
+		return new CotParser(CoreConfigFacade.getInstance().getRemoteConfiguration().getSubmission() == null ? false : CoreConfigFacade.getInstance().getRemoteConfiguration().getSubmission().isValidateXml());
 	}
 }

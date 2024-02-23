@@ -23,42 +23,6 @@ public class FederateGroup extends FederationNode {
         this.filterExpression = "";
     }
 
-    public FederateGroup(FederateIdentity federateIdentity, boolean interconnected) {
-        super(federateIdentity);
-        this.interconnected = interconnected;
-        this.federatesInGroup = new HashSet<>();
-        this.filterExpression = "";
-    }
-
-    /* If there is a group filter expression, the group is interconnected. */
-    public FederateGroup(FederateIdentity federateIdentity, String filterExpression) {
-        super(federateIdentity);
-        this.interconnected = true;
-        this.filterExpression = filterExpression;
-        this.federatesInGroup = new HashSet<>();
-    }
-
-    public FederateGroup(String name, FederateIdentity federateIdentity) {
-        super(name, federateIdentity);
-        this.interconnected = true;
-        this.federatesInGroup = new HashSet<>();
-        this.filterExpression = "";
-    }
-
-    public FederateGroup(String name, FederateIdentity federateIdentity, boolean interconnected) {
-        super(name, federateIdentity);
-        this.interconnected = interconnected;
-        this.federatesInGroup = new HashSet<>();
-        this.filterExpression = "";
-    }
-
-    /* If there is a group filter expression, the group is interconnected. */
-    public FederateGroup(String name, FederateIdentity federateIdentity, String filterExpression) {
-        super(name, federateIdentity);
-        this.interconnected = true;
-        this.filterExpression = filterExpression;
-        this.federatesInGroup = new HashSet<>();
-    }
 
     public boolean isInterconnected() {
         return interconnected;

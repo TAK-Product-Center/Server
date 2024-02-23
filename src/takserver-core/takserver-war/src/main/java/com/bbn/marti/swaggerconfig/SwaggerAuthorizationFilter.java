@@ -2,21 +2,20 @@ package com.bbn.marti.swaggerconfig;
 
 import com.bbn.marti.config.Docs;
 import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.UnauthorizedException;
 import com.bbn.marti.util.CommonUtil;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebFilter;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 public class SwaggerAuthorizationFilter extends OncePerRequestFilter {
 
-    CoreConfig coreConfig;
     CommonUtil martiUtil;
 
     @Override
@@ -32,30 +31,17 @@ public class SwaggerAuthorizationFilter extends OncePerRequestFilter {
 
     public synchronized boolean adminOnly() {
 
-        if (coreConfig() == null) {
+        if (CoreConfigFacade.getInstance() == null) {
             return true;
         }
 
-        Docs docs = coreConfig().getRemoteConfiguration().getDocs();
+        Docs docs = CoreConfigFacade.getInstance().getRemoteConfiguration().getDocs();
 
         if (docs == null) {
             return true;
         }
 
         return docs.isAdminOnly();
-    }
-
-    private CoreConfig coreConfig() {
-        if (coreConfig == null) {
-            synchronized(this) {
-                if (coreConfig == null) {
-                    if (SpringContextBeanForApi.getSpringContext() != null) {
-                        coreConfig = SpringContextBeanForApi.getSpringContext().getBean(CoreConfig.class);
-                    }
-                }
-            }
-        }
-        return coreConfig;
     }
 
     private CommonUtil martiUtil() {

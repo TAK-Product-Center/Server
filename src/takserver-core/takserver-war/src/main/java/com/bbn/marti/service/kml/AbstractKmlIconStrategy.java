@@ -147,14 +147,14 @@ public abstract class AbstractKmlIconStrategy {
 
         String detailText = qr.detailtext;
 
-        if(detailText != null && detailText.contains("_medevac_")) {
+        if (detailText != null && detailText.contains("_medevac_")) {
             styleUrl = "medevac";
             
             medevac = true;
-        } else if(detailText != null && detailText.contains("__group")) {
+        } else if (detailText != null && detailText.contains("__group")) {
            try {
             DetailElement detailElem = new Persister().read(DetailElement.class, detailText);
-            if(detailElem != null && detailElem.group != null && detailElem.group.name != null) {
+            if (detailElem != null && detailElem.group != null && detailElem.group.name != null) {
                 
                styleUrl = detailElem.group.name.toLowerCase();
                

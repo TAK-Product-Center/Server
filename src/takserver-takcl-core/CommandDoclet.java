@@ -1,10 +1,8 @@
-import com.sun.javadoc.*;
 import com.sun.javadoc.ProgramElementDoc;
 import com.sun.tools.doclets.standard.Standard;
 import com.sun.tools.javadoc.Main;
 
 import java.lang.System;
-import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.List;
 

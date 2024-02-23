@@ -136,6 +136,7 @@ public class KubernetesRunnableCluster extends AbstractRunnableServer {
 			FileUtils.copyFile(certPath.resolve("truststore-root.jks").toFile(), certPath.resolve("truststore.jks").toFile());
 
 			kh.updateConfigmap("core-config", Paths.get(serverIdentifier.getConfigFilePath()));
+			kh.updateConfigmap("tak-ignite-config", Paths.get(serverIdentifier.getTAKIgniteConfigFilePath()));
 			kh.updateConfigmap("cert-migration", TAKCLConfigModule.getInstance().getCertificateDir());
 			kh.updateConfigmap("readiness-config", Paths.get("/clustertestrunner.py"));
 

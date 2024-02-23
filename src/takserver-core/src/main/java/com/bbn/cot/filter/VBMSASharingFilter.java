@@ -1,13 +1,14 @@
 package com.bbn.cot.filter;
 
+import com.bbn.marti.config.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.SubmissionService;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.google.common.base.Strings;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 
@@ -42,14 +43,15 @@ public class VBMSASharingFilter {
 		if (!Strings.isNullOrEmpty(dataFeedUid)) {
 			return cot;
 		}
-		
-		if (DistributedConfiguration.getInstance().getVbm().isEnabled()) {
-			if (DistributedConfiguration.getInstance().getVbm().isDisableChatSharing()) {
+
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+		if (config.getVbm().isEnabled()) {
+			if (config.getVbm().isDisableChatSharing()) {
 				if (isChatMessage(cot)) {
 					return null;
 				}
 			}
-			if (DistributedConfiguration.getInstance().getVbm().isDisableSASharing()) {
+			if (config.getVbm().isDisableSASharing()) {
 				if (!isChatMessage(cot)) {
 					return null;
 				}

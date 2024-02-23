@@ -2,9 +2,9 @@
 "use strict";
 
 angular.module('roger_federation.Workflows')
-  .controller('NewWorkflowController', ['$scope', '$state', '$stateParams', '$modalInstance', '$log', 'growl', 'WorkflowService', 'AuthenticationService', newWorkflowController]);
+  .controller('NewWorkflowController', ['$scope', '$state', '$stateParams', '$modalInstance', '$log', 'growl', 'WorkflowService', newWorkflowController]);
 
-function newWorkflowController($scope, $state, $stateParams, $modalInstance, $log, growl, WorkflowService, AuthenticationService) {
+function newWorkflowController($scope, $state, $stateParams, $modalInstance, $log, growl, WorkflowService) {
   $scope.workflow = {
     name: '',
     version: '',
@@ -24,7 +24,7 @@ function newWorkflowController($scope, $state, $stateParams, $modalInstance, $lo
       version: $scope.workflow.version,
       type: $scope.workflow.type,
       description: $scope.workflow.description,
-      creatorName: AuthenticationService.getUserId(),
+      creatorName: '',
       diagramType:  $stateParams.diagramType,
       federationId: '',
       federationName: ''

@@ -1,22 +1,28 @@
 package com.bbn.marti.remote;
 
-import java.io.IOException;
-import java.util.Collection;
-import java.util.HashMap;
-
 import com.bbn.marti.config.Input;
 import com.bbn.marti.remote.groups.ConnectionModifyResult;
 import com.bbn.marti.remote.groups.NetworkInputAddResult;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
 
 public interface MessagingConfigurator {
 
     NetworkInputAddResult addInputAndSave(Input input);
 
+    NetworkInputAddResult addInputNoSave(Input input);
+
     void removeInputAndSave(String name);
 
+    void removeInputNoSave(String name);
+
     Collection<InputMetric> getInputMetrics(boolean excludeDataFeeds);
-        
+
     ConnectionModifyResult modifyInputAndSave(String inputName, Input input);
+
+    ConnectionModifyResult modifyInputNoSave(String inputName, Input input);
 
     MessagingConfigInfo getMessagingConfig();
 
@@ -26,23 +32,27 @@ public interface MessagingConfigurator {
 
     void updateMetric(Input input);
 
-	InputMetric getMetric(Input input);
+    InputMetric getMetric(Input input);
 
-	AuthenticationConfigInfo getAuthenticationConfig();
+    AuthenticationConfigInfo getAuthenticationConfig();
 
-	void modifyAuthenticationConfig(AuthenticationConfigInfo info);
+    void modifyAuthenticationConfig(AuthenticationConfigInfo info);
 
-	SecurityConfigInfo getSecurityConfig();
+    SecurityConfigInfo getSecurityConfig();
 
-	void modifySecurityConfig(SecurityConfigInfo info);
+    void modifySecurityConfig(SecurityConfigInfo info);
 
-	Collection<Integer> getNonSecurePorts();
+    Collection<Integer> getNonSecurePorts();
 
-	HashMap<String, Boolean> verifyConfiguration();
-	
-	void addInput(Input newInput, boolean cluster) throws IOException;
+    HashMap<String, Boolean> verifyConfiguration();
 
-	void removeDataFeedAndSave(String name);
+    void addInputAndSave(Input newInput, boolean cluster) throws IOException;
 
-	InputMetric getInputMetric(String name);
+    void addInputNoSave(Input newInput, boolean cluster) throws IOException;
+
+    void removeDataFeedAndSave(String name);
+
+    void removeDataFeedNoSave(String name);
+
+    InputMetric getInputMetric(String name);
 }

@@ -8,10 +8,11 @@ import java.text.SimpleDateFormat;
 import java.util.SimpleTimeZone;
 import java.util.UUID;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -43,7 +44,7 @@ import tak.server.Constants;
 
 @RestController
 public class ExCheckAPI extends BaseRestController {
-	
+
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(com.bbn.marti.excheck.ExCheckAPI.class);
 
     @Autowired
@@ -51,9 +52,6 @@ public class ExCheckAPI extends BaseRestController {
 
     @Autowired
     private ExCheckService exCheckService;
-    
-    @Autowired
-    private CoreConfig coreConfig;
 
     @Autowired
     private MissionService missionService;
@@ -100,10 +98,10 @@ public class ExCheckAPI extends BaseRestController {
                 payload = mpf.getBytes();
             }
 
-            if (payload.length > coreConfig.getRemoteConfiguration().getNetwork().
+            if (payload.length > CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().
                     getEnterpriseSyncSizeLimitMB() * 1000000) {
                 String message = "Uploaded file exceeds server's size limit of "
-                        + coreConfig.getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB()
+                        + CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeLimitMB()
                         + " MB! (limit is set in CoreConfig)";
                 logger.error(message);
                 return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
@@ -312,8 +310,8 @@ public class ExCheckAPI extends BaseRestController {
         if (existing == null) {
             operation = "added";
         } else if (existing.getStatus() == ChecklistTaskStatus.PENDING &&
-            (checklistTask.getStatus() == ChecklistTaskStatus.COMPLETE ||
-                    checklistTask.getStatus() == ChecklistTaskStatus.COMPLETE_LATE)) {
+                (checklistTask.getStatus() == ChecklistTaskStatus.COMPLETE ||
+                        checklistTask.getStatus() == ChecklistTaskStatus.COMPLETE_LATE)) {
             operation = "completed";
         } else {
             operation = "updated";
@@ -493,7 +491,7 @@ public class ExCheckAPI extends BaseRestController {
             sb.append("<html><body>");
             sb.append("<h2>Checklist : " + checklist.getChecklistDetails().getName() + "</h2>");
             sb.append("<h3>Progress : " + complete + "/" + total + "</h3>");
-                sb.append("<progress value=\"" + complete + "\" max=\"" + total + "\"></progress>");
+            sb.append("<progress value=\"" + complete + "\" max=\"" + total + "\"></progress>");
 
             //
             // show task level info if we were given a token
@@ -564,19 +562,19 @@ public class ExCheckAPI extends BaseRestController {
                 checklistUid, missionService.trimName(missionName), clientUid, martiUtil.getGroupBitVector(request));
         return new ResponseEntity(HttpStatus.OK);
     }
-    
+
     /**
-	 * Utility method that reads a byte array from an input stream using Guava.
-	 * 
-	 * @param in
-	 *            any InputStream containing some data
-	 * @return the InputStream's contents as a byte array; may be size 0 but
-	 *         will not be null.
-	 * @throws IOException
-	 *             if a read error occurs
-	 */
-	private byte[] readByteArray(InputStream in) throws IOException {
-	    
-	    return ByteStreams.toByteArray(in);
-	}
+     * Utility method that reads a byte array from an input stream using Guava.
+     *
+     * @param in
+     *            any InputStream containing some data
+     * @return the InputStream's contents as a byte array; may be size 0 but
+     *         will not be null.
+     * @throws IOException
+     *             if a read error occurs
+     */
+    private byte[] readByteArray(InputStream in) throws IOException {
+
+        return ByteStreams.toByteArray(in);
+    }
 }

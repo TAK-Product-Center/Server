@@ -5,6 +5,7 @@ import com.bbn.marti.takcl.connectivity.interfaces.ConnectingInterface;
 import com.bbn.marti.takcl.connectivity.interfaces.ReceivingInterface;
 import com.bbn.marti.takcl.connectivity.interfaces.SendingInterface;
 import com.bbn.marti.takcl.connectivity.missions.MissionDataSyncClient;
+import com.bbn.marti.takcl.connectivity.oas.OpenApiSpecClient;
 import com.bbn.marti.test.shared.TestConnectivityState;
 import com.bbn.marti.test.shared.data.protocols.ProtocolProfilesInterface;
 import com.bbn.marti.test.shared.data.users.AbstractUser;
@@ -72,6 +73,7 @@ public class UnifiedClient implements ConnectingInterface, SendingInterface, Rec
 	private final ConnectingInterface connector;
 
 	public final MissionDataSyncClient mission;
+	public final OpenApiSpecClient oas;
 
 	private final HashSet<ClientResponseListener> listeners = new HashSet<>();
 
@@ -84,9 +86,11 @@ public class UnifiedClient implements ConnectingInterface, SendingInterface, Rec
 			if (user.getCertPrivateJksPath() != null) {
 				connector = new ConnectibleTakprotoClient(user, innerActivityListener);
 				mission = new MissionDataSyncClient(user);
+				oas = new OpenApiSpecClient(user);
 			} else {
 				connector = new ConnectibleClient(user, innerActivityListener);
 				mission = null;
+				oas = null;
 			}
 			sender = connector;
 			receiver = connector;
@@ -96,12 +100,13 @@ public class UnifiedClient implements ConnectingInterface, SendingInterface, Rec
 			connector = null;
 			receiver = null;
 			mission = null;
-
+			oas = null;
 		} else if (protocol.canListen()) {
 			receiver = new ReceivingClient(user, innerActivityListener);
 			connector = null;
 			sender = null;
 			mission = null;
+			oas = null;
 		} else {
 			throw new RuntimeException("Provided user '" + user.getConsistentUniqueReadableIdentifier() + "' with protocol '" +
 					user.getConnection().getProtocol() + "' cannot be set up as a sender, receiver, or connector!");

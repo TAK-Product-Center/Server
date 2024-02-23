@@ -2,7 +2,7 @@ package com.bbn.marti.sync;
 
 import java.rmi.RemoteException;
 import java.util.List;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.jetbrains.annotations.NotNull;
 import org.owasp.esapi.Validator;

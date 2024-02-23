@@ -11,12 +11,12 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
-import javax.servlet.AsyncContext;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.errors.IntrusionException;
@@ -125,7 +125,7 @@ public class ContentServlet extends EnterpriseSyncServlet {
 			}
 
 			String mimeType = match.getFirst(Metadata.Field.MIMEType);
-			if(validator != null && validator.isValidInput("MIME Type", mimeType, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false)) {
+			if (validator != null && validator.isValidInput("MIME Type", mimeType, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false)) {
 				// Set MIME type of HTTP response
 				if (response.containsHeader("Content-Type")) {
 					response.setHeader("Content-Type", mimeType);

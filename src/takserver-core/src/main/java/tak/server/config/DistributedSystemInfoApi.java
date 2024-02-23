@@ -5,8 +5,7 @@ import org.apache.ignite.services.ServiceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.marti.service.DistributedConfiguration;
-
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.plugins.SystemInfoApi;
 
 /**
@@ -40,7 +39,7 @@ public class DistributedSystemInfoApi implements Service, SystemInfoApi {
 	@Override
 	public String getTAKServerUrl() {
 		try {
-			return DistributedConfiguration.getInstance()
+			return CoreConfigFacade.getInstance()
 					.getRemoteConfiguration().getFederation().getFederationServer().getWebBaseUrl();
 		} catch (Exception e) {
 			return null;

@@ -25,7 +25,8 @@ services.factory('FederateGroupConfigurationService', function($resource) {
 
 services.factory('OutgoingConnectionsService', function($resource) {
 	  return $resource('/Marti/api/outgoingconnections/:name', {}, {
-		  'query': {method: "GET", isArray: false}
+		  'query': {method: "GET", isArray: false},
+		  'update': {method: "PUT"}
 	  });
 	});
 

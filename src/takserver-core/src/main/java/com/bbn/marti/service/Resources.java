@@ -14,25 +14,28 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-
-import com.bbn.marti.config.Buffer.Queue;
-import com.bbn.marti.config.Configuration;
-import com.bbn.marti.util.concurrent.executor.AsyncDelegatingExecutor;
-import com.bbn.marti.util.concurrent.executor.OrderedExecutor;
-import com.bbn.marti.util.concurrent.executor.SizedOrderedExecutor;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import com.bbn.marti.config.Queue;
+import com.bbn.marti.config.Configuration;
+import com.bbn.marti.util.concurrent.executor.AsyncDelegatingExecutor;
+import com.bbn.marti.util.concurrent.executor.OrderedExecutor;
+import com.bbn.marti.util.concurrent.executor.SizedOrderedExecutor;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
+
 public class Resources {
 
-	private static Configuration config = DistributedConfiguration.getInstance().getRemoteConfiguration();
+	private static Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
-	private static Queue queue = DistributedConfiguration.getInstance().getRemoteConfiguration().getBuffer().getQueue();
+	private static Queue queue = CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue();
 
 	private static final int POOL_SIZE_INITIAL = 1;
 
@@ -100,10 +103,6 @@ public class Resources {
 	// pool used for processing messages
 	public static final ExecutorService messageProcessor = !IS_LOW_CORE ? newExecutorService("MessageProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
 
-	public static final ExecutorService readParseProcessor = !IS_LOW_CORE ? newExecutorService("ReadParseProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-	
-	public static final ExecutorService writeParseProcessor = !IS_LOW_CORE ? newExecutorService("WriteParseProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-	
 	public static final ExecutorService tcpStaticSubProcessor = !IS_LOW_CORE ? newExecutorService("TcpStaticSubProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
 
 	// pool used for proto negotiation
@@ -206,7 +205,7 @@ public class Resources {
 		return new SizedOrderedExecutor(new AsyncDelegatingExecutor(executor, name), capacity, name);
 	}
 
-	private static ExecutorService newExecutorService(String name, int initialPoolSize, int maxPoolSize) {
+	public static ExecutorService newExecutorService(String name, int initialPoolSize, int maxPoolSize) {
 
 		return newExecutorService(name, initialPoolSize, maxPoolSize, EXEC_QUEUE_SIZE);
 	}

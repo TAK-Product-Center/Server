@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 public class PluginStore {
 	private static final Logger logger = LoggerFactory.getLogger(SubscriptionStore.class);

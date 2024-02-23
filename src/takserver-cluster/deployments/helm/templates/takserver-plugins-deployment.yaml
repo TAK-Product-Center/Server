@@ -27,10 +27,12 @@ spec:
               cpu: {{ .Values.takserver.api.resources.limits.cpu }}
           volumeMounts:
             - name: config #The name(key) value must match pod volumes name(key) value
-              mountPath: /certs/files/
+              mountPath: /certs-configmap/
             - name: core-config
               mountPath: /CoreConfig.xml
               subPath: CoreConfig.xml
+            - name: tak-ignite-config
+              mountPath: /TAKIgniteConfig.xml
       volumes:
         - name: config
           configMap:
@@ -38,6 +40,10 @@ spec:
         - name: core-config
           configMap:
             name: {{ .Values.coreConfigMapName}}
+        - name: tak-ignite-config
+          configMap:
+            name: {{ .Values.takIgniteConfigMapName }}
+
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
 {{- end }}

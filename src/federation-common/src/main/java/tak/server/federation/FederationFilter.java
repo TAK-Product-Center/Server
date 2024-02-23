@@ -31,7 +31,7 @@ public class FederationFilter {
     }
 
     public void addMessageAttribute(String key, Object value) {
-        if(isValueValidType(value)) {
+        if (isValueValidType(value)) {
             messageAttributes.put(key, value);
         }
     }
@@ -41,7 +41,7 @@ public class FederationFilter {
     }
 
     public void addSourceAttribute(String key, Object value) {
-        if(isValueValidType(value)) {
+        if (isValueValidType(value)) {
             sourceAttributes.put(key, value);
         }
     }
@@ -51,7 +51,7 @@ public class FederationFilter {
     }
 
     public void addDestinationAttribute(String key, Object value) {
-        if(isValueValidType(value)) {
+        if (isValueValidType(value)) {
             destinationAttributes.put(key, value);
 
         }

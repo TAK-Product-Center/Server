@@ -1,26 +1,29 @@
 FROM eclipse-temurin:17-jammy
+RUN apt-get update && apt-get install -y emacs-nox net-tools netcat
 COPY takserver-core/takserver-core*.war takserver.war
-COPY takserver-usermanager/UserManager.jar .
-COPY CoreConfig.xml .
-COPY takserver-schemamanager/SchemaManager.jar .
-COPY takserver-core/logging-restrictsize.xml .
-COPY takserver-core/takserver.sh .
-COPY takserver-core/API/takserver-api-cluster.sh .
-COPY takserver-core/messaging/takserver-messaging-cluster.sh .
-COPY takserver-core/UserAuthenticationFile.xml .
-COPY takserver-core/setenv-cluster.sh ./setenv.sh
-COPY takserver-core/enable_admin.sh .
-COPY takserver-core/messaging-readiness.sh .
-COPY takserver-core/api-readiness.sh .
-COPY takserver-schemamanager/db-connection-configuration.sh .
-RUN chmod +x takserver-api-cluster.sh && \
+COPY takserver-core/setenv-cluster.sh setenv.sh
+COPY takserver-usermanager/UserManager.jar \
+	CoreConfig.xml \
+	takserver-schemamanager/SchemaManager.jar \
+	takserver-core/logging-restrictsize.xml \
+	takserver-core/takserver.sh \
+	takserver-core/config/takserver-config-cluster.sh \
+	takserver-core/API/takserver-api-cluster.sh \
+	takserver-core/messaging/takserver-messaging-cluster.sh \
+	takserver-core/UserAuthenticationFile.xml \
+	takserver-core/enable_admin.sh \
+	takserver-core/messaging-readiness.sh \
+	takserver-core/config-readiness.sh \
+	takserver-core/api-readiness.sh \
+	takserver-schemamanager/db-connection-configuration.sh .
+RUN chmod +x takserver-config-cluster.sh && \
+	chmod +x takserver-api-cluster.sh && \
 	chmod +x takserver-messaging-cluster.sh && \
+	chmod +x config-readiness.sh && \
 	chmod +x messaging-readiness.sh && \
 	chmod +x api-readiness.sh && \
 	chmod +x setenv.sh && \
 	chmod +x db-connection-configuration.sh && \
-	apt-get update && \
-	apt-get install -y emacs-nox net-tools netcat 
-RUN chmod +x takserver.sh
+	chmod +x takserver.sh
 RUN ./db-connection-configuration.sh
 CMD ["jshell"]

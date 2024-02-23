@@ -13,7 +13,7 @@
 <%@ page import="com.bbn.marti.remote.SubscriptionManagerLite" %>
 <%@ page import="com.bbn.marti.remote.RemoteSubscription" %>
 <%@ page import="org.owasp.esapi.ESAPI" %>
-<%@ page import="com.bbn.marti.util.spring.SpringContextBeanForApi" %>
+<%@ page import="com.bbn.marti.remote.util.SpringContextBeanForApi" %>
 <%@ page import="com.bbn.marti.util.CommonUtil" %>
 
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
@@ -86,7 +86,7 @@
 
 	String[] feedIds = request.getParameter("feedId").split("\\|");
 	for (String feedId : feedIds) {
-		Feed feed = com.bbn.marti.util.spring.SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.video.VideoManagerService.class).getFeed(Integer.parseInt(feedId), groupVector);
+		Feed feed = SpringContextBeanForApi.getSpringContext().getBean(com.bbn.marti.video.VideoManagerService.class).getFeed(Integer.parseInt(feedId), groupVector);
 %>
 		<tr>
 			<td><%=feed.getType().toString()%></td>

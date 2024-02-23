@@ -9,7 +9,7 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
-import org.springframework.messaging.support.ChannelInterceptorAdapter;
+import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.ExecutorChannelInterceptor;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -34,8 +34,8 @@ import tak.server.Constants;
  * @since 4.0
  * @author Rob Winch
  */
-public final class SecurityContextChannelInterceptor extends ChannelInterceptorAdapter
-		implements ExecutorChannelInterceptor {
+public final class SecurityContextChannelInterceptor
+		implements ExecutorChannelInterceptor, ChannelInterceptor {
     
     private static final Logger logger = LoggerFactory.getLogger(SecurityContextChannelInterceptor.class);
     

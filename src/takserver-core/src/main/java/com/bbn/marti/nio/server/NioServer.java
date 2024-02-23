@@ -32,7 +32,7 @@ import com.bbn.marti.nio.util.NetUtils;
 import com.bbn.marti.util.Assertion;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.marti.util.concurrent.future.SettableAsyncFuture;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 /**
 * A non-blocking IO server implementation for listening on multiple channels/ports/protocols as a server, and sending/receiving on multiple client channels.
@@ -118,7 +118,7 @@ public class NioServer implements Server, Runnable, Serializable {
 	*/
 	private boolean wakeupOrExceptChange(AbstractSelectorChange change) {
 		if (!selectorChanges.offer(change)) {
-			if(log.isWarnEnabled()) {
+			if (log.isWarnEnabled()) {
 				log.warn("Server received change submitted to dead server " + change.toString());
 			}
 
@@ -539,7 +539,7 @@ public class NioServer implements Server, Runnable, Serializable {
 
 			if (!key.isValid()) {
 				// don't have anything to handle
-				if(log.isTraceEnabled()) {
+				if (log.isTraceEnabled()) {
 					log.trace("Server skipping over invalid key");
 				}
 				continue;
@@ -568,7 +568,7 @@ public class NioServer implements Server, Runnable, Serializable {
 					staySubscribed = handler.handleConnect(channel, this);
 				} else {
 					// jump out, have nothing to do
-					if(log.isWarnEnabled()) {
+					if (log.isWarnEnabled()) {
 						log.warn("Encountered active key with nothing to do");
 					}
 					continue;

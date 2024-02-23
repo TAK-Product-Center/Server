@@ -11,11 +11,11 @@ import com.bbn.marti.config.Filter;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.injector.Injector;
-import com.bbn.marti.service.DistributedConfiguration;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.Subscription;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 
 /*
@@ -23,7 +23,7 @@ import tak.server.cot.CotEventContainer;
  */
 public class InjectionManager {
 
-    private final Filter config = DistributedConfiguration.getInstance().getRemoteConfiguration().getFilter();
+    private final Filter config = CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter();
 
     private static final Logger logger = LoggerFactory.getLogger(InjectionManager.class);
 

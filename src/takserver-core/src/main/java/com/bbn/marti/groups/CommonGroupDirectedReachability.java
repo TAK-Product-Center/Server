@@ -17,8 +17,9 @@ import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.Node;
 import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
-import com.bbn.marti.service.DistributedConfiguration;
-import com.bbn.marti.util.spring.SpringContextBeanForApi;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
+
+import com.bbn.marti.remote.config.CoreConfigFacade;
 
 /*
  *
@@ -73,7 +74,7 @@ public class CommonGroupDirectedReachability implements Reachability<User>, Seri
 		}
 
 		// don't allow reachability between federates
-		if(DistributedConfiguration.getInstance().getRemoteConfiguration().getFederation() != null) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation() != null) {
 			if (src.getClass().equals(FederateUser.class) && dest.getClass().equals(FederateUser.class)) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("federate " + src + " can't reach federate" + dest);
@@ -158,7 +159,7 @@ public class CommonGroupDirectedReachability implements Reachability<User>, Seri
 		}
 
 		boolean federateUser = false;
-		if(src instanceof FederateUser) {
+		if (src instanceof FederateUser) {
 			federateUser = true;
 		}
 
@@ -191,7 +192,7 @@ public class CommonGroupDirectedReachability implements Reachability<User>, Seri
 					for (Node node : inGroup.getNeighbors()) {
 						if (node.isLeaf()) {
 							User user = (User) node;
-							if(fedUser == false || (fedUser && !(user instanceof FederateUser))) {
+							if (fedUser == false || (fedUser && !(user instanceof FederateUser))) {
 								if (!user.equals(src)) {
 									users.add(user);
 								}

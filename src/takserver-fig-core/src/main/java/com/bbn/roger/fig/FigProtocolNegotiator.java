@@ -213,8 +213,8 @@ public class FigProtocolNegotiator {
                         // validate as we go
                         SSLSession sslSession = checkNotNull(checkNotNull(checkNotNull(handler).engine(), "FIG Netty handler SSLEngine").getSession(), "FIG server SSL Session");
 
-                        checkNotNull(sslSession.getPeerCertificateChain());
-                        checkState(sslSession.getPeerCertificateChain().length > 0);
+                        checkNotNull(sslSession.getPeerCertificates());
+                        checkState(sslSession.getPeerCertificates().length > 0);
 
                         X509Certificate[] certs = new X509Certificate[sslSession.getPeerCertificates().length];
                         for (int i = 0; i < sslSession.getPeerCertificates().length; i++) {

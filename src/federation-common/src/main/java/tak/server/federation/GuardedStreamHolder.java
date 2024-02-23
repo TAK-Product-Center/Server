@@ -21,6 +21,7 @@ import com.atakmap.Tak.FederateProvenance;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
 import com.atakmap.Tak.Subscription;
+import com.atakmap.Tak.Identity.ConnectionType;
 import com.google.common.base.Strings;
 
 import io.grpc.ClientCall;
@@ -46,7 +47,7 @@ public class GuardedStreamHolder<T> {
     private Subscription subscription;
     private int maxFederateHops = -1;
     
-    private boolean isHub = false;
+    private boolean isRunningInHub = false;
 
     private final Set<T> cache;
 
@@ -55,13 +56,13 @@ public class GuardedStreamHolder<T> {
     }
     
     // for outgoing connections
-    public GuardedStreamHolder(ClientCall<T, Subscription> clientCall, String fedId, Comparator<T> comp, boolean isHub) {
+    public GuardedStreamHolder(ClientCall<T, Subscription> clientCall, String fedId, Comparator<T> comp, boolean isRunningInHub) {
 
     	requireNonNull(clientCall, "FederatedEvent groupCall");
 
         requireNonNull(comp, "comparator");
         
-        this.isHub = isHub;
+        this.isRunningInHub = isRunningInHub;
 
         this.cache = new ConcurrentSkipListSet<T>(comp);
         
@@ -74,14 +75,14 @@ public class GuardedStreamHolder<T> {
     }
 
     // for incoming connections
-    public GuardedStreamHolder(StreamObserver<T> clientStream, String clientName, String certHash, SSLSession session, Subscription subscription, Comparator<T> comp, boolean isHub) {
+    public GuardedStreamHolder(StreamObserver<T> clientStream, String clientName, String certHash, SSLSession session, Subscription subscription, Comparator<T> comp, boolean isRunningInHub) {
 
         requireNonNull(clientStream, "FederatedEvent client stream");
 
         requireNonNull(subscription, "client subscription");
         requireNonNull(comp, "comparator");
         
-        this.isHub = isHub;
+        this.isRunningInHub = isRunningInHub;
         
         this.cache = new ConcurrentSkipListSet<T>(comp);
 
@@ -93,8 +94,12 @@ public class GuardedStreamHolder<T> {
             throw new IllegalArgumentException("empty cert hash - invalid stream");
         }
 
-        // append a random id to the end, to prevent collisions. this is done for outgoing connections as well in the javascript code
-        String fedId = clientName + "-" + certHash  + "-" + new BigInteger(session.getId());
+        // new takservers will send their CoreConfig serverId. if present, use it, otherwise generate a random unique identifier
+        String serverId = subscription.getIdentity().getServerId();
+        if (Strings.isNullOrEmpty(serverId)) {
+        	serverId = new BigInteger(session.getId()).toString();
+        }
+        String fedId = clientName + "-" + certHash  + "-" + serverId;
 
         this.subscription = subscription;
 
@@ -135,7 +140,7 @@ public class GuardedStreamHolder<T> {
         }
         
         T modifiedEvent = null;
-        if (isHub) {
+        if (isRunningInHub) {
         	// since hub outgoing connections can forward traffic to other hubs, we need to keep a list of visited nodes
             // so that we can stop cycles
             FederateProvenance prov = FederateProvenance.newBuilder()
@@ -155,7 +160,7 @@ public class GuardedStreamHolder<T> {
     	if (modifiedEvent == null) {
     		return;
     	}
-    	        
+    	    	        
         // clientStream = stream of messages going from server to a connected outgoing client
         if (clientStream != null) 
         	clientStream.onNext(modifiedEvent);
@@ -173,7 +178,7 @@ public class GuardedStreamHolder<T> {
         	
         	// if hops exist, check/increment them, if no hops exist, we need to add them
         	FederateHops federateHops = fedEvent.hasFederateHops() ? checkHops(event, fedEvent.getFederateHops()) : 
-        		FederateHops.newBuilder().setCurrentHops(0).setMaxHops(maxFederateHops).build();
+        		FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
         	
         	if (federateHops == null) {
         		return null;
@@ -196,7 +201,7 @@ public class GuardedStreamHolder<T> {
         	
         	// if hops exist, check/increment them, if no hops exist, we need to add them
         	FederateHops federateHops = fedGroup.hasFederateHops() ? checkHops(event, fedGroup.getFederateHops()) : 
-        		FederateHops.newBuilder().setCurrentHops(0).setMaxHops(maxFederateHops).build();
+        		FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
         	
         	if (federateHops == null) {
         		return null;
@@ -219,7 +224,7 @@ public class GuardedStreamHolder<T> {
         	
         	// if hops exist, check/increment them, if no hops exist, we need to add them
         	FederateHops federateHops = rol.hasFederateHops() ? checkHops(event, rol.getFederateHops()) : 
-        		FederateHops.newBuilder().setCurrentHops(0).setMaxHops(maxFederateHops).build();
+        		FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
         	
         	if (federateHops == null) {
         		return null;
@@ -242,7 +247,7 @@ public class GuardedStreamHolder<T> {
         	
         	// if hops exist, check/increment them, if no hops exist, we need to add them
         	FederateHops federateHops = blob.hasFederateHops() ? checkHops(event, blob.getFederateHops()) : 
-        		FederateHops.newBuilder().setCurrentHops(0).setMaxHops(maxFederateHops).build();
+        		FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
         	
         	if (federateHops == null) {
         		return null;
@@ -265,18 +270,33 @@ public class GuardedStreamHolder<T> {
     private FederateHops checkHops(T event, FederateHops federateHops) {
     	long maxHops = federateHops.getMaxHops();
 		long currentHops = federateHops.getCurrentHops() + 1;
-		    		
-		if (currentHops >= maxHops && maxHops != -1) {
+		
+		if (currentHops > maxHops && maxHops != -1) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("dropping message because of hop limit " + event);
 			}
 			return null;
-		}
-		else {
+		} 
+		// if there is only 1 hop left and the next hop is to a federation hub,
+		// just drop the message now because the next hub will not be allowed to send it
+		// further anyways
+		else if (isHubSubscription() && currentHops == maxHops) {  
+			if (logger.isDebugEnabled()) {
+				logger.debug("dropping message because of hop limit (1 hop left but next destination is a hub) " + event);
+			}
+			return null;
+		} else {
 			return FederateHops.newBuilder().setCurrentHops(currentHops).setMaxHops(maxHops).build();
 		}
     }
 
+    // if the subscription associated with this connection is a federation hub
+    private boolean isHubSubscription() {
+    	return subscription != null && 
+    			(subscription.getIdentity().getType() == ConnectionType.FEDERATION_HUB_CLIENT 
+    			|| subscription.getIdentity().getType() == ConnectionType.FEDERATION_HUB_SERVER);
+    }
+    
     public void throwDeadlineExceptionToClient() {
         try {
         	if (clientStream != null)

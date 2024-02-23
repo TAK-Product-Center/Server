@@ -32,8 +32,8 @@ dependencies {
   api "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
   api "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
 
-  implementation 'javax.activation:activation:' + javax_activation_version
-
+  //implementation 'javax.activation:activation:' + javax_activation_version
+  
   // guava
   api group: 'com.google.guava', name: 'guava', version: guava_version
 }

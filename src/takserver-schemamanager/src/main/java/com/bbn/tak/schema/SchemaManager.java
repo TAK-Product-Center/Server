@@ -16,9 +16,9 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Unmarshaller;
 
 import org.apache.commons.lang3.StringUtils;
 import org.flywaydb.core.Flyway;
@@ -341,7 +341,7 @@ public class SchemaManager {
         com.bbn.marti.config.Connection connection = null;
 
         try {
-            logger.info("trying to load configuration from file " + "CoreConfig.xml");
+            logger.info("trying to load configuration from file CoreConfig.xml");
             configuration = loadJAXifiedXML(Configuration.class.getPackage().getName());
         } catch (JAXBException | FileNotFoundException ex) {
             logger.warn("Failure reading database configuration from file " + ex.getMessage() +
@@ -360,7 +360,6 @@ public class SchemaManager {
                 commonOptions.setJdbcUrl(connection.getUrl());
             }
         }
-        StringUtils.substringAfterLast(commonOptions.jdbcUrl, "/");
         commonOptions.setDatabase(StringUtils.substringAfterLast(commonOptions.jdbcUrl, "/"));
 
         if (logger.isDebugEnabled()) {

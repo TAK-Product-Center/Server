@@ -4,23 +4,22 @@ package com.bbn.cot.filter;
 
 import org.dom4j.Attribute;
 import org.dom4j.Element;
-import org.springframework.beans.factory.annotation.Autowired;
 
-import com.bbn.marti.service.DistributedConfiguration;
+import com.bbn.marti.config.Configuration;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 
 public class ScrubInvalidValues implements CotFilter {
 
   	private static String TRACK_XPATH = "/event/detail/track";
   	private static String POINT_XPATH = "/event/point";
-  	
-  	@Autowired
-  	private DistributedConfiguration config;
-  	
+
+;
+
     @Override
 	public CotEventContainer filter(final CotEventContainer cot) {
-
+		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 		if (config.getFilter().getScrubber() != null &&
 			config.getFilter().getScrubber().isEnable()) {
 			boolean drop = true;
@@ -45,16 +44,16 @@ public class ScrubInvalidValues implements CotFilter {
 			results[i++] = isInvalidDouble(point.attribute("ce"), 0, 99999999, 0);
 
 			//optional tags:
-			if(track != null && track.attribute("course") != null) {
+			if (track != null && track.attribute("course") != null) {
 				results[i++] = isInvalidDouble(track.attribute("course"), 0, 360, 0);
 			}
-			if(track != null && track.attribute("speed") != null) {
+			if (track != null && track.attribute("speed") != null) {
 				results[i++] = isInvalidDouble(track.attribute("speed"), 0, 999999, 0);
 			}
 
 			if (drop) {
 				for(int j = 0; j<i; j++) {
-					if(results[j] == true)
+					if (results[j] == true)
 						return null;
 				}
 			}
@@ -65,7 +64,7 @@ public class ScrubInvalidValues implements CotFilter {
 	boolean isInvalidInt(Attribute attribute, int lowerBound, int upperBound, int overwriteValue) {
 			try {
 				int i = Integer.parseInt(attribute.getValue());
-				if(i >= lowerBound && i <= upperBound) {
+				if (i >= lowerBound && i <= upperBound) {
 					return false;
 				}
 			} catch(Exception e) {
@@ -78,7 +77,7 @@ public class ScrubInvalidValues implements CotFilter {
 		try {
                         //logger.warn("Checking attr: " + attribute.getName() + ": " + attribute.getValue());
 			double i = Double.parseDouble(attribute.getValue());
-			if(i >= lowerBound && i <= upperBound) {
+			if (i >= lowerBound && i <= upperBound) {
 				return false;
 			}
                         //logger.warn(" FAILED Bounds check!");

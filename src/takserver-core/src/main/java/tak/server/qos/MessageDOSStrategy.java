@@ -5,6 +5,8 @@ import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.log4j.Logger;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
@@ -34,7 +36,9 @@ public class MessageDOSStrategy extends MessageBaseStrategy<CotEventContainer> {
 	private void init() {
 		currentRateLimit = Metrics.gauge(Constants.METRIC_DOS_ACTIVE_RATE_LIMIT, new AtomicInteger(-1)); // default to no rate limit
 		currentThreshold = Metrics.gauge(Constants.METRIC_DOS_ACTIVE_RATE_LIMIT_THRESHOLD, new AtomicInteger(-1)); // default to no rate limit threshold
-		
+
+		CoreConfig config = CoreConfigFacade.getInstance();
+
 		maxRate = config.getRemoteConfiguration().getFilter().getQos().getDosRateLimiter().getIntervalSeconds();
 		
 		// should be small enough for reads that we dont need a limit

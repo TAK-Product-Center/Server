@@ -9,6 +9,15 @@ import java.util.List;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 
+import com.bbn.marti.config.CAType;
+import com.bbn.marti.config.CertificateConfig;
+import com.bbn.marti.config.CertificateSigning;
+import com.bbn.marti.config.MicrosoftCAConfig;
+import com.bbn.marti.config.NameEntry;
+import com.bbn.marti.config.TAKServerCAConfig;
+import com.bbn.marti.config.Tls;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.util.spring.MartiSocketUserDetailsImpl;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.apache.commons.codec.binary.Base64;
@@ -18,11 +27,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationDetails;
 
-import com.bbn.marti.config.*;
 import com.bbn.marti.jwt.JwtUtils;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.util.X509UsernameExtractor;
@@ -45,15 +51,12 @@ public class CertManagerService {
 
     @Autowired
     private SubscriptionManagerLite subMgr;
-    
-    @Autowired
-    private CoreConfig coreConfig;
 
     private X509UsernameExtractor usernameExtractor = null;
 
-	@EventListener({ContextRefreshedEvent.class})
+    @EventListener({ContextRefreshedEvent.class})
     private void init()throws RemoteException {
-        usernameExtractor = new X509UsernameExtractor(coreConfig.getRemoteConfiguration().getAuth().getDNUsernameExtractorRegex());
+        usernameExtractor = new X509UsernameExtractor(CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getDNUsernameExtractorRegex());
     }
 
     private boolean validateCSR(PKCS10 csr, CertificateConfig certificateConfig) {
@@ -116,7 +119,7 @@ public class CertManagerService {
             //
             // get the cert config from CoreConfig.xml
             //
-            CertificateSigning certificateSigning = coreConfig.getRemoteConfiguration().getCertificateSigning();
+            CertificateSigning certificateSigning = CoreConfigFacade.getInstance().getRemoteConfiguration().getCertificateSigning();
             if (certificateSigning == null) {
                 throw new TakException("CertificateSigning element not found in CoreConfig!");
             }
@@ -147,14 +150,8 @@ public class CertManagerService {
             X509Certificate signedCert = null;
 
             // is the user authenticating to the enrollment endpoint via OAuth?
-            String token = null;
-            if (SecurityContextHolder.getContext().getAuthentication().getDetails()
-                    instanceof OAuth2AuthenticationDetails) {
-
-                // save the token with the certificate
-                token = ((OAuth2AuthenticationDetails)SecurityContextHolder.getContext().
-                        getAuthentication().getDetails()).getTokenValue();
-            }
+            String token = ((MartiSocketUserDetailsImpl)SecurityContextHolder.getContext()
+                    .getAuthentication().getPrincipal()).getToken();
 
             if (certificateSigning.getCA() == CAType.TAK_SERVER) {
 
@@ -169,7 +166,7 @@ public class CertManagerService {
                 long validityNotBeforeOffsetMinutes = takServerCAConfig.getValidityNotBeforeOffsetMinutes();
 
                 String responderUrl = null;
-                Tls tls = coreConfig.getRemoteConfiguration().getSecurity().getTls();
+                Tls tls = CoreConfigFacade.getInstance().getRemoteConfiguration().getSecurity().getTls();
                 if (tls.isEnableOCSP()) {
                     responderUrl = tls.getResponderUrl();
                 }
@@ -201,7 +198,7 @@ public class CertManagerService {
                     throw new TakException("MicrosoftCAConfig not found in CoreConfig!");
                 }
 
-                Tls tlsConfig = coreConfig.getRemoteConfiguration().getSecurity().getTls();
+                Tls tlsConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getSecurity().getTls();
 
                 X509Certificate[] certs = WSTEPClient.submitCSR(tempCsr,
                         microsoftCAConfig.getTemplateName(),
@@ -220,7 +217,7 @@ public class CertManagerService {
                 List<X509Certificate> caList = new LinkedList<>();
                 for (int i = 0; i < certs.length; i++) {
                     if (certs[i].getExtendedKeyUsage() != null
-                    &&  certs[i].getExtendedKeyUsage().contains("1.3.6.1.5.5.7.3.2")) {
+                            &&  certs[i].getExtendedKeyUsage().contains("1.3.6.1.5.5.7.3.2")) {
                         signedCert = certs[i];
                     } else {
                         caList.add(certs[i]);
@@ -228,7 +225,7 @@ public class CertManagerService {
                 }
 
                 caChain = caList.toArray(new X509Certificate[0]);
-                
+
             } else {
                 throw new TakException("Unknown CA type!");
             }

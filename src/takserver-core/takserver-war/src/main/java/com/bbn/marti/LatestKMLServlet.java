@@ -10,9 +10,9 @@ import java.util.Map;
 import java.util.SimpleTimeZone;
 import java.util.logging.Logger;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.ocpsoft.prettytime.PrettyTime;
 import org.owasp.esapi.errors.IntrusionException;
@@ -119,13 +119,13 @@ public class LatestKMLServlet extends EsapiServlet {
 		sqlDateFormat.setTimeZone(new SimpleTimeZone(0, "UTC"));
 		Map<String, String[]> httpParameters = validateParams("LatestKMLServlet", request, response, 
 				requiredHttpParameters, optionalHttpParameters);
-		if(httpParameters == null) {
+		if (httpParameters == null) {
 			// if that is null, then validateParams already did response.sendError
 			return;
 		}
 
          String cotType = getParameterValue(httpParameters, QueryParameter.cotType.name());
-                if(cotType != null) {
+                if (cotType != null) {
                    if (validator != null) {
 			try {
 				cotType = validator.getValidInput(CONTEXT, cotType, MartiValidatorConstants.Regex.CotType.name(), 

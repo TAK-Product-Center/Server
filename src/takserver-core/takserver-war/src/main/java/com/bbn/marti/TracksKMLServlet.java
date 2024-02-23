@@ -13,9 +13,9 @@ import java.util.List;
 import java.util.Map;
 
 import javax.naming.NamingException;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
 import org.apache.commons.io.IOUtils;
@@ -92,7 +92,7 @@ public class TracksKMLServlet extends EsapiServlet {
 		try (Connection connection = ds.getConnection(); PreparedStatement sql = wrapper.prepareStatement("select nextval('"+sequence+"') from generate_series(1,?)", connection)) {
 			sql.setInt(1, batchSize);
 			try (ResultSet results = sql.executeQuery()) {
-				if(results != null) {
+				if (results != null) {
 					while(results.next())
 						idBatch.add(results.getInt(1));					
 				}
@@ -269,7 +269,7 @@ public class TracksKMLServlet extends EsapiServlet {
             Map<String, String[]> httpParameters = validateParams("tracksKml", request, response, 
             		requiredHttpParameters, optionalHttpParameters);
 
-            if(httpParameters == null)
+            if (httpParameters == null)
                 return;
 
 			String groupVector = martiUtil.getGroupBitVector(request);

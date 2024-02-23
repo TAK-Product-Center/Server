@@ -14,16 +14,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.bbn.marti.ValidatorUtils;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.security.web.SecurityUtils;
 
@@ -74,9 +75,13 @@ public class MetadataServlet extends EnterpriseSyncServlet {
     			for (RequestParameters parameter : RequestParameters.values()) {
     				optionalParameters.add(parameter.toString());
     			}
-    			validator.assertValidHTTPRequestParameterSet("MetadataServlet parameters", request, 
+//    			validator.assertValidHTTPRequestParameterSet("MetadataServlet parameters", request, 
+//    					new HashSet<String>(), // No required parameters
+//    					optionalParameters); // optional parameters // FIXME
+    			
+    			ValidatorUtils.assertValidHTTPRequestParameterSet("MetadataServlet parameters", request.getParameterMap().keySet(), 
     					new HashSet<String>(), // No required parameters
-    					optionalParameters); // optional parameters
+    					optionalParameters, validator); // optional parameters
     		}
     		
     		String requestHost = request.getRemoteHost();

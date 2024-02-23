@@ -50,7 +50,7 @@ public class NioNettyFederationClientHandler extends NioNettyFederationServerHan
 				.addListener(new GenericFutureListener<Future<Channel>>() {
 					@Override
 					public void operationComplete(Future<Channel> future) throws Exception {
-						if(future.isSuccess()) {
+						if (future.isSuccess()) {
 							nettyContext = ctx;	
 							remoteSocketAddress = (InetSocketAddress) ctx.channel().remoteAddress();
 							localSocketAddress = (InetSocketAddress) ctx.channel().localAddress();

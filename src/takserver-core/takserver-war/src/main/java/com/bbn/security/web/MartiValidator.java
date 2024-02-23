@@ -22,6 +22,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
  */
 
+import com.bbn.marti.ValidatorUtils;
 import org.owasp.esapi.ESAPI;
 import org.owasp.esapi.Encoder;
 import org.owasp.esapi.ValidationErrorList;
@@ -100,70 +101,15 @@ public class MartiValidator extends DefaultValidator {
 													Set<String> required, 
 													Set<String> optional) 
 		throws ValidationException, IntrusionException {
-		
+
 		if (logger.isDebugEnabled()) {
 			logger.debug(" assertValidHTTPRequestParameterSet. context: " + context + " request: " + request
 					+ " required: " + required
 					+ " optional: " + optional);
 		}
-		
-		// This implementation in inefficient but performance is not much a of a concern.
-		
-		Set<String> given = request.getParameterMap().keySet();
-		Set<String> lowerCase = new HashSet<String>();
-		for (String key : given) {
-			lowerCase.add(key.toLowerCase());
-		}
 
-		// verify ALL required parameters are present		
-		Set<String> missing = new HashSet<String>();
-		for (String parameter : required) {
-			if (!lowerCase.contains(parameter.toLowerCase())) {
-				missing.add(parameter);
-			}
-		}
-		if (missing.size() > 0) {
-
-			String message = "Invalid HTTP request missing parameters " + missing + ": context=" + context;
-			
-			throw new ValidationException(message, message, context);
-		}
-
-		// verify ONLY optional + required parameters are present
-		Set<String> allowed = new HashSet<String>();
-		for (String parameter : required) {
-			allowed.add(parameter.toLowerCase());
-		}
-		for (String parameter : optional) {
-			allowed.add(parameter.toLowerCase());
-		}
-		
-		Set<String> extra = new HashSet<String>();
-		for (String parameter : given) {
-			if (!allowed.contains(parameter.toLowerCase())) {
-				extra.add(parameter);
-			}
-		}
-		
-		if (extra.size() > 0) {
-			Iterator<String> extraItr = extra.iterator();
-			StringBuilder badParameters = new StringBuilder();
-			while (extraItr.hasNext()) {
-				String badExtra = extraItr.next();
-				if (this.isValidInput("assertValidHttpRequestParameterSet", badExtra, "HTTPParameterName",
-						MartiValidatorConstants.DEFAULT_STRING_CHARS, false)) {
-					badParameters.append(badExtra);
-				} else {
-					badParameters.append("[redacted]");
-				}
-				if (extraItr.hasNext()) {
-					badParameters.append(", ");
-				}
-			}
-			
-			throw new ValidationException( context + ": Invalid HTTP request extra parameters (redacted) ", 
-					"Invalid HTTP request extra parameters " + badParameters.toString() + ": context=" + context, context );
-		}
+		ValidatorUtils.assertValidHTTPRequestParameterSet(context, request.getParameterMap().keySet(),
+				required, optional, this);
 	}
 	
 	@Override

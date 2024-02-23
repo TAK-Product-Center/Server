@@ -1,6 +1,11 @@
 package com.bbn.tak.tls;
 
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,8 +14,9 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,18 +26,21 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
 import com.bbn.marti.config.CertificateSigning;
 import com.bbn.marti.config.TAKServerCAConfig;
 import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.network.BaseRestController;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.tak.tls.repository.TakCertRepository;
 
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import tak.server.Constants;
 
 
@@ -45,9 +54,6 @@ public class CertManagerAdminApi extends BaseRestController {
 
     @Autowired
     private TakCertRepository takCertRepository;
-
-    @Autowired
-    private CoreConfig coreConfig;
 
     @Autowired
     SubscriptionManagerLite subscriptionManager;
@@ -260,7 +266,7 @@ public class CertManagerAdminApi extends BaseRestController {
             //
             // grab the CertificateSigning config element
             //
-            CertificateSigning certificateSigning = coreConfig.getRemoteConfiguration().getCertificateSigning();
+            CertificateSigning certificateSigning = CoreConfigFacade.getInstance().getRemoteConfiguration().getCertificateSigning();
             if (certificateSigning == null) {
                 throw new TakException("Couldn't find CertificateSigning in CoreConfig.xml!");
             }
@@ -313,7 +319,7 @@ public class CertManagerAdminApi extends BaseRestController {
 
     @RequestMapping(value = "/certadmin/cert/{hash}", method = RequestMethod.DELETE)
     ApiResponse<TakCert> revokeCertificate(
-                @PathVariable("hash") @NotNull String hash) throws IOException {
+            @PathVariable("hash") @NotNull String hash) throws IOException {
         try {
             TakCert cert = takCertRepository.findOneByHash(hash);
             if (cert == null) {
