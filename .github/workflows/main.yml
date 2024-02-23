@@ -1,0 +1,46 @@
+name: On push to main
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+
+# This allows a subsequently queued workflow run to interrupt previous runs
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+jobs:
+  gradle:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 11
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+          
+      - name: Clean Bootwar
+        run: |
+          cd src
+          ./gradlew clean bootWar
+          
+      - name: Generate .rpm
+        run: |
+          cd src
+          ./gradlew clean buildRpm
+          
+      - name: Upload RPM Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: takServer
+          path: src/takserver-package/build/distributions/*.rpm
