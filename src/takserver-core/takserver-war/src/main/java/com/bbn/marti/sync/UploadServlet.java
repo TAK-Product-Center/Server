@@ -114,7 +114,10 @@ public class UploadServlet extends EnterpriseSyncServlet {
 	public void doPost(HttpServletRequest req, HttpServletResponse response) throws ServletException, IOException {
 
 		AsyncContext async = req.startAsync();
-
+		
+		// Set the timeout for async context for file upload (ms)
+		async.setTimeout(CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeUploadTimeoutMillis());
+		
 		if (logger.isDebugEnabled()) {
 			logger.debug("POST upload");
 		}
@@ -415,7 +418,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 
 					response.setStatus(HttpServletResponse.SC_OK);
 				} catch (Exception e) {
-					logger.error("error processing getResource", e);
+					logger.error("error processing file POST", e);
 				} finally {
 					async.complete();
 				}

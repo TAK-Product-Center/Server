@@ -58,7 +58,7 @@ public class PasswordGrantAuthenticationConverter implements AuthenticationConve
 
         RegisteredClient loginClient = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId(username)
-                .clientSecret(password)
+                .clientSecret(UUID.randomUUID().toString())
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
                 .authorizationGrantType(AuthorizationGrantType.PASSWORD)
                 .scope(OidcScopes.OPENID)

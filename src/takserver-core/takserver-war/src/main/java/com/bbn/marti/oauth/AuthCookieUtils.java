@@ -52,6 +52,20 @@ public class AuthCookieUtils {
         return responseCookieBuilder.build();
     }
 
+    /**
+     * Gets the string representation of the ResponseCookie and conditionally adds the "Partitioned" attribute.
+     * Workaround until Spring Framework supports the Partitioned attribute in ResponseCookie class:
+     * https://github.com/spring-projects/spring-framework/issues/31454 (last accessed January 4, 2024)
+     * @param responseCookie the ResponseCookie
+     * @param partitioned the boolean denoting whether the cookie is partitioned
+     * @return a String representation of the <code>cookie</code>, including the "Partitioned" attribute when <code>partitioned</code> is true
+     */
+    public static String createCookiePartitioned(final ResponseCookie responseCookie, boolean partitioned) {
+        String cookie = responseCookie.toString();
+        if (!partitioned) return cookie;
+        return cookie + (cookie.endsWith(";") ? " " : "; ") + "Partitioned;";
+    }
+
     public static ResponseCookie createCookie(final String name, final String value, int maxAge, boolean sameSiteStrict) {
         SameSite sameSite = SameSite.Lax;
         if (sameSiteStrict) {

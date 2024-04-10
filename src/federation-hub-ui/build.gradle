@@ -86,7 +86,7 @@ dependencies {
   implementation group: 'com.h2database', name: 'h2', version: h2_version
   
   implementation group: 'io.jsonwebtoken', name: 'jjwt', version: '0.9.1'
-  implementation group: 'org.bouncycastle', name: 'bcpkix-jdk15on', version: '1.58'
+  implementation group: 'org.bouncycastle', name: 'bcpkix-jdk15on', version: '1.70'
   
 
   // Apache Ignite (cache and distributed service grid).

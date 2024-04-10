@@ -22,8 +22,11 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
     @Query(value = missionAttributes + " from mission where lower(name) = lower(:name) order by id desc limit 1", nativeQuery = true)
     Mission getByNameNoCache(@Param("name") String name);
 
-    @Query(value = missionAttributes + " from mission where guid = :guid", nativeQuery = true)
+    @Query(value = missionAttributes + " from mission where guid = uuid(:guid)", nativeQuery = true)
     Mission getByGuidNoCache(@Param("guid") UUID guid);
+
+    @Query(value = missionAttributes + " from mission where guid = uuid(:guid)", nativeQuery = true)
+    Mission getByGuid(@Param("guid") UUID missionGuid);
 
     Long findMissionIdByName(String name);
         
@@ -229,17 +232,29 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
     @Query(value = "update mission set tool = :tool where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long updateTool(@Param("name") String name, @Param("groupVector") String groupVector, @Param("tool") String tool);
 
-    @Query(value = "update mission set parent_mission_id = ( select id from mission where lower(name) = lower(:parentName) ) where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
-    Long setParent(@Param("name") String name, @Param("parentName") String parentName, @Param("groupVector") String groupVector);
+    @Query(value = "update mission set parent_mission_id = (select id from mission where guid = uuid(:parentMissionGuid)) where guid = uuid(:missionGuid) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+    Long setParent(@Param("missionGuid") String missionGuid, @Param("parentMissionGuid") String parentMissionGuid, @Param("groupVector") String groupVector);
 
     @Query(value = "update mission set parent_mission_id = null where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long clearParent(@Param("name") String name, @Param("groupVector") String groupVector);
+    
+    @Query(value = "update mission set parent_mission_id = null where guid = uuid(:guid) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+    Long clearParentByGuid(@Param("guid") String guid, @Param("groupVector") String groupVector);
 
     @Query(value = "select parent.name from mission parent, mission child where child.parent_mission_id = parent.id and lower(child.name) = lower(:name)", nativeQuery = true)
     String getParentName(@Param("name") String name);
+    
+    @Query(value = "select parent.guid from mission parent, mission child where child.parent_mission_id = parent.id and child.guid = uuid(:missionGuid)", nativeQuery = true)
+    String getParentGuid(@Param("missionGuid") String missionGuid);
+    
+    @Query(value = "select parent.guid from mission parent, mission child where child.parent_mission_id = parent.id and child.guid = uuid(:missionGuid)", nativeQuery = true)
+    String getParentMissionGuid(@Param("missionGuid") String missionGuid);
 
     @Query(value = "select child.name from mission parent, mission child where child.parent_mission_id = parent.id and lower(parent.name) = lower(:name)", nativeQuery = true)
     List<String> getChildNames(@Param("name") String name);
+    
+    @Query(value = "select child.guid from mission parent, mission child where child.parent_mission_id = parent.id and parent.guid = uuid(:guid)", nativeQuery = true)
+    List<String> getChildGuids(@Param("guid") String guid);
 
     @Query(value = "update mission set password_hash = :passwordHash where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long setPasswordHash(@Param("name") String name, @Param("passwordHash") String password, @Param("groupVector") String groupVector);
@@ -272,6 +287,9 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
     
     @Query(value = "select id from mission where lower(name) = lower(:missionName) order by id asc limit 1", nativeQuery = true)
     Long getLatestMissionIdForName(@Param("missionName") String missionName);
+    
+    @Query(value = "select id from mission where guid = uuid(:missionGuid) order by id asc limit 1", nativeQuery = true)
+    Long getLatestMissionIdForMissionGuid(@Param("missionGuid") String missionGuid);
     
     @Query(value ="select count(*) from mission where invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to

@@ -7,13 +7,15 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
+import com.google.common.base.Strings;
 import jakarta.servlet.http.HttpServletRequest;
 
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +25,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.network.BaseRestController;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -66,6 +69,8 @@ public class GroupsApi extends BaseRestController {
 
     @Autowired
     SubscriptionManagerLite subscriptionManager;
+
+    private Map<String, String> descriptionMap = new ConcurrentHashMap<>();
 
     public GroupManager getGroupManager() {
         return groupManager;
@@ -246,16 +251,27 @@ public class GroupsApi extends BaseRestController {
             try {
                 if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getDefault().equalsIgnoreCase("ldap")) {
                     for (Group group : groups) {
-                        List<LdapGroup> ldapGroups = groupManager.searchGroups(group.getName(), true);
-                        if (ldapGroups.size() == 0) {
-                            logger.debug("unable to find description for group! " + group.getName());
-                            continue;
-                        } else if (ldapGroups.size() > 1) {
-                            logger.error("found more than one result for group! " + group.getName());
+                        String description = descriptionMap.get(group.getName());
+                        if (description == null) {
+                            List<LdapGroup> ldapGroups = groupManager.searchGroups(group.getName(), true);
+                            if (ldapGroups.size() == 0) {
+                                logger.debug("unable to find description for group! " + group.getName());
+                                continue;
+                            } else if (ldapGroups.size() > 1) {
+                                logger.error("found more than one result for group! " + group.getName());
+                            }
+
+                            LdapGroup ldapGroup = ldapGroups.get(0);
+                            description = ldapGroup.getDescription();
+                            if (description == null) {
+                                description = "";
+                            }
+                            descriptionMap.put(group.getName(), description);
                         }
 
-                        LdapGroup ldapGroup = ldapGroups.get(0);
-                        group.setDescription(ldapGroup.getDescription());
+                        if (!Strings.isNullOrEmpty(description)) {
+                            group.setDescription(description);
+                        }
                     }
                 }
             } catch (Exception e) {

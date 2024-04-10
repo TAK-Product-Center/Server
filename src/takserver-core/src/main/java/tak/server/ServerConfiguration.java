@@ -17,11 +17,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
-import com.bbn.marti.jwt.JwtUtils;
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.Wrapper;
@@ -47,6 +46,7 @@ import org.springframework.boot.web.server.ErrorPage;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.cache.interceptor.KeyGenerator;
 import org.springframework.cloud.aws.context.support.env.AwsCloudEnvironmentCheckUtils;
 import org.springframework.context.ApplicationContext;
@@ -54,17 +54,24 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.ImportResource;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.Scope;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.format.support.FormattingConversionServiceFactoryBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor;
+import org.springframework.orm.jpa.vendor.HibernateJpaDialect;
+import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.oxm.Marshaller;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.security.access.PermissionEvaluator;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.web.context.request.RequestContextListener;
 
@@ -79,12 +86,6 @@ import com.bbn.marti.config.Connection;
 import com.bbn.marti.config.Network;
 import com.bbn.marti.config.Oauth;
 import com.bbn.marti.config.Security;
-import tak.server.config.ApiConfiguration;
-import tak.server.config.ApiOnlyConfiguration;
-import tak.server.config.ConfigServiceConfiguration;
-import tak.server.config.MessagingConfiguration;
-import tak.server.config.MessagingOnlyConfiguration;
-import tak.server.util.ActiveProfiles;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.config.Tls.Crl;
 import com.bbn.marti.dao.kml.JDBCCachingKMLDao;
@@ -95,18 +96,21 @@ import com.bbn.marti.groups.FileAuthenticatorAgent;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.groups.OAuthAuthenticator;
 import com.bbn.marti.groups.X509Authenticator;
+import com.bbn.marti.jwt.JwtUtils;
 import com.bbn.marti.logging.AuditLogUtil;
 import com.bbn.marti.maplayer.MapLayerService;
 import com.bbn.marti.model.kml.Icon;
 import com.bbn.marti.model.kml.Iconset;
 import com.bbn.marti.remote.SubmissionInterface;
 import com.bbn.marti.remote.SubscriptionManagerLite;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.config.LocalConfiguration;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.util.LoggingConfigPropertiesSetupUtil;
 import com.bbn.marti.remote.util.RemoteUtil;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.service.ClusterSubscriptionStore;
-import com.bbn.marti.remote.config.LocalConfiguration;
 import com.bbn.marti.service.RepositoryService;
 import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
@@ -141,7 +145,6 @@ import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.sync.service.MissionServiceDefaultImpl;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.VersionBean;
-import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.util.spring.TakAuthenticationProvider;
 import com.bbn.metrics.MetricsCollector;
 import com.bbn.metrics.MissionServiceAspect;
@@ -152,6 +155,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Strings;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -163,9 +167,21 @@ import jakarta.persistence.EntityManagerFactory;
 import tak.server.cache.ActiveGroupCacheHelper;
 import tak.server.cache.CoTCacheHelper;
 import tak.server.cache.MissionCacheHelper;
+import tak.server.cache.SpringCacheOperationUpdater;
 import tak.server.cache.TakIgniteSpringCacheManager;
+import tak.server.cache.resolvers.AllCopMissionCacheResolver;
+import tak.server.cache.resolvers.AllMissionCacheResolver;
+import tak.server.cache.resolvers.MissionCacheResolver;
+import tak.server.cache.resolvers.MissionCacheResolverGuid;
+import tak.server.cache.resolvers.MissionLayerCacheResolver;
+import tak.server.cache.resolvers.TakCacheManagerResolverAspect;
 import tak.server.cluster.ClusterManager;
 import tak.server.cluster.DistributedSubmissionService;
+import tak.server.config.ApiConfiguration;
+import tak.server.config.ApiOnlyConfiguration;
+import tak.server.config.ConfigServiceConfiguration;
+import tak.server.config.MessagingConfiguration;
+import tak.server.config.MessagingOnlyConfiguration;
 import tak.server.filemanager.FileManagerService;
 import tak.server.filemanager.FileManagerServiceDefaultImpl;
 import tak.server.ignite.IgniteConfigurationHolder;
@@ -173,14 +189,9 @@ import tak.server.ignite.IgniteHolder;
 import tak.server.ignite.grid.SubscriptionManagerProxyHandler;
 import tak.server.messaging.MessageConverter;
 import tak.server.profile.ProfileTracker;
+import tak.server.util.ActiveProfiles;
 import tak.server.util.DataSourceUtils;
 import tak.server.util.JavaVersionChecker;
-
-import org.springframework.orm.jpa.JpaTransactionManager;
-import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
-import org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor;
-import org.springframework.orm.jpa.vendor.HibernateJpaDialect;
-import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 
 @org.springframework.context.annotation.Configuration
 @ImportResource({"classpath:security-context.xml"})
@@ -191,6 +202,7 @@ import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 @EnableJpaRepositories(basePackages= {"com.bbn.marti.sync.repository", "com.bbn.marti.dao.kml", "com.bbn.tak.tls.repository", "com.bbn.marti.device.profile.repository", "com.bbn.marti.maplayer.repository", "com.bbn.user.registration.repository", "com.bbn.marti.video", "tak.server.feeds"})
 @EntityScan(basePackages={"com.bbn.marti.sync.model", "tak.server.feeds"})
 @EnableTransactionManagement
+@EnableWebSecurity
 public class ServerConfiguration extends SpringBootServletInitializer  {
 	/*
 	 * This configuration contains beans that common to all configs (See Constants.java for configurations)
@@ -243,13 +255,16 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 			disableStdout();
 		}
 
+		Configuration configuration = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
 		if (ActiveProfiles.getInstance().isConfigProfileActive()) {
 			ConfigServiceConfiguration.setInitialAppProps(application);
+			// set up logging properties for config microservice
+			LoggingConfigPropertiesSetupUtil.getInstance().setupLoggingProperties(configuration);
 			logger.info("Starting Config Microservice");
 		} else {
 			try {
 				logger.info("Starting Ignite for TAK Server" + ActiveProfiles.getInstance().getProfile() + "Service.");
-				Configuration configuration = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
 				setupInitialConfig(application, configuration);
 
@@ -333,6 +348,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 			public void customize(Context context) {
 				context.addWelcomeFile("index.html"); // this enables the <host>:8443/ and <host>:8443 redirects
 				context.setWebappVersion("3.1");
+				context.setBackgroundProcessorDelay(10);
 
 				// make sure JSPs aren't run in development mode
 				Container jsp = context.findChild("jsp");
@@ -582,6 +598,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	}
 
 	@Bean
+	@Primary
 	CacheManager cacheManager(Ignite ignite) {
 		Configuration configuration = null;
 
@@ -608,6 +625,26 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		scm.setConfiguration(IgniteConfigurationHolder.getInstance().getIgniteConfiguration());
 
 		return scm;
+	}
+	
+	@Bean
+	public Caffeine caffeineConfig() {
+		Configuration config = CoreConfigFacade.getInstance().getCachedConfiguration();
+		
+	    return Caffeine.newBuilder()
+				.expireAfterWrite(config.getBuffer().getQueue().getCaffeineFileCacheSeconds(), TimeUnit.SECONDS);
+	    }
+	
+	@Bean
+	public CacheManager caffineCacheManager(Caffeine caffeine) {
+	    CaffeineCacheManager caffeineCacheManager = new CaffeineCacheManager();
+	    caffeineCacheManager.setCaffeine(caffeine);
+	    return caffeineCacheManager;
+	}
+	
+	@Bean
+	public SpringCacheOperationUpdater springCacheOperationUpdater(Ignite ignite) {
+		return new SpringCacheOperationUpdater();
 	}
 
 	@Bean
@@ -757,8 +794,9 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		}
 
 		// http session timeout
-		properties.put("server.session.timeout", config.getNetwork().getHttpSessionTimeoutMinutes() * 60);
-		properties.put("server.servlet.session.cookie.max-age", config.getNetwork().getHttpSessionTimeoutMinutes() * 60);
+		properties.put("server.session.timeout", Integer.toString(config.getNetwork().getHttpSessionTimeoutMinutes() * 60)+"s");
+		properties.put("server.servlet.session.timeout", Integer.toString(config.getNetwork().getHttpSessionTimeoutMinutes() * 60)+"s");
+		properties.put("server.servlet.session.cookie.max-age", Integer.toString(config.getNetwork().getHttpSessionTimeoutMinutes() * 60)+"s");
 
 		// cloudwatch
 
@@ -1219,6 +1257,27 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	public MissionChangeAspect missionChangeAspect() {
 		return new MissionChangeAspect();
 	}
+	
+	@Bean
+	@Profile("!" + Constants.CLUSTER_PROFILE_NAME)
+	public TakCacheManagerResolverAspect MissionCacheResolverAspect() {
+		return new TakCacheManagerResolverAspect();
+	}
+	
+	@Bean("missionCacheResolver")
+	public MissionCacheResolver missionCacheResolver() { return new MissionCacheResolver(); }
+	
+	@Bean("missionCacheResolverGuid")
+	public MissionCacheResolverGuid missionCacheResolverGuid() { return new MissionCacheResolverGuid(); }
+
+	@Bean("missionLayerCacheResolver")
+	public MissionLayerCacheResolver missionLayerCacheResolver() { return new MissionLayerCacheResolver(); }
+
+	@Bean("allMissionCacheResolver")
+	public AllMissionCacheResolver allMissionCacheResolver() { return new AllMissionCacheResolver(); }
+	
+	@Bean("allCopMissionCacheResolver")
+	public AllCopMissionCacheResolver allCopMissionCacheResolver() { return new AllCopMissionCacheResolver(); }
 	
 	@Bean
 	public NetworkMetricsEndpoint networkMetrics(@Lazy MetricsCollector metricsCollector, SubscriptionManager subscriptionManager) {

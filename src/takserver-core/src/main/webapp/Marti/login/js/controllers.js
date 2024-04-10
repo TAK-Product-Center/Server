@@ -26,9 +26,13 @@ loginControllers.controller('loginController', ['$scope', '$location', 'loginSer
 
         $scope.onSubmit = async function() {
             var xhr = new XMLHttpRequest();
-            var url = "/oauth2/token?grant_type=password" +
-                "&username=" + encodeURIComponent(username.value) +
-                "&password=" + encodeURIComponent(password.value);
+            var url = "/oauth/token";
+
+            var formData = new FormData();
+            formData.append("grant_type", "password");
+            formData.append("username", username.value);
+            formData.append("password", password.value);
+
             xhr.responseType = 'json';
             xhr.open("POST", url, true);
             xhr.onload = function() {
@@ -40,7 +44,7 @@ loginControllers.controller('loginController', ['$scope', '$location', 'loginSer
                 }
             };
 
-            xhr.send();
+            xhr.send(formData);
         }
 
         $scope.getConfig();

@@ -3,6 +3,8 @@ package tak.server.config;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.bbn.marti.config.Network;
+import com.bbn.marti.oauth.AuthCookieUtils;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.google.common.base.Strings;
 import org.slf4j.Logger;
@@ -51,7 +53,14 @@ public class WebSocketConfiguration implements WebSocketConfigurer, WebSocketMes
         		.addHandler(new BinaryPayloadWebSocketHandler(), "/payload/1/*")
         		.addInterceptors(auctionInterceptor());
 
-        String allowedOrigins = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowOrigins();
+        // get allowedOrigins from the first connector that has allowOrigins configured
+        String allowedOrigins = "";
+        for (Network.Connector connector : CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getConnector()) {
+            if ( !Strings.isNullOrEmpty(connector.getAllowOrigins()) ) {
+                allowedOrigins = connector.getAllowOrigins();
+                break;
+            }
+        }
         if (!Strings.isNullOrEmpty(allowedOrigins)) {
             takProtoHandler.setAllowedOrigins(allowedOrigins);
             binaryPayloadHandler.setAllowedOrigins(allowedOrigins);

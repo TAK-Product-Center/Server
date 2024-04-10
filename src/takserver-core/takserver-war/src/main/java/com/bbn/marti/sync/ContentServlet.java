@@ -24,6 +24,7 @@ import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.security.web.SecurityUtils;
 import com.google.common.base.Strings;
@@ -255,6 +256,9 @@ public class ContentServlet extends EnterpriseSyncServlet {
 			logger.debug("HEAD resource");
 		}
 
+		// Set the timeout for async context for file download (ms)
+		async.setTimeout(CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeDownloadTimeoutMillis());
+		
 		async.start(() -> {
 			try {
 				getResource(async, HttpMethod.HEAD);

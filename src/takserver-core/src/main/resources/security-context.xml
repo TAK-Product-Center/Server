@@ -41,6 +41,7 @@
 				BasicAuthenticationExceptionTranslationFilter,
 				martiPreAuthenticationFilter,
 				AnonymousAuthenticationFilter,
+				CorsProcessingFilter,
 				oAuth2TokenEndpointFilter,
 				oAuth2BearerTokenAuthenticationFilter,
 				FilterSecurityInterceptor" />
@@ -71,7 +72,7 @@
 		
 		<property name="securityMetadataSource">
 			<sec:filter-security-metadata-source request-matcher="ant" use-expressions="false">
-			
+
 			  <!-- plugin data API -->
 			  <sec:intercept-url pattern="/Marti/api/plugins/*/submit" access="ROLE_ANONYMOUS"/>
 			  <sec:intercept-url pattern="/Marti/api/plugins/*/submit/result" access="ROLE_ANONYMOUS"/>
@@ -327,9 +328,9 @@
 			  <!--  Map Layer Admin tool -->
 			  <sec:intercept-url pattern="/Marti/mla/**" access="ROLE_ADMIN"/>
 
-			  <sec:intercept-url pattern="/oauth2/token" access="ROLE_NO_CLIENT_CERT" />
-			  <sec:intercept-url pattern="/oauth2/authorize"  access="ROLE_NO_CLIENT_CERT" />
-			  <sec:intercept-url pattern="/oauth2/check_token"  access="ROLE_ANONYMOUS" />
+			  <sec:intercept-url pattern="/oauth/token" access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/oauth/authorize"  access="ROLE_NO_CLIENT_CERT" />
+			  <sec:intercept-url pattern="/oauth/check_token"  access="ROLE_ANONYMOUS" />
 
 			  <!-- disallow direct access to login page - needs to pass through a Spring MVC view resolver -->
 				<sec:intercept-url pattern="/login/**" access="ROLE_NO_CLIENT_CERT"/>
@@ -395,7 +396,20 @@
 	<bean id="securityContextHolderAwareRequestFilter" class="org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter" />
 
 	<bean id="passwordGrantAuthenticationConverter" class="com.bbn.marti.oauth.PasswordGrantAuthenticationConverter" />
-	<bean id="inMemoryOAuth2AuthorizationService" class="org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService" />
+
+	<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate" >
+		<constructor-arg ref="dataSource" />
+	</bean>
+
+	<bean id="jdbcRegisteredClientRepository" class="org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository" >
+		<constructor-arg ref="jdbcTemplate" />
+	</bean>
+
+	<bean id="jdbcOAuth2AuthorizationService" class="org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService" >
+		<constructor-arg ref="jdbcTemplate" />
+		<constructor-arg ref="jdbcRegisteredClientRepository" />
+	</bean>
+
 	<bean id="nimbusJwtEncoder" class="org.springframework.security.oauth2.jwt.NimbusJwtEncoder">
 		<constructor-arg ref="jwkSource" />
 	</bean>
@@ -405,7 +419,8 @@
 	</bean>
 
 	<bean id="passwordGrantAuthenticationProvider" class="com.bbn.marti.oauth.PasswordGrantAuthenticationProvider" >
-		<constructor-arg ref="inMemoryOAuth2AuthorizationService" />
+		<constructor-arg ref="jdbcRegisteredClientRepository" />
+		<constructor-arg ref="jdbcOAuth2AuthorizationService" />
 		<constructor-arg ref="jwtGenerator" />
 		<property name="authenticationProvider" ref="martiAuthenticationProvider" />
 	</bean>
@@ -419,6 +434,7 @@
 
 	<bean id="oAuth2TokenEndpointFilter" class="org.springframework.security.oauth2.server.authorization.web.OAuth2TokenEndpointFilter" >
 		<constructor-arg ref="passwordGrantAuthenticationManager" />
+		<constructor-arg value="/oauth/token"/>
 		<property name="authenticationConverter" ref="passwordGrantAuthenticationConverter" />
 		<property name="authenticationSuccessHandler" ref="passwordGrantAuthenticationSuccessHandler" />
 	</bean>
@@ -439,7 +455,9 @@
 	</bean>
 	
 	<bean id="unforgivingAuthFailureProvider" class="com.bbn.marti.util.spring.UnforgivingAuthenticationFailureHandler" />
-	
+
+	<bean id="CorsProcessingFilter" class="com.bbn.marti.util.spring.CorsProcessingFilter" />
+
 	<bean id="BasicAuthenticationFilter" class="org.springframework.security.web.authentication.www.BasicAuthenticationFilter">
 		<constructor-arg ref="martiAuthenticationManager" />
 		<constructor-arg ref="authenticationEntryPoint"/>
@@ -513,6 +531,7 @@
 	            <entry key="8444" value="ROLE_FEDERATE" />
 	            <entry key="8445" value="ROLE_XMPP" />
 			    <entry key="8446" value="ROLE_NO_CLIENT_CERT" />
+			    <entry key="8447" value="ROLE_NO_CLIENT_CERT" />
 	          </util:map>
 	        </property>
 	      </bean>

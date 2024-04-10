@@ -1374,7 +1374,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 				+ RESOURCE_TABLE + " r WHERE " + Column.hash.toString()
 				+ " = ? "
 				+ RemoteUtil.getInstance().getGroupAndClause()
-				+ "ORDER BY " + Column.submissiontime.toString() + ";", connection)) {
+				+ "ORDER BY " + Column.submissiontime.toString() + " limit 1;", connection)) {
 			query.setString(1, hash.toLowerCase());
 			query.setString(2, groupVector);
 			log.fine("getContentByHash Executing SQL: " + query.toString());

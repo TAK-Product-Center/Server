@@ -57,6 +57,8 @@ public class ActiveGroupCacheHelper {
 
     public void setActiveGroupsForUser(String username, List<Group> groups) {
 
+        username = username.toLowerCase();
+
         IgniteCache<Object, Object> activeGroupsCache = getActiveGroupsCache();
         if (activeGroupsCache == null) {
             throw new TakException("Unable to get activeGroupsCache");
@@ -70,8 +72,10 @@ public class ActiveGroupCacheHelper {
     }
 
     public List<Group> getActiveGroupsForUser(String username) {
-        // retrieve the active groups from the cache
 
+        username = username.toLowerCase();
+
+        // retrieve the active groups from the cache
         IgniteCache<Object, Object> activeGroupsCache = getActiveGroupsCache();
         if (activeGroupsCache == null) {
             throw new TakException("Unable to get activeGroupsCache");
@@ -80,26 +84,26 @@ public class ActiveGroupCacheHelper {
         return (List<Group>) activeGroupsCache.get(username);
     }
 
-    private IgniteCache<Object, Object> getActiveGroupsCache() {
+    private synchronized IgniteCache<Object, Object> getActiveGroupsCache() {
 
         IgniteCache<Object, Object> activeGroupCache = ignite.cache(Constants.ACTIVE_GROUPS_CACHE);
         if (activeGroupCache != null) {
             return activeGroupCache;
         }
 
+        logger.info("Populating the activeGroupCache");
+
         Map<String, List<Group>> activeGroups = loadActiveGroups();
         if (activeGroups != null) {
             try {
-                activeGroupCache = ignite.createCache(Constants.ACTIVE_GROUPS_CACHE);
+                activeGroupCache = ignite.getOrCreateCache(Constants.ACTIVE_GROUPS_CACHE);
                 Iterator it = activeGroups.entrySet().iterator();
                 while (it.hasNext()) {
                     Map.Entry userCache = (Map.Entry) it.next();
                     activeGroupCache.put((String) userCache.getKey(), (List<Group>) userCache.getValue());
                 }
-            } catch (CacheException e) {
-                if (logger.isDebugEnabled()) {
-                    logger.debug("exception in getActiveGroupsCache", e);
-                }
+            } catch (Exception e) {
+                logger.error("exception in getActiveGroupsCache", e);
             }
         } else {
             logger.error("loadActiveGroups failed!");
@@ -108,12 +112,12 @@ public class ActiveGroupCacheHelper {
         return activeGroupCache;
     }
 
-    public void saveActiveGroupsForUser(String username, List<Group> groups) {
+    private void saveActiveGroupsForUser(String username, List<Group> groups) {
         try {
             try (Connection connection = ds.getConnection()) {
 
                 try (PreparedStatement statement = connection.prepareStatement(
-                        "delete from active_group_cache where username = ?")) {
+                        "delete from active_group_cache where lower(username) = ?")) {
                     statement.setString(1, username);
                     statement.execute();
                 } catch (SQLException e) {
@@ -142,11 +146,11 @@ public class ActiveGroupCacheHelper {
         }
     }
 
-    public Map<String, List<Group>> loadActiveGroups() {
+    private Map<String, List<Group>> loadActiveGroups() {
         try {
             ConcurrentHashMap<String, List<Group>> results = new ConcurrentHashMap<>();
             try (Connection connection = ds.getConnection(); PreparedStatement ps = connection.prepareStatement(
-                    "select username, groupname, direction, enabled from active_group_cache ")) {
+                    "select distinct lower(username), groupname, direction, enabled from active_group_cache ")) {
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         String username = rs.getString(1);
@@ -186,6 +190,8 @@ public class ActiveGroupCacheHelper {
     }
 
     public boolean assignGroupsCheckCache(Set<Group> groups, User user, String username) {
+
+        username = username.toLowerCase();
 
         // check to see if we have any cache entries for the current username
         List<Group> activeGroups = getActiveGroupsForUser(username);

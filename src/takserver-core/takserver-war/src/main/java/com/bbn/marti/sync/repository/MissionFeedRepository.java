@@ -23,6 +23,9 @@ public interface MissionFeedRepository extends JpaRepository<MissionFeed, String
 
     @Query(value = "select m.name from mission m, mission_feed mf where mf.mission_id = m.id and mf.uid = :missionFeedUid", nativeQuery = true)
     String getMissionNameByMissionFeedUid(@Param("missionFeedUid") String missionFeedUid);
+    
+    @Query(value = "select m.guid from mission m, mission_feed mf where mf.mission_id = m.id and mf.uid = :missionFeedUid", nativeQuery = true)
+    String getMissionGuidByMissionFeedUid(@Param("missionFeedUid") String missionFeedUid);
 
     @Query(value = "select uid, data_feed_uid, filter_polygon, filter_cot_types, filter_callsign, null as mission_id " +
             "from mission_feed where uid = :uid ", nativeQuery = true)

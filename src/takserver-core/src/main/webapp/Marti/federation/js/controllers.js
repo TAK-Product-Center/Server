@@ -177,6 +177,20 @@ federationManagerControllers.controller('FederatesListCtrl', ['$scope',
             );
         };
 
+        $scope.showGroupMappingWarning = function(activeConnection) {
+            let groupMappingEnabled = activeConnection.federateConfig.federatedGroupMapping;
+            let autoMappingEnabled = activeConnection.federateConfig.automaticGroupMapping 
+            let fallbackEnabled = activeConnection.federateConfig.fallbackWhenNoGroupMappings 
+            let numMappings = activeConnection.federateConfig.inboundGroupMapping ? activeConnection.federateConfig.inboundGroupMapping.length : 0
+
+            if (groupMappingEnabled) {
+                if (fallbackEnabled || autoMappingEnabled) return false;
+
+                if (numMappings === 0) return true
+            } else {
+                return false
+            }
+        }
     }
 ]);
 
@@ -188,6 +202,7 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
     'FederateGroupsMapRemoveService',
     'FederateRemoteGroupsService',
     'FederateGroupConfigurationService',
+    'FederateDetailsService',
     '$routeParams',
     '$modal',
     function (
@@ -199,6 +214,7 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
         FederateGroupsMapRemoveService,
         FederateRemoteGroupsService,
         FederateGroupConfigurationService,
+        FederateDetailsService,
         $routeParams,
         $modal
     ) {
@@ -208,7 +224,7 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
 
         $scope.federateGroups = [];
         $scope.federateGroupsMap = [];
-        $scope.federateRemoteGroups = [];
+        $scope.federateRemoteGroups = {};
         $scope.submitInProgress = false;
 
         $scope.getFederateGroups = function () {
@@ -300,8 +316,31 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
                      localGroup: localGroup
                      },
                      function (apiResponse) {
+                        // group mapping was added successfully. if this was the first mapping added,
+                        // automatically enable group mapping for the user and alert them
+                        if (Object.keys($scope.federateGroupsMap).length === 0) {
+                            FederateDetailsService.query({
+                                federateId: $scope.federateId
+                            },
+                            function (apiResponse) {
+                                if (!apiResponse.data.federatedGroupMapping) {
+                                    apiResponse.data.federatedGroupMapping = true
+                                    FederateDetailsService.update(apiResponse.data,
+                                        function (apiResponse) {
+                                            alert('Federated Group mapping has been automatically Enabled! Go to the Fedeate Settings to Disable it.');
+                                        },
+                                        function (apiResponse) {
+                                            alert('An error occurred saving the federate details.');
+                                        }
+                                    );
+                                }
+                            },
+                            function () {
+                                alert('An error occurred fetching the federate details.');
+                            });
+                        }
+
                          $scope.getFederateGroupsMap();
-                         window.location.reload();
                      },
                      function (apiResponse) {
                           alert('An error occurred adding the group. Please correct the errors and resubmit.');

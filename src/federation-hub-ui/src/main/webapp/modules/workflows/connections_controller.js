@@ -78,6 +78,21 @@ function connectionsController($rootScope, $scope, $http, $stateParams, $modalIn
         );
     };
 
+    $scope.disconnect = function(ac) {        
+        $scope.filteredActiveConnections = $scope.filteredActiveConnections.filter(function( obj ) {
+          return obj.connectionId !== ac.connectionId;
+        });
+
+        WorkflowService.disconnectFederate(ac.connectionId).then(
+            function() {
+               
+            },
+            function (result) {
+                console.log("Unable to disconnect federate, " + result);
+            }
+        );
+    };
+
     $scope.cancel = function() {
         $modalInstance.dismiss('cancel');
     };

@@ -45,15 +45,7 @@ public class TAKCLCore {
 	public static final boolean cliIgnoreCoreConfig;
 	public static final long igniteManualRetryTimeout;
 	public static boolean useTakclIgniteConfig;
-	public static final boolean disableConfigProcess;
-	public static final boolean disableMessagingProcess;
-	public static final boolean disableApiProcess;
 
-	public static final boolean disableRetentionProcess;
-
-	public static final boolean disablePluginManagerProcess;
-	
-	public static final boolean disableFederationHubProcess;
 	@Nullable
 	public static final Path testCertSourceDir;
 	public static final boolean keepServersRunning;
@@ -96,12 +88,6 @@ public class TAKCLCore {
 		TakclConfigPath(SYSARG_PREFIX + "config.filepath", "TAKCL_CONFIG_PATH", null, false),
 		// TODO: This is a hack. We should figure out why the tests don't like the ConfigurationHolder from takserver-common
 		UseTakclIgniteConfig(SYSARG_PREFIX + "takclIgniteConfig", "TAKCL_IGNITE_CONFIG", "true", true),
-		DisableConfigProcess(SYSARG_PREFIX + "disableConfigProcess", "TAKCL_DISABLE_CONFIG_PROCESS", "false", true),
-		DisableMessagingProcess(SYSARG_PREFIX + "disableMessagingProcess", "TAKCL_DISABLE_MESSAGING_PROCESS", "false", true),
-		DisableApiProcess(SYSARG_PREFIX + "disableApiProcess", "TAKCL_DISABLE_API_PROCESS", "false", true),
-		DisableFederationHubProcess(SYSARG_PREFIX + "disableFederationHubProcess", "TAKCL_DISABLE_FEDERATION_HUB_PROCESS", "true", true),
-		DisableRetentionProcess(SYSARG_PREFIX + "disableRetentionProcess", "TAKCL_DISABLE_RETENTION_PROCESS", "true", true),
-		DisablePluginManagerProcess(SYSARG_PREFIX + "disablePluginManagerProcess", "TAKCL_DISABLE_PLUGIN_MANAGER_PROCESS", "true", true),
 		TestCertSourceDir(SYSARG_PREFIX + "testCertSourceDir", "TAKCL_TEST_CERT_SRC_DIR", null, false),
 		KeepServersRunning(SYSARG_PREFIX + "keepServersRunning", "TAKCL_KEEP_SERVERS_RUNNING", "false", true),
 		PrintRestDetails(SYSARG_PREFIX + "printRestDetails", "TAKCL_PRINT_REST_DETAILS", "false", true),
@@ -246,12 +232,6 @@ public class TAKCLCore {
 		coreConfigPath = TakclOption.CoreConfigPath.getStringOrNull();
 		cliIgnoreCoreConfig = TakclOption.CliIgnoreCoreConfig.getBoolean();
 		useTakclIgniteConfig = TakclOption.UseTakclIgniteConfig.getBoolean() && TestExceptions.USE_TAKCL_IGNITE_CONFIGURATION_AS_INDICATED;
-		disableConfigProcess = TakclOption.DisableConfigProcess.getBoolean();
-		disableMessagingProcess = TakclOption.DisableMessagingProcess.getBoolean();
-		disableApiProcess = TakclOption.DisableApiProcess.getBoolean();
-		disableFederationHubProcess = TakclOption.DisableFederationHubProcess.getBoolean();
-		disablePluginManagerProcess = TakclOption.DisablePluginManagerProcess.getBoolean();
-		disableRetentionProcess = TakclOption.DisableRetentionProcess.getBoolean();
 		testCertSourceDir = TakclOption.TestCertSourceDir.getPathOrNull(true);
 		keepServersRunning = TakclOption.KeepServersRunning.getBoolean();
 		printRestDetails = TakclOption.PrintRestDetails.getBoolean();

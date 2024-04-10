@@ -180,7 +180,9 @@ public class JwtUtils {
         try {
             Oauth oAuth = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth();
             if (oAuth == null) {
-                logger.error("OAuth config not found");
+                if (logger.isDebugEnabled()) {
+                    logger.debug("OAuth config not found");
+                }
                 return null;
             }
 
@@ -188,7 +190,6 @@ public class JwtUtils {
                 logger.error("No auth server configured");
                 return null;
             }
-
 
             List<RSAPublicKey> rsaPublicKeys = new ArrayList<>();
 

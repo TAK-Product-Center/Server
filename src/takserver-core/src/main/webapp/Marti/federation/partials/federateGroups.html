@@ -51,7 +51,7 @@
 <div id="federateGroupsView">
 	<div id="federateGroupsViewContainer" class="content">
 
-    <h3>Federate Groups</h3>
+    <h3>Federate Group Filtering</h3>
     
     <p>You are configuring groups for federate: <b>{{federateName}}</b></p>
     
@@ -59,17 +59,12 @@
     A federate is another TAK installation with which you wish to share events.
     </p>
     <p>
-    When events arrive from this federate, you may direct them to devices in the local inbound groups you configure below.
-    Similarly, you may send events to this federate from devices in the outbound groups you configure.
+    When events arrive from this federate, you may direct them to devices that belong to any of the local inbound groups configured below. Similarly, you may send events to this federate from devices that belong to any of the local outbound groups configured.
     </p>
     <p>Note: Adding and Removing groups affects the runtime environment
     immediately, and changes are saved to the configuration file.  This
-		configuration is associated with connections based on the certificate
-		provided when the TLS connection is initiated.  What is stored in the configuration
-		file is the SHA256 fingerprint of the certificate.
-    </p>
-    <p>
-    You must select at least one inbound or outbound group to effectively activate this federate.
+		configuration is associated with federate connections based on the certificate
+		provided when the TLS connection is initiated.
     </p>
 
 		<div data-ng-show="serviceReportedMessages">
@@ -155,8 +150,11 @@
 
 				<div style="border: 1px solid gray; padding:5px;">
 					<p>
-						Add remote group and map to local group of this federate. The Remote Group List will only be populated when the federate
-						is connected. Manual entry can be added in the Remote Group field. A remote group may be mapped to many local groups.
+						When group mapping is enabled, the local incoming groups defined above will not be used (unless 'fallback when no group mappings' is enabled). Events that arrive will have the remote groups they originated from attached to them. This allows you to map a specific remote groups directly to any local groups.
+					</p>
+					<p>
+						The Remote Group List below will only be populated when the federate
+						is connected. Manual entries can be added in the Remote Group field. A remote group may be mapped to many local groups.
 					</p>
 
 					<table class="formTable">

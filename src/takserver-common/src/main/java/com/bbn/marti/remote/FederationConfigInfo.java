@@ -30,8 +30,6 @@ public class FederationConfigInfo implements Serializable {
 	private int coreVersion;
 	private List<FederationPort> v1Ports = new ArrayList<FederationPort>();
 	private List<V1Tls> v1Tls = new ArrayList<>();
-	private boolean federatedGroupMapping;
-	private boolean automaticGroupMapping;
 	private boolean enableDataPackageAndMissionFileFilter;
 	private List<String> fileExtension;
 
@@ -41,8 +39,8 @@ public class FederationConfigInfo implements Serializable {
 	public FederationConfigInfo(boolean isEnabled, List<V1Tls> v1Tls, List<FederationPort> v1Ports, int serverPortv1, int serverPortv2, boolean serverPortEnabled,
 								boolean serverPortEnabledv2, String truststorePath, String truststorePass, String tlsVersion,
 								String webBaseURL, boolean allowMissionFederation, boolean allowDataFeedFederation, boolean allowFederatedDelete, boolean enableMissionFederationDisruptionTolerance,
-								long missionFederationDisruptionToleranceRecencySeconds, List<Mission> missionInterval, int coreVersion, boolean federatedGroupMapping,
-								boolean automaticGroupMapping, boolean enableDataPackageAndMissionFileFilter, List<String> fileExtension) {
+								long missionFederationDisruptionToleranceRecencySeconds, List<Mission> missionInterval, int coreVersion,
+								boolean enableDataPackageAndMissionFileFilter, List<String> fileExtension) {
 
 		this.isEnabled = isEnabled;
 		this.v1Ports = v1Ports;
@@ -62,8 +60,6 @@ public class FederationConfigInfo implements Serializable {
 		this.missionInterval = missionInterval;
 		this.coreVersion = coreVersion;
 		this.v1Tls = v1Tls;
-		this.federatedGroupMapping = federatedGroupMapping;
-		this.automaticGroupMapping = automaticGroupMapping;
 		this.enableDataPackageAndMissionFileFilter = enableDataPackageAndMissionFileFilter;
 		this.fileExtension = fileExtension;
 	}
@@ -222,14 +218,6 @@ public class FederationConfigInfo implements Serializable {
 		return ports;
 	}
 
-	public void setFederatedGroupMapping(boolean federatedGroupMapping) { this.federatedGroupMapping = federatedGroupMapping; }
-
-	public boolean isFederatedGroupMapping() { return federatedGroupMapping; }
-
-	public void setAutomaticGroupMapping(boolean automaticGroupMapping) { this.automaticGroupMapping = automaticGroupMapping; }
-
-	public boolean isAutomaticGroupMapping() { return automaticGroupMapping;}
-
 	public boolean isEnableDataPackageAndMissionFileFilter() {
 		return enableDataPackageAndMissionFileFilter;
 	}
@@ -258,8 +246,6 @@ public class FederationConfigInfo implements Serializable {
 		result = prime * result + ((truststorePass == null) ? 0 : truststorePass.hashCode());
 		result = prime * result + ((truststorePath == null) ? 0 : truststorePath.hashCode());
 		result = prime * result + ((webBaseURL == null) ? 0 : webBaseURL.hashCode());
-		result = prime * result + (federatedGroupMapping ? 1231 : 1237);
-		result = prime * result + (automaticGroupMapping ? 1231 : 1237);
 		if (!v1Ports.isEmpty()) {
 			for (FederationPort p : v1Ports) {
 				result = prime * result + p.getPort();
@@ -340,23 +326,21 @@ public class FederationConfigInfo implements Serializable {
 		} else if (!webBaseURL.equals(other.webBaseURL)) {
             return false;
         }
-		if (federatedGroupMapping != other.federatedGroupMapping) {
-            return false;
-        }
-		if (automaticGroupMapping != other.automaticGroupMapping) {
-            return false;
-        }
 		return true;
 	}
 
 	@Override
 	public String toString() {
 		return "FederationConfigInfo [isEnabled=" + isEnabled + ", serverPortEnabled=" + serverPortEnabled
-				+ ", coreVersion=" + coreVersion + ", serverPortv2=" + serverPortv2 + ", serverPortEnabledv2="
+				+ ", serverPortv1=" + serverPortv1 + ", serverPortv2=" + serverPortv2 + ", serverPortEnabledv2="
 				+ serverPortEnabledv2 + ", truststorePath=" + truststorePath + ", truststorePass=" + truststorePass
 				+ ", tlsVersion=" + tlsVersion + ", webBaseURL=" + webBaseURL + ", allowMissionFederation="
-				+ allowMissionFederation + ", allowFederatedDelete=" + allowFederatedDelete + ", v1Ports="
-				+ v1PortsToString() + ", federatedGroupMapping=" + federatedGroupMapping + ", automaticGroupMapping="
-				+ automaticGroupMapping + "]";
+				+ allowMissionFederation + ", allowDataFeedFederation=" + allowDataFeedFederation
+				+ ", allowFederatedDelete=" + allowFederatedDelete + ", enableMissionFederationDisruptionTolerance="
+				+ enableMissionFederationDisruptionTolerance + ", missionFederationDisruptionToleranceRecencySeconds="
+				+ missionFederationDisruptionToleranceRecencySeconds + ", missionInterval=" + missionInterval
+				+ ", coreVersion=" + coreVersion + ", v1Ports=" + v1Ports + ", v1Tls=" + v1Tls
+				+ ", enableDataPackageAndMissionFileFilter=" + enableDataPackageAndMissionFileFilter
+				+ ", fileExtension=" + fileExtension + "]";
 	}
 }

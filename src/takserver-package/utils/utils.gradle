@@ -53,6 +53,7 @@ task copyDocs(type: Copy) {
 task copySwagger(type: Copy) {
 	from project(':takserver-core').file('oas')
 	include '*.html'
+	include '*.js'
 	into "$buildDir/takArtifacts/oas"
 }
 

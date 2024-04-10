@@ -111,15 +111,15 @@ public interface SubscriptionManager extends SubscriptionManagerLite {
 	
 	CotEventContainer makeDeleteMessage(String linkUid, String linkType);
 
-	CotEventContainer createMissionChangeMessage(String missionName, ChangeType changeType, String authorUid, String tool, String changes, String xmlContentForNotification);
+	CotEventContainer createMissionChangeMessage(UUID missionGuid, String missionName, ChangeType changeType, String authorUid, String tool, String changes, String xmlContentForNotification);
 
-	CotEventContainer createMissionCreateMessage(String missionName, String authorUid, String tool);
+	CotEventContainer createMissionCreateMessage(UUID missionGuid, String missionName, String authorUid, String tool);
 
-	CotEventContainer createMissionDeleteMessage(String missionName, String authorUid, String tool);
+	CotEventContainer createMissionDeleteMessage(UUID missionGuid, String missionName, String authorUid, String tool);
 
-	CotEventContainer createMissionInviteMessage(String missionName, String authorUid, String tool, String token, String role);
+	CotEventContainer createMissionInviteMessage(UUID missionGuid, String missionName, String authorUid, String tool, String token, String role);
 
-	CotEventContainer createMissionRoleChangeMessage(String missionName, String authorUid, String tool, String role);
+	CotEventContainer createMissionRoleChangeMessage(UUID missionGuid, String missionName, String authorUid, String tool, String role);
 
 	Set<SituationAwarenessMessage> getLatestReachableSA(User destUser);
 

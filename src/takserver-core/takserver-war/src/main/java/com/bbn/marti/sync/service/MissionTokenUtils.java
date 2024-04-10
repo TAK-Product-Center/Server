@@ -1,20 +1,26 @@
 package com.bbn.marti.sync.service;
 
+import java.security.PrivateKey;
+import java.util.Date;
+import java.util.UUID;
+
+import javax.crypto.spec.SecretKeySpec;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.bbn.marti.jwt.JwtUtils;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.security.PrivateKey;
-import java.util.Date;
-import javax.crypto.spec.SecretKeySpec;
 
 public class MissionTokenUtils {
 
     public static final String MISSION_NAME_CLAIM = "MISSION_NAME";
+    public static final String MISSION_GUID_CLAIM = "MISSION_GUID";
+
 
     public enum TokenType {
         SUBSCRIPTION,
@@ -43,9 +49,9 @@ public class MissionTokenUtils {
         }
         return instance;
     }
-
+    
     public String createMissionToken(
-            String id, String missionName, TokenType tokenType, long expirationMillis, String issuer)  {
+            String id, String missionName, TokenType tokenType, long expirationMillis, String issuer, UUID missionGuid)  {
 
         try {
             Date now = new Date();
@@ -57,7 +63,8 @@ public class MissionTokenUtils {
                     .setIssuer(issuer)
                     .signWith(SignatureAlgorithm.HS256, secretKeySpec)
                     .claim(tokenType.name(), id)
-                    .claim(MISSION_NAME_CLAIM, missionName);
+                    .claim(MISSION_NAME_CLAIM, missionName)
+            		.claim(MISSION_GUID_CLAIM, missionGuid.toString());
 
             if (expirationMillis > 0) {
                 builder.setExpiration(new Date(now.getTime() + expirationMillis));

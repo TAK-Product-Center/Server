@@ -206,10 +206,6 @@ public class AuditLogUtil {
             } else {
                 logger.trace("null validator in AuditLogUtil. Not validating username.");
             }
-
-            if (System.getProperty("disableAuditLog") == null) {
-                logger.debug(MarkerFactory.getMarker(Constants.AUDIT_LOG_MARKER), "username: [" + username + "] roles: [" + roles + "] request: [" + getRequestString() + "] database query: [" + sqlQuery + "]");
-            }
         } catch (Throwable t) {
             logger.warn("exception getting user principal", t);
         }

@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import javax.net.ssl.TrustManagerFactory;
 
+import com.bbn.marti.takcl.connectivity.server.ServerProcessConfiguration;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -142,8 +143,8 @@ public class FedHubTests extends AbstractTestClass {
 			String sessionIdentifier = initTestMethod();
 			
 			// initial setup of the hub without actually starting it
-			enableFedHub();
-			ActionEngine.getRunnableInstanceAndBuildIfnecessary(ImmutableServerProfiles.FEDHUB_0);
+			engine.overrideDefaultProcessConfiguration(ImmutableServerProfiles.FEDHUB_0, ServerProcessConfiguration.FedhubBrokerFedhubPolicy);
+
 			// get fedhub broker config
 			FederationHubServerConfig fedBrokerConfig = getFederationHubConfig();
 			// create policy for allowing connections from the hub's ca (all servers will have same CA, aka interconnected)
@@ -151,9 +152,6 @@ public class FedHubTests extends AbstractTestClass {
 			
 			// start fedhub
 			engine.startServer(ImmutableServerProfiles.FEDHUB_0, sessionIdentifier);
-			
-			// disable all the fedhub flags so we can go back to starting TAK Servers
-			enableTakServer();
 			
 			engine.offlineFederateServers(false, true, ImmutableServerProfiles.SERVER_0, ImmutableServerProfiles.SERVER_1);
 			engine.offlineAddOutboundFederateConnection(true, ImmutableServerProfiles.SERVER_0, ImmutableServerProfiles.FEDHUB_0);
@@ -200,8 +198,8 @@ public class FedHubTests extends AbstractTestClass {
 			String sessionIdentifier = initTestMethod();
 			
 			// initial setup of the hub without actually starting it
-			enableFedHub();
-			ActionEngine.getRunnableInstanceAndBuildIfnecessary(ImmutableServerProfiles.FEDHUB_0);
+			engine.overrideDefaultProcessConfiguration(ImmutableServerProfiles.FEDHUB_0, ServerProcessConfiguration.FedhubBrokerFedhubPolicy);
+
 			// get fedhub broker config
 			FederationHubServerConfig fedBrokerConfig = getFederationHubConfig();
 			// create policy for allowing connections from the hub's ca (all servers will have same CA, aka interconnected)
@@ -209,9 +207,6 @@ public class FedHubTests extends AbstractTestClass {
 			
 			// start fedhub
 			engine.startServer(ImmutableServerProfiles.FEDHUB_0, sessionIdentifier);
-			
-			// disable all the fedhub flags so we can go back to starting TAK Servers
-			enableTakServer();
 			
 			engine.offlineFederateServers(false, true, ImmutableServerProfiles.SERVER_0, ImmutableServerProfiles.SERVER_2);
 			engine.offlineAddOutboundFederateConnection(true, ImmutableServerProfiles.SERVER_0, ImmutableServerProfiles.FEDHUB_0);
@@ -277,8 +272,8 @@ public class FedHubTests extends AbstractTestClass {
 			String sessionIdentifier = initTestMethod();
 			
 			// initial setup of the hub without actually starting it
-			enableFedHub();
-			ActionEngine.getRunnableInstanceAndBuildIfnecessary(ImmutableServerProfiles.FEDHUB_0);
+			engine.overrideDefaultProcessConfiguration(ImmutableServerProfiles.FEDHUB_0, ServerProcessConfiguration.FedhubBrokerFedhubPolicy);
+
 			// get fedhub broker config
 			FederationHubServerConfig fedBrokerConfig = getFederationHubConfig();
 			// create policy for allowing connections from the hub's ca (all servers will have same CA, aka interconnected)
@@ -286,9 +281,6 @@ public class FedHubTests extends AbstractTestClass {
 			
 			// start fedhub
 			engine.startServer(ImmutableServerProfiles.FEDHUB_0, sessionIdentifier);
-			
-			// disable all the fedhub flags so we can go back to starting TAK Servers
-			enableTakServer();
 			
 			engine.offlineFederateServers(false, true, ImmutableServerProfiles.SERVER_0, ImmutableServerProfiles.SERVER_1);
 
@@ -352,25 +344,7 @@ public class FedHubTests extends AbstractTestClass {
 			}
 		}
 	}
-	
-	private void enableFedHub() {
-		ServerProcessDefinition.FederationHubPolicy.setEnabled(true);
-		ServerProcessDefinition.FederationHubBroker.setEnabled(true);
-		ServerProcessDefinition.MessagingService.setEnabled(false);
-		ServerProcessDefinition.ApiService.setEnabled(false);
-		ServerProcessDefinition.RetentionService.setEnabled(false);
-		ServerProcessDefinition.PluginManager.setEnabled(false);
-	}
-	
-	private void enableTakServer() {
-		ServerProcessDefinition.MessagingService.setEnabled(true);
-		ServerProcessDefinition.ApiService.setEnabled(true);	
-		ServerProcessDefinition.FederationHubPolicy.setEnabled(false);
-		ServerProcessDefinition.FederationHubBroker.setEnabled(false);
-		ServerProcessDefinition.RetentionService.setEnabled(false);
-		ServerProcessDefinition.PluginManager.setEnabled(false);
-	}
-	
+
 	private GroupCell createGroupCell(String caName, boolean interconnected) {
 		GroupProperties groupProps = new GroupProperties();
 		groupProps.setFilters(new ArrayList<FilterNode>());

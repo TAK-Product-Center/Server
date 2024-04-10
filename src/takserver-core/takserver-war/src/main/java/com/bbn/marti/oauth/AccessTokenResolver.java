@@ -34,8 +34,8 @@ public class AccessTokenResolver implements BearerTokenResolver {
     @Override
     public String resolve(final HttpServletRequest request) {
 
-        // TAK - only look for tokens on the oauth port (skip mission tokens on 8443)
-        if (request.getLocalPort() != 8446) {
+        // TAK - only look for tokens on the oauth ports (skip mission tokens on 8443)
+        if (request.getLocalPort() != 8446 && request.getLocalPort() != 8447) {
             return null;
         }
 

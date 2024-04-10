@@ -52,7 +52,6 @@ public class KmlIconStrategyJaxb extends AbstractKmlIconStrategy implements Icon
             }
         }
         if (Strings.isNullOrEmpty(cotElement.detailtext)) {
-            logger.debug("empty detail field");
             return;
         }
 
@@ -71,7 +70,6 @@ public class KmlIconStrategyJaxb extends AbstractKmlIconStrategy implements Icon
 
         try {
             detail = (Detail) jaxbUnmarshaller.unmarshal(doc);
-            logger.debug("detail: " + detail);
         } catch (JAXBException e) {
             logger.error("exception unmarshalling detail xml", e);
         }
@@ -93,7 +91,9 @@ public class KmlIconStrategyJaxb extends AbstractKmlIconStrategy implements Icon
                         cotElement.iconGroup = iconParts.group;
                         cotElement.iconName = iconParts.name;
                     } catch (Throwable t) {
-                        logger.debug("exception parsing iconsetpath: " + iconsetPath, t);
+                        if (logger.isDebugEnabled()) {
+                            logger.debug("exception parsing iconsetpath: " + iconsetPath, t);
+                        }
                     }
                 }
 
@@ -108,10 +108,10 @@ public class KmlIconStrategyJaxb extends AbstractKmlIconStrategy implements Icon
                 }
             }
         } catch (Throwable t) {
-            logger.debug("exception getting iconsetpath and color", t);
+            if (logger.isDebugEnabled()) {
+                logger.debug("exception getting iconsetpath and color", t);
+            }
         }
-
-        logger.debug("iconSetPath: " + iconsetPath + " iconColorString: " + iconColorString);
     }
 
     public static void ParseUserIcon(CotElement cotElement) {
@@ -119,7 +119,9 @@ public class KmlIconStrategyJaxb extends AbstractKmlIconStrategy implements Icon
             Document doc = SecureXmlParser.makeDocument(cotElement.detailtext);
             ParseUserIcon(doc, cotElement);
         } catch (Throwable t) {
-            logger.debug("makeDocument threw exception in ParseUserIcon!", t);
+            if (logger.isDebugEnabled()) {
+                logger.debug("makeDocument threw exception in ParseUserIcon!", t);
+            }
         }
     }
 

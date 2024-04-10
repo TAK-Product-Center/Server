@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -40,6 +39,7 @@ import com.bbn.marti.sync.model.Resource;
 import com.google.common.base.Strings;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -50,12 +50,10 @@ import com.bbn.marti.excheck.checklist.ChecklistColumn;
 import com.bbn.marti.excheck.checklist.ChecklistColumnType;
 import com.bbn.marti.excheck.checklist.ChecklistColumns;
 import com.bbn.marti.excheck.checklist.ChecklistDetails;
-import com.bbn.marti.excheck.checklist.ChecklistStatus;
 import com.bbn.marti.excheck.checklist.ChecklistTask;
 import com.bbn.marti.excheck.checklist.ChecklistTaskStatus;
 import com.bbn.marti.excheck.checklist.ChecklistTasks;
 import com.bbn.marti.excheck.checklist.Missions;
-import com.bbn.marti.excheck.checklist.StatusCount;
 import com.bbn.marti.excheck.checklist.Templates;
 import com.bbn.marti.network.ContactManagerService;
 import com.bbn.marti.remote.exception.ForbiddenException;
@@ -68,7 +66,6 @@ import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.service.MissionTokenUtils;
 import com.bbn.marti.sync.repository.MissionRoleRepository;
-import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
@@ -85,9 +82,6 @@ public class ExCheckService {
     private MissionService missionService;
 
     @Autowired
-    private MissionRepository missionRepository;
-
-    @Autowired
     private ContactManagerService contactManagerService;
 
     @Autowired
@@ -100,6 +94,8 @@ public class ExCheckService {
     private DataSource ds;
 
     private ConcurrentHashMap<Class, JAXBContext> jaxbContextMap = new ConcurrentHashMap<>();
+
+    private static ExCheckService exCheckService;
 
     private JAXBContext getJaxbContext(Class c) {
         try {
@@ -336,10 +332,11 @@ public class ExCheckService {
         return checklist;
     }
 
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public void addNewTemplate(Checklist checklist, String uid, String name, String description,
                                String clientUid, String callsign, String groupVector) {
 
-        Checklist existing = getTemplateFromESync(uid, groupVector);
+        Checklist existing = getExCheckService().getTemplateFromESync(uid, groupVector);
         if (existing != null) {
             throw new UnauthorizedException("attempt to add template that already exists!");
         }
@@ -373,10 +370,13 @@ public class ExCheckService {
         // add the template to the excheck templates mission
         MissionContent content = new MissionContent();
         content.getHashes().add(metadata.getHash());
-        missionService.addMissionContent(EXCHECK_TEMPLATES_MISSION, content, clientUid, groupVector);
+        
+        Mission templatesMission = missionService.getMissionByNameCheckGroups(EXCHECK_TEMPLATES_MISSION, groupVector);
+        
+        missionService.addMissionContent(templatesMission.getGuidAsUUID(), content, clientUid, groupVector);
     }
 
-    @Cacheable(Constants.ALL_MISSION_CACHE)
+    @Cacheable(Constants.EXCHECK_CACHE)
     public Checklist getTemplateFromESync(String uid, String groupVector) {
         try {
             // pull the mission package from enterprise sync so we can update it
@@ -392,7 +392,7 @@ public class ExCheckService {
         return null;
     }
 
-    @Cacheable(Constants.ALL_MISSION_CACHE)
+    @Cacheable(Constants.EXCHECK_CACHE)
     public ChecklistTask getTaskFromESync(String uid, String groupVector) {
         try {
             // pull the mission package from enterprise sync so we can update it
@@ -408,7 +408,7 @@ public class ExCheckService {
         return null;
     }
 
-    @Cacheable(Constants.ALL_MISSION_CACHE)
+    @Cacheable(Constants.EXCHECK_CACHE)
     public ChecklistTask getTaskAtTimeFromESync(String uid, Date date, String groupVector) {
         try {
             // pull the mission package from enterprise sync so we can update it
@@ -424,7 +424,7 @@ public class ExCheckService {
         return null;
     }
 
-    @Cacheable(Constants.ALL_MISSION_CACHE)
+    @Cacheable(Constants.EXCHECK_CACHE)
     public ChecklistTask getTaskFromESyncByHash(String hash, String groupVector) {
         try {
             // pull the mission package from enterprise sync so we can update it
@@ -440,7 +440,7 @@ public class ExCheckService {
         return null;
     }
 
-    public Metadata addToEnterpriseSync(byte[] content, String groupVector, String id, List<String> keywords, Date submissionTime) {
+    private Metadata addToEnterpriseSync(byte[] content, String groupVector, String id, List<String> keywords, Date submissionTime) {
         try {
             //
             // build up the metadata for adding to enterprise sync
@@ -479,15 +479,15 @@ public class ExCheckService {
         }
     }
 
-    public Metadata addToEnterpriseSync(byte[] content, String groupVector, String id, List<String> keywords) {
+    private Metadata addToEnterpriseSync(byte[] content, String groupVector, String id, List<String> keywords) {
         return addToEnterpriseSync(content, groupVector, id, keywords, null);
     }
 
-
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public String startChecklist(String id, String clientUid, String callsign,
                                  String name, String description, String startTime, MissionRole.Role defaultRole, String groupVector) {
 
-        Checklist checklist = getTemplateFromESync(id, groupVector);
+        Checklist checklist = getExCheckService().getTemplateFromESync(id, groupVector);
         if (checklist == null) {
             throw new NotFoundException();
         }
@@ -510,11 +510,12 @@ public class ExCheckService {
             task.setUid(UUID.randomUUID().toString());
         }
 
-        createOrUpdateChecklistMission(checklist, clientUid, defaultRole, groupVector);
+        getExCheckService().createOrUpdateChecklistMission(checklist, clientUid, defaultRole, groupVector);
 
         return toXml(checklist);
     }
 
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public String addEditChecklistTask(
             ChecklistTask task, Checklist checklist, String clientUid, String groupVector) {
 
@@ -530,7 +531,10 @@ public class ExCheckService {
         // add the task doc to the checklist mission
         MissionContent content = new MissionContent();
         content.getHashes().add(hash);
-        missionService.addMissionContentAtTime(checklist.getChecklistDetails().getUid(), content, clientUid, groupVector, now, xml);
+        
+        Mission checklistMission = missionService.getMission(checklist.getChecklistDetails().getUid(), groupVector);
+        
+        missionService.addMissionContentAtTime(checklistMission.getGuidAsUUID(), content, clientUid, groupVector, now, xml);
 
         return hash;
     }
@@ -544,8 +548,7 @@ public class ExCheckService {
         return null;
     }
 
-
-    public void createChecklistMission(Checklist checklist, String clientUid, MissionRole.Role defaultRole, String groupVector) {
+    private void createChecklistMission(Checklist checklist, String clientUid, MissionRole.Role defaultRole, String groupVector) {
         // add the new checklist to esync
         String xml = toXml(checklist);
         String checklistId = checklist.getChecklistDetails().getUid();
@@ -587,20 +590,19 @@ public class ExCheckService {
             content.getHashes().add(hash);
         }
 
-        missionService.addMissionContent(checklistId, content, clientUid, groupVector);
+        missionService.addMissionContent(checklistMission.getGuidAsUUID(), content, clientUid, groupVector);
 
         // whoever starts the checklist gets automatically subscribed
         try {
             MissionRole ownerRole = missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_OWNER);
-            missionService.missionSubscribe(checklistId, clientUid, ownerRole, groupVector);
+            missionService.missionSubscribe(checklistMission.getGuidAsUUID(), clientUid, ownerRole, groupVector);
         } catch (JpaSystemException e) { } // DuplicateKeyException comes through as JpaSystemException due to transaction
 
         // add the checklist mission to the ExCheck mission
-        missionService.setParent(checklistMission.getName(), EXCHECK_TEMPLATES_MISSION, groupVector);
+        missionService.setParent(checklistMission.getGuidAsUUID(), missionService.getMissionByNameCheckGroups(EXCHECK_TEMPLATES_MISSION, groupVector).getGuidAsUUID(), groupVector);
     }
 
-
-    public void updateChecklistMission(Checklist oldChecklist, Checklist newChecklist,
+    private void updateChecklistMission(Checklist oldChecklist, Checklist newChecklist,
                                        String clientUid, String groupVector) {
 
         String checklistUid = oldChecklist.getChecklistDetails().getUid();
@@ -617,7 +619,6 @@ public class ExCheckService {
                 maxTaskNumber = task.getNumber();
             }
         }
-
 
         // add/update each task in the updatedChecklist
         for (ChecklistTask updatedTask : newChecklist.getChecklistTasks().getChecklistTask()) {
@@ -652,7 +653,7 @@ public class ExCheckService {
                 }
             }
 
-            String hash = addEditChecklistTask(updatedTask, oldChecklist, clientUid, groupVector);
+            String hash = getExCheckService().addEditChecklistTask(updatedTask, oldChecklist, clientUid, groupVector);
             notifyMissionReferences(hash, operation, oldChecklist, updatedTask, clientUid, groupVector);
         }
 
@@ -660,13 +661,14 @@ public class ExCheckService {
         for (String taskUid : newTaskUids) {
             ChecklistTask removed = getTask(oldChecklist, taskUid);
             notifyMissionReferences(null, "removed", newChecklist, removed, clientUid, groupVector);
-            deleteChecklistTask(checklistUid, taskUid, clientUid, groupVector);
+            getExCheckService().deleteChecklistTask(checklistUid, taskUid, clientUid, groupVector);
         }
 
         subscriptionManager.announceMissionChange(
-                checklistUid, SubscriptionManagerLite.ChangeType.METADATA, clientUid, EXCHECK_TOOL, null);
+                null, checklistUid, SubscriptionManagerLite.ChangeType.METADATA, clientUid, EXCHECK_TOOL, null);
     }
 
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public void createOrUpdateChecklistMission(Checklist checklist, String clientUid, MissionRole.Role defaultRole, String groupVector) {
         try {
             Checklist existing = getChecklist(checklist.getChecklistDetails().getUid(),
@@ -683,35 +685,22 @@ public class ExCheckService {
         }
     }
 
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public void stopChecklist(String id, String clientUid, String groupVector) {
         missionService.deleteMission(id, clientUid, groupVector, true);
     }
 
-    @Cacheable(Constants.ALL_MISSION_CACHE)
     public String getChecklistXml(String checklistUid, Long secago, String groupVector, boolean onlyDetails) {
         Checklist checklist = getChecklist(checklistUid, secago, groupVector, onlyDetails);
         return toXml(checklist);
     }
 
-    @Cacheable(Constants.ALL_MISSION_CACHE)
-    public String getChecklistXml(Mission checklistMission, Long secago, String groupVector, boolean onlyDetails) {
-        Checklist checklist = getChecklist(checklistMission, secago, groupVector, onlyDetails);
-        return toXml(checklist);
-    }
-
-    @Cacheable(Constants.ALL_MISSION_CACHE)
     public Checklist getChecklist(String checklistUid, Long secago, String groupVector, boolean onlyDetails) {
         Mission checklistMission = missionService.getMissionByNameCheckGroups(checklistUid, groupVector);
-        return getChecklist(checklistMission, secago, groupVector, onlyDetails);
-    }
 
-    @Cacheable(Constants.ALL_MISSION_CACHE)
-    public Checklist getChecklist(Mission checklistMission, Long secago, String groupVector, boolean onlyDetails) {
         if (checklistMission == null) {
             throw new NotFoundException();
         }
-
-        String checklistUid = checklistMission.getName();
 
         Checklist checklist = null;
 
@@ -719,7 +708,7 @@ public class ExCheckService {
         Set<String> taskUids = new HashSet<String>();
 
         Set<Resource> resources = checklistMission.getContents();
-        Map<Integer, List<String>> keywordMap = missionService.hydrate(resources);
+        Map<Integer, List<String>> keywordMap = missionService.cachedMissionHydrate(checklistUid, resources);
         for (Resource resource : resources) {
             List<String> keywords = keywordMap.get(resource.getId());
             resource.setKeywords(keywords);
@@ -728,7 +717,7 @@ public class ExCheckService {
         for (Resource resource : checklistMission.getContents()) {
             if (resource.getKeywords().contains("Template")) {
                 if (checklist == null) {
-                    checklist = getTemplateFromESync(resource.getUid(), groupVector);
+                    checklist = getExCheckService().getTemplateFromESync(resource.getUid(), groupVector);
                 }
             } else if (!onlyDetails) {
                 taskUids.add(resource.getUid());
@@ -748,7 +737,7 @@ public class ExCheckService {
         } else {
             // get the latest version of each task
             for (String taskUid : taskUids) {
-                ChecklistTask task = getTaskFromESync(taskUid, groupVector);
+                ChecklistTask task = getExCheckService().getTaskFromESync(taskUid, groupVector);
                 if (task == null) {
                     logger.error("getTaskFromESync (in getChecklist) returned null for taskUid: " + taskUid);
                     continue;
@@ -767,7 +756,6 @@ public class ExCheckService {
         return checklist;
     }
 
-    @Cacheable(Constants.ALL_MISSION_CACHE)
     public Checklist recreateChecklistAtDate(String checklistUid, Date date, String groupVector) {
 
         Mission checklistMission = missionService.getMissionByNameCheckGroups(checklistUid, groupVector);
@@ -785,7 +773,7 @@ public class ExCheckService {
         for (Resource resource : checklistMission.getContents()) {
             if (resource.getKeywords().contains("Template")) {
                 if (checklist == null) {
-                    checklist = getTemplateFromESync(resource.getUid(), groupVector);
+                    checklist = getExCheckService().getTemplateFromESync(resource.getUid(), groupVector);
                 }
             } else {
                 taskUids.add(resource.getUid());
@@ -801,7 +789,7 @@ public class ExCheckService {
 
         // get the latest version of each task
         for (String taskUid : taskUids) {
-            ChecklistTask task = getTaskAtTimeFromESync(taskUid, date, groupVector);
+            ChecklistTask task = getExCheckService().getTaskAtTimeFromESync(taskUid, date, groupVector);
             if (task == null) {
                 logger.error("getTaskFromESync (in recreateChecklistAtDate) returned null for taskUid: " + taskUid);
                 continue;
@@ -819,7 +807,7 @@ public class ExCheckService {
         return checklist;
     }
 
-    @Cacheable(Constants.ALL_MISSION_CACHE)
+    @Cacheable(Constants.EXCHECK_CACHE)
     public String getActiveChecklistXml(String groupVector) {
 
         try {
@@ -878,6 +866,7 @@ public class ExCheckService {
         }
     }
 
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public void deleteChecklistTask(String checklistUid, String taskUid, String clientUid, String groupVector) {
 
         // get the checklist mission
@@ -897,12 +886,13 @@ public class ExCheckService {
         }
 
         // remove the task file from the mission
-        missionService.deleteMissionContent(checklistUid, taskResource.getHash(), null, clientUid, groupVector);
+        missionService.deleteMissionContent(checklistMission.getGuidAsUUID(), taskResource.getHash(), null, clientUid, groupVector);
 
         // delete the file from esync
         deleteUidFromEnterpriseSync(taskUid, groupVector);
     }
 
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public void deleteTemplate(String templateUid, String clientUid, String groupVector) {
 
         // get the exchecktemplates mission
@@ -922,16 +912,17 @@ public class ExCheckService {
         }
 
         // remove the task file from the mission
-        missionService.deleteMissionContent(EXCHECK_TEMPLATES_MISSION, templateResource.getHash(), null, clientUid, groupVector);
+        missionService.deleteMissionContent(templatesMission.getGuidAsUUID(), templateResource.getHash(), null, clientUid, groupVector);
 
         // delete the file from esync
         deleteUidFromEnterpriseSync(templateUid, groupVector);
     }
 
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public boolean addEditTemplateTask(
             String templateUid, ChecklistTask templateTask, String clientUid, String groupVector) {
         // get the template
-        Checklist template = getTemplateFromESync(templateUid, groupVector);
+        Checklist template = getExCheckService().getTemplateFromESync(templateUid, groupVector);
         if (template == null) {
             throw new NotFoundException("template found found! uid : " + templateUid);
         }
@@ -961,15 +952,16 @@ public class ExCheckService {
         // add the updated template doc to the templates mission
         MissionContent content = new MissionContent();
         content.getHashes().add(metadata.getHash());
-        missionService.addMissionContent(EXCHECK_TEMPLATES_MISSION, content, clientUid, groupVector);
+        missionService.addMissionContent(missionService.getMissionByNameCheckGroups(EXCHECK_TEMPLATES_MISSION, groupVector).getGuidAsUUID(), content, clientUid, groupVector);
 
         return existing;
     }
 
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public void deleteTemplateTask(
             String templateUid, String taskUid, String clientUid, String groupVector) {
         // get the template
-        Checklist template = getTemplateFromESync(templateUid, groupVector);
+        Checklist template = getExCheckService().getTemplateFromESync(templateUid, groupVector);
         if (template == null) {
             throw new NotFoundException("template found found! uid : " + templateUid);
         }
@@ -1000,46 +992,7 @@ public class ExCheckService {
         // add the updated template doc to the templates mission
         MissionContent content = new MissionContent();
         content.getHashes().add(metadata.getHash());
-        missionService.addMissionContent(EXCHECK_TEMPLATES_MISSION, content, clientUid, groupVector);
-    }
-
-    public ChecklistStatus getChecklistStatus(String checklistUid, String groupVector) {
-
-        //
-        // count up each status
-        //
-        Integer count = null;
-        HashMap<String, Integer> counts = new HashMap<String, Integer>();
-        Checklist checklist = getChecklist(checklistUid, -1L, groupVector, false);
-        for (ChecklistTask task : checklist.getChecklistTasks().getChecklistTask()) {
-            if (task.getStatus() == null) {
-                continue;
-            }
-
-            count = counts.get(task.getStatus().value());
-            if (count == null) {
-                count = new Integer(1);
-            } else {
-                count++;
-            }
-            counts.put(task.getStatus().value(), count);
-        }
-
-        //
-        // convert results to ChecklistStatus format
-        //
-        StatusCount statusCount = null;
-        ChecklistStatus status = new ChecklistStatus();
-        status.setChecklistUid(checklistUid);
-        status.setChecklistName(checklist.getChecklistDetails().getName());
-        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-            statusCount = new StatusCount();
-            statusCount.setStatus(ChecklistTaskStatus.fromValue(entry.getKey()));
-            statusCount.setCount(entry.getValue());
-            status.getStatusCount().add(statusCount);
-        }
-
-        return status;
+        missionService.addMissionContent(missionService.getMissionByNameCheckGroups(EXCHECK_TEMPLATES_MISSION, groupVector).getGuidAsUUID(), content, clientUid, groupVector);
     }
 
     public void notifyMissionReferences(
@@ -1075,12 +1028,13 @@ public class ExCheckService {
             for (ExternalMissionData externalMissionData : mission.getExternalData()) {
                 if (externalMissionData.getUrlData().contains(checklist.getChecklistDetails().getUid())) {
                     missionService.notifyExternalMissionDataChanged(
-                            missionName, externalMissionData.getId(), token, notes, clientUid, groupVector);
+                    		missionService.getMissionByNameCheckGroups(missionName, groupVector).getGuidAsUUID(), externalMissionData.getId(), token, notes, clientUid, groupVector);
                 }
             }
         }
     }
 
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public void addMissionReferenceToChecklist(
             String checklistUid, String missionName,
             String clientUid, String baseUrl, String groupVector, String password, HttpServletRequest request)
@@ -1124,7 +1078,7 @@ public class ExCheckService {
             // add the new checklist to the checklist mission
             MissionContent content = new MissionContent();
             content.getHashes().add(metadata.getHash());
-            missionService.addMissionContent(checklistUid, content, clientUid, groupVector);
+            missionService.addMissionContent(missionService.getMissionByNameCheckGroups(checklistUid, groupVector).getGuidAsUUID(), content, clientUid, groupVector);
         }
 
         //
@@ -1144,9 +1098,10 @@ public class ExCheckService {
 
         externalMissionData.setId(checklistUid);
 
-        missionService.setExternalMissionData(missionName, clientUid, externalMissionData, groupVector);
+        missionService.setExternalMissionData(dataSyncMission.getGuidAsUUID(), clientUid, externalMissionData, groupVector);
     }
 
+    @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)
     public void removeMissionReferenceFromChecklist(
             String checklistUid, String missionName, String clientUid, String groupVector) throws RemoteException {
 
@@ -1170,7 +1125,7 @@ public class ExCheckService {
         // add the new checklist to the checklist mission
         MissionContent content = new MissionContent();
         content.getHashes().add(metadata.getHash());
-        missionService.addMissionContent(checklistUid, content, clientUid, groupVector);
+        missionService.addMissionContent(missionService.getMissionByNameCheckGroups(checklistUid, groupVector).getGuidAsUUID(), content, clientUid, groupVector);
 
         // build up the notes
         String callsign = contactManagerService.getCallsignForUid(clientUid, groupVector);
@@ -1182,7 +1137,7 @@ public class ExCheckService {
         for (ExternalMissionData externalMissionData : dataSyncMission.getExternalData()) {
             if (externalMissionData.getUrlData().contains(checklistUid)) {
                 missionService.deleteExternalMissionData(
-                        missionName, externalMissionData.getId(), notes, clientUid, groupVector);
+                		missionService.getMissionByNameCheckGroups(missionName, groupVector).getGuidAsUUID(), externalMissionData.getId(), notes, clientUid, groupVector);
             }
         }
     }
@@ -1237,5 +1192,31 @@ public class ExCheckService {
         }
 
         return sb.toString();
+    }
+
+    private ExCheckService getExCheckService() {
+
+        // return the cached exCheckService if we have one
+        if (exCheckService != null) {
+            return exCheckService;
+        }
+
+        synchronized (this) {
+
+            if (exCheckService == null) {
+
+                try {
+                    // cache off and return the missionService bean
+                    exCheckService = SpringContextBeanForApi.getSpringContext()
+                            .getBean(com.bbn.marti.excheck.ExCheckService.class);
+                } catch (Exception e) {
+                    // if we have any problems getting bean just return this
+                    logger.error("exception trying to get ExCheckService bean!", e);
+                    return this;
+                }
+            }
+        }
+
+        return exCheckService;
     }
 }

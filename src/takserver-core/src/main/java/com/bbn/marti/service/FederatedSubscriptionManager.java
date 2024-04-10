@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -12,9 +13,6 @@ import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
 import com.bbn.marti.config.Federation.Federate;
-import tak.server.federation.FederateSubscription;
-import tak.server.federation.GuardedStreamHolder;
-import tak.server.federation.RemoteContactWithSA;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.remote.ConnectionStatus;
 import com.bbn.marti.remote.RemoteContact;
@@ -23,7 +21,9 @@ import com.bbn.marti.remote.RemoteSubscriptionMetrics;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.User;
 
-import io.grpc.stub.StreamObserver;
+import tak.server.federation.FederateSubscription;
+import tak.server.federation.GuardedStreamHolder;
+import tak.server.federation.RemoteContactWithSA;
 
 public interface FederatedSubscriptionManager {
 		
@@ -89,24 +89,24 @@ public interface FederatedSubscriptionManager {
 	ConcurrentHashMap<String, RemoteContactWithSA> removeRemoteContactsMapByChannelHandler(ChannelHandler channelHandler);
 	ConcurrentHashMap<String, RemoteContactWithSA> getRemoteContactsMapByChannelHandler(ChannelHandler channelHandler);
 	
-	void putUidToMission(String mission, String uid);
-	void removeUidByMission(String mission, String uid);
-	Collection<String> getUidsByMission(String mission);
-	Collection<String> getLocalUidsByMission(String mission);
+	void putUidToMission(UUID missionGuid, String uid);
+	void removeUidByMission(UUID missionGuid, String uid);
+	Collection<String> getUidsByMission(UUID missionGuid);
+	Collection<String> getLocalUidsByMission(UUID missionGuid);
 	
-	void putMissionToUid(String uid, String mission);
-	void removeMissionByUid(String uid, String mission);
-	Collection<String> getMissionsByUid(String uid);
+	void putMissionToUid(String uid, UUID missionGuid);
+	void removeMissionByUid(String uid, UUID missionGuid);
+	Collection<UUID> getMissionsByUid(String uid);
 	
-	void putUidToMissionContents(String mission, String uid);
-	void removeUidByMissionContents(String mission, String uid);
-	Collection<String> getUidsByMissionContents(String mission);
+	void putUidToMissionContents(UUID missionGuid, String uid);
+	void removeUidByMissionContents(UUID missionGuid, String uid);
+	Collection<String> getUidsByMissionContents(UUID missionGuid);
 	
-	void putMissionToContentsUid(String uid, String mission);
-	void removeMissionByContentsUid(String uid, String mission);
-	Collection<String> getMissionsByContentsUid(String uid);
+	void putMissionToContentsUid(String uid, UUID missionGuid);
+	void removeMissionByContentsUid(String uid, UUID missionGuid);
+	Collection<UUID> getMissionsByContentsUid(String uid);
 	
-	void removeMission(String missionName, Set<String> uids);
+	void removeMission(UUID missionGuid, Set<String> uids);
 	
 	Collection<FederateSubscription> getFederateSubscriptions();
 	List<ConnectionStatus> getActiveConnectionInfo();
@@ -118,4 +118,5 @@ public interface FederatedSubscriptionManager {
 	AtomicBoolean removeOutgoingRetryScheduled(String name);
 	
 	void clearFederationCaches();
+
 }

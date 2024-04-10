@@ -64,7 +64,7 @@ import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cache.CoTCacheHelper;
-import tak.server.cache.MissionCacheResolver;
+import tak.server.cache.resolvers.MissionCacheResolver;
 import tak.server.cot.CotElement;
 import tak.server.cot.CotEventContainer;
 import tak.server.ignite.IgniteHolder;
@@ -167,7 +167,9 @@ public class RepositoryService extends BaseService {
 
 			CotEventContainer element = inputQueue.take(); // block for first message in batch
 
-			if (element.getType().startsWith("b-t-f")) {
+			if (element.getType().startsWith("b-t-f") &&
+					element.getDocument().selectNodes(
+							"/event/detail/marti/dest[@mission]").size() == 0) {
 				chat_batch.add(element);
 			} else {
 				batch.add(element);
@@ -179,7 +181,9 @@ public class RepositoryService extends BaseService {
 				element = inputQueue.poll();
 
 				if (element != null) {
-					if (element.getType().startsWith("b-t-f")) {
+					if (element.getType().startsWith("b-t-f") &&
+							element.getDocument().selectNodes(
+									"/event/detail/marti/dest[@mission]").size() == 0) {
 						chat_batch.add(element);
 					} else {
 						batch.add(element);
@@ -908,15 +912,15 @@ public class RepositoryService extends BaseService {
 	// seed data structures with {missionName, contentUid} pairs from db at startup
 	public void initializeMissionData() {
 
-		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement("select m.name missionName, mu.uid contentUid "
+		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement("select m.guid missionGuid, mu.uid contentUid "
 				+ "from mission_uid mu "
 				+ "inner join mission m on m.id = mu.mission_id"); ResultSet rs = ps.executeQuery();) {
 
 			while (rs.next()) {
-				String missionName = rs.getString(1);
+				String missionGuid = rs.getString(1);
 				String contentUid = rs.getString(2);
 
-				subscriptionManager.putMissionContentUid(missionName, contentUid);
+				subscriptionManager.putMissionContentUid(UUID.fromString(missionGuid), contentUid);
 			}
 
 		} catch (Exception e) {

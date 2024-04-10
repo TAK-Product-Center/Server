@@ -2,15 +2,18 @@ package tak.server.federation.hub.ui;
 
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.micrometer.core.instrument.Metrics;
 import org.springframework.beans.factory.DisposableBean;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tag;
+import tak.server.federation.hub.FederationHubResources;
 import tak.server.federation.hub.broker.FederationHubBroker;
 import tak.server.federation.hub.broker.FederationHubBrokerMetrics;
 import tak.server.federation.hub.broker.FederationHubBrokerMetrics.ChannelInfo;
@@ -18,8 +21,6 @@ import tak.server.federation.hub.broker.FederationHubBrokerMetrics.ChannelInfo;
 public class FederationHubBrokerMetricsPoller implements DisposableBean {
 
     private static final Logger logger = LoggerFactory.getLogger(FederationHubBrokerMetricsPoller.class);
-
-	private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     private FederationHubBroker fedHubBroker;
 
@@ -31,7 +32,7 @@ public class FederationHubBrokerMetricsPoller implements DisposableBean {
 
         // scheduleAtFixedRate will run every x seconds no matter what
         // scheduleWithFixedDelay will run every x seconds starting AFTER the logic has completed
-        scheduleFuture = scheduler.scheduleWithFixedDelay(() -> {
+        scheduleFuture = FederationHubResources.metricsScheduler.scheduleWithFixedDelay(() -> {
 
             FederationHubBrokerMetrics latestBrokerMetrics = fedHubBroker.getFederationHubBrokerMetrics();
 

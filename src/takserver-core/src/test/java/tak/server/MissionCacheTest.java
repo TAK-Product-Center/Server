@@ -1,10 +1,10 @@
 package tak.server;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Collection;
+import java.util.UUID;
 
 import org.apache.ignite.Ignite;
 import org.junit.Test;
@@ -18,9 +18,14 @@ import com.bbn.marti.service.SubscriptionStore;
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = {TakServerTestApplicationConfig.class})
 public class MissionCacheTest {
-	private static final String MISSION1 = "mission1";
-	private static final String MISSION2 = "mission2";
-	private static final String MISSION3 = "mission3";
+//	private static final String MISSION1 = "mission1";
+//	private static final String MISSION2 = "mission2";
+//	private static final String MISSION3 = "mission3";
+	
+	// replacing these names with random UUIDs - TODO: check if failures
+	private static final UUID MISSION1 = UUID.randomUUID();
+	private static final UUID MISSION2 = UUID.randomUUID();
+	private static final UUID MISSION3 = UUID.randomUUID();
 
 	private static final String UID1 = "uid1";
 	private static final String UID2 = "uid2";
@@ -60,9 +65,8 @@ public class MissionCacheTest {
 		subscriptionStore.putMissionToUid(UID1, MISSION1);
 		subscriptionStore.putMissionToUid(UID1, MISSION1);
 		subscriptionStore.putMissionToUid(UID1, MISSION2);
-
 		
-		Collection<String> missions = subscriptionStore.getMissionsByUid(UID1);
+		Collection<UUID> missions = subscriptionStore.getMissionsByUid(UID1);
 		
 		assertEquals(2, missions.size());
 		assertTrue(missions.contains(MISSION1));
@@ -108,7 +112,7 @@ public class MissionCacheTest {
 		subscriptionStore.putMissionToContentsUid(UID1, MISSION2);
 
 		
-		Collection<String> missions = subscriptionStore.getMissionsByContentsUid(UID1);
+		Collection<UUID> missions = subscriptionStore.getMissionsByContentsUid(UID1);
 		
 		assertEquals(2, missions.size());
 		assertTrue(missions.contains(MISSION1));
