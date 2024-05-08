@@ -20,4 +20,6 @@ message MissionAnnouncement {
     
     repeated string uids = 7;
 
+    string missionGuid = 8;
+
 }

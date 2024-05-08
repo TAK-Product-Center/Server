@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -43,8 +44,8 @@ import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.FederateUser;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.ConcurrentMultiHashMap;
-import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
+import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.google.common.collect.Multimap;
 
 import tak.server.Constants;
@@ -89,16 +90,16 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	private final Map<ConnectionInfo, Subscription> connectionSubMap = new ConcurrentHashMap<>();
 	private final Map<User, Subscription> userSubscriptionMap = new ConcurrentHashMap<>();
 	private final Map<String, RemoteSubscriptionMetrics> clientUidToSubMapMetrics = new ConcurrentHashMap<String, RemoteSubscriptionMetrics>();
-	private final Map<String,Subscription> clientUidToSubMap = new ConcurrentHashMap<String, Subscription>();  
+	private final Map<String, Subscription> clientUidToSubMap = new ConcurrentHashMap<String, Subscription>();  
 	private final Map<String, AtomicBoolean> retryScheduledMap = new ConcurrentHashMap<>();
 	
 	// track mission subscriptions
-    private final Multimap<String, String> missionUidMap = new ConcurrentMultiHashMap<String, String>();
-    private final Multimap<String, String> uidMissionMap = new ConcurrentMultiHashMap<String, String>();
-
+    private final Multimap<UUID, String> missionUidMap = new ConcurrentMultiHashMap<>();
+    private final Multimap<String, UUID> uidMissionMap = new ConcurrentMultiHashMap<>();
+    
     // track uid contents of missions
-    private final Multimap<String, String> uidMissionContentsMap = new ConcurrentMultiHashMap<String, String>();
-    private final Multimap<String, String> missionContentsUidMap = new ConcurrentMultiHashMap<String, String>();
+    private final Multimap<String, UUID> uidMissionContentsMap = new ConcurrentMultiHashMap<String, UUID>();
+    private final Multimap<UUID, String> missionContentsUidMap = new ConcurrentMultiHashMap<UUID, String>();
 
     
     public static synchronized SubscriptionStore getInstance() {
@@ -119,9 +120,7 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
     
     @EventListener({ContextRefreshedEvent.class})
 	private void init() {
-		if (logger.isDebugEnabled()) {
-			logger.debug("init SubscriptionStore. ignite instance: " + ignite);
-		}
+    	logger.debug("init SubscriptionStore. ignite instance {}", ignite);
     }
     
     protected IgniteCache<String, FederationSubscriptionCacheDAO> getFederationSubscriptionCache() {
@@ -636,40 +635,20 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	}
 
 	@Override
-	public void putUidToMission(String mission, String uid) {
-		missionUidMap.put(mission, uid);
+	public void removeUidByMission(UUID missionGuid, String uid) {
+		missionUidMap.remove(missionGuid, uid);
 	}
 
 	@Override
-	public void removeUidByMission(String mission, String uid) {
-		missionUidMap.remove(mission, uid);
-	}
-
-	@Override
-	public Collection<String> getUidsByMission(String mission) {
+	public Collection<String> getUidsByMission(UUID mission) {
 		return getLocalUidsByMission(mission);
 	}
 	
 	@Override
-	public Collection<String> getLocalUidsByMission(String mission) {
-		return missionUidMap.get(mission);
+	public void removeMissionByUid(String uid, UUID missionGuid) {
+		uidMissionMap.remove(uid, missionGuid);
 	}
-
-	@Override
-	public void putMissionToUid(String uid, String mission) {
-		uidMissionMap.put(uid, mission);
-	}
-
-	@Override
-	public void removeMissionByUid(String uid, String mission) {
-		uidMissionMap.remove(uid, mission);
-	}
-
-	@Override
-	public Collection<String> getMissionsByUid(String uid) {
-		return uidMissionMap.get(uid);
-	}
-
+	
 	private Map<String, Set<String>> federateRemoteGroups = new ConcurrentHashMap<>();
 
 	public Map<String, Set<String>> getFederateRemoteGroups() {
@@ -677,40 +656,40 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	}
 
 	@Override
-	public void putUidToMissionContents(String mission, String uid) {
-		missionContentsUidMap.put(mission, uid);
+	public void putUidToMissionContents(UUID missionGuid, String uid) {
+		missionContentsUidMap.put(missionGuid, uid);
 	}
 
 	@Override
-	public void removeUidByMissionContents(String mission, String uid) {
-		missionContentsUidMap.remove(mission, uid);
+	public void removeUidByMissionContents(UUID missionGuid, String uid) {
+		missionContentsUidMap.remove(missionGuid, uid);
 	}
 
 	@Override
-	public Collection<String> getUidsByMissionContents(String mission) {
-		return missionContentsUidMap.get(mission);
+	public Collection<String> getUidsByMissionContents(UUID missionGuid) {
+		return missionContentsUidMap.get(missionGuid);
 	}
 
 	@Override
-	public void putMissionToContentsUid(String uid, String mission) {
-		uidMissionContentsMap.put(uid, mission);
+	public void putMissionToContentsUid(String uid, UUID missionGuid) {
+		uidMissionContentsMap.put(uid, missionGuid);
 	}
 
 	@Override
-	public void removeMissionByContentsUid(String uid, String mission) {
-		uidMissionContentsMap.remove(uid, mission);
+	public void removeMissionByContentsUid(String uid, UUID missionGuid) {
+		uidMissionContentsMap.remove(uid, missionGuid);
 	}
 
 	@Override
-	public Collection<String> getMissionsByContentsUid(String uid) {
+	public Collection<UUID> getMissionsByContentsUid(String uid) {
 		return uidMissionContentsMap.get(uid);
 	}
 	
 	@Override
-	public void removeMission(String missionName, Set<String> uids) {
+	public void removeMission(UUID missionGuid, Set<String> uids) {
 		for (String contentUid : uids) {
-			removeMissionByContentsUid(contentUid, missionName);
-			removeUidByMissionContents(missionName, contentUid);
+			removeMissionByContentsUid(contentUid, missionGuid);
+			removeUidByMissionContents(missionGuid, contentUid);
 		}
 	}
 	
@@ -719,4 +698,25 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 		getFederationSubscriptionCache().clear();
 		getFederationOutgoingConnectionStatusCache().clear();
 	}
+
+	@Override
+	public void putUidToMission(UUID mission, String uid) {
+		missionUidMap.put(mission, uid);
+	}
+
+	@Override
+	public Collection<String> getLocalUidsByMission(UUID mission) {
+		return missionUidMap.get(mission);
+	}
+
+	@Override
+	public void putMissionToUid(String uid, UUID mission) {
+		uidMissionMap.put(uid, mission);
+	}
+
+	@Override
+	public Collection<UUID> getMissionsByUid(String uid) {
+		return uidMissionMap.get(uid);
+	}
+
 }

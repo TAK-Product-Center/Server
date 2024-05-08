@@ -1,29 +1,20 @@
-package tak.server.cache;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.interceptor.CacheEvictOperation;
-import org.springframework.cache.interceptor.CacheOperation;
-import org.springframework.cache.interceptor.CacheOperationInvocationContext;
-import org.springframework.cache.interceptor.CacheResolver;
-import tak.server.Constants;
+package tak.server.cache.resolvers;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public class MissionLayerCacheResolver implements CacheResolver {
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.Cache;
+import org.springframework.cache.interceptor.CacheOperationInvocationContext;
+
+public class MissionLayerCacheResolver extends TakCacheManagerResolver {
 
     public static final String MISSION_LAYER_CACHE_RESOLVER = "missionLayerCacheResolver";
     private static final Logger logger = LoggerFactory.getLogger(MissionLayerCacheResolver.class);
 
     public static final String SUFFIX = "-layers";
-
-    @Autowired
-    private CacheManager cacheManager;
 
     public MissionLayerCacheResolver() { }
 
@@ -32,7 +23,7 @@ public class MissionLayerCacheResolver implements CacheResolver {
         try {
             String cacheName = (String) context.getArgs()[0] + SUFFIX;
             List<Cache> caches = new CopyOnWriteArrayList<>();
-            caches.add(cacheManager.getCache(cacheName));
+            caches.add(getCacheManager().getCache(cacheName));
 
             return caches;
         } catch (Exception e) {

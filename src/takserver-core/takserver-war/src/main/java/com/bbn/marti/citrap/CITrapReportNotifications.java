@@ -13,6 +13,8 @@ import com.bbn.marti.remote.SubmissionInterface;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.util.DateUtil;
+import com.bbn.marti.sync.model.Mission;
+import com.bbn.marti.sync.service.MissionService;
 
 public class CITrapReportNotifications {
 
@@ -23,6 +25,9 @@ public class CITrapReportNotifications {
 
     @Autowired
     private SubmissionInterface submission;
+    
+    @Autowired
+    private MissionService missionService;
 
     private static String getReportNotificationCot(String senderUid, String senderCallsign, String destUid, double lon, double lat, String reportSummary, String cotType) {
         String time = DateUtil.toCotTime(System.currentTimeMillis());
@@ -56,6 +61,8 @@ public class CITrapReportNotifications {
         return summary;
     }
 
+    // Refers to mission by name (instead of guid.) This code could be updated to support guid, but is probably not needed,
+    // because the there is single named mission for each report, with the mission name == the report id.
     public void notifyNonMissionSubscribersWithinRange(
             String groupVector, ReportType report, String missionName, double lon, double lat,
             SubscriptionManagerLite subscriptionManager,
@@ -69,9 +76,11 @@ public class CITrapReportNotifications {
         // get everyone in range of the report
         List<String> inRange = persistenceStore.getUidsInRangeFromPoint(
                 nonsubscriberCotFilter, groupVector, searchSecago, lon, lat, searchRadius);
+        
+        Mission reportMission = missionService.getMission(report.getId(), groupVector);
 
         // get everyone subscribed to the top level mission
-        List<String> missionSubscribers = subscriptionManager.getMissionSubscriptions(missionName, true);
+        List<String> missionSubscribers = subscriptionManager.getMissionSubscriptions(reportMission.getGuidAsUUID(), true);
 
         String senderUid = UUID.randomUUID().toString();
         // iterate over users in range who are not subscribed to the top level mission

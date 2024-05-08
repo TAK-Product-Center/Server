@@ -62,6 +62,7 @@ message GeoEvent {
 	repeated string ptpUids  = 23;
 	repeated string ptpCallsigns = 24;
 	string feedUid = 25;
+	repeated string missionNames = 26;
 }
 
 message BinaryBlob {

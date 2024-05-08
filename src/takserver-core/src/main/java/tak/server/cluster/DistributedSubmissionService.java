@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.UUID;
 
 import org.dom4j.Document;
 import org.dom4j.DocumentHelper;
@@ -42,10 +43,6 @@ public class DistributedSubmissionService implements SubmissionInterface {
 	@Override
 	public boolean submitCot(String cotMessage, NavigableSet<Group> groups) {
 		
-		if (logger.isTraceEnabled()) {
-			logger.trace("submitCot string, groups");
-		}
-		
         return submitCot(cotMessage, groups, true);
 	}
 
@@ -63,23 +60,11 @@ public class DistributedSubmissionService implements SubmissionInterface {
 	@Override
 	public boolean submitCot(String cotMessage, NavigableSet<Group> groups, boolean federate, User user) {
 		
-		if (logger.isTraceEnabled()) {
-			logger.trace("submitCot string, groups, federate, user");
-		}
-		
 		requireNonNull(groups, "submitCot groups");
 
         try {
-
-        	if (logger.isTraceEnabled()) {
-    			logger.trace("start parse XML");
-    		}
         	
             CotEventContainer cot = new CotEventContainer(getCotParser().parse(cotMessage));
-
-            if (logger.isTraceEnabled()) {
-    			logger.trace("finish parse XML");
-    		}
 
             // only set groups, not the user
             cot.setContext(Constants.GROUPS_KEY, groups);
@@ -109,15 +94,11 @@ public class DistributedSubmissionService implements SubmissionInterface {
 	}
 
 	@Override
-	public boolean submitMissionPackageCotAtTime(String cotMessage, String missionName, Date timestamp, NavigableSet<Group> groups, String clientUid) {
+    public boolean submitMissionPackageCotAtTime(String cotMessage, UUID missionGuid, Date timestamp, NavigableSet<Group> groups, String clientUid) {
 		requireNonNull(groups, "submitMissionCotAtTime groups");
 
 		try {
             CotEventContainer cot = new CotEventContainer(getCotParser().parse(cotMessage));
-
-			if (logger.isTraceEnabled()) {
-				logger.trace("CoT message submitted: " + cot + " for groups: " + groups);
-			}
 
 			cot.setContext(Constants.GROUPS_KEY, groups);
 
@@ -126,15 +107,22 @@ public class DistributedSubmissionService implements SubmissionInterface {
 			}
 
 			cot.setContext(Constants.OFFLINE_CHANGE_TIME_KEY, timestamp);
-
-			// if the incoming message didnt already include the dest detail, go ahead and add it
-			if (cot.getDocument().selectNodes("/event/detail/marti/dest[@mission]").size() == 0) {
-				String dest = "<dest mission=\"" + missionName + "\"/>";
-				SAXReader reader = new SAXReader();
-				Document doc = reader.read(new ByteArrayInputStream(dest.getBytes(StandardCharsets.UTF_8)));
-				Element missionDestElem = DocumentHelper.makeElement(cot.getDocument(), "/event/detail/marti/");
-				missionDestElem.add(doc.getRootElement());
+			
+			// If the incoming message has any mission dests, remove them and 
+			List<Node> missionDestNodes = cot.getDocument().selectNodes("/event/detail/marti/dest[@mission]");
+			
+			if (!missionDestNodes.isEmpty()) {
+				for (Node node : missionDestNodes) {
+					node.detach();
+				}
 			}
+			
+			// insert mission-guid dest that is more specific, instead
+			String dest = "<dest mission-guid=\"" + missionGuid.toString() + "\"/>";
+			SAXReader reader = new SAXReader();
+			Document doc = reader.read(new ByteArrayInputStream(dest.getBytes(StandardCharsets.UTF_8)));
+			Element missionDestElem = DocumentHelper.makeElement(cot.getDocument(), "/event/detail/marti/");
+			missionDestElem.add(doc.getRootElement());
 
 			Node flowTags = cot.getDocument().selectSingleNode("/event/detail/_flow-tags_");
 			if (flowTags != null) {

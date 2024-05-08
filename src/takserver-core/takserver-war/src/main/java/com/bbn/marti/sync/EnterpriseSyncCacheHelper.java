@@ -124,7 +124,7 @@ public class EnterpriseSyncCacheHelper {
 			// query for the file
 			file = getFileFromDB(hash);
 
-			if (file != null) {
+			if (file != null && file.getContents() != null) {
 
 				if (isCacheSpring()) {
 					// cache the file
@@ -180,7 +180,7 @@ public class EnterpriseSyncCacheHelper {
 		FileWrapper fileWrapper = null;
 
 		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement(
-				"SELECT data, groups FROM resource r WHERE hash = ? ORDER BY submissionTime;", connection)) {
+				"SELECT data, groups FROM resource r WHERE hash = ? ORDER BY submissionTime limit 1;", connection)) {
 
 			query.setString(1, hash.toLowerCase());
 			logger.debug("getFileFromDB Executing SQL: {}",  query.toString());

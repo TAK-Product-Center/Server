@@ -141,7 +141,13 @@ public class SubscriptionApi extends BaseRestController {
         if (logger.isDebugEnabled()) {
         	logger.debug("subscriptions: " + subscriptions);
         }
-        
+
+        Collection<Group> allOutGroups = groupManager.getAllGroups();
+        Collection<Group> allInGroups = allOutGroups.stream()
+                .map(group -> group.getCopy())
+                .peek(group -> group.setDirection(Direction.IN))
+                .collect(Collectors.toSet());
+
         for (RemoteSubscription subscription : subscriptions) {
             
             SubscriptionInfo si = new SubscriptionInfo(subscription);
@@ -157,13 +163,7 @@ public class SubscriptionApi extends BaseRestController {
             		outVector = groupManager.getCachedOutboundGroupVectorByConnectionId(subscription.getConnectionId()); 
             		inVector = groupManager.getCachedInboundGroupVectorByConnectionId(subscription.getConnectionId()); 
             	}  
-            	
-            	Collection<Group> allOutGroups = groupManager.getAllGroups();
-            	Collection<Group> allInGroups = allOutGroups.stream()
-            			.map(group -> group.getCopy())
-            			.peek(group -> group.setDirection(Direction.IN))
-            			.collect(Collectors.toSet());
-            			
+
                 NavigableSet<Group> outGroupsForSub = RemoteUtil.getInstance().getGroupsForBitVectorString(outVector, allOutGroups);
                 NavigableSet<Group> inGroupsForSub = RemoteUtil.getInstance().getGroupsForBitVectorString(inVector, allInGroups);
                 

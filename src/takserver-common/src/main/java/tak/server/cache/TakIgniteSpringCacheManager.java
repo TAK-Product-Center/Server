@@ -11,6 +11,7 @@ import javax.cache.expiry.TouchedExpiryPolicy;
 
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
+import org.apache.ignite.IgniteLock;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.eviction.fifo.FifoEvictionPolicyFactory;
@@ -157,7 +158,12 @@ public class TakIgniteSpringCacheManager extends SpringCacheManager {
 		}
 
 		return cache;
-	}	
+	}
+
+	@Override public IgniteLock getSyncLock(String cache, Object key) {
+		return super.getSyncLock(cache, key);
+	}
+
 }
 
 class SpringCache implements Cache {
@@ -165,15 +171,18 @@ class SpringCache implements Cache {
 
 	private final IgniteCache<Object, Object> cache;
 
+	private final TakIgniteSpringCacheManager mgr;
+
+
 	/**
 	 * @param cache Cache.
 	 * @param mgr Manager
 	 */
-	SpringCache(IgniteCache<Object, Object> cache, SpringCacheManager mgr) {
+	SpringCache(IgniteCache<Object, Object> cache, TakIgniteSpringCacheManager mgr) {
 		assert cache != null;
 
 		this.cache = cache;
-		//            this.mgr = mgr;
+		this.mgr = mgr;
 	}
 
 	/** {@inheritDoc} */
@@ -214,10 +223,8 @@ class SpringCache implements Cache {
 		Object val = cache.get(key);
 
 		if (val == null) {
-			// original implementation had locks here. 
-			//                IgniteLock lock = mgr.getSyncLock(cache.getName(), key);
-			//
-			//                lock.lock();
+			IgniteLock lock = mgr.getSyncLock(cache.getName(), key);
+			lock.lock();
 
 			try {
 				val = cache.get(key);
@@ -236,7 +243,7 @@ class SpringCache implements Cache {
 				}
 			}
 			finally {
-				//                    lock.unlock();
+				lock.unlock();
 			}
 		}
 

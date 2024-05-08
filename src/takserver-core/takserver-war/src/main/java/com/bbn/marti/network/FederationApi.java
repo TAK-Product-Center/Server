@@ -193,7 +193,7 @@ public class FederationApi extends BaseRestController {
 			activeConnections = federationInterface.getActiveConnectionInfo();
 
 			for (ConnectionStatus cs : activeConnections) {
-				ConnectionInfoSummary csi = new ConnectionInfoSummary(cs.getFederate(), cs, cs.getConnectionStatusValue());
+				ConnectionInfoSummary csi = new ConnectionInfoSummary(federationInterface.getFederate(cs.getFederate().getId()), cs, cs.getConnectionStatusValue());
 				
 				csi.setGroups(cs.getGroups());
 				

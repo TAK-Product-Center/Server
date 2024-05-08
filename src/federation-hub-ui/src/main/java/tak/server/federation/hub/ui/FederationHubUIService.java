@@ -26,6 +26,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -459,6 +460,31 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
     	} catch (Exception e) {
     		logger.error("error with deleteGroupCa", e);
     		return new ResponseEntity<>(new HttpHeaders(), HttpStatus.BAD_REQUEST);
+		}
+    }
+    
+    @RequestMapping(value = "/fig/disconnectFederate/{connectionId}", method = RequestMethod.DELETE)
+    public ResponseEntity<Void> disconnectFederate(@PathVariable("connectionId") String connectionId) {
+    	try {
+        	fedHubBroker.disconnectFederate(connectionId);
+    		return new ResponseEntity<>(new HttpHeaders(), HttpStatus.OK);
+    	} catch (Exception e) {
+    		logger.error("error with deleteGroupCa", e);
+    		return new ResponseEntity<>(new HttpHeaders(), HttpStatus.BAD_REQUEST);
+		}
+    }
+    
+    @RequestMapping(value="/fig/getSelfCaFile", method=RequestMethod.GET)
+    public ResponseEntity<byte[]> getSelfCaFile() {
+    	try {
+    		byte[] contents = fedHubBroker.getSelfCaFile();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            return new ResponseEntity<byte[]>(contents, headers, HttpStatus.OK);
+    	} catch (Exception e) {
+    		logger.error("error with getSelfCaFile", e);
+    		 return new ResponseEntity<byte[]>(new HttpHeaders(), HttpStatus.BAD_REQUEST);
 		}
     }
 

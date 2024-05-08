@@ -60,12 +60,12 @@ fi
 
 # set API max if not set already
 if [ -z "$API_MAX_HEAP" ]; then
-  export API_MAX_HEAP=$(($TOTALRAMBYTES / 2700))
+  export API_MAX_HEAP=$(($TOTALRAMBYTES / 6300))
 fi
 
 # set messaging max if not set already
 if [ -z "$MESSAGING_MAX_HEAP" ]; then
-  export MESSAGING_MAX_HEAP=$(($TOTALRAMBYTES / 4750))
+  export MESSAGING_MAX_HEAP=$(($TOTALRAMBYTES / 6300))
 fi
 
 # set plugin manager max if not set already

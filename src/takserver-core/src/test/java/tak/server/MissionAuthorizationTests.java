@@ -1,30 +1,33 @@
 package tak.server;
 
-import io.jsonwebtoken.Claims;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.oxm.XmlMappingException;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import static org.junit.Assert.assertEquals;
 
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.UUID;
 
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.oxm.XmlMappingException;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
 import com.bbn.marti.jwt.JwtUtils;
 import com.bbn.marti.sync.model.MissionPermission;
 import com.bbn.marti.sync.model.MissionRole;
 import com.bbn.marti.sync.service.MissionTokenUtils;
 
+import io.jsonwebtoken.Claims;
+
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = {TakServerTestApplicationConfig.class})
 public class MissionAuthorizationTests {
-
-    private static final Logger logger = LoggerFactory.getLogger(MissionAuthorizationTests.class);
+    
+    // Using random mission GUID
+    private static final UUID missionGuid = UUID.randomUUID();
+    
+    private static final String missionName = "testMission";
 
     @Test
     public void testMissionToken() throws XmlMappingException, NoSuchAlgorithmException, InvalidKeySpecException {
@@ -36,7 +39,7 @@ public class MissionAuthorizationTests {
         String token = MissionTokenUtils
                 .getInstance(JwtUtils.getInstance().getPrivateKey())
                 .createMissionToken(
-                        tokenId, "testMission", MissionTokenUtils.TokenType.SUBSCRIPTION,-1, "MissionAuthorizationTests");
+                        tokenId, missionName, MissionTokenUtils.TokenType.SUBSCRIPTION,-1, "MissionAuthorizationTests", missionGuid);
 
         Claims claims = MissionTokenUtils
                 .getInstance(JwtUtils.getInstance().getPrivateKey())
@@ -59,3 +62,4 @@ public class MissionAuthorizationTests {
         assertEquals(readOnlySubscriber.hasPermission(MissionPermission.Permission.MISSION_WRITE), false);
     }
 }
+

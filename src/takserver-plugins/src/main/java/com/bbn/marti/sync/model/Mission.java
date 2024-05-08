@@ -7,7 +7,21 @@ import java.util.Date;
 import java.util.List;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
+
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.bbn.marti.maplayer.model.MapLayer;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Strings;
+import com.google.common.collect.ComparisonChain;
 
 import jakarta.persistence.Cacheable;
 import jakarta.persistence.CascadeType;
@@ -26,21 +40,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
-
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Strings;
-import com.google.common.collect.ComparisonChain;
-
-import com.bbn.marti.maplayer.model.MapLayer;
-
 import tak.server.Constants;
 
 /*
@@ -480,7 +479,9 @@ public class Mission implements Serializable, Comparable<Mission> {
     public String toString() {
         StringBuilder builder = new StringBuilder();
         builder.append("Mission [name=");
-        builder.append(name);     
+        builder.append(name); 
+        builder.append(", guid=");
+        builder.append(guid);
         builder.append(", contents=");
         builder.append(contents);
         builder.append(", uids=");
@@ -499,7 +500,7 @@ public class Mission implements Serializable, Comparable<Mission> {
         builder.append(tool);
         builder.append(", expiration=");
         builder.append(expiration);
-        builder.append(", uidAdds= " + getUidAdds() + " resourceAdds= " + getResourceAdds());
+        builder.append(", uidis= " + getUidAdds() + " resourceAdds= " + getResourceAdds());
         builder.append("]");
 
         
@@ -583,5 +584,26 @@ public class Mission implements Serializable, Comparable<Mission> {
         getExternalData().clear();
         getMapLayers().clear();
         getFeeds().clear();
+    }
+    
+    @JsonIgnore
+    @Transient
+    public UUID getGuidAsUUID() {
+
+    	UUID guidUuid = null;
+
+    	if (getGuid() == null) {
+    		throw new IllegalArgumentException("null guid in mission " + getName());
+    	}
+
+    	try {
+
+    		guidUuid = UUID.fromString(getGuid());
+
+    	} catch (IllegalArgumentException e) {
+    		throw new IllegalArgumentException("invalid guid in mission " + getName() + " " + getGuid(), e);
+    	}
+
+    	return guidUuid;
     }
 }

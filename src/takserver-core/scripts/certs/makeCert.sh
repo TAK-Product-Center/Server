@@ -97,7 +97,7 @@ if [[ "$1" == "ca" ]]; then
 else
   openssl req -new -newkey rsa:2048 -sha256 -keyout "${SNAME}".key -passout pass:${PASS} -out "${SNAME}".csr -subj "$SUBJ" 
 fi
-openssl x509 -sha256 -req -days 730 -in "${SNAME}".csr -CA ca.pem -CAkey ca-do-not-share.key -out "${SNAME}".pem -set_serial ${RANDOM} -passin pass:${CAPASS} -extensions $EXT -extfile $CONFIG
+openssl x509 -sha256 -req -days 730 -in "${SNAME}".csr -CA ca.pem -CAkey ca-do-not-share.key -out "${SNAME}".pem -set_serial 0x$(openssl rand -hex 8) -passin pass:${CAPASS} -extensions $EXT -extfile $CONFIG
 
 if [[ "$1" == "ca" ]]; then
   openssl x509 -in "${SNAME}".pem  -addtrust clientAuth -addtrust serverAuth -setalias "${SNAME}" -out "${SNAME}"-trusted.pem

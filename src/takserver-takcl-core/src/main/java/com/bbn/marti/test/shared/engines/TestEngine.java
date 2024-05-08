@@ -3,6 +3,7 @@ package com.bbn.marti.test.shared.engines;
 import com.bbn.marti.takcl.TestExceptions;
 import com.bbn.marti.takcl.TestLogger;
 import com.bbn.marti.takcl.connectivity.missions.MissionModels;
+import com.bbn.marti.takcl.connectivity.server.ServerProcessConfiguration;
 import com.bbn.marti.test.shared.data.GroupProfiles;
 import com.bbn.marti.test.shared.data.GroupSetProfiles;
 import com.bbn.marti.test.shared.data.connections.AbstractConnection;
@@ -384,11 +385,11 @@ public class TestEngine implements EngineInterface, Callable<String> {
 	}
 
 	@Override
-	public void startServerWithStartupValidation(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier, boolean enablePluginManager, boolean enableRetentionService) {
+	public void startServerWithStartupValidation(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier) {
 		TestLogger.executeEngineCommand("startServerWithStartupValidation");
-		actionEngine.startServerWithStartupValidation(server, sessionIdentifier, enablePluginManager, enableRetentionService);
-		verificationEngine.startServerWithStartupValidation(server, sessionIdentifier, enablePluginManager, enableRetentionService);
-		stateEngine.startServerWithStartupValidation(server, sessionIdentifier, enablePluginManager, enableRetentionService);
+		actionEngine.startServerWithStartupValidation(server, sessionIdentifier);
+		verificationEngine.startServerWithStartupValidation(server, sessionIdentifier);
+		stateEngine.startServerWithStartupValidation(server, sessionIdentifier);
 	}
 
 	@Override
@@ -541,5 +542,13 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		actionEngine.missionSetPassword(apiUser, missionName, password);
 		verificationEngine.missionSetPassword(apiUser, missionName, password);
 		stateEngine.missionSetPassword(apiUser, missionName, password);
+	}
+
+	@Override
+	public void overrideDefaultProcessConfiguration(AbstractServerProfile server, ServerProcessConfiguration processConfiguration) {
+		TestLogger.executeEngineCommand("overrideDefaultProcessConfiguration");
+		actionEngine.overrideDefaultProcessConfiguration(server, processConfiguration);
+		verificationEngine.overrideDefaultProcessConfiguration(server, processConfiguration);
+		stateEngine.overrideDefaultProcessConfiguration(server, processConfiguration);
 	}
 }

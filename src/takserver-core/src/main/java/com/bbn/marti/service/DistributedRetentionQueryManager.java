@@ -108,7 +108,10 @@ public class DistributedRetentionQueryManager implements RetentionQueryService, 
 
 	@Override
 	public byte[] getArchivedMission(String missionName, String groupVector, String serverName) {
-		return missionService().archiveMission(missionName, groupVector, serverName);
+		
+		Mission m = missionService().getMissionByNameCheckGroups(missionName, groupVector);
+		
+		return missionService().archiveMission(m.getGuidAsUUID(), groupVector, serverName);
 	}
 	
 	@Override
@@ -207,10 +210,14 @@ public class DistributedRetentionQueryManager implements RetentionQueryService, 
 
 		RepositoryService.getInstance().insertBatchCotData(cotEvents);
 
+		Mission m = missionService().getMissionByNameCheckGroups(missionName, groupVector);
+		
+		final UUID missionGuid = m.getGuidAsUUID();
+		
 		cotEvents.forEach(cot -> {
 			MissionContent missionContent = new MissionContent();
 			missionContent.getUids().add(cot.getUid());
-			missionService().addMissionContent(missionName, missionContent, cot.getUid().split("_mission_")[0],
+			missionService().addMissionContent(missionGuid, missionContent, cot.getUid().split("_mission_")[0],
 					groupVector);
 		});
 	}
@@ -266,8 +273,10 @@ public class DistributedRetentionQueryManager implements RetentionQueryService, 
 		MissionContent mc = new MissionContent();
 		mc.getHashes().add(toStore.getHash());
 		mc.getUids().add(fromStore.getUid());
+		
+		Mission m = missionService().getMissionByNameCheckGroups(missionName, groupVector);
 
-		missionService().addMissionContent(missionName, mc, missionContent.attributeValue("creatorUid"), groupVector);
+		missionService().addMissionContent(m.getGuidAsUUID(), mc, missionContent.attributeValue("creatorUid"), groupVector);
 	}
 
 	@Override

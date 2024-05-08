@@ -17,6 +17,9 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 
 import com.bbn.marti.config.Auth;
@@ -52,6 +55,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
     private Logger logger = LoggerFactory.getLogger(OAuthAuthenticator.class);
     private Oauth oauthConf = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth();
     private Auth.Ldap ldapConf = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap();
+    private OAuth2AuthorizationService oAuth2AuthorizationService;
     private ActiveGroupCacheHelper activeGroupCacheHelper;
     private static OAuthAuthenticator instance;
     private String groupPrefix;
@@ -59,6 +63,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
     private String readGroupSuffix;
     private String writeGroupSuffix;
     private String groupsClaim;
+    private boolean loginWithEmail;
 
 
     public static synchronized OAuthAuthenticator getInstance(
@@ -87,12 +92,15 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
 
         groupManager.registerAuthenticator("oauth", this);
 
+        oAuth2AuthorizationService = SpringContextBeanForApi.getSpringContext().getBean(OAuth2AuthorizationService.class);
+
         if (oauthConf != null) {
             groupPrefix = oauthConf.getGroupprefix().toLowerCase();
             readOnlyGroup = oauthConf.getReadOnlyGroup();
             readGroupSuffix = oauthConf.getReadGroupSuffix();
             writeGroupSuffix = oauthConf.getWriteGroupSuffix();
             groupsClaim = oauthConf.getGroupsClaim();
+            loginWithEmail = oauthConf.isLoginWithEmail();
         }
     }
 
@@ -125,12 +133,23 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
             }
 
             String username;
-            if (claims.get("email") != null) {
+            if (oauthConf != null && oauthConf.getUsernameClaim() != null
+                    && claims.get(oauthConf.getUsernameClaim()) != null) {
+                username = (String) claims.get(oauthConf.getUsernameClaim());
+            } else if (claims.get("email") != null) {
                 // For jwt's from keycloak, get the username from the email claim
                 username = (String) claims.get("email");
             } else if (claims.get("sub") != null) {
                 // jwt's from takserver will contain the sub claim
                 username = (String) claims.get("sub");
+
+                OAuth2Authorization authorization = oAuth2AuthorizationService.findByToken(
+                        token, OAuth2TokenType.ACCESS_TOKEN);
+                if (authorization == null || authorization.getAccessToken() == null ||
+                        authorization.getAccessToken().isExpired()) {
+                    throw new InvalidBearerTokenException("oAuth2AuthorizationService.findByToken failed!");
+                }
+
             } else {
                 // For other trusted tokens, assign a random username if we don't have an attribute mapping
                 username = UUID.randomUUID().toString();
@@ -140,7 +159,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                 AuthenticatedUser auser = (AuthenticatedUser) user;
 
                 if (Strings.isNullOrEmpty(username)) {
-                    throw new TakException("empty username extracted from cert");
+                    throw new TakException("empty username extracted from token");
                 }
 
                 logger.debug("username extracted from OAuth token", username);
@@ -148,14 +167,6 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                 // make a new user object with the identifier from the file
                 user = new AuthenticatedUser(username, auser.getConnectionId(), auser.getAddress(), auser.getCert(), username, "", "", auser.getConnectionType()); // no password or uid
                 user.setToken(token);
-            }
-
-            // try to set groups based on the user_client_roles attribute
-            ArrayList<String> groupNames = (ArrayList<String>) claims.get("user_client_roles");
-
-            // if user_client_roles isn't present, check for the groups attribute
-            if (groupNames == null) {
-                groupNames = (ArrayList<String>) claims.get(groupsClaim);
             }
 
             // set user's classification if included in the token
@@ -171,6 +182,8 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
 
                 groupManager.setClassificationForUser(user, userClassification);
             }
+
+            ArrayList<String> groupNames =  (ArrayList<String>) claims.get(groupsClaim);
 
             boolean useGroupCache = oauthConf != null && oauthConf.isOauthUseGroupCache();
 
@@ -258,7 +271,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                                 }
 
                                 Map<String, String> groupInfo = LdapAuthenticator.getInstance()
-                                        .getGroupInfoBySearch(username);
+                                        .getGroupInfoBySearch(username, loginWithEmail);
 
                                 boolean readOnly = false;
                                 if (!groupInfo.isEmpty()) {

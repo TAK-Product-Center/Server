@@ -15,12 +15,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-import jakarta.xml.bind.DatatypeConverter;
-import jakarta.xml.bind.JAXBContext;
-import jakarta.xml.bind.JAXBException;
-import jakarta.xml.bind.Marshaller;
-import jakarta.xml.bind.Unmarshaller;
-
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
@@ -37,9 +31,17 @@ import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.util.SecureXmlParser;
-import com.bbn.marti.sync.Metadata;
-import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
+import com.bbn.marti.sync.Metadata;
+import com.bbn.marti.sync.model.Mission;
+import com.bbn.marti.sync.service.MissionService;
+import com.google.common.base.Strings;
+
+import jakarta.xml.bind.DatatypeConverter;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.Unmarshaller;
 
 public class CITrapReportService {
 
@@ -162,16 +164,24 @@ public class CITrapReportService {
         // add the report to the top level ci-trap mission
         MissionContent content = new MissionContent();
         content.getHashes().add(metadata.getHash());
-        missionService.addMissionContent(CI_TRAP_MISSION, content, clientUid, groupVector);
+        
+        Mission citrapMission = missionService.getMissionByNameCheckGroups(CI_TRAP_MISSION, groupVector);
+        
+        missionService.addMissionContent(citrapMission.getGuidAsUUID(), content, clientUid, groupVector);
 
         // create a new mission for this report and add the report
-        missionService.createMission(report.getId(), clientUid, groupVector, null, null, null, null, null, null,
+        Mission reportMission = missionService.createMission(report.getId(), clientUid, groupVector, null, null, null, null, null, null,
                 CI_TRAP_MISSION, null, null, null, null, false);
-        missionService.addMissionContent(report.getId(), content, clientUid, groupVector);
+        
+        if (Strings.isNullOrEmpty(reportMission.getGuid())) {
+        	throw new IllegalStateException("CI Trap report mission " + report.getId() + " has no guid.");
+        }
+        
+        missionService.addMissionContent(reportMission.getGuidAsUUID(), content, clientUid, groupVector);
 
         // subscribe for notifications to the new report
         try {
-            missionService.missionSubscribe(report.getId(), clientUid, groupVector);
+            missionService.missionSubscribe(reportMission.getGuidAsUUID(), clientUid, groupVector);
         } catch (JpaSystemException e) { } // DuplicateKeyException comes through as JpaSystemException due to transaction
 
         if (config != null && config.isEnableNotifications()) {
@@ -232,7 +242,10 @@ public class CITrapReportService {
         //
         MissionContent content = new MissionContent();
         content.getHashes().add(metadata.getHash());
-        missionService.addMissionContent(report.getId(), content, clientUid, groupVector);
+        
+        Mission reportMission = missionService.getMissionByNameCheckGroups(report.getId(), groupVector);
+        
+        missionService.addMissionContent(reportMission.getGuidAsUUID(), content, clientUid, groupVector);
         return report;
     }
 
@@ -248,9 +261,12 @@ public class CITrapReportService {
         if (persistenceStore.deleteReport(id, groupVector) == 0) {
             logger.error("deleteReport: deleteReport failed!");
         }
+        
+        
+        Mission citrapMission = missionService.getMissionByNameCheckGroups(CI_TRAP_MISSION, groupVector);
 
         // remove the report from the top level ci-trap mission and delete the entire report specific mission
-        missionService.deleteMissionContent(CI_TRAP_MISSION, null, id, clientUid, groupVector);
+        missionService.deleteMissionContent(citrapMission.getGuidAsUUID(), null, id, clientUid, groupVector);
         missionService.deleteMission(id, clientUid, groupVector, true);
         return true;
     }

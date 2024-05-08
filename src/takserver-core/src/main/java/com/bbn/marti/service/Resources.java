@@ -269,7 +269,7 @@ public class Resources {
 		
 		ThreadFactory threadFactory =
 				new ThreadFactoryBuilder()
-				.setNameFormat("websocket-%1$d")
+				.setNameFormat(name + "-%1$d")
 				.setUncaughtExceptionHandler(new TakServerExceptionHandler())
 				.build();
 		

@@ -21,15 +21,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -38,485 +30,482 @@ import java.util.stream.Collectors;
  */
 public abstract class AbstractRunnableServer {
 
-	public static abstract class AbstractServerProcess {
-		private final boolean enabled;
-		public final ServerProcessDefinition definition;
+    public static abstract class AbstractServerProcess {
+        private boolean enabled;
+        public final ServerProcessDefinition definition;
 
-		public AbstractServerProcess(ServerProcessDefinition definition) {
-			this.definition = definition;
-			this.enabled = definition.isEnabled();
-		}
+        public AbstractServerProcess(ServerProcessDefinition definition) {
+            this.definition = definition;
+            this.enabled = ServerProcessConfiguration.DefaultConfigMessagingApi.isProcessEnabled(definition);
+        }
 
-		public final String getIdentifier() {
-			return definition.identifier;
-		}
+        public final String getIdentifier() {
+            return definition.identifier;
+        }
 
-		public final boolean isEnabled() {
-			return enabled;
-		}
+        void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
 
-		public abstract void start(boolean enableReomteDebug);
+        public final boolean isEnabled() {
+            return enabled;
+        }
 
-		public ServerProcessDefinition getDefinition() {
-			return definition;
-		}
+        public abstract void start(boolean enableReomteDebug);
 
-		public abstract boolean isRunning();
+        public ServerProcessDefinition getDefinition() {
+            return definition;
+        }
 
-		public abstract void stop();
+        public abstract boolean isRunning();
 
-		public abstract void kill();
+        public abstract void stop();
 
-		public abstract List<String> waitForMissingLogStatements(int maxWaitDuration);
-	}
+        public abstract void kill();
 
-	public enum ServerState {
-		CONFIGURING,
-		DEPLOYING,
-		RUNNING,
-		STOPPING,
-		STOPPED,
-	}
+        public abstract List<String> waitForMissingLogStatements(int maxWaitDuration);
+    }
 
-	protected final Logger logger;
-	protected static final List<String> LOGGING_ARGUMENTS;
+    public enum ServerState {
+        CONFIGURING,
+        DEPLOYING,
+        RUNNING,
+        STOPPING,
+        STOPPED,
+    }
 
-	static {
-		if (TAKCLCore.serverLogLevelOverrides == null) {
-			LOGGING_ARGUMENTS = Arrays.asList(
-					"--logging.level.com.bbn=TRACE",
-					"--logging.level.org.apache.ignite=INFO",
-					"--logging.level.tak=TRACE"
-			);
-		} else {
-			String[] logLevelEntries = TAKCLCore.serverLogLevelOverrides.split(" ");
-			LOGGING_ARGUMENTS = new ArrayList<>(logLevelEntries.length);
+    protected final Logger logger;
+    protected static final List<String> LOGGING_ARGUMENTS;
 
-			String logLevel;
-			for (int i = 0; i < logLevelEntries.length; i++) {
-				logLevel = logLevelEntries[i];
-				LOGGING_ARGUMENTS.add("--logging.level." + logLevel);
-			}
-		}
-	}
+    static {
+        if (TAKCLCore.serverLogLevelOverrides == null) {
+            LOGGING_ARGUMENTS = Arrays.asList(
+                "--logging.level.com.bbn=TRACE",
+                "--logging.level.org.apache.ignite=INFO",
+                "--logging.level.tak=TRACE"
+            );
+        } else {
+            String[] logLevelEntries = TAKCLCore.serverLogLevelOverrides.split(" ");
+            LOGGING_ARGUMENTS = new ArrayList<>(logLevelEntries.length);
 
-	protected final AbstractServerProfile serverIdentifier;
+            String logLevel;
+            for (int i = 0; i < logLevelEntries.length; i++) {
+                logLevel = logLevelEntries[i];
+                LOGGING_ARGUMENTS.add("--logging.level." + logLevel);
+            }
+        }
+    }
 
-	public static Integer debuggeeIdentifier = null;
+    protected final AbstractServerProfile serverIdentifier;
 
-	private ServerState serverState = ServerState.STOPPED;
+    public static Integer debuggeeIdentifier = null;
 
-	private final OnlineInputModule onlineInputModule = new OnlineInputModule();
-	private final OnlineFileAuthModule onlineFileAuthModule = new OnlineFileAuthModule();
-	private final OfflineConfigModule offlineConfigModule = new OfflineConfigModule();
-	private final OfflineFileAuthModule offlineFileAuthtModule = new OfflineFileAuthModule();
+    private ServerState serverState = ServerState.STOPPED;
 
-	protected Path logPath;
+    private final OnlineInputModule onlineInputModule = new OnlineInputModule();
+    private final OnlineFileAuthModule onlineFileAuthModule = new OnlineFileAuthModule();
+    private final OfflineConfigModule offlineConfigModule = new OfflineConfigModule();
+    private final OfflineFileAuthModule offlineFileAuthtModule = new OfflineFileAuthModule();
 
-	protected static String logDirectory;
+    protected Path logPath;
 
-	protected final List<? extends AbstractServerProcess> processes;
+    protected static String logDirectory;
+
+    protected final List<? extends AbstractServerProcess> processes;
 
 
-	public final OfflineConfigModule getOfflineConfigModule() {
-		checkServerState(false);
-		return offlineConfigModule;
-	}
+    public final OfflineConfigModule getOfflineConfigModule() {
+        checkServerState(false);
+        return offlineConfigModule;
+    }
 
-	public final OnlineInputModule getOnlineInputModule() {
-		checkServerState(true);
-		return onlineInputModule;
-	}
+    public final OnlineInputModule getOnlineInputModule() {
+        checkServerState(true);
+        return onlineInputModule;
+    }
 
-	public final OfflineFileAuthModule getOfflineFileAuthModule() {
-		checkServerState(false);
-		return offlineFileAuthtModule;
-	}
+    public final OfflineFileAuthModule getOfflineFileAuthModule() {
+        checkServerState(false);
+        return offlineFileAuthtModule;
+    }
 
-	public final OnlineFileAuthModule getOnlineFileAuthModule() {
-		checkServerState(true);
-		return onlineFileAuthModule;
-	}
+    public final OnlineFileAuthModule getOnlineFileAuthModule() {
+        checkServerState(true);
+        return onlineFileAuthModule;
+    }
 
-	public static synchronized void setDebuggee(@Nullable Integer serverIdentifier) {
-		debuggeeIdentifier = serverIdentifier;
+    public static synchronized void setDebuggee(@Nullable Integer serverIdentifier) {
+        debuggeeIdentifier = serverIdentifier;
 
-	}
+    }
 
-	public static void setLogDirectory(@NotNull String newLogDirectory) {
-		logDirectory = newLogDirectory;
-	}
+    public static void setLogDirectory(@NotNull String newLogDirectory) {
+        logDirectory = newLogDirectory;
+    }
 
-	protected AbstractRunnableServer(AbstractServerProfile serverIdentifier) {
-		this.logger = LoggerFactory.getLogger(serverIdentifier.toString());
-		this.serverIdentifier = serverIdentifier;
-		this.offlineConfigModule.init(serverIdentifier);
-		this.offlineFileAuthtModule.init(serverIdentifier);
-		this.processes = createProcessContainerList();
-	}
+    protected AbstractRunnableServer(AbstractServerProfile serverIdentifier) {
+        this.logger = LoggerFactory.getLogger(serverIdentifier.toString());
+        this.serverIdentifier = serverIdentifier;
+        this.offlineConfigModule.init(serverIdentifier);
+        this.offlineFileAuthtModule.init(serverIdentifier);
 
-	public final synchronized void stopServer(long serverKillDelayMS) {
-		if (serverState == ServerState.STOPPING || serverState == ServerState.STOPPED) {
-			logger.warn("Server '" + serverIdentifier.toString() + "' Stop requested even though it is already stopped!");
-		}
+        ServerProcessDefinition[] definitions = ServerProcessDefinition.values();
+        ArrayList<AbstractServerProcess> containers = new ArrayList<>(definitions.length);
+        for (ServerProcessDefinition definition : ServerProcessDefinition.values()) {
+            containers.add(createServerProcess(definition));
+        }
+        this.processes = Collections.unmodifiableList(containers);
+    }
 
-		logger.info("Stopping server " + serverIdentifier + "...");
+    public void overrideDefaultServerConfiguration(ServerProcessConfiguration serverProcessConfiguration) {
+        for (AbstractServerProcess serverProcess : processes) {
+            serverProcess.setEnabled(serverProcessConfiguration.isProcessEnabled(serverProcess.definition));
+        }
+    }
 
-		updateEnabledProcessStates();
+    public final synchronized void stopServer(long serverKillDelayMS) {
+        if (serverState == ServerState.STOPPING || serverState == ServerState.STOPPED) {
+            logger.warn("Server '" + serverIdentifier.toString() + "' Stop requested even though it is already stopped!");
+        }
 
-		try {
-			// Since stopping the process will kill the container logs must be collected before shutdown
-			if (TAKCLCore.k8sMode) {
-				collectFinalLogs();
-			}
+        logger.info("Stopping server " + serverIdentifier + "...");
 
-			serverState = ServerState.STOPPING;
+        updateEnabledProcessStates();
 
-			Exception igniteException = null;
-			try {
-				TakclIgniteHelper.closeAssociatedIgniteInstance(serverIdentifier);
-			} catch (Exception e) {
-				igniteException = e;
-			}
+        try {
+            // Since stopping the process will kill the container logs must be collected before shutdown
+            if (TAKCLCore.k8sMode) {
+                collectFinalLogs();
+            }
 
-			if (!TAKCLCore.keepServersRunning) {
-				Timer killTimer = null;
+            serverState = ServerState.STOPPING;
 
-				if (serverKillDelayMS > 0) {
-					TimerTask tt = new TimerTask() {
-						@Override
-						public void run() {
-							innerKillServer();
-						}
-					};
+            Exception igniteException = null;
+            try {
+                TakclIgniteHelper.closeAssociatedIgniteInstance(serverIdentifier);
+            } catch (Exception e) {
+                igniteException = e;
+            }
 
-					killTimer = new Timer(false);
-					killTimer.schedule(tt, serverKillDelayMS);
-				}
-				innerStopServer();
-				if (killTimer != null) {
-					killTimer.cancel();
-				}
-			}
+            if (!TAKCLCore.keepServersRunning) {
+                Timer killTimer = null;
 
-			onlineInputModule.halt();
-			onlineFileAuthModule.halt();
-			offlineConfigModule.halt();
-			offlineFileAuthtModule.halt();
+                if (serverKillDelayMS > 0) {
+                    TimerTask tt = new TimerTask() {
+                        @Override
+                        public void run() {
+                            innerKillServer();
+                        }
+                    };
 
-			serverState = ServerState.STOPPED;
-			updateEnabledProcessStates();
+                    killTimer = new Timer(false);
+                    killTimer.schedule(tt, serverKillDelayMS);
+                }
+                innerStopServer();
+                if (killTimer != null) {
+                    killTimer.cancel();
+                }
+            }
 
-			if (igniteException != null) {
-				throw new RuntimeException(igniteException);
-			}
-		} finally {
-			serverIdentifier.rerollIgnitePorts();
-			if (!TAKCLCore.k8sMode) {
-				collectFinalLogs();
-			}
-		}
-	}
+            onlineInputModule.halt();
+            onlineFileAuthModule.halt();
+            offlineConfigModule.halt();
+            offlineFileAuthtModule.halt();
 
-	public final synchronized void startServer(@NotNull String sessionIdentifier, int maxWaitMs, boolean failTestOnStartupFailure) {
-		if (serverState != ServerState.STOPPED) {
-			logger.warn("Server '" + serverIdentifier.toString() + "' Start requested even though it is already running or starting!!");
-		}
+            serverState = ServerState.STOPPED;
+            updateEnabledProcessStates();
 
-		boolean isFileAuthEnabled = offlineConfigModule.isFileAuthEnabled();
+            if (igniteException != null) {
+                throw new RuntimeException(igniteException);
+            }
+        } finally {
+            serverIdentifier.rerollIgnitePorts();
+            if (!TAKCLCore.k8sMode) {
+                collectFinalLogs();
+            }
+        }
+    }
 
-		long startTimeMs = System.currentTimeMillis();
+    public final synchronized void startServer(@NotNull String sessionIdentifier, int maxWaitMs, boolean failTestOnStartupFailure) {
+        if (serverState != ServerState.STOPPED) {
+            logger.warn("Server '" + serverIdentifier.toString() + "' Start requested even though it is already running or starting!!");
+        }
 
-		serverState = ServerState.CONFIGURING;
+        boolean isFileAuthEnabled = offlineConfigModule.isFileAuthEnabled();
 
-		Repository repository = this.offlineConfigModule.getRepository();
-		// Set the enabled state
-		repository.setEnable(TestConfiguration.getInstance().dbEnabled);
+        long startTimeMs = System.currentTimeMillis();
 
-		if (TestConfiguration.getInstance().dbEnabled) {
-			String dbHost = TestConfiguration.getInstance().getDbHost(serverIdentifier);
+        serverState = ServerState.CONFIGURING;
 
-			// If the DB Host is set add the credentials
-			if (dbHost != null) {
-				repository.getConnection().setUrl("jdbc:postgresql://" + dbHost + ":5432/cot");
-				repository.getConnection().setUsername("martiuser");
-				repository.getConnection().setPassword(serverIdentifier.getDbPassword());
-			}
-		}
+        Repository repository = this.offlineConfigModule.getRepository();
+        // Set the enabled state
+        repository.setEnable(TestConfiguration.getInstance().dbEnabled);
 
-		this.offlineConfigModule.enableSwagger();
-		this.offlineConfigModule.setSSLSecuritySettings();
-		this.offlineConfigModule.saveChanges();
+        if (TestConfiguration.getInstance().dbEnabled) {
+            String dbHost = TestConfiguration.getInstance().getDbHost(serverIdentifier);
 
-		if (TestConfiguration.getInstance().dbEnabled)
-			TestConfiguration.getInstance().configureDatabase(serverIdentifier);
+            // If the DB Host is set add the credentials
+            if (dbHost != null) {
+                repository.getConnection().setUrl("jdbc:postgresql://" + dbHost + ":5432/cot");
+                repository.getConnection().setUsername("martiuser");
+                repository.getConnection().setPassword(serverIdentifier.getDbPassword());
+            }
+        }
 
-		// Changing the flow tag to match the server ID
-		this.offlineConfigModule.setFlowTag(serverIdentifier.getConsistentUniqueReadableIdentifier());
+        this.offlineConfigModule.enableSwagger();
+        this.offlineConfigModule.setSSLSecuritySettings();
+        this.offlineConfigModule.saveChanges();
 
-		String debugServerStr = System.getProperty("com.bbn.marti.takcl.takserver.debug");
+        if (TestConfiguration.getInstance().dbEnabled)
+            TestConfiguration.getInstance().configureDatabase(serverIdentifier);
 
-		boolean enableRemoteDebug = (debugServerStr != null && debugServerStr.equalsIgnoreCase("true"));
+        // Changing the flow tag to match the server ID
+        this.offlineConfigModule.setFlowTag(serverIdentifier.getConsistentUniqueReadableIdentifier());
 
-		// Removing default inputs from servers other than SERVER_0 since they will cause bind conflicts
-		if (!serverIdentifier.getConsistentUniqueReadableIdentifier().equals(ImmutableServerProfiles.SERVER_0.getConsistentUniqueReadableIdentifier())) {
-			List<Input> inputList = new LinkedList<>(this.getOfflineConfigModule().getInputs());
-			for (Input input : inputList) {
-				if ((input.getPort() == 8088 && input.getName().equals("streamtcp")) ||
-						(input.getPort() == 8087 && (input.getName().equals("stdudp") || input.getName().equals("stdtcp")))) {
-					this.getOfflineConfigModule().removeInput(input.getName());
-				}
-			}
-		} else {
-			for (Input input : this.getOfflineConfigModule().getInputs()) {
-				Integer networkVersion = ProtocolProfiles.getInputByValue(input.getProtocol()).getCoreNetworkVersion();
-				if (networkVersion != null) {
-					input.setCoreVersion(networkVersion);
-				}
-			}
-		}
+        String debugServerStr = System.getProperty("com.bbn.marti.takcl.takserver.debug");
 
-		this.getOfflineConfigModule().setCertHttpsPort(serverIdentifier.getCertHttpsPort());
-		this.getOfflineConfigModule().setFedHttpsPort(serverIdentifier.getFedHttpsPort());
-		this.getOfflineConfigModule().sethttpPlaintextPort(serverIdentifier.getHttpPlaintextPort());
-		this.getOfflineConfigModule().setHttpsPort(serverIdentifier.getHttpsPort());
-		this.getOfflineConfigModule().setIgnitePortRange(serverIdentifier.getIgniteDiscoveryPort(), serverIdentifier.getIgniteDiscoveryPortCount());
-		this.getOfflineConfigModule().setSSLSecuritySettings();
+        boolean enableRemoteDebug = (debugServerStr != null && debugServerStr.equalsIgnoreCase("true"));
 
-		serverState = ServerState.DEPLOYING;
+        // Removing default inputs from servers other than SERVER_0 since they will cause bind conflicts
+        if (!serverIdentifier.getConsistentUniqueReadableIdentifier().equals(ImmutableServerProfiles.SERVER_0.getConsistentUniqueReadableIdentifier())) {
+            List<Input> inputList = new LinkedList<>(this.getOfflineConfigModule().getInputs());
+            for (Input input : inputList) {
+                if ((input.getPort() == 8088 && input.getName().equals("streamtcp")) ||
+                    (input.getPort() == 8087 && (input.getName().equals("stdudp") || input.getName().equals("stdtcp")))) {
+                    this.getOfflineConfigModule().removeInput(input.getName());
+                }
+            }
+        } else {
+            for (Input input : this.getOfflineConfigModule().getInputs()) {
+                Integer networkVersion = ProtocolProfiles.getInputByValue(input.getProtocol()).getCoreNetworkVersion();
+                if (networkVersion != null) {
+                    input.setCoreVersion(networkVersion);
+                }
+            }
+        }
 
-		innerDeployServer(sessionIdentifier, enableRemoteDebug);
-		System.out.println(serverIdentifier.getConsistentUniqueReadableIdentifier() + "' started. Waiting for successful initialization.");
-		serverState = ServerState.RUNNING;
+        this.getOfflineConfigModule().setCertHttpsPort(serverIdentifier.getCertHttpsPort());
+        this.getOfflineConfigModule().setFedHttpsPort(serverIdentifier.getFedHttpsPort());
+        this.getOfflineConfigModule().sethttpPlaintextPort(serverIdentifier.getHttpPlaintextPort());
+        this.getOfflineConfigModule().setHttpsPort(serverIdentifier.getHttpsPort());
+        this.getOfflineConfigModule().setIgnitePortRange(serverIdentifier.getIgniteDiscoveryPort(), serverIdentifier.getIgniteDiscoveryPortCount());
+        this.getOfflineConfigModule().setSSLSecuritySettings();
 
-		waitForServerReady(maxWaitMs, failTestOnStartupFailure);
+        serverState = ServerState.DEPLOYING;
 
-		System.out.println("Server initialized successfully after " + ((System.currentTimeMillis() - startTimeMs) / 1000) + " seconds.");
-		if (!isRunning()) {
-			throw new RuntimeException("Server '" + serverIdentifier.getConsistentUniqueReadableIdentifier() + "' appears to have shutdown immediately after starting. Please ensure another server isn't already running and your config is valid!");
-		}
-		
-		// ignore online input module for fedhub
-		if (!serverIdentifier.getConsistentUniqueReadableIdentifier().contains("FEDHUB")) {
-			onlineInputModule.init(serverIdentifier);
-			
-			if (isFileAuthEnabled) {
-				onlineFileAuthModule.init(serverIdentifier);
-			}
-		}
-	}
+        innerDeployServer(sessionIdentifier, enableRemoteDebug);
+        System.out.println(serverIdentifier.getConsistentUniqueReadableIdentifier() + "' started. Waiting for successful initialization.");
+        serverState = ServerState.RUNNING;
 
-	private void waitForServerReady(int maxWaitTimeMs, boolean failTestOnStartupFailure) {
-		List<? extends AbstractServerProcess> processes = Collections.synchronizedList(getEnabledServerProcesses());
-		Map<AbstractServerProcess, List<String>> results = new ConcurrentHashMap<>();
+        waitForServerReady(maxWaitMs, failTestOnStartupFailure);
+
+        System.out.println("Server initialized successfully after " + ((System.currentTimeMillis() - startTimeMs) / 1000) + " seconds.");
+        if (!isRunning()) {
+            throw new RuntimeException("Server '" + serverIdentifier.getConsistentUniqueReadableIdentifier() + "' appears to have shutdown immediately after starting. Please ensure another server isn't already running and your config is valid!");
+        }
+
+        // ignore online input module for fedhub
+        if (!serverIdentifier.getConsistentUniqueReadableIdentifier().contains("FEDHUB")) {
+            onlineInputModule.init(serverIdentifier);
+
+            if (isFileAuthEnabled) {
+                onlineFileAuthModule.init(serverIdentifier);
+            }
+        }
+    }
+
+    private void waitForServerReady(int maxWaitTimeMs, boolean failTestOnStartupFailure) {
+        List<? extends AbstractServerProcess> processes = Collections.synchronizedList(getEnabledServerProcesses());
+        Map<AbstractServerProcess, List<String>> results = new ConcurrentHashMap<>();
 
 //		try {
 //			Thread.sleep(30000);
 //		} catch (InterruptedException e) {
 //			throw new RuntimeException(e);
 //		}
-		processes.parallelStream().forEach(p -> results.put(p, p.waitForMissingLogStatements(maxWaitTimeMs)));
+        processes.parallelStream().forEach(p -> results.put(p, p.waitForMissingLogStatements(maxWaitTimeMs)));
 
-		if (results.values().stream().mapToInt(List::size).sum() > 0 && failTestOnStartupFailure) {
-			StringBuilder errorBuilder = new StringBuilder();
-			for (AbstractServerProcess process : results.keySet()) {
-				List<String> failures = results.get(process);
-				if (failures.size() > 0) {
-					errorBuilder.append("Server init timeout of " + maxWaitTimeMs + " ms reached for process " +
-							process.getIdentifier() + ".The following log statements were not seen:\n\t" +
-							String.join("\"\n\t\"", failures) + "\n There is a good chance the tests may fail!");
-				}
-			}
-			TAKCLCore.defaultStderr.println(errorBuilder);
-			Assert.fail(errorBuilder.toString());
-		}
-	}
+        if (results.values().stream().mapToInt(List::size).sum() > 0 && failTestOnStartupFailure) {
+            StringBuilder errorBuilder = new StringBuilder();
+            for (AbstractServerProcess process : results.keySet()) {
+                List<String> failures = results.get(process);
+                if (failures.size() > 0) {
+                    errorBuilder.append("Server init timeout of " + maxWaitTimeMs + " ms reached for process " +
+                        process.getIdentifier() + ".The following log statements were not seen:\n\t" +
+                        String.join("\"\n\t\"", failures) + "\n There is a good chance the tests may fail!");
+                }
+            }
+            TAKCLCore.defaultStderr.println(errorBuilder);
+            Assert.fail(errorBuilder.toString());
+        }
+    }
 
-	public synchronized boolean isRunning() {
-		return serverState == ServerState.RUNNING;
-	}
+    public synchronized boolean isRunning() {
+        return serverState == ServerState.RUNNING;
+    }
 
-	public synchronized void watchdogPoll() {
-		if (isRunning()) {
-			checkServerState(true);
-		}
-	}
+    public synchronized void watchdogPoll() {
+        if (isRunning()) {
+            checkServerState(true);
+        }
+    }
 
-	private synchronized void checkServerState(boolean shouldBeOnline) {
-		boolean currentStateValid;
-		boolean serverProcessRunning = isServerProcessRunning(shouldBeOnline);
-		logger.trace("STATE: serverProcessRunning=" + serverProcessRunning);
-		logger.trace("STATE: serverState=" + serverState);
-		logger.trace("STATE: shouldBeOnline=" + shouldBeOnline);
+    private synchronized void checkServerState(boolean shouldBeOnline) {
+        boolean currentStateValid;
+        boolean serverProcessRunning = isServerProcessRunning(shouldBeOnline);
+        logger.trace("STATE: serverProcessRunning=" + serverProcessRunning);
+        logger.trace("STATE: serverState=" + serverState);
+        logger.trace("STATE: shouldBeOnline=" + shouldBeOnline);
 
-		switch (serverState) {
-			case CONFIGURING:
-			case STOPPED:
-				currentStateValid = !serverProcessRunning && !shouldBeOnline;
-				break;
+        switch (serverState) {
+            case CONFIGURING:
+            case STOPPED:
+                currentStateValid = !serverProcessRunning && !shouldBeOnline;
+                break;
 
-			case RUNNING:
-				currentStateValid = shouldBeOnline && (serverProcessRunning);
-				break;
+            case RUNNING:
+                currentStateValid = shouldBeOnline && (serverProcessRunning);
+                break;
 
-			case DEPLOYING:
-			case STOPPING:
-				currentStateValid = false;
-				break;
+            case DEPLOYING:
+            case STOPPING:
+                currentStateValid = false;
+                break;
 
-			default:
-				throw new RuntimeException("Unexpected state " + serverState + "!");
-		}
+            default:
+                throw new RuntimeException("Unexpected state " + serverState + "!");
+        }
 
-		if (!currentStateValid) {
-			String callingMethod = Thread.currentThread().getStackTrace()[2].getMethodName();
-			String msg = "Cannot call " + callingMethod + " on server '" +
-					serverIdentifier.getConsistentUniqueReadableIdentifier() + "' while it its state is " +
-					serverState.name() + " and the server process is " + (serverProcessRunning ? "" : "not") + " running!!";
-			logger.error(msg);
-			throw new RuntimeException(msg);
-		}
-	}
+        if (!currentStateValid) {
+            String callingMethod = Thread.currentThread().getStackTrace()[2].getMethodName();
+            String msg = "Cannot call " + callingMethod + " on server '" +
+                serverIdentifier.getConsistentUniqueReadableIdentifier() + "' while it its state is " +
+                serverState.name() + " and the server process is " + (serverProcessRunning ? "" : "not") + " running!!";
+            logger.error(msg);
+            throw new RuntimeException(msg);
+        }
+    }
 
-	private final TreeMap<String, Boolean> lastKnownEnabledProcessStates = new TreeMap<>();
+    private final TreeMap<String, Boolean> lastKnownEnabledProcessStates = new TreeMap<>();
 
-	public TreeMap<String, Boolean> updateEnabledProcessStates() {
-		synchronized (lastKnownEnabledProcessStates) {
-			boolean print = false;
-			StringBuilder sb = new StringBuilder("Process States:\n\t");
+    public TreeMap<String, Boolean> updateEnabledProcessStates() {
+        synchronized (lastKnownEnabledProcessStates) {
+            boolean print = false;
+            StringBuilder sb = new StringBuilder("Process States:\n\t");
 
-			// Get the state of all enabled processes
-			TreeMap<String, Boolean> currentEnabledProcessStates = new TreeMap<>(processes.stream().filter(
-					AbstractServerProcess::isEnabled).collect(Collectors.toMap(
-					AbstractServerProcess::getIdentifier, AbstractServerProcess::isRunning)));
+            // Get the state of all enabled processes
+            TreeMap<String, Boolean> currentEnabledProcessStates = new TreeMap<>(processes.stream().filter(
+                AbstractServerProcess::isEnabled).collect(Collectors.toMap(
+                AbstractServerProcess::getIdentifier, AbstractServerProcess::isRunning)));
 
-			for (AbstractServerProcess process : processes) {
-				String processIdentifier = process.getIdentifier();
+            for (AbstractServerProcess process : processes) {
+                String processIdentifier = process.getIdentifier();
 
-				if (currentEnabledProcessStates.containsKey(processIdentifier)) {
-					boolean isRunning = currentEnabledProcessStates.get(processIdentifier);
+                if (currentEnabledProcessStates.containsKey(processIdentifier)) {
+                    boolean isRunning = currentEnabledProcessStates.get(processIdentifier);
 
-					if (!lastKnownEnabledProcessStates.containsKey(processIdentifier) ||
-							lastKnownEnabledProcessStates.get(processIdentifier) != isRunning) {
-						print = true;
-					}
+                    if (!lastKnownEnabledProcessStates.containsKey(processIdentifier) ||
+                        lastKnownEnabledProcessStates.get(processIdentifier) != isRunning) {
+                        print = true;
+                    }
 
-					sb.append("\n\t").append(processIdentifier).append(": ").append(isRunning ? "RUNNING" : "NOT RUNNING");
-				} else {
-					sb.append("\n\t").append(processIdentifier).append(": DISABLED");
-				}
-			}
+                    sb.append("\n\t").append(processIdentifier).append(": ").append(isRunning ? "RUNNING" : "NOT RUNNING");
+                } else {
+                    sb.append("\n\t").append(processIdentifier).append(": DISABLED");
+                }
+            }
 
-			if (print) {
-				logger.info(sb.toString());
-			}
-			lastKnownEnabledProcessStates.clear();
-			lastKnownEnabledProcessStates.putAll(currentEnabledProcessStates);
-			return lastKnownEnabledProcessStates;
-		}
-	}
+            if (print) {
+                logger.info(sb.toString());
+            }
+            lastKnownEnabledProcessStates.clear();
+            lastKnownEnabledProcessStates.putAll(currentEnabledProcessStates);
+            return lastKnownEnabledProcessStates;
+        }
+    }
 
 
-	protected void offlineFactoryResetServer() {
-		// TODO: This "offline factory reset" should probably be cleanly removed to bring parity to test deployments and be replaced with server "destruction"
-		if (!TAKCLCore.k8sMode) {
-			logger.error("offlineFactoryResetServer");
-			checkServerState(false);
-			offlineConfigModule.resetConfig();
-			offlineFileAuthtModule.resetConfig();
-			logger.error("offlineFactoryResetServer-end");
-		}
-	}
+    protected void offlineFactoryResetServer() {
+        // TODO: This "offline factory reset" should probably be cleanly removed to bring parity to test deployments and be replaced with server "destruction"
+        if (!TAKCLCore.k8sMode) {
+            logger.error("offlineFactoryResetServer");
+            checkServerState(false);
+            offlineConfigModule.resetConfig();
+            offlineFileAuthtModule.resetConfig();
+            logger.error("offlineFactoryResetServer-end");
+        }
+    }
 
-	public final void killServer() {
-		if (!TAKCLCore.keepServersRunning) {
-			logger.info("Killing server " + serverIdentifier + "...");
-			innerKillServer();
-		}
-	}
+    public final void killServer() {
+        if (!TAKCLCore.keepServersRunning) {
+            logger.info("Killing server " + serverIdentifier + "...");
+            innerKillServer();
+        }
+    }
 
-	protected boolean isServerProcessRunning(boolean shouldBeOnline) {
-		// If they aren't all the same, raise an exception indicating the difference
-		Boolean sharedState = null;
+    protected boolean isServerProcessRunning(boolean shouldBeOnline) {
+        // If they aren't all the same, raise an exception indicating the difference
+        Boolean sharedState = null;
 
-		// Get the state of all enabled processes
-		Map<String, Boolean> enabledProcessStates = updateEnabledProcessStates();
+        // Get the state of all enabled processes
+        Map<String, Boolean> enabledProcessStates = updateEnabledProcessStates();
 
-		// If no processes have been enabled, the test has not started yet, and things are effectively not running
-		if (enabledProcessStates.isEmpty()) {
-			return false;
-		}
+        // If no processes have been enabled, the test has not started yet, and things are effectively not running
+        if (enabledProcessStates.isEmpty()) {
+            return false;
+        }
 
-		for (String processName : enabledProcessStates.keySet()) {
-			boolean state = enabledProcessStates.get(processName);
+        for (String processName : enabledProcessStates.keySet()) {
+            boolean state = enabledProcessStates.get(processName);
 
-			if (shouldBeOnline && !state) {
+            if (shouldBeOnline && !state) {
 
-				if (TAKCLCore.k8sMode) {
-					logger.error("The server process " + processName + " Should be running but it is not!");
-				} else {
+                if (TAKCLCore.k8sMode) {
+                    logger.error("The server process " + processName + " Should be running but it is not!");
+                } else {
 
-					logger.error("The server process " + processName + " Should be running but it is not!  `ps -aux` output:");
-					try {
-						File f = File.createTempFile("PsOutput", ".txt");
-						ProcessBuilder pb = new ProcessBuilder().command("ps", "-aux").redirectErrorStream(true).redirectOutput(f);
-						Process p = pb.start();
-						p.waitFor();
-						String psResults = Files.readString(f.toPath());
-						System.out.println(psResults);
+                    logger.error("The server process " + processName + " Should be running but it is not!  `ps -aux` output:");
+                    try {
+                        File f = File.createTempFile("PsOutput", ".txt");
+                        ProcessBuilder pb = new ProcessBuilder().command("ps", "-aux").redirectErrorStream(true).redirectOutput(f);
+                        Process p = pb.start();
+                        p.waitFor();
+                        String psResults = Files.readString(f.toPath());
+                        System.out.println(psResults);
 
-					} catch (Exception e) {
-						throw new RuntimeException(e);
-					}
-				}
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
 
-			} else if (!shouldBeOnline && state) {
-				logger.error("The server process " + processName + " Should not be running but it is!");
-			}
+            } else if (!shouldBeOnline && state) {
+                logger.error("The server process " + processName + " Should not be running but it is!");
+            }
 
-			if (sharedState == null) {
-				sharedState = state;
-			}
-			if (state != sharedState) {
-				StringBuilder sb = new StringBuilder("Inconsistent process states for " + serverIdentifier + ":");
-				for (String processName2 : enabledProcessStates.keySet()) {
-					sb.append(" ").append(processName2).append(".isRunning=").append(enabledProcessStates.get(processName2));
-				}
-				logger.error(sb.toString());
-				throw new RuntimeException(sb.toString());
-			}
-		}
-		return sharedState;
-	}
-	
-	public final void enableFederationHubProcess() {	
-		// federation hub enabled, disable all other services
-		ServerProcessDefinition.FederationHubPolicy.setEnabled(true);
-		ServerProcessDefinition.FederationHubBroker.setEnabled(true);
-		
-		ServerProcessDefinition.MessagingService.setEnabled(false);
-		ServerProcessDefinition.ApiService.setEnabled(false);	
-		ServerProcessDefinition.RetentionService.setEnabled(false);
-		ServerProcessDefinition.PluginManager.setEnabled(false);
-	}
+            if (sharedState == null) {
+                sharedState = state;
+            }
+            if (state != sharedState) {
+                StringBuilder sb = new StringBuilder("Inconsistent process states for " + serverIdentifier + ":");
+                for (String processName2 : enabledProcessStates.keySet()) {
+                    sb.append(" ").append(processName2).append(".isRunning=").append(enabledProcessStates.get(processName2));
+                }
+                logger.error(sb.toString());
+                throw new RuntimeException(sb.toString());
+            }
+        }
+        return sharedState;
+    }
 
-	public final void enableRetentionProcess(boolean value) {
-		ServerProcessDefinition.RetentionService.setEnabled(value);
-	}
+    protected abstract void innerStopServer();
 
-	public final void enablePluginManagerProcess(boolean value) {
-		ServerProcessDefinition.PluginManager.setEnabled(value);
-	}
+    protected abstract void innerDeployServer(@NotNull String sessionIdentifier, boolean enableRemoteDebug);
 
-	protected abstract void innerStopServer();
+    protected abstract void innerKillServer();
 
-	protected abstract void innerDeployServer(@NotNull String sessionIdentifier, boolean enableRemoteDebug);
+    public abstract List<? extends AbstractServerProcess> getEnabledServerProcesses();
 
-	protected abstract void innerKillServer();
+    protected abstract void collectFinalLogs();
 
-	public abstract List<? extends AbstractServerProcess> getEnabledServerProcesses();
-
-	protected abstract void collectFinalLogs();
-
-	protected abstract List<? extends AbstractServerProcess> createProcessContainerList();
+    protected abstract AbstractServerProcess createServerProcess(ServerProcessDefinition serverProcessDefinition);
 }

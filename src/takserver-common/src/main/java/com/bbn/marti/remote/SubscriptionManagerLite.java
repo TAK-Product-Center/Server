@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.UUID;
 
 import com.bbn.marti.config.GeospatialFilter;
 import com.bbn.marti.remote.groups.Group;
@@ -38,26 +39,27 @@ public interface SubscriptionManagerLite {
     void setXpathForUid(String uid, String xpath);
     
     // Mission subscription management
-    void missionSubscribe(String missionName, String uid);
-    void missionUnsubscribe(String missionName, String uid, String username, boolean disconnectOnly);
-    void missionDisconnect(String missionName, String uid);
-    void removeAllMissionSubscriptions(String missionName);
+    void missionSubscribe(UUID missionGuid, String clientUid);
+    void missionUnsubscribe(UUID missionGuid, String uid, String username, boolean disconnectOnly);
+    void missionDisconnect(UUID missionGuid, String clientUid);
+    void removeAllMissionSubscriptions(UUID missionGuid);
 
-    List<String> getMissionSubscriptions(String missionName, boolean connectedOnly);
-    void announceMissionChange(String missionName, ChangeType changeType, String creatorUid, String tool, String changes, String xmlContentForNotification);
-    void announceMissionChange(String missionName, ChangeType changeType, String creatorUid, String tool, String changes);
-    void announceMissionChange(String missionName, String creatorUid, String tool, String changes);
-    void broadcastMissionAnnouncement(String missionName, String groupVector, String creatorUid, ChangeType changeType, String tool);
-    void sendMissionInvite(String missionName, String[] uids, String authorUid, String tool, String token, String roleXml);
-    void sendMissionRoleChange(String missionName, String uid, String authorUid, String tool, String roleXml);
+    List<String> getMissionSubscriptions(UUID missionGuid, boolean connectedOnly);
+    void announceMissionChange(UUID missionGuid, String missionName, ChangeType changeType, String creatorUid, String tool, String changes, String xmlContentForNotification);
+    void announceMissionChange(UUID missionGuid, String missionName, ChangeType changeType, String creatorUid, String tool, String changes);
+    void announceMissionChange(UUID missionGuid, String missionName, String creatorUid, String tool, String changes);
+    
+    void broadcastMissionAnnouncement(UUID missionGuid, String missionName, String groupVector, String creatorUid, ChangeType changeType, String tool);
+    void sendMissionInvite(UUID missionGuid, String missionName, String[] uids, String authorUid, String tool, String token, String roleXml);
+    void sendMissionRoleChange(UUID missionGuid, String missionName, String uid, String authorUid, String tool, String roleXml);
 
-    List<String> getMissionSubscriptionsForUid(String uid);
+    List<UUID> getMissionSubscriptionsForUid(String uid);
     
     // manage missions / content uids in core services 
-    void putMissionContentUid(String missionName, String uid);
-    void removeMissionContentUids(String missionName, Set<String> uids);
-    Collection<String> getContentUidsForMission(String missionName);
-    Collection<String> getMissionsForContentUid(String uid);
+    void putMissionContentUid(UUID missionGuid, String uid);
+    void removeMissionContentUids(UUID missionGuid, Set<String> uids);
+    Collection<String> getContentUidsForMission(UUID missionGuid);
+    Collection<UUID> getMissionsForContentUid(String uid);
     Set<SituationAwarenessMessage> getLatestReachableSA(User destUser);
 
 

@@ -52,7 +52,12 @@
 
                 <tbody>
                   <tr data-ng-repeat="ac in filteredActiveConnections">
-                    <td data-ng-bind="ac.connectionId"></td>
+                    <td> 
+                        <div>
+                            {{ac.connectionId}}
+                        </div>
+                        <button type="button" ng-click="disconnect(ac)" class="btn-danger btn">Disconnect</button>
+                    </td>
                     <td data-ng-bind="ac.reads"></td>
                     <td data-ng-bind="ac.bRead"></td>
                     <td data-ng-bind="ac.writes"></td>

@@ -3,6 +3,7 @@ package com.bbn.cot.filter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 
@@ -17,11 +18,13 @@ import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.GeospatialFilter;
 import com.bbn.marti.config.GeospatialFilter.BoundingBox;
 import com.bbn.marti.feeds.DataFeedService;
+import com.bbn.marti.remote.InputMetric;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
-import com.bbn.marti.remote.InputMetric;
-import com.bbn.marti.remote.exception.TakException;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.model.MinimalMission;
@@ -29,7 +32,6 @@ import com.bbn.marti.sync.model.MinimalMissionFeed;
 import com.bbn.marti.sync.service.DistributedDataFeedCotService;
 import com.bbn.marti.util.GeomUtils;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -37,7 +39,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cot.CotEventContainer;
 import tak.server.federation.FigFederateSubscription;
 import tak.server.feeds.DataFeedDTO;
@@ -313,7 +314,7 @@ public class DataFeedFilter {
 		}	
 		
 		// Filter as specified in MissionFeed
-		List<String> missionNamesAfterFiltering = new ArrayList<>(); 
+		List<UUID> missionGuidsAfterFiltering = new ArrayList<>(); 
 		for (MinimalMissionFeed missionFeed: missionFeeds) {
 			if (!feedMissionNamesInCotBbox.contains(missionFeed.getMissionName())) {
 				continue; 
@@ -357,18 +358,18 @@ public class DataFeedFilter {
 			}
 			
 			if (isMatchPolygon) {
-				missionNamesAfterFiltering.add(missionFeed.getMissionName());
+				missionGuidsAfterFiltering.add(missionFeed.getMissionGuid());
 			}
 		}
 		
 		if (logger.isDebugEnabled()) {
-			logger.debug("missionNamesAfterFiltering.size: {}", missionNamesAfterFiltering.size());
+			logger.debug("missionGuidsAfterFiltering.size: {}", missionGuidsAfterFiltering.size());
 		}
 		
 		// Collect all the mission subscriber uids for valid feed missions
-		List<String> feedMissionClients = missionNamesAfterFiltering
+		List<String> feedMissionClients = missionGuidsAfterFiltering
 			.stream()
-			.map(missionName -> SubscriptionStore.getInstance().getLocalUidsByMission(missionName)) 
+			.map(missionGuid -> SubscriptionStore.getInstance().getLocalUidsByMission(missionGuid)) 
 			.flatMap(clientUids -> clientUids.stream())
 			.distinct()
 			.collect(Collectors.toList());

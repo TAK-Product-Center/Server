@@ -1,5 +1,8 @@
 package com.bbn.marti.oauth;
 
+import com.bbn.marti.config.Network;
+import com.bbn.marti.util.spring.CorsHeaders;
+import com.google.common.base.Strings;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -56,13 +59,17 @@ public class PasswordGrantAuthenticationSuccessHandler
         ServletServerHttpResponse httpResponse = new ServletServerHttpResponse(response);
 
         AuthCookieUtils.SameSite sameSite = AuthCookieUtils.SameSite.Strict;
-        if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isAllowCredentials()) {
+        boolean partitioned = false;
+
+        // Set SameSite=None and enable the Partitioned attribute when responding to cross-origin requests allowing credentials
+        if (CorsHeaders.checkAndApplyCorsForConnector(request, response) && CorsHeaders.checkAllowCredentials(response)) {
             sameSite = AuthCookieUtils.SameSite.None;
+            partitioned = true;
         }
 
         final ResponseCookie cookieToken = AuthCookieUtils.createCookie(
                 OAuth2TokenType.ACCESS_TOKEN.getValue(), accessTokenResponse.getAccessToken().getTokenValue(), -1, sameSite);
-        response.setHeader(HttpHeaders.SET_COOKIE, cookieToken.toString());
+        response.setHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookiePartitioned(cookieToken, partitioned));
 
         this.accessTokenHttpResponseConverter.write(accessTokenResponse, null, httpResponse);
     }

@@ -76,7 +76,6 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
     private final String[] groupUserAttrs = {"memberOf", "ntUserWorkstations"};
     private final String[] distinguishedNameAttr = {"distinguishedName"};
     private final String[] sAMAccountNameAttr = {"sAMAccountName"};
-    private final String[] uidAttr = {"uid"};
 
     private final boolean debug = false;
 
@@ -580,13 +579,13 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         return null;
     }
 
-    public Map<String, String> getGroupInfoBySearch(String userId) throws NamingException {
+    public Map<String, String> getGroupInfoBySearch(String userId, boolean loginWithEmail) throws NamingException {
 
     	Map<String, String> result = null;
 
     	DirContext ctx = null;
 
-        if (getConf().isLoginWithEmail()) {
+        if (loginWithEmail) {
             String email = userId;
             userId = getUsernameByEmail(email);
             if (userId == null) {
@@ -671,7 +670,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
                     break;
                 }
                 case DS : {
-                    logonNameAttr = uidAttr;
+                    logonNameAttr = new String[] { conf.getNameAttr() };
                     break;
                 }
             }

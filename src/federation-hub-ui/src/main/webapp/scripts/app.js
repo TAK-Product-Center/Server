@@ -175,6 +175,14 @@ angular
                     templateUrl: "views/about.html"
 
                 })
+                .state('settings', {
+                    url: "/settings",
+                    ncyBreadcrumb: {
+                        label: 'Settings'
+                    },
+                    templateUrl: "views/settings.html",
+                    controller: "SettingsController"
+                })
                 // Template States
                 .state('workflows', {
                     abstract: true,

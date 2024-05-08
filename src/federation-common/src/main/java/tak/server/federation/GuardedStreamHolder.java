@@ -306,6 +306,15 @@ public class GuardedStreamHolder<T> {
         }
     }
     
+    public void throwCanceledExceptionToClient() {
+        try {
+        	if (clientStream != null)
+        		clientStream.onError(new StatusRuntimeException(Status.CANCELLED));
+        } catch (Exception e) {
+            logger.warn("exception sending StatusRuntimeException - CANCELLED to client", e);
+        }
+    }
+    
     public void throwPermissionDeniedToClient() {
         try {
         	if (clientStream != null)

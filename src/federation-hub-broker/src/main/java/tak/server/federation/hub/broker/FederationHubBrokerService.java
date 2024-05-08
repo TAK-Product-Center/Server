@@ -118,8 +118,10 @@ import tak.server.federation.FederationNode;
 import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.GuardedStreamHolder;
 import tak.server.federation.hub.FederationHubCache;
+import tak.server.federation.hub.FederationHubResources;
 import tak.server.federation.hub.broker.db.FederationHubMissionDisruptionManager;
 import tak.server.federation.hub.broker.events.BrokerServerEvent;
+import tak.server.federation.hub.broker.events.ForceDisconnectEvent;
 import tak.server.federation.hub.broker.events.HubClientDisconnectEvent;
 import tak.server.federation.hub.broker.events.RestartServerEvent;
 import tak.server.federation.hub.broker.events.StreamReadyEvent;
@@ -144,9 +146,6 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
     private FederationHubPolicyManager fedHubPolicyManager;
     private FederationHubMissionDisruptionManager federationHubMissionDisruptionManager;
     private SSLConfig sslConfig;
-
-    private int numThreads = Runtime.getRuntime().availableProcessors() + 1;
-	private ScheduledExecutorService mfdtScheduler = Executors.newScheduledThreadPool(1);
 
     /* v1 variables. */
     private final Map<String, NioNettyFederationHubServerHandler> v1ClientStreamMap = new ConcurrentHashMap<>();
@@ -183,10 +182,6 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
     	return instance;
     }
 
-    public ScheduledExecutorService getMfdtScheduler() {
-		return mfdtScheduler;
-	}
-    
 	private ContinuousQuery<String, FederationPolicyGraph> continuousConfigurationQuery = new ContinuousQuery<>();
 
     public FederationHubBrokerService(Ignite ignite, SSLConfig sslConfig, FederationHubServerConfig fedHubConfig, FederationHubPolicyManager fedHubPolicyManager, HubConnectionStore hubConnectionStore, FederationHubMissionDisruptionManager federationHubMissionDisruptionManager,
@@ -241,6 +236,30 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                 hubConnectionStore.clearIdFromAllStores(clientStreamEntry.getKey());
             }
         }
+    }
+    
+    public void disconnectFederateByConnectionId(String connectionId) {
+    	// v1
+		NioNettyFederationHubServerHandler v1 = v1ClientStreamMap.get(connectionId);
+		if (v1 != null) {
+			v1.forceClose();
+		}
+		
+		// v2
+		for (Map.Entry<String, GuardedStreamHolder<FederatedEvent>> stream : hubConnectionStore
+				.getClientStreamMap().entrySet()) {
+			if (stream.getValue().getFederateIdentity().getFedId().equals(connectionId)) {
+				stream.getValue().throwCanceledExceptionToClient();
+			}
+		}
+		
+		// outgoing
+		HubFigClient outgoing = outgoingClientMap.get(connectionId);
+     	if (outgoing != null) {
+     		outgoing.processDisconnect();
+     	}
+     	
+		hubConnectionStore.clearIdFromAllStores(connectionId);
     }
 
     /* TODO find place to call this. */
@@ -437,84 +456,95 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
         }).start();
     }
 
-    private void setupFederationV2Server() {
-        /* TODO Create and configure analog to lambda filter. */
+	private ScheduledFuture<?> inactivitySchedulerFuture = null;
 
-        try {
-            sendCaGroupsToFedManager(sslConfig.getTrust());
-        } catch (KeyStoreException e) {
-            throw new RuntimeException(e);
-        }
+	private void setupFederationV2Server() {
+		if (inactivitySchedulerFuture != null) {
+			inactivitySchedulerFuture.cancel(true);
+		}
+		try {
+			sendCaGroupsToFedManager(sslConfig.getTrust());
+		} catch (KeyStoreException e) {
+			throw new RuntimeException(e);
+		}
 
-        if (fedHubConfig.isEnableHealthCheck()) {
-            // Health check thread. Schedule metrics sending every K seconds.
-            Executors.newScheduledThreadPool(1).scheduleAtFixedRate(new Runnable() {
-                @Override
-                public void run() {
-                    removeInactiveClientStreams();
-                    if (!keepRunning.get()) {
-                        // Cancel this scheduled job by throwing an exception.
-                        throw new RuntimeException("Stopping server");
-                    }
-                }
-            }, fedHubConfig.getClientRefreshTime(), fedHubConfig.getClientRefreshTime(), TimeUnit.SECONDS);
-        }
+		if (fedHubConfig.isEnableHealthCheck()) {
+			// Health check thread. Schedule metrics sending every K seconds.
+			inactivitySchedulerFuture = FederationHubResources.healthCheckScheduler.scheduleAtFixedRate(new Runnable() {
+				@Override
+				public void run() {
+					removeInactiveClientStreams();
+					if (!keepRunning.get()) {
+						// Cancel this scheduled job by throwing an exception.
+						throw new RuntimeException("Stopping server");
+					}
+				}
+			}, fedHubConfig.getClientRefreshTime(), fedHubConfig.getClientRefreshTime(), TimeUnit.SECONDS);
+		}
 
-        NettyServerBuilder serverBuilder = NettyServerBuilder.forPort(fedHubConfig.getV2Port())
-            .maxInboundMessageSize(fedHubConfig.getMaxMessageSizeBytes())
-            .sslContext(sslConfig.getSslContext());
+		NettyServerBuilder serverBuilder = NettyServerBuilder.forPort(fedHubConfig.getV2Port())
+				.maxInboundMessageSize(fedHubConfig.getMaxMessageSizeBytes())
+				.sslContext(sslConfig.getSslContext())
+				.executor(FederationHubResources.federationGrpcExecutor)
+				.workerEventLoopGroup(FederationHubResources.federationGrpcWorkerEventLoopGroup)
+				.bossEventLoopGroup(FederationHubResources.federationGrpcWorkerEventLoopGroup)
+				.channelType(Epoll.isAvailable() ? EpollServerSocketChannel.class : NioServerSocketChannel.class);
+		
+		if (fedHubConfig.getMaxConcurrentCallsPerConnection() != null
+				&& fedHubConfig.getMaxConcurrentCallsPerConnection() > 0) {
+			serverBuilder.maxConcurrentCallsPerConnection(fedHubConfig.getMaxConcurrentCallsPerConnection());
+		}
 
-        if (fedHubConfig.getMaxConcurrentCallsPerConnection() != null &&
-                fedHubConfig.getMaxConcurrentCallsPerConnection() > 0) {
-            serverBuilder.maxConcurrentCallsPerConnection(fedHubConfig.getMaxConcurrentCallsPerConnection());
-        }
+		FederatedChannelService service = new FederatedChannelService();
 
-        FederatedChannelService service = new FederatedChannelService();
+		server = serverBuilder.addService(ServerInterceptors.intercept(service, tlsInterceptor())).build();
 
-        server = serverBuilder
-                .addService(ServerInterceptors.intercept(service, tlsInterceptor()))
-                .build();
+		/* TODO What is the purpose of this? */
+		service.binaryMessageStream(new StreamObserver<Empty>() {
+			@Override
+			public void onNext(Empty value) {
+			}
 
-        /* TODO What is the purpose of this? */
-        service.binaryMessageStream(new StreamObserver<Empty>() {
-            @Override
-            public void onNext(Empty value) {}
+			@Override
+			public void onError(Throwable t) {
+			}
 
-            @Override
-            public void onError(Throwable t) {}
+			@Override
+			public void onCompleted() {
+			}
+		});
 
-            @Override
-            public void onCompleted() {}
-        });
+		Executors.newSingleThreadExecutor().submit(new Runnable() {
+			@Override
+			public void run() {
+				requireNonNull(fedHubConfig, "Federation Hub configuration object");
 
-        Executors.newSingleThreadExecutor().submit(new Runnable() {
-            @Override
-            public void run() {
-                requireNonNull(fedHubConfig, "Federation Hub configuration object");
+				try {
+					server.start();
+					logger.info("Federation Hub (v2 protocol) started, listening on port " + fedHubConfig.getV2Port());
 
-                try {
-                    server.start();
-                    logger.info("Federation Hub (v2 protocol) started, listening on port " +
-                            fedHubConfig.getV2Port());
-
-                    Runtime.getRuntime().addShutdownHook(new Thread() {
-                        @Override
-                        public void run() {
-                            System.err.println("*** shutting down gRPC server since JVM is shutting down");
-                            FederationHubBrokerService.this.stop();
-                            keepRunning.set(false);
-                            System.err.println("*** server shut down");
-                        }
-                    });
-                } catch (Exception e) {
-                    logger.error("Exception starting v2 Federation Hub server", e);
-                }
-            }
-        });
-    }
+					Runtime.getRuntime().addShutdownHook(new Thread() {
+						@Override
+						public void run() {
+							System.err.println("*** shutting down gRPC server since JVM is shutting down");
+							FederationHubBrokerService.this.stop();
+							keepRunning.set(false);
+							System.err.println("*** server shut down");
+						}
+					});
+				} catch (Exception e) {
+					logger.error("Exception starting v2 Federation Hub server", e);
+				}
+			}
+		});
+	}
 
     @Override
     public void onApplicationEvent(BrokerServerEvent event) {
+    	if (event instanceof ForceDisconnectEvent) {
+    		disconnectFederateByConnectionId(((ForceDisconnectEvent) event).getConnectionId());
+    	}
+    	
     	if (event instanceof HubClientDisconnectEvent) {
     		outgoingClientMap.remove(((HubClientDisconnectEvent) event).getHubId());
     	}
@@ -619,7 +649,6 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
     Map<String, FederationOutgoingCell> outgoingConfigMap = new HashMap<>();
     Map<String, HubFigClient> outgoingClientMap = new HashMap<>();
     Map<String, ScheduledFuture<?>> outgoingClientRetryMap = new HashMap<>();
-    ScheduledExecutorService retryScheduler = Executors.newScheduledThreadPool(1);
     private synchronized void updateOutgoingConnections(List<FederationOutgoingCell> outgoings) {
     	try {
     		// cancel and clear all the current retries
@@ -699,7 +728,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
 
     	if (fedHubConfig.getOutgoingReconnectSeconds() > 0 && outgoing.getProperties().isOutgoingEnabled()) {
     		logger.info("Connection for {} failed. Trying again in {} seconds.", name, fedHubConfig.getOutgoingReconnectSeconds());
-    		ScheduledFuture<?> future = retryScheduler.scheduleAtFixedRate(() -> {
+    		ScheduledFuture<?> future = FederationHubResources.retryScheduler.scheduleAtFixedRate(() -> {
         		attemptRetry(name, outgoing);
     		}, fedHubConfig.getOutgoingReconnectSeconds(), fedHubConfig.getOutgoingReconnectSeconds(), TimeUnit.SECONDS);
 
@@ -733,7 +762,7 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
             setupFederationV1Server();
         }
 
-        retryScheduler.schedule(() -> {
+        FederationHubResources.retryScheduler.schedule(() -> {
         	 // try to initialize outgoing connections from the saved policy
             List<FederationOutgoingCell> outgoings = fedHubPolicyManager.getPolicyCells()
             		.stream()
@@ -1274,13 +1303,13 @@ public class FederationHubBrokerService implements ApplicationListener<BrokerSer
                 if (changes != null) {
         			
         			for(final Entry<ObjectId, ROL.Builder> entry: changes.getResourceRols().entrySet()) {
-        				mfdtScheduler.schedule(() -> {
+        				FederationHubResources.mfdtScheduler.schedule(() -> {
         					ROL rol = federationHubMissionDisruptionManager.hydrateResourceROL(entry.getKey(), entry.getValue());
         					rolStreamHolder.send(rol);
         				}, delayMs.getAndAdd(500), TimeUnit.MILLISECONDS);
         			}
         			for(final ROL rol: changes.getRols()) {
-        				mfdtScheduler.schedule(() -> {
+        				FederationHubResources.mfdtScheduler.schedule(() -> {
         					rolStreamHolder.send(rol);
         				}, delayMs.getAndAdd(100), TimeUnit.MILLISECONDS);
         			}

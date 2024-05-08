@@ -16,146 +16,129 @@ import java.util.Collections;
 import java.util.List;
 
 public enum ServerProcessDefinition {
-	FederationHubBroker("federation-hub-broker", !TAKCLCore.disableFederationHubProcess, "federation-hub/federation-hub-broker.jar", "/opt/tak/federation-hub/logs/federation-hub-broker.log",
-			Collections.unmodifiableList(Arrays.asList(
-					"Started FederationHubServer"
-			)), Arrays.asList("-Dlogging.config=/opt/tak/federation-hub/configs/logback-broker.xml","-DFEDERATION_HUB_BROKER_CONFIG=federation-hub/configs/federation-hub-broker.yml")),
-	
-	FederationHubPolicy("federation-hub-policy", !TAKCLCore.disableFederationHubProcess, "federation-hub/federation-hub-policy.jar", "/opt/tak/federation-hub/logs/federation-hub-policy.log",
-			Collections.unmodifiableList(Arrays.asList(
-					"Started FederationHubPolicyManagerService"
-			)), Arrays.asList("-Dlogging.config=/opt/tak/federation-hub/configs/logback-policy.xml","-DFEDERATION_HUB_POLICY_CONFIG=federation-hub/ui_generated_policy.json")),
-	
-	PluginManager("plugins", !TAKCLCore.disablePluginManagerProcess, "takserver-pm.jar", "logs/takserver-plugins.log",
-			Collections.unmodifiableList(Arrays.asList(
-					"t.s.p.s.DistributedPluginManager - execute method DistributedPluginManager",
-					"t.s.plugins.service.PluginService - Started PluginService"
-			)), null),
+    FederationHubBroker("federation-hub-broker", "federation-hub/federation-hub-broker.jar", "/opt/tak/federation-hub/logs/federation-hub-broker.log", Collections.unmodifiableList(Arrays.asList(
+        "Started FederationHubServer"
+    )), Arrays.asList("-Dlogging.config=/opt/tak/federation-hub/configs/logback-broker.xml", "-DFEDERATION_HUB_BROKER_CONFIG=federation-hub/configs/federation-hub-broker.yml")),
 
-	RetentionService("retention", !TAKCLCore.disableRetentionProcess, "takserver-retention.jar", "logs/takserver-retention.log",
-			Collections.unmodifiableList(Arrays.asList(
-					"t.s.r.c.DistributedRetentionPolicyConfig -  execute method DistributedRetentionPolicyConfig",
-					"t.s.retention.RetentionApplication - Started RetentionApplication"
-			)), null),
+    FederationHubPolicy("federation-hub-policy", "federation-hub/federation-hub-policy.jar", "/opt/tak/federation-hub/logs/federation-hub-policy.log", Collections.unmodifiableList(Arrays.asList(
+        "Started FederationHubPolicyManagerService"
+    )), Arrays.asList("-Dlogging.config=/opt/tak/federation-hub/configs/logback-policy.xml", "-DFEDERATION_HUB_POLICY_CONFIG=federation-hub/ui_generated_policy.json")),
 
-	ConfigService("config", !TAKCLCore.disableConfigProcess, "takserver.war", "logs/takserver-config.log",
-			Collections.unmodifiableList(Arrays.asList(
-					"t.s.c.ConfigServiceConfiguration - Setting up local and ignite configuration",
-					"t.s.c.ConfigServiceConfiguration - Setting up distributed configuration",
-					"c.b.m.r.c.DistributedConfiguration - execute method DistributedConfiguration"
-			)),
-			Arrays.asList("-Dspring.profiles.active=config")),
+    PluginManager("plugins", "takserver-pm.jar", "logs/takserver-plugins.log", Collections.unmodifiableList(Arrays.asList(
+        "DistributedPluginManager - execute method DistributedPluginManager",
+        "PluginService - Started PluginService"
+    )), null),
 
-	MessagingService("messaging", !TAKCLCore.disableMessagingProcess, "takserver.war", "logs/takserver-messaging.log",
-			Collections.unmodifiableList(Arrays.asList(
-					"c.b.m.s.DistributedSubscriptionManager - DistributedSubscriptionManager execute",
-					"t.s.f.DistributedFederationManager - execute method DistributedFederationManager",
-					"c.b.m.g.DistributedPersistentGroupManager - execute method DistributedPersistentGroupManager",
-					"t.s.profile.DistributedServerInfo - execute method DistributedServerInfo",
-					"c.b.m.s.DistributedContactManager - execute method DistributedContactManager",
-					"c.b.m.r.DistributedRepeaterManager - execute method DistributedRepeaterManager",
-					"c.b.m.groups.DistributedUserManager - DistributedUserManager execute",
-					"t.s.config.DistributedSystemInfoApi - execute method DistributedSystemInfoApi",
-					"t.s.cluster.DistributedInputManager - execute method DistributedInputManager",
-					"t.s.c.DistributedSecurityManager - execute method DistributedSecurityManager",
-					"c.b.m.DistributedMetricsCollector - execute method DistributedMetricsCollector",
-					"t.s.c.DistributedInjectionService - execute method DistributedInjectionService",
-					"t.s.m.DistributedPluginDataFeedApi - execute method DistributedPluginDataFeedApi",
-					"t.s.messaging.DistributedPluginApi - execute method DistributedPluginApi",
-					"t.s.m.DistributedPluginSelfStopApi - execute method DistributedPluginSelfStopApi",
-					"c.b.m.service.MessagingInitializer - takserver-core init complete"
-			)), Arrays.asList("-Dspring.profiles.active=messaging")),
+    RetentionService("retention", "takserver-retention.jar", "logs/takserver-retention.log", Collections.unmodifiableList(Arrays.asList(
+        "DistributedRetentionPolicyConfig -  execute method DistributedRetentionPolicyConfig",
+        "RetentionApplication - Started RetentionApplication"
+    )), null),
 
-	ApiService("api", !TAKCLCore.disableApiProcess, "takserver.war", "logs/takserver-api.log",
-			Collections.unmodifiableList(Arrays.asList(
-					"c.b.m.s.DistributedFederationHttpConnectorManager - execute method DistributedFederationHttpConnectorManager",
-					"c.b.m.s.DistributedRetentionQueryManager - execute method DistributedRetentionQueryManager",
-					"t.s.api.DistributedPluginMissionApi - execute method DistributedPluginMissionApi",
-					"o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started"
-			)), Arrays.asList("-Dspring.profiles.active=api"));
+    ConfigService("config", "takserver.war", "logs/takserver-config.log", Collections.unmodifiableList(Arrays.asList(
+        "ConfigServiceConfiguration - Setting up local and ignite configuration",
+        "ConfigServiceConfiguration - Setting up distributed configuration",
+        "DistributedConfiguration - execute method DistributedConfiguration"
+    )),
+        Arrays.asList("-Dspring.profiles.active=config")),
 
-	public final String identifier;
-	public final String jarName;
-	public final String logPath;
-	public final List<String> logWatchValues;
-	public final List<String> jvmFlags;
-	private boolean enabled;
+    MessagingService("messaging", "takserver.war", "logs/takserver-messaging.log", Collections.unmodifiableList(Arrays.asList(
+        "DistributedSubscriptionManager - DistributedSubscriptionManager execute",
+        "DistributedFederationManager - execute method DistributedFederationManager",
+        "DistributedPersistentGroupManager - execute method DistributedPersistentGroupManager",
+        "DistributedServerInfo - execute method DistributedServerInfo",
+        "DistributedContactManager - execute method DistributedContactManager",
+        "DistributedRepeaterManager - execute method DistributedRepeaterManager",
+        "DistributedUserManager - DistributedUserManager execute",
+        "DistributedSystemInfoApi - execute method DistributedSystemInfoApi",
+        "DistributedInputManager - execute method DistributedInputManager",
+        "DistributedSecurityManager - execute method DistributedSecurityManager",
+        "DistributedMetricsCollector - execute method DistributedMetricsCollector",
+        "DistributedInjectionService - execute method DistributedInjectionService",
+        "DistributedPluginDataFeedApi - execute method DistributedPluginDataFeedApi",
+        "DistributedPluginApi - execute method DistributedPluginApi",
+        "DistributedPluginSelfStopApi - execute method DistributedPluginSelfStopApi",
+        "MessagingInitializer - takserver-core init complete"
+    )), Arrays.asList("-Dspring.profiles.active=messaging")),
 
-	ServerProcessDefinition(@NotNull String identifier, boolean enabled, @NotNull String jarName,
-	                        @NotNull String logPath, @NotNull List<String> logWatchValues, @Nullable List<String> jvmFlags) {
-		this.identifier = identifier;
-		this.enabled = enabled;
-		this.jarName = jarName;
-		this.logPath = logPath;
-		this.logWatchValues = logWatchValues;
-		this.jvmFlags = jvmFlags;
-	}
+    ApiService("api", "takserver.war", "logs/takserver-api.log", Collections.unmodifiableList(Arrays.asList(
+        "DistributedFederationHttpConnectorManager - execute method DistributedFederationHttpConnectorManager",
+        "DistributedRetentionQueryManager - execute method DistributedRetentionQueryManager",
+        "DistributedPluginMissionApi - execute method DistributedPluginMissionApi",
+        "TomcatWebServer - Tomcat started"
+    )), Arrays.asList("-Dspring.profiles.active=api"));
 
-	public void setEnabled(boolean value) {
-		enabled = value;
-	}
+    public final String identifier;
+    public final String jarName;
+    public final String logPath;
+    public final List<String> logWatchValues;
+    public final List<String> jvmFlags;
 
-	public boolean isEnabled() {
-		return enabled;
-	}
+    ServerProcessDefinition(@NotNull String identifier, @NotNull String jarName,
+                            @NotNull String logPath, @NotNull List<String> logWatchValues, @Nullable List<String> jvmFlags) {
+        this.identifier = identifier;
+        this.jarName = jarName;
+        this.logPath = logPath;
+        this.logWatchValues = logWatchValues;
+        this.jvmFlags = jvmFlags;
+    }
 
-	public final List<String> waitForMissingLogStatements(@NotNull AbstractServerProfile serverIdentifier,
-	                                                       @NotNull Path takserverLogsPath, int maxWaitTimeMs) {
-		boolean serverReady = false;
-		int duration = 0;
-		List<String> remainingStatementsToSee = new ArrayList<>(this.logWatchValues);
+    public final List<String> waitForMissingLogStatements(@NotNull AbstractServerProfile serverIdentifier,
+                                                          @NotNull Path takserverLogsPath, int maxWaitTimeMs) {
+        boolean serverReady = false;
+        int duration = 0;
+        List<String> remainingStatementsToSee = new ArrayList<>(this.logWatchValues);
 
-		File logFile = takserverLogsPath.resolve(this.logPath).toFile();
+        File logFile = takserverLogsPath.resolve(this.logPath).toFile();
 
-		try {
-			while (!serverReady && duration < maxWaitTimeMs) {
-				if (!logFile.exists()) {
-					Thread.sleep(500);
-					duration += 500;
-					continue;
-				}
+        try {
+            while (!serverReady && duration < maxWaitTimeMs) {
+                if (!logFile.exists()) {
+                    Thread.sleep(500);
+                    duration += 500;
+                    continue;
+                }
 
-				BufferedReader logFileReader = new BufferedReader(new FileReader(logFile));
+                BufferedReader logFileReader = new BufferedReader(new FileReader(logFile));
 
-				List<String> statementsToRemove = new ArrayList<>(remainingStatementsToSee.size());
-				
-				String logLine = logFileReader.readLine();
-				while (logLine != null) {
-					for (String value : remainingStatementsToSee) {
-						if (logLine.contains(value)) {
-							statementsToRemove.add(value);
-						}
-					}
-					logLine = logFileReader.readLine();
-				}
+                List<String> statementsToRemove = new ArrayList<>(remainingStatementsToSee.size());
 
-				for (String value : statementsToRemove) {
-					remainingStatementsToSee.remove(value);
-				}
-				statementsToRemove.clear();
+                String logLine = logFileReader.readLine();
+                while (logLine != null) {
+                    for (String value : remainingStatementsToSee) {
+                        if (logLine.contains(value)) {
+                            statementsToRemove.add(value);
+                        }
+                    }
+                    logLine = logFileReader.readLine();
+                }
 
-				if (remainingStatementsToSee.isEmpty()) {
-					serverReady = true;
-				} else {
-					Thread.sleep(500);
-					duration += 500;
-				}
-			}
+                for (String value : statementsToRemove) {
+                    remainingStatementsToSee.remove(value);
+                }
+                statementsToRemove.clear();
 
-			if (TAKCLCore.serverStartupWaitTime != null && duration < TAKCLCore.serverStartupWaitTime) {
-				System.out.println("Sleeping for " + (TAKCLCore.serverStartupWaitTime - duration) + " minutes.");
-				Thread.sleep(TAKCLCore.serverStartupWaitTime - duration);
-			}
+                if (remainingStatementsToSee.isEmpty()) {
+                    serverReady = true;
+                } else {
+                    Thread.sleep(500);
+                    duration += 500;
+                }
+            }
 
-			if (serverReady) {
-				System.out.println("Server process " + this.identifier + " appears to be ready based on log statements after " + duration + " ms");
-			} else {
-				System.out.println("Server process " + this.identifier + " init timeout of " + maxWaitTimeMs + " ms reached. The following log statements were not seen:\n\t" +
-						String.join("\"\n\t\"", remainingStatementsToSee) + "\n There is a good chance the tests may fail!");
-			}
-		} catch (InterruptedException | IOException e) {
-			throw new RuntimeException(e);
-		}
-		return remainingStatementsToSee;
-	}
+            if (TAKCLCore.serverStartupWaitTime != null && duration < TAKCLCore.serverStartupWaitTime) {
+                System.out.println("Sleeping for " + (TAKCLCore.serverStartupWaitTime - duration) + " minutes.");
+                Thread.sleep(TAKCLCore.serverStartupWaitTime - duration);
+            }
+
+            if (serverReady) {
+                System.out.println("Server process " + this.identifier + " appears to be ready based on log statements after " + duration + " ms");
+            } else {
+                System.out.println("Server process " + this.identifier + " init timeout of " + maxWaitTimeMs + " ms reached. The following log statements were not seen:\n\t" +
+                    String.join("\"\n\t\"", remainingStatementsToSee) + "\n There is a good chance the tests may fail!");
+            }
+        } catch (InterruptedException | IOException e) {
+            throw new RuntimeException(e);
+        }
+        return remainingStatementsToSee;
+    }
 }

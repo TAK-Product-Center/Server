@@ -5,8 +5,6 @@ import static java.util.Objects.requireNonNull;
 import java.rmi.RemoteException;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
@@ -27,14 +25,13 @@ import mil.af.rl.rol.Resource;
 import mil.af.rl.rol.ResourceOperationParameterEvaluator;
 import mil.af.rl.rol.RolLexer;
 import mil.af.rl.rol.RolParser;
+import tak.server.federation.hub.FederationHubResources;
 import tak.server.federation.hub.broker.db.FederationHubMissionDisruptionManager;
 import tak.server.federation.rol.MissionEnterpriseSyncRolVisitor;
 
 public class FederationHubROLHandler {
 	
 	private static final Logger logger = LoggerFactory.getLogger(FederationHubROLHandler.class);
-	private int numThreads = Runtime.getRuntime().availableProcessors() + 1;
-	private ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 	
 	private FederationHubMissionDisruptionManager federationHubMissionDisruptionManager;
 	
@@ -43,7 +40,7 @@ public class FederationHubROLHandler {
 	}
 	
 	public void onNewEvent(ROL rol, String streamKey, String federateServerId) throws RemoteException {
-		executor.execute(() -> {
+		FederationHubResources.rolExecutor.execute(() -> {
 			if (rol == null) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("skipping null ROL message");

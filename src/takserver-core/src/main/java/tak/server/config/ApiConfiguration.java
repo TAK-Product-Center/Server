@@ -4,13 +4,7 @@ import java.rmi.RemoteException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 
-import jakarta.servlet.MultipartConfigElement;
-import jakarta.servlet.ServletContextEvent;
-import jakarta.servlet.ServletContextListener;
-import jakarta.servlet.http.HttpSessionListener;
 import javax.sql.DataSource;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.apache.ignite.Ignite;
 import org.slf4j.Logger;
@@ -85,11 +79,14 @@ import com.bbn.marti.network.SecurityAuthenticationApi;
 import com.bbn.marti.network.SubmissionApi;
 import com.bbn.marti.network.UIDSearchApi;
 import com.bbn.marti.oauth.OAuthApi;
+import com.bbn.marti.oauth.TokenApi;
 import com.bbn.marti.remote.FederationConfigInterface;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.FileUserManagementInterface;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.service.RetentionQueryService;
 import com.bbn.marti.remote.util.RemoteUtil;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.repeater.RepeaterApi;
 import com.bbn.marti.service.DistributedFederationHttpConnectorManager;
 import com.bbn.marti.service.DistributedRetentionQueryManager;
@@ -124,7 +121,6 @@ import com.bbn.marti.sync.service.PropertiesServiceDefaultImpl;
 import com.bbn.marti.util.IconsetDirWatcher;
 import com.bbn.marti.util.VersionApi;
 import com.bbn.marti.util.spring.HttpSessionCreatedEventListener;
-import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.util.spring.TakAuthSessionDestructionListener;
 import com.bbn.marti.video.VideoConnectionManager;
 import com.bbn.marti.video.VideoConnectionManagerV2;
@@ -148,16 +144,17 @@ import com.bbn.user.registration.RegistrationApi;
 import com.bbn.user.registration.service.UserRegistrationService;
 import com.bbn.useraccountmanagement.FileUserAccountManagementApi;
 import com.bbn.vbm.VBMConfigurationApi;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-
+import jakarta.servlet.MultipartConfigElement;
+import jakarta.servlet.ServletContextEvent;
+import jakarta.servlet.ServletContextListener;
+import jakarta.servlet.http.HttpSessionListener;
 import tak.server.Constants;
 import tak.server.api.DistributedPluginCoreConfigApi;
 import tak.server.api.DistributedPluginFileApi;
 import tak.server.api.DistributedPluginMissionApi;
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.cache.ContactCacheHelper;
-import tak.server.cache.MissionCacheResolver;
-import tak.server.cache.MissionLayerCacheResolver;
 import tak.server.federation.FederationConfigManager;
 import tak.server.filemanager.FileManagerApi;
 import tak.server.filemanager.FileManagerService;
@@ -782,6 +779,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	}
 
 	@Bean
+	public TokenApi oAuth2AdminApi() {
+		return new TokenApi();
+	}
+
+	@Bean
 	public CustomExceptionHandler exceptionHandler() {
 		return new CustomExceptionHandler();
 	}
@@ -857,17 +859,9 @@ public class ApiConfiguration implements WebMvcConfigurer {
 				.serviceProxy(Constants.DISTRIBUTED_RETENTION_QUERY_MANAGER, RetentionQueryService.class, false);
 	}
 
-	@Bean("missionCacheResolver")
-	public MissionCacheResolver missionCacheResolver() { return new MissionCacheResolver(); }
-
-	@Bean("missionLayerCacheResolver")
-	public MissionLayerCacheResolver missionLayerCacheResolver() { return new MissionLayerCacheResolver(); }
-
 	@Bean
 	public QoSManager qosManager(Ignite ignite) {
-		
 		return ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_QOS_MANAGER, QoSManager.class, false);
-		
 	}
 	
 	@Bean

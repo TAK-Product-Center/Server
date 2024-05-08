@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -278,7 +279,7 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 				missionService.invalidateMissionCache(name);
 
 				try {
-					subscriptionManager.broadcastMissionAnnouncement(name, groupVectorMission, creatorUid,
+					subscriptionManager.broadcastMissionAnnouncement(UUID.fromString(mission.getGuid()) ,name, groupVectorMission, creatorUid,
 							SubscriptionManagerLite.ChangeType.METADATA, mission.getTool());
 				} catch (Exception e) {
 					logger.debug("exception announcing mission change " + e.getMessage(), e);
@@ -310,7 +311,10 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 
 			if (missionPackage != null) {
 				List<MissionChange> conflicts = new ArrayList<>();
-				missionService.addMissionPackage(name, missionPackage, creatorUid, commonUtil().getAllInOutGroups(),
+				
+				mission = missionService.getMission(name, groupVectorForAdminUser);
+				
+				missionService.addMissionPackage(mission.getGuidAsUUID(), missionPackage, creatorUid, commonUtil().getAllInOutGroups(),
 						conflicts);
 				mission = missionService.getMission(name, groupVectorForAdminUser);
 			}
@@ -385,7 +389,7 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 
 		String serverName = ""; // Don't have server name
 
-		byte[] archive = missionService.archiveMission(mission.getName(), groupVectorForAdmin, serverName);
+		byte[] archive = missionService.archiveMission(mission.getGuidAsUUID(), groupVectorForAdmin, serverName);
 		missionService.addMissionArchiveToEsync(mission.getName(), archive, groupVectorForAdmin, true);
 
 		logger.debug("added archived mission to esync " + mission.getName());
@@ -407,8 +411,11 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 		if (content.getHashes().isEmpty() && content.getUids().isEmpty()) {
 			throw new IllegalArgumentException("at least one hash or uid must be provided in request");
 		}
+		
+		// get the mission by name here (not guid). This API can easily be extended later to support all these mission operations by guid.
+		Mission m = missionService.getMissionByNameCheckGroups(name, groupVectorForAdmin);
 
-		Mission mission = missionService.addMissionContent(name, content, creatorUid, groupVectorForAdmin);
+		Mission mission = missionService.addMissionContent(m.getGuidAsUUID(), content, creatorUid, groupVectorForAdmin);
 
 		return mission;
     	
@@ -420,9 +427,11 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 		MissionService missionService = missionService();
 
 		final String groupVectorForAdmin = RemoteUtil.getInstance().getBitStringAllGroups();
+		
+		Mission m = missionService.getMissionByNameCheckGroups(name, groupVectorForAdmin);
 
 		// remove the content and track change
-		Mission mission = missionService.deleteMissionContent(name, hash, uid, creatorUid, groupVectorForAdmin);
+		Mission mission = missionService.deleteMissionContent(m.getGuidAsUUID(), hash, uid, creatorUid, groupVectorForAdmin);
 
 		return mission;
 	}
@@ -450,7 +459,7 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 		missionService.invalidateMissionCache(name);
 
 		try {
-			subscriptionManager.broadcastMissionAnnouncement(name, mission.getGroupVector(), creatorUid,
+			subscriptionManager.broadcastMissionAnnouncement(UUID.fromString(mission.getGuid()) ,name, mission.getGroupVector(), creatorUid,
 					SubscriptionManagerLite.ChangeType.KEYWORD, mission.getTool());
 		} catch (Exception e) {
 			logger.debug("exception announcing mission change " + e.getMessage(), e);
@@ -497,7 +506,7 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 		missionService.invalidateMissionCache(name);
 
 		try {
-			subscriptionManager.broadcastMissionAnnouncement(name, mission.getGroupVector(), creatorUid,
+			subscriptionManager.broadcastMissionAnnouncement(UUID.fromString(mission.getGuid()) ,name, mission.getGroupVector(), creatorUid,
 					SubscriptionManagerLite.ChangeType.KEYWORD, mission.getTool());
 		} catch (Exception e) {
 			logger.debug("exception announcing mission change " + e.getMessage(), e);
@@ -534,14 +543,13 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 		missionService.invalidateMissionCache(name);
 
 		try {
-			subscriptionManager.broadcastMissionAnnouncement(name, mission.getGroupVector(), creatorUid,
+			subscriptionManager.broadcastMissionAnnouncement(UUID.fromString(mission.getGuid()), name, mission.getGroupVector(), creatorUid,
 					SubscriptionManagerLite.ChangeType.KEYWORD, mission.getTool());
 		} catch (Exception e) {
 			logger.debug("exception announcing mission change " + e.getMessage(), e);
 		}
 
 		return mission;
-
 	}
 
 
@@ -557,8 +565,12 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 
 		Mission mission = missionService.getMissionByNameCheckGroups(childName, groupVectorForAdmin);
 		missionService.validateMission(mission, childName);
+		
+		Mission childMission = missionService.getMissionByNameCheckGroups(childName, groupVectorForAdmin);
+		
+		Mission parentMission = missionService.getMissionByNameCheckGroups(parentName, groupVectorForAdmin);
 
-		missionService.setParent(childName, parentName, groupVectorForAdmin);
+		missionService.setParent(childMission.getGuidAsUUID(), parentMission.getGuidAsUUID(), groupVectorForAdmin);
 	}
 
 	@Override
@@ -573,7 +585,7 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 		Mission mission = missionService.getMissionByNameCheckGroups(childName, groupVectorForAdmin);
 		missionService.validateMission(mission, childName);
 
-		missionService.clearParent(childName, groupVectorForAdmin);
+		missionService.clearParent(mission.getGuidAsUUID(), groupVectorForAdmin);
 	}
 
 	@Override
@@ -588,7 +600,7 @@ public class DistributedPluginMissionApi implements PluginMissionApi, org.apache
 		Mission mission = missionService.getMissionByNameCheckGroups(parentName, groupVectorForAdmin);
 		missionService.validateMission(mission, parentName);
 
-		Set<Mission> children = missionService.getChildren(parentName, groupVectorForAdmin);
+		Set<Mission> children = missionService.getChildren(mission.getGuidAsUUID(), groupVectorForAdmin);
 
 		return children;
 
