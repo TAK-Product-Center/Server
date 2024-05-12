@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import com.bbn.marti.config.Auth;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.LdapSecurityType;
+import com.bbn.marti.config.LdapStyle;
 import com.bbn.marti.remote.LdapGroup;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.exception.NotFoundException;
@@ -924,7 +925,12 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         try {
             context = connectLdap();
 
-            String userFilter = "(&(objectclass={0})(sAMAccountName={1}))";
+            String logonNameAttr = "sAMAccountName";
+            if (ldapConfig.getStyle() == LdapStyle.DS) {
+                logonNameAttr = ldapConfig.getNameAttr();
+            }
+
+            String userFilter = "(&(objectclass={0})("+ logonNameAttr + "={1}))";
             Object[] args = new Object[] {
                 ldapConfig.getUserObjectClass().trim(),
                 username.trim()
@@ -961,8 +967,15 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
                 SearchResult searchResult = namingEnumeration.next();
                 Attributes attributes = searchResult.getAttributes();
 
-                String cn = (String)attributes.get(CN_ATTR_NM).get();
-                String dn = (String)attributes.get(getDnAttributeName()).get();
+                String cn = null;
+                if (attributes.get(CN_ATTR_NM) != null) {
+                    cn = (String)attributes.get(CN_ATTR_NM).get();
+                }
+
+                String dn = null;
+                if (attributes.get(getDnAttributeName()) != null) {
+                    dn = (String)attributes.get(getDnAttributeName()).get();
+                }
 
                 String desc = null;
                 if (attributes.get(DESCRIPTION_ATTR_NM) != null) {

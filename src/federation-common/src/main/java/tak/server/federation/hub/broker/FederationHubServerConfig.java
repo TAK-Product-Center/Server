@@ -1,14 +1,14 @@
 package tak.server.federation.hub.broker;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
 import org.apache.commons.lang3.RandomStringUtils;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class FederationHubServerConfig {
 
     public FederationHubServerConfig() {
@@ -29,6 +29,8 @@ public class FederationHubServerConfig {
     private String truststorePassword;
 
     private String keyManagerType = "SunX509";
+    private String caFile = "";
+
 
     /* For v1 federation only. */
     private boolean v1Enabled;
@@ -151,12 +153,20 @@ public class FederationHubServerConfig {
     public void setKeyManagerType(String keyManagerType) {
         this.keyManagerType = keyManagerType;
     }
+    
+    public String getCaFile() {
+		return caFile;
+	}
+
+	public void setCaFile(String caFile) {
+		this.caFile = caFile;
+	}
 
     /*
      * v1 federation only.
      */
 
-    public boolean isV1Enabled() {
+	public boolean isV1Enabled() {
         return v1Enabled;
     }
     public void setV1Enabled(boolean v1Enabled) {
@@ -355,19 +365,19 @@ public class FederationHubServerConfig {
 	public String toString() {
 		return "FederationHubServerConfig [keystoreType=" + keystoreType + ", keystoreFile=" + keystoreFile
 				+ ", truststoreType=" + truststoreType + ", truststoreFile=" + truststoreFile + ", keyManagerType="
-				+ keyManagerType + ", v1Enabled=" + v1Enabled + ", v1Port=" + v1Port + ", context=" + context
-				+ ", useEpoll=" + useEpoll + ", allow128cipher=" + allow128cipher + ", allowNonSuiteB=" + allowNonSuiteB
-				+ ", enableOCSP=" + enableOCSP + ", tlsVersions=" + tlsVersions + ", v2Enabled=" + v2Enabled
-				+ ", v2Port=" + v2Port + ", maxMessageSizeBytes=" + maxMessageSizeBytes + ", metricsLogIntervalSeconds="
-				+ metricsLogIntervalSeconds + ", clientTimeoutTime=" + clientTimeoutTime + ", clientRefreshTime="
-				+ clientRefreshTime + ", maxConcurrentCallsPerConnection=" + maxConcurrentCallsPerConnection
-				+ ", enableHealthCheck=" + enableHealthCheck + ", useCaGroups=" + useCaGroups + ", serverName="
-				+ serverName + ", outgoingReconnectSeconds=" + outgoingReconnectSeconds + ", id=" + id + ", nonce="
-				+ nonce + ", fullId=" + fullId + ", dbUsername=" + dbUsername + ", dbPort=" + dbPort + ", dbHost="
-				+ dbHost + ", dbConnectionTimeoutMS=" + dbConnectionTimeoutMS + ", missionFederationDBRetentionDays="
-				+ missionFederationDBRetentionDays + ", missionFederationRecencySeconds="
-				+ missionFederationRecencySeconds + ", missionFederationDisruptionMaxFileSizeBytes="
-				+ missionFederationDisruptionMaxFileSizeBytes + ", missionFederationDisruptionEnabled="
-				+ missionFederationDisruptionEnabled + "]";
+				+ keyManagerType + ", caFile=" + caFile + ", v1Enabled=" + v1Enabled + ", v1Port=" + v1Port
+				+ ", context=" + context + ", useEpoll=" + useEpoll + ", allow128cipher=" + allow128cipher
+				+ ", allowNonSuiteB=" + allowNonSuiteB + ", enableOCSP=" + enableOCSP + ", tlsVersions=" + tlsVersions
+				+ ", v2Enabled=" + v2Enabled + ", v2Port=" + v2Port + ", maxMessageSizeBytes=" + maxMessageSizeBytes
+				+ ", metricsLogIntervalSeconds=" + metricsLogIntervalSeconds + ", clientTimeoutTime="
+				+ clientTimeoutTime + ", clientRefreshTime=" + clientRefreshTime + ", maxConcurrentCallsPerConnection="
+				+ maxConcurrentCallsPerConnection + ", enableHealthCheck=" + enableHealthCheck + ", useCaGroups="
+				+ useCaGroups + ", serverName=" + serverName + ", outgoingReconnectSeconds=" + outgoingReconnectSeconds
+				+ ", id=" + id + ", nonce=" + nonce + ", fullId=" + fullId + ", dbUsername=" + dbUsername + ", dbPort="
+				+ dbPort + ", dbHost=" + dbHost + ", dbConnectionTimeoutMS=" + dbConnectionTimeoutMS
+				+ ", missionFederationDBRetentionDays=" + missionFederationDBRetentionDays
+				+ ", missionFederationRecencySeconds=" + missionFederationRecencySeconds
+				+ ", missionFederationDisruptionMaxFileSizeBytes=" + missionFederationDisruptionMaxFileSizeBytes
+				+ ", missionFederationDisruptionEnabled=" + missionFederationDisruptionEnabled + "]";
 	}
 }

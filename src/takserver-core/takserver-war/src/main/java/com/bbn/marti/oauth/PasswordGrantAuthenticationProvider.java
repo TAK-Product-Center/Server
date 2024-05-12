@@ -10,10 +10,12 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AccessTokenAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.token.DefaultOAuth2TokenContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.util.Assert;
+
 
 public class PasswordGrantAuthenticationProvider implements AuthenticationProvider {
 
@@ -22,10 +24,16 @@ public class PasswordGrantAuthenticationProvider implements AuthenticationProvid
 
     private AuthenticationProvider authenticationProvider;
 
-    public PasswordGrantAuthenticationProvider(OAuth2AuthorizationService authorizationService,
-                                                 OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
+    // TAK
+    private RegisteredClientRepository registeredClientRepository;
+
+    // TAK
+    public PasswordGrantAuthenticationProvider(RegisteredClientRepository registeredClientRepository,
+                                               OAuth2AuthorizationService authorizationService,
+                                               OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
         Assert.notNull(authorizationService, "authorizationService cannot be null");
         Assert.notNull(tokenGenerator, "tokenGenerator cannot be null");
+        this.registeredClientRepository = registeredClientRepository;
         this.authorizationService = authorizationService;
         this.tokenGenerator = tokenGenerator;
     }
@@ -39,7 +47,16 @@ public class PasswordGrantAuthenticationProvider implements AuthenticationProvid
         authenticationProvider.authenticate(authentication);
 
         OAuth2ClientAuthenticationToken clientPrincipal = (OAuth2ClientAuthenticationToken)authentication;
-        RegisteredClient registeredClient = clientPrincipal.getRegisteredClient();
+
+        // TAK
+        RegisteredClient registeredClient = this.registeredClientRepository.findByClientId(
+                clientPrincipal.getRegisteredClient().getClientId());
+        if (registeredClient == null) {
+            try {
+                registeredClient = clientPrincipal.getRegisteredClient();
+                this.registeredClientRepository.save(registeredClient);
+            } catch (Exception e) { }
+        }
 
         // Generate the access token
         OAuth2TokenContext tokenContext = DefaultOAuth2TokenContext.builder()

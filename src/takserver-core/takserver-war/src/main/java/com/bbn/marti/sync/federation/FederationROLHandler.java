@@ -270,22 +270,25 @@ public class FederationROLHandler {
 				}
 
 				CoreConfig coreConfig = CoreConfigFacade.getInstance();
+				
+				String groupVectorString = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
 
+				// TODO: when updating federation to support mission guid, this is one place to address the consistency model for mission
+				// guids.
 				switch (requireNonNull(mud.getChangeType(), "mission update change type")) {
 					case ADD_CONTENT:
 
-						if (!missionService.exists(mud.getMissionName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)))) {
+						if (!missionService.exists(mud.getMissionName(), groupVectorString)) {
 							missionService.createMission(mud.getMissionName(), mud.getMissionCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)), mud.getMissionDescription(), mud.getMissionChatRoom(), null, null, null, null, mud.getMissionTool(), null, null, null, null, false);
 						}
 
-						if (logger.isDebugEnabled()) {
-							logger.debug("adding mission content");
-						}
-						missionService.addMissionContent(mud.getMissionName(), mud.getContent(), mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
+						logger.debug("adding mission content");
+						
+						Mission fedMission = missionService.getMissionByNameCheckGroups(mud.getMissionName(), groupVectorString);
+						missionService.addMissionContent(fedMission.getGuidAsUUID(), mud.getContent(), mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
 
-						if (logger.isDebugEnabled()) {
-							logger.debug("adding mission content complete");
-						}
+						logger.debug("adding mission content complete");
+						
 						break;
 					case REMOVE_CONTENT:
 						try {
@@ -302,7 +305,8 @@ public class FederationROLHandler {
 									uid = mud.getContent().getUids().get(0);
 								}
 
-								missionService.deleteMissionContent(mud.getMissionName(), hash, uid, mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
+								Mission fedMissionr = missionService.getMissionByNameCheckGroups(mud.getMissionName(), groupVectorString);
+								missionService.deleteMissionContent(fedMissionr.getGuidAsUUID(), hash, uid, mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
 
 							} else {
 								logger.info("ignoring federated delete content - disabled in CoreConfig");
@@ -361,28 +365,32 @@ public class FederationROLHandler {
 
 		private void processAssign(ROL rol) {
 
-			if (logger.isDebugEnabled()) {
-				logger.debug("received ROL process assign mission from core " + rol);
-			}
+			logger.debug("received ROL process assign mission from core {}", rol);
 
 			if (parameters instanceof MissionHierarchy) { // for setParent
 				MissionHierarchy missionHierarchy = (MissionHierarchy) parameters;
+				
+				Mission mission = missionService.getMissionByNameCheckGroups(missionHierarchy.getMissionName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
 
 				if (Strings.isNullOrEmpty(missionHierarchy.getParentMissionName())) {
-					missionService.clearParent(missionHierarchy.getMissionName(),
+
+					missionService.clearParent(mission.getGuidAsUUID(),
 							remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
 				} else {
-					missionService.setParent(missionHierarchy.getMissionName(), missionHierarchy.getParentMissionName(),
+					
+					Mission parentMission = missionService.getMissionByNameCheckGroups(missionHierarchy.getParentMissionName(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
+					
+					missionService.setParent(mission.getGuidAsUUID(), parentMission.getGuidAsUUID(),
 							remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
 				}
-			}else if (parameters instanceof MissionExpiration) {
+			} else if (parameters instanceof MissionExpiration) {
 
 				MissionExpiration missionExpiration = (MissionExpiration) parameters;
 
 				missionService.setExpiration(missionExpiration.getMissionName(), missionExpiration.getMissionExpiration(),
 						remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
 
-			}else {
+			} else {
 				throw new IllegalArgumentException("ROL assign mission does not have correct parameters");
 			}
 
@@ -461,7 +469,7 @@ public class FederationROLHandler {
 				// check mission exists before making feed
 				if (mission != null) {
 					// create mission feed association
-					missionService.addFeedToMission(meta.getMissionFeedUid(), meta.getMissionName(), "", mission, meta.getDataFeedUid(), meta.getFilterPolygon(),
+					missionService.addFeedToMission(meta.getMissionFeedUid(), "", mission, meta.getDataFeedUid(), meta.getFilterPolygon(),
 							meta.getFilterCotTypes(), meta.getFilterCallsign());
 				}
 			}

@@ -7,16 +7,12 @@ import java.util.NavigableSet;
 
 import javax.naming.NamingException;
 
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import com.atakmap.Tak.ROL;
-import com.atakmap.Tak.ROL.Builder;
-import com.bbn.marti.maplayer.model.MapLayer;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationManager;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.sync.MissionExpiration;
@@ -30,8 +26,6 @@ import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.Metadata.Field;
 import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionChange;
-import com.bbn.marti.sync.model.MissionLayer;
-import com.bbn.marti.sync.model.MissionLayer.Type;
 import com.bbn.marti.sync.service.MissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
@@ -238,15 +232,17 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 
 	@Override
 	public void addMissionContent(String missionName, MissionContent content, String creatorUid, NavigableSet<Group> groups) {
+		
+		// TODO: When mission federation is updated to support federating guids, update this code accordingly. Mission guids
+		// will extra handling in federated case.
+		
+		Mission fedMission = missionService.getMissionByNameCheckGroups(missionName, creatorUid);
 
 		if (!(CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
 			return;
 		}
 
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("intercepted add mission content: " + content + " mission name " + missionName + " creator uid " + creatorUid);
-		}
+		logger.debug("intercepted add mission content: {}  mission name {} {} reator uid {} ", content, missionName, fedMission.getGuidAsUUID());
 
 		try {
 
@@ -258,17 +254,14 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 			}
 
 			if (!isMissionAllowed(mission.getTool())) {
-				if (logger.isDebugEnabled()) {
-					logger.debug("not federating non-public mission action for mission " + missionName);
-				}
+				logger.debug("not federating non-public mission action for mission {} ", missionName);
 				return;
 			}
 			// TODO: this does not handle the case where the content is a zip format file, e.g, ODT or PDF?
 			if (isBlockedFileEnabled()) {
-				MissionChange latestMission = missionService.getLatestMissionChangeForContentHash(missionName, content.getHashes().get(0));
+				MissionChange latestMission = missionService.getLatestMissionChangeForContentHash(fedMission.getGuidAsUUID(), content.getHashes().get(0));
 				String fileExt = "." + CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
 
-//				MissionChangeUtils.findAndSetContentResource(latestMission);
 				String name = latestMission.getContentResource().getName();
 				// TODO do we need to check file name instead?
 				if (name != null) {

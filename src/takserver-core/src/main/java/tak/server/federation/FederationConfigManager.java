@@ -55,8 +55,6 @@ public class FederationConfigManager implements FederationConfigInterface {
                                         fedConfig.getMissionFederationDisruptionToleranceRecencySeconds(),
                                         mdt.getMission(),
                                         fedConfig.getFederationServer().getCoreVersion(),
-                                        fedConfig.isFederatedGroupMapping(),
-                                        fedConfig.isAutomaticGroupMapping(),
                                         fedConfig.isEnableDataPackageAndMissionFileFilter(),
                                         fedConfig.getFileFilter().getFileExtension());
     }
@@ -97,8 +95,6 @@ public class FederationConfigManager implements FederationConfigInterface {
         fedConfig.getFederationServer().getV1Tls().addAll(info.getV1Tls());
         fedConfig.getFederationServer().getFederationPort().clear();
         fedConfig.getFederationServer().getFederationPort().addAll(info.getV1Ports());
-        fedConfig.setFederatedGroupMapping(info.isFederatedGroupMapping());
-        fedConfig.setAutomaticGroupMapping(info.isAutomaticGroupMapping());
         fedConfig.setEnableDataPackageAndMissionFileFilter(info.isEnableDataPackageAndMissionFileFilter());
         fedConfig.getFileFilter().getFileExtension().clear();
         fedConfig.getFileFilter().getFileExtension().addAll(info.getFileExtension());

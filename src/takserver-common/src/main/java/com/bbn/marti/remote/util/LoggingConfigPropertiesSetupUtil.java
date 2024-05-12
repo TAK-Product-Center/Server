@@ -38,6 +38,8 @@ public class LoggingConfigPropertiesSetupUtil {
             System.setProperty("logging.json.enabled", String.valueOf(config.getLogging().isJsonFormatEnabled()));
             System.setProperty("logging.audit.enabled", String.valueOf(config.getLogging().isAuditLoggingEnabled()));
             System.setProperty("logging.pretty.enabled", String.valueOf(config.getLogging().isPrettyLoggingEnabled()));
+            System.setProperty("logging.separated.enabled", String.valueOf(config.getLogging().isLineSeparatorIncluded()));
+            System.setProperty("logging.spaced.enabled", String.valueOf(config.getLogging().isDoubleSpaced()));
         }
     }
 

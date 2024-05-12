@@ -290,9 +290,7 @@ public class Icon implements Serializable {
         } else {
             throw new IllegalArgumentException("invalid iconsetpath: " + iconsetPath);
         }
-    
-        logger.debug("iconsetUid: " + iconParts.iconsetUid + " icon group: " + iconParts.group + " icon name: " + iconParts.name);
-        
+
         return iconParts;
     }
 }

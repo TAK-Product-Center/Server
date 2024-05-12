@@ -70,6 +70,10 @@
             <xs:attribute name="enableAdminUI" type="xs:boolean" default="true"/>			
             <xs:attribute name="enableWebtak" type="xs:boolean" default="true"/>
             <xs:attribute name="enableNonAdminUI" type="xs:boolean" default="true"/>
+            <xs:attribute name="allowOrigins" type="xs:string" default=""/>
+            <xs:attribute name="allowMethods" type="xs:string" default="POST, PUT, GET, HEAD, OPTIONS, DELETE"/>
+            <xs:attribute name="allowHeaders" type="xs:string" default="Accept, Access-Control-Allow-Headers, Authorization, Content-Type, Cookie, Origin, missionauthorization, X-Requested-With"/>
+            <xs:attribute name="allowCredentials" type="xs:boolean" default="false"/>
           </xs:complexType>
         </xs:element>
         <xs:element name="announce" minOccurs="0" maxOccurs="1">
@@ -90,18 +94,24 @@
       <xs:attribute name="multicastTTL" type="xs:int" default="1"/>
       <xs:attribute name="serverId" type="xs:string" default=""/>
       <xs:attribute name="enterpriseSyncSizeLimitMB" type="xs:int" default="400"/>
+      <xs:attribute name="enterpriseSyncSizeUploadTimeoutMillis" type="xs:int" default="6000000">
+        <xs:annotation>
+          <xs:documentation>Set the timeout for file uploads in milliseconds (sync/upload endpoint). Default is 600000 ms (5 minutes).</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+       <xs:attribute name="enterpriseSyncSizeDownloadTimeoutMillis" type="xs:int" default="6000000">
+        <xs:annotation>
+          <xs:documentation>Set the timeout for file downloads in milliseconds (sync/upload endpoint). Default is 600000 ms (5 minutes).</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
       <xs:attribute name="missionPackageAutoExtractSizeLimitMB" type="xs:int" default="10"/>
       <xs:attribute name="httpSessionTimeoutMinutes" type="xs:int" default="130"/>
       <xs:attribute name="extWebContentDir" type="xs:string" default="webcontent"/>
       <xs:attribute name="takServerHost" type="xs:string"/>
       <xs:attribute name="useLinuxEpoll" type="xs:boolean" default="true"/>
       <xs:attribute name="allowAllOrigins" type="xs:boolean" default="false"/>
-      <xs:attribute name="allowOrigins" type="xs:string"/>
-      <xs:attribute name="allowMethods" type="xs:string" default="POST, PUT, GET, HEAD, OPTIONS, DELETE"/>
-      <xs:attribute name="allowHeaders" type="xs:string"/>
-      <xs:attribute name="allowCredentials" type="xs:boolean" default="false"/>
       <xs:attribute name="enableHSTS" type="xs:boolean" default="true"/>
-      <xs:attribute name="esyncEnableCache" type="xs:int" default="-1"/>
+      <xs:attribute name="esyncEnableCache" type="xs:int" default="0"/>
       <xs:attribute name="esyncEnableCotFilter" type="xs:boolean" default="false"/>
       <xs:attribute name="esyncCotFilter" type="xs:string" />
       <xs:attribute name="version" type="xs:string" default=""/>
@@ -129,6 +139,8 @@
       <xs:attribute name="pingTimeoutSeconds" type="xs:int"/>
       <xs:attribute name="pingTimeoutCheckIntervalSeconds" type="xs:int" default="60"/>
       <xs:attribute name="alwaysArchiveMissionCot" type="xs:boolean" default="false"/>
+      <xs:attribute name="MissionCreateGroupsRegex" type="xs:string" use="optional"/>
+      <xs:attribute name="MissionDeleteRequiresOwner" type="xs:boolean" default="false"/>
     </xs:complexType>
   </xs:element>
 
@@ -193,6 +205,7 @@
             <xs:attribute name="enableConnectionPool" type="xs:boolean" default="false"/>
             <xs:attribute name="connectionPoolTimeout" type="xs:string" default="30000" />
             <xs:attribute name="dnAttributeName" type="xs:string" default="distinguishedName"/>
+            <xs:attribute name="nameAttr" type="xs:string" default="cn"/>
           </xs:complexType>
         </xs:element>
         <xs:element name="File" minOccurs="0" maxOccurs="1">
@@ -293,7 +306,8 @@
       <xs:attribute name="cacheLastTouchedExpiryMinutes" type="xs:int" default="10"/>
       <xs:attribute name="enableCacheGroup" type="xs:boolean" default="true" />
       <xs:attribute name="enableCacheGroupPerName" type="xs:boolean" default="false" />
-      <xs:attribute name="enableCacheWarmer" type="xs:boolean" default="false"/>
+      <xs:attribute name="enableGetAllMissionsCacheWarmer" type="xs:boolean" default="true"/>
+      <xs:attribute name="enableIndividualHydratedMissionsCacheWarmer" type="xs:boolean" default="false"/>
       <xs:attribute name="cacheCotInRepository" type="xs:boolean" default="false"/>
       <xs:attribute name="messageTimestampCacheSizeItems" type="xs:long" default="-1"/>
       <xs:attribute name="enableStoreForwardChat" type="xs:boolean" default="false"/>
@@ -372,6 +386,7 @@
       <xs:attribute name="dbConnectionMaxLifetimeMs" type="xs:int" default="600000"/>
       <xs:attribute name="dbConnectionMaxIdleMs" type="xs:int" default="10000"/>
       <xs:attribute name="poolScaleFactor" type="xs:int" default="200"/>
+      
     </xs:complexType>
   </xs:element>
 
@@ -490,6 +505,8 @@
       <xs:attribute name="jsonFormatEnabled" type="xs:boolean" default="false"/>
       <xs:attribute name="auditLoggingEnabled" type="xs:boolean" default="false"/>
       <xs:attribute name="prettyLoggingEnabled" type="xs:boolean" default="false"/>
+      <xs:attribute name="lineSeparatorIncluded" type="xs:boolean" default="true"/>
+      <xs:attribute name="doubleSpaced" type="xs:boolean" default="false"/>
     </xs:complexType>
   </xs:element>
 
@@ -591,11 +608,13 @@
       </xs:sequence>
       <xs:attribute name="oauthAddAnonymous" type="xs:boolean" default="false"/>
       <xs:attribute name="oauthUseGroupCache" type="xs:boolean" default="false"/>
+      <xs:attribute name="loginWithEmail" type="xs:boolean" default="false"/>
       <xs:attribute name="useTakServerLoginPage" type="xs:boolean" default="false"/>
       <xs:attribute name="readOnlyGroup" type="xs:string" use="optional"/>
       <xs:attribute name="readGroupSuffix" type="xs:string" default="_READ"/>
       <xs:attribute name="writeGroupSuffix" type="xs:string" default="_WRITE"/>
       <xs:attribute name="groupsClaim" type="xs:string" default="groups"/>
+      <xs:attribute name="usernameClaim" type="xs:string" />
       <xs:attribute name="groupprefix" type="xs:string" default=""/>
     </xs:complexType>
   </xs:element>
@@ -732,9 +751,13 @@
             <xs:attribute name="minLatitude" type="xs:double"/>
             <xs:attribute name="maxLongitude" type="xs:double"/>
             <xs:attribute name="maxLatitude" type="xs:double"/>
+            <xs:attribute name="minAltitude" type="xs:double"/>
+            <xs:attribute name="maxAltitude" type="xs:double"/>
           </xs:complexType>
         </xs:element>
       </xs:sequence>
+      <xs:attribute name="minAltitude" type="xs:double"/>
+      <xs:attribute name="maxAltitude" type="xs:double"/>
     </xs:complexType>
   </xs:element>
   
@@ -815,6 +838,11 @@
       <xs:attribute name="sslCert" type="xs:string" default=""/>
       <xs:attribute name="sslKey" type="xs:string" default=""/>
       <xs:attribute name="sslRootCert" type="xs:string" default=""/>
+      <xs:attribute name="queryBufferMaxMemoryPercentage" type="xs:int" default="40">
+        <xs:annotation>
+          <xs:documentation>Set the timeout for file uploads in milliseconds (sync/upload endpoint). Default is 600000 ms (5 minutes).</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
     </xs:complexType>
   </xs:element>
 
@@ -997,7 +1025,7 @@
                   <xs:documentation>If true, enable archival of data from this federate.</xs:documentation>
                 </xs:annotation>
               </xs:attribute>
-              <xs:attribute name="federatedGroupMapping" type="xs:boolean" use="optional" default="true">
+              <xs:attribute name="federatedGroupMapping" type="xs:boolean" use="optional" default="false">
                 <xs:annotation>
                   <xs:documentation>If true, allow group mapping for this federate.</xs:documentation>
                 </xs:annotation>
@@ -1067,8 +1095,6 @@
       <xs:attribute name="missionFederationDisruptionToleranceRecencySeconds" type="xs:long" default="43200" />
       <xs:attribute name="federateOnlyPublicMissions" type="xs:boolean" default="true" />
       <xs:attribute name="enableFederation" type="xs:boolean" default="false"/>
-      <xs:attribute name="federatedGroupMapping" type="xs:boolean" default="true"/>
-      <xs:attribute name="automaticGroupMapping" type="xs:boolean" default="false"/>
       <xs:attribute name="enableDataPackageAndMissionFileFilter" type="xs:boolean" default="false" />
     </xs:complexType>
   </xs:element>

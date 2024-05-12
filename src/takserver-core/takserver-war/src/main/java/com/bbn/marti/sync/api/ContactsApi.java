@@ -37,9 +37,9 @@ import com.bbn.marti.util.CommonUtil;
 import com.google.common.base.Strings;
 
 /*
- * 
+ *
  * REST API for contacts
- * 
+ *
  */
 @RestController
 public class ContactsApi extends BaseRestController {
@@ -72,13 +72,13 @@ public class ContactsApi extends BaseRestController {
 		String groupVector = null;
 
 		Set<Group> inWriteOnlyFilteredGroups = new ConcurrentSkipListSet<>();
-		
+
 		try {
 			// Get group vector for the user associated with this session
 			groupVector = martiUtil.getGroupBitVector(request, Direction.OUT);
-			
+
 			Set<Group> groups = martiUtil.getGroupsFromActiveRequest();
-			
+
 			if (groups != null) {
 				if (!CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getContactApi().isEmpty()) {
 					for (ContactApi filter : CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getContactApi()) {
@@ -90,7 +90,7 @@ public class ContactsApi extends BaseRestController {
 					}
 				}
 			}
-			
+
 			if (logger.isDebugEnabled()) {
 				logger.debug("groups bit vector: " + groupVector);
 				logger.debug("inWriteOnlyFilteredGroups: " + inWriteOnlyFilteredGroups);
@@ -100,7 +100,7 @@ public class ContactsApi extends BaseRestController {
 				logger.debug("exception getting group membership for current web user " + e.getMessage());
 			}
 		}
-		
+
 		List<RemoteSubscription> subscriptions = subMgr.getSubscriptionsWithGroupAccess(groupVector, noFederates, inWriteOnlyFilteredGroups);
 
 		if (logger.isDebugEnabled()) {
@@ -129,7 +129,7 @@ public class ContactsApi extends BaseRestController {
 			}
 		}
 		catch(Exception e) {
-			logger.warn("Exception getting federate contacts - federate server might be configured incorrectly " + e.toString());
+			logger.warn("Exception getting federate contacts - federate server might be configured incorrectly", e);
 		}
 		if (sortBy.equals(SubscriptionSortField.CALLSIGN)) {
 			Collections.sort(subscriptions, RemoteSubscription.sortByCallsign(reversed));

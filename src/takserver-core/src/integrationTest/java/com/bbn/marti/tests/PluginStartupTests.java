@@ -1,5 +1,7 @@
 package com.bbn.marti.tests;
 
+import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
+import com.bbn.marti.takcl.connectivity.server.ServerProcessConfiguration;
 import com.bbn.marti.test.shared.AbstractTestClass;
 import com.bbn.marti.takcl.connectivity.server.ServerProcessDefinition;
 import com.bbn.marti.test.shared.data.generated.ImmutableConnections;
@@ -17,18 +19,12 @@ public class PluginStartupTests extends AbstractTestClass {
 
 	private static final String className = "PluginStartupTests";
 
-	@BeforeClass
-	public static void setup() {
-		ServerProcessDefinition.PluginManager.setEnabled(true);
-		ServerProcessDefinition.RetentionService.setEnabled(false);
-		AbstractTestClass.setup();
-	}
-	
 	@Test(timeout = 420000)
 	public void pluginStartupValiationTest() {
 		try {
 			String sessionIdentifier = initTestMethod();
-			
+
+			engine.overrideDefaultProcessConfiguration(ImmutableServerProfiles.SERVER_0, ServerProcessConfiguration.ConfigMessagingApiPlugins);
 			System.out.println("--- Starting offlineAddUsersAndConnectionsIfNecessary for s0_stcp_anonuser_t_A ...");
 			engine.offlineAddUsersAndConnectionsIfNecessary(ImmutableUsers.s0_stcp_anonuser_t_A);
 			System.out.println("--- Done with offlineAddUsersAndConnectionsIfNecessary for s0_stcp_anonuser_t_A");
@@ -38,7 +34,7 @@ public class PluginStartupTests extends AbstractTestClass {
 			System.out.println("--- Done with offlineEnableLatestSA for SERVER_0");
 
 			System.out.println("--- Starting startServerWithStartupValidation ...");
-			engine.startServerWithStartupValidation(ImmutableServerProfiles.SERVER_0, sessionIdentifier, true, false);
+			engine.startServerWithStartupValidation(ImmutableServerProfiles.SERVER_0, sessionIdentifier);
 			System.out.println("--- Done with startServerWithStartupValidation");
 			
 			System.out.println("--- Starting connectClientsAndVerify ...");

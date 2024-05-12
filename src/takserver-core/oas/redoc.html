@@ -19,8 +19,9 @@
     </style>
 </head>
 <body>
-    <!-- Expects openapispec.json in same directory as this html file -->
-    <redoc spec-url='openapispec.json'></redoc>
     <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+    <div id="redoc-container"></div>
+    <!-- Programmatically load Redoc element -->
+    <script src="https://docs.tak.gov/api/takserver/redoc.js"></script>
 </body>
 </html>

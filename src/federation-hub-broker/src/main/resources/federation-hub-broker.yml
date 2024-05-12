@@ -7,6 +7,7 @@ truststoreFile: /opt/tak/federation-hub/certs/files/fed-truststore.jks
 truststorePassword: atakatak
 
 keyManagerType: SunX509
+caFile: /opt/tak/federation-hub/certs/files/ca.pem
 
 # v1 federation only.
 v1Enabled: true

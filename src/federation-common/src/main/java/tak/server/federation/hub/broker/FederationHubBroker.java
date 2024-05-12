@@ -13,5 +13,7 @@ public interface FederationHubBroker {
     FederationHubBrokerMetrics getFederationHubBrokerMetrics();
     List<String> getGroupsForNode(String federateId);
 	void deleteGroupCa(String groupId);
+	void disconnectFederate(String connectionId);
 	Map<String, X509Certificate> getCAsFromFile();
+	byte[] getSelfCaFile();
 }

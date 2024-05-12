@@ -80,6 +80,7 @@ public class GeospatialEventFilter implements CotFilter {
         // get the current coordinates as doubles
         double latitude = Double.parseDouble(c.getLat());
         double longitude = Double.parseDouble(c.getLon());
+        double altitude = c.getHae();
 
         // dont apply filters to points without location info
         if (noFilterCheckOrigin) {
@@ -88,11 +89,19 @@ public class GeospatialEventFilter implements CotFilter {
             }
         }
 
+        // drop the event if its not found with the altitude range
+        if ((filter.getMinAltitude() != null && altitude < filter.getMinAltitude())
+        ||  (filter.getMaxAltitude() != null && altitude > filter.getMaxAltitude())) {
+            return null;
+        }
+
         // iterate over the filters
         for (GeospatialFilter.BoundingBox bbox : filter.getBoundingBox()) {
 
             // return the cot event if found within one of the inputs filters
-            if (GeomUtils.bboxContainsCoordinate(bbox, latitude, longitude)) {
+            if (GeomUtils.bboxContainsCoordinate(bbox, latitude, longitude)
+            && (bbox.getMinAltitude() == null || altitude >= bbox.getMinAltitude())
+            && (bbox.getMaxAltitude() == null || altitude <= bbox.getMaxAltitude())) {
                 return c;
             }
         }

@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.jetbrains.annotations.NotNull;
@@ -281,13 +282,8 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 		System.out.println("COLLECTING LOGS DONE!");
 	}
 
-	protected List<LocalServerProcessContainer> createProcessContainerList() {
-		ServerProcessDefinition[] definitions = ServerProcessDefinition.values();
-		ArrayList<LocalServerProcessContainer> containers = new ArrayList<>(definitions.length);
-		for (ServerProcessDefinition definition : ServerProcessDefinition.values()) {
-			containers.add(new LocalServerProcessContainer(definition));
-		}
-		return Collections.unmodifiableList(containers);
+	@Override
+	protected AbstractServerProcess createServerProcess(ServerProcessDefinition serverProcessDefinition) {
+		return new LocalServerProcessContainer(serverProcessDefinition);
 	}
-
 }

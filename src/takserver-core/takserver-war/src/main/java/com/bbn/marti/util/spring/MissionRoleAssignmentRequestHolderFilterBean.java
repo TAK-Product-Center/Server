@@ -11,6 +11,7 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import com.bbn.marti.config.Network;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,27 +62,8 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 			resp.setHeader("Access-Control-Allow-Origin", "*");
 			resp.setHeader("Access-Control-Allow-Headers", "*");
 			resp.setHeader("Access-Control-Allow-Methods", "*");
-		} else if (!Strings.isNullOrEmpty(
-				CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowOrigins())) {
-
-			resp.setHeader("Access-Control-Allow-Origin",
-					CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowOrigins());
-
-			if (!Strings.isNullOrEmpty(
-					CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowHeaders())) {
-				resp.setHeader("Access-Control-Allow-Headers",
-						CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowHeaders());
-			}
-
-			if (!Strings.isNullOrEmpty(
-					CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowMethods())) {
-				resp.setHeader("Access-Control-Allow-Methods",
-						CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getAllowMethods());
-			}
-
-			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isAllowCredentials()) {
-				resp.setHeader("Access-Control-Allow-Credentials", "true");
-			}
+		} else {
+			CorsHeaders.checkAndApplyCorsForConnector(req, resp);
 		}
 
 		String path = req.getRequestURI();

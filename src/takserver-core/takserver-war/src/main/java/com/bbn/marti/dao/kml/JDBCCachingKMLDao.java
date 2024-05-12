@@ -611,7 +611,6 @@ public class JDBCCachingKMLDao implements KMLDao {
      * 
      */
     public static void ParseDetailText(CotElement cotElement) {
-        slfLogger.debug("cotElement: " + cotElement);
 
         if (cotElement.detailtext != null) {
             cotElement.hasImage = cotElement.detailtext.contains("image");

@@ -573,7 +573,7 @@ function MissionManager() {
                   })
                   rowData.contents.forEach(function (file){
                     var struct = {
-                      name: file.data.filename,
+                      name: file.data.name,
                       hash: file.data.hash
                     }
                     row.contents.push(struct)

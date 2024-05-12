@@ -1,12 +1,13 @@
 <configuration scan="true" scanPeriod="30 seconds">
-<!--    TODO: Access logging configurations -->
     <springProperty name="JSON_FORMAT_ENABLED" source="logging.json.enabled" defaultValue="false" />
     <springProperty name="AUDIT_ENABLED" source="logging.audit.enabled" defaultValue="false" />
     <springProperty name="PRETTY_PRINT" source="logging.pretty.enabled" defaultValue="false" />
+    <springProperty name="LINE_SEPARATED" source="logging.separated.enabled" defaultValue="true" />
+    <springProperty name="DOUBLE_SPACED" source="logging.spaced.enabled" defaultValue="false" />
 
     <if condition='${AUDIT_ENABLED}'>
         <then><property name="JSON_LAYOUT" value="com.bbn.marti.remote.AuditLogJsonLayout" /></then>
-        <else><property name="JSON_LAYOUT" value="ch.qos.logback.contrib.json.classic.JsonLayout" /></else>
+        <else><property name="JSON_LAYOUT" value="com.bbn.marti.remote.SeparatedJsonLayout" /></else>
     </if>
 
         <appender name="retention_application_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
@@ -19,6 +20,8 @@
                 <then>
                     <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
                         <layout class="${JSON_LAYOUT}">
+                            <appendLineSeparator>${LINE_SEPARATED}</appendLineSeparator>
+                            <doubleSpaced>${DOUBLE_SPACED}</doubleSpaced>
                             <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter">
                                 <prettyPrint>${PRETTY_PRINT}</prettyPrint>
                             </jsonFormatter>

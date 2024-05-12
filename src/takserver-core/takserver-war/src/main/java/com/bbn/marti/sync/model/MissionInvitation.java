@@ -2,6 +2,15 @@ package com.bbn.marti.sync.model;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.google.common.collect.ComparisonChain;
 
 import jakarta.persistence.Cacheable;
 import jakarta.persistence.Column;
@@ -13,15 +22,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.google.common.collect.ComparisonChain;
-
 import tak.server.Constants;
 
 @Entity
@@ -47,9 +47,10 @@ public class MissionInvitation implements Serializable, Comparable<MissionInvita
     protected String token;
     protected MissionRole role;
     protected Long missionId;
+    protected UUID missionGuid;
 
     // no-arg constructor
-    public MissionInvitation(String missionName, String invitee, String type, String creatorUid, Date createTime, String token, MissionRole role, Long missionId) {
+    public MissionInvitation(String missionName, UUID missionGuid, String invitee, String type, String creatorUid, Date createTime, String token, MissionRole role, Long missionId) {
     	
     	if (missionId == null) {
     		throw new IllegalArgumentException("null missionId in MissionInvitation constructor");
@@ -63,6 +64,7 @@ public class MissionInvitation implements Serializable, Comparable<MissionInvita
         this.token = token;
         this.role = role;
         this.missionId = missionId;
+        this.missionGuid = missionGuid;
     }
 
     public MissionInvitation() {
@@ -128,8 +130,18 @@ public class MissionInvitation implements Serializable, Comparable<MissionInvita
     public void setToken(String token) {
         this.token = token;
     }
+    
+    
+    @Column(name = "mission_guid", nullable = false, columnDefinition = "uuid")
+    public UUID getMissionGuid() {
+		return missionGuid;
+	}
 
-    @ManyToOne(fetch = FetchType.EAGER)
+	public void setMissionGuid(UUID missionGuid) {
+		this.missionGuid = missionGuid;
+	}
+
+	@ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name="role_id")
     public MissionRole getRole() { return role; }
     public void setRole(MissionRole role) { this.role = role; }
@@ -137,7 +149,7 @@ public class MissionInvitation implements Serializable, Comparable<MissionInvita
     @Override
     public int compareTo(MissionInvitation that) {
         return ComparisonChain.start()
-                .compare(this.missionName, that.missionName)
+                .compare(this.missionGuid, that.missionGuid)
                 .compare(this.invitee, that.invitee)
                 .compare(this.type, that.type)
                 .compare(this.creatorUid, that.creatorUid)

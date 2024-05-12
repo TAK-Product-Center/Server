@@ -8,10 +8,6 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.UUID;
 
-import jakarta.servlet.http.HttpServletRequest;
-
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.repository.query.Param;
 import org.springframework.jdbc.core.ResultSetExtractor;
 
 import com.bbn.marti.config.GeospatialFilter;
@@ -30,8 +26,10 @@ import com.bbn.marti.sync.model.MissionRole;
 import com.bbn.marti.sync.model.MissionSubscription;
 import com.bbn.marti.sync.model.Resource;
 import com.bbn.marti.sync.model.UidDetails;
+import com.bbn.marti.sync.service.MissionTokenUtils.TokenType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
+import jakarta.servlet.http.HttpServletRequest;
 import tak.server.cache.CotCacheWrapper;
 import tak.server.cot.CotElement;
 import tak.server.cot.CotEventContainer;
@@ -75,6 +73,8 @@ public interface MissionService {
     Long getMissionCount(String tool);
 
     Mission deleteMission(String name, String creatorUid, String groupVector, boolean deepDelete);
+    
+    Mission deleteMissionByGuid(UUID missionGuid, String creatorUid, String groupVector, boolean deepDelete);
 
     CotElement getLatestCotElement(String uid, String groupVector, Date end, ResultSetExtractor<CotElement> resultSetExtractor);
 
@@ -92,11 +92,11 @@ public interface MissionService {
 
     boolean deleteAllCotForUids(List<String> uids, String groupVector);
 
-    void missionInvite(String missionName, String invitee, MissionInvitation.Type type, MissionRole role, String creatorUid, String groupVector);
+    void missionInvite(UUID missionGuid, String invitee, MissionInvitation.Type type, MissionRole role, String creatorUid, String groupVector);
 
     void missionInvite(Mission mission, MissionInvitation missionInvitation);
 
-    void missionUninvite(String missionName, String invitee, MissionInvitation.Type type, String creatorUid, String groupVector);
+    void missionUninvite(UUID missionGuid, String invitee, MissionInvitation.Type type, String creatorUid, String groupVector);
 
     Set<MissionInvitation> getAllMissionInvitationsForClient(String clientUid, String groupVector);
 
@@ -104,29 +104,29 @@ public interface MissionService {
 
     List<Mission> getInviteOnlyMissions(String userName, String tool, NavigableSet<Group> groups);
 
-    MissionSubscription missionSubscribe(String missionName, String clientUid, String groupVector);
+    MissionSubscription missionSubscribe(UUID missionGuid, String clientUid, String groupVector);
 
-    MissionSubscription missionSubscribe(String missionName, String clientUid, MissionRole missionRole, String groupVector);
+    MissionSubscription missionSubscribe(UUID missionGuid, String clientUid, MissionRole missionRole, String groupVector);
 
-    MissionSubscription missionSubscribe(String missionName, Long missionId, String clientUid, String username, MissionRole role, String groupVector);
+    MissionSubscription missionSubscribe(UUID missionGuid, Long missionId, String clientUid, String username, MissionRole role, String groupVector);
 
-    void missionUnsubscribe(String missionName, String uid, String username, String groupVector, boolean disconnectOnly);
+    void missionUnsubscribe(UUID missionGuid, String uid, String username, String groupVector, boolean disconnectOnly);
+    
+    Mission addMissionContent(UUID missionGuid, MissionContent content, String creatorUid, String groupVector);
+    
+	Mission addMissionContentAtTime(UUID missionGuid, MissionContent missionContent, String creatorUid, String groupVector, Date date, String xmlContentForNotification);
 
-    Mission addMissionContent(String missionName, MissionContent content, String creatorUid, String groupVector);
+    boolean addMissionPackage(UUID missionGuid, byte[] missionPackage, String creatorUid, NavigableSet<Group> groups, List<MissionChange> conflicts);
 
-    Mission addMissionContentAtTime(String missionName, MissionContent missionContent, String creatorUid, String groupVector, Date date, String xmlContentForNotification);
+    Mission deleteMissionContent(UUID missionGuid, String hash, String uid, String creatorUid, String groupVector);
 
-    boolean addMissionPackage(String missionName, byte[] missionPackage, String creatorUid, NavigableSet<Group> groups, List<MissionChange> conflicts);
+    Mission deleteMissionContentAtTime(UUID missionGuid, String hash, String uid, String creatorUid, String groupVector, Date date);
 
-    Mission deleteMissionContent(String missionName, String hash, String uid, String creatorUid, String groupVector);
+    byte[] archiveMission(UUID missionGuid, String groupVector, String serverName);
 
-    Mission deleteMissionContentAtTime(String missionName, String hash, String uid, String creatorUid, String groupVector, Date date);
+    void setParent(UUID childMissionGuid, UUID parentMissionGuid, String groupVector);
 
-    byte[] archiveMission(String missionName, String groupVector, String serverName);
-
-    void setParent(String childName, String parentName, String groupVector);
-
-    void clearParent(String childName, String groupVector);
+    void clearParent(UUID childGuid, String groupVector);
 
     boolean exists(String missionName, String groupVector);
     
@@ -135,7 +135,7 @@ public interface MissionService {
     Map<Integer, List<String>> hydrate(Set<Resource> resources);
 
     MissionLayer addMissionLayer(String missionName, Mission mission, String uid, String Name, MissionLayer.Type type, String parentUid, String afterUid, String creatorUid, String groupVector);
-
+    
     void setLayerName(String missionName, Mission mission, String layerUid, String name, String creatorUid);
 
     void setLayerPosition(String missionName, Mission mission, String layerUid, String afterUid, String creatorUid);
@@ -154,8 +154,7 @@ public interface MissionService {
 
     UidDetails hydrate(UidDetails uidDetails, String uid, Date timestamp);
 
-    ExternalMissionData hydrate(String externalDataUid, String externalDataName, String externalDataTool,
-                                String externalDataToken, String externalDataNotes);
+    ExternalMissionData hydrate(String externalDataUid, String externalDataName, String externalDataTool, String externalDataToken, String externalDataNotes);
 
     String addMissionArchiveToEsync(String name, byte[] archive, String groupVector, boolean archivedWhenDeleting);
 
@@ -163,9 +162,13 @@ public interface MissionService {
 
     void validateMission(Mission mission, String missionName);
     
-	void validateMissionByGuid(Mission mission, UUID missionGuid);
+	void validateMissionByGuid(Mission mission);
     
-    void invalidateMissionCache(String cacheName);
+    void invalidateMissionCache(String cacheName); // invalidate by name only
+    
+    void invalidateMissionCache(UUID missionGuid, String missionName); // invalidate by both name and guid
+    
+	void invalidateMissionCache(UUID missionGuid); // invalidate by guid only
 
     boolean isDeleted(String missionName);
     
@@ -177,15 +180,15 @@ public interface MissionService {
 
     String getMissionKml(String missionName, String urlBase, String groupVector);
 
-    ExternalMissionData setExternalMissionData(String missionName, String creatorUid, ExternalMissionData externalMissionData, String groupVector);
+    ExternalMissionData setExternalMissionData(UUID missionGuid, String creatorUid, ExternalMissionData externalMissionData, String groupVector);
 
-    void deleteExternalMissionData(String missionName, String externalMissionDataId, String notes, String creatorUid, String groupVector);
+    void deleteExternalMissionData(UUID missionGuid, String externalMissionDataId, String notes, String creatorUid, String groupVector);
 
-    void notifyExternalMissionDataChanged(String missionName, String externalMissionDataId, String token, String notes, String creatorUid, String groupVector);
+    void notifyExternalMissionDataChanged(UUID missioinGuid, String externalMissionDataId, String token, String notes, String creatorUid, String groupVector);
 
-    MissionChange getLatestMissionChangeForContentHash(String missionName, String contentHash);
+    MissionChange getLatestMissionChangeForContentHash(UUID missionGuid, String contentHash);
 
-    Set<Mission> getChildren(String missionName, String groupVector);
+    Set<Mission> getChildren(UUID missionGuid, String groupVector);
 
     List<LogEntry> getLogEntriesForMission(Mission mission, Long secago, Date start, Date end);
 
@@ -193,11 +196,13 @@ public interface MissionService {
 
     LogEntry addUpdateLogEntry(LogEntry entry, Date created, String groupVector);
 
-    String generateToken(String uid, String missionName, MissionTokenUtils.TokenType tokenType, long expirationMillis);
+    String generateToken(String uid, UUID missionGuid, String missionName, MissionTokenUtils.TokenType tokenType, long expirationMillis);
 
-    MissionRole getRoleFromTypeAndInvitee(String missionName, String type, String invitee);
+    MissionRole getRoleFromTypeAndInvitee(UUID missionGuid, String type, String invitee);
 
     MissionRole getRoleFromToken(Mission mission, MissionTokenUtils.TokenType[] validTokenTypes, HttpServletRequest request);
+
+    boolean validateMissionCreateGroupsRegex(HttpServletRequest request);
 
     MissionRole getRoleForRequest(Mission mission, HttpServletRequest request);
 
@@ -256,9 +261,9 @@ public interface MissionService {
 
     DataFeedDTO getDataFeed(String dataFeedUid);
     
-    MissionFeed addFeedToMission(String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterPolygon, List<String> filterCotTypes, String filterCallsign);
+    MissionFeed addFeedToMission(String creatorUid, Mission mission, String dataFeedUid, String filterPolygon, List<String> filterCotTypes, String filterCallsign);
     
-    MissionFeed addFeedToMission(String missionFeedUid, String missionName, String creatorUid, Mission mission, String dataFeedUid, String filterPolygon, List<String> filterCotTypes, String filterCallsign);
+    MissionFeed addFeedToMission(String missionFeedUid, String creatorUid, Mission mission, String dataFeedUid, String filterPolygon, List<String> filterCotTypes, String filterCallsign);
 
 	void removeFeedFromMission(String missionName, String creatorUid, Mission mission, String missionFeedUid);
 
@@ -280,8 +285,6 @@ public interface MissionService {
 	
     List<String> getMinimalMissionFeedsJsonForDataFeed(String dataFeedUid) throws JsonProcessingException;
     
-	List<Mission> getAllMissionsCached(boolean passwordProtected, boolean defaultRole, String tool);
-
 	boolean validateAccess(Mission mission, HttpServletRequest request);
 
     List<String> getAllCotForString(String uidSearch, String groupVector);
@@ -294,7 +297,11 @@ public interface MissionService {
     
     MissionSubscription getMissionSubcriptionByMissionNameAndClientUidAndUsernameNoMission(String missionName, String clientUid, String username);
     
+    MissionSubscription getMissionSubcriptionByMissionGuidAndClientUidAndUsernameNoMission(String missionGuid, String clientUid, String username);
+    
     MissionSubscription getMissionSubscriptionByMissionNameAndClientUidNoMission(String missionName, String clientUid);
+    
+    MissionSubscription getMissionSubscriptionByMissionGuidAndClientUidNoMission(String missionGuid, String clientUid);
     
     MissionSubscription getMissionSubscriptionByMissionNameAndUsernameNoMission(String missionName, String username);
     
@@ -302,6 +309,10 @@ public interface MissionService {
     
     List<MissionSubscription> getMissionSubscriptionsByMissionNameNoMission(String missionName);
     
+    List<MissionSubscription> getMissionSubscriptionsByMissionGuidNoMission(UUID missionGuid);
+    
     List<MissionSubscription> getMissionSubscriptionsByMissionNameNoMissionNoToken(String missionName);
+
+	List<String> getAllMissionsGuids(boolean passwordProtected, boolean defaultRole, String tool);
     
 }

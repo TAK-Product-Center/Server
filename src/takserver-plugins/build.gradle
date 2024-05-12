@@ -82,4 +82,7 @@ configurations {
     all {
         exclude group: 'ch.qos.logback', module: 'logback-classic'
     }
+    runtimeOnly {
+        exclude group: 'org.slf4j', module: 'slf4j-api'
+    }
 }

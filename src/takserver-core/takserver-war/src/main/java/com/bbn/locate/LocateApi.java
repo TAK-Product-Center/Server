@@ -1,18 +1,9 @@
 package com.bbn.locate;
 
-import com.bbn.marti.config.Locate;
-import com.bbn.marti.remote.CoreConfig;
-import com.bbn.marti.remote.SubmissionInterface;
-import com.bbn.marti.remote.config.CoreConfigFacade;
-import com.bbn.marti.remote.exception.TakException;
-import com.bbn.marti.remote.groups.Direction;
-import com.bbn.marti.remote.groups.Group;
-import com.bbn.marti.remote.groups.GroupManager;
-import com.bbn.marti.remote.util.DateUtil;
-import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.sync.service.MissionService;
-import com.bbn.security.web.MartiValidator;
-import com.bbn.security.web.MartiValidatorConstants;
+import java.util.Date;
+import java.util.NavigableSet;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.owasp.esapi.Validator;
 import org.slf4j.Logger;
@@ -25,12 +16,22 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.bbn.marti.config.Locate;
+import com.bbn.marti.remote.SubmissionInterface;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.exception.TakException;
+import com.bbn.marti.remote.groups.Direction;
+import com.bbn.marti.remote.groups.Group;
+import com.bbn.marti.remote.groups.GroupManager;
+import com.bbn.marti.remote.util.DateUtil;
+import com.bbn.marti.remote.util.RemoteUtil;
+import com.bbn.marti.sync.model.Mission;
+import com.bbn.marti.sync.service.MissionService;
+import com.bbn.security.web.MartiValidator;
+import com.bbn.security.web.MartiValidatorConstants;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.Date;
-import java.util.NavigableSet;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentSkipListSet;
 
 @Validated
 @RestController
@@ -57,6 +58,7 @@ public class LocateApi {
     private Validator validator = new MartiValidator();
 
 
+    // TODO: add API for guid
     @RequestMapping(value = "/locate/api", method = RequestMethod.POST)
     public void locate(
                 @RequestParam(value = "latitude", required = true) Double latitude,
@@ -124,6 +126,10 @@ public class LocateApi {
             groups.add(locateGroup);
             String groupVector = RemoteUtil.getInstance().bitVectorToString(
                     RemoteUtil.getInstance().getBitVectorForGroups(groups));
+            
+            Mission mission = missionService.getMissionByNameCheckGroups(name, groupVector);
+            
+            missionService.validateMissionByGuid(mission);
 
             if (locateConfig.isAddToMission()) {
                 String missionName = locateConfig.getMission().toLowerCase();
@@ -134,10 +140,10 @@ public class LocateApi {
                             null, null, null, null, null, "public", null, null, null, null, false);
                 }
 
-                missionService.missionSubscribe(missionName, creatorUid, groupVector);
+                missionService.missionSubscribe(mission.getGuidAsUUID(), creatorUid, groupVector);
 
                 // submit the marker to the mission
-                submission.submitMissionPackageCotAtTime(cot, missionName, new Date(), groups, creatorUid);
+                submission.submitMissionPackageCotAtTime(cot, mission.getGuidAsUUID(), new Date(), groups, creatorUid);
             }
 
             if (locateConfig.isBroadcast()) {

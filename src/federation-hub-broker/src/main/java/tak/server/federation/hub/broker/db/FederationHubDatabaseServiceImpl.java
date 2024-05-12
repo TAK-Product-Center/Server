@@ -8,8 +8,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.bson.Document;
@@ -40,6 +38,7 @@ import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 
 import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
+import tak.server.federation.hub.FederationHubResources;
 import tak.server.federation.hub.db.FederationHubDatabase;
 
 public class FederationHubDatabaseServiceImpl implements FederationHubDatabaseService {
@@ -48,8 +47,6 @@ public class FederationHubDatabaseServiceImpl implements FederationHubDatabaseSe
 	private static final String FEDERATE_EVENT_COLLECTION_NAME = "federate_event";
 	private static final String FEDERATE_METADATA_COLLECTION_NAME = "federate_metadata";
 	private static final String FEDERATE_RESOURCES_COLLECTION_NAME = "mission_resources";
-	
-	private ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
 	private FederationHubDatabase federationHubDatabase;
 	private CacheManager cacheManager;
@@ -58,7 +55,7 @@ public class FederationHubDatabaseServiceImpl implements FederationHubDatabaseSe
 		this.federationHubDatabase = federationHubDatabase;
 		this.cacheManager = cacheManager;
 		
-		scheduler.scheduleWithFixedDelay(() -> {
+		FederationHubResources.dbRetentionScheduler.scheduleWithFixedDelay(() -> {
 			try {
 				if (!isDBConnected())
 					return;

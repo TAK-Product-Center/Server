@@ -22,6 +22,12 @@
       <xs:attribute name="igniteCommunicationPortCount" default="100" type="xs:int"/>
       <xs:attribute name="igniteHost" default="127.0.0.1" type="xs:string"/>
       <xs:attribute name="igniteWorkerTimeoutMilliseconds" default="2600000" type="xs:long"/>
+      <xs:attribute name="keyStoreFilePath" default="/opt/tak/certs/files/takserver.jks" type="xs:string"/>
+      <xs:attribute name="keyStorePassword" default="atakatak" type="xs:string"/>
+      <xs:attribute name="trustStoreFilePath" default="/opt/tak/certs/files/fed-truststore.jks" type="xs:string"/>
+      <xs:attribute name="trustStorePassword" default="atakatak" type="xs:string"/>
+      <xs:attribute name="igniteTlsEnabled" type="xs:boolean" default="false" />
+      <xs:attribute name="igniteTlsProtocol" type="xs:string" default="TLSv1.2" />
       <xs:attribute name="cacheOffHeapMaxSizeBytes" type="xs:long" default="-1">
         <xs:annotation>
           <xs:documentation>Explicity set the off-heap cache max size (bytes). -1 means autodetect.</xs:documentation>
@@ -45,12 +51,12 @@
       <xs:attribute name="cacheOffHeapEvictionThreshold" type="xs:float" default="0.7"/>
       <xs:attribute name="capacity" type="xs:int" default="2048"/>
       <xs:attribute name="ignitePoolSize" type="xs:int" default="-1"/>
-      <xs:attribute name="ignitePoolSizeMultiplier" type="xs:int" default="16">
+      <xs:attribute name="ignitePoolSizeMultiplier" type="xs:int" default="2">
         <xs:annotation>
           <xs:documentation>Set the multiplier for autodetected ignite thread pool size. The optimal value varies based on system capabilities (CPU core count).</xs:documentation>
         </xs:annotation>
       </xs:attribute>
-      <xs:attribute name="igniteApiServerMode" type="xs:boolean" default="true">
+      <xs:attribute name="igniteApiServerMode" type="xs:boolean" default="false">
         <xs:annotation>
           <xs:documentation>Run API micro-service in Ignite embedded server mode. If disabled, run in client mode.</xs:documentation>
         </xs:annotation>

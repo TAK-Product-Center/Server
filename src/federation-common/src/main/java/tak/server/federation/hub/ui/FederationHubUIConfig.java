@@ -1,9 +1,8 @@
 package tak.server.federation.hub.ui;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class FederationHubUIConfig {
 
     public static final String AUTH_USER_FILE_DEFAULT = "/opt/tak/federation-hub/authorized_users.yml";

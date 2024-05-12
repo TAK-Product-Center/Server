@@ -3,10 +3,8 @@ package tak.server.federation.hub.broker;
 import static io.grpc.MethodDescriptor.generateFullMethodName;
 import static java.util.Objects.requireNonNull;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.Serializable;
-import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,14 +12,7 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -30,9 +21,7 @@ import java.util.stream.Collectors;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 
-import com.atakmap.Tak.BinaryBlob;
 import com.atakmap.Tak.ClientHealth;
 import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederatedChannelGrpc;
@@ -41,7 +30,6 @@ import com.atakmap.Tak.FederatedChannelGrpc.FederatedChannelStub;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.Identity;
 import com.atakmap.Tak.ROL;
-import com.atakmap.Tak.ROL.Builder;
 import com.atakmap.Tak.ServerHealth;
 import com.atakmap.Tak.ServerHealth.ServingStatus;
 import com.atakmap.Tak.Subscription;
@@ -49,8 +37,6 @@ import com.bbn.roger.fig.FederationUtils;
 import com.bbn.roger.fig.FigProtocolNegotiator;
 import com.bbn.roger.fig.Propagator;
 import com.google.common.collect.ComparisonChain;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.ByteString;
 
 import io.grpc.ClientCall;
 import io.grpc.ManagedChannel;
@@ -62,8 +48,8 @@ import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.epoll.Epoll;
+import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -74,6 +60,7 @@ import tak.server.federation.FederateIdentity;
 import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.GuardedStreamHolder;
 import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
+import tak.server.federation.hub.FederationHubResources;
 import tak.server.federation.hub.broker.db.FederationHubMissionDisruptionManager;
 import tak.server.federation.hub.broker.events.HubClientDisconnectEvent;
 import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
@@ -88,32 +75,6 @@ public class HubFigClient implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	private static final Logger logger = LoggerFactory.getLogger(HubFigClient.class);
-
-	private static final int NUM_AVAIL_CORES = Runtime.getRuntime().availableProcessors();
-
-	private ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-
-	// shared executor
-	public static final ExecutorService federationGrpcExecutor = newGrpcThreadPoolExecutor("grpc-federation-executor",1, NUM_AVAIL_CORES);
-
-	private static ExecutorService newGrpcThreadPoolExecutor(String name, int initialPoolSize, int maxPoolSize) {
-		BlockingQueue<Runnable> workQueue = new LinkedBlockingQueue<>(1024 * NUM_AVAIL_CORES);
-
-		ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(name + "-%1$d").build();
-
-		return new ThreadPoolExecutor(initialPoolSize, maxPoolSize, 0L, TimeUnit.MILLISECONDS, workQueue,
-				threadFactory);
-	}
-
-	// shared event loop group
-	public static final EventLoopGroup federationGrpcWorkerEventLoopGroup = newGrpcEventLoopGroup("federationGrpcWorkerEventLoopGroup", NUM_AVAIL_CORES);
-
-	private static EventLoopGroup newGrpcEventLoopGroup(String name, int maxPoolSize) {
-
-		ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(name + "-%1$d").setDaemon(true).build();
-
-		return new NioEventLoopGroup(maxPoolSize, threadFactory);
-	}
 
 	private FederationHubServerConfig fedHubConfig;
 	private String host;
@@ -241,7 +202,7 @@ public class HubFigClient implements Serializable {
 				});
 		
 		final AtomicBoolean initROLStream = new AtomicBoolean(false);
-		healthScheduler = scheduler.scheduleWithFixedDelay(() -> {
+		healthScheduler = FederationHubResources.healthCheckScheduler.scheduleWithFixedDelay(() -> {
 			ClientHealth clientHealth = ClientHealth.newBuilder().setStatus(ClientHealth.ServingStatus.SERVING).build();
 
 			// set the server health to a timestamp only when we are sending a health check
@@ -304,9 +265,9 @@ public class HubFigClient implements Serializable {
 				.negotiationType(NegotiationType.TLS)
 				.sslContext(sslContext)
 				.maxInboundMessageSize(fedHubConfig.getMaxMessageSizeBytes())
-				.channelType(NioSocketChannel.class)
-				.executor(federationGrpcExecutor)
-				.eventLoopGroup(federationGrpcWorkerEventLoopGroup)
+				.channelType(Epoll.isAvailable() ? EpollSocketChannel.class : NioSocketChannel.class)
+				.executor(FederationHubResources.federationGrpcExecutor)
+				.eventLoopGroup(FederationHubResources.federationGrpcWorkerEventLoopGroup)
 				.protocolNegotiator(new FigProtocolNegotiator(new Propagator<X509Certificate[]>() {
 					@Override
 					public X509Certificate[] propogate(X509Certificate[] certs) {
@@ -556,13 +517,13 @@ public class HubFigClient implements Serializable {
 		
 		if (changes != null) {
 			for(final Entry<ObjectId, ROL.Builder> entry: changes.getResourceRols().entrySet()) {
-				FederationHubBrokerService.getInstance().getMfdtScheduler().schedule(() -> {
+				FederationHubResources.mfdtScheduler.schedule(() -> {
 					ROL rol = federationHubMissionDisruptionManager.hydrateResourceROL(entry.getKey(), entry.getValue());
 					rolStreamHolder.send(rol);
 				}, delayMs.getAndAdd(500), TimeUnit.MILLISECONDS);
 			}
 			for(final ROL rol: changes.getRols()) {
-				FederationHubBrokerService.getInstance().getMfdtScheduler().schedule(() -> {
+				FederationHubResources.mfdtScheduler.schedule(() -> {
 					rolStreamHolder.send(rol);
 				}, delayMs.getAndAdd(100), TimeUnit.MILLISECONDS);
 			}

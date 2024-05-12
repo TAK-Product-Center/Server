@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.io.IOException;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -177,10 +178,12 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 							MissionAnnouncement missionannouncement = MissionAnnouncement.parseFrom(m.getData());	
 							CotEventContainer missionCot = clusterMessageConverter.getCotFromMissionAnnouncement(missionannouncement);
 							
+							
+							
 							switch (ClusterMissionAnnouncementType.valueOf(missionannouncement.getMissionAnnouncementType())) {
 							case AnnounceMissionChange:
 								DistributedSubscriptionManager.getInstance()
-									.submitAnnounceMissionChangeCot(missionannouncement.getMissionName(), missionCot);
+									.submitAnnounceMissionChangeCot(missionannouncement.getMissionName(), UUID.fromString(missionannouncement.getMissionGuid()), missionCot);
 								break;
 							case BroadcastMissionAnnouncement:
 								DistributedSubscriptionManager.getInstance()
@@ -352,11 +355,12 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 		}
 	}
 	
-	public void onAnnounceMissionChangeMessage(CotEventContainer changeMessage, String missionName) {
+	public void onAnnounceMissionChangeMessage(CotEventContainer changeMessage, String missionName, UUID missionGuid) {
 		ClusterMissionAnnouncementDetail missionDetail = new ClusterMissionAnnouncementDetail();
 		missionDetail.cot = changeMessage;
 		missionDetail.missionAnnouncementType = ClusterMissionAnnouncementType.AnnounceMissionChange.name();
 		missionDetail.missionName = missionName;
+		missionDetail.missionGuid = missionGuid;
 		publishMissionMessage(missionDetail);
 	}
 	
@@ -472,6 +476,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 		public CotEventContainer cot;
 		public String missionAnnouncementType;
 		public String missionName;
+		public UUID missionGuid;
 		public String groupVector;
 		public String creatorUid;
 		public String clientUid;

@@ -60,6 +60,9 @@ public class DataSourceUtils {
                     + ". The computed connection pool size is: " + numDbConnections);
 
         HikariConfig hikariConfig = new HikariConfig();
+        
+        hikariConfig.addDataSourceProperty("maxResultBuffer", Integer.toString(coreDbConnection.getQueryBufferMaxMemoryPercentage()) + "percent");
+        
         hikariConfig.setUsername(coreDbConnection.getUsername());
         hikariConfig.setPassword(coreDbConnection.getPassword());
         hikariConfig.setJdbcUrl(coreDbConnection.getUrl());

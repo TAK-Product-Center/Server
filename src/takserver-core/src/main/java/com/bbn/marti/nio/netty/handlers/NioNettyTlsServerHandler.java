@@ -73,7 +73,7 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 	protected Counter readCounter = null;
 	protected Counter queueFullCounter = null;
 
-	private ThreadLocal<ExecutorService> readParseProcessor =
+	private static ThreadLocal<ExecutorService> readParseProcessor =
 			new ThreadLocal<ExecutorService>() {
 				@Override public ExecutorService initialValue() {
 					return Resources.newExecutorService("readParseProcessor", 1, 1);

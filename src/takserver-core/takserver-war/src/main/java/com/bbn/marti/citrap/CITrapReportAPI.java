@@ -6,10 +6,6 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.IntrusionException;
@@ -30,17 +26,21 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.bbn.marti.citrap.reports.ReportType;
 import com.bbn.marti.network.BaseRestController;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.SubscriptionManagerLite;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.MissionDeletedException;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.ValidationException;
 import com.bbn.marti.sync.MissionPackageQueryServlet;
+import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.KmlUtils;
 import com.bbn.security.web.MartiValidator;
 import com.bbn.security.web.MartiValidatorConstants;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 public class CITrapReportAPI extends BaseRestController {
@@ -180,8 +180,12 @@ public class CITrapReportAPI extends BaseRestController {
             if (subscribe != null && subscribe.equalsIgnoreCase("true") && clientUid != null) {
                 for (ReportType reportType : reports) {
                     try {
-                        missionService.missionSubscribe(reportType.getId(), clientUid, groupVector);
+                    	
+                    	Mission reportMission = missionService.getMissionByNameCheckGroups(reportType.getId(), groupVector);
+                    	
+                        missionService.missionSubscribe(reportMission.getGuidAsUUID(), clientUid, groupVector);
                     } catch (JpaSystemException e) { } // DuplicateKeyException comes through as JpaSystemException due to transaction
+                    
                     catch (NotFoundException e) {
                         if (logger.isErrorEnabled()) {
                             logger.error("missionSubscribe couldn't find mission for report id : " + StringUtils.normalizeSpace(reportType.getId()));
@@ -267,8 +271,15 @@ public class CITrapReportAPI extends BaseRestController {
             validator.getValidInput("CITrap report filename", filename, "FileName", 255, false);
 
             try {
-                missionService.missionSubscribe(id, clientUid, groupVector);
-            } catch (JpaSystemException e) { } // DuplicateKeyException comes through as JpaSystemException due to transaction
+            	
+            	Mission reportMission = missionService.getMissionByNameCheckGroups(id, groupVector);
+            	
+                missionService.missionSubscribe(reportMission.getGuidAsUUID(), clientUid, groupVector);
+            } catch (JpaSystemException e) {  // DuplicateKeyException comes through as JpaSystemException due to transaction
+            
+        	} catch (NotFoundException e) {
+        		return new ResponseEntity(HttpStatus.NOT_FOUND);
+            }
 
             response.setContentLength(results.length);
 

@@ -199,6 +199,10 @@ public class MessageConverter {
 			mb.setMissionName(detail.missionName);
 		}
 		
+		if (detail.missionGuid != null) {
+			mb.setMissionGuid(detail.missionGuid.toString()); // pass string form through protobuf
+		}
+		
 		if (!Strings.isNullOrEmpty(detail.creatorUid)) {
 			mb.setCreatorUid(detail.creatorUid);
 		}

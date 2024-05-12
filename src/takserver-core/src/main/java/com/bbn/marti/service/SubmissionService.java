@@ -2673,7 +2673,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         List<Connector> connectors = config.getNetwork().getConnector();
         Set<Integer> unsecurePorts = new HashSet<Integer>();
         for (Input input : inputs) {
-            if (!input.getProtocol().contains("tls")) {
+            if (!input.getProtocol().contains("tls") && !input.getProtocol().contains("quic")) {
                 unsecurePorts.add(input.getPort());
             }
         }

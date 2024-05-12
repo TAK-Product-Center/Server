@@ -25,7 +25,8 @@
 	    <th>Initiator</th>
 	    <th>Read Count</th>
 	    <th>Processed Count</th>
-	    <th>Groups (not for group mapping)</th>
+	    <th>Groups</th>
+	    <th>Group Mappings (Remote:Local)</th>
 	    <th>Manage</th>
 	  </tr>
 	</thead>
@@ -38,8 +39,23 @@
 	    <td> {{ac.client | incomingOutgoing}} </td>
 	    <td data-ng-bind="ac.readCount"></td>
 	    <td data-ng-bind="ac.processedCount"></td>
-	    <td><div data-ng-repeat="group in ac.groups">{{group.name}}<span data-ng-show="group.direction === 'IN'">&larr;</span><span data-ng-show="group.direction === 'OUT'">&rarr;</span></div></td>
 	    <td>
+	    	<div data-ng-repeat="group in ac.groups">{{group.name}}
+	    		<span data-ng-show="group.direction === 'IN'">&larr;</span>
+	    		<span data-ng-show="group.direction === 'OUT'">&rarr;</span>
+	    	</div>
+	    </td>
+	    <td>
+	    	<div data-ng-show="showGroupMappingWarning(ac)">
+	    		<p style="color: #F4BB44; font-size: 14px"><strong>Warning:</strong></p>
+	    		<p style="color: #F4BB44; font-size: 14px">Group Mapping is enabled but no inbound group mappings are setup!</p>
+	    		<p style="color: #F4BB44; font-size: 14px">Incoming messages will not be sent to any clients.</p>
+	    		<p style="color: #F4BB44; font-size: 14px">To resolve this issue, turn off group mapping, or configure some</p>
+	    	</div>
+	    	<div data-ng-repeat="mapping in ac.federateConfig.inboundGroupMapping" data-ng-show="ac.federateConfig.federatedGroupMapping">
+	    		<span>{{ mapping }}</span>
+	    	</div>
+	    </td>	    <td>
 	      <a class="nav" href="#!/listFederateContacts/{{ac.federateId | encodeURIComponent}}?name={{ac.federateName | encodeURIComponent}}">View Contacts</a>
 	      <a class="nav" data-ng-click="deleteFederate(ac.federateId)">Delete</a>
     	  <a class="nav" href="#!/editFederateDetails/{{ac.federateId | encodeURIComponent}}?name={{ac.federateName | encodeURIComponent}}">Edit Config</a>

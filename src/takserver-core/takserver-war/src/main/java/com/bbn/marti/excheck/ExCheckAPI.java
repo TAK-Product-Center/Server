@@ -233,7 +233,7 @@ public class ExCheckAPI extends BaseRestController {
         Checklist checklist;
         if (token != null && token.length() > 0) {
             MissionChange missionChange = missionService.getLatestMissionChangeForContentHash(
-                    checklistUid, token);
+                    missionService.getMissionByNameCheckGroups(checklistUid, groupVector).getGuidAsUUID(), token);
             if (missionChange == null) {
                 throw new NotFoundException("change not found for token " + token);
             }
@@ -444,7 +444,7 @@ public class ExCheckAPI extends BaseRestController {
             //
             if (token != null && token.length() > 0) {
                 MissionChange missionChange = missionService.getLatestMissionChangeForContentHash(
-                        checklistUid, token);
+                        missionService.getMissionByNameCheckGroups(creatorUid, groupVector).getGuidAsUUID(), token);
                 if (missionChange == null) {
                     throw new NotFoundException("change not found for token " + token);
                 }

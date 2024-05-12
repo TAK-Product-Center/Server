@@ -50,7 +50,7 @@ public class Constants {
 	// iconset version
 	public static final int ICONSET_CURRENT_VERSION = 1;
 
-	// version 
+	// version
     public static final String SHORT_VER_RESOURCE_PATH = "/shortver.txt";
     public static final String VERSION_INFO_JSON_PATH = "/ver.json";
 
@@ -71,7 +71,7 @@ public class Constants {
     public static final String SOCKET_AUTH_KEY = "SOCKET_AUTH_KEY";
     public static final String X509_CERT = "X509_CERT";
     public static final String X509_CERT_FP = "X509_CERT_FP";
-    
+
     // Federation
 	public static final int STANDARD_FEDERATION = 1;
 	public static final int FIG_FEDERATION = 2;
@@ -84,7 +84,7 @@ public class Constants {
 
 	// Grouping
 	public static final String ANON_GROUP = "__ANON__";
-	
+
     // WebSocket Topic Reaper
     public static final int TOPIC_REAPER_SCHEDULE = 1200; // run reaper every 20 minutes
     public static final int TOPIC_LIFETIME_SECONDS = 7200; // topic lifetime: 2 hours
@@ -126,6 +126,7 @@ public class Constants {
 	public static final String CERTIFICATE_CACHE = "certificate-cache";
 	public static final String VIDEO_CACHE = "video-cache";
 	public static final String DATA_FEED_CACHE = "data-feed-cache";
+	public static final String EXCHECK_CACHE = "excheck-cache";
 
 
 	// distributed message topics (ignite)
@@ -160,6 +161,7 @@ public class Constants {
 	public static final String DEFAULT_FLOWTAG_TEXT = "marti";
 	public static final String USER_KEY = "user";
 	public static final String GROUPS_KEY = "groups";
+	public static final String REMOTE_FEDERATE_SOURCE_GROUPS_KEY = "source_groups";
 	public static final String GROUPS_BIT_VECTOR_KEY = "groups.bit.vector";
 	public static final String NOFEDV2_KEY = "nofedv2";
 	public static final String REPEATER_KEY = "repeater";
@@ -219,22 +221,22 @@ public class Constants {
 
     // loggers
     public static final String CHANGE_LOGGER = "missionchange";
-    
+
     // metrics
     public static final String METRIC_MESSAGE_READ_COUNT = "message.read";
     public static final String METRIC_MESSAGE_WRITE_COUNT = "message.write";
     public static final String METRIC_MESSAGE_PRECONVERT_COUNT = "message.preconverted";
 
-    
+
     public static final String METRIC_FED_DATA_MESSAGE_READ_COUNT = "fed.message.read.data";
     public static final String METRIC_FED_DATA_MESSAGE_WRITE_COUNT = "fed.message.write.data";
-    
+
     public static final String METRIC_FED_ROL_MESSAGE_READ_COUNT = "fed.message.read.rol";
     public static final String METRIC_FED_ROL_MESSAGE_WRITE_COUNT = "fed.message.write.rol";
-    
+
     public static final String METRIC_FED_CONTACT_MESSAGE_READ_COUNT = "fed.message.read.contact";
     public static final String METRIC_FED_CONTACT_MESSAGE_WRITE_COUNT = "fed.message.write.contact";
-    
+
     public static final String METRIC_MESSAGE_QOS_READ_SKIP_COUNT = "message.qos.read.skip";
     public static final String METRIC_MESSAGE_QOS_DELIVERY_SKIP_COUNT = "message.qos.delivery.skip";
     public static final String METRIC_MESSAGE_QOS_DOS_SKIP_COUNT = "message.qos.dos.skip";
@@ -252,17 +254,17 @@ public class Constants {
     public static final String METRIC_CLIENT_COUNT = "messaging.clients.connected";
     public static final String METRIC_MESSAGE_WRITE_LATENCY = "message.write.latency-ms";
 
-    
+
     public static final String METRIC_FEDERATE_ROL_SKIP = "federation.rol.skip";
     public static final String METRIC_QOS_DELIVERY_CACHE_PUT_SKIP = "qos.delivery.cache.skip";
-    
+
     public static final String METRIC_CLIENT_CONNECT = "client.connect";
     public static final String METRIC_CLIENT_DISCONNECT = "client.disconnect";
-    
+
     public static final String METRIC_REPOSITORY_QUEUE_FULL_SKIP = "message.repository.q.skip";
-    
+
     // Provenance keys used in Message
     public static final String PLUGIN_MANAGER_PROVENANCE = "PluginManager";
     public static final String PLUGIN_INTERCEPTOR_PROVENANCE = "PluginInterceptor";
-    
+
 }

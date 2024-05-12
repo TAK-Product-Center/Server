@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import org.apache.ignite.IgniteAtomicSequence;
 import org.apache.ignite.IgniteCache;
@@ -18,9 +19,10 @@ import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.remote.ConnectionStatus;
 import com.bbn.marti.remote.ConnectionStatusValue;
+import com.bbn.marti.sync.service.MissionService;
+
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
-import tak.server.ignite.cache.IgniteCacheHolder;
 
 /**
  *  
@@ -85,107 +87,138 @@ public class ClusterSubscriptionStore extends SubscriptionStore {
 	}
 	
 	@Override
-	public void putUidToMission(String mission, String uid) {
+	public void putUidToMission(UUID mission, String uid) {
 		super.putUidToMission(mission, uid);
 		MissionEntry missionEntry = new MissionEntry();
 		missionEntry.clientUid = uid;
-		missionEntry.missionName = mission;
+		
+		// TODO fix this for mission name - need to track down usages of the name 
+//		missionEntry.missionName = mission;
+		missionEntry.missionGuid = mission;
 		
 		missionUidCache().putIfAbsent(mission+"-"+uid, missionEntry);
 	}
 
 	@Override
-	public void removeUidByMission(String mission, String uid) {
-		super.removeUidByMission(mission, uid);
-		SqlFieldsQuery deleteQry = new SqlFieldsQuery("DELETE FROM MissionEntry me WHERE me.missionName=? AND me.clientUid=?");
-		deleteQry.setArgs(mission, uid);
+	public void removeUidByMission(UUID missionGuid, String uid) {
+		super.removeUidByMission(missionGuid, uid);
+		SqlFieldsQuery deleteQry = new SqlFieldsQuery("DELETE FROM MissionEntry me WHERE me.missionGuid=? AND me.clientUid=?");
+		deleteQry.setArgs(missionGuid.toString(), uid);
 		missionUidCache().query(deleteQry);
 	}
 
 	// This will return all UIDS across all nodes for the mission.
 	@Override
-	public Collection<String> getUidsByMission(String mission) {
+	public Collection<String> getUidsByMission(UUID mission) {
 		return getAllClientsForMission(mission);
 	}
 	
 	// This will return only the UIDS local to this node. This is preferred over
 	// getUidsByMission(String mission) unless you really need all the UIDS
 	@Override
-	public Collection<String> getLocalUidsByMission(String mission) {
+	public Collection<String> getLocalUidsByMission(UUID mission) {
 		return super.getLocalUidsByMission(mission);
 	}
 
 	@Override
 	// already taken care of by putUidToMission
-	public void putMissionToUid(String uid, String mission) {}
+	public void putMissionToUid(String uid, UUID mission) {}
 
 	@Override
 	// already taken care of by removeUidByMission
-	public void removeMissionByUid(String uid, String mission) {}
+	public void removeMissionByUid(String uid, UUID missionGuid) {}
 
 	@Override
-	public Collection<String> getMissionsByUid(String uid) {
+	public Collection<UUID> getMissionsByUid(String uid) {
 		return getAllMissionsForClient(uid);
 	}
 	
 	@Override
-	public void putUidToMissionContents(String mission, String uid) {
+	public void putUidToMissionContents(UUID missionGuid, String uid) {
+		
 		MissionContentsEntry missionContentsEntry = new MissionContentsEntry();
 		missionContentsEntry.contentUid = uid;
-		missionContentsEntry.missionName = mission;
+		// TODO: missionName is not populated here. If needed, we can fetch it from MissionService
+		//missionContentsEntry.missionName = mission;
 				
-		missionContentsUidCache().putIfAbsent(mission+"-"+uid, missionContentsEntry);
+		missionContentsUidCache().putIfAbsent(missionGuid+"-"+uid, missionContentsEntry);
 	}
 
 	@Override
-	public void removeUidByMissionContents(String mission, String uid) {
-		SqlFieldsQuery deleteQry = new SqlFieldsQuery("DELETE FROM MissionContentsEntry mce WHERE mce.missionName=? AND mce.contentUid=?");
-		deleteQry.setArgs(mission, uid);
+	public void removeUidByMissionContents(UUID missionGuid, String uid) {
+		SqlFieldsQuery deleteQry = new SqlFieldsQuery("DELETE FROM MissionContentsEntry mce WHERE mce.missionGuid=? AND mce.contentUid=?");
+		deleteQry.setArgs(missionGuid.toString(), uid);
 		missionContentsUidCache().query(deleteQry);
 	}
 
 	@Override
-	public Collection<String> getUidsByMissionContents(String mission) {
-		return getAllContentsUidsForMission(mission);
+	public Collection<String> getUidsByMissionContents(UUID missionGuid) {
+		return getAllContentsUidsForMission(missionGuid);
 	}
 
 	@Override
 	// already taken care of by putUidToMissionContents
-	public void putMissionToContentsUid(String uid, String mission) {}
+	public void putMissionToContentsUid(String uid, UUID missionGuid) {}
 
 	@Override
 	// already taken care of by removeUidByMissionContents
-	public void removeMissionByContentsUid(String uid, String mission) {}
+	public void removeMissionByContentsUid(String uid, UUID missionGuid) {}
 
 	@Override
-	public Collection<String> getMissionsByContentsUid(String uid) {
+	public Collection<UUID> getMissionsByContentsUid(String uid) {
 		return getAllMissionsForMissionContents(uid);
 	}
 	
 	@Override
-	public void removeMission(String missionName, Set<String> uids) {
+	public void removeMission(UUID missionGuid, Set<String> uids) {
 		for (String contentUid : uids) {
-			removeUidByMissionContents(missionName, contentUid);
+			removeUidByMissionContents(missionGuid, contentUid);
 		}
 	}
 	
 	private static class MissionEntry implements Serializable {
 		private static final long serialVersionUID = -5840505788889535916L;
+		// check if Ignite supports native UUID type or not?
+		@QuerySqlField(index = true) public UUID missionGuid;
 		@QuerySqlField(index = true) public String missionName;
 		@QuerySqlField(index = true) public String clientUid;
 	}
 	
-	private Collection<String> getAllMissionsForClient(String clientUid) {
-		Collection<String> missions = new ArrayList<>();
+	private Collection<UUID> getAllMissionsForClient(String clientUid) {
+		Collection<UUID> missions = new ArrayList<>();
 
-		SqlFieldsQuery qry = new SqlFieldsQuery("select me.missionName from MissionEntry me WHERE me.clientUid=?");
+//		SqlFieldsQuery qry = new SqlFieldsQuery("select me.missionName from MissionEntry me WHERE me.clientUid=?");
+//		qry.setArgs(clientUid);
+//		
+//		SqlFieldsQuery missionQry = qry;
+//		try (QueryCursor<List<?>> cursor = missionUidCache().query(missionQry)) {
+//			for (List<?> row : cursor) {
+//				for (Object missionColumn : row) {
+//					missions.add(missionColumn.toString());
+//				}
+//			}
+//		}
+		
+		// TODO: does this work?
+		SqlFieldsQuery qry = new SqlFieldsQuery("select me.missionGuid from MissionEntry me WHERE me.clientUid=?");
 		qry.setArgs(clientUid);
 		
 		SqlFieldsQuery missionQry = qry;
 		try (QueryCursor<List<?>> cursor = missionUidCache().query(missionQry)) {
 			for (List<?> row : cursor) {
 				for (Object missionColumn : row) {
-					missions.add(missionColumn.toString());
+					
+					if (missionColumn == null) continue;
+					
+					UUID missionGuid = null;
+					
+					try {
+						missionGuid = UUID.fromString(missionColumn.toString());
+					} catch (IllegalArgumentException e) {
+						logger.error("skipping invalid mission guid {}", missionColumn.toString());
+					}
+							
+					missions.add(missionGuid);
 				}
 			}
 		}
@@ -193,10 +226,11 @@ public class ClusterSubscriptionStore extends SubscriptionStore {
 		return missions;
 	}
 	
-	private Collection<String> getAllClientsForMission(String missionName) {	
+	private Collection<String> getAllClientsForMission(UUID missionName) {	
 		Collection<String> uids = new ArrayList<>();
 
-		SqlFieldsQuery qry = new SqlFieldsQuery("select me.clientUid from MissionEntry me WHERE me.missionName=?");
+//		SqlFieldsQuery qry = new SqlFieldsQuery("select me.clientUid from MissionEntry me WHERE me.missionName=?");
+		SqlFieldsQuery qry = new SqlFieldsQuery("select me.clientUid from MissionEntry me WHERE me.missionGuid=?");
 		qry.setArgs(missionName);
 		
 		SqlFieldsQuery missionQry = qry;
@@ -211,11 +245,11 @@ public class ClusterSubscriptionStore extends SubscriptionStore {
 		return uids;
 	}
 	
-	private Collection<String> getAllLocalClientsForMission(String mission) {
+	private Collection<String> getAllLocalClientsForMission(UUID missionGuid) {
 		Collection<String> uids = new ArrayList<>();
 		
-		SqlFieldsQuery qry = new SqlFieldsQuery("select me.clientUid from MissionEntry me inner join \""  + Constants.IGNITE_SUBSCRIPTION_CLIENTUID_TRACKER_CACHE +  "\".RemoteSubscription rs ON me.clientUid = rs._KEY WHERE me.missionName=? AND originNode=?");
-		qry.setArgs(mission, IgniteHolder.getInstance().getIgniteId());
+		SqlFieldsQuery qry = new SqlFieldsQuery("select me.clientUid from MissionEntry me inner join \""  + Constants.IGNITE_SUBSCRIPTION_CLIENTUID_TRACKER_CACHE +  "\".RemoteSubscription rs ON me.clientUid = rs._KEY WHERE me.missionGuid=? AND originNode=?");
+		qry.setArgs(missionGuid.toString(), IgniteHolder.getInstance().getIgniteId());
 		
 		SqlFieldsQuery missionQry = qry;
 		try (QueryCursor<List<?>> cursor = missionUidCache().query(missionQry)) {
@@ -235,11 +269,11 @@ public class ClusterSubscriptionStore extends SubscriptionStore {
 		@QuerySqlField(index = true) public String missionName;
 	}
 	
-	private Collection<String> getAllContentsUidsForMission(String mission) {
+	private Collection<String> getAllContentsUidsForMission(UUID missionGuid) {
 		Collection<String> uids = new ArrayList<>();
 
-		SqlFieldsQuery qry = new SqlFieldsQuery("select mce.contentUid from MissionContentsEntry mce WHERE mce.missionName=?");
-		qry.setArgs(mission);
+		SqlFieldsQuery qry = new SqlFieldsQuery("select mce.contentUid from MissionContentsEntry mce WHERE mce.missionGuid=?");
+		qry.setArgs(missionGuid.toString());
 		
 		SqlFieldsQuery missionQry = qry;
 		try (QueryCursor<List<?>> cursor = missionContentsUidCache().query(missionQry)) {
@@ -253,8 +287,8 @@ public class ClusterSubscriptionStore extends SubscriptionStore {
 		return uids;
 	}
 	
-	private Collection<String> getAllMissionsForMissionContents(String uid) {	
-		Collection<String> missions = new ArrayList<>();
+	private Collection<UUID> getAllMissionsForMissionContents(String uid) {	
+		Collection<UUID> missionGuids = new ArrayList<>();
 
 		SqlFieldsQuery qry = new SqlFieldsQuery("select mce.missionName from MissionContentsEntry mce WHERE mce.contentUid=?");
 		qry.setArgs(uid);
@@ -263,11 +297,11 @@ public class ClusterSubscriptionStore extends SubscriptionStore {
 		try (QueryCursor<List<?>> cursor = missionContentsUidCache().query(missionQry)) {
 			for (List<?> row : cursor) {
 				for (Object missionsColumn : row) {
-					missions.add(missionsColumn.toString());
+					missionGuids.add(UUID.fromString((String) missionsColumn));
 				}
 			}
 		}
 		
-		return missions;
+		return missionGuids;
 	}
 }

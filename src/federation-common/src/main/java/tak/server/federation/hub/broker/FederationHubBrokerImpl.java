@@ -1,5 +1,7 @@
 package tak.server.federation.hub.broker;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.KeyStore;
@@ -21,6 +23,7 @@ import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.ignite.services.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +38,7 @@ import tak.server.federation.FederateOutgoing;
 import tak.server.federation.FederationNode;
 import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
+import tak.server.federation.hub.broker.events.ForceDisconnectEvent;
 import tak.server.federation.hub.broker.events.UpdatePolicy;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
 import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
@@ -163,6 +167,22 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 			logger.error("Exception deleteing CA", e);
 		}
 	}
+	
+	@Override
+	public byte[] getSelfCaFile() {
+		FederationHubDependencyInjectionProxy depProxy = FederationHubDependencyInjectionProxy.getInstance();
+		FederationHubServerConfig fedHubConfig = depProxy.fedHubServerConfig();
+		String caFilePath = fedHubConfig.getCaFile();
+		
+		try {
+		    byte[] contents = FileUtils.readFileToByteArray(new File(caFilePath));
+		    return contents;
+		} catch (Exception e) {
+			logger.error("Exception loading caFile location from " + fedHubConfig.getCaFile() 
+				+ ". Ensure caFile in the federation-hub-broker.yml is set to a valid path." , e);
+			return null;
+		}
+	}
 
     @Override
     public void cancel() {
@@ -268,5 +288,10 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 		}
 
 		return new ArrayList<String>();
+	}
+
+	@Override
+	public void disconnectFederate(String connectionId) {
+		FederationHubDependencyInjectionProxy.getSpringContext().publishEvent(new ForceDisconnectEvent(this, connectionId));
 	}
 }

@@ -4,8 +4,10 @@ package tak.server.federation;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.codec.binary.Base64;
 import org.dom4j.Document;
@@ -180,11 +182,15 @@ public class ProtoBufHelper {
 						geoBuilder.addPtpUids(s);
 					}
 				}
+				Set<String> missionNamesList = (Set<String>) cot.getContextValue("explicitBrokeringMission");
+				if (missionNamesList != null) {
+					for(String s : missionNamesList) {
+						geoBuilder.addMissionNames(s);
+					}
+				}
 				geoBuilder.setOther(detailE.asXML());
 			} catch (Exception e) {
-				if (logger.isDebugEnabled()) {
-					logger.debug("exception setting detail fields ", e);
-				}
+				logger.warn("exception setting detail fields ", e);
 			}
 		}
 
@@ -262,6 +268,14 @@ public class ProtoBufHelper {
 				l.add(geo.getPtpUids(i));
 			}
 			rval.setContextValue("explicitBrokeringUid", l);
+		}
+
+		if (geo.getMissionNamesCount() > 0) {
+			Set<String> l = new HashSet<String>();
+			for(int i = 0; i < geo.getMissionNamesCount(); ++i) {
+				l.add(geo.getMissionNames(i));
+			}
+			rval.setContextValue("explicitBrokeringMission", l);
 		}
 		
 		if (!Strings.isNullOrEmpty(geo.getFeedUid())) {

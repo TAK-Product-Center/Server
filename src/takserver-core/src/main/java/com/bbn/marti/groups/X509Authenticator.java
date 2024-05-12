@@ -263,7 +263,7 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                         	}
 
                             Map<String, String> groupInfo = LdapAuthenticator.getInstance()
-                                    .getGroupInfoBySearch(username);
+                                    .getGroupInfoBySearch(username, ldapConf.isLoginWithEmail());
 
                             if (logger.isDebugEnabled()) {
                                 logger.debug("group info for " + username + " : " + groupInfo);

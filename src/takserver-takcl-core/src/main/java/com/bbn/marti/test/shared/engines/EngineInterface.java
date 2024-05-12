@@ -1,6 +1,7 @@
 package com.bbn.marti.test.shared.engines;
 
 import com.bbn.marti.takcl.connectivity.missions.MissionModels;
+import com.bbn.marti.takcl.connectivity.server.ServerProcessConfiguration;
 import com.bbn.marti.test.shared.data.GroupProfiles;
 import com.bbn.marti.test.shared.data.GroupSetProfiles;
 import com.bbn.marti.test.shared.data.connections.AbstractConnection;
@@ -50,7 +51,7 @@ public interface EngineInterface {
 
 	void startServer(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier);
 
-	void startServerWithStartupValidation(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier, boolean enablePluginManager, boolean enableRetentionService);
+	void startServerWithStartupValidation(@NotNull AbstractServerProfile server, @NotNull String sessionIdentifier);
 
 	void stopServers(@NotNull AbstractServerProfile... servers);
 
@@ -123,4 +124,6 @@ public interface EngineInterface {
 	void missionClearKeywords(@NotNull AbstractUser user, @NotNull String missionName);
 
 	void missionSetPassword(@NotNull AbstractUser apiUser, @NotNull String missionName, @NotNull String password);
+
+	void overrideDefaultProcessConfiguration(AbstractServerProfile server, ServerProcessConfiguration processConfiguration);
 }

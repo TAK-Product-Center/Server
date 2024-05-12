@@ -1,27 +1,35 @@
 package tak.server.cache;
 
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 
-import org.apache.ignite.IgniteCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.Cache;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.Cache.ValueWrapper;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.support.SimpleValueWrapper;
 import org.springframework.context.annotation.Lazy;
 
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.service.MissionService;
 import com.google.common.base.Strings;
 
-import tak.server.Constants;
+import tak.server.cache.resolvers.AllCopMissionCacheResolver;
+import tak.server.cache.resolvers.AllMissionCacheResolver;
 
 public class MissionCacheHelper {
 
-	@Autowired
-	private CacheManager cacheManager;
+    @Autowired
+    private CacheManager cacheManager;
+    
+    @Autowired
+    @Qualifier("caffineCacheManager")
+    private CacheManager caffineCacheManager;
 
 	@Autowired
 	@Lazy // lazy is necessary due to circular dependency. Could be fixed by wrapping this around whole mission data layer, or combining them.
@@ -30,8 +38,12 @@ public class MissionCacheHelper {
 	@Autowired
 	private MissionRepository missionRepository;
 	
-	private static final AtomicBoolean isInvalidateAllMissionCache = new AtomicBoolean(false);
-
+	@Autowired
+	AllMissionCacheResolver allMissionCacheResolver;
+	
+	@Autowired
+	AllCopMissionCacheResolver allCopMissionCacheResolver;
+	
 	private static final Logger logger = LoggerFactory.getLogger(MissionCacheHelper.class);
 	
 	public Mission getMission(String missionName, boolean hydrateDetails, boolean skipCache) {
@@ -46,48 +58,60 @@ public class MissionCacheHelper {
 
 		String key = getKey(missionName, hydrateDetails);
 
-		logger.debug("getMission cache key: {} ", key);
-
 		Mission mission = null;
 
-		Object result = getCache(missionName).get(key);
-
-		if (result == null) {
+		ValueWrapper wrapper = getCacheManager().getCache(missionName).get(key);
+		mission = unwrapMission(wrapper);
+		
+		if (mission != null) {
 			if (logger.isDebugEnabled()) {
-				logger.debug("no cache entry for key: " + key);
+				logger.debug("cache hit for " + key);
 			}
+			return mission;
 		}
-
-		if (result instanceof Mission) {
-			mission = ((Mission) result);
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("cache miss for " + key);
 		}
+		
+		Semaphore lock = null;
+		try {
+			// only lock on cache miss. block to acquire semaphore.
+			lock = getMissionLock(key);
+			lock.acquire();
 
-		if (mission == null) {
-			if (logger.isDebugEnabled()) {
-				logger.debug("cache miss for {}", key);
+			// double-checked cache get
+			wrapper = getCacheManager().getCache(missionName).get(key);	
+			mission = unwrapMission(wrapper);
+
+			if (mission != null) {
+				// cache hit - double-checked lock
+				return mission;
 			}
 
 			mission = doMissionQuery(missionName, hydrateDetails);
 
 			if (mission != null) {
+
 				if (logger.isDebugEnabled()) {
 					logger.debug("Unproxy ExternalMissionData and MapLayer");
 				}
-				
 				UnproxyHelper.unproxyMission(mission);
 
 				// cache the mission with the appropriate key
-				getCache(missionName).put(key, mission);
-
+				getCacheManager().getCache(missionName).put(key, mission);
 			}
-
-		} else {
-			if (logger.isDebugEnabled()) {
-				logger.debug("cache hit for " + key);
+		} catch (InterruptedException e) {
+			logger.error("interrupted", e);
+		} finally {
+			try {
+				// release lock and remove it from lock map
+				lock.release();
+			} finally {
+				deleteLock(key);
 			}
-
 		}
-
+		
 		return mission;
 	}
 	
@@ -102,49 +126,73 @@ public class MissionCacheHelper {
 		}
 		
 		String key = getKeyGuid(guid, hydrateDetails);
-
-		logger.debug("getMissionByGuid cache key {} ", key);
 		
 		Mission mission = null;
 
-		Object result = getCache(guid).get(key);
-
-		if (result == null) {
+		ValueWrapper wrapper = getCacheManager().getCache(guid.toString()).get(key);	
+		mission = unwrapMission(wrapper);
+		
+		if (mission != null) {
 			if (logger.isDebugEnabled()) {
-				logger.debug("no cache entry for key: " + key);
+				logger.debug("cache hit for " + key);
 			}
+			return mission;
 		}
-
-		if (result instanceof Mission) {
-			mission = ((Mission) result);
+		
+		if (logger.isDebugEnabled()) {
+			logger.debug("cache miss for " + key);
 		}
+		
+		Semaphore lock = null;
+		try {
+			// only lock on cache miss. block to acquire semaphore.
+			lock = getMissionLock(key);
+			lock.acquire();
 
-		if (mission == null) {
+			// double-checked cache get
+			wrapper = getCacheManager().getCache(guid.toString()).get(key);	
+			mission = unwrapMission(wrapper);
 
-			if (logger.isDebugEnabled()) {
-				logger.debug("cache miss for " + key);
+			if (mission != null) {
+				// cache hit - double-checked lock
+				return mission;
 			}
 
 			mission = doMissionQueryGuid(guid, hydrateDetails);
 
 			if (mission != null) {
-				
+
 				if (logger.isDebugEnabled()) {
 					logger.debug("Unproxy ExternalMissionData and MapLayer");
 				}
-				
 				UnproxyHelper.unproxyMission(mission);
 
 				// cache the mission with the appropriate key
-				getCache(guid).put(key, mission);
+				getCacheManager().getCache("mg-" + guid.toString()).put(key, mission);
 			}
-
-		} else {
-			if (logger.isDebugEnabled()) {
-				logger.debug("cache hit for " + key);
+		} catch (InterruptedException e) {
+			logger.error("interrupted", e);
+		} finally {
+			try {
+				// release lock and remove it from lock map
+				lock.release();
+			} finally {
+				deleteLock(key);
 			}
 		}
 
+		return mission;
+	}
+	
+	private Mission unwrapMission(ValueWrapper missionWrapper) {
+		Mission mission = null;
+		
+		Object result = missionWrapper == null ? null : missionWrapper.get();
+
+		if (result instanceof Mission) {
+			mission = ((Mission) result);
+		}
+		
 		return mission;
 	}
 
@@ -152,15 +200,13 @@ public class MissionCacheHelper {
 
 		Mission mission = missionRepository.getByNameNoCache(missionName);
 		
-		if (logger.isTraceEnabled()) {
-			logger.trace("mission {} : {} ", missionName, mission);
-		}
+		logger.trace("mission {} : {} ", missionName, mission);
 		
 		if (mission != null) {
-			if (hydrateDetails) {
-				missionService.hydrate(mission, hydrateDetails);
-			}else {
-				missionService.hydrateFeedNameForMission(mission);				
+			missionService.hydrate(mission, hydrateDetails);
+			
+			if (!hydrateDetails) {
+				missionService.hydrateFeedNameForMission(mission);		
 			}
 		}
 
@@ -171,91 +217,65 @@ public class MissionCacheHelper {
 
 		Mission mission = missionRepository.getByGuidNoCache(guid);
 
-		logger.trace("mission {} : {} ", guid, mission);
+		if (logger.isTraceEnabled()) {
+			logger.trace("mission {} : {} ", guid, mission);
+		}
 		
-		if (mission != null && hydrateDetails) {
+		if (mission != null) {
 			missionService.hydrate(mission, hydrateDetails);
-			missionService.hydrateFeedNameForMission(mission);
+			
+			if (!hydrateDetails) {
+				missionService.hydrateFeedNameForMission(mission);		
+			}
 		}
 		
 		return mission;
 	}
 
-	/*
-	 * Get the Ignite cache created by the Spring cache manager so that the options will be the same and ensure that it's the same one
-	 */
-	@SuppressWarnings("unchecked")
-	public IgniteCache<Object, Object> getCache(String cacheName) {
-
-		Object springNativeCache = cacheManager.getCache(cacheName.toLowerCase()).getNativeCache();
-
-		if (!(springNativeCache instanceof IgniteCache)) {
-			throw new IllegalArgumentException("invalid cache type " + springNativeCache.getClass().getTypeName()); 
-		}
-
-		return ((IgniteCache<Object, Object>) springNativeCache); 
-	}
-	
-	/*
-	 * Get the Ignite cache created by the Spring cache manager so that the options will be the same and ensure that it's the same one
-	 */
-	@SuppressWarnings("unchecked")
-	private IgniteCache<Object, Object> getCache(UUID cacheUUID) {
-
-		Object springNativeCache = cacheManager.getCache(cacheUUID.toString()).getNativeCache();
-
-		if (!(springNativeCache instanceof IgniteCache)) {
-			throw new IllegalArgumentException("invalid cache type " + springNativeCache.getClass().getTypeName()); 
-		}
-
-		return ((IgniteCache<Object, Object>) springNativeCache); 
-
-	}
-
-	private String getKey(String missionName, boolean hydrateDetails) {
+	public static String getKey(String missionName, boolean hydrateDetails) {
 
 		return "[getMission, " + missionName.toLowerCase() + ", " + (hydrateDetails ? "true, hydrated" : "false") + "]";
 	}
 	
-	private String getKeyGuid(UUID guid, boolean hydrateDetails) {
+	public static String getKeyGuid(UUID guid, boolean hydrateDetails) {
 
-		return "[missionguid_" + guid + "_" + (hydrateDetails ? "true, hydrated" : "false") + "]";
+		return "[mg-" + guid + "_" + (hydrateDetails ? "true, hydrated" : "false") + "]";
 	}
 	
 	public void clearAllMissionAndCopsCache() {
+		if (logger.isDebugEnabled()) {
+			logger.debug("Clear All Mission And Cops Cache");
+		}		
+		
+		allMissionCacheResolver.invalidateCache();
+		allCopMissionCacheResolver.invalidateCache();
+	}
+	
+    public CacheManager getCacheManager() {
+    	if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+    		return cacheManager;
+    	} else {
+    		return caffineCacheManager;
+    	}
+    }
+	
+    private final ConcurrentHashMap<String, Semaphore> missionAvailableMap = new ConcurrentHashMap<>();
+	
+    private Semaphore getMissionLock(String key) {
+		Semaphore lock = missionAvailableMap.get(key);
 
-		// don't allow concurrent clears of these caches.
-		if (isInvalidateAllMissionCache.compareAndSet(false, true)) {
-			try {
-				
-				try {
-					Cache allMissionCache = cacheManager.getCache(Constants.ALL_MISSION_CACHE);
-
-					if (allMissionCache != null) {
-						allMissionCache.invalidate();
-					}
-				} catch (Exception e) {
-					logger.error("error clearing all mission cache.", e);
-				}
-
-				try {
-					Cache allCopsCache = cacheManager.getCache(Constants.ALL_COPS_MISSION_CACHE);
-
-					if (allCopsCache != null) {
-						allCopsCache.invalidate();
-					}
-				} catch (Exception e) {
-					logger.error("error clearing all mission cache.", e);
-				}
-				
-				logger.debug("cleared all mission cache and all cops cache.");
-			} catch (Exception e) {
-				logger.error("error clearing all mission cache and all cops cache.", e);
-			} finally {
-				isInvalidateAllMissionCache.set(false);
-			}
+		if (lock != null) {
+			return lock;
 		}
 
-		return;
+		lock = new Semaphore(1, true);
+
+		missionAvailableMap.putIfAbsent(key, lock);
+
+		return lock;
+	}
+
+	private void deleteLock(String key) {
+		missionAvailableMap.remove(key);
 	}
 }

@@ -8,9 +8,9 @@
 	    <div data-ng-show="!showRmiError">
 		    <h3>Federate Contacts</h3>
 		</div>
-    
+
 	    <span>You are viewing contacts for federate: <b>{{federateName}}</b></span>
-	    
+
 	    <br/>
 
 	    <div data-ng-show="!showRmiError && federateContacts.length > 0">
@@ -22,14 +22,35 @@
 				  	<tr>
 					  	<th>UID</th>
 					  	<th>Contact Name</th>
+						<th>Incoming Groups</th>
+						<th>Outgoing Groups</th>
 					  	<th>Last Heard From (ms)</th>
 					</tr>
 				</thead>
-				
+
 				<tbody>
 					<tr data-ng-repeat="fc in federateContacts">
 					    <td data-ng-bind="fc.uid"></td>
 						<td data-ng-bind="fc.contactName"></td>
+						<td>
+							<div data-ng-if="fc.groupMappings">
+								<div data-ng-repeat="groupMapping in fc.groupMappings">
+									<b>remote:</b> {{groupMapping.remoteSourceGroup}} &rarr; <b>local:</b> {{groupMapping.localInboundGroup}}
+								</div>
+							</div>
+							<div data-ng-if="fc.inGroups">
+								<div data-ng-repeat="group in fc.inGroups">
+									{{group}}
+								</div>
+							</div>
+						</td>
+						<td>
+							<div data-ng-if="fc.outGroups">
+								<div data-ng-repeat="group in fc.outGroups">
+									{{group}}
+								</div>
+							</div>
+						</td>
 					    <td data-ng-bind="fc.lastHeardFromMillis"></td>
 					</tr>
 				</tbody>
@@ -47,7 +68,7 @@
 			<p>Please ensure the broker is running and reload this page.</p>
 			<hr/>
 	    </div>
-	    
+
 		<input type="button" data-ng-click="backToFederates()" value="Back To Federates" />&nbsp;
     </div>
 </div>

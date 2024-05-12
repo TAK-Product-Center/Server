@@ -26,11 +26,14 @@ import org.apache.ignite.spi.communication.tcp.TcpCommunicationSpi;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.kubernetes.TcpDiscoveryKubernetesIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
+import org.apache.ignite.ssl.SslContextFactory;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.config.TAKIgniteConfiguration;
+import com.bbn.marti.config.Tls;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
 
@@ -126,13 +129,12 @@ public class IgniteConfigurationHolder {
 	 * This is the underlying XML configuration used to configure the IgniteConfiguration initially from the file
 	 * @return
 	 */
-	public void setTAKIgniteConfiguration(TAKIgniteConfiguration takIgniteConfiguration)
-	{
+	public void setTAKIgniteConfiguration(TAKIgniteConfiguration takIgniteConfiguration) {
 		this.takIgniteConfiguration = takIgniteConfiguration;
 	}
 
-	public IgniteConfiguration getIgniteConfiguration()
-	{
+	public IgniteConfiguration getIgniteConfiguration() {
+
 		if (configuration == null) {
 
 			System.out.println("messaging process Xmx (bytes) " + Runtime.getRuntime().maxMemory());
@@ -150,20 +152,30 @@ public class IgniteConfigurationHolder {
 			}
 			System.out.println("cache computed offheap initial size " + takIgniteConfiguration.getCacheOffHeapInitialSizeBytes() + " bytes");
 
-
-			if ((!takIgniteConfiguration.isEmbeddedIgnite())	&& (ActiveProfiles.getInstance().isApiProfileActive() || ActiveProfiles.getInstance().isMonolithProfileActive() ||
-				ActiveProfiles.getInstance().isMessagingProfileActive() || ActiveProfiles.getInstance().isConfigProfileActive())) {
+			// in standalone, messaging always needs to be the ignite server
+			if (ActiveProfiles.getInstance().isMessagingProfileActive()) {
 				takIgniteConfiguration.setEmbeddedIgnite(true);
+			} 
+			// only let api be an ignite server if explicitly set
+			else if (ActiveProfiles.getInstance().isApiProfileActive() && takIgniteConfiguration.isIgniteApiServerMode()) {
+				takIgniteConfiguration.setEmbeddedIgnite(true);
+			} 
+			// all other profiles should be false
+			else {
+				takIgniteConfiguration.setEmbeddedIgnite(false);
 			}
 
-			System.out.println("ignite thread pool size: " + takIgniteConfiguration.getIgnitePoolSize());
+			// Don't set the thread pool size based on processor count for config service
+			if (!ActiveProfiles.getInstance().isConfigProfileActive()) {
+				System.out.println("ignite thread pool size: " + takIgniteConfiguration.getIgnitePoolSize());
 
-			// set ignite pool size based on processor count
-			if (takIgniteConfiguration.getIgnitePoolSize() < 1) {
-				takIgniteConfiguration.setIgnitePoolSize(Runtime.getRuntime().availableProcessors() * takIgniteConfiguration.getIgnitePoolSizeMultiplier());
+				// set ignite pool size based on processor count
+				if (takIgniteConfiguration.getIgnitePoolSize() < 1) {
+					takIgniteConfiguration.setIgnitePoolSize(Runtime.getRuntime().availableProcessors() * takIgniteConfiguration.getIgnitePoolSizeMultiplier());
 
-				if (takIgniteConfiguration.getIgnitePoolSize() > IGNITE_POOL_SIZE_LIMIT) { // ignite hard limit on pool size
-					takIgniteConfiguration.setIgnitePoolSize(IGNITE_POOL_SIZE_LIMIT);
+					if (takIgniteConfiguration.getIgnitePoolSize() > IGNITE_POOL_SIZE_LIMIT) { // ignite hard limit on pool size
+						takIgniteConfiguration.setIgnitePoolSize(IGNITE_POOL_SIZE_LIMIT);
+					}
 				}
 			}
 
@@ -341,18 +353,7 @@ public class IgniteConfigurationHolder {
 			
 			standaloneConf.setCommunicationSpi(tcpSpiConf);
 
-			boolean isIgniteApiServerMode = false;
-			if (ActiveProfiles.getInstance().isApiProfileActive() && takIgniteConfiguration.isIgniteApiServerMode()) {
-				isIgniteApiServerMode = true;
-			}
-
-			// If this process is the API micro-service, optionally run in ignite embedded server mode. In standalone, messaging service is always an ignite server. Plugin manager and retention service are always ignite clients. 
-			if (isIgniteApiServerMode) {
-				standaloneConf.setClientMode(false);
-			} else {
-				standaloneConf.setClientMode(!takIgniteConfiguration.isEmbeddedIgnite());
-			}
-			standaloneConf.setIgniteInstanceName(Constants.IGNITE_INSTANCE_NAME);
+			standaloneConf.setClientMode(!takIgniteConfiguration.isEmbeddedIgnite());
 
 			standaloneConf.setUserAttributes(Collections.singletonMap(Constants.TAK_PROFILE_KEY, igniteProfile));
 			
@@ -368,53 +369,73 @@ public class IgniteConfigurationHolder {
 				standaloneConf.setSystemWorkerBlockedTimeout(failureDetectionTimeoutMs);
 			}
 			
-			if (takIgniteConfiguration.isEmbeddedIgnite()) {
+			
+			// don't set thread pool options for config service
+			if (!ActiveProfiles.getInstance().isConfigProfileActive()) {
+				if (takIgniteConfiguration.isEmbeddedIgnite()) {
 
-				DataStorageConfiguration storageConfig = new DataStorageConfiguration();
+					DataStorageConfiguration storageConfig = new DataStorageConfiguration();
 
-				DataRegionConfiguration takserverStorageRegion = new DataRegionConfiguration();
-				takserverStorageRegion.setName("takserver-cache-region");
-				takserverStorageRegion.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU); // cache eviction policy
+					DataRegionConfiguration takserverStorageRegion = new DataRegionConfiguration();
+					takserverStorageRegion.setName("takserver-cache-region");
+					takserverStorageRegion.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU); // cache eviction policy
 
-				if (takIgniteConfiguration.getCacheOffHeapEvictionThreshold() != -1.f) {
-					takserverStorageRegion.setEvictionThreshold(takIgniteConfiguration.getCacheOffHeapEvictionThreshold());
-				}
+					if (takIgniteConfiguration.getCacheOffHeapEvictionThreshold() != -1.f) {
+						takserverStorageRegion.setEvictionThreshold(takIgniteConfiguration.getCacheOffHeapEvictionThreshold());
+					}
 
 
-				takserverStorageRegion.setInitialSize(takIgniteConfiguration.getCacheOffHeapInitialSizeBytes());
-				takserverStorageRegion.setMaxSize(takIgniteConfiguration.getCacheOffHeapMaxSizeBytes());
+					takserverStorageRegion.setInitialSize(takIgniteConfiguration.getCacheOffHeapInitialSizeBytes());
+					takserverStorageRegion.setMaxSize(takIgniteConfiguration.getCacheOffHeapMaxSizeBytes());
 
-				storageConfig.setDefaultDataRegionConfiguration(takserverStorageRegion);
+					storageConfig.setDefaultDataRegionConfiguration(takserverStorageRegion);
 
-				if (takIgniteConfiguration.isEnableCachePersistence()) {
-					takserverStorageRegion.setPersistenceEnabled(true);
-					String basePath = Paths.get("").toAbsolutePath().toString();
-					FileSystem fs = FileSystems.getDefault();
-					storageConfig.setStoragePath(basePath + fs.getSeparator() + "tmp" + fs.getSeparator() + "cache-" +  igniteProfile);
-				}
+					if (takIgniteConfiguration.isEnableCachePersistence()) {
+						takserverStorageRegion.setPersistenceEnabled(true);
+						String basePath = Paths.get("").toAbsolutePath().toString();
+						FileSystem fs = FileSystems.getDefault();
+						storageConfig.setStoragePath(basePath + fs.getSeparator() + "tmp" + fs.getSeparator() + "cache-" +  igniteProfile);
+					}
 
-				standaloneConf.setDataStorageConfiguration(storageConfig);
-			} else { // client mode - API process
-				ClientConnectorConfiguration ccc = standaloneConf.getClientConnectorConfiguration();
+					standaloneConf.setDataStorageConfiguration(storageConfig);
+				} else { // client mode - API process
+					ClientConnectorConfiguration ccc = standaloneConf.getClientConnectorConfiguration();
 
-				if (takIgniteConfiguration.getIgnitePoolSize() > ccc.getThreadPoolSize()) {
-					ccc.setThreadPoolSize(takIgniteConfiguration.getIgnitePoolSize());
-				}
-			}
-
-			if (!takIgniteConfiguration.isEmbeddedIgnite() && !takIgniteConfiguration.isIgnitePoolSizeUseDefaultsForApi()) {
-				int poolSize = takIgniteConfiguration.getIgnitePoolSize();
-				if (poolSize > 0) {
-					// ignite thread pools
-					standaloneConf.setSystemThreadPoolSize(poolSize + 1);
-					standaloneConf.setPublicThreadPoolSize(poolSize);
-					standaloneConf.setQueryThreadPoolSize(poolSize);
-					standaloneConf.setServiceThreadPoolSize(poolSize);
-					standaloneConf.setStripedPoolSize(poolSize);
-					standaloneConf.setDataStreamerThreadPoolSize(poolSize);
-					standaloneConf.setRebalanceThreadPoolSize(poolSize);
+					if (takIgniteConfiguration.getIgnitePoolSize() > ccc.getThreadPoolSize()) {
+						ccc.setThreadPoolSize(takIgniteConfiguration.getIgnitePoolSize());
+					}
 				}
 			}
+
+			// don't set thread pool options for config service
+			if (!ActiveProfiles.getInstance().isConfigProfileActive()) {
+				if (!takIgniteConfiguration.isEmbeddedIgnite() && !takIgniteConfiguration.isIgnitePoolSizeUseDefaultsForApi()) {
+					int poolSize = takIgniteConfiguration.getIgnitePoolSize();
+					if (poolSize > 0) {
+						// ignite thread pools
+						standaloneConf.setSystemThreadPoolSize(poolSize + 1);
+						standaloneConf.setPublicThreadPoolSize(poolSize);
+						standaloneConf.setQueryThreadPoolSize(poolSize);
+						standaloneConf.setServiceThreadPoolSize(poolSize);
+						standaloneConf.setStripedPoolSize(poolSize);
+						standaloneConf.setDataStreamerThreadPoolSize(poolSize);
+						standaloneConf.setRebalanceThreadPoolSize(poolSize);
+					}
+				}
+			}
+			
+			if(takIgniteConfiguration.isIgniteTlsEnabled()) {
+				SslContextFactory factory = new SslContextFactory();
+				
+				factory.setKeyStoreFilePath(takIgniteConfiguration.getKeyStoreFilePath());
+				factory.setKeyStorePassword(takIgniteConfiguration.getKeyStorePassword().toCharArray());
+				factory.setTrustStoreFilePath(takIgniteConfiguration.getTrustStoreFilePath());
+				factory.setTrustStorePassword(takIgniteConfiguration.getTrustStorePassword().toCharArray());
+				factory.setProtocol(takIgniteConfiguration.getIgniteTlsProtocol());
+				standaloneConf.setSslContextFactory(factory);
+			}
+			
+
 
 			IgniteLogger log = new Slf4jLogger();
 

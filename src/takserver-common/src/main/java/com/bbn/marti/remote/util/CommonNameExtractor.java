@@ -28,8 +28,6 @@ public class CommonNameExtractor {
     }
 
     public String extractCommonName(String dn) {
-        logger.debug("Subject DN is '" + dn + "'");
-
         String commonName = dn;
 
         try {

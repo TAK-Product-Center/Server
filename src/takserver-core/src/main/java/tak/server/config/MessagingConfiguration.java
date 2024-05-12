@@ -4,14 +4,6 @@ import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.List;
 
-import jakarta.servlet.ServletContext;
-
-import com.bbn.marti.remote.config.CoreConfigFacade;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import io.awspring.cloud.autoconfigure.context.properties.AwsS3ResourceLoaderProperties;
-import io.awspring.cloud.autoconfigure.metrics.CloudWatchExportAutoConfiguration;
-
 import org.apache.ignite.Ignite;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration;
@@ -100,14 +92,16 @@ import com.bbn.metrics.service.ActuatorMetricsService;
 import com.bbn.metrics.service.DatabaseMetricsService;
 import com.bbn.metrics.service.NetworkMetricsService;
 import com.bbn.metrics.service.QueueMetricsService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.awspring.cloud.autoconfigure.context.properties.AwsS3ResourceLoaderProperties;
+import io.awspring.cloud.autoconfigure.metrics.CloudWatchExportAutoConfiguration;
+import jakarta.servlet.ServletContext;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
-import tak.server.cache.classification.ClassificationCacheHelper;
 import tak.server.cache.DataFeedCotCacheHelper;
-import tak.server.cache.MissionCacheResolver;
-import tak.server.cache.MissionLayerCacheResolver;
 import tak.server.cache.DatafeedCacheHelper;
+import tak.server.cache.classification.ClassificationCacheHelper;
 import tak.server.cluster.DistributedInjectionService;
 import tak.server.cluster.DistributedInputManager;
 import tak.server.cluster.DistributedSecurityManager;
@@ -494,12 +488,6 @@ public class MessagingConfiguration {
 	public RequestHolderBean requestHolderBean() { 
 		return new RequestHolderBean();
 	}
-
-	@Bean("missionCacheResolver")
-	public MissionCacheResolver missionCacheResolver() { return new MissionCacheResolver(); }
-
-	@Bean("missionLayerCacheResolver")
-	public MissionLayerCacheResolver missionLayerCacheResolver() { return new MissionLayerCacheResolver(); }
 
 	@Bean
 	public MessageDeliveryStrategy mds() {

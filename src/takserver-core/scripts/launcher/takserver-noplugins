@@ -33,15 +33,17 @@ TAK_HOME=/opt/tak
 case "$1" in
      start)
         echo -n "Starting $SERVICE: "
-		    service takserver-messaging start
-		    service takserver-api start
+            service takserver-config start
+            service takserver-messaging start
+            service takserver-api start
         touch "/var/lock/subsys/$SERVICE"
     ;;
     stop)
         echo -n "Shutting down $SERVICE: "
-    		service takserver-messaging stop
-		    service takserver-api stop
-	      echo "done."
+            service takserver-config stop
+            service takserver-messaging stop
+            service takserver-api stop
+        echo "done."
     ;;
     status)
         RETVAL=0
