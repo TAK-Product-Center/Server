@@ -56,7 +56,7 @@ public class FederationHubPolicyManagerService implements CommandLineRunner {
         ClusterGroup cg = ignite.cluster().forAttribute(
             FederationHubConstants.FEDERATION_HUB_IGNITE_PROFILE_KEY,
             FederationHubConstants.FEDERATION_HUB_POLICY_IGNITE_PROFILE);
-        ignite.services(cg).deployClusterSingleton(
+        ignite.services(cg).deployNodeSingleton(
             FederationHubConstants.FED_HUB_POLICY_MANAGER_SERVICE, hpm);
     }
 

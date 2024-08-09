@@ -16,4 +16,6 @@ public interface FederationHubBroker {
 	void disconnectFederate(String connectionId);
 	Map<String, X509Certificate> getCAsFromFile();
 	byte[] getSelfCaFile();
+	FederationHubServerConfig getFederationHubBrokerConfig();
+	FederationHubServerConfig saveFederationHubServerConfig(FederationHubServerConfig brokerConfig);
 }

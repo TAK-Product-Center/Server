@@ -22,6 +22,8 @@ dependencies {
   implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
   implementation 'org.apache.commons:commons-lang3:' + commons_lang_version
   implementation group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
+  implementation group: 'io.jsonwebtoken', name: 'jjwt', version: jsonwebtoken_version
+  
 }
 
 compileJava {

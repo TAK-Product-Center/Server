@@ -12,12 +12,14 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManagerFactory;
 
-import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Strings;
+
 import io.grpc.netty.GrpcSslContexts;
 import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.OpenSslServerContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
@@ -27,12 +29,13 @@ public class SSLConfig {
 
     private TrustManagerFactory trustMgrFactory;
     private KeyManagerFactory keyMgrFactory;
-    private SslContext sslContext; // context used to source the tabula rasa engine
+    private SslContext sslContextClientAuth;
+    private SslContext sslContextNoAuth;
     private KeyStore trust;
     private KeyStore self;
     private FederationHubServerConfig config;
 
-    public SslContext initSslContext(FederationHubServerConfig config) {
+    public void initSslContext(FederationHubServerConfig config) {
         this.config = config;
 
         try {
@@ -54,13 +57,18 @@ public class SSLConfig {
             trust.load(getFileOrResource(config.getTruststoreFile()), config.getTruststorePassword().toCharArray());
             trustMgrFactory.init(trust);
 
-            sslContext = GrpcSslContexts.configure(SslContextBuilder.forServer(keyMgrFactory), SslProvider.OPENSSL) // this ensures that we are using OpenSSL, not JRE SSL
+            sslContextClientAuth = GrpcSslContexts.configure(SslContextBuilder.forServer(keyMgrFactory), SslProvider.OPENSSL) // this ensures that we are using OpenSSL, not JRE SSL
                 .protocols("TLSv1.2","TLSv1.3")
                 .trustManager(trustMgrFactory)
                 .clientAuth(ClientAuth.REQUIRE) // client auth always required
                 .build();
+            
+            sslContextNoAuth = GrpcSslContexts.configure(SslContextBuilder.forServer(keyMgrFactory), SslProvider.OPENSSL) // this ensures that we are using OpenSSL, not JRE SSL
+                    .protocols("TLSv1.2","TLSv1.3")
+                    .trustManager(trustMgrFactory)
+                    .clientAuth(ClientAuth.NONE) // client auth always required
+                    .build();
 
-            return sslContext;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -74,14 +82,22 @@ public class SSLConfig {
         return null;
     }
 
-    public synchronized void refresh() {
-        try {
-            this.trust = initTrust(config, trustMgrFactory);
-//            sslContext.init(keyMgrFactory.getKeyManagers(), trustMgrFactory.getTrustManagers(), new SecureRandom());
-        } catch (RuntimeException e) {
-            logger.warn("Exeception refreshing SSL Context", e);
-        }
-    }
+	public synchronized void refresh() {
+		try {
+			this.trust = initTrust(config, trustMgrFactory);
+
+			// Get the current SSL context attached to the running server and update the truststore
+			// Newly created SSL sessions will use this new truststore. Existing SSL sessions will not be forced to reconnect
+			// (Note: This only applies to refreshes for adding CA's. When CA's are deleted, all connections will be forced to reconnect)
+			OpenSslServerContext openSslServerSessionContextClientAuth = (OpenSslServerContext) sslContextClientAuth;
+			openSslServerSessionContextClientAuth.updateSslContext(trustMgrFactory);
+			
+			OpenSslServerContext openSslServerSessionContextNoAuth = (OpenSslServerContext) sslContextNoAuth;
+			openSslServerSessionContextNoAuth.updateSslContext(trustMgrFactory);
+		} catch (Exception e) {
+			logger.warn("Exeception refreshing SSL Context", e);
+		}
+	}
 
     public static KeyStore initTrust(FederationHubServerConfig config, TrustManagerFactory trustManagerFactory)
             throws RuntimeException {
@@ -119,11 +135,14 @@ public class SSLConfig {
         this.keyMgrFactory = keyMgrFactory;
     }
 
-    public SslContext getSslContext() {
-        return sslContext;
+    public SslContext getSslContextClientAuth() {
+        return sslContextClientAuth;
     }
 
-
+    public SslContext getSslContextNoAuth() {
+        return sslContextNoAuth;
+    }
+    
     public KeyStore getTrust() {
         return trust;
     }
@@ -146,6 +165,4 @@ public class SSLConfig {
 
         return new FileInputStream(name);
     }
-
-
 }

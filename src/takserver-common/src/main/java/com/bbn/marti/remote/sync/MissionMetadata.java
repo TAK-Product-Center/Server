@@ -1,5 +1,7 @@
 package com.bbn.marti.remote.sync;
 
+import java.util.UUID;
+
 /*
  * 
  * value class holding succinct metadata about a mission
@@ -12,6 +14,7 @@ public class MissionMetadata {
 	private String chatRoom;
 	private String tool;
 	private String description;
+	private UUID guid;
 	public String getName() {
 		return name;
 	}
@@ -42,9 +45,15 @@ public class MissionMetadata {
 	public void setDescription(String description) {
 		this.description = description;
 	}
+	public UUID getGuid() {
+		return guid;
+	}
+	public void setGuid(UUID guid) {
+		this.guid = guid;
+	}
 	@Override
 	public String toString() {
 		return "MissionMetadata [name=" + name + ", creatorUid=" + creatorUid + ", chatRoom=" + chatRoom + ", tool="
-				+ tool + ", description=" + description + "]";
+				+ tool + ", description=" + description + ", guid=" + guid + "]";
 	}
 }

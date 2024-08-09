@@ -104,6 +104,17 @@ public class FederationPolicyModel {
             group.setFilterExpression(groupCell.getProperties().getFilterExpression());
             policyGraph.addGroup(group);
         });
+        
+        cells.stream().filter(cell -> cell instanceof FederationTokenGroupCell).forEach(cell -> {
+        	FederationTokenGroupCell tokenGroupCell = (FederationTokenGroupCell) cell;
+            FederateIdentity identity = new FederateIdentity(tokenGroupCell.getProperties().getName());
+            FederateGroup group = new FederateGroup(identity);
+            group.getAttributes().putAll(tokenGroupCell.getProperties().attributesToMap());
+            group.setInterconnected(tokenGroupCell.getProperties().isInterconnected());
+            group.setFilterExpression(tokenGroupCell.getProperties().getFilterExpression());
+            policyGraph.addGroup(group);
+        });
+
 
         cells.stream().filter(cell -> cell instanceof FederateCell).forEach( cell -> {
             FederateCell federateCell = (FederateCell) cell;
@@ -198,6 +209,15 @@ public class FederationPolicyModel {
                 group.setFilterExpression(groupCell.getProperties().getFilterExpression());
                 policy.getGroups().add(group);
             });
+            
+            cells.stream().filter(cell -> cell instanceof FederationTokenGroupCell).forEach(cell -> {
+            	FederationTokenGroupCell federationTokenGroupCell = (FederationTokenGroupCell) cell;
+                GroupHolder group = new GroupHolder(federationTokenGroupCell.getProperties().getName());
+                group.setAttributes(federationTokenGroupCell.getProperties().attributesToMap());
+                group.setInterconnected(federationTokenGroupCell.getProperties().isInterconnected());
+                group.setFilterExpression(federationTokenGroupCell.getProperties().getFilterExpression());
+                policy.getGroups().add(group);
+            });
         }
 
         return policy;
@@ -210,9 +230,10 @@ public class FederationPolicyModel {
                     return ((FederateCell) cell).getProperties().getName();
                 } else if (cell instanceof GroupCell) {
                     return ((GroupCell) cell).getProperties().getName();
-                }
-                else if (cell instanceof FederationOutgoingCell) {
+                } else if (cell instanceof FederationOutgoingCell) {
                     return ((FederationOutgoingCell) cell).getProperties().getName();
+                } else if (cell instanceof FederationTokenGroupCell) {
+                    return ((FederationTokenGroupCell) cell).getProperties().getName();
                 }
                 return ((EdgeCell) cell).getProperties().getName();
             }

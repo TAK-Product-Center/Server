@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: storagequota
-  namespace: takserver
+  namespace: {{.Values.takserver.namespace}}
 spec:
   hard:
     persistentvolumeclaims: {{ .Values.takserver.limits.persistentVolumeClaims }}
@@ -12,7 +12,7 @@ apiVersion: v1
 kind: LimitRange
 metadata:
   name: storagelimits
-  namespace: takserver
+  namespace: {{.Values.takserver.namespace}}
 spec:
   limits:
     - max:

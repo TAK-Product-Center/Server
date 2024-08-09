@@ -255,18 +255,18 @@ public class KMLMissionServletTests {
 		List<Schema> schemas = doc.getSchema();
 		assertEquals(1, schemas.size());
 		
-		List<SimpleArrayField> schemaExtension = schemas.get(0).getSchemaExtension();
+		List<Object> schemaExtension = schemas.get(0).getSchemaExtension();
 		assertEquals(3, schemaExtension.size());
 		
-		SimpleArrayField schemaField = schemaExtension.get(0);
+		SimpleArrayField schemaField = (SimpleArrayField)schemaExtension.get(0);
 		assertEquals("speed", schemaField.getName());
 		assertEquals("Speed m/s", schemaField.getDisplayName());
 		
-		schemaField = schemaExtension.get(1);
+		schemaField = (SimpleArrayField)schemaExtension.get(1);
 		assertEquals("ce", schemaField.getName());
 		assertEquals("Circular Error (m)", schemaField.getDisplayName());
 		
-		schemaField = schemaExtension.get(2);
+		schemaField = (SimpleArrayField)schemaExtension.get(2);
 		assertEquals("le", schemaField.getName());
 		assertEquals("Linear Error (m)", schemaField.getDisplayName());
 	}

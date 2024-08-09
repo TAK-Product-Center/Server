@@ -69,6 +69,10 @@ if [[ ! -d "${ARTIFACT_SRC}/federation-hub" ]];then
   mkdir "${ARTIFACT_SRC}/federation-hub"
 fi
 
+if [[ ! -d "${ARTIFACT_SRC}/lib" ]];then
+  mkdir "${ARTIFACT_SRC}/lib"
+fi
+
 cp -r ${ARTIFACT_TEMPLATE_DIR}/* ${ARTIFACT_SRC}/
 cp takserver-package/federation-hub/build/artifacts/jars/* "${ARTIFACT_SRC}/federation-hub/"
 cp -r takserver-package/federation-hub/build/artifacts/configs "${ARTIFACT_SRC}/federation-hub/configs"

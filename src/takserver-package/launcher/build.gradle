@@ -232,24 +232,26 @@ ospackage {
     }
 }
 
-task prePackage { }
-prePackage.dependsOn copyJarsNoDb
-prePackage.dependsOn copyWars
-prePackage.dependsOn copyPluginsJar
-prePackage.dependsOn copyRetentionJar
-prePackage.dependsOn copyCoreConfigXSD
-prePackage.dependsOn copyCoreConfigExample
-prePackage.dependsOn copyConfigScripts
-prePackage.dependsOn copyMessagingScripts
-prePackage.dependsOn copyAPIScripts
-prePackage.dependsOn copyPluginsScripts
-prePackage.dependsOn copyRetentionConfigs
-prePackage.dependsOn copyRetentionMissionStoreDir
-prePackage.dependsOn copyRetentionScripts
+task prePackage(type: Copy) { task ->
+    with takserverCommonSpec(task)
+	with copyFullPluginManagerSpec(task)
+    with copyFullRetentionServiceSpec(task)
+    with copyCoreConfigExampleSpec()
+    with copyConfigScriptsSpec()
+    with copyMessagingScriptsSpec()
+    with copyAPIScriptsSpec()
+
+    // Ideally deconfliction would be done, but that requires more time
+    duplicatesStrategy DuplicatesStrategy.INCLUDE
+    destinationDir = file("$buildDir/takArtifacts")
+
+
+    // TODO: Fix this gradle-detected dependency that probably shouldn't be
+    dependsOn(':takserver-cluster:copyClusterConfig',
+            ':takserver-cluster:copyClusterProperties',
+            ':takserver-cluster:moveCoreConfig')
+}
 prePackage.dependsOn copyLauncherScripts
-prePackage.dependsOn copyDocs
-prePackage.dependsOn copyPolicy
-prePackage.dependsOn copyLicense
 
 buildRpm.dependsOn prePackage
 

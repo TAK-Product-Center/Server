@@ -27,6 +27,10 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
 
     @Query(value = missionAttributes + " from mission where guid = uuid(:guid)", nativeQuery = true)
     Mission getByGuid(@Param("guid") UUID missionGuid);
+    
+    // Only fetch the mission name for the guid (rather than the whole mission)
+    @Query(value = "select name from mission where guid = uuid(:guid)", nativeQuery = true)
+    String getMissionNameForMissionGuid(@Param("guid") UUID missionGuid);
 
     Long findMissionIdByName(String name);
         
@@ -180,7 +184,7 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
             "and tool in :tools AND " + RemoteUtil.GROUP_CLAUSE + " order by id desc ", nativeQuery = true)
     List<Mission> getAllMissionsByTools(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole, @Param("tools") List<String> tools, @Param("groupVector") String groupVector);
 
-    @Query(value = missionAttributes + " from mission where invite_only = false and " +
+    @Query(value = missionAttributes + " from mission where name != 'exchecktemplates' and name != 'citrap' and invite_only = false and " +
             "((:passwordProtected = false and password_hash is null) or :passwordProtected = true)" +                       // only include password protected missions if asked to
             "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) " +   // return new missions with default role of MISSION_SUBSCRIBER to older clients
             "AND " + RemoteUtil.GROUP_CLAUSE + " and create_time < (now() - (:ttl * INTERVAL '1 second'))" + " order by id desc ", nativeQuery = true)
@@ -258,6 +262,9 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
 
     @Query(value = "update mission set password_hash = :passwordHash where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long setPasswordHash(@Param("name") String name, @Param("passwordHash") String password, @Param("groupVector") String groupVector);
+    
+    @Query(value = "update mission set password_hash = :passwordHash where guid = uuid(:guid) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
+    Long setPasswordHashByGuid(@Param("guid") String guid, @Param("passwordHash") String password, @Param("groupVector") String groupVector);
 
     @Query(value = "update mission set default_role_id = :defaultRoleId where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long setDefaultRoleId(@Param("name") String name, @Param("defaultRoleId") Long defaultRoleId, @Param("groupVector") String groupVector);

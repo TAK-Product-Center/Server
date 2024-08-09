@@ -664,8 +664,10 @@ public class ExCheckService {
             getExCheckService().deleteChecklistTask(checklistUid, taskUid, clientUid, groupVector);
         }
 
+        Mission checklistMission = missionService.getMissionByNameCheckGroups(checklistUid, groupVector);
+
         subscriptionManager.announceMissionChange(
-                null, checklistUid, SubscriptionManagerLite.ChangeType.METADATA, clientUid, EXCHECK_TOOL, null);
+                checklistMission.getGuidAsUUID(), checklistUid, SubscriptionManagerLite.ChangeType.METADATA, clientUid, EXCHECK_TOOL, null);
     }
 
     @CacheEvict(value = Constants.EXCHECK_CACHE, allEntries = true)

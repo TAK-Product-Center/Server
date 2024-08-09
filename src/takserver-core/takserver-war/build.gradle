@@ -150,7 +150,8 @@ dependencies {
   //implementation 'javax.activation:activation:' + javax_activation_version
   implementation('org.glassfish.jaxb:jaxb-runtime:' + jaxb_glassfish_version)
 
-  api name: 'JavaAPIforKml-2.2.2'
+  implementation group: 'uk.m0nom', name: 'javaapiforkml', version: javaapiforkml_version
+
   implementation group: 'com.squareup.okhttp3', name: 'okhttp', version: okhttp3_version
  
 }

@@ -1,0 +1,29 @@
+keystoreType: JKS
+keystoreFile: /opt/tak/federation-hub/certs/files/takserver.jks
+keystorePassword: atakatak
+
+truststoreType: JKS
+truststoreFile: /opt/tak/federation-hub/certs/files/fed-truststore.jks
+truststorePassword: atakatak
+
+keyAlias: takserver
+
+authUsers: /opt/tak/federation-hub/authorized_users.yml
+
+port: 9100
+
+allowOauth: false
+oauthPort: 8446
+keycloakServerName: 
+keycloakDerLocation: /opt/tak/certs/keycloak.der 
+keycloakClientId: 
+keycloakSecret: 
+keycloakrRedirectUri: https://localhost:8446/login/redirect 
+keycloakAuthEndpoint: 
+keycloakTokenEndpoint: 
+keycloakAccessTokenName : access_token
+keycloakRefreshTokenName : refresh_token
+keycloakClaimName:
+keycloakAdminClaimValue:
+
+enableFlowIndicators: true

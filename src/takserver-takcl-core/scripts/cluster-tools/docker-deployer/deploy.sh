@@ -2,7 +2,7 @@
 
 set -e
 
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" > /dev/null 2>&1 && pwd )
 CANDIDATE_COUNT=$(ls -1 ${SCRIPT_DIR}/../../../../takserver-cluster/build/distributions/takserver-cluster-*.zip | wc -l)
 
 if [[ "${1}" == "" ]];then
@@ -37,7 +37,7 @@ DOCKERFILE="${SCRIPT_DIR}/files/Dockerfile"
 DOCKERCONTEXT="${SCRIPT_DIR}/files"
 
 docker build --file="${DOCKERFILE}" --tag=tak-deployer:latest "${DOCKERCONTEXT}"
-docker run -it --name="${CONTAINER_NAME}" \
+docker run -it --name="${CONTAINER_NAME}-nocerts" \
 	--mount type=bind,source="${CLUSTER_PROPERTIES}",target=/cluster-properties,readonly \
 	--mount type=bind,source="${HOME}"/.aws,target=/aws-src,readonly \
 	--mount type=bind,source="${TAKSERVER_CERT_SOURCE}",target=/certs-src,readonly \

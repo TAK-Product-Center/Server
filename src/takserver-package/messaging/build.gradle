@@ -94,15 +94,12 @@ ospackage {
     }
 }
 
-task prePackage { }
-prePackage.dependsOn copyJarsNoDb
-prePackage.dependsOn copyWars
-prePackage.dependsOn copyCoreConfigXSD
-prePackage.dependsOn copyCoreConfigExample
-prePackage.dependsOn copyMessagingScripts
-prePackage.dependsOn copyDocs
-prePackage.dependsOn copyPolicy
-prePackage.dependsOn copyLicense
+task prePackage(type: Copy) { task ->
+    with takserverCommonSpec(task)
+    with copyCoreConfigExampleSpec()
+    with copyMessagingScriptsSpec()
+    destinationDir = file("$buildDir/takArtifacts")
+}
 
 buildRpm.dependsOn prePackage
 

@@ -1,0 +1,93 @@
+The load tests are fairly easy to run. They require python 3.6.1+ to run. In order to make sure you have the right dependencies, use the python pip utility and the requirements.txt file to
+
+pip install -r requirements.txt
+
+
+There are two main ways to use the tool, with the config file (base_config.yml):
+>$ python tak_tester.py —config base_config.yml —-test-pytak
+
+or using only command line arguments:
+
+>$ python tak_tester.py --host <hostname/ip> --cert <path_to_cert> --password <password_for_cert> --test-pytak
+
+The --clients <num_clients> option will override the option set in the config file, if you want to run the test with a different number without changing the file.
+
+Use -h or —help to get information about all possible command line arguments.
+
+In order to use the config file, you will have to change a few things, mainly the host address and cert path.
+
+connection:
+  host: "<hostname/ip address>"
+  tls: 8089
+  https: 8443
+  udp: 8087
+
+authentication:
+  cert: "<path/to/cert.p12>"
+  password: "atakatak" # if no password, use empty string
+
+
+MissionApi config:
+In order to determine which missions to create, --test-pytak and --test-websocket-proto look at the Missions section of the config:
+Missions:
+  creatorUid: PyTAK-0
+  group: __ANON__
+  tool: PyTAK
+
+  size_files:
+     - 1mb.txt:
+         1000000
+     - 5mb.txt:
+         5000000
+
+  missions:
+    - mission_1:
+        files:
+          - 1mb.txt
+          - 5mb.txt
+
+    - mission_2:
+        keywords:
+          - cool
+
+        description: "A cool mission!"
+
+    - mission_3:
+        files:
+          - 1mb.txt
+
+    - mission_4:
+        tool: OtherPyTAK
+
+The size files are automatically created with random data to be of the indicated size before uploading them to the server.
+All the missions listed below are then created. If a mission parameter is not specified, then it uses one of the defaults
+of creatorUid, group, and tool listed at the top of this section. The size_files section can be omitted entirely if desired,
+and there is no error for including a file in a mission if the file doesn't exist.
+
+In the PyTAK section of the config, there is a subsection for configuring the mission api behaviour.
+In the missions subsection, if you want all the clients to subscribe to the same missions, then set random
+to False, subscribe should be a list of the missions the clients subscribe to. Then, you can set whether the
+clients add cot tracks to the missions, the frequency of sending this data, and whether they should react
+to mission change announcements by making the appropriate datasync call. In the provided config file,
+the non-random scenario is provided, and the random configuration is commented out below, should you wish to use it instead.
+The main difference is that instead of list of missions to subscribe to, you should provide the number
+of missions the client should randomly select to subscribe.
+
+
+CloudWatch Configuration:
+
+To configure pyTAK to send metric data to CloudWatch, follow the instructions in the "Configuration" section in the link:
+https://boto3.amazonaws.com/v1/documentation/api/latest/guide/quickstart.html
+
+>> vim ~/.aws/credentials
+[default]
+aws_access_key_id = YOUR_ACCESS_KEY
+aws_secret_access_key = YOUR_SECRET_KEY
+
+>> vim ~/.aws/config
+[default]
+region=us-east-2
+
+You can run the main method in cloud_watch.py to check your configuration.
+
+

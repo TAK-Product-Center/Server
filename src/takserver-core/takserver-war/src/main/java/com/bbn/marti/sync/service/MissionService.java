@@ -51,6 +51,8 @@ public interface MissionService {
     Mission getMission(String missionName, boolean hydrateDetails);
     
     Mission getMissionByGuid(UUID missionGuid, boolean hydrateDetails);
+    
+    String getMissionNameByGuid(UUID missionGuid);
 
     Mission getMission(String missionName, String groupVector);
 
@@ -85,6 +87,8 @@ public interface MissionService {
     List<CotElement> getAllCotForUid(String uid, Date start, Date end, String groupVector);
 
     String getCachedCot(String missionName, Set<String> uids, String groupVector);
+    
+    String getCachedCot(UUID missionGuid, Set<String> uids, String groupVector);
 
     List<CotElement> getCotElementsByTimeAndBbox(Date start, Date end, GeospatialFilter.BoundingBox boundingBox, String groupVector);
 
@@ -101,6 +105,8 @@ public interface MissionService {
     Set<MissionInvitation> getAllMissionInvitationsForClient(String clientUid, String groupVector);
 
     List<MissionInvitation> getMissionInvitations(String missionName);
+    
+    List<MissionInvitation> getMissionInvitationsByGuid(UUID missionGuid);
 
     List<Mission> getInviteOnlyMissions(String userName, String tool, NavigableSet<Group> groups);
 
@@ -156,7 +162,7 @@ public interface MissionService {
 
     ExternalMissionData hydrate(String externalDataUid, String externalDataName, String externalDataTool, String externalDataToken, String externalDataNotes);
 
-    String addMissionArchiveToEsync(String name, byte[] archive, String groupVector, boolean archivedWhenDeleting);
+    String addMissionArchiveToEsync(String archiveName, byte[] archiveBytes, String groupVector, boolean archivedWhenDeleting);
 
     String trimName(String name);
 
@@ -179,6 +185,8 @@ public interface MissionService {
     Set<MissionChange> getMissionChangesByGuid(UUID missionGuid, String groupVector, Long secago, Date start, Date end, boolean squashed);
 
     String getMissionKml(String missionName, String urlBase, String groupVector);
+
+    String getMissionKml(UUID missionGuid, String urlBase, String groupVector);
 
     ExternalMissionData setExternalMissionData(UUID missionGuid, String creatorUid, ExternalMissionData externalMissionData, String groupVector);
 
@@ -219,8 +227,10 @@ public interface MissionService {
     void setSubscriptionUsername(Long missionId, String clientUid, String username);
 
     boolean validatePermission(MissionPermission.Permission permission, HttpServletRequest request);
-
+    
     List<Map.Entry<String, String>> getAllMissionSubscriptions();
+
+    List<Map.Entry<Map.Entry<String, String>, String>> getAllMissionSubscriptionsWithGuid();
 
     MissionRole getDefaultRole(Mission mission);
     
@@ -232,11 +242,18 @@ public interface MissionService {
 
 	CotEventContainer getLatestCotEventContainerForUid(String uid, String groupVector);
 
-	Mission getMissionByNameCheckGroups(String missionName, String groupVector);
+	// get mission by name (no group check)
+    Mission getMissionByName(String missionName, boolean hydrateDetails);
+
+    Mission getMissionByNameCheckGroups(String missionName, boolean hydrateDetails, String groupVector);
+
+    Mission getMissionByNameCheckGroups(String missionName, String groupVector);
 	
 	Mission getMissionByGuidCheckGroups(UUID missionGuid, String groupVector);
 
     boolean setExpiration(String missionName, Long ttl, String groupVector);
+
+    boolean setExpiration(UUID missionGuid, Long ttl, String groupVector);
 
     void deleteMissionByTtl(Integer ttl);
 
@@ -246,16 +263,19 @@ public interface MissionService {
 
 	// resource and mission change caching
 	Map<Integer, List<String>> getCachedResources(String missionName, Set<Resource> resources);
+	
+	// resource and mission change caching
+	Map<Integer, List<String>> getCachedResourcesByGuid(UUID missionGuid, Set<Resource> resources);
 
-	List<MissionChange> findLatestCachedMissionChanges(String missionName, List<String> uids, List<String> hashes, int changeType);
+	List<MissionChange> findLatestCachedMissionChanges(UUID missionGuid, List<String> uids, List<String> hashes, int changeType);
 
-	List<MissionChange> findLatestCachedMissionChangesForUids(String missionName, List<String> uids, int changeType);
+	List<MissionChange> findLatestCachedMissionChangesForUids(UUID missionGuid, List<String> uids, int changeType);
 
-	List<MissionChange> findLatestCachedMissionChangesForHashes(String missionName, List<String> hashes, int changeType);
+	List<MissionChange> findLatestCachedMissionChangesForHashes(UUID missionGuid, List<String> hashes, int changeType);
 
-	Collection<CotCacheWrapper> getLatestMissionCotWrappersForUids(String missionName, Set<String> uids, String groupVector);
+	Collection<CotCacheWrapper> getLatestMissionCotWrappersForUids(UUID missionGuid, Set<String> uids, String groupVector);
 
-	List<Resource> getCachedResourcesByHash(String missionName, String hash);
+	List<Resource> getCachedResourcesByHash(UUID missionGuid, String hash);
 
     MissionFeed getMissionFeed(String missionFeedUid);
 
@@ -270,10 +290,16 @@ public interface MissionService {
 	MapLayer getMapLayer(String mapLayerUid);
 
 	MapLayer addMapLayerToMission(String missionName, String creatorUid, Mission mission, MapLayer mapLayer);
+	
+//	MapLayer addMapLayerToMissionByGuid(UUID missionGuid, String creatorUid, Mission mission, MapLayer mapLayer);
 
     MapLayer updateMapLayer(String missionName, String creatorUid, Mission mission, MapLayer mapLayer);
+    
+//    MapLayer updateMapLayerByGuid(UUID missionGuid, String creatorUid, Mission mission, MapLayer mapLayer);
 
     void removeMapLayerFromMission(String missionName, String creatorUid, Mission mission, String mapLayerUid);
+    
+//    void removeMapLayerFromMissionByGuid(UUID missionGuid, String creatorUid, Mission mission, String mapLayerUid);
 
     List<Mission> getMissionsForDataFeed(String feed_uid);
 
@@ -312,6 +338,8 @@ public interface MissionService {
     List<MissionSubscription> getMissionSubscriptionsByMissionGuidNoMission(UUID missionGuid);
     
     List<MissionSubscription> getMissionSubscriptionsByMissionNameNoMissionNoToken(String missionName);
+    
+    List<MissionSubscription> getMissionSubscriptionsByMissionGuidNoMissionNoToken(UUID missionGuid);
 
 	List<String> getAllMissionsGuids(boolean passwordProtected, boolean defaultRole, String tool);
     

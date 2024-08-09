@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: takserver-api-service
+spec:
+  allocateLoadBalancerNodePorts: true
+  externalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  internalTrafficPolicy: Cluster
+  ports:
+    - name: cert-https
+      nodePort: 8443
+      port: 8443
+      protocol: TCP
+      targetPort: 8443
+    - name: federation-truststore
+      nodePort: 8444
+      port: 8444
+      protocol: TCP
+      targetPort: 8444
+    - name: https
+      nodePort: 8446
+      port: 8446
+      protocol: TCP
+      targetPort: 8446
+  selector:
+    app: takserver-api
+  sessionAffinity: None
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: takserver-messaging-service
+spec:
+  allocateLoadBalancerNodePorts: true
+  externalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  internalTrafficPolicy: Cluster
+  ports:
+    - name: tls
+      nodePort: 8089
+      port: 8089
+      protocol: TCP
+      targetPort: 8089
+    - name: federation-v1
+      nodePort: 9000
+      port: 9000
+      protocol: TCP
+      targetPort: 9000
+    - name: federation-v2
+      nodePort: 9001
+      port: 9001
+      protocol: TCP
+      targetPort: 9001
+  selector:
+    app: takserver-messaging
+  sessionAffinity: None
+  type: LoadBalancer

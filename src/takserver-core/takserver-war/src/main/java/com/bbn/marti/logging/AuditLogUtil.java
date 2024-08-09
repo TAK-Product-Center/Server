@@ -27,6 +27,7 @@ import org.springframework.security.core.GrantedAuthority;
 import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 
+import org.springframework.web.util.ContentCachingRequestWrapper;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 import tak.server.Constants;
 
@@ -139,7 +140,7 @@ public class AuditLogUtil {
         }
     }
 
-    public static void setMdc(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    public static void setMdc(HttpServletRequest req, HttpServletResponse resp) {
         // request
         setMdcUsernameAndRoles(req);
 
@@ -148,12 +149,12 @@ public class AuditLogUtil {
         MDC.put("source-ip", req.getRemoteAddr());
         MDC.put("session", req.getRequestedSessionId());
         MDC.put("method", req.getMethod());
-        MDC.put("request-body", IOUtils.toString(req.getInputStream(), StandardCharsets.UTF_8));
+        MDC.put("request-body", new String(new ContentCachingRequestWrapper(req).getContentAsByteArray(), StandardCharsets.UTF_8));
 
         // response
         MDC.put("response-status", String.valueOf(resp.getStatus()));
         resp.getHeaderNames().forEach(name -> MDC.put("response-"+(String) name, (String) resp.getHeader((String) name)));
-        MDC.put("response-body", IOUtils.toString(new ContentCachingResponseWrapper(resp).getContentInputStream(), StandardCharsets.UTF_8));
+        MDC.put("response-body", new String(new ContentCachingResponseWrapper(resp).getContentAsByteArray(), StandardCharsets.UTF_8));
     }
 
     private static void setMdcUsernameAndRoles(HttpServletRequest request) {

@@ -28,7 +28,6 @@ public class HubConnectionStore {
     private final Map<String, GuardedStreamHolder<ROL>> clientROLStreamMap = new ConcurrentHashMap<>();
     private final Map<String, GuardedStreamHolder<FederateGroups>> clientGroupStreamMap = new ConcurrentHashMap<>();
     private final Map<String, FederateGroups> clientToGroups = new ConcurrentHashMap<>();
-    private final Map<String, SSLSession> sessionMap =  new ConcurrentHashMap<>();
     private final Map<String, HubConnectionInfo> connectionInfos = new ConcurrentHashMap<>();
     
     private final Map<String, List<ROL>> tempRolCache = new ConcurrentHashMap<>();
@@ -53,7 +52,6 @@ public class HubConnectionStore {
     	this.clientROLStreamMap.remove(id);
     	this.clientGroupStreamMap.remove(id);
     	this.clientToGroups.remove(id);
-    	this.sessionMap.remove(id);
     	this.connectionInfos.remove(id);
     	this.tempRolCache.remove(id);
     }
@@ -63,7 +61,6 @@ public class HubConnectionStore {
     	this.clientROLStreamMap.clear();
     	this.clientGroupStreamMap.clear();
     	this.clientToGroups.clear();
-    	this.sessionMap.clear();
     	this.connectionInfos.clear();
     	this.tempRolCache.clear();
     }
@@ -116,17 +113,5 @@ public class HubConnectionStore {
     
     public void removeFederateGroups(String id) {
     	this.clientToGroups.remove(id);
-    }
-
-    public Map<String, SSLSession> getSessionMap() {
-    	return Collections.unmodifiableMap(sessionMap);
-    }
-    
-    public void addSession(String id, SSLSession session) {
-    	this.sessionMap.put(id, session);
-    }
-    
-    public void removeSession(String id) {
-    	this.sessionMap.remove(id);
     }
 }

@@ -2,12 +2,13 @@
 
 set -e
 
-EXTERNAL_IP=10.2.10.2
-MK_DRIVER=docker # or docker, kvm2, virtualbox, qemu, etc. See https://minikube.sigs.k8s.io/docs/drivers/ 
-MK_CPU_COUNT=12
-MK_MEMORY=16g
+EXTERNAL_IP=192.168.11.38
+EXTERNAL_IP=128.33.66.208
+MK_DRIVER=kvm2 # or docker, kvm2, virtualbox, qemu, etc. See https://minikube.sigs.k8s.io/docs/drivers/ 
+MK_CPU_COUNT=16
+MK_MEMORY=20g
 DOCKER_REGISTRY_PORT=4000
-ENABLE_INGRES=false
+ENABLE_INGRESS=true
 
 if [[ "${TAKCL_SERVER_POSTGRES_PASSWORD}" == "" ]];then
 	echo Please set the environment variable TAKCL_SERVER_POSTGRES_PASSWORD to a password to use this script!
@@ -30,7 +31,7 @@ HELM_VERSION=v3.12.3
 MINIKUBE_VERSION=v1.31.2
 K8S_VERSION=v1.27.0
 
-SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )"
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" > /dev/null 2>&1 && pwd 2> /dev/null; )"
 
 DB_IDENTIFIER=takserver-cluster-db
 POSTGRES_USER=postgres
@@ -183,7 +184,9 @@ deploy_local() {
 	${MINIKUBE} start --memory=${MK_MEMORY} --cpus=${MK_CPU_COUNT} --kubernetes-version=${K8S_VERSION} --insecure-registry=${EXTERNAL_IP}:${DOCKER_REGISTRY_PORT} --driver=${MK_DRIVER} --apiserver-port 9210
 	if [[ "${ENABLE_INGRESS}" == "true" ]];then
 		${MINIKUBE} addons enable ingress
+		sleep 5
 		${KUBECTL} patch deployment -n ingress-nginx ingress-nginx-controller --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value":"--enable-ssl-passthrough"}]'  
+		sleep 5
 	fi
 
 	# Crate the custom certificate store. Make sure admin.pem exists to ensure the admin user is activated and startup completes successfully!
@@ -241,14 +244,11 @@ delete_local_images() {
 
 setup_ingress() {
 	if [[ "${ENABLE_INGRESS}" == "true" ]];then
+		echo Waiting 10 seconds before enabling ingress...
+		sleep 10
 		${KUBECTL} apply -f minikube-ingress-loadbalancer.yaml
-		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"8443":"takserver/takserver-api-service:8443"}}'
-		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"8444":"takserver/takserver-api-service:8444"}}'
-		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"8446":"takserver/takserver-api-service:8446"}}'
-		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"8089":"takserver/takserver-messaging-service:8090"}}'
-		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"9000":"takserver/takserver-messaging-service:9000"}}'
-		${KUBECTL} patch configmap tcp-services -n ingress-nginx --patch '{"data":{"9001":"takserver/takserver-messaging-service:9001"}}'
 		${KUBECTL} patch deployment ingress-nginx-controller -n ingress-nginx --patch "$(cat minikube-ingress-patch.yaml)"
+		${MINIKUBE} service list
 	fi
 }
 

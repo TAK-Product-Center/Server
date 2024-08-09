@@ -73,19 +73,21 @@ takserver:
     storage:
       max: 50Gi
       min: 1Gi
+global:
+  postgresql:
+    host: takserver-postgresql
+    port: "5432"
+    auth:
+      postgresqlUsername: postgres
+      postgresqlPassword: postgres
+      postgresqlDatabase: cot
 postgresql:
   enabled: true
   image:
     registry: docker.io
     repository: postgis/postgis
-    tag: 15-3.3
+    tag: 15-3.4
   configurationConfigMap: postgres-configuration
-  postgresqlDatabase: cot
-
-global:
-  postgresql:
-    postgresqlUsername: postgres
-    postgresqlPassword: postgres
 
 ignite:
   image:

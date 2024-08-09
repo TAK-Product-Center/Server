@@ -235,8 +235,10 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 		
 		// TODO: When mission federation is updated to support federating guids, update this code accordingly. Mission guids
 		// will extra handling in federated case.
-		
-		Mission fedMission = missionService.getMissionByNameCheckGroups(missionName, creatorUid);
+
+		String groupVector = remoteUtil.bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
+
+		Mission fedMission = missionService.getMissionByNameCheckGroups(missionName, groupVector);
 
 		if (!(CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
 			return;
@@ -247,7 +249,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 		try {
 
 			// include mission metadata in federated add content, so that the mission can be created on the federate, if it does not exist
-			Mission mission = missionService.getMission(missionName, remoteUtil.bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups)));
+			Mission mission = missionService.getMission(missionName, groupVector);
 
 			if (mission == null) {
 				throw new IllegalArgumentException("can't federate mission change for mission " + missionName + " that does not exist");

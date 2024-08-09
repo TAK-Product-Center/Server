@@ -22,7 +22,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 
 	private static ApplicationContext springContext;
 
-	private static ApiDependencyProxy instance = null;
+	private static volatile ApiDependencyProxy instance = null;
 
 	public static ApiDependencyProxy getInstance() {
 		if (instance == null) {
@@ -46,7 +46,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		this.springContext = context;
 	}
 
-	private ServerInfo serverInfo = null;
+	private volatile ServerInfo serverInfo = null;
 
 	public ServerInfo serverInfo() {
 		if (serverInfo == null) {
@@ -60,7 +60,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		return serverInfo;
 	}
 
-	private MissionRoleRepository missionRoleRepository = null;
+	private volatile MissionRoleRepository missionRoleRepository = null;
 
 	public MissionRoleRepository missionRoleRepository() {
 		if (missionRoleRepository == null) {
@@ -74,7 +74,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		return missionRoleRepository;
 	}
 
-	private EnterpriseSyncService enterpriseSyncService = null;
+	private volatile EnterpriseSyncService enterpriseSyncService = null;
 
 	public EnterpriseSyncService enterpriseSyncService() {
 		if (enterpriseSyncService == null) {
@@ -88,7 +88,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		return enterpriseSyncService;
 	}
 
-	private CoTCacheHelper cotCacheHelper = null;
+	private volatile CoTCacheHelper cotCacheHelper = null;
 
 	public CoTCacheHelper cotCacheHelper() {
 		if (cotCacheHelper == null) {
@@ -102,7 +102,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		return cotCacheHelper;
 	}
 
-	private MissionRepository missionRepository = null;
+	private volatile MissionRepository missionRepository = null;
 
 	public MissionRepository missionRepository() {
 		if (missionRepository == null) {
@@ -116,7 +116,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		return missionRepository;
 	}
 
-	private SubscriptionManagerLite subscriptionManagerLite = null;
+	private volatile SubscriptionManagerLite subscriptionManagerLite = null;
 
 	public SubscriptionManagerLite subscriptionManagerLite() {
 		if (subscriptionManagerLite == null) {
@@ -130,7 +130,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		return subscriptionManagerLite;
 	}
 
-	private MissionService missionService = null;
+	private volatile MissionService missionService = null;
 
 	public MissionService missionService() {
 		if (missionService == null) {
@@ -144,7 +144,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		return missionService;
 	}
 
-	private GroupManager groupManager = null;
+	private volatile GroupManager groupManager = null;
 
 	public GroupManager groupManager() {
 		if (groupManager == null) {
@@ -158,7 +158,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		return groupManager;
 	}
 
-	private PluginManager pluginManager = null;
+	private volatile PluginManager pluginManager = null;
 
 	public PluginManager pluginManager() {
 		if (pluginManager == null) {
@@ -172,7 +172,7 @@ public class ApiDependencyProxy implements ApplicationContextAware {
 		return pluginManager;
 	}
 
-	private CommonUtil commonUtil = null;
+	private volatile CommonUtil commonUtil = null;
 
 	public CommonUtil commonUtil() {
 		if (commonUtil == null) {

@@ -381,7 +381,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		} catch (Exception e) {
 			logger.warn("Exception setting Tomcat working directory", e);
 		}
-
+		
 		return factory;
 	}
 

@@ -31,7 +31,7 @@ FEDERATION_HUB_HOME=/opt/tak/federation-hub
 case "$1" in
      start)
         echo -n "Starting $SERVICE: "
-          su tak -c "cd ${FEDERATION_HUB_HOME}/scripts && ./federation-hub-broker.sh &> /opt/tak/federation-hub/logs/federation-hub-broker-console.log &"
+          su tak -c "cd ${FEDERATION_HUB_HOME}/scripts && ./federation-hub-broker.sh > /opt/tak/federation-hub/logs/federation-hub-broker-console.log 2>&1 &"
           if [ $? -eq 0 ]; then
 	      echo "OK"
 	      else

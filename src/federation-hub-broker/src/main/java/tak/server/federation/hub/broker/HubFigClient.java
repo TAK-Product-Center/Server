@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+import org.apache.ignite.internal.processors.platform.client.cache.ClientCacheSqlFieldsQueryRequest;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +62,7 @@ import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.GuardedStreamHolder;
 import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
 import tak.server.federation.hub.FederationHubResources;
+import tak.server.federation.hub.FederationHubUtils;
 import tak.server.federation.hub.broker.db.FederationHubMissionDisruptionManager;
 import tak.server.federation.hub.broker.events.HubClientDisconnectEvent;
 import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
@@ -76,10 +78,13 @@ public class HubFigClient implements Serializable {
 
 	private static final Logger logger = LoggerFactory.getLogger(HubFigClient.class);
 
-	private FederationHubServerConfig fedHubConfig;
+	private FederationHubServerConfigManager fedHubConfigManager;
+
 	private String host;
 	private int port;
 	private X509Certificate[] sessionCerts;
+	private String clientFingerprint;
+	private List<String> clientGroups;
 	private String fedName;
 	private String clientUid = UUID.randomUUID().toString().replace("-", "");
 
@@ -108,8 +113,8 @@ public class HubFigClient implements Serializable {
 	
 	private FederationHubMissionDisruptionManager federationHubMissionDisruptionManager;
 	
-	public HubFigClient(FederationHubServerConfig fedHubConfig, FederationHubMissionDisruptionManager federationHubMissionDisruptionManager, FederationOutgoingCell federationOutgoingCell) {
-		this.fedHubConfig = fedHubConfig;
+	public HubFigClient(FederationHubServerConfigManager fedHubConfigManager, FederationHubMissionDisruptionManager federationHubMissionDisruptionManager, FederationOutgoingCell federationOutgoingCell) {
+		this.fedHubConfigManager = fedHubConfigManager;
 		this.federationHubMissionDisruptionManager = federationHubMissionDisruptionManager;
 		this.host = federationOutgoingCell.getProperties().getHost();
 		this.port = federationOutgoingCell.getProperties().getPort();
@@ -126,7 +131,7 @@ public class HubFigClient implements Serializable {
 	}
 
 	public void start() throws Exception {
-		sslConfig.initSslContext(fedHubConfig);
+		sslConfig.initSslContext(fedHubConfigManager.getConfig());
 
 		channel = openFigConnection(host, port,
 				GrpcSslContexts.configure(SslContextBuilder.forClient(), SslProvider.OPENSSL)
@@ -142,7 +147,7 @@ public class HubFigClient implements Serializable {
 
 		// Send a subscription request, get back a stream of messages from server
 		asyncFederatedChannel.clientEventStream(Subscription.newBuilder().setFilter("")
-				.setIdentity(Identity.newBuilder().setType(Identity.ConnectionType.FEDERATION_HUB_CLIENT).setServerId(fedHubConfig.getFullId()).setName(fedName).setUid(clientUid).build()).build(),
+				.setIdentity(Identity.newBuilder().setType(Identity.ConnectionType.FEDERATION_HUB_CLIENT).setServerId(fedHubConfigManager.getConfig().getFullId()).setName(fedName).setUid(clientUid).build()).build(),
 				new StreamObserver<FederatedEvent>() {
 
 					@Override
@@ -264,7 +269,7 @@ public class HubFigClient implements Serializable {
 		return NettyChannelBuilder.forAddress(host, port)
 				.negotiationType(NegotiationType.TLS)
 				.sslContext(sslContext)
-				.maxInboundMessageSize(fedHubConfig.getMaxMessageSizeBytes())
+				.maxInboundMessageSize(fedHubConfigManager.getConfig().getMaxMessageSizeBytes())
 				.channelType(Epoll.isAvailable() ? EpollSocketChannel.class : NioSocketChannel.class)
 				.executor(FederationHubResources.federationGrpcExecutor)
 				.eventLoopGroup(FederationHubResources.federationGrpcWorkerEventLoopGroup)
@@ -275,18 +280,19 @@ public class HubFigClient implements Serializable {
 							sessionCerts = certs;
 							X509Certificate clientCert = certs[0];
 							X509Certificate caCert = certs[1];
-
-							String fingerprint = FederationUtils.getBytesSHA256(clientCert.getEncoded());
-							String issuerDN = clientCert.getIssuerX500Principal().getName();
-							String issuerCN = Optional.ofNullable(FederationHubBrokerImpl.getCN(issuerDN)).map(cn -> cn.toLowerCase()).orElse("");							
 							
-							if (fedHubConfig.isUseCaGroups()) {
+							clientFingerprint = FederationUtils.getBytesSHA256(((X509Certificate)clientCert).getEncoded());
+							clientGroups = FederationHubUtils.getCaGroupIdsFromCerts(certs);
+							
+							if (fedHubConfigManager.getConfig().isUseCaGroups()) {
 								try {
 									hubClientFederate = new Federate(new FederateIdentity(fedName));
-									hubClientFederate.addGroupIdentity(new FederateIdentity(issuerDN + "-" + FederationUtils.getBytesSHA256(caCert.getEncoded())));
-									String group = issuerDN + "-" + FederationUtils.getBytesSHA256(caCert.getEncoded());
-									hubClientGroups = new ArrayList<>();
-									hubClientGroups.add(group);
+									
+									for (String clientGroup: clientGroups) {
+										hubClientFederate.addGroupIdentity(new FederateIdentity(clientGroup));
+										hubClientGroups.add(clientGroup);
+									}
+									
 									FederationHubDependencyInjectionProxy.getInstance().fedHubPolicyManager().addCaFederate(hubClientFederate, hubClientGroups);
 								} catch (Exception e) {
 									logger.error("error updating federate node", e);
@@ -354,6 +360,10 @@ public class HubFigClient implements Serializable {
                     }
                 }, true
             );
+		
+		groupStreamHolder.setClientFingerprint(clientFingerprint);
+        groupStreamHolder.setClientGroups(clientGroups);
+        
 		FederationHubDependencyInjectionProxy.getInstance().hubConnectionStore().addGroupStream(fedName, groupStreamHolder);
 	}
 	
@@ -427,6 +437,9 @@ public class HubFigClient implements Serializable {
                 }, true
             );
 		
+		eventStreamHolder.setClientFingerprint(clientFingerprint);
+        eventStreamHolder.setClientGroups(clientGroups);
+        
 		setServerSubscriptionForConnection();
 		
 		eventStreamHolder.send(FederatedEvent.newBuilder().build());
@@ -503,12 +516,15 @@ public class HubFigClient implements Serializable {
                 }, true
             );
 		
+		rolStreamHolder.setClientFingerprint(clientFingerprint);
+		rolStreamHolder.setClientGroups(clientGroups);
+		
 		// get the changes, but don't send till we add the rolStream because the stream will get used
         // down the line for getting the session id        
 		FederationHubMissionDisruptionManager.OfflineMissionChanges changes = null;
-        if (fedHubConfig.isMissionFederationDisruptionEnabled()) {
+        if (fedHubConfigManager.getConfig().isMissionFederationDisruptionEnabled()) {
         	changes = federationHubMissionDisruptionManager.getMissionChangesAndTrackConnectEvent(
-            		rolStreamHolder.getFederateIdentity().getFedId(), sessionCerts);
+            		rolStreamHolder.getFederateIdentity().getFedId(), clientGroups);
         }
 		
 		FederationHubDependencyInjectionProxy.getInstance().hubConnectionStore().addRolStream(fedName, rolStreamHolder);

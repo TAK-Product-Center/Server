@@ -103,6 +103,7 @@ dependencies {
   implementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
   api group: 'com.beust', name: 'jcommander', version: jcommander_version
 
+  implementation group: 'uk.m0nom', name: 'javaapiforkml', version: javaapiforkml_version
 }
 
 sourceSets {

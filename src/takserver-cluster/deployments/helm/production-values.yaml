@@ -92,15 +92,19 @@ postgresql:
   image:
     registry: docker.io
     repository: postgis/postgis
-    tag: 15-3.3
-  configurationConfigMap: postgres-configuration
-  postgresqlDatabase: cot
+    tag: 15-3.4
+  primary:
+    existingConfigmap: postgres-configuration
 
 global:
   postgresql:
-    postgresqlUsername: postgres
-    postgresqlPassword: postgres
-
+    host: takserver-postgresql
+    port: "5432"
+    auth:
+      database: cot
+      password: postgres
+      postgresPassword: postgres
+      username: postgres
 ignite:
   image:
     tag: 2.15.0-jdk11

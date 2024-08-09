@@ -11,7 +11,7 @@ import org.springframework.context.ApplicationContextAware;
 public class FederationHubDependencyInjectionProxy implements ApplicationContextAware {
     private static ApplicationContext springContext;
 
-    private static FederationHubDependencyInjectionProxy instance = null;
+    private volatile static FederationHubDependencyInjectionProxy instance = null;
 
     public static FederationHubDependencyInjectionProxy getInstance() {
         if (instance == null) {
@@ -35,7 +35,7 @@ public class FederationHubDependencyInjectionProxy implements ApplicationContext
         this.springContext = context;
     }
 
-    private FederationHubPolicyManager fedHubPolicyManager = null;
+    private volatile FederationHubPolicyManager fedHubPolicyManager = null;
 
     public FederationHubPolicyManager fedHubPolicyManager() {
         if (fedHubPolicyManager == null) {
@@ -49,7 +49,7 @@ public class FederationHubDependencyInjectionProxy implements ApplicationContext
         return fedHubPolicyManager;
     }
 
-    private SSLConfig sslConfig = null;
+    private volatile SSLConfig sslConfig = null;
 
     public SSLConfig sslConfig() {
         if (sslConfig == null) {
@@ -63,21 +63,21 @@ public class FederationHubDependencyInjectionProxy implements ApplicationContext
         return sslConfig;
     }
 
-    private FederationHubServerConfig fedHubServerConfig = null;
+    private volatile FederationHubServerConfigManager fedHubServerConfigManager = null;
 
-    public FederationHubServerConfig fedHubServerConfig() {
-        if (fedHubServerConfig == null) {
+    public FederationHubServerConfigManager fedHubServerConfigManager() {
+        if (fedHubServerConfigManager == null) {
             synchronized (this) {
-                if (fedHubServerConfig == null) {
-                    fedHubServerConfig = springContext.getBean(FederationHubServerConfig.class);
+                if (fedHubServerConfigManager == null) {
+                	fedHubServerConfigManager = springContext.getBean(FederationHubServerConfigManager.class);
                 }
             }
         }
 
-        return fedHubServerConfig;
+        return fedHubServerConfigManager;
     }
 
-    private FederationHubBroker federationHubBroker = null;
+    private volatile FederationHubBroker federationHubBroker = null;
 
     public FederationHubBroker federationHubBroker() {
         if (federationHubBroker == null) {
@@ -91,7 +91,7 @@ public class FederationHubDependencyInjectionProxy implements ApplicationContext
         return federationHubBroker;
     }
 
-    private FederationHubBrokerMetrics federationHubBrokerMetrics = null;
+    private volatile FederationHubBrokerMetrics federationHubBrokerMetrics = null;
 
     public FederationHubBrokerMetrics federationHubBrokerMetrics() {
         if (federationHubBrokerMetrics == null) {
@@ -104,7 +104,7 @@ public class FederationHubDependencyInjectionProxy implements ApplicationContext
         return federationHubBrokerMetrics;
     }
 
-    private HubConnectionStore hubConnectionStore = null;
+    private volatile HubConnectionStore hubConnectionStore = null;
 
     public HubConnectionStore hubConnectionStore() {
         if (hubConnectionStore == null) {

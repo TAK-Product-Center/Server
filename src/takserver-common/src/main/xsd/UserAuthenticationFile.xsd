@@ -35,6 +35,9 @@
       <xs:enumeration value="ROLE_ADMIN"/>
       <xs:enumeration value="ROLE_READONLY"/>
       <xs:enumeration value="ROLE_ANONYMOUS"/>
+      <xs:enumeration value="ROLE_NON_ADMIN_UI"/>
+      <xs:enumeration value="ROLE_WEBTAK"/>
+      <xs:enumeration value="ROLE_NON_ADMIN_UI"/>
     </xs:restriction>
   </xs:simpleType>
 </xs:schema>

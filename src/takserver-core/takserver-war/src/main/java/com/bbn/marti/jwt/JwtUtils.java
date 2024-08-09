@@ -9,6 +9,7 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,10 +21,12 @@ import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.interfaces.RSAPublicKey;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -176,6 +179,12 @@ public class JwtUtils {
         return parser;
     }
 
+    private RSAPublicKey loadPublicKey(byte[] key) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+        return (RSAPublicKey) kf.generatePublic(spec);
+    }
+
     public List<RSAPublicKey> getExternalVerifiers() {
         try {
             Oauth oAuth = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth();
@@ -194,10 +203,26 @@ public class JwtUtils {
             List<RSAPublicKey> rsaPublicKeys = new ArrayList<>();
 
             for (Oauth.AuthServer authServer : oAuth.getAuthServer()) {
-                byte[] keyBytes = Files.readAllBytes(Paths.get(authServer.getIssuer()));
-                X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
-                KeyFactory kf = KeyFactory.getInstance("RSA");
-                rsaPublicKeys.add((RSAPublicKey) kf.generatePublic(spec));
+                try {
+                    String issuer = authServer.getIssuer();
+                    byte[] keyBytes = Files.readAllBytes(Paths.get(issuer));
+
+                    if (issuer.toLowerCase().endsWith(".pem")) {
+                        String key = new String(keyBytes);
+                        String[] keys = key.split("-----BEGIN PUBLIC KEY-----");
+                        for (int i = 1; i < keys.length; i++) {
+                            keys[i] = keys[i]
+                                    .replaceAll("\n", "")
+                                    .replaceAll("-----END PUBLIC KEY-----", "");
+                            byte[] decoded = Base64.decodeBase64(keys[i]);
+                            rsaPublicKeys.add(loadPublicKey(decoded));
+                        }
+                    } else {
+                        rsaPublicKeys.add(loadPublicKey(keyBytes));
+                    }
+                } catch (Exception e) {
+                    logger.error("exception loading authServer public key", e);
+                }
             }
 
             return rsaPublicKeys;

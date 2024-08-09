@@ -174,6 +174,16 @@
                 </select>
               </td>
             </tr>
+            <tr>
+              <td class="rowHeader"><label for="connectionToken">Federation Connection Token</label></td>
+              <td class="rowValue">
+                <input type="text" data-ng-model="modifiedOutgoing.connectionToken" name="connectionToken"/>
+                <br/>
+                <span class="inlineHelp">This field is used for creating a federation connection using token authentication rather than X509 client mutual authentication.</span>
+                <br/>
+                <span style="color: red; font-size: 12px" data-ng-show="modifiedOutgoing.connectionToken.length > 0">Warning!! X509 mutual authentication is disabled and is being replaced by token authentication.</span>
+              </td>
+            </tr>
           </table>
         </td>
       </tr>

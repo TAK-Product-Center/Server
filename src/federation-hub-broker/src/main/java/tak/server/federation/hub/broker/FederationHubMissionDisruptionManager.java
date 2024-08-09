@@ -52,18 +52,13 @@ public class FederationHubMissionDisruptionManager {
 		for(Document document : federationHubDatabaseService.getFederateMetadatas()) {
 			String federateId = document.getString("federate_id");
 			
-			List<Binary> certs = (List<Binary>) document.get("cert_array");
+			List<String> clientGroups = (List<String>) document.get("client_groups");
 			CertificateFactory cf = CertificateFactory.getInstance("X.509");
-			for (Binary cert : certs) {
-				ByteArrayInputStream bais = new ByteArrayInputStream(cert.getData());
-				X509Certificate x509Cert = (X509Certificate) cf.generateCertificate(bais);
-				
-				String issuerDN = x509Cert.getIssuerX500Principal().getName();
-				String group = issuerDN + "-" + FederationUtils.getBytesSHA256(x509Cert.getEncoded());
+			for (String clientGroup : clientGroups) {
 				Federate federate = new Federate(new FederateIdentity(federateId));
-				federate.addGroupIdentity(new FederateIdentity(group));
+				federate.addGroupIdentity(new FederateIdentity(clientGroup));
 				List<String> federateGroups = new ArrayList<>();
-				federateGroups.add(group);
+				federateGroups.add(clientGroup);
 				
 				FederationHubDependencyInjectionProxy.getInstance().fedHubPolicyManager().addCaFederate(federate, federateGroups);
 			}
@@ -80,7 +75,7 @@ public class FederationHubMissionDisruptionManager {
 	}
 
 	@SuppressWarnings("unchecked")
-	public OfflineMissionChanges getMissionChangesAndTrackConnectEvent(String federateServerId, Certificate[] certificates) {
+	public OfflineMissionChanges getMissionChangesAndTrackConnectEvent(String federateServerId, List<String> clientGroups) {
 		OfflineMissionChanges changes = new OfflineMissionChanges();
 	
 		try {
@@ -94,7 +89,7 @@ public class FederationHubMissionDisruptionManager {
 						
 			Date now = new Date();
 			
-			long recencySecs = FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfig().getMissionFederationRecencySeconds();
+			long recencySecs = FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager().getConfig().getMissionFederationRecencySeconds();
 			long maxRecencyMillis;
 			if (recencySecs == -1) {
 			    maxRecencyMillis = lastUpdate.getTime();
@@ -157,7 +152,7 @@ public class FederationHubMissionDisruptionManager {
 				}
 			}
 			
-			federationHubDatabaseService.addFederateMetadata(federateServerId, certificates);
+			federationHubDatabaseService.addFederateMetadata(federateServerId, clientGroups);
 		} catch (Exception e) {
 			logger.error("getMissionChangesAndTrackConnectEvent error", e);
 		}

@@ -159,6 +159,8 @@ public class MissionCacheHelper {
 			}
 
 			mission = doMissionQueryGuid(guid, hydrateDetails);
+			
+			logger.debug("Mission from doMissionQueryGuid {} {}", guid, mission);
 
 			if (mission != null) {
 
@@ -217,9 +219,7 @@ public class MissionCacheHelper {
 
 		Mission mission = missionRepository.getByGuidNoCache(guid);
 
-		if (logger.isTraceEnabled()) {
-			logger.trace("mission {} : {} ", guid, mission);
-		}
+		logger.debug("doMissionQueryGuid mission before hydrate {} : {} ", guid, mission);
 		
 		if (mission != null) {
 			missionService.hydrate(mission, hydrateDetails);
@@ -228,6 +228,9 @@ public class MissionCacheHelper {
 				missionService.hydrateFeedNameForMission(mission);		
 			}
 		}
+		
+		logger.debug("doMissionQueryGuid mission after hydrate {} : {} ", guid, mission);
+
 		
 		return mission;
 	}

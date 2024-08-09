@@ -278,7 +278,9 @@ public class TracksKMLServlet extends EsapiServlet {
 				throw new IllegalStateException("empty group vector");
 			}
 
-			logger.info("group vector: " + groupVector);
+			if (logger.isDebugEnabled()) {
+				logger.debug("group vector: " + groupVector);
+			}
 
 	      	String uid = getParameterValue(httpParameters, QueryParameter.uid.name());
 	      	String callsign = getParameterValue(httpParameters, QueryParameter.callsign.name());

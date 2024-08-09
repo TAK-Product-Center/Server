@@ -255,26 +255,27 @@ ospackage {
 
 
 
-task prePackage { }
-prePackage.dependsOn copyJars
-prePackage.dependsOn copyWars
-prePackage.dependsOn copyCoreConfigXSD
-prePackage.dependsOn copyCoreConfigExample
-prePackage.dependsOn copyCoreScripts
-prePackage.dependsOn copyDbScripts
-prePackage.dependsOn copyDocs
-prePackage.dependsOn copySwagger
-prePackage.dependsOn copyPolicy
-prePackage.dependsOn copyLicense
-prePackage.dependsOn copyConfigScripts
-prePackage.dependsOn copyAPIScripts
-prePackage.dependsOn copyPluginsJar
-prePackage.dependsOn copyPluginsScripts
-prePackage.dependsOn copyRetentionConfigs
-prePackage.dependsOn copyRetentionJar
-prePackage.dependsOn copyRetentionMissionStoreDir
-prePackage.dependsOn copyRetentionScripts
-prePackage.dependsOn copySchemaManagerJar
+task prePackage(type: Copy) { task ->
+    with takserverCommonSpec(task)
+	with copySchemaManagerJarSpec(task)
+    with copyCoreConfigExampleSpec()
+    with copyCoreScriptsSpec()
+    with copyDbScriptsSpec()
+    with copySwaggerSpec()
+    with copyConfigScriptsSpec()
+    with copyAPIScriptsSpec()
+	with copyFullPluginManagerSpec(task)
+    with copyFullRetentionServiceSpec(task)
+
+    // Ideally deconfliction would be done, but that requires more time
+    duplicatesStrategy DuplicatesStrategy.INCLUDE
+    destinationDir file("$buildDir/takArtifacts")
+
+    // TODO: Fix this gradle-detected dependency that probably shouldn't be
+    dependsOn(':takserver-cluster:copyClusterConfig',
+            ':takserver-cluster:copyClusterProperties',
+            ':takserver-cluster:moveCoreConfig')
+}
 
 buildRpm.dependsOn prePackage
 
@@ -375,6 +376,11 @@ task buildHardenedFullDocker {
     dependsOn constructHardenedFullDockerZip
 }
 
+task buildIntegrationTester {
+    description = 'Builds takserver-integration-tester-' + takversion + '-' + takreleaserpm + '.zip'
+    dependsOn constructIntegrationTesterZip
+}
+
 task createCIVersionArtifact() {
     // The docker tags, starting with the unique primary docker tag
     def primaryDockerTag = (takversion + '-' + takreleaserpm).toLowerCase()
@@ -405,4 +411,10 @@ task createCIVersionArtifact() {
                     "TAK_VERSION=\"$takVersion\"\n" +
                     "TAK_RPM_VERSION=\"$takversion-$takreleaserpm\"\n" +
                     "TAK_DOCKER_PRIMARY_TAG=\"$primaryDockerTag\"\n"
+}
+
+task buildAll(type: DefaultTask) {
+    dependsOn('buildRpm', 'buildDeb', 'buildDocker', 'buildFullDocker', 'buildHardenedDocker',
+            'buildHardenedFullDocker', 'buildFedhubDocker', ':takserver-cluster:buildCluster', 'bundlePublishArtifacts',
+            ':takserver-takcl-core:publicJar', ':takserver-plugins:publish')
 }

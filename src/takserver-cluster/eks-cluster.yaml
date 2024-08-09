@@ -13,6 +13,7 @@ managedNodeGroups:
   instanceType: c5.4xlarge
   name: cluster-node-group
   volumeSize: 100
+  volumeEncrypted: true
 metadata:
   name: cluster
   region: us-east-1

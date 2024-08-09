@@ -22,7 +22,7 @@ import tak.server.cot.CotEventContainer;
 public class DataFeedCotCacheHelper {
 	private static final Logger logger = Logger.getLogger(DataFeedCotCacheHelper.class);
 
-	private static DataFeedCotCacheHelper instance;
+	private volatile static DataFeedCotCacheHelper instance;
 	public static DataFeedCotCacheHelper getInstance() {
 		if (instance == null) {
 			synchronized (DataFeedCotCacheHelper.class) {
@@ -34,7 +34,7 @@ public class DataFeedCotCacheHelper {
 		return instance;
 	}
 
-	private Map<String, Cache<String, CotEventContainer>> dataFeedCaches = new HashMap<>();
+	private volatile Map<String, Cache<String, CotEventContainer>> dataFeedCaches = new HashMap<>();
 	private Cache<String, CotEventContainer> latestSACacheForDataFeed(DataFeed dataFeed) {
 		Cache<String, CotEventContainer> cache = dataFeedCaches.get(dataFeed.getUuid());
 		if (cache == null) {

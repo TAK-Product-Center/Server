@@ -40,7 +40,7 @@ public class FileConfigurationApi {
     	}
     	
     	try {
-			CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().setEnterpriseSyncSizeLimitMB(fileConfigurationModel.getUploadSizeLimit());
+			CoreConfigFacade.getInstance().setAndSaveEnterpriseSyncSizeLimit(fileConfigurationModel.getUploadSizeLimit());
 			CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
 		} catch (Exception e) {
 			logger.error("Error in setFileConfiguration: ", e);

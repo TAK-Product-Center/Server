@@ -4,7 +4,7 @@ setup_mongo () {
 
   # try to get username from /opt/tak/CoreConfig.xml
   if [ -f "/opt/tak/federation-hub/configs/federation-hub-broker.yml" ]; then
-    username=$(echo $(grep -m 1 "dbUsername:" /opt/tak/federation-hub/configs/federation-hub-broker.yml) | sed 's/.*dbUsername: *//')
+    username=$(echo $(grep -m 1 "dbUsername:" /opt/tak/federation-hub/configs/federation-hub-broker.yml) | sed 's/.*dbUsername: *//' | sed 's/"//g')
   fi
 
   # cant find username - use default
@@ -17,7 +17,7 @@ setup_mongo () {
 
   # try to get password from /opt/tak/CoreConfig.xml
   if [ -f "/opt/tak/federation-hub/configs/federation-hub-broker.yml" ]; then
-    password=$(echo $(grep -m 1 "dbPassword:" /opt/tak/federation-hub/configs/federation-hub-broker.yml) | sed 's/.*dbPassword: *//')
+    password=$(echo $(grep -m 1 "dbPassword:" /opt/tak/federation-hub/configs/federation-hub-broker.yml) | sed 's/.*dbPassword: *//' | sed 's/"//g')
   fi
 
   # cant find password - generate one
@@ -34,7 +34,6 @@ setup_mongo () {
   sleep 1
   $(echo "mongosh admin --file /opt/tak/federation-hub/scripts/db/create_user.js")
   sleep 1
-  rm "/opt/tak/federation-hub/scripts/db/create_user.js"
 }
 
 setup_mongo

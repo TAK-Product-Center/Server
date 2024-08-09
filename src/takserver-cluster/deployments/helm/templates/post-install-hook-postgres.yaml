@@ -3,7 +3,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "{{ .Release.Name }}"
+  name: "{{ .Release.Name }}-db-setup"
   labels:
     app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
     app.kubernetes.io/instance: {{ .Release.Name | quote }}
@@ -28,31 +28,24 @@ spec:
         "proxy.istio.io/config": '{ "holdApplicationUntilProxyStarts": true }'
     spec:
       restartPolicy: Never
-      initContainers:
-        - name: check-db-ready
-          image: postgres:15-alpine
-          command: ['sh', '-c',
-              'until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT;
-                do echo waiting for database; sleep 5; done;']
-          env:
-          - name: POSTGRES_DB
-            value: {{ .Values.postgresql.postgresqlDatabase }}
-          - name: POSTGRES_USER
-            value: {{ .Values.global.postgresql.postgresqlUsername }}
-          - name: POSTGRES_PASSWORD
-            value: {{ .Values.global.postgresql.postgresqlPassword }}
-          - name: POSTGRES_HOST
-            value: takserver-postgresql
-          - name: POSTGRES_PORT
-            value: "5432"
       containers:
       - name: post-install-job
         image: "{{ .Values.takserver.takserverDatabaseSetup.image.repository }}:{{ .Values.takserver.takserverDatabaseSetup.image.tag }}"
         env:
           - name: 'region'
-            value: 'placeholder'
+            value: 'aws-rds-placeholder'
           - name: 'identifier'
-            value: 'identifier'
+            value: 'aws-rds-placeholder'
+          - name: POSTGRES_DB
+            value: {{ .Values.global.postgresql.auth.database }}
+          - name: POSTGRES_USER
+            value: {{ .Values.global.postgresql.auth.username }}
+          - name: POSTGRES_PASSWORD
+            value: {{ .Values.global.postgresql.auth.password }}
+          - name: POSTGRES_HOST
+            value: "{{ .Values.global.postgresql.host }}"
+          - name: POSTGRES_PORT
+            value: "{{ .Values.global.postgresql.port }}"
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
 {{- end }}

@@ -9,7 +9,6 @@ import java.util.Set;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import javax.transaction.Transactional;
 
 import org.jetbrains.annotations.NotNull;
 import org.owasp.esapi.errors.IntrusionException;
@@ -22,6 +21,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -198,6 +198,7 @@ public class ProfileAdminAPI extends BaseRestController {
             profileRepository.deleteById(id);
             return new ResponseEntity(HttpStatus.OK);
         } catch (Exception e) {
+            logger.error("exception in deleteProfile!", e);
             throw new TakException("exception in deleteProfile", e);
         }
     }

@@ -74,6 +74,8 @@ public class FederationHubServerConfig {
     private long missionFederationDisruptionMaxFileSizeBytes = 268435456;
     private boolean missionFederationDisruptionEnabled = false;
     
+    private List<TokenAuthServer> federationTokenAuthServers = new ArrayList<>();
+    
     public int getOutgoingReconnectSeconds() {
 		return outgoingReconnectSeconds;
 	}
@@ -361,6 +363,14 @@ public class FederationHubServerConfig {
 		this.missionFederationDisruptionMaxFileSizeBytes = missionFederationDisruptionMaxFileSizeBytes;
 	}
 
+	public List<TokenAuthServer> getFederationTokenAuthServers() {
+		return federationTokenAuthServers;
+	}
+
+	public void setFederationTokenAuthServers(List<TokenAuthServer> federationTokenAuthServers) {
+		this.federationTokenAuthServers = federationTokenAuthServers;
+	}
+
 	@Override
 	public String toString() {
 		return "FederationHubServerConfig [keystoreType=" + keystoreType + ", keystoreFile=" + keystoreFile
@@ -379,5 +389,27 @@ public class FederationHubServerConfig {
 				+ ", missionFederationRecencySeconds=" + missionFederationRecencySeconds
 				+ ", missionFederationDisruptionMaxFileSizeBytes=" + missionFederationDisruptionMaxFileSizeBytes
 				+ ", missionFederationDisruptionEnabled=" + missionFederationDisruptionEnabled + "]";
+	}
+	
+	@JsonIgnoreProperties(ignoreUnknown = true)
+	public static class TokenAuthServer {
+		private int port = 9103;
+		private String type = "jwt";
+		public int getPort() {
+			return port;
+		}
+		public void setPort(int port) {
+			this.port = port;
+		}
+		public String getType() {
+			return type;
+		}
+		public void setType(String type) {
+			this.type = type;
+		}
+		@Override
+		public String toString() {
+			return "TokenAuthServer [port=" + port + ", type=" + type + "]";
+		}
 	}
 }

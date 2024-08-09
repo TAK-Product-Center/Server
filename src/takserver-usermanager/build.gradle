@@ -1,5 +1,3 @@
-import groovy.xml.MarkupBuilder
-
 import java.nio.file.Files
 import java.nio.file.Paths
 
@@ -19,7 +17,7 @@ shadowJar {
     dependsOn compileJava
     baseName = 'UserManager'
     classifier = 'all'
-	setZip64(true)
+    setZip64(true)
     version = version
 }
 
@@ -108,8 +106,27 @@ task integrationTest(type: Test) {
 }
 
 dependencies {
-    implementation project(':takserver-takcl-core')
-    implementation project(':takserver-common')
+    implementation(project(':takserver-takcl-core')) {
+        exclude group: 'io.kubernetes', module: 'client-java'
+        exclude group: 'org.springframework', module: 'spring-context'
+        exclude group: 'org.springframework.security', module: 'spring-security-core'
+        exclude group: 'org.springframework', module: 'spring-context'
+        exclude group: 'org.springframework', module: 'spring-beans'
+        exclude group: 'org.springframework', module: 'spring-context'
+        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-data-mongodb'
+        exclude group: 'org.hibernate.orm', module: 'hibernate-core'
+        exclude group: 'org.hibernate.orm', module: 'hibernate-entitymanager'
+        exclude group: 'org.apache.ignite', module: 'ignite-indexing'
+        exclude group: 'org.hibernate.orm', module: 'hibernate-core'
+        exclude group: 'org.apache.ignite', module: 'ignite-indexing'
+        exclude group: 'org.antlr', module: 'antlr4'
+    }
+    implementation(project(':takserver-common')) {
+        exclude group: 'org.hibernate.orm', module: 'hibernate-core'
+        exclude group: 'org.apache.ignite', module: 'ignite-indexing'
+        exclude group: 'org.antlr', module: 'antlr4'
+    }
+
     implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
     implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
     implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
@@ -129,14 +146,14 @@ dependencies {
     integrationTestImplementation group: 'com.h2database', name: 'h2', version: h2_version
 }
 
-task copyJar (type: Copy, dependsOn: shadowJar) {
-  from file('build/libs')
-  include 'UserManager-' + version + '-all.jar'
-  into "$buildDir/cluster"
-  rename('UserManager-' + version + '-all.jar', 'UserManager.jar')
+task copyJar(type: Copy, dependsOn: shadowJar) {
+    from file('build/libs')
+    include 'UserManager-' + version + '-all.jar'
+    into "$buildDir/cluster"
+    rename('UserManager-' + version + '-all.jar', 'UserManager.jar')
 }
 
-task setupCluster (type: Copy, dependsOn: copyJar) {}
+task setupCluster(type: Copy, dependsOn: copyJar) {}
 
 clean {
     doFirst {

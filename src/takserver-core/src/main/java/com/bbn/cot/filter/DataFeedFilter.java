@@ -49,7 +49,7 @@ import tak.server.feeds.DataFeedDTO;
 public class DataFeedFilter {
 	private static final Logger logger = LoggerFactory.getLogger(DataFeedFilter.class);
 	
-	private static DataFeedFilter instance = null;
+	private volatile static DataFeedFilter instance = null;
 	
 	@Autowired
 	private DataFeedService dataFeedService;

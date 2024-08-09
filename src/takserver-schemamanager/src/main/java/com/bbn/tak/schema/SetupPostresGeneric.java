@@ -22,6 +22,10 @@ public class SetupPostresGeneric extends Command
     {
         boolean installSucceeded = false;
         String database = schemaManager.commonOptions.database;
+        String user = schemaManager.commonOptions.username;
+        if (user == null) {
+            user = "postgres";
+        }
         try (Connection connection = schemaManager.getConnection())
         {
             Statement installStatement = null;
@@ -32,11 +36,11 @@ public class SetupPostresGeneric extends Command
                 sqlBuilder.append("create extension if not exists fuzzystrmatch;");
                 sqlBuilder.append("create extension if not exists postgis_tiger_geocoder;");
                 sqlBuilder.append("create extension if not exists postgis_topology;");
-                sqlBuilder.append("alter schema tiger owner to postgres;");
-                sqlBuilder.append("alter schema tiger_data owner to postgres;");
-                sqlBuilder.append("alter schema topology owner to postgres;");
+                sqlBuilder.append("alter schema tiger owner to " + user + ";");
+                sqlBuilder.append("alter schema tiger_data owner to " + user + ";");
+                sqlBuilder.append("alter schema topology owner to " + user + ";");
                 sqlBuilder.append("CREATE FUNCTION exec(text) returns text language plpgsql volatile AS $f$ BEGIN EXECUTE $1; RETURN $1; END; $f$;");
-                sqlBuilder.append("SELECT exec('ALTER TABLE ' || quote_ident(s.nspname) || '.' || quote_ident(s.relname) || ' OWNER TO postgres;') FROM (SELECT nspname, relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace = n.oid) WHERE nspname in ('tiger','topology') AND relkind IN ('r','S','v') ORDER BY relkind = 'S') s;");
+                sqlBuilder.append("SELECT exec('ALTER TABLE ' || quote_ident(s.nspname) || '.' || quote_ident(s.relname) || ' OWNER TO " + user + ";') FROM (SELECT nspname, relname FROM pg_class c JOIN pg_namespace n ON (c.relnamespace = n.oid) WHERE nspname in ('tiger','topology') AND relkind IN ('r','S','v') ORDER BY relkind = 'S') s;");
                 String sql = sqlBuilder.toString();
                 installStatement = connection.createStatement();
                 logger.debug(sql);

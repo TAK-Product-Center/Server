@@ -31,7 +31,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.bbn.marti.config.Filter;
 import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.network.BaseRestController;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.ContactManager;
+import com.bbn.marti.remote.exception.ValidationException;
 import com.bbn.marti.remote.RemoteCachedSubscription;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.RemoteSubscriptionMetrics;
@@ -944,6 +946,14 @@ public class SubscriptionApi extends BaseRestController {
 
     private void doSetActiveGroups(String username, List<Group> activeGroups, String clientUid) {
 
+        if (CoreConfigFacade.getInstance().getRemoteConfiguration()
+                .getAuth().isX509UseGroupCacheRequiresActiveGroup()) {
+            if (activeGroups.stream().noneMatch(g -> g.getActive())) {
+                subscriptionManager.sendGroupsUpdatedMessage(username, null);
+                throw new ValidationException(username + " must have at least 1 active group");
+            }
+        }
+
         // store the active group selection in the cache
         activeGroupCacheHelper.setActiveGroupsForUser(username, activeGroups);
 
@@ -975,6 +985,11 @@ public class SubscriptionApi extends BaseRestController {
 
             return new ResponseEntity(HttpStatus.OK);
 
+        } catch (ValidationException e) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("ValidationException in setActiveGroups", e);
+            }
+            return new ResponseEntity(HttpStatus.BAD_REQUEST);
         } catch (Exception e) {
             logger.error("exception in setActiveGroups!", e);
             return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -1000,6 +1015,11 @@ public class SubscriptionApi extends BaseRestController {
 
             return new ResponseEntity(HttpStatus.OK);
 
+        } catch (ValidationException e) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("ValidationException in setActiveGroups", e);
+            }
+            return new ResponseEntity(HttpStatus.BAD_REQUEST);
         } catch (Exception e) {
             logger.error("exception in setActiveGroups!", e);
             return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);

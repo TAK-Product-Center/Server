@@ -143,17 +143,16 @@ ospackage {
     }
 }
 
-task prePackageDbOnlyScripts { }
-prePackageDbOnlyScripts.dependsOn copyDbOnlyScripts
+task prePackage(type: Copy) { task ->
+    with copySchemaManagerJarSpec(task)
+    with copyDbScriptsSpec().exclude('pg_hba.conf', 'postgresql.conf')
+    with copyDbOnlyScriptsSpec()
+    with copyDocsSpec()
+    with copyLicenseSpec()
+    destinationDir = file("$buildDir/takArtifacts")
+}
 
-
-task prePackage { }
-prePackage.dependsOn prePackageDbOnlyScripts
-prePackage.dependsOn copySchemaManagerJar
 prePackage.dependsOn copyCoreConfigExampleOnly
-prePackage.dependsOn copyDbScripts
-prePackage.dependsOn copyDocs
-prePackage.dependsOn copyLicense
 
 buildRpm.dependsOn prePackage
 

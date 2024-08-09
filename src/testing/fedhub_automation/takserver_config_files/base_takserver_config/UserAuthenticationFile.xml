@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<UserAuthenticationFile xmlns="http://bbn.com/marti/xml/bindings">
+    <User identifier="admin" fingerprint="BF:50:C3:B0:44:BB:74:EE:8E:4C:D6:E1:8F:FB:B2:5C:D0:39:2F:F0:5D:0B:87:6D:47:C3:5C:96:8A:33:34:B7" passwordHashed="false" role="ROLE_ADMIN">
+        <groupList>Test</groupList>
+    </User>
+    <User identifier="user" fingerprint="03:26:0E:76:2E:F0:9F:DC:74:BE:8E:D4:59:60:13:EA:E3:F5:E0:F6:79:ED:00:92:82:6C:5B:BE:52:BF:90:F7" passwordHashed="false">
+        <groupList>Test2</groupList>
+    </User>
+</UserAuthenticationFile>

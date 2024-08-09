@@ -1,0 +1,119 @@
+/**
+ * Composite copyspecs that are either made of a combination of other specs or a base spec along with
+ * derived specs for other custom deployment scenarios such as containerization.
+ */
+
+apply from: "$rootDir/takserver-package/utils/copyspecs-base.gradle"
+
+ext {
+    takserverCommonSpec = { task ->
+        return copySpec {
+            with copyBaseTakJarsAndWarsSpec(task)
+            with copyCoreConfigXSDSpec()
+            with copyDocsSpec()
+            with copyPolicySpec()
+            with copyLicenseSpec()
+        }
+    }
+
+    takserverDockerCommonSpec = { task ->
+        return copySpec {
+            with takserverCommonSpec(task)
+            with copyGeneratedDockerFilesSpec(task)
+            with copySchemaManagerJarSpec(task)
+            with copyFullPluginManagerSpec(task)
+            with copyFullRetentionServiceSpec(task)
+            with copySwaggerSpec()
+        }
+    }
+
+    copyDbScriptsSpec = {
+        return copySpec {
+            from project(':takserver-schemamanager').file('scripts')
+            rename('(.*)', 'db-utils/$1')
+        }
+    }
+
+    copyDockerDbScriptsSpec = {
+        return copySpec {
+            with copyDbScriptsSpec().exclude('pg_hba.conf', 'postgresql.conf', 'configureInDocker.sh')
+            from(project(':takserver-schemamanager').file('docker')) {
+                include('pg_hba.conf', 'postgresql.conf', 'configureInDocker.sh')
+                rename('(.*)', 'db-utils/$1')
+            }
+        }
+    }
+
+    copyHardenedDockerDbScriptsSpec = {
+        return copySpec {
+            with copyDockerDbScriptsSpec().exclude('configureInDocker.sh', 'takserver-setup-db.sh')
+            from(project(':takserver-schemamanager').file('docker/hardened')) {
+                include('configureInDocker.sh', 'takserver-setup-db.sh')
+                rename('(.*)', 'db-utils/$1')
+            }
+        }
+    }
+
+    copyHardenedFullDockerDbScriptsSpec = {
+        return copySpec {
+            with copyDockerDbScriptsSpec().exclude('configureInDocker.sh',
+                    'pg_hba.conf', 'postgresql.conf')
+        }
+    }
+
+
+    copyCoreConfigExampleSpec = {
+        return copySpec {
+            from project(':takserver-core').file('example/')
+            include 'TAKIgniteConfig.example.xml', 'CoreConfig.example.xml', 'logging-restrictsize.xml'
+        }
+    }
+
+    copyDockerCoreConfigExampleSpec = {
+        return copySpec {
+            with copyCoreConfigExampleSpec().exclude('CoreConfig.example.xml')
+            from(project(':takserver-core').file('example')) {
+                include('CoreConfig.example.docker.xml')
+                rename('CoreConfig.example.docker.xml', 'CoreConfig.example.xml')
+            }
+        }
+    }
+
+    copyHardenedDockerCoreConfigExampleSpec = {
+        return copySpec {
+            with copyCoreConfigExampleSpec().exclude('CoreConfig.example.xml')
+            from(project(':takserver-core').file('example')) {
+                include('CoreConfig.example.docker-hardened.xml')
+                rename('CoreConfig.example.docker-hardened.xml', 'CoreConfig.example.xml')
+            }
+        }
+    }
+
+
+    copyHardenedFullDockerCoreConfigExampleSpec = {
+        return copySpec {
+            with copyCoreConfigExampleSpec().exclude('CoreConfig.example.xml')
+            from(project(':takserver-core').file('example')) {
+                include('CoreConfig.example.docker-hardened-full.xml')
+                rename('CoreConfig.example.docker-hardened-full.xml', 'CoreConfig.example.xml')
+            }
+        }
+    }
+
+    copyDockerScriptsSpec = {
+        return copySpec {
+            from project(':takserver-core').file('scripts')
+            exclude 'utils', 'plugins*', 'retention*', 'takserver.sh'
+        }
+    }
+
+    copyDockerSecurityFilesSpec = {
+        return copySpec {
+            from project(':takserver-core').file('docker/hardened/tak/security')
+            include "rpms/repos/*"
+            include "rpms/signatures/*"
+            include "epel-release*"
+            rename('(.*)', 'docker/hardened/takArtifacts/security/$1')
+        }
+    }
+}

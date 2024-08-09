@@ -725,6 +725,8 @@ function MissionManager() {
         } else if(value === 1){
           setResetDataFeeds(!resetDataFeeds);
           addOrEditMission(setValue, 2, setApiSent, setMissionChanged, missionChanged);
+        } else{
+          addOrEditMission(setValue, 1, setApiSent, setMissionChanged, missionChanged);
         }
         setDrawerOpen(false);
       } 

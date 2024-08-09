@@ -98,7 +98,7 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
         FederationHubPolicyManager fedHubPolicyManager =
             depProxy.fedHubPolicyManager();
         FederationHubServerConfig fedHubConfig =
-            depProxy.fedHubServerConfig();
+            depProxy.fedHubServerConfigManager().getConfig();
 
         try {
             String dn = ca.getSubjectX500Principal().getName();
@@ -108,7 +108,6 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
             saveTruststoreFile(sslConfig, fedHubConfig);
             sslConfig.refresh();
             FederationHubBrokerUtils.sendCaGroupToFedManager(fedHubPolicyManager, ca);
-            depProxy.restartV2Server();
         } catch (KeyStoreException | RuntimeException | CertificateEncodingException e) {
             logger.error("Exception adding CA", e);
             throw new RuntimeException(e);
@@ -143,7 +142,7 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 		FederationHubDependencyInjectionProxy depProxy = FederationHubDependencyInjectionProxy.getInstance();
 		FederationHubPolicyManager fedHubPolicyManager = depProxy.fedHubPolicyManager();
 		SSLConfig sslConfig = depProxy.sslConfig();
-		FederationHubServerConfig fedHubConfig = depProxy.fedHubServerConfig();
+		FederationHubServerConfig fedHubConfig = depProxy.fedHubServerConfigManager().getConfig();
 
 		try {
 			for (Enumeration<String> e = sslConfig.getTrust().aliases(); e.hasMoreElements();) {
@@ -171,7 +170,7 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 	@Override
 	public byte[] getSelfCaFile() {
 		FederationHubDependencyInjectionProxy depProxy = FederationHubDependencyInjectionProxy.getInstance();
-		FederationHubServerConfig fedHubConfig = depProxy.fedHubServerConfig();
+		FederationHubServerConfig fedHubConfig = depProxy.fedHubServerConfigManager().getConfig();
 		String caFilePath = fedHubConfig.getCaFile();
 		
 		try {
@@ -293,5 +292,15 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 	@Override
 	public void disconnectFederate(String connectionId) {
 		FederationHubDependencyInjectionProxy.getSpringContext().publishEvent(new ForceDisconnectEvent(this, connectionId));
+	}
+
+	@Override
+	public FederationHubServerConfig getFederationHubBrokerConfig() {
+		return FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager().getConfig();
+	}
+	
+	@Override
+	public FederationHubServerConfig saveFederationHubServerConfig(FederationHubServerConfig brokerConfig) {
+		return FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager().saveConfig(brokerConfig);
 	}
 }

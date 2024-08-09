@@ -1,0 +1,105 @@
+apply plugin: 'java-library'
+apply plugin: 'maven-publish'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+apply plugin: 'application'
+
+apply plugin: 'com.github.johnrengelman.shadow'
+
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
+buildscript {
+  repositories {
+    mavenCentral()
+    maven {
+      url 'https://plugins.gradle.org/m2'
+    }
+  }
+  dependencies {
+    classpath 'gradle.plugin.com.github.johnrengelman:shadow:' + gradle_shadow_version
+  }
+}
+
+//apply plugin: 'com.github.johnrengelman.shadow'
+
+repositories {
+  mavenCentral()
+  mavenLocal()
+}
+dependencies {
+	implementation 'commons-cli:commons-cli:1.7.0'
+  
+    implementation 'org.apache.commons:commons-lang3:' + commons_lang_version
+  	implementation group: 'org.postgresql', name: 'postgresql', version: postgres_version
+  	implementation group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
+  	implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
+  
+  	implementation group: 'jakarta.persistence', name: 'jakarta.persistence-api', version: jakarta_persistence_api_version
+  	implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: jakarta_xml_bind_api_version
+  	api group: 'com.zaxxer', name: 'HikariCP', version: hikaricp_version
+
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jackson_version
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jackson_version
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jackson_version
+    implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: jackson_version  	
+	  implementation 'org.apache.commons:commons-lang3:' + commons_lang_version
+	  implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+	  implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
+	  implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
+	  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+		
+	  api group: 'com.google.guava', name: 'guava', version: guava_version
+	  implementation group: 'ch.qos.logback.contrib', name: 'logback-json-classic', version: logback_jackson_version
+	  
+	    // required to fix version conflict for h2 between ignite and spring boot
+  implementation group: 'com.h2database', name: 'h2', version: h2_version
+  
+    implementation group: 'org.apache.ignite', name: 'ignite-core', version: ignite_version
+  implementation ("org.apache.ignite:ignite-spring:$ignite_version") {
+	exclude group: 'org.springframework', module: 'spring-context'
+  }
+  
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-cache', version: spring_boot_version
+  
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-jpa', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-mail', version: spring_boot_version
+  
+    implementation group: 'org.hibernate.orm', name: 'hibernate-core', version: hibernate_version
+  implementation group: 'org.hibernate.orm', name: 'hibernate-entitymanager', version: hibernate_entitymanager_version
+  
+  implementation group: 'org.postgresql', name: 'postgresql', version: postgres_version
+  
+    implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: jakarta_xml_bind_api_version	
+    
+      implementation group: 'joda-time', name: 'joda-time', version: joda_version
+    
+  
+}
+
+def jarBaseName = ''
+
+task buildImporter() {}
+task buildExporter() {}
+
+shadowJar {
+	setZip64(true)
+	if (project.gradle.startParameter.taskNames.contains('buildImporter')) {
+		mainClassName = 'tak.db.profiler.TakDBProfilerImporter'
+		jarBaseName = 'tak-db-profiler-importer'
+	}
+	
+	if (project.gradle.startParameter.taskNames.contains('buildExporter')) {
+		mainClassName = 'tak.db.profiler.TakDBProfilerExporter'
+		jarBaseName = 'tak-db-profiler-exporter'
+	}
+	baseName = jarBaseName
+	classifier = 'uber'
+	version = '1.0'
+}
+
+clean {
+  delete 'bin'
+}

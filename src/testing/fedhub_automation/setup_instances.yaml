@@ -1,0 +1,450 @@
+
+- name: aws var setup
+  hosts: localhost
+  tasks:
+  - set_fact:
+      region: us-east-1
+      availability_zone: us-east-1a
+      timestamp: "{{ ansible_date_time.iso8601_basic }}"
+
+- name: fedhub var setup
+  hosts: localhost
+  vars_files:
+    - variables.yml
+  tasks:
+  - set_fact:
+      fedhub_instance_name_prefix: "{{ instance_name_prefix }}_fedhub_"
+      fedhub_config_files_dir: "fedhub_config_files"
+      fedhub_instances_group: fedhub_instances
+      fedhub_user_name: rocky
+      fedhub_generated_files_folder: "fedhub_gen_files"
+
+- name: takserver var setup
+  hosts: localhost
+  vars_files:
+    - variables.yml
+  tasks:
+  - set_fact:
+      takserver_instance_name_prefix: "{{ instance_name_prefix }}_takserver_"
+      takserver_config_files_dir: "takserver_config_files"
+      takserver_user_name: ec2-user
+      takserver_instances_group: takserver_instances
+  - set_fact:
+      takserver_certs_dir: "certs"
+      takserver_base_config_dir: "base_takserver_config"
+      pytak_config_files_dir: "pytak_config_files"
+      load_testing_cfgs_dir: "load_testing_cfgs"
+
+- name: pytak var setup
+  hosts: localhost
+  vars_files:
+    - variables.yml
+  tasks:
+  - set_fact:
+      pytak_instances_group: pytak_instances
+      pytak_user_name: centos    
+      pytak_instance_name_prefix: "{{ instance_name_prefix }}_pytak_"
+
+- name: copy files to appropriate places
+  hosts: localhost
+  vars_files:
+    - variables.yml
+  gather_facts: true
+  remote_user: "{{ takserver_user_name }}"
+  tasks:
+    - name: copy files to appropriate places
+      ansible.builtin.shell:
+        cmd: |
+          rm {{ takserver_config_files_dir }}/{{ takserver_base_config_dir }}/*.pem
+          rm {{ takserver_config_files_dir }}/{{ takserver_base_config_dir }}/*.zip
+          rm {{ fedhub_config_files_dir }}/*.rpm
+          cp -n {{ key_name}}.pem {{ takserver_config_files_dir }}/{{ takserver_base_config_dir }}/
+          cp -n {{ takserver_version }}.zip {{ takserver_config_files_dir }}/{{ takserver_base_config_dir }}/
+          cp -n {{ fedhub_version }} {{ fedhub_config_files_dir }}/
+      delegate_to: localhost
+
+- name: provisioning fedhub instance
+  hosts: localhost
+  vars_files:
+    - variables.yml
+  gather_facts: true
+  collections:
+    - community.aws
+    - amazon.aws
+  remote_user: "{{ fedhub_user_name }}"
+  tasks:
+    - name: provision
+      ec2_instance:
+        name: "{{ fedhub_instance_name_prefix + timestamp }}"
+        key_name: "{{ key_name }}"
+        instance_type: "{{ fedhub_instance_type }}"
+        image_id: "{{ fedhub_ami_id }}"
+        security_group: sg-b721f0f8
+        region: "{{ region }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_session_token: "{{ aws_session_token }}"
+        state: present
+        wait: true
+        count: 1
+        detailed_monitoring: true
+      register: ec2_output
+    - set_fact:
+        ec2_fedhubs: "{{ ec2_output }}"
+    - name: Wait for EC2 Instance to be Running
+      wait_for:
+        host: "{{ item.public_ip_address }}"
+        port: 22
+        delay: 10
+        timeout: 300
+        state: started
+      loop: "{{ ec2_fedhubs.instances }}"
+      when: ec2_fedhubs.instances | length > 0
+      delegate_to: localhost
+    - name: Add EC2 Instance IP to Inventory
+      add_host:
+        groups: "{{ fedhub_instances_group }}"
+        name: "{{ item.public_ip_address }}"
+        ansible_host: "{{ item.public_ip_address }}"
+        ansible_user: "{{ fedhub_user_name }}"
+        ansible_ssh_private_key_file: "{{ key_name }}.pem"
+      loop: "{{ ec2_fedhubs.instances }}"
+      when: ec2_fedhubs.instances | length > 0
+      delegate_to: localhost
+
+- name: provisioning takserver instances
+  hosts: localhost
+  vars_files:
+    - variables.yml
+  gather_facts: true
+  collections:
+    - community.aws
+    - amazon.aws
+  remote_user: "{{ takserver_user_name }}"
+  tasks:
+    - name: provision
+      ec2_instance:
+        name: "{{ takserver_instance_name_prefix + timestamp }}"
+        key_name: "{{ key_name }}"
+        instance_type: "{{ takserver_instance_type }}"
+        image_id: "{{ takserver_ami_id }}"
+        security_group: sg-0a127f08b303384b3
+        region: "{{ region }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_session_token: "{{ aws_session_token }}"
+        state: present
+        wait: true
+        count: "{{ takserver_num_instances }}"
+        detailed_monitoring: true
+      register: ec2_output
+    - set_fact:
+        ec2_takservers: "{{ ec2_output }}"
+    - name: Wait for EC2 Instance to be Running
+      wait_for:
+        host: "{{ item.public_ip_address }}"
+        port: 22
+        delay: 10
+        timeout: 300
+        state: started
+      loop: "{{ ec2_takservers.instances }}"
+      when: ec2_takservers.instances | length > 0
+      delegate_to: localhost
+    - name: Add EC2 Instance IP to Inventory
+      add_host:
+        groups: "{{ takserver_instances_group }}"
+        name: "{{ item.public_ip_address }}"
+        ansible_host: "{{ item.public_ip_address }}"
+        ansible_user: "{{ takserver_user_name }}"
+        ansible_ssh_private_key_file: "{{ key_name }}.pem"
+      loop: "{{ ec2_takservers.instances }}"
+      when: ec2_takservers.instances | length > 0
+      delegate_to: localhost
+    - name: Generate CoreConfig.xml
+      template:
+        src: "{{ takserver_config_files_dir }}/{{ takserver_base_config_dir }}/CoreConfig.xml.jn2"
+        dest: "{{ takserver_config_files_dir }}/{{ takserver_base_config_dir }}/CoreConfig.xml"
+      vars:
+        fedhub_ip_address: "{{ hostvars.localhost.ec2_fedhubs.instances[0].public_ip_address }}"
+    - name: Generate load testing configs
+      template:
+        src: "{{ takserver_config_files_dir }}/{{ load_testing_cfgs_dir }}/config_elu_load_testing.yml.jn2"
+        dest: "{{ takserver_config_files_dir }}/{{ load_testing_cfgs_dir }}/config_elu_load_testing_{{ iteration }}.yml"
+      vars:
+        takserver_host: "{{ item.public_ip_address }}"
+        pytak_self_sa_delta: "{{ self_sa_delta }}"
+        pytak_clients: "{{ clients }}"
+      loop: "{{ ec2_takservers.instances }}"
+      loop_control:
+        index_var: iteration
+      when: ec2_takservers.instances | length > 0
+      delegate_to: localhost
+    - name: copy takserver config files to first instance
+      ansible.builtin.shell: scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "{{ key_name }}".pem "{{ takserver_config_files_dir }}"/* "{{ takserver_user_name }}"@"{{ ec2_takservers.instances[0].public_ip_address }}":/home/"{{ takserver_user_name }}"/
+      when: ec2_takservers.instances | length > 0  # Check if an instance was created
+      delegate_to: localhost
+    - name: Generate certificates on first takserver instance
+      ansible.builtin.shell:
+        cmd: |
+          sudo yum install java-1.8.0-amazon-corretto -y
+          cd {{ takserver_certs_dir }}
+          ./makeRootCa.sh takserver_{{ timestamp }}_{{ iteration }}
+          ./makeCert.sh server takserver
+          ./makeCert.sh client user
+          ./makeCert.sh client admin
+          rm files/fed-truststore.jks
+          cd ~
+          cp original-fed-truststore.jks {{ takserver_certs_dir }}/files/fed-truststore.jks
+          cp -n -r {{ takserver_base_config_dir }} takserver_config_{{ iteration }}
+          cp -n -r {{ takserver_certs_dir }}/files takserver_config_{{ iteration }}/files
+          mv --backup=t {{ takserver_certs_dir }}/files takserver_config_{{ iteration }}/{{ pytak_config_files_dir }}/load_test/certs/
+          cp {{ load_testing_cfgs_dir}}/config_elu_load_testing_{{ iteration}}.yml takserver_config_{{ iteration }}/{{ pytak_config_files_dir }}/load_test/config_elu_load_testing.yml
+          keytool -importcert -file takserver_config_{{ iteration }}/files/ca.pem -alias takserver_{{ timestamp }}_{{ iteration }} -keystore fed-truststore.jks -storepass atakatak -noprompt
+        chdir: /home/{{ takserver_user_name }}
+      loop: "{{ query('sequence', 'start=1 end='+(takserver_num_instances|string)) }}"
+      loop_control:
+        index_var: iteration
+      delegate_to: "{{ ec2_takservers.instances[0].public_ip_address }}"
+    - name: Generate fedhub policy on first takserver instance
+      ansible.builtin.shell:
+        cmd: |
+          mkdir {{ fedhub_generated_files_folder }}
+          python3 generate_fedhub_policy.py /home/{{ takserver_user_name }}/ {{ connection_index }} > ui_generated_policy.json
+          mv fed-truststore.jks {{ fedhub_generated_files_folder }}/
+          mv ui_generated_policy.json {{ fedhub_generated_files_folder }}/
+        chdir: /home/{{ takserver_user_name }}
+      delegate_to: "{{ ec2_takservers.instances[0].public_ip_address }}"
+    - name: copy files from first instance to itself
+      ansible.builtin.shell:
+        cmd: |
+          sudo mv --backup=t takserver_config_0/* ~
+          cp -r pytak_config_files takserver_config_0/
+        chdir: /home/{{ takserver_user_name }}
+      delegate_to: "{{ ec2_takservers.instances[0].public_ip_address }}"
+    - name: copy files from first instance to other instances
+      ansible.builtin.shell:
+        cmd: scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "{{ key_name }}".pem takserver_config_"{{ iteration + 1 }}"/* "{{ takserver_user_name }}"@"{{ item.public_ip_address }}":/home/"{{ takserver_user_name }}"/
+        chdir: /home/{{ takserver_user_name }}
+      when: ec2_takservers.instances | length > 1  # Ensure there is more than one instance
+      loop: "{{ ec2_takservers.instances[1:] }}"  # Start from the second instance
+      loop_control:
+        index_var: iteration
+      delegate_to: "{{ ec2_takservers.instances[0].public_ip_address }}"
+
+- name: transfer generated fedhub related files from first takserver instance to fedhub instance
+  hosts: localhost
+  vars_files:
+    - variables.yml
+  tasks:
+    - name: pull fedhub related generated files from first takserver instance to localhost
+      ansible.builtin.shell:
+        cmd: |
+          scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "{{ key_name }}".pem "{{ takserver_user_name }}"@"{{ ec2_takservers.instances[0].public_ip_address }}":/home/"{{ takserver_user_name }}"/"{{ fedhub_generated_files_folder }}"/* "{{ fedhub_config_files_dir }}"/
+          mv "{{ fedhub_config_files_dir }}"/fed-truststore.jks "{{ fedhub_config_files_dir }}"/fedhub_files/
+      when: ec2_takservers.instances | length > 0  # Check if an instance was created
+      delegate_to: localhost
+    - name: copy fedhub config files to fedhub instance
+      ansible.builtin.shell: scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "{{ key_name }}".pem "{{ fedhub_config_files_dir }}"/* "{{ fedhub_user_name }}"@"{{ ec2_fedhubs.instances[0].public_ip_address }}":/home/"{{ fedhub_user_name }}"/
+      when: ec2_fedhubs.instances | length > 0  # Check if an instance was created
+      delegate_to: localhost
+
+- name: setup fedhub instance
+  hosts: "{{ hostvars.localhost.fedhub_instances_group }}"
+  vars_files:
+    - variables.yml
+  remote_user: "{{ hostvars.localhost.fedhub_user_name }}"
+  tasks:
+    - name: install and start fedhub
+      ansible.builtin.shell:
+        cmd: |
+          sudo dnf --disablerepo=* -y install https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+          sudo dnf update -y
+          sudo dnf install java-17-openjdk-devel -y
+          sudo yum install takserver-fed-hub-*.noarch.rpm -y
+          sudo cp federation-hub-broker.yml /opt/tak/federation-hub/configs/federation-hub-broker.yml
+          sudo cp federation-hub-ui.yml /opt/tak/federation-hub/configs/federation-hub-ui.yml
+          sudo dnf install checkpolicy
+          cd /opt/tak/federation-hub && sudo ./apply-selinux.sh && sudo semodule -l | grep takserver
+          cd /home/{{ hostvars.localhost.fedhub_user_name }}
+          sudo cp /opt/tak/federation-hub/scripts/db/mongodb-org.repo /etc/yum.repos.d/mongodb-org.repo
+          sudo yum install -y mongodb-org
+          sudo systemctl daemon-reload
+          sudo systemctl enable mongod
+          sudo systemctl restart mongod
+          sudo /opt/tak/federation-hub/scripts/db/configure.sh
+          sudo alternatives --set java /usr/lib/jvm/java-17-openjdk-17.0.12.0.7-2.el8.x86_64/bin/java
+          sudo cp -r fedhub_files /opt/tak/federation-hub/certs/files
+          sudo mv ui_generated_policy.json /opt/tak/federation-hub/
+          sudo chmod 777 -R /opt/tak/federation-hub
+          sudo systemctl restart mongod
+          sudo systemctl enable federation-hub
+          sudo systemctl restart federation-hub
+          sudo java -jar /opt/tak/federation-hub/jars/federation-hub-manager.jar /opt/tak/federation-hub/certs/files/admin.pem
+          sudo dnf install xorg-x11-xauth xorg-x11-utils xorg-x11-fonts* -y
+          sudo dnf install unzip -y
+        chdir: /home/{{ hostvars.localhost.fedhub_user_name }}/
+
+- name: provisioning pytak instances
+  hosts: localhost
+  vars_files:
+    - variables.yml
+  gather_facts: true
+  collections:
+    - community.aws
+    - amazon.aws
+  remote_user: "{{ pytak_user_name }}"
+  tasks:
+    - name: provision
+      ec2_instance:
+        name: "{{ pytak_instance_name_prefix + timestamp }}"
+        key_name: "{{ key_name }}"
+        instance_type: "{{ pytak_instance_type }}"
+        image_id: "{{ pytak_ami_id }}"
+        security_group: sg-b721f0f8
+        region: "{{ region }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_session_token: "{{ aws_session_token }}"
+        state: present
+        wait: true
+        count: "{{ pytak_num_instances * takserver_num_instances }}"
+        detailed_monitoring: true
+      register: ec2_output
+    - set_fact:
+        ec2_pytaks: "{{ ec2_output }}"
+    - name: Wait for EC2 Instance to be Running
+      wait_for:
+        host: "{{ item.public_ip_address }}"
+        port: 22
+        delay: 10
+        timeout: 300
+        state: started
+      loop: "{{ ec2_pytaks.instances }}"
+      when: ec2_pytaks.instances | length > 0
+      delegate_to: localhost
+    - name: Add EC2 Instance IP to Inventory
+      add_host:
+        groups: "{{ pytak_instances_group }}"
+        name: "{{ item.public_ip_address }}"
+        ansible_host: "{{ item.public_ip_address }}"
+        ansible_user: "{{ pytak_user_name }}"
+        ansible_ssh_private_key_file: "{{ key_name }}.pem"
+      loop: "{{ ec2_pytaks.instances }}"
+      when: ec2_pytaks.instances | length > 0
+      delegate_to: localhost
+    - name: copy files from first takserver instance to pytak instances
+      ansible.builtin.shell:
+        cmd: scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "{{ key_name }}".pem takserver_config_{{ iteration // pytak_num_instances }}/{{ pytak_config_files_dir }}/load_test "{{ pytak_user_name }}"@"{{ item.public_ip_address }}":/home/"{{ pytak_user_name }}"/
+        chdir: /home/{{ takserver_user_name }}
+      when: ec2_pytaks.instances | length > 1  # Ensure there is more than one instance
+      loop: "{{ ec2_pytaks.instances }}"  # Start from the second instance
+      loop_control:
+        index_var: iteration
+      delegate_to: "{{ ec2_takservers.instances[0].public_ip_address }}"
+
+- name: global var setup
+  hosts: takserver_instances
+  vars_files:
+    - variables.yml
+  tasks:
+  - set_fact:
+      takserver_version: "{{ takserver_version }}"
+      takserver_user_name: "{{ hostvars.localhost.takserver_user_name }}"
+      ec2_takservers: "{{ hostvars.localhost.ec2_takservers }}"
+
+- name: setup takserver instances
+  hosts: " {{ hostvars.localhost.takserver_instances_group }}"
+  vars_files:
+    - variables.yml
+  remote_user: "{{ takserver_user_name }}"
+  tasks:
+    - name: install and start takserver
+      ansible.builtin.shell:
+        cmd: |
+          sudo yum install -y docker
+          sudo service docker start
+          sudo chown "{{ takserver_user_name }}" /var/run/docker.sock
+          unzip "{{ takserver_version }}".zip
+          cp CoreConfig.xml "{{ takserver_version }}"/tak/CoreConfig.xml
+          cp -r files "{{ takserver_version }}"/tak/certs/
+          cp UserAuthenticationFile.xml "{{ takserver_version }}"/tak/UserAuthenticationFile.xml
+          cp pg_hba.conf "{{ takserver_version }}"/tak/db-utils/pg_hba.conf
+          cd {{ takserver_version }}
+          docker build -t takserver-db:"$(cat tak/version.txt)" -f docker/Dockerfile.takserver-db .
+          docker network create takserver-"$(cat tak/version.txt)"
+          docker build -t takserver:"$(cat tak/version.txt)" -f docker/Dockerfile.takserver .
+          docker run -d -v $(pwd)/tak:/opt/tak:z -it -p 5432:5432 --network takserver-"$(cat tak/version.txt)" --network-alias tak-database --name takserver-db-"$(cat tak/version.txt)" takserver-db:"$(cat tak/version.txt)"
+          docker run -d -v $(pwd)/tak:/opt/tak:z -it -p 8089:8089 -p 8443:8443 -p 8444:8444 -p 8446:8446 -p 8087:8087/tcp -p 8087:8087/udp -p 8088:8088 -p 9000:9000 -p 9001:9001 --network takserver-"$(cat tak/version.txt)" --name takserver-"$(cat tak/version.txt)" takserver:"$(cat tak/version.txt)"  
+        chdir: /home/{{ takserver_user_name }}/
+
+- name: global var setup
+  hosts: "{{ hostvars.localhost.pytak_instances_group }}"
+  vars_files:
+    - variables.yml
+  tasks:
+  - set_fact:
+      pytak_user_name: "{{ hostvars.localhost.pytak_user_name }}"
+
+- name: setup pytak instances
+  hosts: "{{ hostvars.localhost.pytak_instances_group }}"
+  vars_files:
+    - variables.yml
+  remote_user: "{{ pytak_user_name }}"
+  tasks:
+    - name: Pause for 2.5 minutes to give takservers a chance to start before pytak clients are started, since pytak clients will not reattempt connection
+      pause:
+        seconds: 150
+    - set_fact:
+        ec2_pytaks: "{{ hostvars.localhost.ec2_pytaks }}"
+    - name: install and start pytak
+      ansible.builtin.shell:
+        cmd: |
+          nohup bash runload.sh > pytak_output.log &
+        chdir: /home/{{ hostvars.localhost.pytak_user_name }}/load_test
+      async: 2592000 # 60*60*24*30 – 1 month
+      poll: 0
+      
+# - name: clean up fedhub instance
+#   hosts: localhost
+#   remote_user: "{{ fedhub_user_name }}"
+#   tasks:
+#     - name: Prompt user before deleting instances
+#       ansible.builtin.pause:
+#         prompt: "Press enter to delete all instances"
+#     - name: delete fedhub instance
+#       ec2_instance:
+#         state: absent
+#         region: "{{ region }}"
+#         aws_secret_key: "{{ aws_secret_key }}"
+#         aws_access_key: "{{ aws_access_key }}"
+#         instance_ids: "{{ item.instance_id }}"
+#       loop: "{{ ec2_fedhubs.instances }}"
+#       when: ec2_fedhubs.instances | length > 0  # Check if there are instances to delete
+
+# - name: clean up takserver instances
+#   hosts: localhost
+#   remote_user: "{{ takserver_user_name }}"
+#   tasks:
+#     - name: delete takserver instances
+#       ec2_instance:
+#         state: absent
+#         region: "{{ region }}"
+#         aws_secret_key: "{{ aws_secret_key }}"
+#         aws_access_key: "{{ aws_access_key }}"
+#         instance_ids: "{{ item.instance_id }}"
+#       loop: "{{ ec2_takservers.instances }}"
+#       when: ec2_takservers.instances | length > 0  # Check if there are instances to delete
+
+# - name: clean up pytak instances
+#   hosts: localhost
+#   remote_user: "{{ pytak_user_name }}"
+#   tasks:
+#     - name: delete pytak instances
+#       ec2_instance:
+#         state: absent
+#         region: "{{ region }}"
+#         aws_secret_key: "{{ aws_secret_key }}"
+#         aws_access_key: "{{ aws_access_key }}"
+#         instance_ids: "{{ item.instance_id }}"
+#       loop: "{{ ec2_pytaks.instances }}"
+#       when: ec2_pytaks.instances | length > 0  # Check if there are instances to delete

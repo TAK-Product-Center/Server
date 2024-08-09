@@ -1,5 +1,10 @@
 # Automated Cluster Quickstart
 
+Cluster deployment has been tested on the following targets:
+ - AWS EKS
+ - RKE2
+ - Minikube
+
 ## Cluster Unimplemented Features
 - Latest SA
 - Port changes / Input definitions. It's possible to change these in the cluster (add / remove / modify inputs), but the cluster kubernetes YAML would need to be changed also to reflect the changes.
@@ -12,12 +17,14 @@
 - Injectors
 - Plugins - untested
 
-## Prerequisites
+## AWS Deployment
+
+### Prerequisites
 - AWS:
   - An AWS commerical account. AWS GovCloud has not been recently tested.
   - __OPTIONAL:__ A DNS Hosted Zone registered in AWS Route 53 - https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-register.html. This can be used to map a domain name to the Load Balancer, but is not required
   
-- The following software must be installed on the workstation you are using to create the cluster:
+- An x86-64 system (deployment from ARM-based Macs has not been tested and is unlikely to work) with the following software must be installed on the workstation you are using to create the cluster:
   - python 3.7
   - pip 3.7
   - Kubectl (kubernetes client version 1.21)
@@ -29,12 +36,12 @@
   - helm - Install as described here: https://helm.sh
   - eksctl - Required to create and manage AWS EKS clusters. Install as described here: https://eksctl.io
   
-## Install Dependencies and Check Software
+### Install Dependencies and Check Software
 - run `pip3 install -r cluster/scripts/requirements.txt` to install python dependencies
 - run `kubectl version` to ensure it is available from your user account, and that it is version 1.21.
 - run `docker run hello-world` to ensure docker is running
 
-## Configuring AWS Credentials
+### Configuring AWS Credentials
 - Set Region : `aws configure set region <region>` [(List of Regions)](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html)
 - Set Access Key : `aws configure set aws_access_key_id <aws_access_key_id>` [(Managing access keys (console))](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html)
 - Set Secret Key : `aws configure set aws_secret_access_key <aws_secret_access_key>`
@@ -44,25 +51,65 @@
                     `aws configure set aws_secret_access_key 318860611555`
 - View config :   `aws configure list`
 
-## Create a CA and X.509 certificates for TAK Server
+### Create a CA and X.509 certificates for TAK Server
 - The installer script will automatically generate certs at cluster/takserver-core/certs/files unless certs are already present. You can import your own certs into cluster/takserver-core/certs/files to use existing ones. However, a naming convention for certs is used so we recommend following the automatic generation process first.
 
-## Set Up Environment Variables
+### Set Up Environment Variables
 - Edit __cluster/cluster-properties__
--- Set and review the options here including the cluster name, number of EC2 nodes, domain name to register (optional). The number of pods per service (messaging, API etc) is defined based on the total number of EC2 nodes.
+-- Set the TAK_DEPLOYMENT_TARGET to aws and configure the **Common Properties** and **AWS Properties**. Set and review the options here including the cluster name, number of EC2 nodes, domain name to register (optional). The number of pods per service (messaging, API etc) is defined based on the total number of EC2 nodes.
 - Source __cluster/cluster-properties__
 `source cluster/cluster-properties`
 
-## Build AWS EKS TAK Server Cluster (see note about alternate KOPS method at the bottom of this README)
+### Build AWS EKS TAK Server Cluster (see note about alternate KOPS method at the bottom of this README)
 - Depending on your environment, your python command may be `python` rather than `python3`.
 `python3 cluster/scripts/build-eks.py` 
   
-## Delete EKS TAK Server Cluster __this command will delete your cluster and all data__
+### Delete EKS TAK Server Cluster __this command will delete your cluster and all data__
 - Depending on your environment, your python command may be `python` rather than `python3`.
 - `python cluster/scripts/delete-eks.py`
+- If it gets stuck with a message along the lines of "1 pods are unevictable from node ip-1-2-3-4.ec2.internal" you may need to navigate to the AWS CloudFormation console and manually remove the nodegroup. This will unblock that step of the deletion.  
 
-## Notes
+
+### Notes
 - AWS DNS propagation can take some time. When building the cluster and testing the load balancer, you may experience connection refused or host not found errors. Give them a reasonable amount of time to resolve, 20-30 minutes, before troubleshooting / debugging
+
+## Generic (Minikube and RKE2) Deployment
+
+### Prerequisites
+- Docker Engine 20
+- Python 3.7
+- Python 3.7 Pip
+- PyYAML
+
+Helm, Kubectl, and Minikube will be downloaded automatically to `scripts/setup-bins/` on Linux x86_64, Linux ARM,
+Linux ARM64, Mac OSX x86_64 (Older x86-based systems), and Mac OSX ARM4 (M2, M3, etc).
+
+### Install Dependencies
+Install docker, python, and python-pip as is typical for your operating system. To install PyYAML execute 
+`python3 -m pip install pyyaml`.  
+
+### Set Up Environment Variables
+
+The file __cluster/cluster-properties__ contains the configuration settings. Set the TAK_DEPLOYMENT_TARGET to 
+**generic-rke2** or **generic-minikube** depending on your deployment target. Then configure the **Common Properties** 
+and **Generic Properties**. If using RKE2 you will need to set the TAK_KUBECONFIG_FILE variable to a credentials file. 
+If you are using Minikube an instance will automatically be brought up and used utilizing the configured 
+TAK_MINIKUBE_DRIVER as the backend. It is recommended to use a personalized namespace if using a shared cluster to 
+prevent deployment conflicts!
+
+### Deploy Generic environment
+Executing the following command will deploy the environment: `python3 cluster/scripts/build-generic.py`.  This will do 
+the following:  
+1. Download the proper versions of kubectl, helm, and if applicable minikube to scripts/setup-bins.  
+2. Build the docker images.  
+3. Produce certs in <dir> if TAK_CERT_SOURCE_DIR has not been set to a certificate directory.  
+4. Update the helm configuration files.  
+5. Publish the docker images to TAK_INSECURE_PUBLISH_REPO.  
+6. If running minikube and TAK_MINIKUBE_DELETE_EXISTING_INSTANCE is set to true, stop and delete any running Minikube instances.  
+7. If running minikube, start up a new instance using the configured driver, memory, and CPU settings.  
+8. Deploy it to the cluster.  
+9. Display the port mapping details. More advanced ingress is not yet supported.  
+
 
 ## Useful Commands
 - Tail Logs

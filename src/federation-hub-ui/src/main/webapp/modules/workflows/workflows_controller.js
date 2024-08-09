@@ -16,6 +16,8 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
   $state.tids = {}
   $state.cache = {}
 
+  console.log('workflowsController')
+
   function translateIds(){
     if (JointPaper.paper &&  JointPaper.paper._views) {
       var nodeKeys = Object.keys(JointPaper.paper._views);
@@ -116,9 +118,16 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
   }
 
   function AnimateDataFlow(){
-    if($state.fkdi == ""){
-      $state.fkdi = $interval(pollDataFlowStats, 5000);
-    }
+    WorkflowService.isAllowFlowIndicators().then(function(allowFlowIndicators) {
+      if (allowFlowIndicators) {
+        console.log('Allow Flow Indicators')
+        if($state.fkdi == ""){
+          $state.fkdi = $interval(pollDataFlowStats, 5000);
+        }
+      } else {
+        console.log('Disable Flow Indicators')
+      }
+    })
   }
 
   function pollActiveConnections() {
@@ -167,7 +176,7 @@ function workflowsController($scope, $rootScope, $window, $state, $stateParams, 
           cellView.resize()
         }
 
-        if (cellView.model.attributes.graphType === "GroupCell") {
+        if (cellView.model.attributes.graphType === "GroupCell" || cellView.model.attributes.graphType === "FederationTokenGroupCell") {
           let linkedActiveConnections = []
           
           activeConnections.forEach(activeConnection => {
@@ -515,6 +524,8 @@ $scope.saveGraph = function() {
         $state.go('workflows.editor.addFederateGroup');
       } else if (['FederationOutgoing'].indexOf(propertiesType) !== -1) {
         $state.go('workflows.editor.addFederationOutgoing');
+      } else if (['FederationTokenGroup'].indexOf(propertiesType) !== -1) {
+        $state.go('workflows.editor.addFederationTokenGroup');
       }
     }
   }

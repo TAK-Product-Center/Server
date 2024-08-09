@@ -275,7 +275,7 @@ public class IgniteConfigurationHolder {
 				//				spec:
 
 				ipFinder.setServiceName("takserver-ignite");
-				ipFinder.setNamespace("takserver");
+				ipFinder.setNamespace(takIgniteConfiguration.getIgniteClusterNamespace());
 
 				// default is
 				//     /** Kubernetes API server URL in a string form. */

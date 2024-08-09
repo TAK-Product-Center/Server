@@ -1,9 +1,10 @@
 FROM eclipse-temurin:17-jammy
+
+# Netcat is necessary to check if the remote server is open for use.
+# This could probably be replaced by a "-wait" parameter or something similar in SchemaManager.jar
+RUN apt update -y && apt install -y netcat
+
 COPY takserver-schemamanager/SchemaManager.jar ./
 COPY takserver-schemamanager/generic-cluster-database-configuration.sh ./
-COPY CoreConfig.xml opt/tak/CoreConfig.xml
-COPY takserver-schemamanager/db-connection-configuration.sh .
 RUN chmod +x generic-cluster-database-configuration.sh
-RUN chmod +x db-connection-configuration.sh
-RUN ./db-connection-configuration.sh
 CMD ["./generic-cluster-database-configuration.sh"]

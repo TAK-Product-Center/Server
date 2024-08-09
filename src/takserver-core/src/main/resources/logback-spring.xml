@@ -77,6 +77,33 @@
                 </else>
             </if>
         </appender>
+        <appender name="http_access_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/takserver-api-access.log</file>
+            <filter class="com.bbn.marti.logging.AuditLogMarkerExcludingRootLoggerThresholdFilter" />
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>logs/takserver-api-access.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+                <maxHistory>90</maxHistory>
+            </rollingPolicy>
+            <if condition="${JSON_FORMAT_ENABLED}">
+                <then>
+                    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+                        <layout class="${JSON_LAYOUT}">
+                            <appendLineSeparator>${LINE_SEPARATED}</appendLineSeparator>
+                            <doubleSpaced>${DOUBLE_SPACED}</doubleSpaced>
+                            <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter">
+                                <prettyPrint>${PRETTY_PRINT}</prettyPrint>
+                            </jsonFormatter>
+                            <timestampFormat>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampFormat>
+                        </layout>
+                    </encoder>
+                </then>
+                <else>
+                    <encoder>
+                        <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
+                    </encoder>
+                </else>
+            </if>
+        </appender>
     </springProfile>
     <springProfile name="messaging">
         <appender name="application_log" class="ch.qos.logback.core.rolling.RollingFileAppender">
@@ -164,6 +191,10 @@
             </else>
         </if>
     </appender>
+    <!--  async appender for audit log -->
+	<appender name="audit_log_async" class="ch.qos.logback.classic.AsyncAppender">
+      	<appender-ref ref="audit_log"/>
+    </appender>
 
     <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -219,11 +250,25 @@
             <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
+    <appender name="esapi_log_async" class="ch.qos.logback.classic.AsyncAppender">
+      	<appender-ref ref="esapi_log"/>
+    </appender>
     <logger name="IntrusionDetector" additivity="false" >
-        <appender-ref ref="esapi_log" />
+        <appender-ref ref="esapi_log_async" />
     </logger>
+    <!--  async appender for http log -->
+	<appender name="http_access_log_async" class="ch.qos.logback.classic.AsyncAppender">
+      	<appender-ref ref="http_access_log"/>
+    </appender>
+    <logger name="http_access_logger" additivity="false">
+    	<appender-ref ref="http_access_log_async" />
+	</logger>
+	<!--  async appender for application log -->
+	<appender name="application_log_async" class="ch.qos.logback.classic.AsyncAppender">
+      	<appender-ref ref="application_log"/>
+    </appender>
     <root level="INFO">
-        <appender-ref ref="application_log" />
-        <appender-ref ref="audit_log" />
+        <appender-ref ref="application_log_async" />
+        <appender-ref ref="audit_log_async" />
     </root>
 </configuration>

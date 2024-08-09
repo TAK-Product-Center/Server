@@ -99,7 +99,7 @@ task zipCluster(type: Zip) {
     dependsOn pullTakserverCore
     dependsOn pullSchemaManager
     dependsOn pullUserManager
-    dependsOn pullTakcl
+//    dependsOn pullTakcl
     dependsOn deleteCoreConfig
     dependsOn copyClusterScripts
     dependsOn copyDeployments
@@ -136,7 +136,7 @@ task zipClusterHelm(type: Zip) {
     dependsOn pullTakserverCore
     dependsOn pullSchemaManager
     dependsOn pullUserManager
-    dependsOn pullTakcl
+//    dependsOn pullTakcl
     dependsOn deleteCoreConfig
     dependsOn copyClusterScripts
     dependsOn copyDbConfigurations
@@ -197,5 +197,5 @@ task buildHelmCluster {
   dependsOn copyCertsConfigMap
 }
 
-
-
+// TODO: Fix this gradle-detected dependency that probably shouldn't be
+tasks.getByName('jar').dependsOn('copyClusterConfig', 'copyClusterProperties', 'moveCoreConfig')

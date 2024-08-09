@@ -3,7 +3,7 @@ keystoreFile: /opt/tak/federation-hub/certs/files/takserver.jks
 keystorePassword: atakatak
 
 truststoreType: JKS
-truststoreFile: /opt/tak/federation-hub/certs/files/fed-truststore.jks
+truststoreFile: /opt/tak/federation-hub/certs/files/truststore-root.jks
 truststorePassword: atakatak
 
 keyAlias: takserver

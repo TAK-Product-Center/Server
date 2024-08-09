@@ -1,0 +1,87 @@
+<div class="modal-header">
+    <div style="clear: both">
+        <h3 class="modal-title" style="float: left">{{editorTitle}} {{roger_federation.type}}</h3>
+        <h4 ng-if="editExisting" style="float: right">{{roger_federation.stringId}}</h4>
+    </div>
+</div>
+
+<div class="modal-footer">
+    <button class="btn btn-primary" type="button" ng-click="generateToken()">Generate Token</button>
+    <button ng-if="editExisting" class="btn btn-primary" type="button" ng-click="showActiveConnections()">Show Active Connections</button>
+</div>
+
+<div class="modal-body" data-ng-init="initialize()">
+    <form name="federateForm">
+
+        <div class="row form-group" ng-class="{ 'has-error': federateForm.name.$touched && federateForm.name.$invalid }">
+            <label class="col-sm-3">Token Group Name</label>
+            <div class="col-sm-9">
+                <input type="text" name="name" class="form-control" ng-disabled="editExisting || roger_federation.tokens.length > 0" ng-model="roger_federation.stringId" required/>
+                <div class="help-block" ng-messages="federateForm.name.$error" ng-if="federateForm.name.$touched">
+                </div>
+                <div style="color: red" ng-if="tokenNameExists" class="help-block">
+                    Token Group name already exists
+                </div>
+            </div>
+        </div>
+
+        <div class="row form-group" ng-class="{ 'has-error': federateForm.port.$touched && federateForm.port.$invalid }">
+            <label class="col-sm-3">Valid For (ms) </label>
+            <div class="col-sm-9">
+                <input type="number" name="port" class="form-control" ng-model="roger_federation.expiration" min="-1" required/>
+                <div class="help-block" ng-messages="federateForm.port.$error" ng-if="federateForm.port.$touched">
+                </div>
+                <span>
+                    <button data-ng-click="roger_federation.expiration = -1">No Exp</button>
+                    <button data-ng-click="roger_federation.expiration = 3600000">1 Hour</button>
+                    <button data-ng-click="roger_federation.expiration = 86400000">1 Day</button>
+                    <button data-ng-click="roger_federation.expiration = 604800000">1 Week</button>
+                    <button data-ng-click="roger_federation.expiration = 18144000000">1 Month</button>
+                    <button data-ng-click="roger_federation.expiration = 31536000000">1 Year</button>
+                </span>
+            </div>
+        </div>
+
+        <div class="row form-group">
+            <label class="col-sm-3">Interconnected</label>
+            <div class="col-sm-9">
+                <input type="checkbox" name="interconnected" class="form-control" ng-model="roger_federation.interconnected"/>
+                <div class="help-block" ng-messages="federateForm.interconnected.$error" ng-if="federateForm.interconnected.$touched">
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <h4 style="align-content: center; text-align: center;">Generated Tokens</h4>
+        <div class="row">
+          <div style="margin-right: 1.5%; margin-left: 1.5%;">
+            <table class="tablesorter" style="table-layout: fixed; width: 80%; margin-left: 10%; margin-right: 10%;  border-collapse:separate; border-spacing:0 5px;">
+              <thead>
+                <tr>
+                  <th style="text-align: center; align-content: center;">Copy Token</th>
+                  <th style="text-align: center; align-content: center;">Expiration</th>
+                  <th style="text-align: center; align-content: center;">Delete</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="token in roger_federation.tokens" style="text-align: center; align-content: center;">
+                  <td style="width: 33%">
+                    <button data-ng-click="copyToken(token.token)">{{previewToken(token.token)}}</button>
+                  </td>
+                  <td style="width: 33%">{{getDisplayDate(token.expiration)}}</td>
+                  <td style="width: 33%">
+                    <button data-ng-click="deleteToken(token)" class="btn-danger">Delete</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-primary" type="button" ng-click="submit()" ng-disabled="!federateForm.$valid">OK</button>
+            <button class="btn btn-primary" type="button" ng-click="cancel()">Cancel</button>
+        </div>
+    </form>
+</div>

@@ -1,24 +1,21 @@
-### ------ TAK CLUSTER PROPERTIES ------ ###
+######################## COMMON DEPLOYMENT PROPERTIES #########################
 
-# Absolute path to the takserver cluster directory. (eg. /Users/user/takserver-cluster-<version>/cluster)
-export CLUSTER_HOME_DIR=
+# Valid values: 'aws', 'generic-rke2', 'generic-minikube'
+export TAK_DEPLOYMENT_TARGET=
 
-# Unique Cluster Name - This will be used to keep naming conventions consistent across resources. No capitals or underscores (eg. bbn-cluster)
+# Unique Cluster Name - This will be used to keep naming conventions consistent across resources. No capitals or 
+# underscores (eg. bbn-cluster). In generic deployments this along with a partial uuid will be used as the namespace
 export TAK_CLUSTER_NAME=
 
-# Set the AWS zones for the cluster region. At least 2 zones are required. (eg. "us-east-1a,us-east-1b")
-export TAK_CLUSTER_ZONES=${ZONES:-"<zone1>,<zone2>"}
+# The optional directory that contains the certificate files. This must be less than 1MB and contain an 'admin.pem' admin certificate!
+export TAK_CERT_SOURCE_DIR=
 
-# Set the number of cluster nodes
+# Set the number of cluster nodes. If using rke2 or minikube setting to zero will result in the bare minimum for
+# development to be used. Realistically the number of actual nodes will be around 4x this number
 export TAK_CLUSTER_NODE_COUNT=20
 
 # Set if takserver plugins should be enabled (0 false, 1 true)
 export TAK_PLUGINS=0
-
-### ------ Configure Route 53 Domain Name or Gossip-based DNS ------ ###
-# By default, gossip-based DNS is used in the cluster. The domain name must end with k8s.local
-# Or, set the Domain Name of the hosted zone you registered with Route53. (eg. yourorg.tak.net) (leave off trailing .)
-export TAK_CLUSTER_DOMAIN_NAME=k8s.local
 
 ### ------ DATABASE PROPERTIES ------ ###
 
@@ -27,15 +24,6 @@ export TAK_DB_USERNAME=martiuser
 
 # Master password for RDS
 export TAK_DB_PASSWORD=
-
-# RDS DB Instance Size
-# Size details: https://aws.amazon.com/rds/instance-types/
-# Postgres compatibility: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.html
-export TAK_DB_SIZE=db.m5.16xlarge
-
-# RDS DB Initial Storage
-export TAK_DB_ALLOCATED_STORAGE=500
-
 
 ### ------ CERTIFICATE PROPERTIES ------ ###
 
@@ -53,17 +41,85 @@ export TAK_CITY=
 # Set Certificate Organizational Unit
 export TAK_ORGANIZATIONAL_UNIT=
 
-# Absolute path to the takserver configmap file that will override the default cert values (eg. /Users/user/takserver-cluster-<version>/cluster).
-# Leave empty if you want to use the defaults.
-export CERT_CONFIGMAP_FILE=
 
-### ------ PRESET VARIABLES - DO NOT EDIT  ------ ###
 
-export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id)
-export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key)
-export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-export AWS_S3_KOPS_STORE_NAME=tak.server-$TAK_CLUSTER_NAME
-export TAK_CLUSTER_REGION=$(aws configure get region)
-export KOPS_STATE_STORE=s3://$AWS_S3_KOPS_STORE_NAME
-# get or refresh ECR token
-aws ecr get-login-password --region $TAK_CLUSTER_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$TAK_CLUSTER_REGION.amazonaws.com
+######################### AWS DEPLOYMENT PROPERTIES ###########################
+# Absolute path to the takserver cluster directory. (eg. /Users/user/takserver-cluster-<version>/cluster)
+export CLUSTER_HOME_DIR=
+
+# Set the AWS zones for the cluster region. At least 2 zones are required. (eg. "us-east-1a,us-east-1b")
+export TAK_CLUSTER_ZONES=${ZONES:-"<zone1>,<zone2>"}
+
+### ------ Configure Route 53 Domain Name or Gossip-based DNS ------ ###
+# By default, gossip-based DNS is used in the cluster. The domain name must end with k8s.local
+# Or, set the Domain Name of the hosted zone you registered with Route53. (eg. yourorg.tak.net) (leave off trailing .)
+export TAK_CLUSTER_DOMAIN_NAME=k8s.local
+
+# RDS DB Instance Size
+# Size details: https://aws.amazon.com/rds/instance-types/
+# Postgres compatibility: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.html
+export TAK_DB_SIZE=db.m5.16xlarge
+
+# RDS DB Initial Storage
+export TAK_DB_ALLOCATED_STORAGE=500
+
+
+
+####################### GENERIC DEPLOYMENT PROPERTIES #########################
+
+# Currently only tested with insecure docker registries, but secure registries should also work in theory
+export TAK_INSECURE_PUBLISH_REPO=
+
+#### ------ RKE2 Properties ------ ####
+
+# The configuration file to use to connect to the kubernetes instance
+export TAK_KUBECONFIG_FILE=
+
+# If there are issues applying the ingress rules you may be able to enable this to get around any issues in your environment
+export TAK_USE_PORT_EXPOSURE=false
+
+#### ------ MINIKUBE PROPERTIES ------ ####
+
+# Minikube is meant for development only. If you don't have enough CPUs the 
+# services will fail! The number defined here assumes
+# TAK_CLUSTER_NODE_COUNT=0 (which defaults to the bare minimum) and TAK_PLUGINS=1
+export TAK_MINIKUBE_DRIVER=docker
+export TAK_MINIKUBE_MEMORY=16g
+export TAK_MINIKUBE_CPUS=10
+
+# Stop and delete any existing minikube instance
+export TAK_MINIKUBE_DELETE_EXISTING_INSTANCE=false
+
+
+
+### ------------------- PRESET VARIABLES - DO NOT EDIT  ------------------- ###
+
+export TAK_HELM_VERSION=v3.12.3
+export TAK_MINIKUBE_VERSION=v1.31.2
+export TAK_KUBERNETES_VERSION=v1.27.0
+
+# Ignore AWS stuff if not necessary so aws installation isn't necessary
+if [[ "${TAK_DEPLOYMENT_TARGET}" == "aws" ]];then
+    echo Activating AWS configuration
+    export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id)
+    export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key)
+    export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+    export AWS_S3_KOPS_STORE_NAME=tak.server-$TAK_CLUSTER_NAME
+    export TAK_CLUSTER_REGION=$(aws configure get region)
+    export KOPS_STATE_STORE=s3://$AWS_S3_KOPS_STORE_NAME
+    # get or refresh ECR token
+    aws ecr get-login-password --region $TAK_CLUSTER_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$TAK_CLUSTER_REGION.amazonaws.com
+
+elif [[ "${TAK_DEPLOYMENT_TARGET}" == "generic-rke2" ]];then 
+    echo Activating Generic RKE2 configuration
+    export TAK_KUBERNETES_NAMESPACE=${TAK_CLUSTER_NAME}
+    export KUBECONFIG=${TAK_KUBECONFIG_FILE}
+
+elif [[ "${TAK_DEPLOYMENT_TARGET}" == "generic-minikube" ]];then
+    echo Activating Generic Minikube configuration
+    export TAK_KUBERNETES_NAMESPACE=${TAK_CLUSTER_NAME}
+
+else
+    echo  -e "\033[31;5mTAK_DEPLOYMENT_TARGET MUST BE SET TO 'aws', 'generic-rke2', or 'generic-minikube!\033[0m"
+    exit 1
+fi

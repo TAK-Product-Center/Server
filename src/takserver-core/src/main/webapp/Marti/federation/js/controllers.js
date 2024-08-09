@@ -735,16 +735,11 @@ federationManagerControllers.controller('OutgoingConnectionModificationCtrl', ['
         $scope.saveOutgoingConnection = function (outgoingConnection) {
             // if outgoing is enabled, warn that current changes will restart connection
             if ($scope.originalOutgoing.enabled && $scope.modifiedOutgoing.enabled) {
-                if ($scope.originalOutgoing.displayName !== $scope.modifiedOutgoing.displayName ||
-                    $scope.originalOutgoing.address !== $scope.modifiedOutgoing.address ||
-                    $scope.originalOutgoing.port !== $scope.modifiedOutgoing.port ||
-                    $scope.originalOutgoing.protocolVersion !== $scope.modifiedOutgoing.protocolVersion) {
-                    if (confirm('Config changes will restart the connection')) {
-                        // nothing to do
-                    } else {
-                      alert('Save Canceled.');
-                      return;
-                    }
+                if (confirm('Config changes will restart the connection')) {
+                    // nothing to do
+                } else {
+                  alert('Save Canceled.');
+                  return;
                 }
             }
 

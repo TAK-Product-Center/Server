@@ -9,20 +9,6 @@ import java.util.List;
 import java.util.NavigableSet;
 import java.util.SimpleTimeZone;
 
-import jakarta.persistence.Cacheable;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Transient;
-import jakarta.persistence.Convert;
-import jakarta.persistence.Converter;
-import jakarta.xml.bind.annotation.XmlRootElement;
-import jakarta.xml.bind.annotation.XmlTransient;
-import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
-
 import org.hibernate.annotations.Formula;
 //import org.hibernate.annotations.Type;
 import org.jetbrains.annotations.NotNull;
@@ -39,6 +25,17 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.Lists;
 
+import jakarta.persistence.Cacheable;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import jakarta.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.bind.annotation.XmlTransient;
+import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import tak.server.Constants;
 
 /*

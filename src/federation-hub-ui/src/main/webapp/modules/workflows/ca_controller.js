@@ -28,6 +28,10 @@ function caController($rootScope, $scope, $state, $http, $stateParams, $modalIns
     };
 
     $scope.deleteGroupCa = function(uid) {
+        if (!confirm("Are you sure you want to delete this CA?")) {
+            return;
+        }
+
         $scope.knownCas = $scope.knownCas.filter(ca => ca.uid !== uid);
         if (JointPaper.paper &&  JointPaper.paper._views) {
             var nodeKeys = Object.keys(JointPaper.paper._views);

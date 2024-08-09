@@ -9,6 +9,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -560,7 +561,7 @@ public class FederationServer {
 					throw new IllegalArgumentException("client cert not available");
 				}
 
-				streamHolder = new GuardedStreamHolder<FederatedEvent>(clientStream, fedName, FederationUtils.getBytesSHA256(clientCertArray[0].getEncoded()), session, subscription, new Comparator<FederatedEvent>() {
+				streamHolder = new GuardedStreamHolder<FederatedEvent>(clientStream, fedName, FederationUtils.getBytesSHA256(clientCertArray[0].getEncoded()), new BigInteger(session.getId()).toString(), subscription, new Comparator<FederatedEvent>() {
 
 					@Override
 					public int compare(FederatedEvent a, FederatedEvent b) {
@@ -692,7 +693,7 @@ public class FederationServer {
 						clientStream,
 						clientName,
 						fedCertHash,
-						session,
+						new BigInteger(session.getId()).toString(),
 						subscription,
 						(ROL a, ROL b) -> ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result(), false);
 
@@ -1468,7 +1469,7 @@ public class FederationServer {
 						responseObserver,
 						clientName,
 						fedCertHash,
-						session,
+						new BigInteger(session.getId()).toString(),
 						subscription,
 						(FederateGroups a, FederateGroups b) -> ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result(), false);
 

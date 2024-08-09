@@ -2,8 +2,10 @@ package com.bbn.marti.sync.federation;
 
 import java.rmi.RemoteException;
 import java.util.NavigableSet;
+import java.util.UUID;
 
 import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.sync.service.MissionService;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
@@ -43,6 +45,9 @@ public class MissionFederationAspect {
 
 	@Autowired
 	private GroupManager gm;
+
+	@Autowired
+	private MissionService ms;
 
 	// If we were using AspectJ instead of Spring AOP - something like !adviceexecution() would avoid the stack tracing
 	// or name this pointcut and use !within(A)
@@ -238,8 +243,11 @@ public class MissionFederationAspect {
 				logger.debug("addMissionContent advice " + jp.getSignature().getName() + " " + jp.getKind());
 			}
 
+			Mission mission = ms.getMissionByGuidCheckGroups((UUID) jp.getArgs()[0], (String) jp.getArgs()[3]);
+			ms.validateMissionByGuid(mission);
+
 			// federated add mission content
-			mfm.addMissionContent((String) jp.getArgs()[0], (MissionContent) jp.getArgs()[1], (String) jp.getArgs()[2], gm.groupVectorToGroupSet((String) jp.getArgs()[3]));
+			mfm.addMissionContent(mission.getName(), (MissionContent) jp.getArgs()[1], (String) jp.getArgs()[2], gm.groupVectorToGroupSet((String) jp.getArgs()[3]));
 
 		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {
@@ -266,8 +274,11 @@ public class MissionFederationAspect {
 				logger.debug("addMissionContent advice " + jp.getSignature().getName() + " " + jp.getKind());
 			}
 
+			Mission mission = ms.getMissionByGuidCheckGroups((UUID) jp.getArgs()[0], (String) jp.getArgs()[3]);
+			ms.validateMissionByGuid(mission);
+
 			// federated add mission content
-			mfm.deleteMissionContent((String) jp.getArgs()[0], (String) jp.getArgs()[1], (String) jp.getArgs()[2], (String) jp.getArgs()[3], gm.groupVectorToGroupSet((String) jp.getArgs()[4]));
+			mfm.deleteMissionContent(mission.getName(), (String) jp.getArgs()[1], (String) jp.getArgs()[2], (String) jp.getArgs()[3], gm.groupVectorToGroupSet((String) jp.getArgs()[4]));
 
 		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {
@@ -294,8 +305,14 @@ public class MissionFederationAspect {
 				logger.debug("setParent advice " + jp.getSignature().getName() + " " + jp.getKind());
 			}
 
+			Mission childMission = ms.getMissionByGuidCheckGroups((UUID) jp.getArgs()[0], (String) jp.getArgs()[2]);
+			ms.validateMissionByGuid(childMission);
+
+			Mission parentMission = ms.getMissionByGuidCheckGroups((UUID) jp.getArgs()[1], (String) jp.getArgs()[2]);
+			ms.validateMissionByGuid(parentMission);
+
 			// federated add mission content
-			mfm.setParent((String) jp.getArgs()[0], (String) jp.getArgs()[1], gm.groupVectorToGroupSet((String) jp.getArgs()[2]));
+			mfm.setParent(childMission.getName(), parentMission.getName(), gm.groupVectorToGroupSet((String) jp.getArgs()[2]));
 
 		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {
@@ -322,8 +339,11 @@ public class MissionFederationAspect {
 				logger.debug("setParent advice " + jp.getSignature().getName() + " " + jp.getKind());
 			}
 
+			Mission childMission = ms.getMissionByGuidCheckGroups((UUID) jp.getArgs()[0], (String) jp.getArgs()[1]);
+			ms.validateMissionByGuid(childMission);
+
 			// federated clear mission parent
-			mfm.clearParent((String) jp.getArgs()[0], gm.groupVectorToGroupSet((String) jp.getArgs()[1]));
+			mfm.clearParent(childMission.getName(), gm.groupVectorToGroupSet((String) jp.getArgs()[1]));
 
 		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {

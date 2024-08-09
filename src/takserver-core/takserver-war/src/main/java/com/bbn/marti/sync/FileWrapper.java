@@ -1,5 +1,6 @@
 package com.bbn.marti.sync;
 
+import java.io.InputStream;
 import java.io.Serializable;
 import java.util.Arrays;
 
@@ -12,6 +13,7 @@ public class FileWrapper implements Serializable {
 	String hash;
 	String uid;
 	String groupVector;
+	InputStream inputStream;
 	
 	public byte[] getContents() {
 		return contents;
@@ -36,6 +38,13 @@ public class FileWrapper implements Serializable {
 	}
 	public void setGroupVector(String groupVector) {
 		this.groupVector = groupVector;
+	}
+	
+	public InputStream getInputStream() {
+		return inputStream;
+	}
+	public void setInputStream(InputStream inputStream) {
+		this.inputStream = inputStream;
 	}
 	@Override
 	public String toString() {

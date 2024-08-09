@@ -1,5 +1,6 @@
 package tak.server.federation.hub.ui;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
@@ -15,6 +16,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import org.owasp.esapi.Validator;
 import org.slf4j.Logger;
@@ -62,8 +64,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import tak.server.federation.FederateGroup;
 import tak.server.federation.FederationException;
 import tak.server.federation.FederationPolicyGraph;
+import tak.server.federation.hub.FederationHubUtils;
+import tak.server.federation.hub.FedhubJwtUtils;
 import tak.server.federation.hub.broker.FederationHubBroker;
 import tak.server.federation.hub.broker.FederationHubBrokerMetrics;
+import tak.server.federation.hub.broker.FederationHubServerConfig;
 import tak.server.federation.hub.broker.HubConnectionInfo;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
 import tak.server.federation.hub.policy.FederationPolicy;
@@ -71,8 +76,11 @@ import tak.server.federation.hub.ui.graph.EdgeFilter;
 import tak.server.federation.hub.ui.graph.FederateCell;
 import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
 import tak.server.federation.hub.ui.graph.FederationPolicyModel;
+import tak.server.federation.hub.ui.graph.FederationTokenGroupCell;
 import tak.server.federation.hub.ui.graph.FilterUtils;
 import tak.server.federation.hub.ui.graph.GroupCell;
+import tak.server.federation.hub.ui.graph.JwtTokenRequestModel;
+import tak.server.federation.hub.ui.graph.JwtTokenResponseModel;
 import tak.server.federation.hub.ui.jwt.AuthRequest;
 import tak.server.federation.hub.ui.jwt.AuthResponse;
 import tak.server.federation.hub.ui.keycloak.AuthCookieUtils;
@@ -249,6 +257,32 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
     }
+    
+	@RequestMapping(value = "/fig/generateJwtToken", method = RequestMethod.POST)
+	public ResponseEntity<JwtTokenResponseModel> generateJwtToken(@RequestBody JwtTokenRequestModel tokenRequest) {
+		try {
+			String token = FedhubJwtUtils.getInstance(fedHubConfig).createToken(tokenRequest.getClientFingerprint(),
+					tokenRequest.getClientGroup(), tokenRequest.getExpiration());
+
+			JwtTokenResponseModel response = new JwtTokenResponseModel();
+			response.setToken(token);
+			
+			return new ResponseEntity<>(response, new HttpHeaders(), HttpStatus.OK);
+		} catch (Exception e) {
+			logger.error("error with generateJwtToken", e);
+			return new ResponseEntity<>(new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+	}
+    
+    @RequestMapping(value="/fig/allowFlowIndicators", method=RequestMethod.GET)
+	public ResponseEntity<Boolean> isAllowFlowIndicators() {
+		try {
+		    return new ResponseEntity<>(fedHubConfig.isEnableFlowIndicators() ,new HttpHeaders(), HttpStatus.OK);
+		} catch (Exception e) {
+			logger.error("error with isAllowFlowIndicators", e);
+			return new ResponseEntity<>(new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+	}
 
     @RequestMapping(value = "/fig/saveFederation", method = RequestMethod.POST)
     @ResponseBody
@@ -404,6 +438,10 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
     				FederationOutgoingCell oCell = (FederationOutgoingCell) cell;
     				groupsForNode.addAll(fedHubBroker.getGroupsForNode(oCell.getProperties().getName()));
     			}
+                if (cell instanceof FederationTokenGroupCell) {
+                    FederationTokenGroupCell tCell = (FederationTokenGroupCell) cell;
+                    groupsForNode.addAll(fedHubBroker.getGroupsForNode(tCell.getProperties().getName()));
+                }
     		}
     	});
 
@@ -487,6 +525,77 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
     		 return new ResponseEntity<byte[]>(new HttpHeaders(), HttpStatus.BAD_REQUEST);
 		}
     }
+    
+    @RequestMapping(value = "/fig/getBrokerConfig", method = RequestMethod.GET)
+	public ResponseEntity<FederationHubServerConfig> addFederateGroup() {
+        return new ResponseEntity<FederationHubServerConfig>(fedHubBroker.getFederationHubBrokerConfig(), new HttpHeaders(), HttpStatus.OK);
+    }
+    
+    @RequestMapping(value = "/fig/updateBrokerConfig", method = RequestMethod.POST)
+   	public ResponseEntity<FederationHubServerConfig> updateBrokerConfig(@RequestBody FederationHubServerConfig brokerConfig) {
+    	return new ResponseEntity<FederationHubServerConfig>(fedHubBroker.saveFederationHubServerConfig(brokerConfig), new HttpHeaders(), HttpStatus.OK);
+    }
+    
+    @RequestMapping(value="/fig/restartBroker", method=RequestMethod.GET)
+	public ResponseEntity<Void> serverRestart() {
+		try {		
+			logger.info("Restarting Broker Service");
+
+			killBrokerProcess();
+			
+		    // start
+		    String startCmd= "./federation-hub-broker.sh &> /opt/tak/federation-hub/logs/federation-hub-broker-console.log &";
+			String[] startCmds = new String[] {"bash", "-c", startCmd};
+			
+			ProcessBuilder startProcessBuilder = new ProcessBuilder(startCmds);
+			startProcessBuilder.directory(new File("/opt/tak/federation-hub/scripts"));
+		    Process startProcess = startProcessBuilder.start();
+		    
+		    startProcess.waitFor();
+		    
+		    canAccessBrokerProcess().get();
+		    logger.info("Federation Hub Broker is available");
+		    
+		    return new ResponseEntity<>(new HttpHeaders(), HttpStatus.OK);
+		} catch (Exception e) {
+			logger.error("error with restartBroker", e);
+			return new ResponseEntity<>(new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+	}
+    
+    private void killBrokerProcess() {
+    	try {
+    		String killCmd = "pkill -9 -f \"federation-hub-broker\"";
+			String[] killCmds = new String[] {"bash", "-c", killCmd};
+			
+			ProcessBuilder killProcessBuilder = new ProcessBuilder(killCmds);
+			killProcessBuilder.directory(new File("/opt/tak/federation-hub/scripts"));
+		    Process killProcess = killProcessBuilder.start();
+		   
+		    killProcess.waitFor();
+    	} catch (Exception e) {
+    		logger.error("error with killBrokerProcess", e);
+		}
+    }
+    
+    private boolean canAccessBrokerProcessServices() throws Exception {
+    	fedHubBroker.getActiveConnections();
+		return true;
+	}
+    
+    private CompletableFuture<Boolean> canAccessBrokerProcess() {
+		try {
+			logger.info("Waiting for the Broker process...");
+			return CompletableFuture.completedFuture(canAccessBrokerProcessServices());
+		} catch (Exception e) {
+			try {
+				Thread.sleep(1000L);
+			} catch (InterruptedException e1) {
+				logger.error("interruped sleep", e1);
+			}
+			return canAccessBrokerProcess();
+		}
+	}
 
     private String sha256(String input) throws UnsupportedEncodingException, NoSuchAlgorithmException {
         byte[] bytes = input.getBytes("US-ASCII");
@@ -518,6 +627,14 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
     }
 
     private List<RemoteGroup> federateGroupsToGroupHolders(Collection<FederateGroup> groups) {
+    	X509Certificate selfCa = null;
+    	try {
+        	byte[] selfCaB = fedHubBroker.getSelfCaFile();
+        	selfCa = FederationHubUtils.loadX509CertFromBytes(selfCaB);
+		} catch (Exception e) {
+			logger.error("error computing self ca", e);
+		}
+    	    	
     	Map<String, X509Certificate> cas = fedHubBroker.getCAsFromFile();
         List<RemoteGroup> groupList = new LinkedList<>();
         for (FederateGroup group : groups) {
@@ -529,6 +646,7 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
             	X509Certificate ca = cas.get(fedId);
             	remoteGroup.setIssuer(ca.getIssuerX500Principal().getName());
             	remoteGroup.setSubject(ca.getSubjectX500Principal().getName());
+            	remoteGroup.setIsHubGroup(ca.equals(selfCa));
             }
 
             groupList.add(remoteGroup);
@@ -540,7 +658,8 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
     	private String uid;
     	private String issuer;
     	private String subject;
-
+    	private boolean isHubGroup = false;
+    	
     	public String getUid() {
 			return uid;
 		}
@@ -559,7 +678,11 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
 		public void setSubject(String subject) {
 			this.subject = subject;
 		}
-
-
+		public boolean isHubGroup() {
+			return isHubGroup;
+		}
+		public void setIsHubGroup(boolean isHubGroup) {
+			this.isHubGroup = isHubGroup;
+		}
     }
 }

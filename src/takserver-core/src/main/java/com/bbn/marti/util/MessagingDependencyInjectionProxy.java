@@ -49,7 +49,7 @@ import tak.server.qos.QoSManager;
 public class MessagingDependencyInjectionProxy implements ApplicationContextAware {
 	private static ApplicationContext springContext;
 
-	private static MessagingDependencyInjectionProxy instance = null;
+	private volatile static MessagingDependencyInjectionProxy instance = null;
 
 	public static MessagingDependencyInjectionProxy getInstance() {
 		if (instance == null) {
@@ -73,7 +73,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		this.springContext = context;
 	}
 
-	private GroupManager groupManager = null;
+	private volatile GroupManager groupManager = null;
 
 	public GroupManager groupManager() {
 		if (groupManager == null) {
@@ -87,7 +87,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return groupManager;
 	}
 
-	private GroupDao groupDao = null;
+	private volatile GroupDao groupDao = null;
 
 	public GroupDao groupDao() {
 		if (groupDao == null) {
@@ -101,7 +101,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return groupDao;
 	}
 
-	private GroupStore groupStore = null;
+	private volatile GroupStore groupStore = null;
 
 	public GroupStore groupStore() {
 		if (groupStore == null) {
@@ -115,7 +115,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return groupStore;
 	}
 
-	private CoreConfig coreConfig = null;
+	private volatile CoreConfig coreConfig = null;
 
 	public CoreConfig coreConfig() {
 		if (coreConfig == null) {
@@ -129,7 +129,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return coreConfig;
 	}
 
-	private CoreConfig simpleCoreConfig = null;
+	private volatile CoreConfig simpleCoreConfig = null;
 
 	public CoreConfig simpleCoreConfig() {
 		if (simpleCoreConfig == null) {
@@ -143,7 +143,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return simpleCoreConfig;
 	}
 
-	private SubscriptionStore subStore = null;
+	private volatile SubscriptionStore subStore = null;
 
 	public SubscriptionStore subscriptionStore() {
 		if (subStore == null) {
@@ -157,7 +157,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return subStore;
 	}
 
-	private MissionSubscriptionRepository msr = null;
+	private volatile MissionSubscriptionRepository msr = null;
 
 	public MissionSubscriptionRepository missionSubscriptionRepository() {
 		if (msr == null) {
@@ -171,7 +171,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return msr;
 	}
 
-	private SubmissionService submissionService = null;
+	private volatile SubmissionService submissionService = null;
 
 	public SubmissionService submissionService() {
 		if (submissionService == null) {
@@ -185,7 +185,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return submissionService;
 	}
 
-	private ContactManager contactManager = null;
+	private volatile ContactManager contactManager = null;
 
 	public ContactManager contactManager() {
 		if (contactManager == null) {
@@ -199,7 +199,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return contactManager;
 	}
 
-	private RepeaterStore repeaterStore = null;
+	private volatile RepeaterStore repeaterStore = null;
 
 	public RepeaterStore repeaterStore() {
 		if (repeaterStore == null) {
@@ -213,7 +213,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return repeaterStore;
 	}
 
-	private MissionService missionService = null;
+	private volatile MissionService missionService = null;
 
 	public MissionService missionService() {
 		if (missionService == null) {
@@ -227,7 +227,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return missionService;
 	}
 
-	private FileAuthenticator fileAuthenticator = null;
+	private volatile FileAuthenticator fileAuthenticator = null;
 
 	public FileAuthenticator fileAuthenticator() {
 		if (fileAuthenticator  == null) {
@@ -241,7 +241,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return fileAuthenticator;
 	}
 
-	private NioNettyBuilder nioNettyBuilder = null;
+	private volatile NioNettyBuilder nioNettyBuilder = null;
 
 	public NioNettyBuilder nioNettyBuilder() {
 		if (nioNettyBuilder == null) {
@@ -255,7 +255,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return nioNettyBuilder;
 	}
 	
-	private Messenger<CotEventContainer> cotMessenger = null;
+	private volatile Messenger<CotEventContainer> cotMessenger = null;
 
 	@SuppressWarnings("unchecked")
 	public Messenger<CotEventContainer> cotMessenger() {
@@ -270,7 +270,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return cotMessenger;
 	}
 
-	private ClusterManager clusterManager = null;
+	private volatile ClusterManager clusterManager = null;
 
 	public ClusterManager clusterManager() {
 		if (!coreConfig().getRemoteConfiguration().getCluster().isEnabled()) return null;
@@ -286,7 +286,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return clusterManager;
 	}
 
-	private FederationEventRepository fedEventRepo = null;
+	private volatile FederationEventRepository fedEventRepo = null;
 
 	private Object fedEventRepoLock = new Object();
 
@@ -303,7 +303,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return fedEventRepo;
 	}
 
-	private ServerInfo serverInfo = null;
+	private volatile ServerInfo serverInfo = null;
 
 	public ServerInfo serverInfo() {
 
@@ -318,7 +318,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return serverInfo;
 	}
 
-	private MessageDeliveryStrategy mds = null;
+	private volatile MessageDeliveryStrategy mds = null;
 
 	public MessageDeliveryStrategy mds() {
 
@@ -333,7 +333,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return mds;
 	}
 
-	private MessageReadStrategy mrs = null;
+	private volatile MessageReadStrategy mrs = null;
 
 	public MessageReadStrategy mrs() {
 
@@ -348,7 +348,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return mrs;
 	}
 
-	private MessageDOSStrategy mdoss = null;
+	private volatile MessageDOSStrategy mdoss = null;
 
 	public MessageDOSStrategy mdoss() {
 
@@ -401,7 +401,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return aep;
 	}
 
-	private DataFeedRepository dataFeedRepository = null;
+	private volatile DataFeedRepository dataFeedRepository = null;
 
 	public DataFeedRepository dataFeedRepository() {
 		if (dataFeedRepository == null) {
@@ -415,7 +415,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return dataFeedRepository;
 	}
 
-	private EnterpriseSyncService esyncService = null;
+	private volatile EnterpriseSyncService esyncService = null;
 
 	public EnterpriseSyncService esyncService() {
 		if (esyncService == null) {
@@ -428,7 +428,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return esyncService;
 	}
 
-	private MissionRepository missionRepository = null;
+	private volatile MissionRepository missionRepository = null;
 
 	public MissionRepository missionRepository() {
 		if (missionRepository == null) {
@@ -442,7 +442,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return missionRepository;
 	}
 
-	private SubscriptionManagerLite subscriptionManagerLite = null;
+	private volatile SubscriptionManagerLite subscriptionManagerLite = null;
 
 	public SubscriptionManagerLite subscriptionManagerLite() {
 		if (subscriptionManagerLite == null) {
@@ -456,7 +456,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return subscriptionManagerLite;
 	}
 
-	private MissionRoleRepository missionRoleRepository = null;
+	private volatile MissionRoleRepository missionRoleRepository = null;
 
 	public MissionRoleRepository missionRoleRepository() {
 		if (missionRoleRepository == null) {
@@ -469,7 +469,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return missionRoleRepository;
 	}
 
-	private DatafeedCacheHelper pluginDatafeedCacheHelper = null;
+	private volatile DatafeedCacheHelper pluginDatafeedCacheHelper = null;
 
 	public DatafeedCacheHelper pluginDatafeedCacheHelper() {
 		if (pluginDatafeedCacheHelper == null) {
@@ -482,7 +482,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return pluginDatafeedCacheHelper;
 	}
 
-	private PluginDataFeedJdbc pluginDataFeedJdbc = null;
+	private volatile PluginDataFeedJdbc pluginDataFeedJdbc = null;
 
 	public PluginDataFeedJdbc pluginDataFeedJdbc() {
 		if (pluginDataFeedJdbc == null) {
@@ -495,7 +495,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return pluginDataFeedJdbc;
 	}
 
-	private RemoteUtil remoteUtil = null;
+	private volatile RemoteUtil remoteUtil = null;
 
 	public RemoteUtil remoteUtil() {
 		if (remoteUtil == null) {

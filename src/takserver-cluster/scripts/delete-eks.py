@@ -10,6 +10,13 @@ import fileinput
 import hashlib
 import xml.etree.ElementTree
 
+
+if 'TAK_DEPLOYMENT_TARGET' in os.environ and os.environ['TAK_DEPLOYMENT_TARGET'] != 'aws':
+	print(f'TAK_DEPLOYMENT_TARGET is not set to "aws"! Ensure all required variables are set in cluster-properties ' +
+		  'and it has been sourced prior to running this script!')
+	exit(1)
+
+
 # AWS CREDS
 AWS_ACCESS_KEY_ID = os.environ['AWS_ACCESS_KEY_ID']
 AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']

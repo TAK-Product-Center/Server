@@ -1,10 +1,27 @@
 package tak.server.federation.hub;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+
+import javax.naming.InvalidNameException;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 
 import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.configuration.ClientConnectorConfiguration;
@@ -17,6 +34,7 @@ import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.bbn.roger.fig.FederationUtils;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -124,4 +142,111 @@ public class FederationHubUtils {
 		return new ObjectMapper(new YAMLFactory()).readValue(new FileInputStream(configFile),
 				FederationHubIgniteConfig.class);
 	}
+	
+    public static String getCN(String dn) throws RuntimeException {
+        if (Strings.isNullOrEmpty(dn)) {
+            throw new IllegalArgumentException("empty DN");
+        }
+
+        try {
+            LdapName ldapName = new LdapName(dn);
+
+            for (Rdn rdn : ldapName.getRdns()) {
+                if (rdn.getType().equalsIgnoreCase("CN")) {
+                    return rdn.getValue().toString();
+                }
+            }
+
+            throw new RuntimeException("No CN found in DN: " + dn);
+        } catch (InvalidNameException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
+	public static X509Certificate loadX509CertFromBytes(byte[] cert) throws CertificateException, IOException {
+
+		if (cert == null) {
+			throw new IllegalArgumentException("empty cert");
+		}
+
+		CertificateFactory cf = CertificateFactory.getInstance("X.509");
+
+		InputStream is = new ByteArrayInputStream(cert);
+		try {
+			return (X509Certificate) cf.generateCertificate(is);
+		} finally {
+			is.close();
+		}
+	}
+
+	public static X509Certificate loadX509CertFile(String caFilename) throws CertificateException, IOException {
+
+		if (Strings.isNullOrEmpty(caFilename)) {
+			throw new IllegalArgumentException("empty ca file name");
+		}
+
+		CertificateFactory cf = CertificateFactory.getInstance("X.509");
+
+		InputStream is = new FileInputStream(caFilename);
+		try {
+			return (X509Certificate) cf.generateCertificate(is);
+		} finally {
+			is.close();
+		}
+	}
+    
+    public static List<X509Certificate> verifyTrustedClientCert(TrustManagerFactory tmf, X509Certificate clientCert) {
+    	List<X509Certificate> signingCa = new ArrayList<>();
+    	for (TrustManager trustManager : tmf.getTrustManagers()) {
+			if (trustManager instanceof X509TrustManager) {
+				try {
+					X509TrustManager x509TrustManager = (X509TrustManager) trustManager;
+					
+					// first validate and check if client certificate is trusted
+					x509TrustManager.checkClientTrusted(new X509Certificate[] { clientCert }, "RSA");
+
+					// next find the CA(s) that signed the client certificate
+					for (X509Certificate trustedCa : x509TrustManager.getAcceptedIssuers()) {
+						try {
+							clientCert.verify(trustedCa.getPublicKey());
+							signingCa.add(trustedCa);
+						} catch (Exception e) {}
+					}
+				} catch (Exception e) {}
+			}
+		}
+    	return signingCa;
+    }
+    
+    public static List<String> getCaGroupIdsFromCerts(Certificate[] peerCertificates) {
+    	List<String> caCertGroups = new LinkedList<>();
+		/*
+		 * The cert array returned by gRPC's SSLSession is padded with null entries.
+		 * This loop adds all certs in the array from index 1 (index 0 is the peer's
+		 * cert, index 1+ are CA certs) til the first null entry (the start of the
+		 * padding) to a list of CA certs.
+		 */
+		for (int i = 1; i < peerCertificates.length; i++) {
+			if (peerCertificates[i] == null) {
+				break;
+			}
+			
+			X509Certificate caCert = ((X509Certificate) peerCertificates[i]);
+    		caCertGroups.add(getCaGroupIdFromCert(caCert));
+		}
+		return caCertGroups;
+    }
+    
+    public static String getCaGroupIdFromCert(X509Certificate caCert) {
+    	try {
+    		String fingerprint = FederationUtils.getBytesSHA256(caCert.getEncoded());
+    		String issuerDN = caCert.getIssuerX500Principal().getName();
+    		String issuerCN = Optional.ofNullable(getCN(issuerDN)).map(cn -> cn.toLowerCase()).orElse("");
+    		
+    		return issuerDN + "-" + fingerprint;
+    	} catch (Exception e) {
+    		logger.error("getCaGroupIdFromCert error", e);
+    		return null;
+		}
+    }
 }

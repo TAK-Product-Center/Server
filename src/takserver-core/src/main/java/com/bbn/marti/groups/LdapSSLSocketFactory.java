@@ -77,6 +77,11 @@ public class LdapSSLSocketFactory extends SSLSocketFactory {
     }
 
     @Override
+    public Socket createSocket() throws IOException {
+        return socketFactory.createSocket();
+    }
+
+    @Override
     public Socket createSocket(Socket socket, String host, int port, boolean autoClose) throws IOException {
         return socketFactory.createSocket(socket, host, port, autoClose);
     }
