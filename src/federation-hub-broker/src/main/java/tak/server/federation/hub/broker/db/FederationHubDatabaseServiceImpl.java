@@ -2,7 +2,6 @@ package tak.server.federation.hub.broker.db;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.security.cert.Certificate;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
@@ -60,7 +59,7 @@ public class FederationHubDatabaseServiceImpl implements FederationHubDatabaseSe
 				if (!isDBConnected())
 					return;
 				
-				long retentionDays = FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfig().getMissionFederationDBRetentionDays();
+				long retentionDays = FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager().getConfig().getMissionFederationDBRetentionDays();
 				
 				// delete expired events based on received_time
 				Bson receivedTimeFilter = Filters.lt("received_time", new Date(Instant.now().toEpochMilli() - retentionDays*24*60*60 * 1000));
@@ -166,7 +165,7 @@ public class FederationHubDatabaseServiceImpl implements FederationHubDatabaseSe
              try (GridFSDownloadStream downloadStream = resourceCollection().openDownloadStream(resourceObjectId)) {
                  int fileLength = (int) downloadStream.getGridFSFile().getLength();
                  
-     			long maxSizeBytes = FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfig().getMissionFederationDisruptionMaxFileSizeBytes();
+     			long maxSizeBytes = FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager().getConfig().getMissionFederationDisruptionMaxFileSizeBytes();
     			if (fileLength > maxSizeBytes) {
     				logger.info("File size of " + fileLength + " exceeds config limit of " + maxSizeBytes + "MB. Skipping " + downloadStream.getGridFSFile().getMetadata());
     				return null;
@@ -215,23 +214,15 @@ public class FederationHubDatabaseServiceImpl implements FederationHubDatabaseSe
 
 	@Override
 	@CachePut(value = "federate_metadata", key = "{#root.args[0]}")
-	public Document addFederateMetadata(String id, Certificate[] certificates) {
+	public Document addFederateMetadata(String id, List<String> clientGroups) {
 		if (!isDBConnected())
 			return null;
 		
         try {
-        	List<byte[]> binaryCerts = new ArrayList<>();
-        	for (int i = 1; i < certificates.length; i++) {
-        		if (certificates[i] == null) {
-                    break;
-                }
-        		binaryCerts.add(certificates[i].getEncoded());
-        	}
-        	
         	Bson filter = Filters.eq("federate_id", id);
         	Bson update = Updates.combine(
         			Updates.set("federate_id", id), 
-        			Updates.set("cert_array", binaryCerts), 
+        			Updates.set("client_groups", clientGroups), 
         			Updates.set("last_update", Instant.now()));
         	
         	UpdateOptions options = new UpdateOptions().upsert(true);

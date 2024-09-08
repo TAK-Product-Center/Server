@@ -240,13 +240,13 @@ public class DistributedPluginManager implements PluginManager, Service {
     }
 
     @Override
-    public PluginResponse requestDataFromPlugin(String pluginClassName, Map<String, String> allRequestParams, String contentType) {
+    public PluginResponse requestDataFromPlugin(String pluginClassName, Map<String, String> allRequestParams, String accept) {
         if (Strings.isNullOrEmpty(pluginClassName)) {
             throw new IllegalArgumentException("plugin class name is empty");
         }
 
-        if (Strings.isNullOrEmpty(contentType)) {
-            throw new IllegalArgumentException("content type must be specified");
+        if (Strings.isNullOrEmpty(accept)) {
+            throw new IllegalArgumentException("accept must be specified");
         }
 
         AtomicInteger pluginDataRequestCounter = new AtomicInteger();
@@ -259,7 +259,7 @@ public class DistributedPluginManager implements PluginManager, Service {
 
         PluginResponse result = new PluginResponse();
         for (PluginLifecycle plugin : plugins) {
-            result = plugin.onRequestData(allRequestParams, contentType);
+            result = plugin.onRequestData(allRequestParams, accept);
             pluginDataRequestCounter.incrementAndGet();
         }
 

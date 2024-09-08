@@ -88,6 +88,14 @@ public class OutgoingConnectionSummary implements Serializable {
     public void setReconnectInterval(Integer value) {
         this.outgoingConnection.setReconnectInterval(value);
     }
+    
+    public String getConnectionToken() {
+        return outgoingConnection.getConnectionToken();
+    }
+
+    public void setConnectionToken(String value) {
+        this.outgoingConnection.getConnectionToken();
+    }
 
     public ConnectionInfoSummary getConnectionInfoSummary() {
 	return connectionInfoSummary;

@@ -20,13 +20,15 @@
 
 set -e
 
-if [[ ! -f 'artifacts-master.zip' ]];then
+if [[ ! -f 'artifacts-master.zip' ]] && [[ ! -d 'UNSIGNED-master' ]];then
 	echo Please copy or symlink the reference artifacts.zip produced from the signing of a recent master CI build to artifacts-master.zip!
+	echo Optionally move a locally built 'UNSIGNED' directory to UNSIGNED-master.
 	exit 1
 fi
 
-if [[ ! -f 'artifacts-modified.zip' ]];then
+if [[ ! -f 'artifacts-modified.zip' ]] && [[ ! -d 'UNSIGNED-modified' ]];then
 	echo Please copy or symlink the artifacts.zip produced from the signing of a modified branch freom the CI to artifacts-modified.zip!
+	echo Optionally move a locally built 'UNSIGNED' directory to UNSIGNED-modified.
 	exit 1
 fi
 
@@ -48,11 +50,18 @@ fi
 
 extractArtifacts() {
 	identifier=${1}
+
 	targetDir="${PWD}/artifacts-${identifier}"
 	mkdir "${targetDir}"
 
-	unzip artifacts-${identifier}.zip -d artifacts-${identifier}-tmp
-	pushd "artifacts-${identifier}-tmp/SIGNED/$(ls artifacts-${identifier}-tmp/SIGNED)"
+  if [[ -f "artifacts-${identifier}.zip" ]];then
+    unzip artifacts-${identifier}.zip -d artifacts-${identifier}-tmp
+	  pushd "artifacts-${identifier}-tmp/UNSIGNED/$(ls artifacts-${identifier}-tmp/UNSIGNED)"
+
+  elif [[ -d "UNSIGNED-${identifier}" ]];then
+    version=$(ls "UNSIGNED-${identifier}/")
+    pushd "UNSIGNED-${identifier}/${version}"
+  fi
 
 	for filename in ./*;do
 		if [[ "${filename}" == *.deb ]];then
@@ -108,8 +117,10 @@ extractArtifacts() {
 		fi
 	done
     popd
-	rm -r artifacts-${identifier}-tmp
+  if [[ -d "artifacts-${identifier}-tmp" ]];then
+  	rm -r artifacts-${identifier}-tmp
+  fi
 }
 
-extractArtifacts master
+#extractArtifacts master
 extractArtifacts modified

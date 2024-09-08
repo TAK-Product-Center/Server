@@ -103,6 +103,7 @@ import com.bbn.roger.fig.FederationUtils;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.google.common.collect.SortedSetMultimap;
 import com.google.common.collect.TreeMultimap;
 import com.google.protobuf.ByteString;
@@ -1188,7 +1189,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 			}
 			return;
 		}
-
+		
 		FederatedSubscriptionManager fedSubManager = SubscriptionStore.getInstanceFederatedSubscriptionManager();
 		if (fedSubManager == null) {
 			String errorMessage = "FedSubManager is null";
@@ -1275,6 +1276,8 @@ public class DistributedFederationManager implements FederationManager, Service 
 				saveOutgoing(outgoing, false);
 			}
 			fedSubManager.updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
+			SubscriptionStore.getInstanceFederatedSubscriptionManager()
+				.getAndPutFederateOutgoingStatus(outgoing.getDisplayName(), status);
 		}
 	}
 
@@ -1322,7 +1325,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@Override
 	public synchronized void addOutgoingConnection(String name, String host, int port, int reconnect, int maxRetries,
-			boolean unlimitedRetries, boolean enable, int protocolVersion, String fallback) {
+			boolean unlimitedRetries, boolean enable, int protocolVersion, String fallback, String token) {
 
 		// check for dupes by name in the cache
 		if (SubscriptionStore.getInstanceFederatedSubscriptionManager().getCachedFederationConnectionStatus(name) != null) {
@@ -1343,6 +1346,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 		outgoing.setFallback(fallback);
 		outgoing.setMaxRetries(maxRetries);
 		outgoing.setUnlimitedRetries(unlimitedRetries);
+		outgoing.setConnectionToken(token);
 
 		Federation federationConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
@@ -1372,7 +1376,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	}
 
 	@Override
-	public synchronized void updateOutgoingConnection(Federation.FederationOutgoing original, Federation.FederationOutgoing update) {
+	public synchronized void updateOutgoingConnection(Federation.FederationOutgoing original, Federation.FederationOutgoing update) {		
 		boolean wasNameChange = false;
 
 		// if the name is being updated, make sure the new name isn't taken
@@ -1390,9 +1394,22 @@ public class DistributedFederationManager implements FederationManager, Service 
 				throw new DuplicateFederateException("outgoing for " + update.getAddress() + ", " + update.getPort() + " already exists");
 			}
 		}
+		
+		// clear old
+		disableOutgoing(original);
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().removeOutgoingNumRetries(original.getDisplayName());
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().removeOutgoingRetryScheduled(original.getDisplayName());
+		
+		// add new
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingNumRetries(update.getDisplayName());
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingRetryScheduled(update.getDisplayName());
+		
+		// remove references to old name
+		if (wasNameChange) {
+			SubscriptionStore.getInstanceFederatedSubscriptionManager().removeFederateOutgoingStatus(original.getDisplayName());
+		}
 
 		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
-
 		for (Federation.FederationOutgoing f : config.getFederation().getFederationOutgoing()) {
 			if (f.getDisplayName().compareTo(original.getDisplayName()) == 0) {
 
@@ -1407,56 +1424,21 @@ public class DistributedFederationManager implements FederationManager, Service 
 				f.setFallback(update.getFallback());
 				f.setMaxRetries(update.getMaxRetries());
 				f.setUnlimitedRetries(update.isUnlimitedRetries());
-
+				f.setConnectionToken(update.getConnectionToken());
+				
 				CoreConfigFacade.getInstance().setAndSaveFederation(federationConfig);
 
 				break;
 			}
 		}
-
-		// clear old
-		SubscriptionStore.getInstanceFederatedSubscriptionManager().removeOutgoingNumRetries(original.getDisplayName());
-		SubscriptionStore.getInstanceFederatedSubscriptionManager().removeOutgoingRetryScheduled(original.getDisplayName());
-
-		// add new
-		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingNumRetries(update.getDisplayName());
-		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingRetryScheduled(update.getDisplayName());
-
-		// if the original and the updated are disabled, just update cache incase the name changed
-		if (!original.isEnabled() && !update.isEnabled()) {
-			ConnectionStatus status = new ConnectionStatus(ConnectionStatusValue.DISABLED);
-			SubscriptionStore.getInstanceFederatedSubscriptionManager().getAndPutFederateOutgoingStatus(update.getDisplayName(), status);
-		}
-		// if the original was enabled and the updated is disabled, nothing to do other than disable
-		else if (original.isEnabled() && !update.isEnabled()) {
-			// disable the original outgoing connection
-			disableOutgoing(original);
-		}
-		// if the original was disabled and the updated is enabled, initiate the outgoing
-		else if (!original.isEnabled() && update.isEnabled()) {
+		
+		if (update.isEnabled()) {
 			ConnectionStatus status = new ConnectionStatus(ConnectionStatusValue.CONNECTING);
 			SubscriptionStore.getInstanceFederatedSubscriptionManager().getAndPutFederateOutgoingStatus(update.getDisplayName(), status);
 			initiateOutgoing(update, status);
-		}
-		// if the display name, address, port or protocol version has changed, we need to restart the connection
-		// otherwise we can just update the config and keep it connected
-		else if (original.isEnabled() && update.isEnabled()) {
-			if (!original.getDisplayName().equals(update.getDisplayName()) || !original.getPort().equals(update.getPort()) ||
-					!original.getAddress().equals(update.getAddress()) || original.getProtocolVersion() != update.getProtocolVersion()) {
-
-				// disable the original outgoing connection
-				disableOutgoing(original);
-
-				// re-enable with the new outgoing connection
-				ConnectionStatus status = new ConnectionStatus(ConnectionStatusValue.CONNECTING);
-				SubscriptionStore.getInstanceFederatedSubscriptionManager().getAndPutFederateOutgoingStatus(update.getDisplayName(), status);
-				initiateOutgoing(update, status);
-			}
-		}
-
-		// remove references to old name
-		if (wasNameChange) {
-			SubscriptionStore.getInstanceFederatedSubscriptionManager().removeFederateOutgoingStatus(original.getDisplayName());
+		} else {
+			ConnectionStatus status = new ConnectionStatus(ConnectionStatusValue.DISABLED);
+			SubscriptionStore.getInstanceFederatedSubscriptionManager().getAndPutFederateOutgoingStatus(update.getDisplayName(), status);
 		}
 	}
 
@@ -2044,6 +2026,59 @@ public class DistributedFederationManager implements FederationManager, Service 
 		}
 	}
 
+	public void addPluginContact(CotEventContainer cot, Set<Group> groups) {
+		try {
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("federation manager add plugin contact " + cot.asXml());
+			}
+
+			// prevent NullPointerExceptions from getting thrown by the msg builder
+			if (cot.getCallsign() == null || cot.getEndpoint() == null || cot.getUid() == null) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("null callsign or uid in FederationManager.addPluginContact " + cot.asXml());
+				}
+				return;
+			}
+
+			// build up a new contact to send
+			ContactListEntry newContact = ContactListEntry.newBuilder()
+					.setCallsign(cot.getCallsign())
+					.setUid(cot.getUid())
+					.setOperation(CRUD.CREATE)
+					.build();
+
+			// get the IN group names for the plugin contacts
+			Set<String> contactGroupNames = groups
+					.stream().filter(g -> g.getDirection() == Direction.IN)
+					.map(g -> g.getName()).collect(Collectors.toSet());
+
+			// iterate across federation subscriptions
+			for (FederateSubscription destSub : SubscriptionStore.getInstanceFederatedSubscriptionManager()
+					.getFederateSubscriptions()) {
+
+				// get the OUT group names for the federation subscriptions
+				Set<String> destSubGroupNames = groupManager().getGroups(destSub.getUser())
+						.stream().filter(g -> g.getDirection() == Direction.OUT)
+						.map(g -> g.getName()).collect(Collectors.toSet());
+				Sets.SetView<String> commonGroupNames = Sets.intersection(contactGroupNames, destSubGroupNames);
+
+				// skip this federation if no OUT groups in common with the contact
+				if (commonGroupNames.size() == 0) {
+					continue;
+				}
+
+				// apply the common groups to the federated contact event and send it
+				FederatedEvent f = FederatedEvent.newBuilder().setContact(newContact).
+						addAllFederateGroups(commonGroupNames).build();
+				destSub.submitLocalContact(f, System.currentTimeMillis());
+			}
+
+		} catch (Exception e) {
+			logger.error("exception in addPluginContact", e);
+		}
+	}
+
 	public void addLocalContact(CotEventContainer cot, ChannelHandler src) {
 
 		if (logger.isDebugEnabled()) {
@@ -2164,11 +2199,14 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 			Resources.fedReconnectThreadPool.schedule(new Runnable() {
 				@Override
-				public void run() {
+				public void run() {					
+					if (status.getConnectionStatusValue() != ConnectionStatusValue.RETRY_SCHEDULED) {
+						return;
+					}
+
 					boolean retryScheduled = SubscriptionStore.getInstanceFederatedSubscriptionManager().getOutgoingRetryScheduled(outgoing.getDisplayName()).compareAndSet(true, false);
 					if (SubscriptionStore.getInstanceFederatedSubscriptionManager() .getFederationConnectionStatus(outgoing.getDisplayName()) != null
 							&& status.compareAndSetConnectionStatusValue(ConnectionStatusValue.RETRY_SCHEDULED, ConnectionStatusValue.CONNECTING) && retryScheduled) {
-
 						if (outgoing.isUnlimitedRetries() ||
 								(SubscriptionStore.getInstanceFederatedSubscriptionManager()
 													.getOutgoingNumRetries(outgoing.getDisplayName())

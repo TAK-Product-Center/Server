@@ -203,6 +203,8 @@ public class TakFigClient implements Serializable {
 	}
 
 	private String clientUid = "";
+	
+	private String connectionToken = "";
 
 	private FigFederateSubscription federateSubscription = null;
 
@@ -272,6 +274,8 @@ public class TakFigClient implements Serializable {
 
 		this.outgoingName = outgoing.getDisplayName();
 		this.status = status;
+		this.connectionToken = outgoing.getConnectionToken();
+		
 		Tls figTls = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getTls();
 
 		// use the client name from the outgoing configuration
@@ -335,10 +339,17 @@ public class TakFigClient implements Serializable {
 			} catch (Exception e) {
 				logger.warn("exception initializing trust store", e);
 			}
-
-			SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(SslContextBuilder.forClient(), SslProvider.OPENSSL)  // this ensures that we are using OpenSSL, not JRE SSL
-					.keyManager(keyMgrFactory)
-					.trustManager(trustMgrFactory);
+			
+			SslContextBuilder sslContextBuilder;
+			// don't use a key manager if we are using token auth
+			if (!Strings.isNullOrEmpty(connectionToken)) {
+				sslContextBuilder = GrpcSslContexts.configure(SslContextBuilder.forClient(), SslProvider.OPENSSL)  // this ensures that we are using OpenSSL, not JRE SSL
+						.trustManager(trustMgrFactory);
+			} else {
+				sslContextBuilder = GrpcSslContexts.configure(SslContextBuilder.forClient(), SslProvider.OPENSSL)  // this ensures that we are using OpenSSL, not JRE SSL
+						.keyManager(keyMgrFactory)
+						.trustManager(trustMgrFactory);
+			}
 
 			String context = "TLSv1.2,TLSv1.3";
 
@@ -359,7 +370,13 @@ public class TakFigClient implements Serializable {
 		}
 
 		blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel);
-		asyncFederatedChannel = FederatedChannelGrpc.newStub(channel);
+				
+		if (!Strings.isNullOrEmpty(connectionToken)) {
+			TokenAuthCredential credential = new TokenAuthCredential(connectionToken);
+			asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
+		} else {
+			asyncFederatedChannel = FederatedChannelGrpc.newStub(channel);
+		}
 
 		connectionInfo = new ConnectionInfo();
 

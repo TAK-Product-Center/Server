@@ -1,6 +1,5 @@
 package tak.server.federation.hub.broker.db;
 
-import java.security.cert.Certificate;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -12,7 +11,7 @@ public interface FederationHubDatabaseService {
 	
 	void storeRol(Document rol);
 
-	Document addFederateMetadata(String id, Certificate[] certificates);
+	Document addFederateMetadata(String id, List<String> clientGroups);
 	Document getFederateMetadata(String id);
 	List<Document> getFederateMetadatas();
 

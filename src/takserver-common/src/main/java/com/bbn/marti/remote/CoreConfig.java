@@ -20,6 +20,7 @@ import com.bbn.marti.config.Federation.FederationServer;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.config.Qos;
 import com.bbn.marti.config.Repository;
+import com.bbn.marti.config.Subscription;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.config.Vbm;
 import com.bbn.marti.remote.groups.NetworkInputAddResult;
@@ -54,7 +55,15 @@ public interface CoreConfig {
     void setAndSaveStoreForwardChatEnabled(boolean storeForwardChatEnabled);
 	
     void setAndSaveVbmConfiguration(Vbm vbm);
-    
+
+    void setAndSaveServerId(String serverId);
+
+    void setAndSaveEnterpriseSyncSizeLimit(int uploadSizeLimit);
+
+    void addStaticSubscriptionAndSave(@NotNull Subscription.Static newStaticSubscription);
+
+    void removeStaticSubscriptionAndSave(@NotNull String subscriptionIdentifier);
+
     boolean isContactApiFilter();
     
     Set<String> getContactApiWriteOnlyGroups();

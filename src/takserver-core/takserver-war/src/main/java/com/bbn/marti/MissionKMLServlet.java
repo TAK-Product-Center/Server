@@ -263,9 +263,11 @@ public class MissionKMLServlet extends LatestKMLServlet {
     	}
 
     	boolean includeExtendedData = false;
-    	if (extendedData != null && extendedData.equalsIgnoreCase("true")) {
-    		includeExtendedData = true;
-    	}
+
+    	// ignore extendedData for now until JAK custom schema issue is resolved
+//    	if (extendedData != null && extendedData.equalsIgnoreCase("true")) {
+//    		includeExtendedData = true;
+//    	}
 
     	boolean optimizeExportAsBoolean = true; //Default to true to maintain backward compatibility
     	if (optimizeExport != null && optimizeExport.equalsIgnoreCase("false")) {

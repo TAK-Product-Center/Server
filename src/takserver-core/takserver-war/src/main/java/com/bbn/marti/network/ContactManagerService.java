@@ -41,6 +41,8 @@ public class ContactManagerService {
 	private ContactCacheHelper contactCache;
 
 	private AtomicLong lastUpdateMillis = new AtomicLong(-1);
+	
+	private volatile List<ClientEndpoint> result = null;
 
 	public List<ClientEndpoint> getCachedClientEndpointData(boolean connected, boolean recent, String groupVector, long secAgo) {
 
@@ -48,8 +50,6 @@ public class ContactManagerService {
 
 
 			boolean skipCache = !CoreConfigFacade.getInstance().getCachedConfiguration().getBuffer().getQueue().isEnableClientEndpointCache();
-
-			List<ClientEndpoint> result = null;
 
 			String key = contactCache.getKeyGetCachedClientEndpointData(connected, recent, secAgo);
 

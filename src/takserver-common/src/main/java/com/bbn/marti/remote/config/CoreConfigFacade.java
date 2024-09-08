@@ -145,6 +145,26 @@ public class CoreConfigFacade implements CoreConfig {
         notifyConfigDirty();
     }
 
+    public void setAndSaveServerId(String serverId) {
+        coreConfig.setAndSaveServerId(serverId);
+        notifyConfigDirty();
+    }
+
+    public void setAndSaveEnterpriseSyncSizeLimit(int uploadSizeLimit) {
+        coreConfig.setAndSaveEnterpriseSyncSizeLimit(uploadSizeLimit);
+        notifyConfigDirty();
+    }
+
+    public void addStaticSubscriptionAndSave(@NotNull Subscription.Static newStaticSubscription) {
+        coreConfig.addStaticSubscriptionAndSave(newStaticSubscription);
+        notifyConfigDirty();
+    }
+
+    public void removeStaticSubscriptionAndSave(@NotNull String subscriptionIdentifier) {
+        coreConfig.removeStaticSubscriptionAndSave(subscriptionIdentifier);
+        notifyConfigDirty();
+    }
+
     public boolean isContactApiFilter() {
         return coreConfig.isContactApiFilter();
     }

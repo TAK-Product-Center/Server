@@ -1,0 +1,18 @@
+aws_secret_key: # SECRET KEY HERE
+aws_access_key: # ACCESS KEY HERE
+aws_session_token: # SESSION TOKEN HERE
+key_name: tak-bbn-admin
+fedhub_version: takserver-fed-hub-5.2-DEV53.noarch.rpm
+takserver_version: takserver-docker-5.2-DEV-84
+takserver_num_instances: 4
+pytak_num_instances: 1 # number of pytak instances to provision per takserver instance
+clients: 1 # number of clients for each pytak client to simulate
+self_sa_delta: 1 # frequency in seconds for position reporting by pytak simulated clients
+fedhub_instance_type: c5.4xlarge
+takserver_instance_type: c5.xlarge
+pytak_instance_type: t2.medium
+fedhub_ami_id: ami-027bcdee875d9ac1a
+takserver_ami_id: ami-00fd0e043ae988157
+pytak_ami_id: ami-0f8604d85567e0aba
+connection_index: 1
+instance_name_prefix: automation_test

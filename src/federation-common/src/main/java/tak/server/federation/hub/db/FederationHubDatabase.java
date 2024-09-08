@@ -17,6 +17,9 @@ public class FederationHubDatabase {
 	private MongoDatabase cotDatabase;
 	private boolean dbIsConnected = false;
 	
+	// no-op for when db is disabled
+	public FederationHubDatabase() {}
+	
 	public FederationHubDatabase(String username, String password, String host, int port) {
 		try {
 			mongo = new AbstractMongoClientConfiguration() {

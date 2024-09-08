@@ -32,7 +32,7 @@ if [[ "$canamelen" -lt 5 ]]; then
 fi
 
 CRYPTO_SETTINGS=""
-
+FIPS_SETTINGS=""
 openssl list -providers 2>&1 | grep "\(invalid command\|unknown option\)" >/dev/null
 if [ $? -ne 0 ] ; then
   echo "Using legacy provider"
@@ -44,7 +44,7 @@ for var in "$@"
 do
     if [ "$var" == "-fips" ] || [ "$var" == "--fips" ];then
       fips=true
-    	CRYPTO_SETTINGS='-macalg SHA256 -aes256 -descert -keypbe AES-256-CBC -certpbe AES-256-CBC'
+      FIPS_SETTINGS='-macalg SHA256 -aes256 -descert -keypbe AES-256-CBC -certpbe AES-256-CBC'
     fi
 done
 
@@ -54,9 +54,9 @@ openssl req -new -sha256 -x509 -days 3652 -extensions v3_ca -keyout ca-do-not-sh
 openssl x509 -in ca.pem  -addtrust clientAuth -addtrust serverAuth -setalias "${CA_NAME}" -out ca-trusted.pem
 
 if [ "$fips" = true ];then
-  openssl pkcs12 -legacy -export -in ca-trusted.pem -out truststore-root-legacy.p12 -nokeys -caname "${CA_NAME}" -passout pass:${CAPASS}
+  openssl pkcs12 ${CRYPTO_SETTINGS} -export -in ca-trusted.pem -out truststore-root-legacy.p12 -nokeys -caname "${CA_NAME}" -passout pass:${CAPASS}
 fi
-openssl pkcs12 ${CRYPTO_SETTINGS} -export -in ca-trusted.pem -out truststore-root.p12 -nokeys -caname "${CA_NAME}" -passout pass:${CAPASS}
+openssl pkcs12 ${CRYPTO_SETTINGS} ${FIPS_SETTINGS} -export -in ca-trusted.pem -out truststore-root.p12 -nokeys -caname "${CA_NAME}" -passout pass:${CAPASS}
 keytool -import -trustcacerts -file ca.pem -keystore truststore-root.jks -alias "${CA_NAME}" -storepass "${CAPASS}" -noprompt
 cp truststore-root.jks fed-truststore.jks
 
@@ -75,6 +75,3 @@ if ! $(grep -q unique_subject crl_index.txt.attr); then
 fi
 
 openssl ca -config ../config.cfg -gencrl -keyfile ca-do-not-share.key $KEYPASS -cert ca.pem -out ca.crl
-
-
-

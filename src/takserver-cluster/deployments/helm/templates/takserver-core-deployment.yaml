@@ -19,6 +19,10 @@ spec:
           env:
             - name: "spring_profiles_active"
               value: "k8cluster"
+            - name: POSTGRES_HOST
+              value: "{{ .Values.global.postgresql.host }}"
+            - name: POSTGRES_PORT
+              value: "{{ .Values.global.postgresql.port }}"
           resources:
             requests:
               cpu: "{{ .Values.takserver.messaging.resources.requests.cpu }}"
@@ -87,6 +91,11 @@ spec:
       containers:
         - name: takserver-api 
           image: "{{ .Values.takserver.api.image.repository }}:{{ .Values.takserver.api.image.tag }}"
+          env:
+            - name: POSTGRES_HOST
+              value: "{{ .Values.global.postgresql.host }}"
+            - name: POSTGRES_PORT
+              value: "{{ .Values.global.postgresql.port }}"
           resources:
             requests:
               cpu: "{{ .Values.takserver.api.resources.requests.cpu }}"
@@ -114,8 +123,8 @@ spec:
               command:
               - /api-readiness.sh
             initialDelaySeconds: 180
-            periodSeconds: 10
-            failureThreshold: 4
+            periodSeconds: 30
+            failureThreshold: 6
           volumeMounts:
             - name: config #The name(key) value must match pod volumes name(key) value
               mountPath: /certs-configmap/
@@ -168,8 +177,8 @@ spec:
             tcpSocket:
               port: 10800
             initialDelaySeconds: 20
-            periodSeconds: 10
-            failureThreshold: 4
+            periodSeconds: 30
+            failureThreshold: 6
           volumeMounts:
             - name: config #The name(key) value must match pod volumes name(key) value
               mountPath: /certs-configmap/

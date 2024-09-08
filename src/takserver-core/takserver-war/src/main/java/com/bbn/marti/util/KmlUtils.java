@@ -38,6 +38,7 @@ import de.micromata.opengis.kml.v_2_2_0.ExtendedData;
 import de.micromata.opengis.kml.v_2_2_0.Feature;
 import de.micromata.opengis.kml.v_2_2_0.Folder;
 import de.micromata.opengis.kml.v_2_2_0.Geometry;
+import de.micromata.opengis.kml.v_2_2_0.Icon;
 import de.micromata.opengis.kml.v_2_2_0.IconStyle;
 import de.micromata.opengis.kml.v_2_2_0.Kml;
 import de.micromata.opengis.kml.v_2_2_0.LabelStyle;
@@ -298,11 +299,14 @@ public class KmlUtils {
         if (lineColor == null)
             lineColor = "8fffffff";
 
+        Icon icon = new Icon();
+
+        icon.setHref(iconUrl);
+
         s.withId(styleUrl)
         .withIconStyle(new IconStyle()
         .withScale(1.0)
-        .withIcon(new BasicLink()
-        .withHref(iconUrl)))
+        .withIcon(icon))
         .withLabelStyle(new LabelStyle()
         .withColor(labelColor)
         .withScale(1.5))
@@ -495,8 +499,10 @@ public class KmlUtils {
 
 	            if (includeExtendedData) {
 		            ExtendedData extendedData = t.createAndSetExtendedData();
-		            SchemaData schemaData = extendedData.createAndAddSchemaData();
-		            
+
+                    SchemaData schemaData = new SchemaData();
+                    extendedData.getSchemaData().add(schemaData);
+
 		            schemaData.setSchemaUrl("#trackschema");
 		            
 		            speed = new SimpleArrayData();
@@ -507,9 +513,9 @@ public class KmlUtils {
 		            ce.setName("ce");
 		            le.setName("le");
 		            
-		            schemaData.addToSchemaDataExtension(speed);
-		            schemaData.addToSchemaDataExtension(ce);
-		            schemaData.addToSchemaDataExtension(le);
+		            schemaData.getSchemaDataExtension().add(speed);
+		            schemaData.getSchemaDataExtension().add(ce);
+		            schemaData.getSchemaDataExtension().add(le);
 	            }
 	            lastReportTime = qr.servertime;
         	} else {
@@ -924,9 +930,15 @@ public class KmlUtils {
       	
       	ExtendedData extendedData = track.getExtendedData();
       	SchemaData schemaData = extendedData.getSchemaData().get(0);
-      	
-      	for (SimpleArrayData simpleArrayData : schemaData.getSchemaDataExtension()) {
-      	
+
+        for (Object object : schemaData.getSchemaDataExtension()) {
+
+            if (!(object instanceof SimpleArrayData)) {
+                continue;
+            }
+
+            SimpleArrayData simpleArrayData = (SimpleArrayData) object;
+
       		if (simpleArrayData.getValue().size() != size) {
           		log.severe("trackKmlToCot: track array size mismatch!");
           		return null;

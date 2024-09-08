@@ -91,6 +91,7 @@ public class ActiveGroupCacheHelper {
             return activeGroupCache;
         }
 
+        Date start = new Date();
         logger.info("Populating the activeGroupCache");
 
         Map<String, List<Group>> activeGroups = loadActiveGroups();
@@ -108,6 +109,8 @@ public class ActiveGroupCacheHelper {
         } else {
             logger.error("loadActiveGroups failed!");
         }
+
+        logger.info("activeGroupCache cache warmed - took " + ((new Date().getTime() - start.getTime()) / 1000) + " seconds");
 
         return activeGroupCache;
     }
@@ -215,7 +218,8 @@ public class ActiveGroupCacheHelper {
         activeGroups.addAll(adds);
 
         for (Group group : adds) {
-            group.setActive(false);
+            group.setActive(CoreConfigFacade.getInstance().getRemoteConfiguration()
+                    .getAuth().isX509UseGroupCacheDefaultActive());
         }
 
         // if we only have one group, make sure its active

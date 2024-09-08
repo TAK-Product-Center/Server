@@ -1,0 +1,269 @@
+/**
+ * Base deployment copy specs. These are intended to be applied to artifacts that do not involve containerization or
+ * other modifications beyond the base configuration. Any that are adapted are stored along with the adapted copy specs
+ * in copyspecs-composite.gradle for ease of comparison.
+ */
+
+task createDockerDirs() {
+    doFirst {
+        mkdir "$buildDir/takDockerDirs/logs"
+        mkdir "$buildDir/takDockerDirs/lib"
+        mkdir "$buildDir/takDockerDirs/webcontent/webtak-plugins"
+        new File("$buildDir/takDockerDirs/logs/takserver.log").text = ""
+        new File("$buildDir/takDockerDirs/version.txt").text = """$version"""
+    }
+}
+
+task createVersionFile() {
+    doFirst {
+        mkdir "$buildDir/takVersionDir"
+        new File("$buildDir/takVersionDir/version.txt").text = """$version"""
+    }
+}
+
+ext {
+
+    // Required base takserver component executable files
+    copyBaseTakJarsAndWarsSpec = { task ->
+        task.dependsOn(':takserver-core:bootJar')
+        task.dependsOn(':takserver-core:bootWar')
+        task.dependsOn(':takserver-usermanager:shadowJar')
+        return copySpec {
+            with copySpec {
+                from getRootProject().subprojects.collect { it.tasks.withType(Jar) }
+                rename('UserManager-' + version + '-all.jar', 'utils/UserManager.jar')
+                exclude 'takserver-common*', 'takserver-core*', 'takserver-package*', 'API*', 'messaging*',
+                        'database*', 'takserver-schemamanager*', 'takserver-takcl*', 'takserver-usermanager*',
+                        'takserver-war-*', 'takcl*', 'takserver-plugin*', 'schemamanager*',
+                        'takserver-plugin-manager*', 'takserver-cluster*', 'takserver-fig-core*', 'takserver-retention*',
+                        'rol*', 'Periodic*', 'launcher*', 'takserver-' + version + '*',
+                        'federation-hub-*', 'federation-common-*', 'takserver-protobuf-*'
+            }
+            with copySpec {
+                from project(':takserver-core').collect { it.tasks.withType(War) }
+                rename('takserver-core-' + version + '.war', 'takserver.war')
+                exclude 'takserver-war*', 'takserver-war-*.war'
+
+            }
+        }
+    }
+
+    copySchemaManagerJarSpec = { Task task ->
+        task.dependsOn(':takserver-schemamanager:shadowJar')
+        return copySpec {
+            from project(':takserver-schemamanager').collect { it.tasks.withType(Jar) }
+            rename('schemamanager-' + version + '-uber.jar', 'db-utils/SchemaManager.jar')
+            exclude 'takserver-schemamanager*'
+        }
+    }
+
+    copyLicenseSpec = {
+        return copySpec {
+            from("${project.rootDir}/../")
+            include 'LICENSE.txt'
+        }
+    }
+
+
+    // Copy db-utils scripts from dbonly directory
+    copyDbOnlyScriptsSpec = {
+        return copySpec {
+            from project(':takserver-schemamanager').file('scripts-dbonly')
+            rename('(.*)', 'db-utils/$1')
+        }
+    }
+
+    // Get CoreConfig.xsd and other XSDs including the TAKIgniteConfig.xsd
+    copyCoreConfigXSDSpec = {
+        return copySpec {
+            from project(':takserver-common').file('src/main/xsd')
+            include '*.xsd'
+        }
+    }
+
+    copyCoreScriptsSpec = {
+        return copySpec {
+            from project(':takserver-core').file('scripts')
+            exclude 'config*', 'utils', 'messaging*', 'API*', 'plugins*', 'retention*', "launcher*", 'takserver.sh'
+        }
+    }
+
+    copyFullDockerScriptsSpec = {
+        return copySpec {
+            from project(':takserver-core').file('scripts')
+            exclude 'utils', 'plugins*', 'retention*', 'takserver.sh'
+        }
+    }
+
+    copyConfigScriptsSpec = {
+        return copySpec {
+            from project(':takserver-core').file('scripts')
+            exclude 'utils*', 'messaging*', 'API*', 'plugins*', 'retention*', 'launcher*', 'takserver.sh'
+        }
+    }
+
+    copyAPIScriptsSpec = {
+        return copySpec {
+            from project(':takserver-core').file('scripts')
+            exclude 'config*', 'utils*', 'messaging*', 'plugins*', 'retention*', 'launcher*', 'takserver.sh'
+        }
+    }
+
+    copyMessagingScriptsSpec = {
+        return copySpec {
+            from project(':takserver-core').file('scripts')
+            exclude 'config*', 'utils*', 'API*', 'launcher*', 'plugins*', 'retention*', 'takserver.sh'
+        }
+    }
+
+    copyLauncherAndConfigAndMessagingScriptsSpec = {
+        return copySpec {
+            from project(':takserver-core').file('scripts')
+            exclude 'utils*', 'API*', 'plugins*', 'retention*', 'takserver.sh'
+        }
+    }
+
+    copyDocsSpec = {
+        return copySpec {
+            from getRootProject().file('docs')
+            include '*.pdf'
+            rename('(.*)', 'docs/$1')
+        }
+    }
+
+    copySwaggerSpec = {
+        return copySpec {
+            from project(':takserver-core').file('oas')
+            include '*.html'
+            include '*.js'
+            rename('(.*)', 'oas/$1')
+        }
+    }
+
+    copyPolicySpec = {
+        return copySpec {
+            from project(':takserver-core').file('scripts/utils')
+            include '*.te'
+        }
+    }
+
+    copyFullRetentionServiceSpec = { task ->
+        task.dependsOn(':takserver-retention:bootJar')
+        return copySpec {
+            // Copy the retention config
+            with copySpec {
+                from project(':takserver-retention').file('conf/retention')
+                rename('(.*)', 'conf/retention/$1')
+            }
+            // Copy the mission store config
+            with copySpec {
+                from project(':takserver-retention').file('mission-archive/')
+                rename('(.*)', 'mission-archive/$1')
+            }
+            // Copy the Scripts
+            with copySpec {
+                from project(':takserver-core').file('scripts/retention/')
+                rename('(.*)', 'retention/$1')
+            }
+            // Add the jar build dependency and copy it
+            with copySpec {
+                from getRootProject().project(':takserver-retention').collect { it.tasks.withType(Jar) }
+                rename('takserver-retention-' + version + '.jar', 'takserver-retention.jar')
+            }
+        }
+    }
+
+    copyFullFedhubSpec = { task ->
+        // Add jar task dependencies
+        task.dependsOn(':federation-hub-broker:build')
+        task.dependsOn(':federation-hub-policy:build')
+        task.dependsOn(':federation-hub-ui:bootWar')
+        task.dependsOn(':federation-hub-ui:shadowJar')
+        return copySpec {
+            // Add the jars
+            with copySpec {
+                from getRootProject().subprojects.collect { "${it.buildDir}/libs" }
+                include 'federation-hub-*-' + version + '.jar', 'federation-hub-ui-' + version + '.war'
+                rename 'federation-hub-broker-*' + version + '.jar', 'federation-hub/federation-hub-broker.jar'
+                rename 'federation-hub-policy-*' + version + '.jar', 'federation-hub/federation-hub-policy.jar'
+                rename 'federation-hub-ui-*' + version + '.war', 'federation-hub/federation-hub-ui.war'
+                rename 'federation-hub-manager-*' + version + '.jar', 'federation-hub/federation-hub-manager.jar'
+            }
+            // Add the configuration files
+            with copySpec {
+                from getRootProject().subprojects.collect { "${it.projectDir}/src/main/resources" }
+                include 'federation-hub-*.yml', 'logback-*.xml'
+                rename('(.*)', 'federation-hub/configs/$1')
+            }
+        }
+    }
+
+    copyFedhubConfigsSpec = {
+        return copySpec {
+            from getRootProject().subprojects.collect { "${it.projectDir}/src/main/resources" }
+            include 'federation-hub-*.yml', 'logback-*.xml'
+            rename('(.*)', 'federation-hub/configs/$1')
+        }
+    }
+
+    copyFullPluginManagerSpec = { task ->
+        task.dependsOn(':takserver-plugin-manager:bootJar')
+        return copySpec {
+            // Copy the jar
+            with copySpec {
+                from project(':takserver-plugin-manager').collect { it.tasks.withType(Jar) }
+                rename('takserver-plugin-manager-' + version + '.jar', 'takserver-pm.jar')
+            }
+
+            // Copy the scripts
+            with copySpec {
+                from project(':takserver-core').file('scripts/plugins')
+            }
+        }
+    }
+
+    copyIntegrationTestAdditionsSpec = { task ->
+        // Add jar task dependency
+        task.dependsOn(':takserver-takcl-core:publicJar')
+        return copySpec {
+            // Copy the jar
+            from(project(':takserver-takcl-core').file('build/libs')) {
+                include("takcl-${version}-exe.jar")
+                rename("takcl-${version}-exe.jar", "utils/takcl.jar")
+            }
+            // Copy the p
+            from(project(':takserver-takcl-core').file('plugin-test-libs')) {
+                rename('(.*)', 'lib/$1')
+            }
+        }
+    }
+
+    copyHealthCheckScriptsSpec = {
+        return copySpec {
+            from project(':takserver-core').file('docker/hardened/tak/health')
+            rename('(.*)', 'docker/hardened/takArtifacts/health/$1')
+        }
+    }
+
+    copyGeneratedDockerFilesSpec = { task ->
+        task.dependsOn(createDockerDirs)
+        return copySpec {
+            from("$buildDir/takDockerDirs")
+        }
+    }
+
+    copyVersionFileSpec = { task ->
+        task.dependsOn(createVersionFile)
+        return copySpec {
+            from("$buildDir/takVersionDir/version.txt")
+        }
+    }
+
+    copyPluginTestLibsSpec = { task ->
+        return copySpec {
+            from(project(':takserver-takcl-core').file('plugin-test-libs')) {
+                rename('(.*)', 'lib/$1')
+            }
+        }
+    }
+}

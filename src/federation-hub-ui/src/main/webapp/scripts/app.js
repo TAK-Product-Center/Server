@@ -371,6 +371,15 @@ angular
                 controller: 'AddFederationOutgoingController'
             });
 
+            modalStateProvider.state('workflows.editor.addFederationTokenGroup', {
+                backdrop: 'static',
+                keyboard: false,
+                size: 'lg',
+                url: '/addFederationTokenGroup',
+                templateUrl: "views/workflows/add_federation_token_group.html",
+                controller: 'AddFederationTokenGroupController'
+            });
+
             modalStateProvider.state('workflows.editor.connections', {
                 backdrop: 'static',
                 keyboard: false,

@@ -12,8 +12,16 @@ sleep 1
 # create data directory, set mongod permissions, remove lock file
 echo "Creating Mongo data directory at /var/lib/mongodb"
 mkdir -p /var/lib/mongodb
-chown -R mongod:mongod /var/lib/mongodb
-chcon -Rv --type=mongod_var_lib_t /var/lib/mongodb
+
+# Debian installs
+if [ -f /etc/debian_version ]; then
+    chown -R mongodb:mongodb /var/lib/mongodb
+# Other OS
+else
+   chown -R mongod:mongod /var/lib/mongodb
+   chcon -Rv --type=mongod_var_lib_t /var/lib/mongodb
+fi
+
 rm -f /tmp/mongodb-27017.sock
 sleep 1
 cp /opt/tak/federation-hub/scripts/db/mongod-noauth.conf /etc/mongod.conf

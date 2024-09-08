@@ -137,7 +137,7 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
 
             if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509TokenAuth() &&
                     cert != null && cert.token != null && cert.token.length() > 0) {
-                user.setName(cert.token);
+                user.setToken(cert.token);
                 try {
                     groupManager.authenticate("oauth", user);
                 } catch (InvalidBearerTokenException | JwtException e) {

@@ -335,7 +335,8 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().isEsyncEnableCotFilter()) {
 			try {
-				if (Arrays.asList(metadata.getKeywords()).contains("missionpackage")) {
+				if (metadata.getKeywords() != null &&
+						Arrays.asList(metadata.getKeywords()).contains("missionpackage")) {
 					String cotFilter = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEsyncCotFilter();
 					if (!Strings.isNullOrEmpty(cotFilter)) {
 						content = DataPackageFileBlocker.blockCoT(metadata, content, cotFilter);
@@ -1334,8 +1335,6 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 		FileWrapper file = enterpriseSyncCacheHelper.getFileByHash(hash);
 
-		logger.debug("get file {} {} ", hash, (file == null || file.getContents() == null) ? "not found" : (file.getContents().length + " bytes"));
-
 		// not found
 		if (file == null || file.getContents() == null) {
 			return null;
@@ -1657,4 +1656,72 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		return esyncEnableCache || (clusterConfig.isEnabled() && clusterConfig.isKubernetes());
 	}
 
+	/**
+	 * Gets the content of an Enterprise Sync object.
+	 * @param hash Hash of the object to retrieve
+	 * @return the content of the latest stored object matching that hash, or <code>null</code> if no match
+	 * @throws SQLException
+	 * @throws NamingException
+	 */
+	@Override
+	public InputStream getContentStreamByHash(String hash, String groupVector) throws SQLException, NamingException {
+
+		if (Strings.isNullOrEmpty(groupVector)) {
+			throw new IllegalArgumentException("empty group vector");
+		}
+
+		FileWrapper file = enterpriseSyncCacheHelper.getInputStreamFileWrapperFromDB(hash);
+
+		// not found
+		if (file == null || file.getInputStream() == null) {
+			logger.info("file for hash " + hash + " not found.");
+			return null;
+		}
+
+		if (Strings.isNullOrEmpty(file.getGroupVector())) {
+			throw new IllegalArgumentException("empty group vector in file for hash " + hash);
+		}
+
+		if (!remoteUtil.isGroupVectorAllowed(groupVector, file.getGroupVector())) {
+			// not allowed
+			return null;
+		}
+
+		// found and allowed
+		return file.getInputStream();
+	}
+	
+	/**
+	 * Gets the content of an Enterprise Sync object.
+	 * @param hash Hash of the object to retrieve
+	 * @return the content of the latest stored object matching that hash, or <code>null</code> if no match
+	 * @throws SQLException
+	 * @throws NamingException
+	 */
+	@Override
+	public InputStream getContentStreamByUid(String uid, String groupVector) throws SQLException, NamingException {
+
+		if (Strings.isNullOrEmpty(groupVector)) {
+			throw new IllegalArgumentException("empty group vector");
+		}
+
+		FileWrapper file = enterpriseSyncCacheHelper.getInputStreamFileWrapperFromDBbyUid(uid);
+
+		// not found
+		if (file == null || file.getInputStream() == null) {
+			return null;
+		}
+
+		if (Strings.isNullOrEmpty(file.getGroupVector())) {
+			throw new IllegalArgumentException("empty group vector in file for uid " + uid);
+		}
+
+		if (!remoteUtil.isGroupVectorAllowed(groupVector, file.getGroupVector())) {
+			// not allowed
+			return null;
+		}
+
+		// found and allowed
+		return file.getInputStream();
+	}
 }

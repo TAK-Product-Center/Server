@@ -67,7 +67,7 @@ public interface PluginManager {
 	 * Request data from a plugin. Implementation of this function is entirely delegated to the plugin.
 	 * 
 	 */
-	PluginResponse requestDataFromPlugin(String pluginClassName, Map<String, String> allRequestParams, String contentType);
+	PluginResponse requestDataFromPlugin(String pluginClassName, Map<String, String> allRequestParams, String accept);
 	
 	/*
 	 * Delete data from a plugin. Implementation of this function is entirely delegated to the plugin.

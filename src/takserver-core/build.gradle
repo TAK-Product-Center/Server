@@ -150,7 +150,9 @@ dependencies {
   implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
 
   implementation "io.netty.incubator:netty-incubator-codec-native-quic:$netty_quic_version:linux-x86_64"
+  implementation "io.netty.incubator:netty-incubator-codec-native-quic:$netty_quic_version:linux-aarch_64"
   implementation "io.netty.incubator:netty-incubator-codec-native-quic:$netty_quic_version:osx-x86_64"
+  implementation "io.netty.incubator:netty-incubator-codec-native-quic:$netty_quic_version:osx-aarch_64"
   implementation "io.netty.incubator:netty-incubator-codec-native-quic:$netty_quic_version:windows-x86_64"
 
   implementation group: 'io.netty', name: 'netty-tcnative-classes', version: netty_tcnative_version
@@ -290,7 +292,7 @@ dependencies {
 
   //implementation group: 'org.springframework.security', name: 'spring-security-oauth2-authorization-server', version: '1.1.2'
 
-
+    implementation group: 'uk.m0nom', name: 'javaapiforkml', version: javaapiforkml_version
 }
 
 clean {

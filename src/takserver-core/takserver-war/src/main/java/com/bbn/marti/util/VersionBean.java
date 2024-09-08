@@ -20,9 +20,9 @@ import tak.server.util.VersionInfo;
 
 public class VersionBean {
     
-    private String ver = null;
+    private volatile String ver = null;
     
-    private VersionInfo versionInfo = null;
+    private volatile VersionInfo versionInfo = null;
     
     Logger logger = LoggerFactory.getLogger(VersionBean.class);
     

@@ -1,4 +1,5 @@
 ARG TAKSERVER_IMAGE_REPO=docker-devtest-local.artifacts.tak.gov/takserver-cluster/takserver-base
 ARG TAKSERVER_IMAGE_TAG=core-base
 FROM ${TAKSERVER_IMAGE_REPO}:${TAKSERVER_IMAGE_TAG}
+RUN apt update && apt install -y postgresql-client inetutils-ping socat wget curl vim
 CMD ["sh", "takserver-config-cluster.sh"]

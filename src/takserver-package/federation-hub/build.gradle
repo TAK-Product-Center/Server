@@ -34,6 +34,7 @@ task copyFedHubJars(type: Copy) {
     dependsOn(':federation-hub-broker:build')
     dependsOn(':federation-hub-policy:build')
     dependsOn(':federation-hub-ui:bootWar')
+    dependsOn(':federation-hub-ui:bootJar')
     dependsOn(':federation-hub-ui:shadowJar')
 
     from getRootProject().subprojects.collect { "${it.buildDir}/libs" }
@@ -149,22 +150,11 @@ cp /opt/tak/federation-hub/scripts/federation-hub-broker /etc/init.d
 cp /opt/tak/federation-hub/scripts/federation-hub-policy /etc/init.d
 cp /opt/tak/federation-hub/scripts/federation-hub-ui /etc/init.d
 
-# Add mongo repo to yum
-cp /opt/tak/federation-hub/scripts/db/mongodb-org.repo /etc/yum.repos.d/mongodb-org.repo
 
 # Set up logging directory.
 mkdir -p /opt/tak/federation-hub/logs
 chown tak:tak /opt/tak/federation-hub/logs
 chmod 755 /opt/tak/federation-hub/logs
-
-# Change ownership of configuration files.
-if [ -f /opt/tak/CoreConfig.xml ] ; then
-    chown -f tak:tak /opt/tak/CoreConfig.xml 2>/dev/null
-fi
-
-if [ -d "/opt/tak/webcontent" ] ; then
-  chown -fR tak:tak /opt/tak/webcontent
-fi
 
 cat <<- "EOF"
 
@@ -253,14 +243,17 @@ with or without a co-located TAK server.
     }
 }
 
-task prePackage { }
+task prePackage(type: Copy) { task ->
+    with copyLicenseSpec()
+    destinationDir file("$buildDir/takArtifacts")
+}
+
 prePackage.dependsOn copyFedHubReadme
 prePackage.dependsOn copyFedHubDockerReadme
 prePackage.dependsOn copyFedHubConfigs
 prePackage.dependsOn copyFedHubJars
 prePackage.dependsOn copyFedHubScripts
 prePackage.dependsOn copyCertScripts
-prePackage.dependsOn copyLicense
 prePackage.dependsOn copySELinuxPolicy
 prePackage.dependsOn copySELinuxScript
 
@@ -276,9 +269,6 @@ buildDeb {
   requires('openjdk-17-jdk')
 }
 
-def copyFedhubVersionFileDef() { return copySpec {
-    from 'build/takArtifacts/version.txt'
-}}
 def copyFedhubResourcesDef() { return copySpec {
     from 'build/artifacts'
 }}
@@ -301,20 +291,13 @@ task createFedhubDockerLogDir() {
     }
 }
 
-task deleteNonDockerFedhubBrokerConfig(type : Delete) {
-    delete "$buildDir/artifacts/configs/federation-hub-broker.yml"
-    delete "$buildDir/artifacts/configs/federation-hub-broker-docker.yml"
-}
-
-def copyFedhubVersionFile = copyFedhubVersionFileDef()
 def copyFedhubResources = copyFedhubResourcesDef()
 def copyFedhubDocker = copyFedhubDockerDef()
 def copyFedhubDockerScript = copyFedhubDockerScriptDef()
 def copyCertsSetup = copyCertsSetupDef()
 def copyDocsToTopLevel = copyDocsToTopLevelDef()
 
-task constructFedhubDockerZip(type: Zip) {
-    dependsOn createVersionFile
+task constructFedhubDockerZip(type: Zip) { Task task ->
     dependsOn createFedhubDockerLogDir
     dependsOn buildRpm
    
@@ -323,18 +306,18 @@ task constructFedhubDockerZip(type: Zip) {
     destinationDir(file("$buildDir/distributions"))
     into('takserver-fedhub-docker-' + version)
 
-    with copyFedhubVersionFile.into('tak')
-    with copyFedhubResources.into('tak/federation-hub')
+    with copyVersionFileSpec(task).into('tak')
+    with copyFedhubResources.exclude("configs/federation-hub-broker.yml", "configs/federation-hub-broker-docker.yml")
+            .into('tak/federation-hub')
     with copyFedhubDockerScript.into('tak/federation-hub/scripts')
     with copyFedhubDocker.into('docker')
     with copyCertsSetup.into('tak/certs')
     with copyDocsToTopLevel.into('./')
-    
-    dependsOn deleteNonDockerFedhubBrokerConfig
     
     from(project(':federation-hub-broker').file('src/main/resources')) {
     	include('federation-hub-broker-docker.yml')
 		rename('federation-hub-broker-docker.yml', 'federation-hub-broker.yml')
 		into('tak/federation-hub/configs')
 	}
+
 }

@@ -2,13 +2,11 @@ package tak.server.federation;
 
 import static java.util.Objects.requireNonNull;
 
-import java.math.BigInteger;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
-
-import javax.net.ssl.SSLSession;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,9 +17,9 @@ import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederateHops;
 import com.atakmap.Tak.FederateProvenance;
 import com.atakmap.Tak.FederatedEvent;
+import com.atakmap.Tak.Identity.ConnectionType;
 import com.atakmap.Tak.ROL;
 import com.atakmap.Tak.Subscription;
-import com.atakmap.Tak.Identity.ConnectionType;
 import com.google.common.base.Strings;
 
 import io.grpc.ClientCall;
@@ -46,6 +44,8 @@ public class GuardedStreamHolder<T> {
     private FederateIdentity federateIdentity;
     private Subscription subscription;
     private int maxFederateHops = -1;
+    private String clientFingerprint;
+    private List<String> clientGroups;
     
     private boolean isRunningInHub = false;
 
@@ -75,7 +75,7 @@ public class GuardedStreamHolder<T> {
     }
 
     // for incoming connections
-    public GuardedStreamHolder(StreamObserver<T> clientStream, String clientName, String certHash, SSLSession session, Subscription subscription, Comparator<T> comp, boolean isRunningInHub) {
+    public GuardedStreamHolder(StreamObserver<T> clientStream, String clientName, String certHash, String sessionId, Subscription subscription, Comparator<T> comp, boolean isRunningInHub) {
 
         requireNonNull(clientStream, "FederatedEvent client stream");
 
@@ -97,7 +97,7 @@ public class GuardedStreamHolder<T> {
         // new takservers will send their CoreConfig serverId. if present, use it, otherwise generate a random unique identifier
         String serverId = subscription.getIdentity().getServerId();
         if (Strings.isNullOrEmpty(serverId)) {
-        	serverId = new BigInteger(session.getId()).toString();
+        	serverId = sessionId;
         }
         String fedId = clientName + "-" + certHash  + "-" + serverId;
 
@@ -144,8 +144,8 @@ public class GuardedStreamHolder<T> {
         	// since hub outgoing connections can forward traffic to other hubs, we need to keep a list of visited nodes
             // so that we can stop cycles
             FederateProvenance prov = FederateProvenance.newBuilder()
-        			.setFederationServerId(FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfig().getFullId())
-        			.setFederationServerName(FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfig().getServerName())
+        			.setFederationServerId(FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager().getConfig().getFullId())
+        			.setFederationServerName(FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager().getConfig().getServerName())
         			.build();
             
             Set<FederateProvenance> federateProvenances = new HashSet<>();
@@ -345,7 +345,23 @@ public class GuardedStreamHolder<T> {
     	this.maxFederateHops = maxFederateHops;
     }
 
-    @Override
+	public String getClientFingerprint() {
+		return clientFingerprint;
+	}
+
+	public void setClientFingerprint(String clientFingerprint) {
+		this.clientFingerprint = clientFingerprint;
+	}
+
+	public List<String> getClientGroups() {
+		return clientGroups;
+	}
+
+	public void setClientGroups(List<String> clientGroups) {
+		this.clientGroups = clientGroups;
+	}
+
+	@Override
 	public String toString() {
 		return "GuardedStreamHolder [clientStream=" + clientStream + ", clientCall=" + clientCall + ", lastHealthTime="
 				+ lastHealthTime + ", lastHealthStatus=" + lastHealthStatus + ", federateIdentity=" + federateIdentity

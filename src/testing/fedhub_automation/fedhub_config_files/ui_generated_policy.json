@@ -1,0 +1,699 @@
+{
+    "name": "Testing",
+    "federate_edges": [
+        {
+            "source": "CN=takserver_20240702T095507284890_0,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-15b5f560e4665b9e2a3c5e20c3837a90a688fe3a5fb233737721f3d2372336b8",
+            "destination": "CN=takserver_20240702T095507284890_1,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-de5e2cdd11ced24e3dfa3c99d1ba8b7a8eadff4d7b723055fec1ca2aa0106bcb",
+            "groupsFilterType": "ALL"
+        },
+        {
+            "source": "CN=takserver_20240702T095507284890_1,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-de5e2cdd11ced24e3dfa3c99d1ba8b7a8eadff4d7b723055fec1ca2aa0106bcb",
+            "destination": "CN=takserver_20240702T095507284890_0,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-15b5f560e4665b9e2a3c5e20c3837a90a688fe3a5fb233737721f3d2372336b8",
+            "groupsFilterType": "ALL"
+        },
+        {
+            "source": "CN=takserver_20240702T095507284890_1,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-de5e2cdd11ced24e3dfa3c99d1ba8b7a8eadff4d7b723055fec1ca2aa0106bcb",
+            "destination": "CN=takserver_20240702T095507284890_2,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-4770bf1865f7efd6e9e6a1db4bd8f58c8cbc3294aef2a7f89a8cf1649f3dc75e",
+            "groupsFilterType": "ALL"
+        },
+        {
+            "source": "CN=takserver_20240702T095507284890_2,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-4770bf1865f7efd6e9e6a1db4bd8f58c8cbc3294aef2a7f89a8cf1649f3dc75e",
+            "destination": "CN=takserver_20240702T095507284890_1,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-de5e2cdd11ced24e3dfa3c99d1ba8b7a8eadff4d7b723055fec1ca2aa0106bcb",
+            "groupsFilterType": "ALL"
+        },
+        {
+            "source": "CN=takserver_20240702T095507284890_2,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-4770bf1865f7efd6e9e6a1db4bd8f58c8cbc3294aef2a7f89a8cf1649f3dc75e",
+            "destination": "CN=takserver_20240702T095507284890_3,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-a58ba359ab428b59c050f5aeb42820f851c182ff47e2f461156d6dc533a6b63f",
+            "groupsFilterType": "ALL"
+        },
+        {
+            "source": "CN=takserver_20240702T095507284890_3,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-a58ba359ab428b59c050f5aeb42820f851c182ff47e2f461156d6dc533a6b63f",
+            "destination": "CN=takserver_20240702T095507284890_2,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-4770bf1865f7efd6e9e6a1db4bd8f58c8cbc3294aef2a7f89a8cf1649f3dc75e",
+            "groupsFilterType": "ALL"
+        },
+        {
+            "source": "CN=takserver_20240702T095507284890_0,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-15b5f560e4665b9e2a3c5e20c3837a90a688fe3a5fb233737721f3d2372336b8",
+            "destination": "CN=takserver_20240702T095507284890_3,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-a58ba359ab428b59c050f5aeb42820f851c182ff47e2f461156d6dc533a6b63f",
+            "groupsFilterType": "ALL"
+        },
+        {
+            "source": "CN=takserver_20240702T095507284890_3,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-a58ba359ab428b59c050f5aeb42820f851c182ff47e2f461156d6dc533a6b63f",
+            "destination": "CN=takserver_20240702T095507284890_0,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-15b5f560e4665b9e2a3c5e20c3837a90a688fe3a5fb233737721f3d2372336b8",
+            "groupsFilterType": "ALL"
+        }
+    ],
+    "groups": [
+        {
+            "uid": "CN=takserver_20240702T095507284890_0,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-15b5f560e4665b9e2a3c5e20c3837a90a688fe3a5fb233737721f3d2372336b8",
+            "interconnected": false
+        },
+        {
+            "uid": "CN=takserver_20240702T095507284890_1,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-de5e2cdd11ced24e3dfa3c99d1ba8b7a8eadff4d7b723055fec1ca2aa0106bcb",
+            "interconnected": false
+        },
+        {
+            "uid": "CN=takserver_20240702T095507284890_2,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-4770bf1865f7efd6e9e6a1db4bd8f58c8cbc3294aef2a7f89a8cf1649f3dc75e",
+            "interconnected": false
+        },
+        {
+            "uid": "CN=takserver_20240702T095507284890_3,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-a58ba359ab428b59c050f5aeb42820f851c182ff47e2f461156d6dc533a6b63f",
+            "interconnected": false
+        }
+    ],
+    "additionalData": {
+        "uiData": {
+            "name": "Testing",
+            "version": "",
+            "type": "",
+            "description": "Testing",
+            "thumbnail": null,
+            "cells": [
+                {
+                    "graphType": "GroupCell",
+                    "id": "d5082a90-d386-4e73-8519-603b94a77d38",
+                    "attrs": {
+                        ".body": {
+                            "fill": "white",
+                            "opacity": "0.35"
+                        },
+                        ".inner": {
+                            "visibility": "hidden"
+                        },
+                        "path": {
+                            "ref": ".outer"
+                        },
+                        "image": {
+                            "ref": ".outer",
+                            "ref-dy": "",
+                            "ref-y": 5,
+                            "xlink:href": "data:image/png;base64,MIIDwDCCAqigAwIBAgIUAmkmFvVf9jRkmof8wEA9g8ZuWKMwDQYJKoZIhvcNAQELBQAweDELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMRQwEgYDVQQHDAtTaWduYWxfSGlsbDEMMAoGA1UECgwDSVNTMQwwCgYDVQQLDANCQk4xKjAoBgNVBAMMIXRha3NlcnZlcl8yMDI0MDcwMlQwOTU1MDcyODQ4OTBfMDAeFw0yNDA3MDIxNzAyMTNaFw0zNDA3MDIxNzAyMTNaMHgxCzAJBgNVBAYTAlVTMQswCQYDVQQIDAJDQTEUMBIGA1UEBwwLU2lnbmFsX0hpbGwxDDAKBgNVBAoMA0lTUzEMMAoGA1UECwwDQkJOMSowKAYDVQQDDCF0YWtzZXJ2ZXJfMjAyNDA3MDJUMDk1NTA3Mjg0ODkwXzAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCxNFf2XYLmrAxImqPMkPH7TsKHwWcbbFAW3bL55zeJX+uAH2byxt54387Krkc6pT3eH8xeljHJt+3aKQlSKq6q3idQbyt7IXF2GTrFryE2TFCib8fNEAqLcH9Q8aNVEEMP5UI8ts+AOl+Q7mlQF72SoVNJWTci4ZF6SL0Enq/1/R4qoYf5rtxK5nbNmIl9sQFYZ8S0EbTIGX91HIptp1/x/oYpqwmU5gU9OPCG3Ai9J6ORft1otfDW+pFJm5moXA5aLKHwRo6M8k2fKCFZCAEimm9jYQnsKEhHHFcLVmvL/y/BDrcw291sW1h3h/YvVMYrOhIEpWhQYcZF0Nt8Le1/AgMBAAGjQjBAMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBRilhoMN/yJwHEz+++Rv4Ug0rdq7TANBgkqhkiG9w0BAQsFAAOCAQEAQaIUEfPaDf1x9fbGo/o0QwKnRbpDgF7ir/7xQ7/FcTCXVDBNIGKTmi1XUNSvdDwJMKLJiVmT64BMnrAD3hdASkxYQYynFcBRfu2rlwcvKpPoZNBr0XGcWxmIz/RRfNsUAT2ZtbfCTFXspDwVQrNk/+1bDXmTY83EhZVylSCW/gFqD0v95j0QrIvjQzSK2gEgV3jlV4rTKr3MDmg57kV1UnkTRNTgvoupzHPMZDo6KOIfarnUcUoXrpnUsASqY2O1aoOXUl9KDXsZTDU0e47u/TEcRh7YmeUfjZsazTc//xOue+pYfkZrz3XPRwIMjvZ0Ep+VD9zQLzOI3AZr4NtLyg=="
+                        },
+                        "text": {
+                            "ref-y": 0.5
+                        },
+                        ".content": {
+                            "text": "BBN0"
+                        },
+                        ".fobj": {
+                            "width": 200,
+                            "height": 150
+                        },
+                        "div": {
+                            "style": {
+                                "width": 200,
+                                "height": 150
+                            }
+                        },
+                        ".fobj div": {
+                            "style": {
+                                "verticalAlign": "middle",
+                                "paddingTop": 0
+                            }
+                        },
+                        ".outer": {
+                            "stroke-width": 1,
+                            "stroke-dasharray": "none"
+                        },
+                        ".sub-process": {
+                            "visibility": "hidden",
+                            "data-sub-process": ""
+                        }
+                    },
+                    "type": "bpmn.Activity",
+                    "roger_federation": {
+                        "name": "CN=takserver_20240702T095507284890_0,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-15b5f560e4665b9e2a3c5e20c3837a90a688fe3a5fb233737721f3d2372336b8",
+                        "id": null,
+                        "description": "BBN0",
+                        "attributes": [],
+                        "interconnected": false,
+                        "groupFilters": [],
+                        "type": "Group",
+                        "stringId": "BBN0"
+                    },
+                    "size": {
+                        "width": 200,
+                        "height": 150
+                    },
+                    "activeConnections": [],
+                    "icon": "circle",
+                    "angle": 0,
+                    "z": "0",
+                    "position": {
+                        "x": 1064,
+                        "y": 1346
+                    },
+                    "activityType": "task",
+                    "embeds": "",
+                    "content": "BBN0"
+                },
+                {
+                    "graphType": "GroupCell",
+                    "id": "86cf84ac-e706-42be-a35c-0ec25b9430f4",
+                    "attrs": {
+                        ".body": {
+                            "fill": "white",
+                            "opacity": "0.35"
+                        },
+                        ".inner": {
+                            "visibility": "hidden"
+                        },
+                        "path": {
+                            "ref": ".outer"
+                        },
+                        "image": {
+                            "ref": ".outer",
+                            "ref-dy": "",
+                            "ref-y": 5,
+                            "xlink:href": "data:image/png;base64,MIIDwDCCAqigAwIBAgIUGUjHE6cu7yhflBDKuRfRk0UVO4YwDQYJKoZIhvcNAQELBQAweDELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMRQwEgYDVQQHDAtTaWduYWxfSGlsbDEMMAoGA1UECgwDSVNTMQwwCgYDVQQLDANCQk4xKjAoBgNVBAMMIXRha3NlcnZlcl8yMDI0MDcwMlQwOTU1MDcyODQ4OTBfMTAeFw0yNDA3MDIxNzAyMThaFw0zNDA3MDIxNzAyMThaMHgxCzAJBgNVBAYTAlVTMQswCQYDVQQIDAJDQTEUMBIGA1UEBwwLU2lnbmFsX0hpbGwxDDAKBgNVBAoMA0lTUzEMMAoGA1UECwwDQkJOMSowKAYDVQQDDCF0YWtzZXJ2ZXJfMjAyNDA3MDJUMDk1NTA3Mjg0ODkwXzEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCojixmVdB3AmxBTfFxRS92UXchONqSO0PvO2aTnn5vJdGISi7S3S7Um3s6HSB7NHgKs2nz42uhafwLv5HL1ZAYGMlD/jW7Y43lOz2b3UsP5XnFnmPJyc20OQ6D2biS4jJVjBGq6AbVg/Lp6nmimfaRI4I4Ft+dxb6/6UWiL/f9vEY5qncAQiaEon2mW/UBSQ2TqEppoh0v/0t7XcbkXczEXrbhPI53egMOHBTs3A+w4S6NCGegZec6AdvT5MO6rMQRDLoS8gEVFm6oosoPCY5SGF05/3qmlxSeggGzrbFKKmtBCEazuBoLkGRPhsQCMJ64J5Ag4WuXw2bKsg38MEnJAgMBAAGjQjBAMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBRpPd1hPyxXZkRTrRDKKNFWkaGG1DANBgkqhkiG9w0BAQsFAAOCAQEANQgjmFZTf34Ft/8BtpEvgvqfvQUpZoWutanvdsiQ7/8Mit6X1PaeF6Sy6P+yWRBJGAMbqh2h0IfUul2dyAh07oRAOBeCN/BJQKcpohZgfTlX9bGyMg+pb/rLj2kG7+RLUj1hf3CqeBdnjtV3FMvfAl60CfvYZVmO96d/ZNAt8Rl3pe50dzp57zrWmbPSIW/XP4HNYgwrK2D5yh/gfkc6kLETTnvPIjfymVUIx3DINnK8UGfmxaroMMja2okEm0ssm2hD89FUVOPOjpBsk39EYqrlKwlxNsSP89rvjmYxjTQSwsnIYm7CgMjX+3UJcCVh7tsy4kK+RmEHDI5cLatoGg=="
+                        },
+                        "text": {
+                            "ref-y": 0.5
+                        },
+                        ".content": {
+                            "text": "BBN1"
+                        },
+                        ".fobj": {
+                            "width": 200,
+                            "height": 150
+                        },
+                        "div": {
+                            "style": {
+                                "width": 200,
+                                "height": 150
+                            }
+                        },
+                        ".fobj div": {
+                            "style": {
+                                "verticalAlign": "middle",
+                                "paddingTop": 0
+                            }
+                        },
+                        ".outer": {
+                            "stroke-width": 1,
+                            "stroke-dasharray": "none"
+                        },
+                        ".sub-process": {
+                            "visibility": "hidden",
+                            "data-sub-process": ""
+                        }
+                    },
+                    "type": "bpmn.Activity",
+                    "roger_federation": {
+                        "name": "CN=takserver_20240702T095507284890_1,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-de5e2cdd11ced24e3dfa3c99d1ba8b7a8eadff4d7b723055fec1ca2aa0106bcb",
+                        "id": null,
+                        "description": "BBN1",
+                        "attributes": [],
+                        "interconnected": false,
+                        "groupFilters": [],
+                        "type": "Group",
+                        "stringId": "BBN1"
+                    },
+                    "size": {
+                        "width": 200,
+                        "height": 150
+                    },
+                    "activeConnections": [],
+                    "icon": "circle",
+                    "angle": 0,
+                    "z": "1",
+                    "position": {
+                        "x": 1064,
+                        "y": 1346
+                    },
+                    "activityType": "task",
+                    "embeds": "",
+                    "content": "BBN1"
+                },
+                {
+                    "graphType": "GroupCell",
+                    "id": "b97168b4-08a5-422a-a24e-17e427c0cba3",
+                    "attrs": {
+                        ".body": {
+                            "fill": "white",
+                            "opacity": "0.35"
+                        },
+                        ".inner": {
+                            "visibility": "hidden"
+                        },
+                        "path": {
+                            "ref": ".outer"
+                        },
+                        "image": {
+                            "ref": ".outer",
+                            "ref-dy": "",
+                            "ref-y": 5,
+                            "xlink:href": "data:image/png;base64,MIIDwDCCAqigAwIBAgIUPMp8keSzB3Tj//EovIaAUHqkw/swDQYJKoZIhvcNAQELBQAweDELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMRQwEgYDVQQHDAtTaWduYWxfSGlsbDEMMAoGA1UECgwDSVNTMQwwCgYDVQQLDANCQk4xKjAoBgNVBAMMIXRha3NlcnZlcl8yMDI0MDcwMlQwOTU1MDcyODQ4OTBfMjAeFw0yNDA3MDIxNzAyMjRaFw0zNDA3MDIxNzAyMjRaMHgxCzAJBgNVBAYTAlVTMQswCQYDVQQIDAJDQTEUMBIGA1UEBwwLU2lnbmFsX0hpbGwxDDAKBgNVBAoMA0lTUzEMMAoGA1UECwwDQkJOMSowKAYDVQQDDCF0YWtzZXJ2ZXJfMjAyNDA3MDJUMDk1NTA3Mjg0ODkwXzIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCWSu+w2yRT4h2ZldmTk9CJj8RFO/ZkcNLdaiSgbPFNeg1sxtZ04mOpWXIAQYXm4bkbHETDxMe8p89ckPAs16uyJAmNdkSIPYdN6HUJNn8Ry2yygErnXrgXHpJTRAyh0nFE02hdaweGk35hfvkLISd8Lb4qb/zi4hNJPunyQh9yyuOwYk/1HshTutc9E5CB/ja9+Jg29vZDghl3n5gEwS9zImHi9azxQEUTkKnNWjSjPZXjO512TNgJ9j+2M8Grfq7sTNSxmvsoPr/wa2Ac6aMfbzLXGbDUrEdOSuZPLulmAZJ0cUtPjPAfz9lb7kfbX4US0fN+vj6YNIkJICsZijoLAgMBAAGjQjBAMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBSDr07bOuWQV/26vVGiR0EEFnLi5TANBgkqhkiG9w0BAQsFAAOCAQEAY7T3eZ1VDWO1kQ9K3QmFXi0nc6qWxOAbjy8jEU5++pY1H/QRkKb5BNu6rfO4vScmLK9I05tv2jN4qFOaEF0Wn6QRHpmbjtS0hzdQhIsCKwAxxcB5m769DQNsDjt7uxwnyESwtqFhRgJv7vWotKeDWsXB8DDVh/MMBm7DKDrF95eKf/qKz6n2yMnIqjHyYAHPqj/PCNMiDqf/ITsYrdtp6S7wJ9V+agnXRKnzjyDzddbwtfRvfXr66pcmKB4+G1XU/ejlignmuxBSGSLCdcjsp1vvWPs0RnS/N4VfeVoc9vx75H7Gc5DsmHyRCgEY5fXvePHP9GVsHRXpxUhcEJ7gQw=="
+                        },
+                        "text": {
+                            "ref-y": 0.5
+                        },
+                        ".content": {
+                            "text": "BBN2"
+                        },
+                        ".fobj": {
+                            "width": 200,
+                            "height": 150
+                        },
+                        "div": {
+                            "style": {
+                                "width": 200,
+                                "height": 150
+                            }
+                        },
+                        ".fobj div": {
+                            "style": {
+                                "verticalAlign": "middle",
+                                "paddingTop": 0
+                            }
+                        },
+                        ".outer": {
+                            "stroke-width": 1,
+                            "stroke-dasharray": "none"
+                        },
+                        ".sub-process": {
+                            "visibility": "hidden",
+                            "data-sub-process": ""
+                        }
+                    },
+                    "type": "bpmn.Activity",
+                    "roger_federation": {
+                        "name": "CN=takserver_20240702T095507284890_2,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-4770bf1865f7efd6e9e6a1db4bd8f58c8cbc3294aef2a7f89a8cf1649f3dc75e",
+                        "id": null,
+                        "description": "BBN2",
+                        "attributes": [],
+                        "interconnected": false,
+                        "groupFilters": [],
+                        "type": "Group",
+                        "stringId": "BBN2"
+                    },
+                    "size": {
+                        "width": 200,
+                        "height": 150
+                    },
+                    "activeConnections": [],
+                    "icon": "circle",
+                    "angle": 0,
+                    "z": "2",
+                    "position": {
+                        "x": 1064,
+                        "y": 1346
+                    },
+                    "activityType": "task",
+                    "embeds": "",
+                    "content": "BBN2"
+                },
+                {
+                    "graphType": "GroupCell",
+                    "id": "00a19d37-b65a-40c7-ab8c-73ec58eac700",
+                    "attrs": {
+                        ".body": {
+                            "fill": "white",
+                            "opacity": "0.35"
+                        },
+                        ".inner": {
+                            "visibility": "hidden"
+                        },
+                        "path": {
+                            "ref": ".outer"
+                        },
+                        "image": {
+                            "ref": ".outer",
+                            "ref-dy": "",
+                            "ref-y": 5,
+                            "xlink:href": "data:image/png;base64,MIIDwDCCAqigAwIBAgIUddq9bPb0RtQE/5AGIjsLpie3he0wDQYJKoZIhvcNAQELBQAweDELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMRQwEgYDVQQHDAtTaWduYWxfSGlsbDEMMAoGA1UECgwDSVNTMQwwCgYDVQQLDANCQk4xKjAoBgNVBAMMIXRha3NlcnZlcl8yMDI0MDcwMlQwOTU1MDcyODQ4OTBfMzAeFw0yNDA3MDIxNzAyMjlaFw0zNDA3MDIxNzAyMjlaMHgxCzAJBgNVBAYTAlVTMQswCQYDVQQIDAJDQTEUMBIGA1UEBwwLU2lnbmFsX0hpbGwxDDAKBgNVBAoMA0lTUzEMMAoGA1UECwwDQkJOMSowKAYDVQQDDCF0YWtzZXJ2ZXJfMjAyNDA3MDJUMDk1NTA3Mjg0ODkwXzMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCbMKnbFlt2ucLxnW5LBRX4TxIBl43wBm+/PYVh4mLrNHdG3o5WK2XBGPTW/ymqi4I9XqguTkmTArYRNM/HDor9Q5EK9esxgGvO6oAUn7DaFuCmyElDrb5ZSikV0Bt8f/Ic2C6piDeCJhc+vqFAr4U3OOrqe7P4fQGZwP6KYpdjA/yeqh6Ku4PMMV8T9v0e09LtFeD6kEr0vustTJKYoiUQaWKVUL1e1wNpEiZv15dKPPVSFtSYJf7PPf8wu+KrzwIneCbx5MpZgtbP6iPIWnLaN7p7nn8aDLOs0rkxPLiYos0dmQ5O2DV8GJWY4yFlhccii43T0iHf5auNx5bXvcghAgMBAAGjQjBAMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBS4n0uRWVcPSZTDla55ShYN8VgmlTANBgkqhkiG9w0BAQsFAAOCAQEAYmJPcIb3s6kQoBpGxp7oZ/urWAqaa/QtjIP49/Q+TE7fQ7uWdFAemlDC55bMIzYmpT47FQ4oTQjlfT2Cg97yP3XpC5VXV2dgmevPEdC/GoUKU/4M33K7ZJIUJ2RZLYjMiUroqBfpGYL6k3AHgwzuwLGv/KrTXzT81o52LKyivxvnNxYdV0kcvJ63ZImEeTejBq4hqJ64bcEyn7Ib+XWF7c3uQI5DOoWZWnIqYQotXWrQmEwrL1Ojr5XCeueKzCYT6p03y/P/9jTwGz8tf3+lELEDJbBsQ8CFzonJEX/53ixXAFL5VbXCSx9y3XSDhqee8TipuPZ7G9SWuPWnT2oUyQ=="
+                        },
+                        "text": {
+                            "ref-y": 0.5
+                        },
+                        ".content": {
+                            "text": "BBN3"
+                        },
+                        ".fobj": {
+                            "width": 200,
+                            "height": 150
+                        },
+                        "div": {
+                            "style": {
+                                "width": 200,
+                                "height": 150
+                            }
+                        },
+                        ".fobj div": {
+                            "style": {
+                                "verticalAlign": "middle",
+                                "paddingTop": 0
+                            }
+                        },
+                        ".outer": {
+                            "stroke-width": 1,
+                            "stroke-dasharray": "none"
+                        },
+                        ".sub-process": {
+                            "visibility": "hidden",
+                            "data-sub-process": ""
+                        }
+                    },
+                    "type": "bpmn.Activity",
+                    "roger_federation": {
+                        "name": "CN=takserver_20240702T095507284890_3,OU=BBN,O=ISS,L=Signal_Hill,ST=CA,C=US-a58ba359ab428b59c050f5aeb42820f851c182ff47e2f461156d6dc533a6b63f",
+                        "id": null,
+                        "description": "BBN3",
+                        "attributes": [],
+                        "interconnected": false,
+                        "groupFilters": [],
+                        "type": "Group",
+                        "stringId": "BBN3"
+                    },
+                    "size": {
+                        "width": 200,
+                        "height": 150
+                    },
+                    "activeConnections": [],
+                    "icon": "circle",
+                    "angle": 0,
+                    "z": "3",
+                    "position": {
+                        "x": 1064,
+                        "y": 1346
+                    },
+                    "activityType": "task",
+                    "embeds": "",
+                    "content": "BBN3"
+                },
+                {
+                    "graphType": "EdgeCell",
+                    "id": "5dc0a5c2-9a61-4e8a-8e33-5a985cf5a4a3",
+                    "attrs": {},
+                    "type": "bpmn.Flow",
+                    "roger_federation": {
+                        "name": "BBN0 -> BBN1",
+                        "allowedGroups": [],
+                        "disallowedGroups": [],
+                        "groupsFilterType": "allGroups",
+                        "edgeFilters": [],
+                        "type": "Federate Policy"
+                    },
+                    "router": {
+                        "name": "metro"
+                    },
+                    "connector": {
+                        "name": "rounded"
+                    },
+                    "z": "4",
+                    "source": {
+                        "id": "d5082a90-d386-4e73-8519-603b94a77d38"
+                    },
+                    "embeds": "",
+                    "flowType": "normal",
+                    "target": {
+                        "id": "86cf84ac-e706-42be-a35c-0ec25b9430f4"
+                    },
+                    "labels": [
+                        {
+                            "position": 0.5,
+                            "attrs": {
+                                "text": {
+                                    "text": "BBN0 -> BBN1"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "graphType": "EdgeCell",
+                    "id": "639f728f-623c-42e8-adfa-9b1c60df7002",
+                    "attrs": {},
+                    "type": "bpmn.Flow",
+                    "roger_federation": {
+                        "name": "BBN1 -> BBN0",
+                        "allowedGroups": [],
+                        "disallowedGroups": [],
+                        "groupsFilterType": "allGroups",
+                        "edgeFilters": [],
+                        "type": "Federate Policy"
+                    },
+                    "router": {
+                        "name": "metro"
+                    },
+                    "connector": {
+                        "name": "rounded"
+                    },
+                    "z": "5",
+                    "source": {
+                        "id": "86cf84ac-e706-42be-a35c-0ec25b9430f4"
+                    },
+                    "embeds": "",
+                    "flowType": "normal",
+                    "target": {
+                        "id": "d5082a90-d386-4e73-8519-603b94a77d38"
+                    },
+                    "labels": [
+                        {
+                            "position": 0.5,
+                            "attrs": {
+                                "text": {
+                                    "text": "BBN1 -> BBN0"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "graphType": "EdgeCell",
+                    "id": "f0560bb6-a2f6-4a0b-b00e-a8776d0fe983",
+                    "attrs": {},
+                    "type": "bpmn.Flow",
+                    "roger_federation": {
+                        "name": "BBN1 -> BBN2",
+                        "allowedGroups": [],
+                        "disallowedGroups": [],
+                        "groupsFilterType": "allGroups",
+                        "edgeFilters": [],
+                        "type": "Federate Policy"
+                    },
+                    "router": {
+                        "name": "metro"
+                    },
+                    "connector": {
+                        "name": "rounded"
+                    },
+                    "z": "6",
+                    "source": {
+                        "id": "86cf84ac-e706-42be-a35c-0ec25b9430f4"
+                    },
+                    "embeds": "",
+                    "flowType": "normal",
+                    "target": {
+                        "id": "b97168b4-08a5-422a-a24e-17e427c0cba3"
+                    },
+                    "labels": [
+                        {
+                            "position": 0.5,
+                            "attrs": {
+                                "text": {
+                                    "text": "BBN1 -> BBN2"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "graphType": "EdgeCell",
+                    "id": "01f0acf0-0389-48e3-b95e-ccdc1fb48d18",
+                    "attrs": {},
+                    "type": "bpmn.Flow",
+                    "roger_federation": {
+                        "name": "BBN2 -> BBN1",
+                        "allowedGroups": [],
+                        "disallowedGroups": [],
+                        "groupsFilterType": "allGroups",
+                        "edgeFilters": [],
+                        "type": "Federate Policy"
+                    },
+                    "router": {
+                        "name": "metro"
+                    },
+                    "connector": {
+                        "name": "rounded"
+                    },
+                    "z": "7",
+                    "source": {
+                        "id": "b97168b4-08a5-422a-a24e-17e427c0cba3"
+                    },
+                    "embeds": "",
+                    "flowType": "normal",
+                    "target": {
+                        "id": "86cf84ac-e706-42be-a35c-0ec25b9430f4"
+                    },
+                    "labels": [
+                        {
+                            "position": 0.5,
+                            "attrs": {
+                                "text": {
+                                    "text": "BBN2 -> BBN1"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "graphType": "EdgeCell",
+                    "id": "b6c429ee-1624-4ad0-86ef-5e6005606800",
+                    "attrs": {},
+                    "type": "bpmn.Flow",
+                    "roger_federation": {
+                        "name": "BBN2 -> BBN3",
+                        "allowedGroups": [],
+                        "disallowedGroups": [],
+                        "groupsFilterType": "allGroups",
+                        "edgeFilters": [],
+                        "type": "Federate Policy"
+                    },
+                    "router": {
+                        "name": "metro"
+                    },
+                    "connector": {
+                        "name": "rounded"
+                    },
+                    "z": "8",
+                    "source": {
+                        "id": "b97168b4-08a5-422a-a24e-17e427c0cba3"
+                    },
+                    "embeds": "",
+                    "flowType": "normal",
+                    "target": {
+                        "id": "00a19d37-b65a-40c7-ab8c-73ec58eac700"
+                    },
+                    "labels": [
+                        {
+                            "position": 0.5,
+                            "attrs": {
+                                "text": {
+                                    "text": "BBN2 -> BBN3"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "graphType": "EdgeCell",
+                    "id": "41658263-fad5-4c71-8ffa-3a22d2a53168",
+                    "attrs": {},
+                    "type": "bpmn.Flow",
+                    "roger_federation": {
+                        "name": "BBN3 -> BBN2",
+                        "allowedGroups": [],
+                        "disallowedGroups": [],
+                        "groupsFilterType": "allGroups",
+                        "edgeFilters": [],
+                        "type": "Federate Policy"
+                    },
+                    "router": {
+                        "name": "metro"
+                    },
+                    "connector": {
+                        "name": "rounded"
+                    },
+                    "z": "9",
+                    "source": {
+                        "id": "00a19d37-b65a-40c7-ab8c-73ec58eac700"
+                    },
+                    "embeds": "",
+                    "flowType": "normal",
+                    "target": {
+                        "id": "b97168b4-08a5-422a-a24e-17e427c0cba3"
+                    },
+                    "labels": [
+                        {
+                            "position": 0.5,
+                            "attrs": {
+                                "text": {
+                                    "text": "BBN3 -> BBN2"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "graphType": "EdgeCell",
+                    "id": "58f9b4e2-d62c-4c1d-9c89-9d8f680a4976",
+                    "attrs": {},
+                    "type": "bpmn.Flow",
+                    "roger_federation": {
+                        "name": "BBN0 -> BBN3",
+                        "allowedGroups": [],
+                        "disallowedGroups": [],
+                        "groupsFilterType": "allGroups",
+                        "edgeFilters": [],
+                        "type": "Federate Policy"
+                    },
+                    "router": {
+                        "name": "metro"
+                    },
+                    "connector": {
+                        "name": "rounded"
+                    },
+                    "z": "10",
+                    "source": {
+                        "id": "d5082a90-d386-4e73-8519-603b94a77d38"
+                    },
+                    "embeds": "",
+                    "flowType": "normal",
+                    "target": {
+                        "id": "00a19d37-b65a-40c7-ab8c-73ec58eac700"
+                    },
+                    "labels": [
+                        {
+                            "position": 0.5,
+                            "attrs": {
+                                "text": {
+                                    "text": "BBN0 -> BBN3"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "graphType": "EdgeCell",
+                    "id": "254f40be-5a98-4514-9cb2-374235c9e580",
+                    "attrs": {},
+                    "type": "bpmn.Flow",
+                    "roger_federation": {
+                        "name": "BBN3 -> BBN0",
+                        "allowedGroups": [],
+                        "disallowedGroups": [],
+                        "groupsFilterType": "allGroups",
+                        "edgeFilters": [],
+                        "type": "Federate Policy"
+                    },
+                    "router": {
+                        "name": "metro"
+                    },
+                    "connector": {
+                        "name": "rounded"
+                    },
+                    "z": "11",
+                    "source": {
+                        "id": "00a19d37-b65a-40c7-ab8c-73ec58eac700"
+                    },
+                    "embeds": "",
+                    "flowType": "normal",
+                    "target": {
+                        "id": "d5082a90-d386-4e73-8519-603b94a77d38"
+                    },
+                    "labels": [
+                        {
+                            "position": 0.5,
+                            "attrs": {
+                                "text": {
+                                    "text": "BBN3 -> BBN0"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "diagramType": "Federation"
+        }
+    }
+}

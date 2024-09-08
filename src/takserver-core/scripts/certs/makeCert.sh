@@ -72,6 +72,7 @@ else
 fi
 
 CRYPTO_SETTINGS=""
+FIPS_SETTINGS=""
 
 openssl list -providers 2>&1 | grep "\(invalid command\|unknown option\)" >/dev/null
 if [ $? -ne 0 ] ; then
@@ -85,7 +86,7 @@ do
     echo "$var"
     if [ "$var" == "-fips" ] || [ "$var" == "--fips" ];then
       fips=true
-      CRYPTO_SETTINGS='-macalg SHA256 -aes256 -descert -keypbe AES-256-CBC -certpbe AES-256-CBC'
+      FIPS_SETTINGS='-macalg SHA256 -aes256 -descert -keypbe AES-256-CBC -certpbe AES-256-CBC'
     fi
 done
 
@@ -114,17 +115,17 @@ cat ca-trusted.pem >> "${SNAME}"-trusted.pem
 
 # now make pkcs12 and jks keystore files
 if [[ "$1" == "server" ||  "$1" == "client" || "$1" == "dbclient" ]]; then
-  openssl pkcs12 ${CRYPTO_SETTINGS} -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}".p12 -name "${SNAME}" -CAfile ca.pem -passin pass:${PASS} -passout pass:${PASS}
+  openssl pkcs12 ${CRYPTO_SETTINGS} ${FIPS_SETTINGS} -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}".p12 -name "${SNAME}" -CAfile ca.pem -passin pass:${PASS} -passout pass:${PASS}
   keytool -importkeystore -deststorepass "${PASS}" -destkeypass "${PASS}" -destkeystore "${SNAME}".jks -srckeystore "${SNAME}".p12 -srcstoretype PKCS12 -srcstorepass "${PASS}" -alias "${SNAME}"
 else # a CA
   if [ "$fips" = true ];then
-    openssl pkcs12 -legacy -export -in "${SNAME}"-trusted.pem -out truststore-"${SNAME}"-legacy.p12 -nokeys -passout pass:${CAPASS}
+    openssl pkcs12 ${CRYPTO_SETTINGS} -export -in "${SNAME}"-trusted.pem -out truststore-"${SNAME}"-legacy.p12 -nokeys -passout pass:${CAPASS}
   fi
-  openssl pkcs12 ${CRYPTO_SETTINGS} -export -in "${SNAME}"-trusted.pem -out truststore-"${SNAME}".p12 -nokeys -passout pass:${CAPASS}
+  openssl pkcs12 ${CRYPTO_SETTINGS} ${FIPS_SETTINGS} ${FIPS_SETTINGS} -export -in "${SNAME}"-trusted.pem -out truststore-"${SNAME}".p12 -nokeys -passout pass:${CAPASS}
   keytool -import -trustcacerts -file "${SNAME}".pem -keystore truststore-"${SNAME}".jks -storepass "${CAPASS}" -noprompt
 
   # include a CA signing keystore; NOT FOR DISTRIBUTION TO CLIENTS
-  openssl pkcs12 ${CRYPTO_SETTINGS} -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}"-signing.p12 -name "${SNAME}" -passin pass:${CAPASS} -passout pass:${CAPASS}
+  openssl pkcs12 ${CRYPTO_SETTINGS} ${FIPS_SETTINGS} -export -in "${SNAME}".pem -inkey "${SNAME}".key -out "${SNAME}"-signing.p12 -name "${SNAME}" -passin pass:${CAPASS} -passout pass:${CAPASS}
   keytool -importkeystore -deststorepass "${CAPASS}" -destkeypass "${CAPASS}" -destkeystore "${SNAME}"-signing.jks -srckeystore "${SNAME}"-signing.p12 -srcstoretype PKCS12 -srcstorepass "${CAPASS}" -alias "${SNAME}"
 
   ## create empty crl 

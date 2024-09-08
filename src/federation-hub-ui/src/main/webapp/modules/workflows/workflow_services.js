@@ -633,6 +633,32 @@ angular.module('roger_federation.Workflows')
           });
   };
 
+  workflowService.generateJwtToken = function(tokenRequest) {
+    return $http({
+      method: 'POST',
+      url: ConfigService.getServerBaseUrlStrV2() + 'generateJwtToken',
+      data: tokenRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).then(function(res) {
+      return res.data;
+    }, function(reason) {
+      throw reason;
+    });
+  };
+
+  workflowService.isAllowFlowIndicators = function() {
+      return $http.get(
+          ConfigService.getServerBaseUrlStrV2() + 'allowFlowIndicators/').then(
+          function(res) {
+              return res.data;
+          },
+          function(reason) {
+              throw reason;
+          });
+  };
+
   workflowService.getSelfCa = function() {
       return $http.get(
           ConfigService.getServerBaseUrlStrV2() + 'getSelfCaFile/').then(
@@ -642,6 +668,17 @@ angular.module('roger_federation.Workflows')
           function(reason) {
               throw reason;
           });
+  };
+
+  workflowService.restartBroker = function() {
+      return $http.get(
+        ConfigService.getServerBaseUrlStrV2() + 'restartBroker/').then(
+        function(res) {
+            return res;
+        },
+        function(reason) {
+            throw reason;
+        });
   };
 
   workflowService.getDataFlowStats = function() {

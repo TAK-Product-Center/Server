@@ -988,6 +988,41 @@ public class RepositoryService extends BaseService {
 
 		return mm;
 	}
+	
+	@Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, keyGenerator = "methodNameMultiStringArgCacheKeyGenerator")
+	public MissionMetadata getMissionMetadataByGuid(UUID missionGuid) {
+		if (missionGuid == null) {
+			throw new IllegalArgumentException("empty mission guid");
+		}
+
+		MissionMetadata mm = new MissionMetadata();
+
+		try (Connection connection = getConnection(); PreparedStatement ps = connection.prepareStatement("select creatoruid, chatroom, tool, description, name from mission where guid = uuid(?)")) {
+			ps.setString(1, missionGuid.toString());
+			try (ResultSet rs = ps.executeQuery()) {
+
+				if (rs.next()) {
+					mm.setGuid(missionGuid);
+					mm.setCreatorUid(rs.getString(1));
+					mm.setChatRoom(rs.getString(2));
+					mm.setTool(rs.getString(3));
+					mm.setDescription(rs.getString(4));
+					mm.setName(rs.getString(5));
+				} else {
+					throw new TakException("mission for guid " + missionGuid + " does not exist");
+				}
+			}
+
+		} catch (Exception e) {
+			throw new TakException("Exception getting mission metadata from database for mission " + missionGuid, e);
+		}
+
+		if (log.isDebugEnabled()) {
+			log.debug("retrieved " + mm + " for mission name " + missionGuid);
+		}
+
+		return mm;
+	}
 
 	public byte[] getContentByHash(String hash) throws SQLException, NamingException {
 		byte[] result = null;

@@ -1,0 +1,40 @@
+connection:
+  host: "{{ takserver_host }}"
+  tls: 8089
+  https: 8443
+  udp: 8087
+authentication:
+  cert: "./certs/user.p12"
+  password: "atakatak" # if no password, use empty string
+PyTAK:
+  self_sa_delta: {{ pytak_self_sa_delta }}
+  offset: 0 # time between starting clients
+  clients: {{ pytak_clients }}
+  websocket_path: "takproto/1"
+  missions:
+    random: False
+    subscribe:
+      - mission_1
+    send_mission_cot: True
+    send_only_new_tracks: False
+    mission_write_interval: 100000 # seconds
+    react_to_change_message: True
+    download_mission_content: 1.0 # percent of clients that download file (from 0 -> 1)
+    download_existing_content: False
+    send_mission_cot_probability: 0.1
+    uploads:
+      probability: 0.15
+      size: 10000000 # 10mb
+      interval: 1200 # in seconds
+UDPTest:
+  interval: 100 # milliseconds
+  clients: 100
+Missions:
+  creatorUid: PyTAK-0
+  group: __ANON__
+  tool: public
+  size_files:
+     - 1mb.txt: 1000000
+     - 5mb.txt: 5000000
+  missions:
+    - mission_1:

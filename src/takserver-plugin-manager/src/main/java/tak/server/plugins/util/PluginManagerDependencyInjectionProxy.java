@@ -21,7 +21,7 @@ import tak.server.plugins.PluginStarter;
 public class PluginManagerDependencyInjectionProxy implements ApplicationContextAware {
 	private static ApplicationContext springContext;
 
-	private static PluginManagerDependencyInjectionProxy instance = null;
+	private volatile static PluginManagerDependencyInjectionProxy instance = null;
 
 	public static PluginManagerDependencyInjectionProxy getInstance() {
 		if (instance == null) {
@@ -45,7 +45,7 @@ public class PluginManagerDependencyInjectionProxy implements ApplicationContext
 		this.springContext = context;
 	}
 
-	private Ignite ignite = null;
+	private volatile Ignite ignite = null;
 
 	public Ignite ignite() {
 		if (ignite == null) {
@@ -59,7 +59,7 @@ public class PluginManagerDependencyInjectionProxy implements ApplicationContext
 		return ignite;
 	}
 	
-	private PluginRegistry pluginRegistry = null;
+	private volatile PluginRegistry pluginRegistry = null;
 
 	public PluginRegistry pluginRegistry() {
 		if (pluginRegistry == null) {
@@ -73,7 +73,7 @@ public class PluginManagerDependencyInjectionProxy implements ApplicationContext
 		return pluginRegistry;
 	}
 	
-	private PluginStarter pluginStarter = null;
+	private volatile PluginStarter pluginStarter = null;
 
 	public PluginStarter pluginStarter() {
 		if (pluginStarter == null) {
@@ -87,7 +87,7 @@ public class PluginManagerDependencyInjectionProxy implements ApplicationContext
 		return pluginStarter;
 	}
 	
-	private PluginApi pluginApi = null;
+	private volatile PluginApi pluginApi = null;
 
 	public PluginApi pluginApi() {
 		if (pluginApi == null) {

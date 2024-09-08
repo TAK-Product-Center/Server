@@ -135,7 +135,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	
 	private final Logger changeLogger = LoggerFactory.getLogger(Constants.CHANGE_LOGGER);
 
-	private Validator validator;
+	private volatile Validator validator;
 
 	private boolean applyClassificationFilter = false;
 
@@ -145,7 +145,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 	}
     
-	private static DistributedSubscriptionManager instance = null;
+	private volatile static DistributedSubscriptionManager instance = null;
 	
     public static synchronized DistributedSubscriptionManager getInstance() {
 		if (instance == null) {
@@ -502,7 +502,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			    }
 
 			    // send a delivery failure notification if the chat message recipient is offline
-			    if (reachableMatches.isEmpty() && c.getType().startsWith("b-t-f")) {
+			    if (reachableMatches.isEmpty() && c.getType().startsWith("b-t-f")
+						&& !c.getType().equals("b-t-f-s")) {
 			    	Subscription senderSub = getSubscription(sender);
 			    	messagingUtil().sendDeliveryFailure(senderSub.clientUid, c);
 				}
@@ -950,8 +951,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 					tokens[1], remote.iface,
 					Integer.parseInt(tokens[2]), remote.xpath, remote.uid, remote.filterGroups, remote.toStatic().getFilter());
 
-			CoreConfigFacade.getInstance().getRemoteConfiguration().getSubscription().getStatic().add(remote.toStatic());
-			CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
+			CoreConfigFacade.getInstance().addStaticSubscriptionAndSave(remote.toStatic());
+
 		} catch (Exception e) {
 			throw new TakException("Error adding subscription", e);
 		}
@@ -1100,14 +1101,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 	
 	private void checkAndDeleteStaticSubscription(String uid) {
-		List<com.bbn.marti.config.Subscription.Static> staticSubs = CoreConfigFacade.getInstance().getRemoteConfiguration().getSubscription().getStatic();
-		for(com.bbn.marti.config.Subscription.Static ss : staticSubs) {
-			if (ss.getName().compareTo(uid) == 0) {
-				staticSubs.remove(ss);
-				CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
-				break;
-			}
-        }
+		CoreConfigFacade.getInstance().removeStaticSubscriptionAndSave(uid);
 	}
 	
 	private boolean doDeleteSubscription(Subscription sub, String uid) {

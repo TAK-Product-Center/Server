@@ -34,6 +34,8 @@ public class FederationHubUIConfig {
     private String keycloakAdminClaimValue;
     private String keycloakAccessTokenName = "access_token";
     private String keycloakRefreshTokenName = "refresh_token";
+    
+    private boolean enableFlowIndicators = true;
 
     public String getKeystoreType() {
         return keystoreType;
@@ -175,17 +177,23 @@ public class FederationHubUIConfig {
 	public void setKeycloakAdminClaimValue(String keycloakAdminClaimValue) {
 		this.keycloakAdminClaimValue = keycloakAdminClaimValue;
 	}
+	public boolean isEnableFlowIndicators() {
+		return enableFlowIndicators;
+	}
+	public void setEnableFlowIndicators(boolean enableFlowIndicators) {
+		this.enableFlowIndicators = enableFlowIndicators;
+	}
 	@Override
 	public String toString() {
 		return "FederationHubUIConfig [keystoreType=" + keystoreType + ", keystoreFile=" + keystoreFile
-				+ ", keystorePassword=" + keystorePassword + ", truststoreType=" + truststoreType + ", truststoreFile="
-				+ truststoreFile + ", keyAlias=" + keyAlias + ", authUsers=" + authUsers + ", port=" + port
-				+ ", allowOauth=" + allowOauth + ", oauthPort=" + oauthPort + ", keycloakServerName="
-				+ keycloakServerName + ", keycloakDerLocation=" + keycloakDerLocation + ", keycloakClientId="
-				+ keycloakClientId + ", keycloakSecret=" + keycloakSecret + ", keycloakrRedirectUri="
+				+ ", truststoreType=" + truststoreType + ", truststoreFile=" + truststoreFile + ", keyAlias=" + keyAlias
+				+ ", authUsers=" + authUsers + ", port=" + port + ", allowOauth=" + allowOauth + ", oauthPort="
+				+ oauthPort + ", keycloakServerName=" + keycloakServerName + ", keycloakDerLocation="
+				+ keycloakDerLocation + ", keycloakClientId=" + keycloakClientId + ", keycloakrRedirectUri="
 				+ keycloakrRedirectUri + ", keycloakAuthEndpoint=" + keycloakAuthEndpoint + ", keycloakTokenEndpoint="
-				+ keycloakTokenEndpoint + ", keycloakAccessTokenName=" + keycloakAccessTokenName
-				+ ", keycloakRefreshTokenName=" + keycloakRefreshTokenName + ", keycloakClaimName=" + keycloakClaimName
-				+ ", keycloakAdminClaimValue=" + keycloakAdminClaimValue + "]";
+				+ keycloakTokenEndpoint + ", keycloakClaimName=" + keycloakClaimName + ", keycloakAdminClaimValue="
+				+ keycloakAdminClaimValue + ", keycloakAccessTokenName=" + keycloakAccessTokenName
+				+ ", keycloakRefreshTokenName=" + keycloakRefreshTokenName + ", enableFlowIndicators="
+				+ enableFlowIndicators + "]";
 	}
 }

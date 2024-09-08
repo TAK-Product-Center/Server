@@ -1,17 +1,5 @@
 # need java for keytool
 FROM eclipse-temurin:17-jammy
 COPY takserver-core/certs/* /
-ARG ARG_CA_NAME
-ENV CA_NAME=$ARG_CA_NAME
-ARG ARG_STATE
-ENV STATE=$ARG_STATE
-ARG ARG_CITY
-ENV CITY=$ARG_CITY
-ARG ARG_ORGANIZATIONAL_UNIT
-ENV ORGANIZATIONAL_UNIT=$ARG_ORGANIZATIONAL_UNIT
-RUN apt update && \
-	apt install -y apt-utils && \
-    apt install -y openssl && \
-    apt install -y vim && \
-    ./generateClusterCerts.sh
-CMD ["bash"]
+RUN apt update && apt install -y apt-utils openssl vim
+CMD ["bash", "generateClusterCerts.sh"]

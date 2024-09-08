@@ -3,6 +3,8 @@ package tak.server.federation.hub.ui;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.naming.InvalidNameException;
 
@@ -25,7 +27,13 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
+import org.springframework.security.web.util.matcher.AndRequestMatcher;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import tak.server.federation.hub.ui.jwt.UserService;
 import tak.server.federation.hub.ui.manage.AuthManager;
@@ -44,6 +52,9 @@ public class SecurityConfig {
 
 	@Autowired
 	private AuthorizationFileWatcher authFileWatcher;
+	
+	@Autowired
+	private FederationHubUIConfig fedHubConfig;
 
 //	@Override
 //	protected void configure(AuthenticationManagerBuilder auth) throws Exception {
@@ -59,6 +70,14 @@ public class SecurityConfig {
 		 authenticationProvider.setUserDetailsService(userService);
 		 return new ProviderManager(authenticationProvider);
 	}
+	
+	private RequestMatcher oauthPortMatch = new RequestMatcher() {
+		@Override
+		public boolean matches(HttpServletRequest request) {
+			return fedHubConfig.isAllowOauth() && fedHubConfig.getOauthPort() != null 
+					&& request.getLocalPort() == fedHubConfig.getOauthPort();
+		}
+	};
 
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -66,12 +85,10 @@ public class SecurityConfig {
 		http.csrf().disable();
 		
 		http.x509().authenticationUserDetailsService(new X509AuthenticatedUserDetailsService());
-
+		
 		http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.ALWAYS);
 
-//		http.authorizeRequests().antMatchers("/error","/oauth/**", "/login**", "/login/**", "/bowerDependencies/**", "/favicon.ico").permitAll()
-//			.anyRequest().authenticated();
-		http.authorizeHttpRequests().requestMatchers("/error","/oauth/**", "/login**", "/login/**", "/bowerDependencies/**", "/favicon.ico").permitAll()
+		http.authorizeHttpRequests().requestMatchers(getMatchers("/error","/oauth/**", "/login**", "/login/**", "/bowerDependencies/**", "/favicon.ico")).permitAll()
 			.anyRequest().authenticated();
 
 		http.exceptionHandling().authenticationEntryPoint((request, response, ex) -> {
@@ -101,5 +118,15 @@ public class SecurityConfig {
 
 			throw new UsernameNotFoundException("Authorized user for certificate " + dn + " not found");
 		}
+	}
+	
+	private RequestMatcher[] getMatchers(String... paths) {
+		List<RequestMatcher> matchers = new ArrayList<>();
+		for (String path: paths) {
+			RequestMatcher pathMatch = new AntPathRequestMatcher(path);
+			RequestMatcher oauthAndPortMatch = new AndRequestMatcher(oauthPortMatch, pathMatch);
+			matchers.add(oauthAndPortMatch);
+		}
+		return matchers.toArray(new RequestMatcher[0]);
 	}
 }

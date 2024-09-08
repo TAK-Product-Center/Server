@@ -59,7 +59,11 @@ public class MissionCacheResolver extends TakCacheManagerResolver {
             		cacheNameMissionName = ((String) context.getArgs()[1].toString());
             	}
             }
-        	
+
+            if (cacheNameMissionName != null) {
+                cacheNameMissionName = cacheNameMissionName.toLowerCase();
+            }
+
             List<Cache> caches = new CopyOnWriteArrayList<>();
             
             if (cacheNameMissionGuid != null) {

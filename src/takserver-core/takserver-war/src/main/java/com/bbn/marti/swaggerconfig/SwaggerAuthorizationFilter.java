@@ -16,7 +16,7 @@ import java.io.IOException;
 
 public class SwaggerAuthorizationFilter extends OncePerRequestFilter {
 
-    CommonUtil martiUtil;
+	volatile CommonUtil martiUtil;
 
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)

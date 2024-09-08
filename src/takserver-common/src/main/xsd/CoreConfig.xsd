@@ -94,12 +94,12 @@
       <xs:attribute name="multicastTTL" type="xs:int" default="1"/>
       <xs:attribute name="serverId" type="xs:string" default=""/>
       <xs:attribute name="enterpriseSyncSizeLimitMB" type="xs:int" default="400"/>
-      <xs:attribute name="enterpriseSyncSizeUploadTimeoutMillis" type="xs:int" default="6000000">
+      <xs:attribute name="enterpriseSyncSizeUploadTimeoutMillis" type="xs:int" default="600000">
         <xs:annotation>
           <xs:documentation>Set the timeout for file uploads in milliseconds (sync/upload endpoint). Default is 600000 ms (5 minutes).</xs:documentation>
         </xs:annotation>
       </xs:attribute>
-       <xs:attribute name="enterpriseSyncSizeDownloadTimeoutMillis" type="xs:int" default="6000000">
+       <xs:attribute name="enterpriseSyncSizeDownloadTimeoutMillis" type="xs:int" default="600000">
         <xs:annotation>
           <xs:documentation>Set the timeout for file downloads in milliseconds (sync/upload endpoint). Default is 600000 ms (5 minutes).</xs:documentation>
         </xs:annotation>
@@ -224,6 +224,8 @@
       <xs:attribute name="x509groupsDefaultRDN" type="xs:boolean" default="false"/>
       <xs:attribute name="x509addAnonymous" type="xs:boolean" default="false"/>
       <xs:attribute name="x509useGroupCache" type="xs:boolean" default="false"/>
+      <xs:attribute name="x509useGroupCacheDefaultActive" type="xs:boolean" default="false"/>
+      <xs:attribute name="x509useGroupCacheRequiresActiveGroup" type="xs:boolean" default="false"/>
       <xs:attribute name="x509useGroupCacheRequiresExtKeyUsage" type="xs:boolean" default="true"/>
       <xs:attribute name="x509checkRevocation" type="xs:boolean" default="false"/>
       <xs:attribute name="x509tokenAuth" type="xs:boolean" default="false"/>
@@ -507,6 +509,11 @@
       <xs:attribute name="prettyLoggingEnabled" type="xs:boolean" default="false"/>
       <xs:attribute name="lineSeparatorIncluded" type="xs:boolean" default="true"/>
       <xs:attribute name="doubleSpaced" type="xs:boolean" default="false"/>
+      <xs:attribute name="httpAccessEnabled" type="xs:boolean" default="false">
+      	<xs:annotation>
+          <xs:documentation>Enable http access log (/opt/tak/logs/takserver-api-access.log)</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
     </xs:complexType>
   </xs:element>
 
@@ -944,6 +951,7 @@
             <xs:attribute name="fallback" type="xs:string"/>
             <xs:attribute name="maxRetries" type="xs:int" default = "0" use="optional"/>
             <xs:attribute name="unlimitedRetries" type="xs:boolean" default="true"/>
+            <xs:attribute name="connectionToken" type="xs:string" default=""/>
           </xs:complexType>
         </xs:element>
         

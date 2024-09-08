@@ -28,7 +28,7 @@ import com.google.common.cache.CacheBuilder;
 
 public abstract class MessageBaseStrategy<T> implements MessageStrategy<T> {
 
-	private Cache<String, Long> cache;
+	private volatile Cache<String, Long> cache;
 
 	protected long maxCacheSize;
 

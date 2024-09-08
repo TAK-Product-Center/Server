@@ -86,7 +86,7 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 	
 	private String type = null;
 	
-	private String endpoint = null;
+	private volatile String endpoint = null;
 	
 	// Flag to track whether this is a new message, or stored message (as is the case with Latest SA)
 	private boolean stored = false;

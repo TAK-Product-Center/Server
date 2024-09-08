@@ -28,18 +28,12 @@ spec:
           volumeMounts:
             - name: config #The name(key) value must match pod volumes name(key) value
               mountPath: /certs-configmap/
-            - name: core-config
-              mountPath: /CoreConfig.xml
-              subPath: CoreConfig.xml
             - name: tak-ignite-config
               mountPath: /TAKIgniteConfig.xml
       volumes:
         - name: config
           configMap:
             name: {{ .Values.certConfigMapName }}
-        - name: core-config
-          configMap:
-            name: {{ .Values.coreConfigMapName}}
         - name: tak-ignite-config
           configMap:
             name: {{ .Values.takIgniteConfigMapName }}

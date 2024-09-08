@@ -46,6 +46,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCrypt;
@@ -367,6 +368,8 @@ public class MissionApi extends BaseRestController {
 				UUID missionGuid = parseGuid(guid);
 				
 				Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+				
+				logger.debug("mission from getMissionByGuid {} {}", missionGuid, mission);
 
 				try {
 					if (!Strings.isNullOrEmpty(password)) {
@@ -404,10 +407,8 @@ public class MissionApi extends BaseRestController {
 				Set<Mission> result = new HashSet<>();
 				result.add(mission);
 
-				if (logger.isDebugEnabled()) {
-					logger.debug("GET mission: " + result);
-				}
-
+				logger.debug("GET mission: {}", mission);
+				
 				return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), result);
 
 			} catch (Exception e) {
@@ -520,6 +521,7 @@ public class MissionApi extends BaseRestController {
 				expirationParam,
 				inviteOnlyParam,
 				false,
+				false,
 				requestBody,
 				request,
 				sessionId,
@@ -593,6 +595,7 @@ public class MissionApi extends BaseRestController {
 				expirationParam,
 				inviteOnlyParam,
 				allowDupe,
+				true,
 				requestBody,
 				request,
 				sessionId,
@@ -617,6 +620,7 @@ public class MissionApi extends BaseRestController {
 															   Long expirationParam,
 															   Boolean inviteOnlyParam,
 															   boolean allowDupe,
+															   boolean allowDupeInDifferentGroups,
 															   byte[] requestBody,
 															   final HttpServletRequest request,
 															   final String sessionId,
@@ -688,6 +692,7 @@ public class MissionApi extends BaseRestController {
 				// if the user is trying to add a mission to anon, apply the user's groups instead of failing
     			if (groupNames.length == 1 && groupNames[0].equals("__ANON__")) {
 					groupVectorMission = groupVectorUser;
+					bitVectorMission = bitVectorUser;
 				} else {
 					throw new ForbiddenException("Illegal attempt to set groupVector for Mission!");
 				}
@@ -722,28 +727,28 @@ public class MissionApi extends BaseRestController {
 
 			String name = missionService.trimName(nameParam);
 
-			Mission mission;
+			Mission mission = null;
 			try {
 
+				// get mission
 				try {
-					// uses MissionCacheHelper to get the mission
-					// then calls validate mission
-					// throws NotFoundException or MissionDeletedException if the mission doesn't exist
-					mission = missionService.getMission(name, groupVectorUser);
+					mission = missionService.getMissionByName(name, true);
+					missionService.validateMission(mission, name); // checks if the mission was deleted, or null
 				} catch (Exception e) {
 					if (logger.isDebugEnabled()) {
 						logger.debug("exception getting mission", e); // make sure this gets logged, then rethrow
 					}
+					
 					throw e;
 				}
-
-				if (mission == null) {
-					if (logger.isDebugEnabled()) {
-						logger.debug("mission {} not found in database or cache.", name);
-					}
+				
+				// If the mission exists, but the user is not allowed to access it, don't use or try to update the existing mission. Instead, allow duplicate mission creation. 
+				if (!remoteUtil.isGroupVectorAllowed(groupVectorUser, mission.getGroupVector())) {
+					allowDupe = true;
+					mission = null;
 				}
 
-				if (allowDupe) {
+				if (allowDupe && allowDupeInDifferentGroups) {
 
 					logger.info("creating duplicate mission {} ", name);
 
@@ -922,7 +927,7 @@ public class MissionApi extends BaseRestController {
 
 			return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), Sets.newHashSet(mission));
 
-		} catch (Exception e) {
+		} catch (Exception e) { // log and rethrow
 			logger.error("exception in createMission", e);
 			throw e;
 		}
@@ -952,7 +957,7 @@ public class MissionApi extends BaseRestController {
 		// result
 		Mission mission = null;
 
-		logger.info("Create mission {} (does not exist)", name);
+		logger.info("Creating new mission {}", name);
 
 		String passwordHash = null;
 		if (!Strings.isNullOrEmpty(password)) {
@@ -1333,7 +1338,7 @@ public class MissionApi extends BaseRestController {
 		
 		try {
 			// This validates the input string (UUID)
-			UUID.fromString(guidString);
+			guid = UUID.fromString(guidString);
 		} catch (IllegalArgumentException e) {
 			// rethrow with additional context
 			throw new IllegalArgumentException("Invalid mission guid in request", e);
@@ -1436,9 +1441,8 @@ public class MissionApi extends BaseRestController {
 	}
 
 	/*
-	 * Send a mission package to a list of contacts
+	 * Send a mission package to a list of contacts (by mission name)
 	 */
-	// TODO: add support for sending mission package by mission guid - edge case
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
 	@RequestMapping(value = "/missions/{name:.+}/send", method = RequestMethod.POST)
 	ApiResponse<Set<Mission>> sendMissionArchive(@PathVariable("name") @NotNull String missionName, HttpServletRequest request) throws ValidationException, IntrusionException {
@@ -1494,12 +1498,69 @@ public class MissionApi extends BaseRestController {
 		result.add(mission);
 		return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), result);
 	}
+	
+	/*
+	 * Send a mission package to a list of contacts (by mission guid)
+	 */
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{guid:.+}/send", method = RequestMethod.POST)
+	ApiResponse<Set<Mission>> sendMissionArchiveByGuid(@PathVariable("name") @NotNull String missionGuidParam, HttpServletRequest request) throws ValidationException, IntrusionException {
+
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission);
+
+		String[] contactUids = request.getParameterValues("contacts");
+
+		if (contactUids == null || contactUids.length == 0) {
+			throw new IllegalArgumentException("empty contacts array");
+		}
+
+		// validate the uids before sending on to the subscriptionManager
+		for (String uid : contactUids) {
+			validator.getValidInput(context, uid, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
+		}
+		validateParameters(new Object() {}.getClass().getEnclosingMethod());
+
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+
+		byte[] archive = missionService.archiveMission(mission.getGuidAsUUID(), groupVector, request.getServerName());
+		
+		String archiveName = mission.getName() + "_" + mission.getGuid().toString(); // include the guid in the archive zipo name for uniqueness
+
+		String shaHash = missionService.addMissionArchiveToEsync(archiveName, archive, groupVector, false);
+
+		String requestUrl = request.getRequestURL().toString();
+		String url = requestUrl.substring(0, requestUrl.indexOf(request.getServletPath()))
+				+ "/Marti/sync/content?hash=" + shaHash; // yes: uid will be set to the shaHash in the CoT message (see below)
+
+		// Generate the CoT message
+		String cotMessage = CommonUtil.getFileTransferCotMessage(
+				/*String uid*/ shaHash, // yes: set the UID to be the hash, this makes it consistent with ATAK-generated mission packages
+				/*String shaHash*/ shaHash,
+				/*String callsign*/  SecurityContextHolder.getContext().getAuthentication().getName(),
+				/*String filename*/ archiveName + ".zip",
+				/*String url*/ url,
+				/*long sizeInBytes*/ archive.length,
+				/*String[] contacts*/ contactUids);
+
+		try {
+			submission.submitCot(cotMessage, martiUtil.getGroupsFromRequest(request));
+		} catch (Exception e) {
+			throw new TakException(e);
+		}
+
+		Set<Mission> result = new HashSet<>();
+		result.add(mission);
+		return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), result);
+	}
 
 	/*
-	 * add single or multiple mission content, by hash or UID
+	 * add single or multiple mission content (hash or UID) - referencing mission by name.
 	 *
 	 */
-	// TODO: add guid API for this
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{name:.+}/contents", method = RequestMethod.PUT)
 	public Callable<ApiResponse<Set<Mission>>> addMissionContent(@PathVariable("name") String name,
@@ -1536,11 +1597,9 @@ public class MissionApi extends BaseRestController {
 	}
 	
 	/*
-	 * add single or multiple mission content, by hash or UID
+	 * add single or multiple mission content (hash or UID) - referencing mission by guid.
 	 *
 	 */
-	
-	
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/guid/{guid:.+}/contents", method = RequestMethod.PUT)
 	public Callable<ApiResponse<Set<Mission>>> addMissionContentByGuid(@PathVariable("guid") String guid,
@@ -1565,9 +1624,6 @@ public class MissionApi extends BaseRestController {
 			}
 
 			Mission mission = missionService.addMissionContent(missionGuid, content, creatorUid, groupVector);
-
-			// TODO can remove?
-//			MissionUtils.findAndSetTransientValuesForMission(mission);
 
 			Set<Mission> result = new HashSet<>();
 			result.add(mission);
@@ -1613,7 +1669,6 @@ public class MissionApi extends BaseRestController {
 	 * remove mission content by hash or uid
 	 */
 	
-	// TODO: add API case with guid param
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{name:.+}/contents", method = RequestMethod.DELETE)
 	ApiResponse<Set<Mission>> removeMissionContent(@PathVariable("name") String name,
@@ -1644,6 +1699,40 @@ public class MissionApi extends BaseRestController {
 		// return mission object without resource and uid list (since the query could be expensive)
 		return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), Sets.newHashSet(updatedMission));
 	}
+	
+	@RequestMapping(value = "/missions/guid/{guid:.+}/contents", method = RequestMethod.DELETE)
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	ApiResponse<Set<Mission>> removeMissionContentByGuid(@PathVariable("guid") String guid,
+												   @RequestParam(value = "hash", required = false) @ValidatedBy("MartiSafeString") String hash,
+												   @RequestParam(value = "uid", required = false) @ValidatedBy("MartiSafeString") String uid,
+												   @RequestParam(value = "creatorUid", defaultValue = "") @ValidatedBy("MartiSafeString") String creatorUid,
+												   HttpServletRequest request) throws ValidationException, IntrusionException {
+
+		// validate this differently since it's a path variable
+		validator.getValidInput(context, guid, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
+
+		validateParameters(new Object() {}.getClass().getEnclosingMethod());
+		
+		String groupVector = null;
+
+		try {
+			// Get group vector for the user associated with this session
+			groupVector = martiUtil.getGroupBitVector(request);
+		} catch (Exception e) {
+			logger.debug("exception getting group membership for user request", e);
+		}
+		
+		UUID guidUuid = parseGuid(guid);
+		
+		Mission mission = missionService.getMissionByGuidCheckGroups(guidUuid, groupVector);
+		
+		// remove the content and track change
+		Mission updatedMission = missionService.deleteMissionContent(mission.getGuidAsUUID(), hash, uid, creatorUid, martiUtil.getGroupVectorBitString(request));
+
+		// return mission object without resource and uid list (since the query could be expensive)
+		return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), Sets.newHashSet(updatedMission));
+	}
+
 
 	/*
 	 * get the content change set for a missions given a time period
@@ -2233,6 +2322,34 @@ public class MissionApi extends BaseRestController {
 		return new ApiResponse<MissionSubscription>(
 				Constants.API_VERSION, MissionSubscription.class.getName(), missionSubscription);
 	}
+	
+	/*
+	 * Returns the mission subscription for the current user by guid
+	 */
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/subscription", method = RequestMethod.GET)
+	@ResponseStatus(HttpStatus.OK)
+	public ApiResponse<MissionSubscription> getSubscriptionForUserByGuid(
+			@PathVariable("missionGuid") String missionGuidParam,
+			@RequestParam(value = "uid", defaultValue = "") String uid)
+	{
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		// validate existence of mission
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission);
+
+		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
+		MissionSubscription missionSubscription = missionSubscriptionRepository
+				.findByMissionGuidAndClientUidAndUsernameNoMission(missionGuid.toString(), uid, username);
+
+		if (missionSubscription == null) {
+			throw new NotFoundException("Mission subscription not found");
+		}
+
+		return new ApiResponse<MissionSubscription>(
+				Constants.API_VERSION, MissionSubscription.class.getName(), missionSubscription);
+	}
 
 	/*
 	 * subscribe to mission changes
@@ -2355,6 +2472,127 @@ public class MissionApi extends BaseRestController {
 					Constants.API_VERSION,  MissionSubscription.class.getName(), missionSubscription);
 		};
 	}
+	
+	/*
+	 * subscribe to mission changes by guid
+	 */
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/subscription", method = RequestMethod.PUT)
+	@ResponseStatus(HttpStatus.CREATED)
+	public Callable<ApiResponse<MissionSubscription>> createMissionSubscriptionByGuid(
+			@RequestParam(value = "uid", defaultValue = "") String uid,
+			@RequestParam(value = "topic", defaultValue = "") String topic,
+			@RequestParam(value = "password", defaultValue = "") String password,
+			@RequestParam(value = "secago", required = false) Long secago,
+			@RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date start,
+			@RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date end,
+			@PathVariable("missionGuid") String missionGuidParam) {
+
+		final HttpServletRequest request = requestHolderBean.getRequest();
+
+		final String sessionId = requestHolderBean.sessionId();
+
+		final String groupVector = martiUtil.getGroupVectorBitString(sessionId);
+
+		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
+		
+		final UUID missionGuid = parseGuid(missionGuidParam);
+
+		return () -> {
+
+			Mission mission;
+			if (missionService.getApiVersionNumberFromRequest(request) >= 4) {
+				mission = missionService.getMissionByGuid(missionGuid, groupVector);
+			} else {
+				mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
+				missionService.validateMissionByGuid(mission);
+			}
+
+			MissionRole subRole = missionService.getRoleFromToken(mission,
+					new MissionTokenUtils.TokenType[]{
+							MissionTokenUtils.TokenType.INVITATION,
+							MissionTokenUtils.TokenType.SUBSCRIPTION,
+							MissionTokenUtils.TokenType.ACCESS
+					}, request);
+
+			//
+			// for password protected missions, the caller must provide a password or a token invite
+			//
+			if (mission.isPasswordProtected()) {
+				if (!Strings.isNullOrEmpty(password)) {
+					if (!BCrypt.checkpw(password, mission.getPasswordHash())) {
+						throw new ForbiddenException("Illegal attempt to subscribe to mission! Password did not match.");
+					}
+				}  else if (subRole == null) {
+					throw new ForbiddenException("Illegal attempt to subscribe to mission! No token role provided.");
+				}
+			} else if (!Strings.isNullOrEmpty(password)) {
+				throw new ForbiddenException("Illegal attempt to subscribe to mission! No password provided.");
+			} else if (mission.isInviteOnly() && subRole == null) {
+				// find a username invitation for the current user
+				subRole = missionService.getRoleFromTypeAndInvitee(
+						mission.getGuidAsUUID(), MissionInvitation.Type.userName.name(), username);
+				if (subRole == null) {
+					throw new ForbiddenException("Illegal attempt to subscribe to invite only mission!");
+				}
+			}
+
+			MissionRole role = null;
+			if (subRole != null) {
+				role = subRole;
+			} else {
+				role = missionService.getDefaultRole(mission);
+			}
+
+			if (Strings.isNullOrEmpty(uid) && Strings.isNullOrEmpty(topic)) {
+				throw new IllegalArgumentException("either 'uid' or 'topic' parameter must be specified");
+			}
+
+			MissionSubscription missionSubscription = missionService.missionSubscribe(mission.getGuidAsUUID(), mission.getId(),
+					Strings.isNullOrEmpty(topic) ? uid : "topic:" + topic, username, role, groupVector);
+
+			if (mission.getFeeds() != null) {
+				for (MissionFeed missionFeed : mission.getFeeds()) {
+					dataFeedCotService.sendLatestFeedEvents(mission, missionFeed, Collections.singletonList(uid), groupVector);
+				}
+			}
+
+			try {
+				// clear out any uid invitations now that the uid has subscribed
+				missionService.missionUninvite(mission.getGuidAsUUID(),
+						uid, MissionInvitation.Type.clientUid, uid, groupVector);
+
+				// clear out any callsign invitations for the devices current callsign
+				RemoteSubscription subscription = subscriptionManagerProxy.getSubscriptionManagerForClientUid(uid).getRemoteSubscriptionByClientUid(uid);
+				if (subscription != null && !Strings.isNullOrEmpty(subscription.callsign)) {
+					missionService.missionUninvite(mission.getGuidAsUUID(), subscription.callsign,
+							MissionInvitation.Type.callsign, uid, groupVector);
+				}
+			}
+			catch (Exception e) {
+				throw new TakException(e);
+			}
+
+			// return changes and logs with API 3+
+			if (missionService.getApiVersionNumberFromRequest(request) >= 3) {
+
+				missionSubscription.setMission(mission);
+
+				Set<MissionChange> changes = missionService.getMissionChanges(
+						mission.getName(), groupVector, secago, start, end, false);
+				missionSubscription.getMission().setMissionChanges(changes);
+
+				List<LogEntry> logs = missionService.getLogEntriesForMission(mission, secago, start, end);
+				missionSubscription.getMission().setLogs(logs);
+
+			} else {
+				//  mission is not returned < API 3
+				missionSubscription.setMission(null);
+			}
+
+			return new ApiResponse<MissionSubscription>(
+					Constants.API_VERSION,  MissionSubscription.class.getName(), missionSubscription);
+		};
+	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_SET_ROLE')")
 	@RequestMapping(value = "/missions/{missionName:.+}/subscription", method = RequestMethod.POST)
@@ -2389,9 +2627,43 @@ public class MissionApi extends BaseRestController {
 		boolean success = missionService.inviteOrUpdate(mission, subscriptions, creatorUid, groupVector);
 		response.setStatus(success ? HttpServletResponse.SC_OK : HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_SET_ROLE')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/subscription", method = RequestMethod.POST)
+	public void setSubscriptionRoleByGuid(
+			@RequestBody List<MissionSubscription> subscriptions,
+			@PathVariable("missionGuid") String missionGuidParam,
+			@RequestParam(value = "creatorUid", required = true) @ValidatedBy("MartiSafeString") String creatorUid,
+			HttpServletRequest request) {
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+
+		// validate existence of mission
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
+		missionService.validateMissionByGuid(mission);
+
+		// validate subscription list
+		for (MissionSubscription subscription : subscriptions) {
+			if (subscription.getClientUid() == null || subscription.getRole() == null) {
+				throw new IllegalArgumentException("missing clientUid or role");
+			}
+
+			MissionRole role = missionRoleRepository.findFirstByRole(subscription.getRole().getRole());
+
+			if (!missionService.validateRoleAssignment(mission, request, role)) {
+				throw new ForbiddenException("validateRoleAssignment failed! Illegal attempt to assign role "
+						+ role.getRole().name());
+			}
+		}
+
+		boolean success = missionService.inviteOrUpdate(mission, subscriptions, creatorUid, groupVector);
+		response.setStatus(success ? HttpServletResponse.SC_OK : HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+	}
 
 	/*
-	 * unsubscribe to mission changes
+	 * unsubscribe from mission changes
 	 *
 	 */
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')") // use MISSION_READ here to allow readonly users to unsubscribe
@@ -2424,6 +2696,41 @@ public class MissionApi extends BaseRestController {
 			return null;
 		};
 	}
+	
+	/*
+	 * unsubscribe from mission changes by guid
+	 *
+	 */
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')") // use MISSION_READ here to allow readonly users to unsubscribe
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/subscription", method = RequestMethod.DELETE)
+	@ResponseStatus(HttpStatus.OK)
+	public Callable<Void> deleteMissionSubscriptionByGuid(
+			@RequestParam(value = "uid", defaultValue = "") String uid,
+			@RequestParam(value = "topic", defaultValue = "") String topic,
+			@RequestParam(value = "disconnectOnly", defaultValue = "true") boolean disconnectOnly,
+			@PathVariable("missionGuid") String missionGuidParam) {
+
+		final String groupVector = martiUtil.getGroupVectorBitString(request);
+
+		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
+		return () -> {
+			
+			UUID missionGuid = parseGuid(missionGuidParam);
+
+			// validate existence of mission
+			Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
+			missionService.validateMissionByGuid(mission);
+
+			if (Strings.isNullOrEmpty(uid) && Strings.isNullOrEmpty(topic)) {
+				throw new IllegalArgumentException("either 'uid' or 'topic' parameter must be specified");
+			}
+
+			missionService.missionUnsubscribe(mission.getGuidAsUUID(), Strings.isNullOrEmpty(topic) ? uid : topic, username, groupVector, disconnectOnly);
+
+			return null;
+		};
+	}
 
 	/*
 	 * Get all mission subscriptions
@@ -2434,6 +2741,17 @@ public class MissionApi extends BaseRestController {
 	@ResponseStatus(HttpStatus.OK)
 	public ApiResponse<List<Map.Entry<String, String>>> getAllMissionSubscriptions() {
 		return new ApiResponse<List<Map.Entry<String, String>>>(Constants.API_VERSION, "MissionSubscription", missionService.getAllMissionSubscriptions());
+	}
+	
+	/*
+	 * Get all mission subscriptions with guid
+	 *
+	 */
+	@PreAuthorize("hasRole('ROLE_ADMIN')") // restrict to admin
+	@RequestMapping(value = "/missions/all/subscriptions/guid", method = RequestMethod.GET)
+	@ResponseStatus(HttpStatus.OK)
+	public ApiResponse<List<Map.Entry<Map.Entry<String, String>, String>>> getAllMissionSubscriptionsWithGuid() {
+		return new ApiResponse<List<Map.Entry<Map.Entry<String, String>, String>>>(Constants.API_VERSION, "MissionSubscription", missionService.getAllMissionSubscriptionsWithGuid());
 	}
 
 	/*
@@ -2455,7 +2773,53 @@ public class MissionApi extends BaseRestController {
 			throw new TakException(e);
 		}
 	}
+	
+	/*
+	 * 
+	 * Get subscriptions to the specified mission by guid
+	 *
+	 */
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/subscriptions", method = RequestMethod.GET)
+	@ResponseStatus(HttpStatus.OK)
+	public ApiResponse<List<String>> getMissionSubscriptionsByGuid(
+			@PathVariable("missionGuid") String missionGuidParam, HttpServletRequest request) {
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
 
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission);
+
+		try {
+			return new ApiResponse<List<String>>(Constants.API_VERSION, "MissionSubscription", subscriptionManager.getMissionSubscriptions(mission.getGuidAsUUID(), false));
+		} catch (Exception e) {
+			throw new TakException(e);
+		}
+	}
+
+	/* roles by guid */
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/subscriptions/roles", method = RequestMethod.GET)
+	@ResponseStatus(HttpStatus.OK)
+	public ApiResponse<List<MissionSubscription>> getMissionSubscriptionRolesByGuid(
+			@PathVariable("missionGuid") String missionGuidParam, HttpServletRequest request) {
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission);
+
+		// ensure tokens are removed from the output
+		List<MissionSubscription> missionSubscriptions = missionService.getMissionSubscriptionsByMissionGuidNoMissionNoToken(missionGuid);
+		for (MissionSubscription missionSubscription : missionSubscriptions) {
+			missionSubscription.setToken(null);
+		}
+
+		return new ApiResponse<List<MissionSubscription>>(Constants.API_VERSION, "MissionSubscription",
+				missionSubscriptions);
+	}
+	
+	/* roles by name */
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
 	@RequestMapping(value = "/missions/{missionName:.+}/subscriptions/roles", method = RequestMethod.GET)
 	@ResponseStatus(HttpStatus.OK)
@@ -2491,7 +2855,62 @@ public class MissionApi extends BaseRestController {
 		return new ApiResponse<MissionRole>(
 				Constants.API_VERSION,  MissionRole.class.getName(), role);
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/role", method = RequestMethod.GET)
+	public ApiResponse<MissionRole> getMissionRoleFromTokenByGuid(
+			@PathVariable("missionGuid") String missionGuidParam, HttpServletRequest request) {
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
 
+		// validate existence of mission
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission);
+
+		MissionRole role = (MissionRole)request.getAttribute(MissionRole.class.getName());
+
+		return new ApiResponse<MissionRole>(
+				Constants.API_VERSION,  MissionRole.class.getName(), role);
+	}
+
+	@PreAuthorize("hasPermission(#request, 'MISSION_SET_ROLE')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/role", method = RequestMethod.PUT)
+	public void setMissionRoleByGuid(
+			@PathVariable("missionGuid") String missionGuidParam,
+			@RequestParam(value = "clientUid", defaultValue = "") @ValidatedBy("MartiSafeString") String clientUid,
+			@RequestParam(value = "username", defaultValue = "") @ValidatedBy("MartiSafeString") String username,
+			@RequestParam(value = "role", required = false) @ValidatedBy("MartiSafeString") MissionRole.Role newRole,
+			HttpServletRequest request) {
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		// validate existence of mission
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission);
+
+		if (mission.getDefaultRole() == null) {
+			logger.error("illegal attempt to set role on non role-enabled mission!");
+			throw new IllegalArgumentException();
+		}
+
+		boolean result = true;
+
+		MissionRole role = null;
+
+		if (newRole != null) {
+			role = missionRoleRepository.findFirstByRole(newRole);
+
+			if (!missionService.validateRoleAssignment(mission, request, role)) {
+				throw new ForbiddenException(
+						"validateRoleAssignment failed! Illegal attempt to assign role " + newRole.name());
+			}
+		}
+
+		result = missionService.setRole(mission, clientUid, username, role, martiUtil.getGroupVectorBitString(request));
+
+		response.setStatus(result ? HttpServletResponse.SC_OK : HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+	}
+	
 	@PreAuthorize("hasPermission(#request, 'MISSION_SET_ROLE')")
 	@RequestMapping(value = "/missions/{missionName:.+}/role", method = RequestMethod.PUT)
 	public void setMissionRole(
@@ -2505,6 +2924,9 @@ public class MissionApi extends BaseRestController {
 
 		// validate existence of mission
 		Mission mission = missionService.getMissionByNameCheckGroups(missionName, martiUtil.getGroupVectorBitString(request));
+		
+		logger.debug("mission in setMissionRole {} default role {}", mission, mission.getDefaultRole());
+		
 		missionService.validateMission(mission, missionName);
 
 		if (mission.getDefaultRole() == null) {
@@ -2576,6 +2998,26 @@ public class MissionApi extends BaseRestController {
 
 		return new ApiResponse<List<MissionInvitation>>(Constants.API_VERSION, "MissionInvitation", missionInvitations);
 	}
+	
+	/*
+	 * Get invitations to the specified mission by guid
+	 *
+	 */
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/invitations", method = RequestMethod.GET)
+	@ResponseStatus(HttpStatus.OK)
+	public ApiResponse<List<MissionInvitation>> getMissionInvitationsByGuid(
+			@PathVariable("missionGuid") String missionGuidParam, HttpServletRequest request) {
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission);
+
+		List<MissionInvitation> missionInvitations = missionService.getMissionInvitationsByGuid(mission.getGuidAsUUID());
+
+		return new ApiResponse<List<MissionInvitation>>(Constants.API_VERSION, "MissionInvitation", missionInvitations);
+	}
 
 	@RequestMapping(value = "/missions/{name:.+}/invite/{type:.+}/{invitee:.+}", method = RequestMethod.PUT)
 	@ResponseStatus(HttpStatus.OK)
@@ -2639,7 +3081,126 @@ public class MissionApi extends BaseRestController {
 
 		missionService.missionInvite(mission.getGuidAsUUID(), invitee, type, inviteRole, creatorUid, groupVector);
 	}
+	
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/invite/{type:.+}/{invitee:.+}", method = RequestMethod.PUT)
+	@ResponseStatus(HttpStatus.OK)
+	public void inviteToMissionByGuid(
+			@PathVariable("missionGuid") @NotNull String missionGuidParam,
+			@PathVariable("type") @NotNull MissionInvitation.Type type,
+			@PathVariable("invitee") @NotNull String invitee,
+			@RequestParam(value = "creatorUid", required = true) @ValidatedBy("MartiSafeString") String creatorUid,
+			@RequestParam(value = "role", defaultValue = "") @ValidatedBy("MartiSafeString") MissionRole.Role role,
+			HttpServletRequest request) {
 
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
+		missionService.validateMissionByGuid(mission);
+
+		CoreConfig config = CoreConfigFacade.getInstance();
+
+		// If VBM is enabled, only let the mission owner or admin invite users to a COP mission
+		if (config.getRemoteConfiguration().getVbm() != null &&
+				config.getRemoteConfiguration().getVbm().isEnabled() &&
+				config.getRemoteConfiguration().getNetwork().getMissionCopTool().equals(mission.getTool())) {
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("Mission Invite 2: VBM is enabled");
+			}
+
+			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+			if (roleForRequest == null) {
+				throw new IllegalArgumentException("no role for request!");
+			}
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("Mission Invite 2: Role for request: {}", roleForRequest.getRole().toString());
+			}
+
+			if (!roleForRequest.getRole().equals(MissionRole.Role.MISSION_OWNER)) {
+				String msg = "Only mission owner or admin can send an invite";
+				logger.error(msg);
+				throw new ForbiddenException(msg);
+			}
+		}
+
+		MissionRole inviteRole = null;
+		if (role != null) {
+			inviteRole = missionRoleRepository.findFirstByRole(role);
+		} else {
+			inviteRole = missionService.getDefaultRole(mission);
+		}
+
+		if (!missionService.validateRoleAssignment(mission, request, inviteRole)) {
+			throw new ForbiddenException("validateRoleAssignment failed! Illegal attempt to assign role "
+					+ inviteRole.getRole().name());
+		}
+
+		missionService.missionInvite(mission.getGuidAsUUID(), invitee, type, inviteRole, creatorUid, groupVector);
+	}
+
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/invite/{type:.+}/{invitee:.+}", method = RequestMethod.DELETE)
+	@ResponseStatus(HttpStatus.OK)
+	@Transactional
+	public void uninviteFromMissionByGuid(
+			@PathVariable("missionGuid") @NotNull String missionGuidParam,
+			@PathVariable("type") @NotNull MissionInvitation.Type type,
+			@PathVariable("invitee") @NotNull String invitee,
+			@RequestParam(value = "creatorUid", required = true) @ValidatedBy("MartiSafeString") String creatorUid,
+			HttpServletRequest request) {
+
+		try {
+			UUID missionGuid = parseGuid(missionGuidParam);
+
+			Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
+			missionService.validateMissionByGuid(mission);
+
+			CoreConfig config = CoreConfigFacade.getInstance();
+
+			// If VBM is enabled, only let the mission owner or admin invite users to a COP mission
+			if (config.getRemoteConfiguration().getVbm() != null &&
+					config.getRemoteConfiguration().getVbm().isEnabled() &&
+					config.getRemoteConfiguration().getNetwork().getMissionCopTool().equals(mission.getTool())) {
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("Mission Invite 2: VBM is enabled");
+				}
+
+				MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+				if (roleForRequest == null) {
+					throw new IllegalArgumentException("no role for request!");
+				}
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("Mission Invite 2: Role for request: {}", roleForRequest.getRole().toString());
+				}
+
+				if (!roleForRequest.getRole().equals(MissionRole.Role.MISSION_OWNER)) {
+					String msg = "Only mission owner or admin can send an invite";
+					logger.error(msg);
+					throw new ForbiddenException(msg);
+				}
+			}
+
+			MissionRole role = missionService.getRoleFromToken(mission, new MissionTokenUtils.TokenType[]{
+					MissionTokenUtils.TokenType.INVITATION,
+					MissionTokenUtils.TokenType.SUBSCRIPTION
+			}, request);
+
+			if (mission.isPasswordProtected() && role == null) {
+				throw new ForbiddenException("Illegal attempt to delete invitation");
+			}
+
+			missionService.missionUninvite(
+					mission.getGuidAsUUID(), invitee, type, creatorUid, martiUtil.getGroupVectorBitString(request));
+		} catch (Exception e) {
+			logger.error("exception in uninviteFromMission!", e);
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+		}
+	}
+	
 	@RequestMapping(value = "/missions/{name:.+}/invite/{type:.+}/{invitee:.+}", method = RequestMethod.DELETE)
 	@ResponseStatus(HttpStatus.OK)
 	@Transactional
@@ -2703,7 +3264,7 @@ public class MissionApi extends BaseRestController {
 			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 		}
 	}
-
+	
 	// Mission Log
 	/*
 	 * Create a new log entry (autogenerating the entry id)
@@ -2949,11 +3510,54 @@ public class MissionApi extends BaseRestController {
 
 		return new ResponseEntity<String>(cot, headers, HttpStatus.OK);
 	}
+	
+	// Get all latest CoT events for a mission by guid
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/cot", method = RequestMethod.GET)
+	ResponseEntity<String> getLatestMissionCotEventsByGuid(@PathVariable("missionGuid") @NotNull String missionGuidParam, HttpServletRequest request) {
+	
+		final String sessionId = requestHolderBean.sessionId();
 
+		if (logger.isDebugEnabled()) {
+			logger.debug("session id: " + requestHolderBean.sessionId());
+		}
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		String groupVector = martiUtil.getGroupVectorBitString(sessionId);
+
+		// will throw appropriate exeception if mission does not exist or has been deleted
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
+		missionService.validateMissionByGuid(mission);
+
+		String cot = missionService.getCachedCot(missionGuid, mission.getUids(), groupVector);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(org.springframework.http.MediaType.APPLICATION_XML);
+
+		return new ResponseEntity<String>(cot, headers, HttpStatus.OK);
+	}
+
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/contacts", method = RequestMethod.GET)
+	@ResponseStatus(HttpStatus.OK)
+	public ResponseEntity<List<RemoteSubscription>> getMissionContactsByGuid(
+			@PathVariable("missionGuid") @NotNull String missionGuidParam, HttpServletRequest request) throws RemoteException {
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission);
+
+		List<RemoteSubscription> results = subscriptionManager.getSubscriptionsWithGroupAccess(mission.getGroupVector(), false);
+
+		return new ResponseEntity<List<RemoteSubscription>>(results, new HttpHeaders(), HttpStatus.OK);
+	}
+	
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
 	@RequestMapping(value = "/missions/{name:.+}/contacts", method = RequestMethod.GET)
 	@ResponseStatus(HttpStatus.OK)
-	public ResponseEntity<List<RemoteSubscription>> results(
+	public ResponseEntity<List<RemoteSubscription>> getMissionContacts(
 			@PathVariable("name") @NotNull String missionName, HttpServletRequest request) throws RemoteException {
 
 		if (Strings.isNullOrEmpty(missionName)) {
@@ -3094,8 +3698,129 @@ public class MissionApi extends BaseRestController {
 		response.setStatus(HttpServletResponse.SC_OK);
 
 	}
+	
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/invite", method = RequestMethod.POST)
+	public void sendMissionInvitesByGuid(
+			@PathVariable("missionGuid") @NotNull String missionGuidParam,
+			@RequestParam(value = "creatorUid", required = false) @ValidatedBy("MartiSafeString") String creatorUid,
+			HttpServletRequest request
+	) throws RemoteException, ValidationException, IOException {
 
-	// TODO: add APIs to do this by guid
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
+		missionService.validateMissionByGuid(mission);
+
+		CoreConfig config = CoreConfigFacade.getInstance();
+
+		// If VBM is enabled, only let the mission owner or admin invite users to a COP mission
+		if (config.getRemoteConfiguration().getVbm() != null &&
+				config.getRemoteConfiguration().getVbm().isEnabled() &&
+				config.getRemoteConfiguration().getNetwork().getMissionCopTool().equals(mission.getTool())) {
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("Mission Invite: VBM is enabled");
+			}
+
+			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+			if (roleForRequest == null) {
+				throw new IllegalArgumentException("no role for request!");
+			}
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("Mission Invite: Role for request: {}", roleForRequest.getRole().toString());
+			}
+
+			if (!roleForRequest.getRole().equals(MissionRole.Role.MISSION_OWNER)) {
+				String msg = "Only mission owner or admin can send an invite";
+				logger.error(msg);
+				throw new ForbiddenException(msg);
+			}
+		}
+
+		if (missionService.getApiVersionNumberFromRequest(request) > 2) {
+
+			String body = new String(IOUtils.toByteArray(request.getInputStream()));
+
+			ObjectMapper mapper = new ObjectMapper();
+			List<MissionInvitation> missionInvitations =
+					mapper.readValue(body, new TypeReference<List<MissionInvitation>>(){});
+
+			for (MissionInvitation missionInvitation : missionInvitations) {
+
+				if (missionInvitation.getType() == null || missionInvitation.getInvitee() == null) {
+					throw new IllegalArgumentException("invitation found without type or invitee attribute!");
+				}
+
+				missionInvitation.setMissionName(mission.getName());
+				missionInvitation.setMissionGuid(mission.getGuidAsUUID());
+				missionInvitation.setCreatorUid(creatorUid);
+				missionInvitation.setCreateTime(new Date());
+
+				MissionRole role = missionInvitation.getRole();
+				if (role == null) {
+					role = missionService.getDefaultRole(mission);
+				} else {
+					role = missionRoleRepository.findFirstByRole(role.getRole());
+				}
+
+				if (!missionService.validateRoleAssignment(mission, request, role)) {
+					throw new ForbiddenException("validateRoleAssignment failed! Illegal attempt to assign role "
+							+ role.getRole().name());
+				}
+
+				String token = missionService.generateToken(
+						UUID.randomUUID().toString(), mission.getGuidAsUUID(),  mission.getName(), MissionTokenUtils.TokenType.INVITATION, -1);
+				missionInvitation.setToken(token);
+
+				missionInvitation.setRole(role);
+
+				missionService.missionInvite(mission, missionInvitation);
+			}
+
+		} else {
+
+			String[] contactUids = request.getParameterValues("contacts");
+
+			if (contactUids == null || contactUids.length == 0) {
+				throw new IllegalArgumentException("empty contacts array");
+			}
+
+			// validate the uids before sending on to the subscriptionManager
+			for (String uid : contactUids) {
+				validator.getValidInput(context, uid, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
+			}
+			validateParameters(new Object() {
+			}.getClass().getEnclosingMethod());
+
+			User user = groupManager.getUserByConnectionId(RequestContextHolder.currentRequestAttributes().getSessionId());
+
+			String author = Strings.isNullOrEmpty(creatorUid) ? user.getName() : creatorUid;
+
+			MissionRole inviteRole = missionService.getDefaultRole(mission);
+
+			if (!missionService.validateRoleAssignment(mission, request, inviteRole)) {
+				throw new ForbiddenException("validateRoleAssignment failed! Illegal attempt to assign role "
+						+ inviteRole.getRole().name());
+			}
+
+			for (String uid : contactUids) {
+				try {
+					missionService.missionInvite(
+							mission.getGuidAsUUID(), uid, MissionInvitation.Type.clientUid, inviteRole, author, groupVector);
+				} catch (Exception e) {
+					logger.debug("Attempt to re-invite clientUid: " + uid + " to: " + mission.getName() + " " + mission.getGuid());
+					continue;
+				}
+			}
+		}
+
+		response.setStatus(HttpServletResponse.SC_OK);
+
+	}
+
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{childName:.+}/parent/{parentName:.+}", method = RequestMethod.PUT)
 	@ResponseStatus(HttpStatus.OK)
@@ -3115,6 +3840,25 @@ public class MissionApi extends BaseRestController {
 
 		missionService.setParent(childMission.getGuidAsUUID(), parentMission.getGuidAsUUID(), martiUtil.getGroupVectorBitString(request));
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{childGuid:.+}/parent/guid/{parentGuid:.+}", method = RequestMethod.PUT)
+	@ResponseStatus(HttpStatus.OK)
+	public void setParentByGuid(@PathVariable("childGuid") @NotNull String childGuidParam,
+			@PathVariable("parentGuid") @NotNull String parentGuidParam,
+			HttpServletRequest request) {
+
+		UUID childGuid = parseGuid(childGuidParam);
+		UUID parentGuid = parseGuid(parentGuidParam);
+
+		Mission childMission = missionService.getMissionByGuidCheckGroups(childGuid, martiUtil.getGroupVectorBitString(request));
+		Mission parentMission = missionService.getMissionByGuidCheckGroups(parentGuid, martiUtil.getGroupVectorBitString(request));
+
+		missionService.validateMissionByGuid(childMission);
+		missionService.validateMissionByGuid(parentMission);
+
+		missionService.setParent(childMission.getGuidAsUUID(), parentMission.getGuidAsUUID(), martiUtil.getGroupVectorBitString(request));
+	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{childName:.+}/parent", method = RequestMethod.DELETE)
@@ -3128,8 +3872,20 @@ public class MissionApi extends BaseRestController {
 
 		missionService.clearParent(mission.getGuidAsUUID(), martiUtil.getGroupVectorBitString(request));
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{childGuid:.+}/parent", method = RequestMethod.DELETE)
+	@ResponseStatus(HttpStatus.OK)
+	public void clearParentByGuid(@PathVariable("childGuid") @NotNull String childGuidParam, HttpServletRequest request) {
 
-	// TODO: add API here for guid case
+		UUID childGuid = parseGuid(childGuidParam);
+
+		Mission mission = missionService.getMissionByGuidCheckGroups(childGuid, martiUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission);
+
+		missionService.clearParent(mission.getGuidAsUUID(), martiUtil.getGroupVectorBitString(request));
+	}
+
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
 	@RequestMapping(value = "/missions/{name:.+}/children", method = RequestMethod.GET)
 	ApiResponse<Set<Mission>> getChildren(@PathVariable("name") @NotNull String parentName, HttpServletRequest request) {
@@ -3139,6 +3895,21 @@ public class MissionApi extends BaseRestController {
 
 		Mission mission = missionService.getMissionByNameCheckGroups(parentName, martiUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, parentName);
+
+		Set<Mission> children = missionService.getChildren(mission.getGuidAsUUID(), groupVector);
+
+		return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), children);
+	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{guid:.+}/children", method = RequestMethod.GET)
+	ApiResponse<Set<Mission>> getChildrenByGuid(@PathVariable("guid") @NotNull String parentGuidParam, HttpServletRequest request) {
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+
+		UUID parentGuid = parseGuid(parentGuidParam);
+
+		Mission mission = missionService.getMissionByGuidCheckGroups(parentGuid, martiUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission);
 
 		Set<Mission> children = missionService.getChildren(mission.getGuidAsUUID(), groupVector);
 
@@ -3188,8 +3959,38 @@ public class MissionApi extends BaseRestController {
 		return new ResponseEntity<String>(
 				missionService.getMissionKml(missionName, urlBase, groupVector), headers, HttpStatus.OK);
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/kml", method = RequestMethod.GET)
+	ResponseEntity<String> getKmlByGuid(
+			@PathVariable("missionGuid") @NotNull String missionGuidParam,
+			@RequestParam(value = "download", defaultValue = "false") boolean download,
+			HttpServletRequest request) {
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
 
-	// TODO: add case here for API with guid param
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(new org.springframework.http.MediaType(
+				"application", "vnd.google-earth.kml+xml"));
+
+		String urlBase = null;
+		if (download) {
+			headers.setContentDispositionFormData("kml", missionGuid + ".kml");
+		} else {
+			String requestUrl = request.getRequestURL().toString();
+			try {
+				requestUrl = URLDecoder.decode(requestUrl, "UTF-8");
+			} catch (UnsupportedEncodingException e) {
+				logger.error("error decoding URL" + requestUrl);
+			}
+			urlBase = requestUrl.substring(0, requestUrl.indexOf(request.getServletPath()));
+		}
+
+		return new ResponseEntity<String>(
+				missionService.getMissionKml(missionGuid, urlBase, groupVector), headers, HttpStatus.OK);
+	}
+
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{name}/externaldata", method = RequestMethod.POST)
 	@ResponseStatus(HttpStatus.CREATED)
@@ -3213,8 +4014,33 @@ public class MissionApi extends BaseRestController {
 		// save the new log entry and let the database generate the id
 		return new ApiResponse<>(Constants.API_VERSION, ExternalMissionData.class.getName(), externalMissionData);
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{guid}/externaldata", method = RequestMethod.POST)
+	@ResponseStatus(HttpStatus.CREATED)
+	public ApiResponse<ExternalMissionData> setExternalMissionDataByGuid(
+			@PathVariable(value = "guid") String missionGuidParam,
+			@RequestParam(value = "creatorUid") @ValidatedBy("MartiSafeString") String creatorUid,
+			@RequestBody @NotNull ExternalMissionData externalMissionData,
+			HttpServletRequest request) {
+		if (Strings.isNullOrEmpty(externalMissionData.getId())) {
+			throw new IllegalArgumentException("ExternalMissionData id must be included");
+		}
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
 
-	// TODO: add guid case to API
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
+
+		missionService.validateMissionByGuid(mission);
+
+		externalMissionData = missionService.setExternalMissionData(mission.getGuidAsUUID(), creatorUid, externalMissionData, groupVector);
+
+		// save the new log entry and let the database generate the id
+		return new ApiResponse<>(Constants.API_VERSION, ExternalMissionData.class.getName(), externalMissionData);
+	}
+
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{name}/externaldata/{id}", method = RequestMethod.DELETE)
 	@ResponseStatus(HttpStatus.OK)
@@ -3230,8 +4056,25 @@ public class MissionApi extends BaseRestController {
 
 		missionService.deleteExternalMissionData(mission.getGuidAsUUID(), externalMissionDataId, notes, creatorUid, groupVector);
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{guid}/externaldata/{id}", method = RequestMethod.DELETE)
+	@ResponseStatus(HttpStatus.OK)
+	public void deleteExternalMissionDataByGuid(
+			@PathVariable(value = "guid") String missionGuidParam,
+			@PathVariable(value = "id") String externalMissionDataId,
+			@RequestParam(value = "notes") @ValidatedBy("MartiSafeString") String notes,
+			@RequestParam(value = "creatorUid") @ValidatedBy("MartiSafeString") String creatorUid,
+			HttpServletRequest request) {
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
 
-	// TODO: add guid case to API
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		missionService.deleteExternalMissionData(mission.getGuidAsUUID(), externalMissionDataId, notes, creatorUid, groupVector);
+	}
+
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{name}/externaldata/{id}/change", method = RequestMethod.POST)
 	@ResponseStatus(HttpStatus.OK)
@@ -3245,6 +4088,25 @@ public class MissionApi extends BaseRestController {
 		String groupVector = martiUtil.getGroupVectorBitString(request);
 		
 		Mission mission = missionService.getMission(missionName, groupVector);
+
+		missionService.notifyExternalMissionDataChanged(mission.getGuidAsUUID(), externalMissionDataId, token, notes, creatorUid, groupVector);
+	}
+
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{guid}/externaldata/{id}/change", method = RequestMethod.POST)
+	@ResponseStatus(HttpStatus.OK)
+	public void notifyExternalDataChangedByGuid(
+			@PathVariable(value = "guid") String missionGuidParam,
+			@PathVariable(value = "id") String externalMissionDataId,
+			@RequestParam(value = "creatorUid") @ValidatedBy("MartiSafeString") String creatorUid,
+			@RequestParam(value = "notes") @ValidatedBy("MartiSafeString") String notes,
+			@RequestBody String token,
+			HttpServletRequest request) {
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		missionService.notifyExternalMissionDataChanged(mission.getGuidAsUUID(), externalMissionDataId, token, notes, creatorUid, groupVector);
 	}
@@ -3269,6 +4131,33 @@ public class MissionApi extends BaseRestController {
 
 		try {
 			subscriptionManager.broadcastMissionAnnouncement(UUID.fromString(mission.getGuid()), missionName, mission.getGroupVector(), creatorUid,
+					SubscriptionManagerLite.ChangeType.METADATA, mission.getTool());
+		} catch (Exception e) {
+			logger.debug("exception announcing mission change " + e.getMessage(), e);
+		}
+	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_SET_PASSWORD')")
+	@RequestMapping(value = "/missions/guid/{guid:.+}/password", method = RequestMethod.PUT)
+	@ResponseStatus(HttpStatus.OK)
+	public void setPasswordByGuid(
+			@PathVariable(value = "guid") @ValidatedBy("MartiSafeString") String missionGuidParam,
+			@RequestParam(value = "password", defaultValue = "") @ValidatedBy("MartiSafeString") String password,
+			@RequestParam(value = "creatorUid", defaultValue = "") @ValidatedBy("MartiSafeString") String creatorUid,
+			HttpServletRequest request) {
+
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		String newPasswordHash = BCrypt.hashpw(password, BCrypt.gensalt());
+		missionRepository.setPasswordHashByGuid(missionGuid.toString(), newPasswordHash, groupVector);
+		missionService.invalidateMissionCache(missionGuid);
+
+		try {
+			subscriptionManager.broadcastMissionAnnouncement(UUID.fromString(mission.getGuid()), mission.getName(), mission.getGroupVector(), creatorUid,
 					SubscriptionManagerLite.ChangeType.METADATA, mission.getTool());
 		} catch (Exception e) {
 			logger.debug("exception announcing mission change " + e.getMessage(), e);
@@ -3299,6 +4188,31 @@ public class MissionApi extends BaseRestController {
 		}
 	}
 
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_SET_PASSWORD')")
+	@RequestMapping(value = "/missions/guid/{guid:.+}/password", method = RequestMethod.DELETE)
+	@ResponseStatus(HttpStatus.OK)
+	public void removePasswordByGuid(
+			@PathVariable(value = "guid") @ValidatedBy("MartiSafeString") String missionGuidParam,
+			@RequestParam(value = "creatorUid", defaultValue = "") @ValidatedBy("MartiSafeString") String creatorUid,
+			HttpServletRequest request) {
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		missionRepository.setPasswordHashByGuid(missionGuid.toString(), null, groupVector);
+		missionService.invalidateMissionCache(missionGuid);
+
+		try {
+			subscriptionManager.broadcastMissionAnnouncement(UUID.fromString(mission.getGuid()), mission.getName(), mission.getGroupVector(), creatorUid,
+					SubscriptionManagerLite.ChangeType.METADATA, mission.getTool());
+		} catch (Exception e) {
+			logger.debug("exception announcing mission change " + e.getMessage(), e);
+		}
+	}
+
 	@RequestMapping(value = "/missions/{name}/expiration", method = RequestMethod.PUT)
 	@ResponseStatus(HttpStatus.OK)
 	public void setExpiration(
@@ -3317,6 +4231,32 @@ public class MissionApi extends BaseRestController {
 				retentionPolicyConfig.setMissionExpiryTask(missionName, expiration);
 			} catch (Exception e) {
 				logger.error(" Exception getting Retention service, task not scheduled immediately " + missionName);
+			}
+		} catch (Exception e) {
+			logger.debug("exception setting mission expiration " + e.getMessage(), e);
+		}
+	}
+	
+	@RequestMapping(value = "/missions/guid/{guid}/expiration", method = RequestMethod.PUT)
+	@ResponseStatus(HttpStatus.OK)
+	public void setExpirationByGuid(
+			@PathVariable(value = "guid") @ValidatedBy("MartiSafeString") String missionGuidParam,
+			@RequestParam(value = "expiration", required = false) Long expiration,
+			HttpServletRequest request) {
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		try {
+			String groupVector = martiUtil.getGroupVectorBitString(request);
+			boolean result = missionService.setExpiration(missionGuid, expiration, groupVector);
+			response.setStatus(result ? HttpServletResponse.SC_OK : HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+			try {
+				if (logger.isDebugEnabled()) {
+					logger.debug(" setting the mission expiration " + missionGuid.toString() + " time " + expiration);
+				}
+				retentionPolicyConfig.setMissionExpiryTask(missionGuid.toString(), expiration);
+			} catch (Exception e) {
+				logger.error(" Exception getting Retention service, task not scheduled immediately " + missionGuid.toString());
 			}
 		} catch (Exception e) {
 			logger.debug("exception setting mission expiration " + e.getMessage(), e);
@@ -3366,7 +4306,52 @@ public class MissionApi extends BaseRestController {
 			throw new Exception("Server error when adding feed to mission");
 		}
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/{missionGuid:.+}/feed", method = RequestMethod.POST)
+	@ResponseStatus(HttpStatus.OK)
+	public void addFeedByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam,
+			@RequestParam(value = "creatorUid") @ValidatedBy("MartiSafeString") String creatorUid,
+			@RequestParam(value = "dataFeedUid") @ValidatedBy("MartiSafeString") String dataFeedUid,
+			@RequestParam(value = "filterPolygon", required = false) @ValidatedBy("MartiSafeString") List<String> filterPolygonList,
+			@RequestParam(value = "filterCotTypes", required = false) String filterCotTypesSerialized, // TODO: @ValidatedBy
+			@RequestParam(value = "filterCallsign", required = false) @ValidatedBy("MartiSafeString") String filterCallsign,
+			HttpServletRequest request) throws Exception {
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
 
+				String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+		List<String> filterCotTypes = null;
+		if (filterCotTypesSerialized != null) {
+			try {
+				ObjectMapper mapper = new ObjectMapper();
+				filterCotTypes = Arrays.asList(mapper.readValue(filterCotTypesSerialized, String[].class));
+			} catch (Exception e) {
+				logger.error("Error parsing parameter filterCotTypesSerialized from the request", e);
+				response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				throw new Exception("Error parsing parameter filterCotTypesSerialized from the request");
+			}
+		}else {
+			filterCotTypes = new ArrayList<>();
+		}
+
+		String filterPolygon = null;
+		if (filterPolygonList != null) {
+			filterPolygon = boundingPolygonPointsToString(filterPolygonList);
+		}
+
+		try {
+			missionService.addFeedToMission(mission.getName(), creatorUid, mission, dataFeedUid, filterPolygon, filterCotTypes, filterCallsign);
+		} catch (Exception e) {
+			logger.error("exception in addFeed!", e);
+			response.setStatus(HttpServletResponse.SC_BAD_GATEWAY);
+			throw new Exception("Server error when adding feed to mission");
+		}
+	}
+
+	// TODO add guid case
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{missionName:.+}/feed/{uid:.+}", method = RequestMethod.DELETE)
 	@ResponseStatus(HttpStatus.OK)
@@ -3409,6 +4394,27 @@ public class MissionApi extends BaseRestController {
 
 		return new ApiResponse<>(Constants.API_VERSION, "MapLayer", newMapLayer);
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/maplayers", method = RequestMethod.POST)
+	@ResponseStatus(HttpStatus.OK)
+	ApiResponse<MapLayer> createMapLayerByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam,
+			@RequestParam(value = "creatorUid") @ValidatedBy("MartiSafeString") String creatorUid,
+			@RequestBody MapLayer mapLayer) {
+		
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		mapLayer.setMission(mission);
+
+		MapLayer newMapLayer = missionService.addMapLayerToMission(mission.getName(), creatorUid, mission, mapLayer);
+
+		return new ApiResponse<>(Constants.API_VERSION, "MapLayer", newMapLayer);
+	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{missionName:.+}/maplayers/{uid}", method = RequestMethod.DELETE)
@@ -3424,6 +4430,22 @@ public class MissionApi extends BaseRestController {
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		missionService.removeMapLayerFromMission(missionName, creatorUid, mission, uid);
+	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/{missionGuid:.+}/maplayers/{uid}", method = RequestMethod.DELETE)
+	@ResponseStatus(HttpStatus.OK)
+	void deleteMapLayerByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam,
+			@RequestParam(value = "creatorUid") @ValidatedBy("MartiSafeString") String creatorUid,
+			@PathVariable("uid") @NotNull String uid) {
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		missionService.removeMapLayerFromMission(mission.getName(), creatorUid, mission, uid);
 	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
@@ -3442,6 +4464,26 @@ public class MissionApi extends BaseRestController {
 		mapLayer.setMission(mission);
 
 		MapLayer newMapLayer = missionService.updateMapLayer(missionName, creatorUid, mission, mapLayer);
+
+		return new ApiResponse<>(Constants.API_VERSION, "MapLayer", newMapLayer);
+	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/maplayers", method = RequestMethod.PUT)
+	@ResponseStatus(HttpStatus.OK)
+	ApiResponse<MapLayer> updateMapLayerByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam,
+			@RequestParam(value = "creatorUid") @ValidatedBy("MartiSafeString") String creatorUid,
+			@RequestBody MapLayer mapLayer) {
+		
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		mapLayer.setMission(mission);
+
+		MapLayer newMapLayer = missionService.updateMapLayer(mission.getName(), creatorUid, mission, mapLayer);
 
 		return new ApiResponse<>(Constants.API_VERSION, "MapLayer", newMapLayer);
 	}
@@ -3503,6 +4545,31 @@ public class MissionApi extends BaseRestController {
 			return null;
 		}
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/layers", method = RequestMethod.GET)
+	public ApiResponse<List<MissionLayer>> getMissionLayersByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam)
+					throws ValidationException, IntrusionException, RemoteException {
+
+		try {
+			
+			UUID missionGuid = parseGuid("missionGuidParam");
+			
+			String groupVector = martiUtil.getGroupVectorBitString(request);
+			Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+			List<MissionLayer> missionLayers = missionService.hydrateMissionLayers(mission.getName(), mission);
+
+			return new ApiResponse<List<MissionLayer>>(
+					Constants.API_VERSION, MissionLayer.class.getSimpleName(), missionLayers);
+
+		} catch (Exception e) {
+			logger.error("exception in getMissionLayers", e);
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+			return null;
+		}
+	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
 	@RequestMapping(value = "/missions/{missionName:.+}/layers/{layerUid:.+}", method = RequestMethod.GET)
@@ -3517,6 +4584,34 @@ public class MissionApi extends BaseRestController {
 			Mission mission = missionService.getMission(missionName, groupVector);
 
 			MissionLayer missionLayer = missionService.hydrateMissionLayer(missionName, mission, layerUid);
+
+			return new ApiResponse<MissionLayer>(
+					Constants.API_VERSION, MissionLayer.class.getSimpleName(), missionLayer);
+
+		} catch (NotFoundException nfe) {
+			throw nfe;
+		} catch (Exception e) {
+			logger.error("exception in getMissionLayer", e);
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+			return null;
+		}
+	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/layers/{layerUid:.+}", method = RequestMethod.GET)
+	public ApiResponse<MissionLayer> getMissionLayerByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam,
+			@PathVariable(value = "layerUid") String layerUid)
+			throws ValidationException, IntrusionException, RemoteException {
+
+		try {
+			
+			UUID missionGuid = parseGuid(missionGuidParam);
+			
+			String groupVector = martiUtil.getGroupVectorBitString(request);
+			Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+			MissionLayer missionLayer = missionService.hydrateMissionLayer(mission.getName(), mission, layerUid);
 
 			return new ApiResponse<MissionLayer>(
 					Constants.API_VERSION, MissionLayer.class.getSimpleName(), missionLayer);
@@ -3555,6 +4650,30 @@ public class MissionApi extends BaseRestController {
 	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/layers", method = RequestMethod.PUT)
+	public ApiResponse<MissionLayer> createMissionLayerByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam,
+			@RequestParam(value = "name", required = true) @ValidatedBy("MartiSafeString") String name,
+			@RequestParam(value = "type", required = true) @ValidatedBy("MartiSafeString") MissionLayer.Type type,
+			@RequestParam(value = "uid", required = false) @ValidatedBy("MartiSafeString") String uid,
+			@RequestParam(value = "parentUid", required = false) @ValidatedBy("MartiSafeString") String parentUid,
+			@RequestParam(value = "afterUid", required = false) @ValidatedBy("MartiSafeString") String afterUid,
+			@RequestParam(value = "creatorUid", required = true) @ValidatedBy("MartiSafeString") String creatorUid)
+					throws ValidationException, IntrusionException, RemoteException {
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		MissionLayer missionLayer = missionService.addMissionLayer(
+				mission.getName(), mission, uid, name, type, parentUid, afterUid, creatorUid, groupVector);
+
+		return new ApiResponse<MissionLayer>(
+				Constants.API_VERSION, MissionLayer.class.getSimpleName(), missionLayer);
+	}
+
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{missionName:.+}/layers/{layerUid:.+}/name", method = RequestMethod.PUT)
 	public void setLayerName(
 			@PathVariable(value = "missionName") String missionName,
@@ -3570,15 +4689,32 @@ public class MissionApi extends BaseRestController {
 
 		missionService.setLayerName(missionName, mission, layerUid, name, creatorUid);
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/layers/{layerUid:.+}/name", method = RequestMethod.PUT)
+	public void setLayerNameByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam,
+			@PathVariable(value = "layerUid") String layerUid,
+			@RequestParam(value = "name", required = true) @ValidatedBy("MartiSafeString") String name,
+			@RequestParam(value = "creatorUid", required = true) @ValidatedBy("MartiSafeString") String creatorUid)
+					throws ValidationException, IntrusionException, RemoteException {
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		missionService.setLayerName(mission.getName(), mission, layerUid, name, creatorUid);
+	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
-	@RequestMapping(value = "/missions/{missionName:.+}/layers/{layerUid:.+}/position", method = RequestMethod.PUT)
+	@RequestMapping(value = "/missions/guid/{missionName:.+}/layers/{layerUid:.+}/position", method = RequestMethod.PUT)
 	public void setLayerPosition(
 			@PathVariable(value = "missionName") String missionName,
 			@PathVariable(value = "layerUid") String layerUid,
 			@RequestParam(value = "afterUid", required = false) @ValidatedBy("MartiSafeString") String afterUid,
 			@RequestParam(value = "creatorUid", required = true) @ValidatedBy("MartiSafeString") String creatorUid)
-			throws ValidationException, IntrusionException, RemoteException {
+					throws ValidationException, IntrusionException, RemoteException {
 
 		missionName = missionService.trimName(missionName);
 
@@ -3586,6 +4722,23 @@ public class MissionApi extends BaseRestController {
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		missionService.setLayerPosition(missionName, mission, layerUid, afterUid, creatorUid);
+	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/layers/{layerUid:.+}/position", method = RequestMethod.PUT)
+	public void setLayerPositionByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam,
+			@PathVariable(value = "layerUid") String layerUid,
+			@RequestParam(value = "afterUid", required = false) @ValidatedBy("MartiSafeString") String afterUid,
+			@RequestParam(value = "creatorUid", required = true) @ValidatedBy("MartiSafeString") String creatorUid)
+					throws ValidationException, IntrusionException, RemoteException {
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		missionService.setLayerPosition(mission.getName(), mission, layerUid, afterUid, creatorUid);
 	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
@@ -3613,6 +4766,30 @@ public class MissionApi extends BaseRestController {
 	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/layers/parent", method = RequestMethod.PUT)
+	public void setLayerParentByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam,
+			@RequestParam(value = "layerUid") @ValidatedBy("MartiSafeString") String[] layerUids,
+			@RequestParam(value = "parentUid", required = false) @ValidatedBy("MartiSafeString") String parentUid,
+			@RequestParam(value = "afterUid", required = false) @ValidatedBy("MartiSafeString") String afterUid,
+			@RequestParam(value = "creatorUid", required = true) @ValidatedBy("MartiSafeString") String creatorUid)
+					throws ValidationException, IntrusionException, RemoteException {
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		// move the first layer in the parameter list after the afterUid
+		String useAfterUid = afterUid;
+		for (String layerUid : layerUids) {
+			missionService.setLayerParent(mission.getName(), mission, layerUid, parentUid, useAfterUid, creatorUid);
+			// move each other layer in the last after its predecessor in the parameter list
+			useAfterUid = layerUid;
+		}
+	}
+
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
 	@RequestMapping(value = "/missions/{missionName:.+}/layers", method = RequestMethod.DELETE)
 	public void deleteMissionLayer(
 			@PathVariable(value = "missionName") String missionName,
@@ -3629,9 +4806,27 @@ public class MissionApi extends BaseRestController {
 			missionService.removeMissionLayer(missionName, mission, layerUid, creatorUid, groupVector);
 		}
 	}
+	
+	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/layers", method = RequestMethod.DELETE)
+	public void deleteMissionLayerByGuid(
+			@PathVariable(value = "missionGuid") String missionGuidParam,
+			@RequestParam(value = "uid", required = true) @ValidatedBy("MartiSafeString") String[] layerUids,
+			@RequestParam(value = "creatorUid", required = true) @ValidatedBy("MartiSafeString") String creatorUid)
+					throws ValidationException, IntrusionException, RemoteException {
+
+		UUID missionGuid = parseGuid(missionGuidParam);
+		
+		String groupVector = martiUtil.getGroupVectorBitString(request);
+		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+
+		for (String layerUid : layerUids) {
+			missionService.removeMissionLayer(mission.getName(), mission, layerUid, creatorUid, groupVector);
+		}
+	}
 
 	/*
-	 * get all missions with pagination
+	 * get all missions with pagination (used by mission manager UI)
 	 */
 	@RequestMapping(value = "/pagedmissions", method = RequestMethod.GET)
 	Callable<ApiResponse<List<Mission>>> getPagedMissions(

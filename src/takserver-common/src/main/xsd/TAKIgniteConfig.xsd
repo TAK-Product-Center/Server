@@ -33,6 +33,11 @@
           <xs:documentation>Explicity set the off-heap cache max size (bytes). -1 means autodetect.</xs:documentation>
         </xs:annotation>
       </xs:attribute>
+      <xs:attribute name="igniteClusterNamespace" type="xs:string" default="takserver">
+        <xs:annotation>
+          <xs:documentation>The namespace used in a cluster deployment. Default is takserver</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
       <xs:attribute name="cacheOffHeapInitialSizeBytes" type="xs:long" default="-1">
         <xs:annotation>
           <xs:documentation>Explicity set the off-heap cache initial size (bytes). -1 means autodetect</xs:documentation>

@@ -62,7 +62,7 @@ public interface FederationManager {
 	void enableOutgoing(String name);
 
 	// will throw exception if output with same name already exists
-	void addOutgoingConnection(String name, String host, int port, int reconnect, int maxRetries, boolean unlimitedRetries, boolean enable, int protocolVersion, String fallback);
+	void addOutgoingConnection(String name, String host, int port, int reconnect, int maxRetries, boolean unlimitedRetries, boolean enable, int protocolVersion, String fallback, String token);
 	void updateOutgoingConnection(Federation.FederationOutgoing original, Federation.FederationOutgoing update);
 	void removeOutgoing(String name);
 

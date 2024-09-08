@@ -344,21 +344,28 @@
 			  <sec:intercept-url pattern="/user-management/**" access="ROLE_ADMIN"/>
 			  <sec:intercept-url pattern="/vbm/api/classification" access="ROLE_ANONYMOUS"/>
 			  <sec:intercept-url pattern="/vbm/**" access="ROLE_ADMIN"/>
-
-			   <!-- static content -->
+			  
+			  <!-- Mission Manager -->
+			  <sec:intercept-url pattern="/Marti/MissionManager.html" access="ROLE_NON_ADMIN_UI"/>
+			  <sec:intercept-url pattern="/Marti/api/pagedmissions" access="ROLE_NON_ADMIN_UI" />
+			  <sec:intercept-url pattern="/Marti/api/missioncount" access="ROLE_NON_ADMIN_UI" />
+			  <sec:intercept-url pattern="/vbm/api/config" access="ROLE_NON_ADMIN_UI" />
+			  <sec:intercept-url pattern="/Marti/api/util/isAdmin" access="ROLE_NON_ADMIN_UI" />
+			  <sec:intercept-url pattern="/Marti/api/security/isSecure" access="ROLE_NON_ADMIN_UI" />
+			  
+			  <!-- static content -->
 			  <sec:intercept-url pattern="/Marti/favicon.ico" access="ROLE_NON_ADMIN_UI" />
 			  <sec:intercept-url pattern="/Marti/tablesorter/**" access="ROLE_NON_ADMIN_UI" />
-
+			  <sec:intercept-url pattern="/Marti/static/**" access="ROLE_NON_ADMIN_UI" />
+			  <sec:intercept-url pattern="/Marti/jquery/**" access="ROLE_NON_ADMIN_UI" />
+			  
 			  <!-- require admin for other /Marti paths -->
 			  <sec:intercept-url pattern="/Marti/**" access="ROLE_ADMIN" />
 
 			  <!-- require anonymous for everything else (namely extWebContentDir paths) -->
 			  <sec:intercept-url pattern="/**" access="ROLE_ANONYMOUS" />
-			  
-			  
-			  
-			  
-			  	 
+
+			  <sec:intercept-url pattern="/Marti/documentation/**" access="ROLE_ADMIN" />
 
 			</sec:filter-security-metadata-source>
 		</property>

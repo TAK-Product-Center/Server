@@ -152,6 +152,7 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     private static final Logger logger = LoggerFactory.getLogger(SubmissionService.class);
     private static final Logger dlogger = LoggerFactory.getLogger("DistributedSubmissionServiceReceiver");
 	private static final Logger dupeLogger = LoggerFactory.getLogger("dupe-message-logger");
+	public static String LINK_XPATH = "/event/detail/link";
 
     public static final String CHANNEL_TYPE_KEY = "channel.type";
     public static enum ChannelType {FED_V1, FED_V2, COT};
@@ -647,7 +648,26 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 									logger.debug("Convert Message to Plugin CotEventContainer.");
 								}
             					CotEventContainer pluginCotEvent = messageConverter.dataMessageToCot(m, false);
-            					
+
+								if (!Strings.isNullOrEmpty(pluginCotEvent.getCallsign())
+										&& !Strings.isNullOrEmpty(pluginCotEvent.getEndpoint()) && !Strings.isNullOrEmpty(pluginCotEvent.getUid())) {
+									if (config.getFederation() != null) {
+										try {
+											NavigableSet<Group> groups = (NavigableSet<Group>) pluginCotEvent.getContextValue(Constants.GROUPS_KEY);
+											federationManager.addPluginContact(pluginCotEvent, groups);
+										} catch (Exception e) {
+											if (logger.isDebugEnabled()) {
+												logger.debug("exception adding federated plugin contact", e);
+											}
+										}
+									}
+								} else if (pluginCotEvent.getType().equals("t-x-d-d")) {
+									Element link = (Element)pluginCotEvent.getDocument().selectSingleNode(LINK_XPATH);
+									if (link != null && link.attribute("uid") != null) {
+										federationManager.removeLocalContact(link.attributeValue("uid"));
+									}
+								}
+
             					if (isDataFeedMessage) {
 
 									if (logger.isDebugEnabled()) {

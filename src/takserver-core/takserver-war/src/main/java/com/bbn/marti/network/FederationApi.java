@@ -790,7 +790,8 @@ public class FederationApi extends BaseRestController {
 						outgoingConnection.isUnlimitedRetries(),
 						outgoingConnection.isEnabled(),
 						outgoingConnection.getProtocolVersion(),
-						outgoingConnection.getFallback());
+						outgoingConnection.getFallback(), 
+						outgoingConnection.getConnectionToken());
 
 				result = new ResponseEntity<ApiResponse<Federation.FederationOutgoing>>(new ApiResponse<Federation.FederationOutgoing>(Constants.API_VERSION,
 						Federation.FederationOutgoing.class.getName(), outgoingConnection), HttpStatus.OK);

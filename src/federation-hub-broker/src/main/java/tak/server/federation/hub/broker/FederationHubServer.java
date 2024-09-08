@@ -23,7 +23,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.data.mongodb.core.MongoTemplate;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -91,8 +90,9 @@ public class FederationHubServer implements CommandLineRunner {
 		FederationHubBrokerImpl hb = new FederationHubBrokerImpl();
 		ClusterGroup cg = ignite.cluster().forAttribute(FederationHubConstants.FEDERATION_HUB_IGNITE_PROFILE_KEY,
 				FederationHubConstants.FEDERATION_HUB_BROKER_IGNITE_PROFILE);
-		ignite.services(cg).deployClusterSingleton(FederationHubConstants.FED_HUB_BROKER_SERVICE, hb);
-
+		
+		ignite.services(cg).deployNodeSingleton(FederationHubConstants.FED_HUB_BROKER_SERVICE, hb);
+	
 		return hb;
 	}
 
@@ -122,24 +122,18 @@ public class FederationHubServer implements CommandLineRunner {
 	}
 
 	@Bean
-	public FederationHubServerConfig getFedHubConfig() throws JsonParseException, JsonMappingException, IOException {
-		FederationHubServerConfig config = loadConfig(configFile);
-		if (Strings.isNullOrEmpty(config.getId())) {
-			config.setId(UUID.randomUUID().toString().replace("-", ""));
-			saveConfig(configFile, config);
-		}
-
-		return loadConfig(configFile);
+	public FederationHubServerConfigManager getFedHubConfig() throws JsonParseException, JsonMappingException, IOException {
+		return new FederationHubServerConfigManager(configFile);
 	}
 
 	@Bean
 	@Order(Ordered.LOWEST_PRECEDENCE)
 	public FederationHubBrokerService FederationHubBrokerService(Ignite ignite, SSLConfig getSslConfig,
-			FederationHubServerConfig fedHubConfig, FederationHubPolicyManager fedHubPolicyManager,
+			FederationHubServerConfigManager fedHubConfigManager, FederationHubPolicyManager fedHubPolicyManager,
 			HubConnectionStore hubConnectionStore, FederationHubMissionDisruptionManager federationHubMissionDisruptionManager,
 		 	FederationHubBrokerMetrics fedHubBrokerMetrics) {
 
-		return  new FederationHubBrokerService(ignite, getSslConfig, fedHubConfig,
+		return  new FederationHubBrokerService(ignite, getSslConfig, fedHubConfigManager,
 				fedHubPolicyManager, hubConnectionStore, federationHubMissionDisruptionManager,
 				fedHubBrokerMetrics);
 	}
@@ -169,33 +163,14 @@ public class FederationHubServer implements CommandLineRunner {
 	}
 
 	@Bean
-	public FederationHubDatabase federationHubDatabase(FederationHubServerConfig fedHubConfig) {
-		return new FederationHubDatabase(fedHubConfig.getDbUsername(), fedHubConfig.getDbPassword(),
-				fedHubConfig.getDbHost(), fedHubConfig.getDbPort());
-	}
-
-	@Bean
-	public MongoTemplate mongoTemplate(FederationHubDatabase hubDatabase) throws Exception {
-		return new MongoTemplate(hubDatabase.getClient(), "cot");
-	}
-
-	private FederationHubServerConfig loadConfig(String configFile)
-			throws JsonParseException, JsonMappingException, FileNotFoundException, IOException {
-		if (getClass().getResource(configFile) != null) {
-			// It's a resource.
-			return new ObjectMapper(new YAMLFactory()).readValue(getClass().getResourceAsStream(configFile),
-					FederationHubServerConfig.class);
+	public FederationHubDatabase federationHubDatabase(FederationHubServerConfigManager fedHubConfigManager) {
+		FederationHubServerConfig fedHubConfig = fedHubConfigManager.getConfig();
+		
+		if (fedHubConfig.isMissionFederationDisruptionEnabled()) {
+			return new FederationHubDatabase(fedHubConfig.getDbUsername(), fedHubConfig.getDbPassword(),
+					fedHubConfig.getDbHost(), fedHubConfig.getDbPort());
+		} else {
+			return new FederationHubDatabase();
 		}
-
-		// It's a file.
-		return new ObjectMapper(new YAMLFactory()).readValue(new FileInputStream(configFile),
-				FederationHubServerConfig.class);
-	}
-
-	private void saveConfig(String configFile, FederationHubServerConfig config)
-			throws JsonParseException, JsonMappingException, FileNotFoundException, IOException {
-
-		ObjectMapper om = new ObjectMapper(new YAMLFactory());
-		om.writeValue(new File(configFile), config);
 	}
 }

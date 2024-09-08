@@ -181,13 +181,13 @@ public class PluginDataApi extends BaseRestController {
 		// TODO: handle IllegalArgumentException better
 		try {
 
-			String contentType =  requestHolderBean.getRequest().getHeader("content-type");
+			String accept =  requestHolderBean.getRequest().getHeader("accept");
 
 			logger.info("submit " + pluginClassName);
-			logger.info("content type: " + contentType);
+			logger.info("accept " + accept);
 
 			try {
-				result = pluginManager.requestDataFromPlugin(pluginClassName, allRequestParams, contentType);
+				result = pluginManager.requestDataFromPlugin(pluginClassName, allRequestParams, accept);
 			} catch (Exception e) {
 				throw new TakException("error accesing PluginManager process - is it running?", e);
 			}

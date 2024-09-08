@@ -87,6 +87,10 @@ public interface MissionSubscriptionRepository extends JpaRepository<MissionSubs
     @Query(value = "select ms.uid, null as token, null as mission_id, ms.client_uid, ms.username, ms.create_time, ms.role_id from mission m " +
             "inner join mission_subscription ms on m.id = ms.mission_id where m.name = :missionName", nativeQuery = true)
     List<MissionSubscription> findAllByMissionNameNoMissionNoToken(@Param("missionName") String missionName);
+    
+    @Query(value = "select ms.uid, null as token, null as mission_id, ms.client_uid, ms.username, ms.create_time, ms.role_id from mission m " +
+            "inner join mission_subscription ms on m.id = ms.mission_id where m.guid = uuid(:missionGuid)", nativeQuery = true)
+    List<MissionSubscription> findAllByMissionGuidNoMissionNoToken(@Param("missionGuid") String missionGuid);
 
     @Query(value = "select ms.uid, ms.token, m.id as mission_id, ms.client_uid, ms.username, ms.create_time, ms.role_id from mission m " +
             "inner join mission_subscription ms on m.id = ms.mission_id where m.tool = 'public' ", nativeQuery = true)

@@ -1,5 +1,7 @@
 package com.bbn.marti.sync;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -9,7 +11,6 @@ import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +21,7 @@ import org.springframework.context.event.EventListener;
 
 import com.bbn.marti.JDBCQueryAuditLogHelper;
 import com.bbn.marti.config.Cluster;
-import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.TakException;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Strings;
@@ -200,6 +201,86 @@ public class EnterpriseSyncCacheHelper {
 
 		} catch (Exception e) {
 			String msg = "exception executing getContentByHash query " + e.getMessage();
+			logger.error(msg, e);
+			throw new TakException(msg, e);
+		}
+
+		return fileWrapper;
+
+	}
+	
+	public FileWrapper getInputStreamFileWrapperFromDB(String hash) {
+		
+		if (Strings.isNullOrEmpty(hash)) {
+			throw new IllegalArgumentException("empty hash");
+		}
+		
+		FileWrapper fileWrapper = null;
+
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement(
+				"SELECT data, groups, length(data) FROM resource r WHERE hash = ? ORDER BY submissionTime limit 1", connection)) {
+
+			query.setString(1, hash.toLowerCase());
+			logger.debug("getInputStreamFileWrapperFromDB Executing SQL: {}",  query.toString());
+
+			try (ResultSet queryResults = query.executeQuery()) {
+
+				fileWrapper = new FileWrapper();
+				
+				if (queryResults.next()) {
+					
+					InputStream contentStream = queryResults.getBinaryStream(1);
+					long contentLen = queryResults.getLong(3);
+					
+					logger.debug("content length {}, stream {}, ", contentLen, contentStream);
+					
+					fileWrapper.setInputStream(queryResults.getBinaryStream(1));
+					fileWrapper.setHash(hash);
+					fileWrapper.setGroupVector(queryResults.getString(2));
+				} else {
+					logger.info("getContentByHash no results {}", hash);
+				}
+			}
+
+		} catch (Exception e) {
+			String msg = "exception executing getInputStreamFileWrapperFromDB query " + e.getMessage();
+			logger.error(msg, e);
+			throw new TakException(msg, e);
+		}
+
+		return fileWrapper;
+
+	}
+	
+	public FileWrapper getInputStreamFileWrapperFromDBbyUid(String uid) {
+		
+		if (Strings.isNullOrEmpty(uid)) {
+			throw new IllegalArgumentException("empty uid");
+		}
+		
+		FileWrapper fileWrapper = null;
+
+		try (Connection connection = dataSource.getConnection(); PreparedStatement query = queryHelper.prepareStatement(
+				"SELECT data, groups FROM resource r WHERE uid = ? ORDER BY submissionTime desc limit 1", connection)) {
+
+			query.setString(1, uid.toLowerCase());
+			logger.debug("getInputStreamFileWrapperFromDBbyUid Executing SQL: {}",  query.toString());
+
+			try (ResultSet queryResults = query.executeQuery()) {
+
+				fileWrapper = new FileWrapper();
+
+				if (queryResults.next()) {
+					fileWrapper.setInputStream(queryResults.getBinaryStream(1));
+					fileWrapper.setUid(uid);
+					fileWrapper.setGroupVector(queryResults.getString(2));
+				} else {
+					logger.info("getInputStreamFileWrapperFromDBbyUid no results {}", uid);
+				}
+			}
+
+		} catch (Exception e) {
+			String msg = "exception executing getInputStreamFileWrapperFromDB query " + e.getMessage();
 			logger.error(msg, e);
 			throw new TakException(msg, e);
 		}

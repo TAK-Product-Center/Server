@@ -43,15 +43,12 @@ apply plugin: 'eclipse'
 // This should be fixed in  Gradle 7.2 according to
 // https://github.com/gradle/gradle/issues/4505, but that's a larger task than
 // A five minute work-around.
-if ("$System.env.TAK_GRADLE_CI_MODE" != "true") {
-  println("NOT USING CI")
-  idea {
-    module {
-      // Not using generatedSourceDirs because of
-      // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
-      sourceDirs += file("${projectDir}/build/generated/source/proto/main/java")
-      sourceDirs += file("${projectDir}/build/generated/source/proto/main/grpc")
-    }
+idea {
+  module {
+    // Not using generatedSourceDirs because of
+    // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
+    sourceDirs += file("${projectDir}/build/generated/source/proto/main/java")
+    sourceDirs += file("${projectDir}/build/generated/source/proto/main/grpc")
   }
 }
 

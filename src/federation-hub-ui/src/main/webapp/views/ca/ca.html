@@ -15,7 +15,7 @@
             <tr ng-repeat="ca in knownCas" style="text-align: center; align-content: center;">
               <td>{{ca.uid}}</td>
               <td>
-                <button data-ng-click="deleteGroupCa(ca.uid)" class="btn-danger">Delete</button>
+                <button data-ng-disabled="ca.hubGroup" data-ng-click="deleteGroupCa(ca.uid)" class="btn-danger">Delete</button>
               </td>
             </tr>
           </tbody>

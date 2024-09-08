@@ -28,7 +28,7 @@ public final class DistributedServerInfo implements ServerInfo, Service {
 
 	private static final Logger logger = LoggerFactory.getLogger(DistributedServerInfo.class);
 
-	private String serverId = null;
+	private volatile String serverId = null;
 
 	private boolean isCluster = false;
 
@@ -106,7 +106,7 @@ public final class DistributedServerInfo implements ServerInfo, Service {
 		String id = UUID.randomUUID().toString().replace("-", "");
 
 		try {
-			CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().setServerId(id);
+			CoreConfigFacade.getInstance().setAndSaveServerId(id);
 			CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
 
 		} catch (Exception e) {

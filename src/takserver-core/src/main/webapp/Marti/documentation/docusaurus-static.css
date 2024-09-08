@@ -1,0 +1,31 @@
+@media (max-width: 996px) {
+
+	aside.theme-doc-sidebar-container {
+		border-right: 1px solid var(--ifm-toc-border-color);
+		position: fixed;
+		width: var(--ifm-navbar-sidebar-width);
+		height: calc(100% - var(--ifm-navbar-height));
+		z-index: var(--ifm-z-index-dropdown);
+		background-color: var(--ifm-navbar-background-color);
+	}
+
+	aside.theme-doc-sidebar-container nav.menu {
+		display: inherit;
+		padding: 0.5rem 0 0.5rem 0.5rem;
+		scrollbar-gutter: stable;
+	}
+
+	nav.navbar div.navbar__items div[class*="colorModeToggle_"],
+	nav.navbar div.navbar__items .navbar__item {
+		display: revert;
+	}
+
+	nav.navbar div.navbar__items div[class*="navbarSearchContainer_"] {
+		position: revert;
+	}
+
+}
+
+div[class*="colorModeToggle_"] > button.clean-btn {
+	cursor: pointer;
+}

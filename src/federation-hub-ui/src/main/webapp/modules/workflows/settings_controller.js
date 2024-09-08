@@ -34,4 +34,15 @@ function settingsController($rootScope, $scope, $http, $stateParams, $timeout, $
       });
     }
 
+  $scope.restartBroker = function() {
+    growl.success("Federation Hub Broker Process Restarting - Please wait for it to restart before proceeding.");
+    WorkflowService.restartBroker().then(function(result) {
+        if (result.status === 200)
+          growl.success("Federation Hub Broker Process Has Successfully Restarted");
+        else
+          growl.error("Federation Hub Broker Process Restart Failed");
+      }, function(error) {
+          growl.error("Failed to restart SERVER" + error);
+      });
+  }
 }

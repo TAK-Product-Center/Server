@@ -78,6 +78,15 @@ public interface EnterpriseSyncService {
 	 * @throws NamingException
 	 */
 	 byte[] getContentByUid(String uid, String groupVector) throws SQLException, NamingException;
+	 
+	 /**
+		 * Gets the content of an Enterprise Sync object.
+		 * @param uid UID of the object to retrieve
+		 * @return the content of the latest stored object matching that UID, or <code>null</code> if no match
+		 * @throws SQLException
+		 * @throws NamingException
+		 */
+	 InputStream getContentStreamByUid(String uid, String groupVector) throws SQLException, NamingException;
 
 	/**
 	 * Gets the content of an Enterprise Sync object.
@@ -106,6 +115,15 @@ public interface EnterpriseSyncService {
 	 * @throws NamingException
 	 */
 	 byte[] getContentByHash(String hash, String groupVector) throws SQLException, NamingException;
+	 
+	 /**
+		 * Gets the content of an Enterprise Sync object.
+		 * @param hash Hash of the object to retrieve
+		 * @return InputStream for the latest stored object matching that hash, or <code>null</code> if no match
+		 * @throws SQLException
+		 * @throws NamingException
+		 */
+	 InputStream getContentStreamByHash(String hash, String groupVector) throws SQLException, NamingException;
 
 	/**
 	 * Gets the content of an Enterprise Sync object. This searches the full resource table vs the latest resource

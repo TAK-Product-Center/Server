@@ -551,6 +551,18 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
 	    saveChangesAndUpdateCache();
     }
 
+    @Override
+    public void setAndSaveServerId(String serverId) {
+        getRemoteConfiguration().getNetwork().setServerId(serverId);
+        saveChangesAndUpdateCache();
+    }
+
+    @Override
+    public void setAndSaveEnterpriseSyncSizeLimit(int uploadSizeLimt) {
+        getRemoteConfiguration().getNetwork().setEnterpriseSyncSizeLimitMB(uploadSizeLimt);
+        saveChangesAndUpdateCache();
+    }
+
 	@Override
 	public boolean isContactApiFilter() {
 		return getRemoteConfiguration().getFilter().getContactApi() != null;

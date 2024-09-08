@@ -151,6 +151,7 @@ import jakarta.servlet.ServletContextEvent;
 import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.http.HttpSessionListener;
 import tak.server.Constants;
+import tak.server.CustomizeEmbeddedTomcatContainer;
 import tak.server.api.DistributedPluginCoreConfigApi;
 import tak.server.api.DistributedPluginFileApi;
 import tak.server.api.DistributedPluginMissionApi;
@@ -963,6 +964,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Bean
 	public FileManagerService fileManagerService(DataSource dataSource) {
 		return new FileManagerServiceDefaultImpl(dataSource);
+	}
+	
+	@Bean
+	public CustomizeEmbeddedTomcatContainer customizeEmbeddedTomcatContainer() {
+		return new CustomizeEmbeddedTomcatContainer();
 	}
 
 	@Override

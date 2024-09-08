@@ -65,7 +65,8 @@ dependencies {
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-cache', version: spring_boot_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-mongodb', version: spring_boot_version
   api group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeine_version
-
+  implementation group: 'io.jsonwebtoken', name: 'jjwt', version: jsonwebtoken_version
+  
   testImplementation group: 'junit', name: 'junit', version: junit_version
   testImplementation group: 'org.mockito', name: 'mockito-core', version: mockito_version
   testImplementation("org.springframework.boot:spring-boot-starter-test:$spring_boot_version") {

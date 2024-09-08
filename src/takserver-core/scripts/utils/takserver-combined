@@ -35,7 +35,7 @@ TAK_HOME=/opt/tak
 case "$1" in
      start)
         echo -n "Starting $SERVICE: "
-          su tak -c "cd ${TAK_HOME} && ./takserver.sh &> /opt/tak/logs/takserver-console.log &"
+          su tak -c "cd ${TAK_HOME} && ./takserver.sh > /opt/tak/logs/takserver-console.log 2>&1 &"
           if [ $? -eq 0 ]; then
 	      echo "OK"
 	      else

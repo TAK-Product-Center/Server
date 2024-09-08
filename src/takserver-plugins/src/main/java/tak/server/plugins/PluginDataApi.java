@@ -46,7 +46,7 @@ public interface PluginDataApi {
 	 * Request data from a plugin. Implementation of this function is provided by the plugin.
 	 *
 	 */
-	default PluginResponse onRequestData(Map<String, String> allRequestParams, String contentType) {
+	default PluginResponse onRequestData(Map<String, String> allRequestParams, String accept) {
 
 		logger.info("requestDataFromPlugin method not implemented in plugin class " + getClass().getName() + " must be implemented in order to submit data.");
 		return null;

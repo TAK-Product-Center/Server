@@ -3,6 +3,7 @@
 package com.bbn.marti.sync;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -11,12 +12,6 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
-import jakarta.servlet.AsyncContext;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.errors.IntrusionException;
@@ -26,10 +21,18 @@ import org.springframework.http.HttpMethod;
 
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.NotFoundException;
+import com.bbn.marti.remote.exception.TakException;
 import com.bbn.security.web.SecurityUtils;
 import com.google.common.base.Strings;
+import com.google.common.io.ByteStreams;
 
 import io.micrometer.core.instrument.Metrics;
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Servlet for retrieving the content
@@ -71,7 +74,9 @@ public class ContentServlet extends EnterpriseSyncServlet {
 
 		String remoteHost = "unidentified host";
 		String context = "GET request parameters";
-		byte[] content = new byte[0];
+		
+		InputStream contentStream = null;
+		
 		Metadata match = null;
 		List<Metadata> matches = null;
 		try {
@@ -90,10 +95,8 @@ public class ContentServlet extends EnterpriseSyncServlet {
 			}
 
 			if (hash != null) {
-				content = enterpriseSyncService.getContentByHash(hash, groupVector);
-				if (logger.isDebugEnabled()) {
-					logger.debug("content by hash size: " + (content != null ? content.length : "null"));
-				}
+				contentStream = enterpriseSyncService.getContentStreamByHash(hash, groupVector);
+				
 				try {
 					matches = enterpriseSyncService.getMetadataByHash(hash, groupVector);
 				} catch (Exception e) {
@@ -102,7 +105,7 @@ public class ContentServlet extends EnterpriseSyncServlet {
 					}
 				}
 			} else if (uid != null){
-				content = enterpriseSyncService.getContentByUid(uid, groupVector);
+				contentStream = enterpriseSyncService.getContentStreamByUid(uid, groupVector);
 				matches = enterpriseSyncService.getMetadataByUid(uid, groupVector);
 			}
 
@@ -110,9 +113,9 @@ public class ContentServlet extends EnterpriseSyncServlet {
 				throw new NotFoundException("no metadata results for " + query);
 			}
 
-			if (content == null) {
+			if (contentStream == null) {
 				if (logger.isErrorEnabled()) {
-					logger.error("found null content for :" + StringUtils.normalizeSpace(query));
+					logger.error("found null content stream for :" + StringUtils.normalizeSpace(query));
 				}
 				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 				return;
@@ -163,19 +166,18 @@ public class ContentServlet extends EnterpriseSyncServlet {
 
 			if (method == HttpMethod.GET) {
 
-
 				// apply offset param
 				if (offset != null && offset > 0) {
 
-					// validate the offset
-					if (content.length < 1 || offset > content.length - 1) {
-						throw new IllegalArgumentException("invalid offset " + offset + " for file size " + content.length);
+					try {
+						contentStream.skip(offset);
+					} catch (Exception e) {
+						throw new TakException("error applying offset parameter in request " + offset, e);
 					}
 
 					if (logger.isInfoEnabled()) {
 						logger.info("applying offset " + offset);
 					}
-					content = Arrays.copyOfRange(content, offset, content.length);
 				}
 
 				try (OutputStream outStream = response.getOutputStream()) {
@@ -186,7 +188,8 @@ public class ContentServlet extends EnterpriseSyncServlet {
 						return;
 					}
 
-					outStream.write(content);
+					// use guava buffered stream conversion to copy data stream from database to servlet request OutputStream
+					ByteStreams.copy(contentStream, outStream);
 				}
 			}		
 
@@ -209,6 +212,13 @@ public class ContentServlet extends EnterpriseSyncServlet {
 			logger.error("Exception in getResource ", e);
 			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 		} finally {
+			if (contentStream != null) {
+				try {
+					contentStream.close();
+				} catch (Exception e) {
+					logger.error("Exception closing content stream", e);
+				}
+			}
 			async.complete();
 		}
 	}
@@ -237,6 +247,9 @@ public class ContentServlet extends EnterpriseSyncServlet {
 		if (logger.isDebugEnabled()) {
 			logger.debug("GET resource");
 		}
+		
+		// Set the timeout for async context for file download (ms)
+		async.setTimeout(CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeDownloadTimeoutMillis());
 
 		async.start(() -> {
 			try {
