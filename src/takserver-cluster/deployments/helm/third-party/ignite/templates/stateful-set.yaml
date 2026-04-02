@@ -23,6 +23,12 @@ spec:
       priorityClassName: "{{ .Values.priorityClassName }}"
 {{- end }}
       volumes:
+        - name: ignite-extensions
+          configMap:
+            name: ignite-extensions
+            items:
+            - key: ignite-extensions.jar
+              path: ignite-extensions.jar
         - name: config-volume
           configMap:
             name: {{ include "ignite.fullname" . }}-configmap
@@ -72,6 +78,9 @@ spec:
         - containerPort: 8080 # REST port number.
         - containerPort: 10900 #Thin clients port number.
         volumeMounts:
+        - name: ignite-extensions
+          mountPath: /opt/ignite/libs/ignite-extensions.jar
+          subPath: ignite-extensions.jar
 {{- if (.Values.persistence.enabled) }}
         - mountPath: "/wal"
           name: ignite-wal
@@ -79,7 +88,8 @@ spec:
           name: ignite-persistence
 {{- end }}
         - name: config-volume
-          mountPath: /opt/ignite/apache-ignite/config
+          mountPath: /opt/ignite/config/default-config.xml
+          subPath: default-config.xml
 {{- with .Values.extraVolumeMounts }}
 {{- toYaml . | nindent 8 }}
 {{- end }}

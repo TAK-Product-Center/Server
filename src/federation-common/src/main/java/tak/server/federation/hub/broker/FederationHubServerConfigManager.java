@@ -2,6 +2,7 @@ package tak.server.federation.hub.broker;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -17,7 +18,7 @@ public class FederationHubServerConfigManager {
 	private final String configFile;
 	private FederationHubServerConfig config = null;
 	
-	FederationHubServerConfigManager(String configFile) {
+	public FederationHubServerConfigManager(String configFile) {
 		this.configFile = configFile;
 		
 		config = loadConfig();
@@ -36,12 +37,14 @@ public class FederationHubServerConfigManager {
 		try {
 			if (getClass().getResource(configFile) != null) {
 				// It's a resource.
-				config = new ObjectMapper(new YAMLFactory()).readValue(getClass().getResourceAsStream(configFile),
-						FederationHubServerConfig.class);
+				try (InputStream is = getClass().getResourceAsStream(configFile)) {
+					config = new ObjectMapper(new YAMLFactory()).readValue(is,FederationHubServerConfig.class);
+				}
 			} else {
 				// It's a file.
-				config = new ObjectMapper(new YAMLFactory()).readValue(new FileInputStream(configFile),
-						FederationHubServerConfig.class);	
+				try (InputStream is = new FileInputStream(configFile)) {
+					config = new ObjectMapper(new YAMLFactory()).readValue(is, FederationHubServerConfig.class);
+				}
 			}
 		} catch (Exception e) {
 			logger.error("Error loading broker config", e);

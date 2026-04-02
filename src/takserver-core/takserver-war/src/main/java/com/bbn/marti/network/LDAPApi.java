@@ -61,7 +61,7 @@ public class LDAPApi extends BaseRestController {
     }
 
     @RequestMapping(value = "/groups", method = RequestMethod.GET)
-    public ResponseEntity<ApiResponse<SortedSet<LdapGroup>>> getLdapGroups(HttpServletResponse response, @RequestParam String groupNameFilter) {
+    public ResponseEntity<ApiResponse<SortedSet<LdapGroup>>> getLdapGroups(HttpServletResponse response, @RequestParam(value = "groupNameFilter") String groupNameFilter) {
 
     	setCacheHeaders(response);
     	
@@ -108,7 +108,7 @@ public class LDAPApi extends BaseRestController {
 
     @RequestMapping(value = "/groups/members", method = RequestMethod.GET)
     public ResponseEntity<ApiResponse<Integer>> getLdapGroupMembers(
-            HttpServletRequest request, HttpServletResponse response, @RequestParam String[] groupNameFilter) {
+            HttpServletRequest request, HttpServletResponse response, @RequestParam(value = "groupNameFilter") String[] groupNameFilter) {
 
         NavigableSet<Group> userGroups = martiUtil.getUserGroups(request);
 

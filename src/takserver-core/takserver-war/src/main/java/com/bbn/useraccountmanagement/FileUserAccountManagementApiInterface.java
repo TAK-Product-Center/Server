@@ -27,6 +27,8 @@ public interface FileUserAccountManagementApiInterface {
     
     public void updateGroupsForUser(SimpleUserGroupModel simpleUserModel);
     
+    public void updateUsersForGroup(SimpleGroupWithUsersModel simpleGroupModel);
+
     public void deleteUser(String username);
     
     public Set<GroupNameModel> getAllGroupNames();

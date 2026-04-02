@@ -111,8 +111,6 @@ public interface SubscriptionManager extends SubscriptionManagerLite {
 	
 	CotEventContainer makeDeleteMessage(String linkUid, String linkType);
 
-	CotEventContainer createMissionChangeMessage(UUID missionGuid, String missionName, ChangeType changeType, String authorUid, String tool, String changes, String xmlContentForNotification);
-
 	CotEventContainer createMissionCreateMessage(UUID missionGuid, String missionName, String authorUid, String tool);
 
 	CotEventContainer createMissionDeleteMessage(UUID missionGuid, String missionName, String authorUid, String tool);
@@ -134,4 +132,11 @@ public interface SubscriptionManager extends SubscriptionManagerLite {
 	void removeWebsocketSubscription(String connectionId);
 	
 	int getLocalSubscriptionCount();
+	
+	void submitAnnounceMissionChangeCot(String missionName, UUID fromString, CotEventContainer missionCot);
+	void submitBroadcastMissionAnnouncementCot(String creatorUid, String groupVector, CotEventContainer missionCot);
+	void submitSendMissionInviteCot(String[] array, CotEventContainer missionCot);
+	void submitSendMissionRoleChangeCot(String clientUid, CotEventContainer missionCot);
+	
+	void addFilterToSub(Subscription subscription, Filter filter);
 }

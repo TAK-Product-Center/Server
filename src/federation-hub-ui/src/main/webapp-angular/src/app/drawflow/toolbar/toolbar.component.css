@@ -1,0 +1,3 @@
+.navbar-right>a:not(:last-child){
+    margin-right: 25px;
+}

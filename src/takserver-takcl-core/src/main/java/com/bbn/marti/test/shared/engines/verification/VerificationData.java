@@ -6,6 +6,8 @@ import com.bbn.marti.test.shared.engines.state.StateEngine;
 import com.bbn.marti.tests.Assert;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.TreeMap;
@@ -15,6 +17,8 @@ import java.util.TreeSet;
  * Created on 2/9/18.
  */
 public class VerificationData {
+
+    private static final Logger logger = LoggerFactory.getLogger(VerificationData.class);
 
 	static VerificationData instance = new VerificationData();
 
@@ -58,7 +62,7 @@ public class VerificationData {
 				Assert.fail(message);
 				throw new RuntimeException(message);
 			}
-			System.out.println("--- VerificationData setUserExpectations, put user: " + user +", expectedSenders.size(): "+ expectedSenders.size()+ ", expectedConnectivityState: " + expectedConnectivityState);
+			logger.debug("--- VerificationData setUserExpectations, put user: " + user +", expectedSenders.size(): "+ expectedSenders.size()+ ", expectedConnectivityState: " + expectedConnectivityState);
 			userVerificationIterationData.put(user, new VerificationClient(user, expectedSenders, expectedConnectivityState));
 		}
 	}
@@ -66,7 +70,7 @@ public class VerificationData {
 	synchronized void validateAllUserExpectations(String justification) {
 		// TODO: All users should really be validated, not just those tagged with a validator.
 		for (Map.Entry<AbstractUser, VerificationClient> entry : userVerificationIterationData.entrySet()) {
-			System.out.println("\t ---VerificationData: validateAllUserExpectations: entry.getKey():" + entry.getKey() + ", entry.getValue().getProfile(): "+ entry.getValue().getProfile());
+			logger.debug("\t ---VerificationData: validateAllUserExpectations: entry.getKey():" + entry.getKey() + ", entry.getValue().getProfile(): "+ entry.getValue().getProfile());
 			UserExpectationValidator uev = new UserExpectationValidator(
 					StateEngine.data.getState(entry.getKey()), entry.getValue());
 			uev.validateExpectations(justification, true);

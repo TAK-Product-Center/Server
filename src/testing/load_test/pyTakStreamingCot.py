@@ -77,7 +77,7 @@ class PyTAKStreamingCot:
         with p12_to_pem(self.certfile, self.password) as cert:
             self.ssl_context.load_cert_chain(cert)
 
-        self.location = (random.uniform(-90, 90), random.uniform(-180, 180))
+        self.location = (random.uniform(-75, 75), random.uniform(-170, 170))
         self.data_dict = data_dict if data_dict is not None else dict()
         self.data_dict[self.uid] = {'write': 0, 'read': 0, 'bytes': 0, 'connected': False}
 

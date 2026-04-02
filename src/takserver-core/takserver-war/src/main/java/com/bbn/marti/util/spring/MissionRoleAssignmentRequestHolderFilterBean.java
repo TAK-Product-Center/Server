@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.annotation.Order;
 import org.springframework.web.filter.GenericFilterBean;
 
 import com.bbn.marti.logging.AuditLogUtil;
@@ -28,18 +27,14 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-@Order(0)
 public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterBean {
 	private static final Logger logger = LoggerFactory.getLogger(MissionRoleAssignmentRequestHolderFilterBean.class);
-
-	@Autowired
-	private RequestHolderBean requestBean;
 
 	@Autowired
 	private MissionService missionService;
 
 	@Autowired
-	private CommonUtil martiUtil;
+	private CommonUtil commonUtil;
 
 	private final String apiMissions = "/api/missions/";
 	private final String copMissions = "/api/cops/";
@@ -47,8 +42,6 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 
 	@Override
 	public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
-		requestBean.setRequest(servletRequest);
-		requestBean.setMissionRole(null);
 
 		HttpServletRequest req = (HttpServletRequest) servletRequest;
 		HttpServletResponse resp = (HttpServletResponse) servletResponse;
@@ -65,6 +58,8 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 		} else {
 			CorsHeaders.checkAndApplyCorsForConnector(req, resp);
 		}
+
+		CustomHeaders.checkAndApplyCustomHeadersForConnector(req, resp);
 
 		String path = req.getRequestURI();
 		String apiPath = apiMissions;
@@ -97,7 +92,7 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 					
 					missionGuid = UUID.fromString((String) req.getParameter("guid"));
 					
-					Mission mission = missionService.getMissionNoContentByGuid(missionGuid, martiUtil.getGroupVectorBitString(req.getSession().getId()));
+					Mission mission = missionService.getMissionNoContentByGuid(missionGuid, commonUtil.getGroupVectorBitString(req));
 					
 					setMissionRole(mission, req, servletResponse, false);
 
@@ -166,12 +161,12 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 
 								UUID missionUuid = UUID.fromString(missionGuid);
 
-								mission = missionService.getMissionNoContentByGuid(missionUuid, martiUtil.getGroupVectorBitString(req.getSession().getId()));
+								mission = missionService.getMissionNoContentByGuid(missionUuid, commonUtil.getGroupVectorBitString(req));
 							} else {
 
 								logger.debug("getting mission by name {}", missionName);
 
-								mission = missionService.getMissionNoContent(missionName, martiUtil.getGroupVectorBitString(req.getSession().getId()));
+								mission = missionService.getMissionNoContent(missionName, commonUtil.getGroupVectorBitString(req));
 							}
 
 							setMissionRole(mission, req, servletResponse, missionCreate);
@@ -214,7 +209,7 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 		}
 	}
 	
-	private void setMissionRole(Mission mission, HttpServletRequest req, ServletResponse servletResponse, boolean missionCreate) {
+	private void setMissionRole(Mission mission, HttpServletRequest request, ServletResponse servletResponse, boolean missionCreate) {
 		
 		if (mission == null) {
 			logger.warn("null mission");
@@ -222,17 +217,21 @@ public class MissionRoleAssignmentRequestHolderFilterBean extends GenericFilterB
 		}
 		
 		try {
+			
+			boolean isAdmin = commonUtil.isAdmin(request);
+			
+			logger.debug("isAdmin: {}", isAdmin);
 
-			MissionRole role = missionService.getRoleForRequest(mission, req);
+			MissionRole role = missionService.getRoleForRequest(mission, request, isAdmin);
 
 			logger.debug("assigned mission role: {} for mission ", role);
 			
-			requestBean.setMissionRole(role);
-
-			req.setAttribute(MissionRole.class.getName(), role);
+			// Store the mission and the mission role in the request
+	        request.setAttribute(Mission.class.getName(), mission);
+			request.setAttribute(MissionRole.class.getName(), role);
 
 			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled()) {
-				if (!missionService.validateAccess(mission, req)) {
+				if (!missionService.validateAccess(mission, request)) {
 					((HttpServletResponse) servletResponse).setStatus(HttpServletResponse.SC_NOT_FOUND);
 					return;
 				}

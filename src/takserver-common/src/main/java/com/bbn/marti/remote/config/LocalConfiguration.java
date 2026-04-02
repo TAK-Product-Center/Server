@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
@@ -40,6 +41,7 @@ import com.bbn.marti.config.DosLimitRule;
 import com.bbn.marti.config.DosRateLimiter;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.FederationOutgoing;
+import com.bbn.marti.config.Federation.FederationServer.FederationTokenAuthentication;
 import com.bbn.marti.config.Federation.FederationServer.V1Tls;
 import com.bbn.marti.config.Filter;
 import com.bbn.marti.config.Flowtag;
@@ -73,7 +75,7 @@ public class LocalConfiguration {
 	public static final String DEFAULT_TRUSTSTORE = "certs/files/fed-truststore.jks";
 	public static String CONFIG_FILE = null;
 	static final String DEFAULT_CONFIG_FILE = "CoreConfig.xml";
-	static final String ALT_DEFAULT_CONFIG_FILE = "data/CoreConfig.xml";
+	static final String ALT_DEFAULT_CONFIG_FILE = "conf/CoreConfig.xml";
 	static final String EXAMPLE_BASE_CONFIG_FILE = "CoreConfig.example.xml";
 	public static boolean doUpgrades = true;
 	private Configuration configuration;
@@ -141,6 +143,16 @@ public class LocalConfiguration {
 			}
 
 			conf = JAXBUtils.loadJAXifiedXML(CONFIG_FILE, Configuration.class.getPackage().getName());
+
+            // If in cluster mode, we must save it to an alternate location
+            if (conf != null && conf.getCluster() != null && conf.getCluster().isEnabled()) {
+                logger.info("Using alternate CoreConfig storage location due to clustering.");
+                CONFIG_FILE = ALT_DEFAULT_CONFIG_FILE;
+                if (!Files.exists(Paths.get(ALT_DEFAULT_CONFIG_FILE).getParent())) {
+                    Files.createDirectory(Paths.get(ALT_DEFAULT_CONFIG_FILE).getParent());
+                }
+                JAXBUtils.saveJAXifiedObject(CONFIG_FILE, conf, true);
+            }
 
 		} catch (jakarta.xml.bind.UnmarshalException ue) {
 			// There is a good chance it is lacking a namespace if it is an older file.
@@ -357,6 +369,8 @@ public class LocalConfiguration {
 			tls.setTruststorePass(existingTls.getTruststorePass());
 			tls.setKeymanager(existingTls.getKeymanager());
 			fedServer.setTls(tls);
+			FederationTokenAuthentication federationTokenAuthentication = new FederationTokenAuthentication();
+			fedServer.setFederationTokenAuthentication(federationTokenAuthentication);
 			Federation federation = new Federation();
 			federation.setFederationServer(fedServer);
 			configuration.setFederation(federation);
@@ -371,6 +385,13 @@ public class LocalConfiguration {
 				fileFilter.getFileExtension().add("pref");
 				configuration.getFederation().setFileFilter(fileFilter);
 				changed = true;
+			}
+			if (configuration.getFederation().getFederationServer() != null) {
+				if (configuration.getFederation().getFederationServer().getFederationTokenAuthentication() == null) {
+					FederationTokenAuthentication federationTokenAuthentication = new FederationTokenAuthentication();
+					configuration.getFederation().getFederationServer().setFederationTokenAuthentication(federationTokenAuthentication);
+					changed = true;
+				}
 			}
 		}
 
@@ -656,12 +677,21 @@ public class LocalConfiguration {
 
 	private String getCurrentVer() {
 		String currentVer = null;
-
+		
+		InputStream fis = null;
 		try {
-			currentVer = IOUtils.toString(
-					LocalConfiguration.class.getResourceAsStream(Constants.SHORT_VER_RESOURCE_PATH), Charsets.UTF_8);
+			fis = LocalConfiguration.class.getResourceAsStream(Constants.SHORT_VER_RESOURCE_PATH);
+			currentVer = IOUtils.toString(fis, Charsets.UTF_8);
 		} catch (Exception e) {
 			throw new TakException(e);
+		} finally {
+			if (fis != null) {
+        		try {
+        			fis.close();
+				} catch (IOException e) {
+					logger.error("Error closing configuration file stream", e);
+				}
+        	}
 		}
 
 		if (Strings.isNullOrEmpty(currentVer)) {

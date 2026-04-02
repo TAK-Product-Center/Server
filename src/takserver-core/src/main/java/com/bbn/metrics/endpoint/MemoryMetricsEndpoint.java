@@ -9,6 +9,7 @@ import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import com.bbn.metrics.MetricsCollector;
 import com.bbn.metrics.dto.MemoryMetrics;
 import com.bbn.metrics.service.ActuatorMetricsService;
+import com.bbn.metrics.messaging.MessagingMetricsService;
 
 @Endpoint(id = "custom-memory-metrics")
 public class MemoryMetricsEndpoint {
@@ -16,6 +17,8 @@ public class MemoryMetricsEndpoint {
 	private MetricsCollector metricsCollector;
 	@Autowired
 	ActuatorMetricsService actuatorMetricsService;
+	@Autowired
+	MessagingMetricsService messagingMetricsService;
 	
 	public MemoryMetricsEndpoint(MetricsCollector metricsCollector) {
 		this.metricsCollector = metricsCollector;
@@ -27,6 +30,8 @@ public class MemoryMetricsEndpoint {
 		MemoryMetrics memoryMetrics = new MemoryMetrics();
 		memoryMetrics.setHeapCommitted(actuatorMetricsService.getHeapCommitted());
 		memoryMetrics.setHeapUsed(actuatorMetricsService.getHeapUsed());
+		memoryMetrics.setMessagingHeapCommitted(messagingMetricsService.getHeapCommitted());
+		memoryMetrics.setMessagingHeapUsed(messagingMetricsService.getHeapUsed());
 		
 		return memoryMetrics;
 	}

@@ -3,6 +3,7 @@
 package com.bbn.marti.util;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
@@ -40,8 +41,9 @@ public class VersionBean {
     	if (ver == null) {
     		synchronized (this) {
     			if (ver == null) {
-					ver = IOUtils.toString(
-							VersionBean.class.getResourceAsStream(Constants.SHORT_VER_RESOURCE_PATH), Charsets.UTF_8);
+    				try (InputStream fis = VersionBean.class.getResourceAsStream(Constants.SHORT_VER_RESOURCE_PATH)) {
+    					ver = IOUtils.toString(fis, Charsets.UTF_8);
+    				}
     			}
     		}
     	}
@@ -60,9 +62,8 @@ public class VersionBean {
 			synchronized (this) {
 				if (versionInfo == null) {
 
-					try {
-						String versionInfoJson = IOUtils.toString(
-								VersionBean.class.getResourceAsStream(Constants.VERSION_INFO_JSON_PATH), Charsets.UTF_8);
+					try(InputStream fis = VersionBean.class.getResourceAsStream(Constants.VERSION_INFO_JSON_PATH)) {
+						String versionInfoJson = IOUtils.toString(fis, Charsets.UTF_8);
 
 						versionInfo = new Gson().fromJson(versionInfoJson, VersionInfo.class);
 

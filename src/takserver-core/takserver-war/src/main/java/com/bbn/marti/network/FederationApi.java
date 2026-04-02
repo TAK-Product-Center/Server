@@ -6,9 +6,11 @@ import java.io.InputStream;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,10 +39,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
+import com.bbn.marti.config.Federation.Federate.OutboundGroupHopLimit;
+import com.bbn.marti.config.Tls;
 import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.remote.ConnectionStatus;
 import com.bbn.marti.remote.FederationManager;
 import com.bbn.marti.remote.RemoteContact;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.service.FederationHttpConnectorManager;
 import com.bbn.marti.sync.repository.FederationEventRepository;
 import com.bbn.security.web.MartiValidator;
@@ -51,7 +56,11 @@ import com.google.common.collect.Multimap;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 
+import io.jsonwebtoken.Claims;
 import tak.server.Constants;
+import tak.server.federation.jwt.FederationJwtUtils;
+import tak.server.federation.jwt.JwtTokenRequestModel;
+import tak.server.federation.jwt.JwtTokenResponseModel;
 import tak.server.ignite.ApiIgniteBroker;
 
 /**
@@ -146,7 +155,7 @@ public class FederationApi extends BaseRestController {
 
 		SortedSet<RemoteContact> federateContacts = null;
 		ResponseEntity<ApiResponse<SortedSet<RemoteContact>>> result = null;
-		List<String> errors = null;
+		List<String> errors = new ArrayList<String>();
 
 		try {
 			federateContacts = new ConcurrentSkipListSet<RemoteContact>(new Comparator<RemoteContact>() {
@@ -158,16 +167,12 @@ public class FederationApi extends BaseRestController {
 				}
 			});
 
-			errors = getCertificateFingerprintValidationErrors(federateId);
-
-			if (errors.isEmpty()) {
-				Collection<RemoteContact> fc = federationInterface.getContactsForFederate(federateId, null);
-				if (fc != null) {
-					federateContacts.addAll(fc);
-				}
-
-				result = new ResponseEntity<ApiResponse<SortedSet<RemoteContact>>>(new ApiResponse<SortedSet<RemoteContact>>(Constants.API_VERSION, SortedSet.class.getName(), federateContacts), HttpStatus.OK);
+			Collection<RemoteContact> fc = federationInterface.getContactsForFederate(federateId, null);
+			if (fc != null) {
+				federateContacts.addAll(fc);
 			}
+
+			result = new ResponseEntity<ApiResponse<SortedSet<RemoteContact>>>(new ApiResponse<SortedSet<RemoteContact>>(Constants.API_VERSION, SortedSet.class.getName(), federateContacts), HttpStatus.OK);
 		} catch (Exception e) {
 			errors.add("Unexpected error retrieving federate contacts.");
 			logger.debug("Exception getting federate contacts.", e);
@@ -375,8 +380,7 @@ public class FederationApi extends BaseRestController {
 	}
 
 	@RequestMapping(value = "/federategroups", method = RequestMethod.POST)
-	public ResponseEntity<ApiResponse<String>> addFederateGroup(@RequestBody FederateGroupAssociation federateGroupAssociation) {
-
+	public ResponseEntity<ApiResponse<String>> addFederateGroup(@RequestBody FederateGroupAssociation federateGroupAssociation) {		
 		ResponseEntity<ApiResponse<String>> result = null;
 
 		List<String> errors = null;
@@ -453,7 +457,7 @@ public class FederationApi extends BaseRestController {
 	}
 
 	@RequestMapping(value = "/federategroupsmap/{federateId}", method = RequestMethod.DELETE)
-	public ResponseEntity<ApiResponse<String>> removeFederateGroupMap(@PathVariable("federateId") String federateId, String remoteGroup, String localGroup) {
+	public ResponseEntity<ApiResponse<String>> removeFederateGroupMap(@PathVariable("federateId") String federateId, @RequestParam("remoteGroup") String remoteGroup, @RequestParam("localGroup") String localGroup) {
 
 		ResponseEntity<ApiResponse<String>> result = null;
 
@@ -512,7 +516,83 @@ public class FederationApi extends BaseRestController {
 
 		return result;
 	}
+	
+	@RequestMapping(value = "/federate-outbound-groups-hop-limit/{federateId}", method = RequestMethod.DELETE)
+	public ResponseEntity<ApiResponse<String>> removeFederateOutboundGroupsHopLimit(@PathVariable("federateId") String federateId, @RequestParam("group") String group) {
+		if (logger.isDebugEnabled()) {
+			logger.debug("Received DELETE request removeFederateOutboundGroupsHopLimit for federateId {}, group {}", federateId, group);
+		}
+		ResponseEntity<ApiResponse<String>> result = null;
 
+		String error = "";
+
+		try {
+			federationInterface.removeFederateOutboundGroupHopLimit(federateId, group);
+			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION,
+					String.class.getName(), federateId), HttpStatus.OK);
+		} catch (Exception e) {
+			logger.error("Exception removing federate group hop limit.", e);
+			error =  e.getMessage();
+		}
+		if (result == null) {
+			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), null, error),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+
+	@RequestMapping(value = "/federate-outbound-groups-hop-limit/{federateId}", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<String>> addFederateOutboundGroupsHopLimit(@PathVariable("federateId") String federateId, @RequestBody Map<String, Object> bodyMap) {
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("Received POST request addFederateOutboundGroupsHopLimit for federateId {}", federateId);
+		}
+		ResponseEntity<ApiResponse<String>> result = null;
+
+		String error = "";
+
+		try {
+			String groupName = (String) bodyMap.get("groupName");
+			String hopLimit = (String) bodyMap.get("hopLimit");
+			federationInterface.setFederateOutboundGroupHopLimit(federateId, groupName, Integer.parseInt(hopLimit));
+			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION,
+					String.class.getName(), groupName), HttpStatus.OK);
+		} catch (Exception e) {
+			logger.error("Exception setting federate group hop limit.", e);
+			error =  e.getMessage();
+		}
+		if (result == null) {
+			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), null, error),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+
+	@RequestMapping(value = "/federate-outbound-groups-hop-limit/{federateId}", method = RequestMethod.GET)
+	public ResponseEntity<ApiResponse<List<OutboundGroupHopLimit>>> getFederateOutboundGroupsHopLimits(@PathVariable("federateId") String federateId, HttpServletResponse response) {
+		if (logger.isDebugEnabled()) {
+			logger.debug("Received POST request getFederateOutboundGroupsHopLimits for federateId {}", federateId);
+		}
+		ResponseEntity<ApiResponse<List<OutboundGroupHopLimit>>> result = null;
+
+		String error = "";
+
+		try {
+			result = new ResponseEntity<ApiResponse<List<OutboundGroupHopLimit>>>(new ApiResponse<List<OutboundGroupHopLimit>>(Constants.API_VERSION,
+					String.class.getName(), federationInterface.getGroupHopLimitsForFederate(federateId)), HttpStatus.OK);
+		} catch (Exception e) {
+			logger.error("Exception getting federate group hop limit.", e);
+			error =  e.getMessage();
+		}
+		if (result == null) {
+			result = new ResponseEntity<ApiResponse<List<OutboundGroupHopLimit>>>(HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
+		return result;
+	}
+	
 	@RequestMapping(value = "/federategroups/{federateId}", method = RequestMethod.DELETE)
 	public ResponseEntity<ApiResponse<String>> removeFederateGroup(@PathVariable("federateId") String federateId, @RequestParam("group") String group, @RequestParam("direction") DirectionValue directionValue) {
 
@@ -532,10 +612,12 @@ public class FederationApi extends BaseRestController {
 					federationInterface.removeFederateFromGroupsInbound(federateGroupAssociation.getFederateId(), groups);
 				} else if (federateGroupAssociation.getDirection() == DirectionValue.OUTBOUND) {
 					federationInterface.removeFederateFromGroupsOutbound(federateGroupAssociation.getFederateId(), groups);
+					federationInterface.removeFederateOutboundGroupHopLimit(federateId, group);
 				} else if (federateGroupAssociation.getDirection() == DirectionValue.BOTH) {
 					//Not used for now, but we can do so if the presentation requires it
 					federationInterface.removeFederateFromGroupsInbound(federateGroupAssociation.getFederateId(), groups);
 					federationInterface.removeFederateFromGroupsOutbound(federateGroupAssociation.getFederateId(), groups);
+					federationInterface.removeFederateOutboundGroupHopLimit(federateId, group);
 				}
 				//Ideally we need a more meaningful return here (like the number of records removed), but the service layer only returns void for now, so we just return the name of the group removed
 				result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION,
@@ -771,6 +853,40 @@ public class FederationApi extends BaseRestController {
 		}
 		return result;
 	}
+	
+	@RequestMapping(value = "/federatecatokenauth", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<String>> setFederateCATokenAuth(@RequestBody Map<String, Object> data){
+		ResponseEntity<ApiResponse<String>> result = null;
+
+		List<String> errors = new ArrayList<>();
+		try {
+			
+			String fingerprint = (String) data.get("fingerPrint");
+			boolean allowTokenAuth = (Boolean) data.get("allowTokenAuth");
+			Object durationObj = data.get("tokenAuthDuration");
+			Long duration = null;
+			if (durationObj instanceof Integer) {
+				duration = ((Integer) durationObj).longValue();
+			} else if (durationObj instanceof Long) {
+				duration = (Long) durationObj;
+			}
+			
+			federationInterface.setCATokenAuthentication(fingerprint, allowTokenAuth, duration);
+			
+			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION,
+					String.class.getName(), fingerprint), HttpStatus.OK);
+		}
+		catch(Exception e){
+			logger.error("Exception changing federate CA token authentication", e);
+			errors.add(e.getMessage());
+		}
+
+		if (result == null){
+			result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), null, errors),
+					HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+		return result;
+	}
 
 	@RequestMapping(value = "/outgoingconnections", method = RequestMethod.POST)
 	public ResponseEntity<ApiResponse<Federation.FederationOutgoing>> createOutgoingConnection(@RequestBody Federation.FederationOutgoing outgoingConnection) {
@@ -782,16 +898,7 @@ public class FederationApi extends BaseRestController {
 		try {
 			errors = getValidationErrors(outgoingConnection);
 			if (errors.isEmpty()) {
-				federationInterface.addOutgoingConnection(outgoingConnection.getDisplayName(),
-						outgoingConnection.getAddress(),
-						outgoingConnection.getPort(),
-						outgoingConnection.getReconnectInterval(),
-						outgoingConnection.getMaxRetries(),
-						outgoingConnection.isUnlimitedRetries(),
-						outgoingConnection.isEnabled(),
-						outgoingConnection.getProtocolVersion(),
-						outgoingConnection.getFallback(), 
-						outgoingConnection.getConnectionToken());
+				federationInterface.addOutgoingConnection(outgoingConnection);
 
 				result = new ResponseEntity<ApiResponse<Federation.FederationOutgoing>>(new ApiResponse<Federation.FederationOutgoing>(Constants.API_VERSION,
 						Federation.FederationOutgoing.class.getName(), outgoingConnection), HttpStatus.OK);
@@ -906,9 +1013,24 @@ public class FederationApi extends BaseRestController {
 			if (x509Certificates != null) {
 				for (X509Certificate x : x509Certificates) {
 					String fingerprint = getCertFingerprint(x);
-					int maxHops = federationInterface.getCAMaxHops(fingerprint);
 					
-					certificateSummaries.add(new CertificateSummary(x.getIssuerDN().getName(), x.getSubjectDN().getName(), x.getSerialNumber(), fingerprint, maxHops));
+					int maxHops = -1;
+					boolean allowTokenAuth = false;
+					long tokenAuthDuration = -1;
+					
+					List<Federation.FederateCA> federateCAs = CoreConfigFacade.getInstance().getRemoteConfiguration()
+							.getFederation().getFederateCA();
+					for (Federation.FederateCA ca : federateCAs) {
+						if (ca.getFingerprint().compareTo(fingerprint) == 0) {
+							maxHops = ca.getMaxHops();
+							allowTokenAuth = ca.isAllowTokenAuth();
+							tokenAuthDuration = ca.getTokenAuthDuration();
+							break;
+						}
+					}
+					
+					certificateSummaries.add(new CertificateSummary(x.getIssuerDN().getName(), x.getSubjectDN().getName(), 
+							x.getSerialNumber(), fingerprint, maxHops, allowTokenAuth, tokenAuthDuration));
 				}
 			}
 			result = new ResponseEntity<ApiResponse<List<CertificateSummary>>>(new ApiResponse<List<CertificateSummary>>(Constants.API_VERSION, CertificateSummary.class.getName(), certificateSummaries), HttpStatus.OK);
@@ -975,31 +1097,27 @@ public class FederationApi extends BaseRestController {
 		List<String> errors = new ArrayList<String>();
 
 		try {
-			errors.addAll(getCertificateFingerprintValidationErrors(fingerprint));
+			List<X509Certificate> certificates = federationInterface.getCAList();
+			if (certificates != null) {
+				for (X509Certificate x : certificates) {
+					if (getCertFingerprint(x).equals(fingerprint)) {
+						
+						federationInterface.removeCA(x);
+						
+						ApiIgniteBroker.brokerVoidServiceCalls(s -> ((FederationHttpConnectorManager) s)
+								.asyncReloadFederationHttpConnector(), Constants.DISTRIBUTED_FEDERATION_HTTP_CONNECTOR_SERVICE, FederationHttpConnectorManager.class);
 
-			if (errors.isEmpty()) {
-				List<X509Certificate> certificates = federationInterface.getCAList();
-				if (certificates != null) {
-					for (X509Certificate x : certificates) {
-						if (getCertFingerprint(x).equals(fingerprint)) {
-							
-							federationInterface.removeCA(x);
-							
-							ApiIgniteBroker.brokerVoidServiceCalls(s -> ((FederationHttpConnectorManager) s)
-									.asyncReloadFederationHttpConnector(), Constants.DISTRIBUTED_FEDERATION_HTTP_CONNECTOR_SERVICE, FederationHttpConnectorManager.class);
-
-							result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), null), HttpStatus.OK);
-							break;
-						}
+						result = new ResponseEntity<ApiResponse<String>>(new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), null), HttpStatus.OK);
+						break;
 					}
-					if (result == null) {
-						errors.add("Certificate not found for deletion.");
-						logger.error("Unable to location certificate for deletion.", fingerprint);
-					}
-				} else {
-					errors.add("Certificate not found for deletion.");
-					logger.error("No certificates returned from federationInterface during deletion.");
 				}
+				if (result == null) {
+					errors.add("Certificate not found for deletion.");
+					logger.error("Unable to location certificate for deletion.", fingerprint);
+				}
+			} else {
+				errors.add("Certificate not found for deletion.");
+				logger.error("No certificates returned from federationInterface during deletion.");
 			}
 		} catch (Exception e) {
 			errors.add(e.getMessage());
@@ -1025,8 +1143,7 @@ public class FederationApi extends BaseRestController {
 		try {
 			errors = getValidationErrors(federate);
 			if (errors.isEmpty()) {
-				federationInterface.updateFederateDetails(federate.getId(), federate.isArchive(), federate.isShareAlerts(),
-						federate.isFederatedGroupMapping(), federate.isAutomaticGroupMapping(), federate.isFallbackWhenNoGroupMappings(), federate.getNotes(), federate.getMaxHops());
+				federationInterface.updateFederateDetails(federate);
 
 				result = new ResponseEntity<ApiResponse<Federate>>(new ApiResponse<Federate>(Constants.API_VERSION,
 						Federate.class.getName(), federate), HttpStatus.OK);
@@ -1049,7 +1166,7 @@ public class FederationApi extends BaseRestController {
 	}
 
 	@RequestMapping(value = "/federatedetails/{id}", method = RequestMethod.GET)
-	public ResponseEntity<ApiResponse<Federation.Federate>> getFederateDetails(@PathVariable("id") String id, HttpServletResponse response) {
+	public ResponseEntity<ApiResponse<Federate>> getFederateDetails(@PathVariable("id") String id, HttpServletResponse response) {
 
 		setCacheHeaders(response);
 
@@ -1102,7 +1219,6 @@ public class FederationApi extends BaseRestController {
 			errors.add("Federate ID must not be null or a zero length string.");
 		} else {
 			federateGroupAssociation.setFederateId(federateGroupAssociation.getFederateId().trim());
-			errors.addAll(getCertificateFingerprintValidationErrors(federateGroupAssociation.getFederateId()));
 		}
 
 		if (federateGroupAssociation.getGroup() == null || federateGroupAssociation.getGroup().trim().length() == 0) {
@@ -1224,7 +1340,7 @@ public class FederationApi extends BaseRestController {
 		return errors;
 	}
 
-	private List<String> getValidationErrors(Federation.Federate federate) {
+	private List<String> getValidationErrors(Federate federate) {
 
 		List<String> errors = new ArrayList<String>();
 
@@ -1279,7 +1395,7 @@ public class FederationApi extends BaseRestController {
 	 * @param fingerPrint
 	 * @return
 	 */
-	private List<String> getCertificateFingerprintValidationErrors(String fingerPrint) {
+	private List<String> getCertificateFingerprintValidationErrorss(String fingerPrint) {
 
 		List<String> errors = new ArrayList<String>();
 
@@ -1382,7 +1498,8 @@ public class FederationApi extends BaseRestController {
 	}
 	
 	@RequestMapping(value = "/federatemissions/{federateId}", method = RequestMethod.PUT)
-	public ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>> updateFederateMissions(@PathVariable String federateId, @RequestBody FederateMissionPerConnectionSettings federateMissionPerConnectionSettings) {
+	public ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>> updateFederateMissions(
+			@PathVariable("federateId") String federateId, @RequestBody FederateMissionPerConnectionSettings federateMissionPerConnectionSettings) {
 
 		ResponseEntity<ApiResponse<FederateMissionPerConnectionSettings>> result = null;
 
@@ -1406,6 +1523,68 @@ public class FederationApi extends BaseRestController {
 					String.class.getName(), null, errors), HttpStatus.INTERNAL_SERVER_ERROR);
 		}
 
+		return result;
+	}
+	
+	@RequestMapping(value = "/generateAndSaveFederationJwtToken", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<JwtTokenResponseModel>> generateAndSaveJwtToken(@RequestBody JwtTokenRequestModel tokenRequest) {
+		ResponseEntity<ApiResponse<JwtTokenResponseModel>> result = null;
+
+		try {
+			Tls config = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer()
+					.getTls();
+			
+			FederationJwtUtils jwtUtils = FederationJwtUtils.getInstance(config.getKeystoreFile(),
+					config.getKeystorePass(), config.getKeystore());
+			
+			String tokenName = (String) tokenRequest.getAttributes().get("name");
+			
+			String token = jwtUtils.createFederationToken(tokenName, tokenRequest.getExpiration());
+			
+			Federate federateToken = new Federate();
+			federateToken.setId(token);
+			federateToken.setTokenFederate(true);
+			federateToken.setTokenExpiration(tokenRequest.getExpiration());
+			federateToken.setName(tokenName);
+			
+			federationInterface.addFederateToConfig(federateToken);
+
+			JwtTokenResponseModel response = new JwtTokenResponseModel();
+			response.setToken(token);
+			response.setExpiration(tokenRequest.getExpiration());
+			
+			result = new ResponseEntity<ApiResponse<JwtTokenResponseModel>>(new ApiResponse<JwtTokenResponseModel>(Constants.API_VERSION, JwtTokenResponseModel.class.getName(), response), HttpStatus.OK);
+		} catch (Exception e) {
+			logger.error("error with generateJwtToken", e);
+			result = new ResponseEntity<ApiResponse<JwtTokenResponseModel>>(new ApiResponse<JwtTokenResponseModel>(Constants.API_VERSION, JwtTokenResponseModel.class.getName(), null), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+		return result;
+	}
+	
+	@RequestMapping(value = "/generateFederationJwtToken", method = RequestMethod.POST)
+	public ResponseEntity<ApiResponse<JwtTokenResponseModel>> generateFederationJwtToken(@RequestBody JwtTokenRequestModel tokenRequest) {
+		ResponseEntity<ApiResponse<JwtTokenResponseModel>> result = null;
+
+		try {
+			Tls config = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer()
+					.getTls();
+			
+			FederationJwtUtils jwtUtils = FederationJwtUtils.getInstance(config.getKeystoreFile(),
+					config.getKeystorePass(), config.getKeystore());
+			
+			String tokenName = (String) tokenRequest.getAttributes().get("name");
+			
+			String token = jwtUtils.createFederationToken(tokenName, tokenRequest.getExpiration());
+			
+			JwtTokenResponseModel response = new JwtTokenResponseModel();
+			response.setToken(token);
+			response.setExpiration(tokenRequest.getExpiration());
+			
+			result = new ResponseEntity<ApiResponse<JwtTokenResponseModel>>(new ApiResponse<JwtTokenResponseModel>(Constants.API_VERSION, JwtTokenResponseModel.class.getName(), response), HttpStatus.OK);
+		} catch (Exception e) {
+			logger.error("error with generateJwtToken", e);
+			result = new ResponseEntity<ApiResponse<JwtTokenResponseModel>>(new ApiResponse<JwtTokenResponseModel>(Constants.API_VERSION, JwtTokenResponseModel.class.getName(), null), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
 		return result;
 	}
 }

@@ -7,8 +7,27 @@ import com.google.common.util.concurrent.AtomicDouble;
 public class CpuMetrics {
 	
 	private AtomicInteger cpuCount;
-	private AtomicDouble cpuUsage;	
-	
+	private AtomicDouble cpuUsage;
+
+	private double messagingCpuUsage;
+	private int messagingCpuCount;
+
+	public double getMessagingCpuUsage() {
+		return messagingCpuUsage;
+	}
+
+	public void setMessagingCpuUsage(double messagingCpuUsage) {
+		this.messagingCpuUsage = messagingCpuUsage;
+	}
+
+	public int getMessagingCpuCount() {
+		return messagingCpuCount;
+	}
+
+	public void setMessagingCpuCount(int cpuCount) {
+		this.messagingCpuCount = cpuCount;
+	}
+
 	public AtomicInteger getCpuCount() {
 		return cpuCount;
 	}

@@ -91,13 +91,18 @@ postgresql:
 
 ignite:
   image:
-    tag: 2.15.0-jdk11
+    tag: 2.17.0
   serviceAccount:
     name: takserver-ignite
 
-nats-operator:
+nats:
   image:
-    tag: 0.8.3
-  cluster:
-    auth:
-      enabled: false
+    tag: 1.0.1
+  config:
+    jetstream:
+      enabled: true
+    cluster:
+      enabled: true
+      replicas: 3
+      auth:
+        enabled: false

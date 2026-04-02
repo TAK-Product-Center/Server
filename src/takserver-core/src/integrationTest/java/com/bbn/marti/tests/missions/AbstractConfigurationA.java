@@ -29,7 +29,7 @@ public abstract class AbstractConfigurationA extends AbstractSingleServerTestCla
 	protected static final byte[] dataA = Util.generateDummyData(524288);
 	protected static final byte[] dataB = Util.generateDummyData(524288);
 
-	protected static final AbstractUser admin = ImmutableUsers.s0_authstcp_authwssuser012_012f;
+	protected static final AbstractUser admin = ImmutableUsers.s0_authstcpadmin_authwssuser012;
 	protected static final AbstractUser missionOwner = ImmutableUsers.s0_authstcp_authwssuser012_012fA;
 	protected static final AbstractUser existingMember = ImmutableUsers.s0_authstcp_authwssuser0_0f;
 	protected static final AbstractUser newMember = ImmutableUsers.s0_authstcp_authwssuser2_2f;
@@ -50,11 +50,9 @@ public abstract class AbstractConfigurationA extends AbstractSingleServerTestCla
 		engine.startServer(ImmutableServerProfiles.SERVER_0, classIdentifier);
 
 		onfam.init(ImmutableServerProfiles.SERVER_0);
-		onfam.certmod(admin.getCertPublicPemPath().toString(), null, null, true, null, admin.getDefinedGroupSet().stringArray(), null, null);
-		StateEngine.data.getState(admin).overrideAdminStatus(true);
-		onfam.certmod(missionOwner.getCertPublicPemPath().toString(), null, null, false, null, missionOwner.getDefinedGroupSet().stringArray(), null, null);
-		onfam.certmod(existingMember.getCertPublicPemPath().toString(), null, null, false, null, existingMember.getDefinedGroupSet().stringArray(), null, null);
-		onfam.certmod(nonMember.getCertPublicPemPath().toString(), null, null, false, null, nonMember.getDefinedGroupSet().stringArray(), null, null);
+		onfam.certmod(missionOwner.getCertPublicPemPath().toString(), null, null, false, null, missionOwner.getDefinedGroupSet().stringArray(), null, null, false, false, false);
+		onfam.certmod(existingMember.getCertPublicPemPath().toString(), null, null, false, null, existingMember.getDefinedGroupSet().stringArray(), null, null, false, false, false);
+		onfam.certmod(nonMember.getCertPublicPemPath().toString(), null, null, false, null, nonMember.getDefinedGroupSet().stringArray(), null, null, false, false, false);
 
 		// TODO Missions: Connection shouldn't be necessary, but is being done for now to minimize potential issues with the rest of the StateEngine
 		engine.connectClientsAndVerify(false, admin, existingMember);

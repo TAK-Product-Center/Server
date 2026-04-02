@@ -51,9 +51,12 @@ def runCmd(cmd):
 	    if out == b'' and p.poll() != None:
 	        break
 	    
-	    if out != b'':
-	    	sys.stdout.write(out.decode('utf-8'))
-	    	sys.stdout.flush()
+        if out != b'' and out != b'\xe2' and out != b'\x94' and out != b'\x81':
+            try:
+                sys.stdout.write(out.decode('utf-8'))
+            except:
+                print('could not print command output')
+            sys.stdout.flush()
 	
 	return p.poll()
 
@@ -627,6 +630,7 @@ def installHelmChart():
 			+ ' --set takserver.messaging.image.repository=' + AWS_ECR_URI
 			+ ' --set takserver.api.image.repository=' + AWS_ECR_URI
 			+ ' --set takserver.plugins.image.repository=' + AWS_ECR_URI
+            + ' --set ignite.image.repository=' + AWS_ECR_URI
 			+ ' --set ignite.replicaCount=' + str(total_ignite)
 			+ ' --set nats.cluster.replicas=' + str(total_nats)
 			+ ' --set stan.cluster.replicas=' + str(total_nats)))

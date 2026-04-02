@@ -29,10 +29,10 @@ public class MissionCacheResolver extends TakCacheManagerResolver {
         	// basic case for old behavior
         	if (context.getArgs()[0] instanceof String) { 
         		logger.debug("basic case");
-        		String cacheName = ((String) context.getArgs()[0]);
+        		String cacheName = ((String) context.getArgs()[0]).toLowerCase();
         		
             	List<Cache> caches = new CopyOnWriteArrayList<>();
-                caches.add(getCacheManager().getCache(cacheName.toLowerCase()));
+                caches.add(getCacheManager().getCache(cacheName));
 
                 if ((CacheOperation)context.getOperation() instanceof CacheEvictOperation) {
                     caches.add(getCacheManager().getCache(cacheName + MissionLayerCacheResolver.SUFFIX));	

@@ -15,6 +15,7 @@ import java.util.Set;
 import jakarta.xml.bind.JAXBException;
 
 import com.bbn.marti.config.*;
+import com.bbn.marti.config.Federation.Federate.OutboundGroupHopLimit;
 import com.bbn.marti.takcl.config.common.TakclRunMode;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -420,15 +421,15 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 
 	public void setSSLSecuritySettings() {
 		SSLHelper ssl = SSLHelper.getInstance();
-		String keystorePath = server.getServerPath() + "certs/files/keystore.jks";
-		String truststorePath = server.getServerPath() + "certs/files/truststore.jks";
+		String keystorePath = server.getServerPath() + "certs/files/takserver.jks";
+		String truststorePath = server.getServerPath() + "certs/files/truststore-root.jks";
 
 		if (!Files.exists(Paths.get(keystorePath))) {
 			ssl.copyServerKeystoreJks(server.getConsistentUniqueReadableIdentifier(), keystorePath);
 		}
 
 		if (!Files.exists(Paths.get(truststorePath))) {
-			ssl.copyServerTruststoreJks(truststorePath);
+			ssl.copyServerTruststoreJks(server.getConsistentUniqueReadableIdentifier(), truststorePath);
 		}
 
 		Tls tls = new Tls();
@@ -444,7 +445,7 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 
 		if (TAKCLCore.k8sMode) {
 			tls.setKeystoreFile("/certs/files/takserver.jks");
-			tls.setTruststoreFile("/certs/files/truststore.jks");
+			tls.setTruststoreFile("/certs/files/truststore-root.jks");
 
 			if (configuration.getFederation() != null && configuration.getFederation().getFederationServer() != null &&
 					configuration.getFederation().getFederationServer().getTls() != null) {
@@ -483,11 +484,8 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 	public void enableFederationServer(boolean useV1Federation, boolean useV2Federation) {
 		SSLHelper ssl = SSLHelper.getInstance();
 
-		String keystorePath = server.getServerPath() + "federationKeystore.jks";
-		String truststorePath = server.getServerPath() + "federationTruststore.jks";
-
-		ssl.copyServerKeystoreJks(server.getConsistentUniqueReadableIdentifier(), keystorePath);
-		ssl.copyServerTruststoreJks(truststorePath);
+		String keystorePath = server.getServerPath() + "certs/files/takserver.jks";
+		String truststorePath = server.getServerPath() + "certs/files/fed-truststore.jks";
 
 		Federation federation = configuration.getFederation();
 
@@ -548,6 +546,33 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 		saveChanges();
 	}
 
+	public void addFederateMaxHops(@NotNull AbstractServerProfile federate, int maxHops) {
+		List<Federation.Federate> federateList = configuration.getFederation().getFederate();
+
+		for (Federation.Federate loopfederate : federateList) {
+			if (loopfederate.getName().equals(federate.getConsistentUniqueReadableIdentifier())) {
+				loopfederate.setMaxHops(maxHops);
+				saveChanges();
+				return;
+			}
+		}
+
+		throw new RuntimeException("Cannot add max hops for " + server.getConsistentUniqueReadableIdentifier() + "because the federate " + federate.getConsistentUniqueReadableIdentifier() + " has not been added!");
+	}
+	
+	public void enableFederatedGroupMapping(@NotNull AbstractServerProfile federate, boolean enable) {
+		List<Federation.Federate> federateList = configuration.getFederation().getFederate();
+
+		for (Federation.Federate loopfederate : federateList) {
+			if (loopfederate.getName().equals(federate.getConsistentUniqueReadableIdentifier())) {
+				loopfederate.setFederatedGroupMapping(enable);
+				saveChanges();
+				return;
+			}
+		}
+
+		throw new RuntimeException("Cannot enable group mapping for " + server.getConsistentUniqueReadableIdentifier() + "because the federate " + federate.getConsistentUniqueReadableIdentifier() + " has not been added!");
+	}
 
 	public boolean containsFederationOutgoing(@NotNull AbstractServerProfile targetServer) {
 		List<Federation.FederationOutgoing> outgoingList = configuration.getFederation().getFederationOutgoing();
@@ -592,6 +617,7 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 		} else {
 			outgoingServer.setPort(targetServer.getFederationV1ServerPort());
 		}
+		outgoingServer.setEnabled(true);
 		saveChanges();
 	}
 
@@ -629,6 +655,39 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 
 		throw new RuntimeException("Cannot add outbound group for " + server.getConsistentUniqueReadableIdentifier() + "because the federate " + federate.getConsistentUniqueReadableIdentifier() + " has not been added!");
 	}
+	
+	public void addFederateOutboundGroupHopLimit(@NotNull AbstractServerProfile federate, @NotNull String groupIdentifier, int hopLimit) {
+		List<Federation.Federate> federateList = configuration.getFederation().getFederate();
+
+		for (Federation.Federate loopfederate : federateList) {
+			if (loopfederate.getName().equals(federate.getConsistentUniqueReadableIdentifier())) {
+				List<OutboundGroupHopLimit> outboundGroupHopLimits = loopfederate.getOutboundGroupHopLimit();
+
+				OutboundGroupHopLimit limit = new OutboundGroupHopLimit();
+				limit.setGroupName(groupIdentifier);
+				limit.setHopLimit(hopLimit);
+				
+				boolean limitExists = false;
+				for (OutboundGroupHopLimit l: outboundGroupHopLimits) {
+					if (l.getGroupName().equals(groupIdentifier)) {
+						limitExists = true;
+						break;
+					}
+				}
+				
+				if (limitExists) {
+					throw new RuntimeException(server.getConsistentUniqueReadableIdentifier() + "already has an outbound federate group hop limit for " + federate.getConsistentUniqueReadableIdentifier() + " named '" + groupIdentifier + "'!");
+				}
+				
+				outboundGroupHopLimits.add(limit);
+				saveChanges();
+				return;
+
+			}
+		}
+
+		throw new RuntimeException("Cannot add outbound group hop limit for " + server.getConsistentUniqueReadableIdentifier() + "because the federate " + federate.getConsistentUniqueReadableIdentifier() + " has not been added!");
+	}
 
 	public boolean containsFederateInboundGroup(@NotNull AbstractServerProfile federate, @NotNull String groupIdentifier) {
 		List<Federation.Federate> federateList = configuration.getFederation().getFederate();
@@ -665,6 +724,27 @@ public class OfflineConfigModule implements ServerAppModuleInterface {
 		throw new RuntimeException("Cannot add inbound group for " + server.getConsistentUniqueReadableIdentifier() + "because the federate " + federate.getConsistentUniqueReadableIdentifier() + " has not been added!");
 	}
 
+	public void addFederateInboundGroupMapping(@NotNull AbstractServerProfile federate, @NotNull String remote,  @NotNull String local) {
+		List<Federation.Federate> federateList = configuration.getFederation().getFederate();
+
+		for (Federation.Federate loopfederate : federateList) {
+			if (loopfederate.getName().equals(federate.getConsistentUniqueReadableIdentifier())) {
+				List<String> inboundGroupMappings = loopfederate.getInboundGroupMapping();
+				String mapping = remote + ":" + local;
+
+				if (inboundGroupMappings.contains(mapping)) {
+					throw new RuntimeException(server.getConsistentUniqueReadableIdentifier() + "already has an inbound federate group mapping for " + federate.getConsistentUniqueReadableIdentifier() + " named '" + mapping + "'!");
+				}
+				inboundGroupMappings.add(mapping);
+				saveChanges();
+				return;
+
+			}
+		}
+
+		throw new RuntimeException("Cannot add inbound group mapping for " + server.getConsistentUniqueReadableIdentifier() + "because the federate " + federate.getConsistentUniqueReadableIdentifier() + " has not been added!");
+	}
+	
 	@Command
 	public void setIgnitePortRange(@Nullable Integer discoveryPort, @Nullable Integer discoveryPortCount) {
 

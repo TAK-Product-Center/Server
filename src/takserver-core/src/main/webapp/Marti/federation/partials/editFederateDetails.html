@@ -56,6 +56,27 @@
   		<li class="error" data-ng-repeat="message in messages">{{message}}</li>
   	</ul>
   </div>
+
+  <hr>
+  <div style="margin-left: 5%" data-ng-show="federateDetails.tokenFederate">
+      <label for="name">Token Expiration</label>
+      <input type="number" data-ng-model="federateDetails.newTokenExpiration" min="-1"/>
+
+      <select ng-model="federateDetails.newTokenExpiration">
+        <option ng-value="-1">No Exp</option>
+        <option ng-value="3600000">1 Hour</option>
+        <option ng-value="86400000">1 Day</option>
+        <option ng-value="604800000">1 Week</option>
+        <option ng-value="18144000000">1 Month</option>
+        <option ng-value="31536000000">1 Year</option>
+      </select>
+
+          <button data-ng-disabled="!federateDetails.newTokenExpiration" data-ng-click="regenerateToken()">
+        Regenerate Token
+      </button>
+
+  </div>
+  <hr>
   
   <form name="federateDetailsForm" novalidate data-ng-submit="federateDetailsForm.$valid && saveFederateDetails(federateDetails)">
   	<table>
@@ -127,8 +148,25 @@
       <td class="rowHeader"><label for="maxHops">*Max Hops</label></td>
       <td class="rowValue">
         <input name="maxHops" data-ng-model="federateDetails.maxHops" type="number" min="-1">
+        <br/><span class="inlineHelp">Set the maximum number of hops messages sent to this federation are allowed to make (-1 for no limit)</span>
       </td>
     </tr>
+
+     <tr>
+      <td class="rowHeader"><label for="useGroupHopLimiting">*Use Group Hop Limiting</label></td>
+      <td class="rowValue">
+        <select name="useGroupHopLimiting" data-ng-model="federateDetails.useGroupHopLimiting" required data-ng-options="boolToStr(item) for item in [true, false]">
+        </select>
+        <br/><span class="inlineHelp">When enabled, group hop limiting will be used in place of max hops. Individual group hop limits can be configured on the 'edit groups' page </span>
+      </td>
+      <td class="error">
+          <span data-ng-show="federateDetailsForm.$submitted || federateDetailsForm.useGroupHopLimiting.$touched">
+            <span data-ng-show="federateDetailsForm.useGroupHopLimiting.$error.required">The Fallback When No Group Mappings flag must be set.</span>
+          </span>
+      </td>
+    </tr>
+
+
   		<tr>
   			<td class="rowHeader"><label for="name">Notes</label></td>
   			<td class="rowValue">
@@ -141,8 +179,7 @@
   					<span data-ng-show="federateDetailsForm.notes.$error.pattern">Notes may contain only upper and lower case letters, numbers, spaces and underscores</span>
   				</span>
   			</td>
-  		</tr>
-
+  	</tr>
 		<tr>
 			<td style="text-align:right;">*Required</td>
 			<td style="padding:10px;" align="right">

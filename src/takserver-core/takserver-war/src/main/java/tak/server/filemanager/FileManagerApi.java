@@ -1,5 +1,6 @@
 package tak.server.filemanager;
 
+import java.nio.charset.StandardCharsets;
 import java.rmi.RemoteException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.NavigableSet;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.apache.catalina.util.URLEncoder;
 import org.owasp.esapi.ESAPI;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
@@ -41,7 +43,7 @@ import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.Metadata.Field;
 import com.bbn.marti.sync.repository.ResourceRepository;
 import com.bbn.marti.util.CommonUtil;
-import com.bbn.marti.util.spring.RequestHolderBean;
+import com.bbn.marti.util.spring.RequestUtilBean;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.google.common.base.Strings;
 
@@ -75,7 +77,7 @@ public class FileManagerApi extends BaseRestController {
 	private JDBCCachingKMLDao dao;
 	
 	@Autowired
-    private RequestHolderBean requestHolderBean;
+    private RequestUtilBean requestHolderBean;
 	
 	@Autowired
     private ServerInfo serverInfo;
@@ -213,7 +215,7 @@ public class FileManagerApi extends BaseRestController {
 		            .contentLength(resource.contentLength())
 		            .header(HttpHeaders.CONTENT_DISPOSITION,
 		                    ContentDisposition.attachment()
-		                        .filename(fileName)
+		                        .filename(URLEncoder.DEFAULT.encode(fileName, StandardCharsets.UTF_8))
 		                        .build().toString())
 		            .body(resource);
 			 
@@ -440,6 +442,8 @@ public class FileManagerApi extends BaseRestController {
 			 } else {
 				 entry.put("Groups","");
 			 }
+
+			entry.put("Tool", resource.getTool());
 			
 		 } catch (Exception e) {
 			 logger.error("Error getting metadata entry: ",e);

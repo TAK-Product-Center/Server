@@ -10,18 +10,16 @@ The purpose of TAKCL, or the TAK Command Line, is two fold:
 
 ### Overview, Packages, and Source Sets
 
+Much of the Takcl code exists in [takserver-usermanager](../../takserver-usermanager) since they share much of the 
+same codebase. 
 Takcl is broken down into six source sets within takserver-takcl-core/src:
-  * core - Core low-dependency files used throughout the framework
+
   * cursedtak - An alpha curses-like client to be used to simulate a server client
   * exe - Files necessary to create the executable takcl.jar
   * main - All other shared files
-  * rpm - Customizations needed for the deployment with the takserver RPM
-  * test - test files
 
 The tests themselves are stored under the corresponding project:
 * [takserver-core/src/integrationTest](../../takserver-core/src/integrationTest)
-
-The UserManager also uses TAKCL behind the scenes, and is located in [takserver-usermanager](../../takserver-usermanager)
 
 The architecture can be broken down into two major components: TACKL, and the Test Framework: 
 
@@ -194,6 +192,14 @@ environment tags are supported:
 | TAKCL_SERVER2_DB_HOST | com.bbn.marti.takcl.server2DbHost | Tertiary Server DB            | 10.221.8.123, dnsHostname |
 | TAKCL_JAVA_VERSION    | com.bbn.marti.takcl.javaVersion   | Java version                  | 11.0.12, 13.0.1, 8.0.302  |
 
+## Rest APIs
+The introduction of OpenAPI Spec generation has made it easy to make client APIs available with minimal coding.
+
+A copy of the generated spec is located in 
+[src/main/openapi/takserver-openapi-spec.json](../src/main/openapi/takserver-openapi-spec.json). 
+This is read during compilation to generate API stubs in the package _tak.server.api.client_. See how the SubmissionAPI 
+is enabled in [com.bbn.marti.takcl.connectivity.TakserverClient](../src/main/java/com/bbn/marti/takcl/connectivity/TakserverClient.java) 
+to see how to enable additional API endpoints.
 
 ## Notes
 

@@ -5,16 +5,21 @@ import static java.util.Objects.requireNonNull;
 import java.io.IOException;
 import java.rmi.RemoteException;
 import java.sql.SQLException;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.NavigableSet;
 import java.util.Set;
-import java.util.UUID;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.UUID;
 
 import javax.naming.NamingException;
 
 import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.exception.NotFoundException;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
+import com.bbn.marti.util.TimeUtils;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -24,20 +29,26 @@ import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.retry.support.RetrySynchronizationManager;
 
 import com.atakmap.Tak.ROL;
 import com.bbn.marti.config.DataFeed;
-import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.service.InputManager;
 import com.bbn.marti.remote.sync.MissionExpiration;
 import com.bbn.marti.remote.sync.MissionHierarchy;
 import com.bbn.marti.remote.sync.MissionUpdateDetails;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForLogEntry;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForLogEntryType;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayer;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayerType;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayer;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayerType;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForExternalData;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForExternalDataType;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.Metadata;
@@ -55,6 +66,7 @@ import mil.af.rl.rol.RolLexer;
 import mil.af.rl.rol.RolParser;
 import mil.af.rl.rol.value.DataFeedMetadata;
 import mil.af.rl.rol.value.MissionMetadata;
+import tak.server.PluginManager;
 import tak.server.federation.rol.MissionEnterpriseSyncRolVisitor;
 import tak.server.feeds.DataFeedDTO;
 import tak.server.feeds.DataFeed.DataFeedType;
@@ -73,6 +85,31 @@ public class FederationROLHandler {
 
 	@Autowired
 	private InputManager inputManager;
+
+	@Autowired(required = false)
+	protected PluginManager pluginManager;
+
+	private static FederationROLHandler federationROLHandler;
+
+	private FederationROLHandler getFederationROLHandler() {
+		if (federationROLHandler != null) {
+			return federationROLHandler;
+		}
+
+		synchronized (this) {
+			if (federationROLHandler == null) {
+				try {
+					federationROLHandler = SpringContextBeanForApi.getSpringContext()
+							.getBean(com.bbn.marti.sync.federation.FederationROLHandler.class);
+				} catch (Exception e) {
+					logger.error("exception trying to get FederationROLHandler bean!", e);
+					return this;
+				}
+			}
+		}
+
+		return federationROLHandler;
+	}
 
 	public FederationROLHandler(MissionService missionService, EnterpriseSyncService syncService, RemoteUtil remoteUtil, DataFeedRepository dataFeedRepository) throws RemoteException {
 		this.missionService = missionService;
@@ -149,6 +186,37 @@ public class FederationROLHandler {
 					throw new IllegalArgumentException("invalid federation processor kind " + resource);
 			}
 		}
+	}
+
+	@Retryable(retryFor = { NotFoundException.class })
+	public void addMissionContentWhenPresent(UUID missionGuid, MissionUpdateDetails mud, String groupVector)
+			throws NotFoundException {
+
+		if (mud.getContent().getUids() != null && !mud.getContent().getUids().isEmpty()) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("attempt number {} to find mission uid",
+						RetrySynchronizationManager.getContext().getRetryCount());
+			}
+
+			for (String uid : mud.getContent().getUids()) {
+				try {
+					missionService.getLatestCotForUid(uid, groupVector, TimeUtils.MAX_TS);
+				} catch (NotFoundException e) {
+					logger.error("getLatestCotForUid failed to find uid {}", uid);
+					throw e;
+				}
+			}
+		}
+
+		missionService.addMissionContentAtTime(missionGuid, mud.getContent(), mud.getCreatorUid(), groupVector,
+				mud.getDate() != null ? mud.getDate() : new Date(), mud.getXmlContentForNotification());
+
+		logger.debug("adding mission content complete");
+	}
+
+	@Recover
+	public void recover(NotFoundException e) {
+		logger.error("unable to add federated mission uid", e);
 	}
 
 	private class FederationMissionProcessor implements FederationProcessor<ROL> {
@@ -283,12 +351,20 @@ public class FederationROLHandler {
 						}
 
 						logger.debug("adding mission content");
-						
-						Mission fedMission = missionService.getMissionByNameCheckGroups(mud.getMissionName(), groupVectorString);
-						missionService.addMissionContent(fedMission.getGuidAsUUID(), mud.getContent(), mud.getCreatorUid(), remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
 
-						logger.debug("adding mission content complete");
-						
+						Executors.newSingleThreadExecutor().submit(
+								new Runnable() {
+									@Override
+									public void run() {
+										try {
+											Mission fedMission = missionService.getMissionByNameCheckGroups(mud.getMissionName(), groupVectorString);
+											getFederationROLHandler().addMissionContentWhenPresent(fedMission.getGuidAsUUID(), mud, groupVectorString);
+										} catch (Exception e) {
+											logger.error("exception calling addMissionContentWhenPresent", e);
+										}
+								   }
+						});
+
 						break;
 					case REMOVE_CONTENT:
 						try {
@@ -356,7 +432,42 @@ public class FederationROLHandler {
 				} else {
 					throw new IllegalArgumentException("invalid MissionUpdateDetailsForMissionLayerType: " + mud.getType());
 				}
+			} else if (parameters instanceof MissionUpdateDetailsForExternalData) {
 
+				MissionUpdateDetailsForExternalData mud = (MissionUpdateDetailsForExternalData) parameters;
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("MissionUpdateDetailsForExternalData: " + mud);
+				}
+
+				String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
+
+				Mission fedMission = missionService.getMissionByNameCheckGroups(mud.getMissionName(), groupVector);
+
+				if (mud.getMissionUpdateDetailsForExternalDataType() == MissionUpdateDetailsForExternalDataType.SET_EXTERNAL_DATA) {
+					missionService.setExternalMissionData(fedMission.getGuidAsUUID(), mud.getCreatorUid(), mud.getExternalMissionData(), groupVector);
+				} else if (mud.getMissionUpdateDetailsForExternalDataType() == MissionUpdateDetailsForExternalDataType.DELETE_EXTERNAL_DATA) {
+					missionService.deleteExternalMissionData(fedMission.getGuidAsUUID(), mud.getExternalMissionDataId(), mud.getNotes(), mud.getCreatorUid(), groupVector);
+				} else if (mud.getMissionUpdateDetailsForExternalDataType() == MissionUpdateDetailsForExternalDataType.NOTIFY_EXTERNAL_DATA_CHANGE) {
+					missionService.notifyExternalMissionDataChanged(fedMission.getGuidAsUUID(), mud.getExternalMissionDataId(), mud.getToken(), mud.getNotes(), mud.getCreatorUid(), groupVector);
+				} else {
+					throw new IllegalArgumentException("invalid MissionUpdateDetailsForExternalDataType: " + mud.getMissionUpdateDetailsForExternalDataType());
+				}
+			} else if (parameters instanceof MissionUpdateDetailsForLogEntry) {
+
+				MissionUpdateDetailsForLogEntry mud = (MissionUpdateDetailsForLogEntry) parameters;
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("MissionUpdateDetailsForLogEntry: " + mud);
+				}
+
+				String groupVector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
+
+				if (mud.getMissionUpdateDetailsForLogEntryType() == MissionUpdateDetailsForLogEntryType.ADD_UPDATE_LOG_ENTRY) {
+					missionService.addUpdateLogEntry(mud.getLogEntry(), mud.getCreated(), groupVector);
+				} else if (mud.getMissionUpdateDetailsForLogEntryType() == MissionUpdateDetailsForLogEntryType.DELETE_LOG_ENTRY) {
+					missionService.deleteLogEntry(mud.getId(), groupVector);
+				}
 			} else {
 				throw new IllegalArgumentException("invalid parameters object type for mission update action: " + parameters.getClass().getSimpleName());
 			}
@@ -592,15 +703,20 @@ public class FederationROLHandler {
 			}
 
 			// save the federated resource to the database
+			Metadata metadata = resource.toMetadata();
+
 			try {
-				String vector = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
-				if (syncService.getContentByUid(resource.getUid(), vector) == null) {
-					syncService.insertResource(resource.toMetadata(), content, remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
-				}
+				syncService.insertResource(metadata, content, remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups)));
 			} catch (IllegalArgumentException | ValidationException | IntrusionException | IllegalStateException | SQLException | NamingException | IOException e) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("exception saving federated resource to database", e);
 				}
+			}
+
+			try {
+				pluginManager.onFileUpload(metadata.getPluginClassName(), metadata);
+			} catch (Exception e) {
+				logger.error("exception calling pluginManager.onFileUpload", e);
 			}
 		}
 

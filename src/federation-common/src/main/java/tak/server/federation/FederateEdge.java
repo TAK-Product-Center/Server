@@ -14,7 +14,6 @@ import java.util.Set;
  *     Destination - federate identity of the destination node. This does not
  *       point directly to the node to avoid a circular dependency.
  *     Filter Set - a set of filter methods that apply to this edge.
- *     Filter Expression - the filter expression of this edge.
  */
 public class FederateEdge {
 	
@@ -24,7 +23,7 @@ public class FederateEdge {
 	}
 	
 	public static GroupFilterType getGroupFilterType(String name) {
-		if ("allGroups".equals(name.toLowerCase())) {
+		if ("allgroups".equals(name.toLowerCase())) {
 			return GroupFilterType.ALL;
 		}
 		
@@ -45,20 +44,14 @@ public class FederateEdge {
 	
     private final FederateIdentity source;
     private final FederateIdentity destination;
-    private final Set<FederationFilter> filterSet;
-    private final String filterExpression;
     private final Set<String> allowedGroups;
     private final Set<String> disallowedGroups;
     private final GroupFilterType filterType;
 
     public FederateEdge(FederateIdentity source, FederateIdentity destination,
-            String filterExpression, Set<String> allowedGroups, Set<String> disallowedGroups,
-            GroupFilterType filterType) {
+            Set<String> allowedGroups, Set<String> disallowedGroups, GroupFilterType filterType) {
         this.source = source;
         this.destination = destination;
-
-        filterSet = new HashSet<>();
-        this.filterExpression = filterExpression;
         
         this.allowedGroups = allowedGroups;
         this.disallowedGroups = disallowedGroups;
@@ -87,18 +80,6 @@ public class FederateEdge {
         return destination;
     }
 
-    public void addFilter(FederationFilter newFilter) {
-        filterSet.add(newFilter);
-    }
-
-    public Set<FederationFilter> getFilterSet() {
-        return filterSet;
-    }
-
-    public String getFilterText() {
-        return filterExpression;
-    }
-
     @Override
     public boolean equals(Object object) {
         if (this == object) { return true; }
@@ -108,25 +89,20 @@ public class FederateEdge {
 
         if (!source.equals(that.source)) { return false; }
         if (!destination.equals(that.destination)) { return false; }
-        return filterSet != null ? filterSet.equals(that.filterSet) : that.filterSet == null;
+        
+        return true;
     }
 
     @Override
     public int hashCode() {
         int result = source.hashCode();
         result = 31 * result + destination.hashCode();
-        result = 31 * result + filterSet.hashCode();
         return result;
-    }
-
-    public String getFilterExpression() {
-        return filterExpression;
     }
 
     @Override
 	public String toString() {
-		return "FederateEdge [source=" + source + ", destination=" + destination + ", filterSet=" + filterSet
-				+ ", filterExpression=" + filterExpression + ", allowedGroups=" + allowedGroups + ", disallowedGroups="
-				+ disallowedGroups + ", filterType=" + filterType + "]";
+		return "FederateEdge [source=" + source + ", destination=" + destination + ", allowedGroups=" + allowedGroups
+				+ ", disallowedGroups=" + disallowedGroups + ", filterType=" + filterType + "]";
 	}
 }

@@ -34,6 +34,13 @@ import tak.server.cot.CotParser;
  */
 public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventContainer> {
 	private final static Logger log = LoggerFactory.getLogger(StreamingCotProtocol.class);
+	
+	private static ThreadLocal<CotParser> cotParser =
+			new ThreadLocal<CotParser>() {
+				@Override public CotParser initialValue() {
+					return CotParserCreator.newInstance();
+				}
+			};
 
 	/**
 	 * A static, inner factory class that returns a new instance of the outer.
@@ -98,7 +105,7 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 		StringBuffer messageStringBuilder = (this.messageStringBuffer == null ? new StringBuffer() : this.messageStringBuffer);
 		CotParser parser = (this.parser == null ? CotParserCreator.newInstance() : this.parser);
 
-		List<CotEventContainer> msgs = add(messageStringBuilder, newData, parser, handler);
+		List<CotEventContainer> msgs = add(messageStringBuilder, newData, handler);
 
 
 
@@ -201,7 +208,7 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 	 *
 	 * Parses as many complete messages as possible out of the buffer.
 	 */
-	public static List<CotEventContainer> add(StringBuffer messageStringBuffer, CharSequence newData, CotParser parser, ChannelHandler handler) {
+	public static List<CotEventContainer> add(StringBuffer messageStringBuffer, CharSequence newData, ChannelHandler handler) {
 
 		List<CotEventContainer> results = new LinkedList<CotEventContainer>();
 
@@ -233,7 +240,8 @@ public class StreamingCotProtocol extends AbstractBroadcastingProtocol<CotEventC
 						log.trace("possible message: " + msg);
 					}
 
-					CotEventContainer tmp = new CotEventContainer(parser.parse(msg));
+					// Use a CotParser from the ThreadLocal in the current thread to parse the message.
+					CotEventContainer tmp =  new CotEventContainer(cotParser.get().parse(msg));
 					results.add(tmp);
 				} catch (Exception e) {
 					// TODO: try to close

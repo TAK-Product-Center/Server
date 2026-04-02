@@ -8,12 +8,15 @@ public class CertificateSummary {
 
 	public CertificateSummary() {}
 	
-	public CertificateSummary(String issuerDN, String subjectDN, BigInteger serialNumber, String fingerPrint, int maxHops) {
+	public CertificateSummary(String issuerDN, String subjectDN, BigInteger serialNumber, String fingerPrint,
+			int maxHops, boolean allowTokenAuth, long tokenAuthDuration) {
 		this.issuerDN = issuerDN;
 		this.subjectDN = subjectDN;
 		this.serialNumber = serialNumber;
 		this.fingerPrint = fingerPrint;
 		this.maxHops = maxHops;
+		this.allowTokenAuth = allowTokenAuth;
+		this.tokenAuthDuration = tokenAuthDuration;
 	}
 	
 	public String getIssuerDN() {
@@ -56,9 +59,28 @@ public class CertificateSummary {
 		this.maxHops = maxHops;
 	}
 
+	public boolean isAllowTokenAuth() {
+		return allowTokenAuth;
+	}
+
+	public void setAllowTokenAuth(boolean allowTokenAuth) {
+		this.allowTokenAuth = allowTokenAuth;
+	}
+
+	public long getTokenAuthDuration() {
+		return tokenAuthDuration;
+	}
+
+	public void setTokenAuthDuration(long tokenAuthDuration) {
+		this.tokenAuthDuration = tokenAuthDuration;
+	}
+
+
 	private String issuerDN;
 	private String subjectDN;
 	private BigInteger serialNumber;
 	private String fingerPrint;
 	private int maxHops;
+	private boolean allowTokenAuth;
+	private long tokenAuthDuration;
 }

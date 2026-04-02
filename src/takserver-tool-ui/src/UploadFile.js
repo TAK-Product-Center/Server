@@ -41,7 +41,9 @@ var copMissions = [];
 function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFileProp, selectedMission}) {
   // Hooks
     const [missions, setMissions] = React.useState([]);
-    const [checked, setChecked] = React.useState([]);
+    const [missionsChecked, setMissionsChecked] = React.useState([]);
+    const [groups, setGroups] = React.useState([]);
+    const [groupsChecked, setGroupsChecked] = React.useState([]);
     const [resourceName, setResourceName] = React.useState("");
     const [downloadPath, setDownloadPath] = React.useState("");
     const [lat, setLat] = React.useState("");
@@ -61,7 +63,7 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
       var selectArray = []
       if(selectedMission != null){
         selectArray.push(selectedMission)
-        setChecked(selectArray)
+        setMissionsChecked(selectArray)
       }
     },[selectedMission])
 
@@ -78,6 +80,17 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
                 }
               });
               setMissions(missionList);
+          });
+    },[openHook])
+
+    useEffect(() => {
+      fetch('/Marti/api/groups/all')
+          .then(response => response.json())
+          .then(data => {
+              let groupsList = data.data.map(function(groupData) {
+                return groupData.name
+              })
+              setGroups(groupsList);
           });
     },[openHook])
 
@@ -110,10 +123,11 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
 
     function clearData(){
       if(selectedMission != null){
-        setChecked([selectedMission])
+        setMissionsChecked([selectedMission])
       } else {
-        setChecked([]);
+        setMissionsChecked([]);
       }
+      setGroupsChecked([]);
       setFileProp("");
       setResourceName("");
       setDownloadPath("");
@@ -135,17 +149,19 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
       formData.append('DownloadPath', downloadPath);
       formData.append('Latitude', lat);
       formData.append('Longitude', lon);
+      if (groupsChecked.length > 0) {
+        formData.append('Groups', groupsChecked.join(','))
+      }
       fetch('/Marti/sync/upload', {
         method: "POST",
         body: formData
       }).then(function (res) {
         if (res.ok) {
           res.json().then(data => {
-            const missionsLength = checked.length;
+            const missionsLength = missionsChecked.length;
               for (var i = 0; i < missionsLength; i++) {
-                addMissionContents(data.Hash,checked[i], data.SubmissionUser);
+                addMissionContents(data.Hash,missionsChecked[i], data.SubmissionUser);
               }
-               
           });
         }
       }, function (e) {
@@ -174,16 +190,26 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
     }
 
 
-    const handleChange = (event) => {
+    const handleMissionChange = (event) => {
       const {
         target: { value },
       } = event;
-      setChecked(
+      setMissionsChecked(
         // On autofill we get a stringified value.
         typeof value === 'string' ? value.split(',') : value,
       );
     };
 
+
+    const handleGroupChange = (event) => {
+      const {
+        target: { value },
+      } = event;
+      setGroupsChecked(
+        // On autofill we get a stringified value.
+        typeof value === 'string' ? value.split(',') : value,
+      );
+    };
 
     return(
     <Dialog open={openHook}
@@ -222,8 +248,8 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
               labelId="mission-chip-label"
               id="mission-multiple-chip"
               multiple
-              value={checked}
-              onChange={handleChange}
+              value={missionsChecked}
+              onChange={handleMissionChange}
               input={<OutlinedInput id="select-multiple-chip" label="Chip" />}
               renderValue={(selected) => (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -247,6 +273,42 @@ function UploadFile({openHook, setOpenHook, deleted, setDeleted, fileProp, setFi
             </div>
           ) : (
             <DialogContentText>No missions available.</DialogContentText>
+          )}
+          <DialogTitle sx={{pl: 0}}>Group</DialogTitle>
+          
+          <DialogContentText>You may optionally associate the file with a group.</DialogContentText>
+          {groups.length > 0 ? (
+            <div>
+            <InputLabel id="mission-chip-label">Group</InputLabel>
+            <Select style={{width: 350}}
+              labelId="mission-chip-label"
+              id="mission-multiple-chip"
+              multiple
+              value={groupsChecked}
+              onChange={handleGroupChange}
+              input={<OutlinedInput id="select-multiple-chip" label="Chip" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip key={value} label={value} />
+                  ))}
+                </Box>
+              )}
+              MenuProps={MenuProps}
+            >
+              {groups.map((group) => (
+                <MenuItem
+                  key={group}
+                  value={group}
+                  style={getStyles(group, groups, theme)}
+                >
+                  {group}
+                </MenuItem>
+              ))}
+            </Select>
+            </div>
+          ) : (
+            <DialogContentText>No groups available.</DialogContentText>
           )}
           <ListItemButton sx={{pl: 0}} onClick={toggleDetails}>
             Optional Settings {openDetails ? <ExpandLess /> : <ExpandMore />}

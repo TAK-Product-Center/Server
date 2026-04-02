@@ -1,6 +1,7 @@
 package tak.server.federation.hub.ui.keycloak;
 
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.Key;
@@ -56,7 +57,9 @@ public class KeycloakTokenParser {
             String keyStorePass = fedHubConfig.getKeystorePassword();
 
             KeyStore keyStore = KeyStore.getInstance(keyStoreType);
-            keyStore.load(new FileInputStream(keyStoreFile), keyStorePass.toCharArray());
+            try (InputStream is = new FileInputStream(keyStoreFile)) {
+                keyStore.load(is, keyStorePass.toCharArray());
+            }
 
             PrivateKey search = null;
             Enumeration<String> aliases = keyStore.aliases();

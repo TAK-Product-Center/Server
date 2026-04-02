@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.groups.value.FileAuthenticatorControl;
+import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.FileUserManagementInterface;
 import com.bbn.marti.remote.groups.SimpleGroupWithUsersModel;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
@@ -116,6 +117,20 @@ public class DistributedUserManager implements org.apache.ignite.services.Servic
             throw new RuntimeException(e);
         }
     	return control;
+    }
+
+    @Override
+    public FileAuthenticatorControl removeUserFromGroup(@NotNull String userIdentifier, @NotNull String groupName, @NotNull Direction direction) {
+        FileAuthenticator fileAuthenticator = getFileAuthenticator();
+        FileAuthenticatorControl control;
+        try {
+            control = fileAuthenticator.removeUserFromGroup(userIdentifier, groupName,  direction);
+            fileAuthenticator.saveChanges(control);
+        } catch (IOException | JAXBException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+        return control;
     }
 
     @Override

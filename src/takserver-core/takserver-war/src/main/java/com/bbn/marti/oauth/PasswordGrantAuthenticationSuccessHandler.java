@@ -1,8 +1,6 @@
 package com.bbn.marti.oauth;
 
-import com.bbn.marti.config.Network;
 import com.bbn.marti.util.spring.CorsHeaders;
-import com.google.common.base.Strings;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -67,9 +65,11 @@ public class PasswordGrantAuthenticationSuccessHandler
             partitioned = true;
         }
 
-        final ResponseCookie cookieToken = AuthCookieUtils.createCookie(
-                OAuth2TokenType.ACCESS_TOKEN.getValue(), accessTokenResponse.getAccessToken().getTokenValue(), -1, sameSite);
-        response.setHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookiePartitioned(cookieToken, partitioned));
+
+        for (ResponseCookie cookie : AuthCookieUtils.createCookiesWithMaxSize(
+                OAuth2TokenType.ACCESS_TOKEN.getValue(), accessTokenResponse.getAccessToken().getTokenValue(), -1, sameSite == AuthCookieUtils.SameSite.Strict, request.isSecure())) {
+            response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookiePartitioned(cookie, partitioned));
+        }
 
         this.accessTokenHttpResponseConverter.write(accessTokenResponse, null, httpResponse);
     }

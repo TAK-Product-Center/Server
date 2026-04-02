@@ -104,6 +104,19 @@ public class FederationHubDependencyInjectionProxy implements ApplicationContext
         return federationHubBrokerMetrics;
     }
 
+    private volatile FederationHubBrokerGlobalMetrics federationHubBrokerGlobalMetrics = null;
+
+    public FederationHubBrokerGlobalMetrics federationHubBrokerGlobalMetrics() {
+        if (federationHubBrokerGlobalMetrics == null) {
+            synchronized (this) {
+                if (federationHubBrokerGlobalMetrics == null) {
+                    federationHubBrokerGlobalMetrics = springContext.getBean(FederationHubBrokerGlobalMetrics.class);
+                }
+            }
+        }
+        return federationHubBrokerGlobalMetrics;
+    }
+
     private volatile HubConnectionStore hubConnectionStore = null;
 
     public HubConnectionStore hubConnectionStore() {

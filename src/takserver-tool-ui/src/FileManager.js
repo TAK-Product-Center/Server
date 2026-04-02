@@ -324,7 +324,7 @@ function FileManager() {
         if(params.keywords !== "" || params.keywords !== "none"){
             keyword = params.keywords
         }
-        const data = "[ \"" + keyword + "\" ]";
+        var data = "[ \"" + keyword + "\" ]";
         console.log(params)
         var url = '/Marti/api/sync/metadata/' + params.hash + '/keywords' 
         console.log(url)
@@ -338,6 +338,25 @@ function FileManager() {
                 console.log(res);
             }
         }));
+
+        var tool = ""
+        if(params.tool !== ""){
+            tool = params.tool
+        }
+        console.log(params)
+        url = '/Marti/api/sync/metadata/' + params.hash + '/tool'
+        console.log(url)
+        fetch(url, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: tool
+        }).then((function (res) {
+            if(!res.ok){
+                setSomethingDeleted(!deleted);
+                console.log(res);
+            }
+        }));
+
         return(params);
       };
 
@@ -394,6 +413,7 @@ function FileManager() {
                         updateTime: rowData.Time,
                         type: rowData.MimeType,
                         expiration: rowData.Expiration,
+                        tool: rowData.Tool,
                         actions: 'Delete'
                     }
                     rows.push(row);
@@ -469,6 +489,22 @@ function FileManager() {
             ) 
         }},
         { field: 'groups', headerName: 'Groups', width: 150, sortable: false, filterable: false },
+        { field: 'tool', headerName: 'Tool', width: 155, filterOperators: stringOperators,  editable: true, sortable: false, filterable: false, renderCell: (params) => {
+                return (
+                    <>
+                        {params.value}
+                        <IconButton
+                            onClick={() => {
+                                setCellModesModel({
+                                    ...cellModesModel,
+                                    [params.id]: { ...cellModesModel[params.id], [params.field]: { mode: GridCellModes.Edit } },
+                                });
+                            }}>
+                            <EditIcon />
+                        </IconButton>
+                    </>
+                )
+            } },
         { field: 'size', headerName: 'Size (Approx)', width: 120, filterable: false },
         { field: 'updateTime', headerName: 'Update Time', width: 180, filterable: false,
         renderCell: (params) => {

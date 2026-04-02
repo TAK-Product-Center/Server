@@ -6,9 +6,10 @@ import com.bbn.marti.takcl.AppModules.OfflineConfigModule;
 import com.bbn.marti.takcl.AppModules.OfflineFileAuthModule;
 import com.bbn.marti.takcl.AppModules.OnlineFileAuthModule;
 import com.bbn.marti.takcl.AppModules.OnlineInputModule;
+import com.bbn.marti.takcl.SSLHelper;
 import com.bbn.marti.takcl.TAKCLCore;
-import com.bbn.marti.takcl.TakclIgniteHelper;
 import com.bbn.marti.takcl.TestConfiguration;
+import com.bbn.marti.test.shared.data.generated.ImmutableUsers;
 import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
@@ -19,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -105,7 +107,7 @@ public abstract class AbstractRunnableServer {
     private final OnlineInputModule onlineInputModule = new OnlineInputModule();
     private final OnlineFileAuthModule onlineFileAuthModule = new OnlineFileAuthModule();
     private final OfflineConfigModule offlineConfigModule = new OfflineConfigModule();
-    private final OfflineFileAuthModule offlineFileAuthtModule = new OfflineFileAuthModule();
+    private final OfflineFileAuthModule offlineFileAuthModule = new OfflineFileAuthModule();
 
     protected Path logPath;
 
@@ -126,7 +128,7 @@ public abstract class AbstractRunnableServer {
 
     public final OfflineFileAuthModule getOfflineFileAuthModule() {
         checkServerState(false);
-        return offlineFileAuthtModule;
+        return offlineFileAuthModule;
     }
 
     public final OnlineFileAuthModule getOnlineFileAuthModule() {
@@ -147,7 +149,7 @@ public abstract class AbstractRunnableServer {
         this.logger = LoggerFactory.getLogger(serverIdentifier.toString());
         this.serverIdentifier = serverIdentifier;
         this.offlineConfigModule.init(serverIdentifier);
-        this.offlineFileAuthtModule.init(serverIdentifier);
+        this.offlineFileAuthModule.init(serverIdentifier);
 
         ServerProcessDefinition[] definitions = ServerProcessDefinition.values();
         ArrayList<AbstractServerProcess> containers = new ArrayList<>(definitions.length);
@@ -180,13 +182,6 @@ public abstract class AbstractRunnableServer {
 
             serverState = ServerState.STOPPING;
 
-            Exception igniteException = null;
-            try {
-                TakclIgniteHelper.closeAssociatedIgniteInstance(serverIdentifier);
-            } catch (Exception e) {
-                igniteException = e;
-            }
-
             if (!TAKCLCore.keepServersRunning) {
                 Timer killTimer = null;
 
@@ -210,14 +205,10 @@ public abstract class AbstractRunnableServer {
             onlineInputModule.halt();
             onlineFileAuthModule.halt();
             offlineConfigModule.halt();
-            offlineFileAuthtModule.halt();
+            offlineFileAuthModule.halt();
 
             serverState = ServerState.STOPPED;
             updateEnabledProcessStates();
-
-            if (igniteException != null) {
-                throw new RuntimeException(igniteException);
-            }
         } finally {
             serverIdentifier.rerollIgnitePorts();
             if (!TAKCLCore.k8sMode) {
@@ -229,6 +220,12 @@ public abstract class AbstractRunnableServer {
     public final synchronized void startServer(@NotNull String sessionIdentifier, int maxWaitMs, boolean failTestOnStartupFailure) {
         if (serverState != ServerState.STOPPED) {
             logger.warn("Server '" + serverIdentifier.toString() + "' Start requested even though it is already running or starting!!");
+        }
+
+        try {
+            SSLHelper.genCertsIfNecessary();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
 
         boolean isFileAuthEnabled = offlineConfigModule.isFileAuthEnabled();
@@ -290,6 +287,9 @@ public abstract class AbstractRunnableServer {
         this.getOfflineConfigModule().setHttpsPort(serverIdentifier.getHttpsPort());
         this.getOfflineConfigModule().setIgnitePortRange(serverIdentifier.getIgniteDiscoveryPort(), serverIdentifier.getIgniteDiscoveryPortCount());
         this.getOfflineConfigModule().setSSLSecuritySettings();
+
+        // Enabling the admin user
+        this.offlineFileAuthModule.addAdminUser(ImmutableUsers.valueOf(serverIdentifier.getAdminuserIdentifier()));
 
         serverState = ServerState.DEPLOYING;
 
@@ -391,7 +391,7 @@ public abstract class AbstractRunnableServer {
     public TreeMap<String, Boolean> updateEnabledProcessStates() {
         synchronized (lastKnownEnabledProcessStates) {
             boolean print = false;
-            StringBuilder sb = new StringBuilder("Process States:\n\t");
+            StringBuilder sb = new StringBuilder("Process States:");
 
             // Get the state of all enabled processes
             TreeMap<String, Boolean> currentEnabledProcessStates = new TreeMap<>(processes.stream().filter(
@@ -428,11 +428,11 @@ public abstract class AbstractRunnableServer {
     protected void offlineFactoryResetServer() {
         // TODO: This "offline factory reset" should probably be cleanly removed to bring parity to test deployments and be replaced with server "destruction"
         if (!TAKCLCore.k8sMode) {
-            logger.error("offlineFactoryResetServer");
+            logger.trace("offlineFactoryResetServer");
             checkServerState(false);
             offlineConfigModule.resetConfig();
-            offlineFileAuthtModule.resetConfig();
-            logger.error("offlineFactoryResetServer-end");
+            offlineFileAuthModule.resetConfig();
+            logger.trace("offlineFactoryResetServer-end");
         }
     }
 
@@ -495,6 +495,37 @@ public abstract class AbstractRunnableServer {
             }
         }
         return sharedState;
+    }
+
+    public int issueUserManagerJarCommand(List<String> command) {
+        String serverPath = serverIdentifier.getServerPath();
+
+        command = new LinkedList<>(command);
+        command.addAll(0, List.of("java", "-jar", "utils/UserManager.jar"));
+
+        // Build the process
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
+        processBuilder.directory(new File(serverPath));
+
+        // Set up log redirection paths
+        String serverName = serverIdentifier.getConsistentUniqueReadableIdentifier();
+        File errorFile = logPath.resolve(serverName + "-UserManager.stderr.txt").toFile();
+        File outputFile = logPath.resolve(serverName + "-UserManager.stdout.txt").toFile();
+        processBuilder.redirectError(errorFile);
+        processBuilder.redirectOutput(outputFile);
+
+        try {
+            System.out.println("Executing [" + String.join("  \\\n\t", command) + "]");
+
+            // Start the process, giving a little break to prevent any weird conflicts
+            Process userManagerProcess = processBuilder.start();
+
+            int result = userManagerProcess.waitFor();
+            return result;
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
     protected abstract void innerStopServer();

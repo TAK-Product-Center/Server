@@ -2,9 +2,7 @@ package tak.server.federation;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /*
  * Abstract class to represent federate nodes from the federate policy language.
@@ -16,8 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
  *     Name - human readable designation for the node. This is NOT required, nor
  *       used in policy decisions
  *     Federate identity - identity of the node within the federation. Required.
- *     Attributes - a map of attribute objects that can be assigned to the node.
- *       These may be used in making policy decisions. Not required.
  *     Incoming edges - a set of directed edges that point to this node.
  *     Outgoing edges - a set of directed edges that point from this node.
  */
@@ -27,13 +23,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class FederationNode {
     private String name;
     private final FederateIdentity federateIdentity;
-    private final ConcurrentHashMap<String, Object> attributes;
     private final Set<FederateEdge> incomingEdges;
     private final Set<FederateEdge> outgoingEdges;
 
     public FederationNode(FederateIdentity federateIdentity) {
         this.federateIdentity = federateIdentity;
-        attributes = new ConcurrentHashMap<>();
         incomingEdges = new HashSet<>();
         outgoingEdges = new HashSet<>();
     }
@@ -41,7 +35,6 @@ public abstract class FederationNode {
     public FederationNode(String nodeName, FederateIdentity federateIdentity) {
         this.name = nodeName;
         this.federateIdentity = federateIdentity;
-        attributes = new ConcurrentHashMap<>();
         incomingEdges = new HashSet<>();
         outgoingEdges = new HashSet<>();
     }
@@ -52,18 +45,6 @@ public abstract class FederationNode {
 
     public String getName() {
         return this.name;
-    }
-
-    public void addAttribute(String key, Object value) {
-        if (isValueValidType(value)) {
-            attributes.put(key, value);
-        } else {
-            throw new IllegalArgumentException("The passed value was not a valid type.");
-        }
-    }
-
-    public Map<String, Object> getAttributes() {
-        return attributes;
     }
 
     public void addIncomingEdge(FederateEdge edge) {
@@ -107,16 +88,13 @@ public abstract class FederationNode {
                 : that.federateIdentity != null)
             return false;
 
-        return attributes != null
-            ? attributes.equals(that.attributes)
-            : that.attributes == null;
+        return true;
     }
 
     @Override
     public int hashCode() {
         int result = name != null ? name.hashCode() : 0;
         result = 31 * result + federateIdentity.hashCode();
-        result = 31 * result + (attributes != null ? attributes.hashCode() : 0);
         return result;
     }
 
@@ -125,7 +103,6 @@ public abstract class FederationNode {
         return "FederationNode{" +
             "name='" + name + '\'' +
             ", uid='" + federateIdentity.toString() + '\'' +
-            ", attributes=" + attributes +
             '}';
     }
 }

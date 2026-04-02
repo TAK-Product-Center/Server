@@ -16,7 +16,7 @@ public abstract class BaseService {
 
 	protected AtomicBoolean keepGoing = new AtomicBoolean(false);
 	protected Thread runThread = null;
-	protected List<BaseService> consumers = new LinkedList<BaseService>();
+	protected final List<BaseService> consumers = new LinkedList<BaseService>();
 
 	public boolean isKeepGoing() {
 	    return keepGoing.get();

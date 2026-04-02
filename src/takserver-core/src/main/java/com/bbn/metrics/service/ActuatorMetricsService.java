@@ -42,6 +42,8 @@ public class ActuatorMetricsService {
 	}
 	
 	public AtomicDouble getCpuUsage() {
+		logProcessIdentity();
+
 		cpuUsed.set(metricsEndpoint
 				.metric("system.cpu.usage", null)
 				.getMeasurements()
@@ -59,5 +61,10 @@ public class ActuatorMetricsService {
 				.getValue().intValue());
 		
 		return cpuCount;
+	}
+
+	private void logProcessIdentity() {
+		String pid = java.lang.management.ManagementFactory.getRuntimeMXBean().getName(); // e.g. "12345@hostname"
+		logger.info("Collecting CPU usage from process: {}", pid);
 	}
 }

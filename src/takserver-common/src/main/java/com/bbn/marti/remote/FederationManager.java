@@ -4,8 +4,8 @@ package com.bbn.marti.remote;
 
 import java.security.cert.X509Certificate;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 
@@ -14,33 +14,42 @@ import org.jetbrains.annotations.NotNull;
 import com.atakmap.Tak.ROL;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
+import com.bbn.marti.config.Federation.Federate.OutboundGroupHopLimit;
+import com.bbn.marti.config.Federation.FederateCA;
 import com.bbn.marti.config.Federation.FederationOutgoing;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
 import com.google.common.collect.Multimap;
 
+import tak.server.cot.CotEventContainer;
+
 public interface FederationManager {
 	// Federate Configuration
 	List<Federate> getAllFederates();
 	Federate getFederate(@NotNull String federateUID);
+	FederateCA getFederateCA(String fingerprint);
+
 	List<String> getGroupsInbound(@NotNull String federateUID);
 	Multimap<String, String> getInboundGroupMap(@NotNull String federateUID);
 	List<String> getGroupsOutbound(@NotNull String federateUID);
+	List<OutboundGroupHopLimit> getGroupHopLimitsForFederate(String fedId);
 	List<String> getFederateRemoteGroups(String federateUID);
 	List<String> getCAGroupsInbound(@NotNull String caID);
 	List<String> getCAGroupsOutbound(@NotNull String caID);
-	int getCAMaxHops(String caID);
 	void addMaxHopsToCA(String caID, int maxHops);
+	void setCATokenAuthentication(String caID, boolean allowTokenAuth, long duration);
 
 	void addFederateToGroupsInbound(@NotNull String federateUID, @NotNull Set<String> localGroupNames);
 	void addFederateToGroupsOutbound(@NotNull String federateUID, @NotNull Set<String> localGroupNames);
 	void addFederateGroupsInboundMap(@NotNull String federateUID, @NotNull String remoteGroup, @NotNull String localGroup);
+	void setFederateOutboundGroupHopLimit(@NotNull String federateUID, @NotNull String groupName, Integer hopLimit);
 	void addInboundGroupToCA(@NotNull String caID, @NotNull Set<String> localGroupNames);
 	void addOutboundGroupToCA(@NotNull String caID, @NotNull Set<String> localGroupNames);
 	void removeFederateFromGroupsInbound(@NotNull String federateUID, @NotNull Set<String> localGroupNames);
 	void removeFederateFromGroupsOutbound(@NotNull String federateUID, @NotNull Set<String> localGroupNames);
 	void removeFederateInboundGroupsMap(@NotNull String federateUID, @NotNull String remoteGroup, @NotNull String localGroup);
+	void removeFederateOutboundGroupHopLimit(@NotNull String federateUID, @NotNull String groupName);
 	void removeInboundGroupFromCA(@NotNull String caID, @NotNull Set<String> localGroupNames);
 	void removeOutboundGroupFromCA(@NotNull String caID, @NotNull Set<String> localGroupNames);
 	void updateFederateMissionSettings(@NotNull String federateUID, @NotNull boolean missionFederateDefault, @NotNull List<Federation.Federate.Mission> federateMissions);
@@ -62,7 +71,7 @@ public interface FederationManager {
 	void enableOutgoing(String name);
 
 	// will throw exception if output with same name already exists
-	void addOutgoingConnection(String name, String host, int port, int reconnect, int maxRetries, boolean unlimitedRetries, boolean enable, int protocolVersion, String fallback, String token);
+	void addOutgoingConnection(Federation.FederationOutgoing outgoing);
 	void updateOutgoingConnection(Federation.FederationOutgoing original, Federation.FederationOutgoing update);
 	void removeOutgoing(String name);
 
@@ -70,7 +79,7 @@ public interface FederationManager {
 	void addCA(X509Certificate ca);
 	void removeCA(X509Certificate ca);
 
-	void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, boolean fallbackWhenNoGroupMappings, String notes, int maxHops);
+	void updateFederateDetails(Federate federate);
 	void removeFederate(String federateId);
 
 	List<Federate> getConfiguredFederates();
@@ -96,4 +105,7 @@ public interface FederationManager {
 	void trackConnectEventForFederate(String fedId, String fedName, boolean isRemote);
 	void trackDisconnectEventForFederate(String fedId, String fedName, boolean isRemote);
 	void trackSendChangesEventForFederate(String fedId, String fedName, boolean isRemote);
+	
+	void addFederationProvenance(CotEventContainer cot);
+	void addFederateToConfig(Federate federate);
 }

@@ -61,3 +61,42 @@
     cursor: pointer;
 }
 
+#groups_modal-body table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#groups_modal-body table th,
+#groups_modal-body table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+#groups_modal-body table th {
+  background-color: #f0f0f0;
+  text-align: center;
+}
+
+#groups_modal-body table .col-out,
+#groups_modal-body table .col-in,
+#groups_modal-body table .col-actions {
+  text-align: center;
+}
+
+#groups_modal-body .col-name {
+    width: 35%; 
+}
+
+#groups_modal-body .col-out,
+#groups_modal-body .col-in {
+  width: 15%; 
+}
+
+#groups_modal-body .col-actions {
+  width: 35%; 
+  white-space: nowrap;
+}
+
+#groups_modal-body input[type="checkbox"] {
+  transform: scale(1.5);
+}

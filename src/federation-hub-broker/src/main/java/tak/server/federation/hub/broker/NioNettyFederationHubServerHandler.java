@@ -240,7 +240,7 @@ public class NioNettyFederationHubServerHandler extends SimpleChannelInboundHand
                     try {
                         brokerService.assignGroupFilteredMessageSourceAndDestinationsFromPolicy(federatedMessage, null,
                             federateIdentity);
-                        Set<AddressableEntity<?>> dests = federatedMessage.getDestinations();
+                        Set<AddressableEntity> dests = federatedMessage.getDestinations();
                     } catch (FederationException e) {
                         logger.error("Could not get destinations from policy graph", e);
                         forceClose();

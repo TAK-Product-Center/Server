@@ -52,7 +52,7 @@ public class MissionDataFlowTests extends AbstractConfigurationA {
 	public void h_subscribeNewMemberToMission() {
 		engine.onlineAddUser(newMember);
 		engine.connectClientsAndVerify(true, newMember);
-		onfam.certmod(newMember.getCertPublicPemPath().toString(), null, null, false, null, newMember.getDefinedGroupSet().stringArray(), null, null);
+		onfam.certmod(newMember.getCertPublicPemPath().toString(), null, null, false, null, newMember.getDefinedGroupSet().stringArray(), null, null, false, false, false);
 		engine.missionSubscribe(newMember, missionName, newMember);
 	}
 

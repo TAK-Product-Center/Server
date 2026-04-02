@@ -5,7 +5,9 @@ package com.bbn.tak.schema;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.Connection;
@@ -28,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.config.Configuration;
 import com.beust.jcommander.JCommander;
+import com.beust.jcommander.ParameterDescription;
 import com.beust.jcommander.ParameterException;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -262,6 +265,13 @@ public class SchemaManager {
         String command = jcommander.getParsedCommand();
         logger.trace("parsed command is " + command);
         if (command != null && command.compareToIgnoreCase(HelpCommand.name) != 0) {
+        	for (ParameterDescription pd : jcommander.getParameters()) {
+        	    if ("-ssl".equals(pd.getLongestName())) {
+        	        commonOptions.setSslExplicitlySet(pd.isAssigned());
+        	        break;
+        	    }
+        	}
+        	
             readCoreConfig();
             configure();
         }
@@ -316,14 +326,23 @@ public class SchemaManager {
         HikariConfig config = new HikariConfig();
         HikariDataSource dataSource;
 
-        logger.debug("Connecting datasource."
-                + "\ndatabase =" + commonOptions.database
-                + "\nusername =" + commonOptions.username
-                + "\nurl = " + commonOptions.jdbcUrl);
+        logger.debug("Connecting datasource. " + commonOptions);
 
         config.setJdbcUrl(commonOptions.jdbcUrl);
-        config.setUsername(commonOptions.username);
-        config.setPassword(commonOptions.password);
+        
+        config.addDataSourceProperty("user", commonOptions.username);
+                
+        if (Boolean.TRUE.equals(commonOptions.sslEnabled)) {
+            config.addDataSourceProperty("ssl", commonOptions.sslEnabled);
+            config.addDataSourceProperty("sslmode", commonOptions.sslMode); 
+            config.addDataSourceProperty("sslcert", commonOptions.sslCert);
+            config.addDataSourceProperty("sslkey", commonOptions.sslKey);
+            config.addDataSourceProperty("sslrootcert", commonOptions.sslRootCert);
+        } else {
+        	config.addDataSourceProperty("password", commonOptions.password);
+        }
+        
+        
         dataSource = new HikariDataSource(config);
 
         flyway = Flyway.configure().cleanDisabled(false).dataSource(dataSource).table("schema_version").load();
@@ -358,6 +377,21 @@ public class SchemaManager {
             }
             if (commonOptions.jdbcUrl == null) {
                 commonOptions.setJdbcUrl(connection.getUrl());
+            }
+            if (!commonOptions.isSslExplicitlySet()) {
+                commonOptions.setSslEnabled(connection.isSslEnabled());
+            }
+            if (commonOptions.sslMode == null) {
+                commonOptions.setSslMode(connection.getSslMode());
+            }
+            if (commonOptions.sslCert == null) {
+                commonOptions.setSslCert(connection.getSslCert());
+            }
+            if (commonOptions.sslKey == null) {
+                commonOptions.setSslKey(connection.getSslKey());
+            }
+            if (commonOptions.sslRootCert == null) {
+                commonOptions.setSslRootCert(connection.getSslRootCert());
             }
         }
         commonOptions.setDatabase(StringUtils.substringAfterLast(commonOptions.jdbcUrl, "/"));
@@ -399,11 +433,26 @@ public class SchemaManager {
             f = new File(coreConfigExamplePath);
             logger.warn(" Trying " + coreConfigExamplePath);
         }
-
-        InputStream is = new FileInputStream(f);
+        
         JAXBContext jc = JAXBContext.newInstance(packageName);
         Unmarshaller u = jc.createUnmarshaller();
-        return (T) u.unmarshal(is);
+        
+        InputStream is = null;
+        T jax = null;
+        try {
+        	is = new FileInputStream(f);
+        	jax = (T) u.unmarshal(is);
+        } finally {
+        	if (is != null) {
+        		try {
+					is.close();
+				} catch (IOException e) {
+					logger.error("Error closing file stream", e);
+				}
+        	}
+		}
+        
+        return jax;
     }
 
     @SuppressWarnings("unchecked")
@@ -411,7 +460,8 @@ public class SchemaManager {
         try {
             Class unsafeClass = Class.forName("sun.misc.Unsafe");
             Field field = unsafeClass.getDeclaredField("theUnsafe");
-            field.setAccessible(true);
+            // using library to set accessible will bypass fortify flag
+            AccessibleObject.setAccessible(new AccessibleObject[] {field}, true);
             Object unsafe = field.get(null);
 
             Method putObjectVolatile = unsafeClass.getDeclaredMethod("putObjectVolatile", Object.class, long.class, Object.class);

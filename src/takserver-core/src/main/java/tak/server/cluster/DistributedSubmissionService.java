@@ -94,7 +94,7 @@ public class DistributedSubmissionService implements SubmissionInterface {
 	}
 
 	@Override
-    public boolean submitMissionPackageCotAtTime(String cotMessage, UUID missionGuid, Date timestamp, NavigableSet<Group> groups, String clientUid) {
+    public boolean submitMissionCot(String cotMessage, UUID missionGuid, Date timestamp, NavigableSet<Group> groups, String clientUid) {
 		requireNonNull(groups, "submitMissionCotAtTime groups");
 
 		try {
@@ -106,8 +106,10 @@ public class DistributedSubmissionService implements SubmissionInterface {
 				cot.setContext(Constants.CLIENT_UID_KEY, clientUid);
 			}
 
-			cot.setContext(Constants.OFFLINE_CHANGE_TIME_KEY, timestamp);
-			
+			if (timestamp != null) {
+				cot.setContext(Constants.OFFLINE_CHANGE_TIME_KEY, timestamp);
+			}
+
 			// If the incoming message has any mission dests, remove them and 
 			List<Node> missionDestNodes = cot.getDocument().selectNodes("/event/detail/marti/dest[@mission]");
 			

@@ -1,0 +1,118 @@
+<h1 mat-dialog-title class="dialogHeader">{{editorTitle}} Edge</h1>
+<!-- 
+<mat-dialog-content class="mat-typography">
+  <button class="btn btn-primary" type="button" (click)="modifyCa()">Remove CA's</button>
+  <button *ngIf="editExisting" class="btn btn-primary" type="button" (click)="showActiveConnections()">Show Active Connections</button>
+</mat-dialog-content> -->
+
+<mat-dialog-content class="mat-typography">
+  <form (ngSubmit)="onSave(edge)" #userForm="ngForm">
+    <div class="form-group">
+      <label for="name">Name</label>
+      <input
+        type="text"
+        id="name"
+        class="form-control"
+        [(ngModel)]="edge.federation.name"
+        name="name"
+        required
+      />
+    </div>
+
+    <h3>Group Filtering</h3>
+
+    <div style="border: 1px solid gray; padding:5px;">
+      <ul style="padding-left:15px;list-style: none;">
+          <li style="padding-bottom:5px;">
+            <input id="allRadio" value="allGroups" [(ngModel)]="edge.federation.groupsFilterType" type="radio" name="groupsFilterType" />
+            <label>&nbsp;Allow All Messages</label>
+            <span>(This must be used for all V1 server connections and any V2 server connections that aren't running group mapping)</span>
+          </li>
+          <li style="padding-bottom:5px;">
+            <input id="allowedRadio" value="allowed" [(ngModel)]="edge.federation.groupsFilterType" type="radio" name="groupsFilterType" />
+            <label>&nbsp;Allowed Groups</label>
+            <span>(allow any message containing one of these groups)</span>
+          </li>
+          <li style="padding-bottom:5px;">
+            <input id="disallowedRadio" value="disallowed" [(ngModel)]="edge.federation.groupsFilterType" type="radio" name="groupsFilterType" />
+            <label>&nbsp;Disallowed Groups</label>
+            <span>(block any message containing one of these groups)</span>
+          </li>
+          <li style="padding-bottom:5px;">
+            <input id="allowedAndDisallowedRadio" value="allowedAndDisallowed" [(ngModel)]="edge.federation.groupsFilterType" type="radio" name="groupsFilterType" />
+            <label>&nbsp;Allowed And Disallowed Groups</label>
+            <span>(allow messages that contains an allowed group and contains no disallowed groups)</span>
+          </li>
+      </ul>
+
+      <table [hidden]="edge.federation.groupsFilterType === 'allGroups'" class="formTable">
+        <tr>
+          <td class="rowHeader"><label style="font-weight:normal;" for="remoteGroups">Known Outbound Groups&nbsp;</label></td>
+          <td class="rowValue">
+            <select name="outboundGroup" [(ngModel)]="outboundGroup" id="outboundGroup">
+              <option value ="">-- Select Group -- </option>
+              <option *ngFor="let outboundGroup of knownOutboundGroups" value="{{outboundGroup}}">{{outboundGroup}}</option>
+            </select>
+          </td>
+        </tr>
+        <tr>
+
+        <tr>
+          <td class="rowHeader"><label style="font-weight:normal;" for="outboundGroup">Remote Group</label></td>
+          <td class="rowValue">
+            <input type="text" [(ngModel)]="outboundGroup" name="outboundGroup" maxlength="255" data-ng-pattern="/^[\w\d\s\.\(\)@#$_\=\-\+\[\]\{\},\|\\]*$/"/>
+          </td>
+        </tr>
+        <tr>
+          <td style="text-align:right;"colspan="2">
+            <button [hidden]="edge.federation.groupsFilterType !== 'allowed' && edge.federation.groupsFilterType !== 'allowedAndDisallowed'" type="button" class="btn btn-default" (click)="allowGroup(outboundGroup)" >Allow Group</button>
+            <button [hidden]="edge.federation.groupsFilterType !== 'disallowed' && edge.federation.groupsFilterType !== 'allowedAndDisallowed'" type="button" class="btn btn-default" (click)="disallowGroup(outboundGroup)">Disallow Group</button>
+          </td>
+          <td></td>
+        </tr>
+      </table>
+    </div>
+
+  <br>
+  <table [hidden]="edge.federation.allowedGroups.length === 0 || (edge.federation.groupsFilterType !== 'allowed' && edge.federation.groupsFilterType !== 'allowedAndDisallowed')" class="formTable" style="border-collapse:separate;border-spacing:2px;">
+    <thead>
+    <tr>
+      <th>Allowed Group</th>
+      <th></th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr *ngFor="let group of edge.federation.allowedGroups">
+      <td>{{group}}</td>
+      <td>
+        <a (click)="deleteAllowedGroup(group)" class="btn btn-danger">Remove</a>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+
+  <br>
+  <table [hidden]="edge.federation.disallowedGroups.length === 0 || (edge.federation.groupsFilterType !== 'disallowed' && edge.federation.groupsFilterType !== 'allowedAndDisallowed')" class="formTable" style="border-collapse:separate;border-spacing:2px;">
+    <thead>
+    <tr>
+      <th>Disallowed Group</th>
+      <th></th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr *ngFor="let group of edge.federation.disallowedGroups">
+      <td>{{group}}</td>
+      <td>
+        <a (click)="deleteDisallowedGroup(group)" class="btn btn-danger">Remove</a>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button (click)="onCancel()" mat-button mat-dialog-close class="btn btn-just-outline border-radius margin-right">Cancel</button>
+  <button class="btn btn-primary" (click)="onSave(edge)" [disabled]="userForm.invalid" [mat-dialog-close]="true">Save</button>
+</mat-dialog-actions>
+

@@ -2,6 +2,9 @@ apply plugin: 'java-library'
 
 dependencies {
 
+  // override beanutils version in esapi
+  implementation group: 'commons-beanutils', name: 'commons-beanutils', version: beanutils_version
+
   // use protobuf generated code from takserver-protobuf project
   api project(':takserver-protobuf')
 

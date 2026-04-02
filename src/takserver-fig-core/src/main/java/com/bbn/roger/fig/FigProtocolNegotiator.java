@@ -3,9 +3,7 @@ package com.bbn.roger.fig;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
-import java.io.ByteArrayInputStream;
 import java.net.URI;
-import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 
 import javax.net.ssl.SSLEngine;
@@ -34,18 +32,10 @@ import io.grpc.netty.InternalWriteBufferingAndExceptionHandlerUtils;
 import io.grpc.netty.ProtocolNegotiationEvent;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.ssl.OpenSslSessionContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.util.AsciiString;
-
-import javax.net.ssl.SSLSessionContext;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.common.annotations.VisibleForTesting;
 
 /*
  *

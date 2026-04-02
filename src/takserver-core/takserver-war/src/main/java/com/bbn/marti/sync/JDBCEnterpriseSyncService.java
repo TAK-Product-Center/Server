@@ -1541,7 +1541,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 		}
 
 		if (logger.isDebugEnabled()) {
-			logger.debug(("EnterpriseSync getMetadataByHash cache miss " + cacheKey));
+			logger.debug(("EnterpriseSync getMetadataByHash cache miss or cache disabled " + cacheKey));
 		}
 
 		List<Metadata> results = new LinkedList<Metadata>();
@@ -1655,6 +1655,58 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	private boolean isCacheEsync() {
 		return esyncEnableCache || (clusterConfig.isEnabled() && clusterConfig.isKubernetes());
 	}
+	
+	
+	/**
+	 * Gets the content of an Enterprise Sync object.
+	 * @param hash Hash of the object to retrieve
+	 * @return the content of the latest stored object matching that hash, or <code>null</code> if no match
+	 * @throws SQLException
+	 * @throws NamingException
+	 */
+	@Override
+	public InputStream getContentStreamByHash(String hash, String groupVector, boolean isAdmin) throws SQLException, NamingException {
+		if (Strings.isNullOrEmpty(groupVector)) {
+			throw new IllegalArgumentException("empty group vector");
+		}
+
+		FileWrapper file = enterpriseSyncCacheHelper.getInputStreamFileWrapperFromDB(hash);
+		
+		logger.debug("for hash {} fetched FileWrapper {}", hash, file);
+		
+		InputStream is = file.getInputStream();
+		// not found
+		if (file == null || is == null) {
+			logger.debug("file {} inputstream {}", file, is);
+			
+			logger.info("file for hash " + hash + " not found.");
+			return null;
+		}
+
+		if (Strings.isNullOrEmpty(file.getGroupVector())) {
+			throw new IllegalArgumentException("empty group vector in file for hash " + hash);
+		}
+		
+		if (isAdmin) {
+			logger.debug("allowing file access for hash {} for admin", hash);
+			
+			return is;
+		} else {
+			logger.debug("not admin - checking group vector");
+		}
+
+		if (!remoteUtil.isGroupVectorAllowed(groupVector, file.getGroupVector())) {
+			logger.debug("groupVector {} not allowed for hash {} file {}", groupVector, hash, file);
+			
+			// not allowed
+			return null;
+		}
+
+		// found and allowed
+		logger.debug("file found and allowed for hash {}", hash);
+
+		return is;
+	}
 
 	/**
 	 * Gets the content of an Enterprise Sync object.
@@ -1665,30 +1717,7 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	 */
 	@Override
 	public InputStream getContentStreamByHash(String hash, String groupVector) throws SQLException, NamingException {
-
-		if (Strings.isNullOrEmpty(groupVector)) {
-			throw new IllegalArgumentException("empty group vector");
-		}
-
-		FileWrapper file = enterpriseSyncCacheHelper.getInputStreamFileWrapperFromDB(hash);
-
-		// not found
-		if (file == null || file.getInputStream() == null) {
-			logger.info("file for hash " + hash + " not found.");
-			return null;
-		}
-
-		if (Strings.isNullOrEmpty(file.getGroupVector())) {
-			throw new IllegalArgumentException("empty group vector in file for hash " + hash);
-		}
-
-		if (!remoteUtil.isGroupVectorAllowed(groupVector, file.getGroupVector())) {
-			// not allowed
-			return null;
-		}
-
-		// found and allowed
-		return file.getInputStream();
+		return getContentStreamByHash(hash, groupVector, false); 
 	}
 	
 	/**
@@ -1699,29 +1728,46 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 	 * @throws NamingException
 	 */
 	@Override
-	public InputStream getContentStreamByUid(String uid, String groupVector) throws SQLException, NamingException {
+	public InputStream getContentStreamByUid(String uid, String groupVector, boolean isAdmin) throws SQLException, NamingException {
 
 		if (Strings.isNullOrEmpty(groupVector)) {
 			throw new IllegalArgumentException("empty group vector");
 		}
 
 		FileWrapper file = enterpriseSyncCacheHelper.getInputStreamFileWrapperFromDBbyUid(uid);
-
+		
+		logger.debug("filewrapper for uid {} {}", uid, file);
+		
+		InputStream is = file.getInputStream();
+		
+		logger.debug("file input stream for uid {} {}", uid, is);
+		
 		// not found
-		if (file == null || file.getInputStream() == null) {
+		if (file == null || is == null) {
+			logger.debug("uid {} file not found {} {}", file, is);
 			return null;
 		}
 
 		if (Strings.isNullOrEmpty(file.getGroupVector())) {
 			throw new IllegalArgumentException("empty group vector in file for uid " + uid);
 		}
+		
+		if (isAdmin) {
+			logger.debug("alllowing file access for uid {} for admin", uid);
+			
+			return is;
+		}
 
 		if (!remoteUtil.isGroupVectorAllowed(groupVector, file.getGroupVector())) {
+			logger.debug("group vector not allowed for uid {}", uid);
+
 			// not allowed
 			return null;
 		}
 
 		// found and allowed
-		return file.getInputStream();
+		logger.debug("file found and group vector allowed for uid {} {}", uid, is);
+
+		return is;
 	}
 }

@@ -18,7 +18,7 @@ public class AuthenticatorUtil {
     public static final String ROLE_WEBTAK = "ROLE_WEBTAK";
     public static final String ROLE_NON_ADMIN_UI = "ROLE_NON_ADMIN_UI";
         
-    public static void setUserRolesBasedOnRequestPort(User user, Logger logger) {
+    public static void setUserRolesBasedOnRequestPort(User user, Logger logger, boolean userHasWebtakAccess) {
     	
     	boolean portHasAdminEnabled = false;
     	boolean portHasWebtakEnabled = false;
@@ -75,7 +75,7 @@ public class AuthenticatorUtil {
         }
 
         // add role ROLE_WEBTAK if the port has webtak enabled
-        if (portHasWebtakEnabled) {
+        if (portHasWebtakEnabled && userHasWebtakAccess) {
             user.getAuthorities().add(ROLE_WEBTAK);
         }
         

@@ -76,6 +76,14 @@ public class FederationHubServerConfig {
     
     private List<TokenAuthServer> federationTokenAuthServers = new ArrayList<>();
     
+    private final int maxExpectedConnectedFederates = 100;
+    
+    private String cloudwatchNamespace = "fedhub";
+    private String cloudwatchName = "";
+    private int cloudwatchMetricsBatchSize = 20;
+    private int cloudwatchStepSeconds = 60;
+    private boolean cloudwatchEnable = false;
+    
     public int getOutgoingReconnectSeconds() {
 		return outgoingReconnectSeconds;
 	}
@@ -370,6 +378,50 @@ public class FederationHubServerConfig {
 	public void setFederationTokenAuthServers(List<TokenAuthServer> federationTokenAuthServers) {
 		this.federationTokenAuthServers = federationTokenAuthServers;
 	}
+	
+	public int getMaxExpectedConnectedFederates() {
+		return maxExpectedConnectedFederates;
+	}
+	
+	public String getCloudwatchNamespace() {
+		return cloudwatchNamespace;
+	}
+
+	public void setCloudwatchNamespace(String cloudwatchNamespace) {
+		this.cloudwatchNamespace = cloudwatchNamespace;
+	}
+
+	public String getCloudwatchName() {
+		return cloudwatchName;
+	}
+
+	public void setCloudwatchName(String cloudwatchName) {
+		this.cloudwatchName = cloudwatchName;
+	}
+
+	public int getCloudwatchMetricsBatchSize() {
+		return cloudwatchMetricsBatchSize;
+	}
+
+	public void setCloudwatchMetricsBatchSize(int cloudwatchMetricsBatchSize) {
+		this.cloudwatchMetricsBatchSize = cloudwatchMetricsBatchSize;
+	}
+
+	public boolean isCloudwatchEnable() {
+		return cloudwatchEnable;
+	}
+
+	public void setCloudwatchEnable(boolean cloudwatchEnable) {
+		this.cloudwatchEnable = cloudwatchEnable;
+	}
+
+	public int getCloudwatchStepSeconds() {
+		return cloudwatchStepSeconds;
+	}
+
+	public void setCloudwatchStepSeconds(int cloudwatchStepSeconds) {
+		this.cloudwatchStepSeconds = cloudwatchStepSeconds;
+	}
 
 	@Override
 	public String toString() {
@@ -383,12 +435,16 @@ public class FederationHubServerConfig {
 				+ clientTimeoutTime + ", clientRefreshTime=" + clientRefreshTime + ", maxConcurrentCallsPerConnection="
 				+ maxConcurrentCallsPerConnection + ", enableHealthCheck=" + enableHealthCheck + ", useCaGroups="
 				+ useCaGroups + ", serverName=" + serverName + ", outgoingReconnectSeconds=" + outgoingReconnectSeconds
-				+ ", id=" + id + ", nonce=" + nonce + ", fullId=" + fullId + ", dbUsername=" + dbUsername + ", dbPort="
-				+ dbPort + ", dbHost=" + dbHost + ", dbConnectionTimeoutMS=" + dbConnectionTimeoutMS
+				+ ", id=" + id + ", fullId=" + fullId + ", dbUsername=" + dbUsername + ", dbPort=" + dbPort
+				+ ", dbHost=" + dbHost + ", dbConnectionTimeoutMS=" + dbConnectionTimeoutMS
 				+ ", missionFederationDBRetentionDays=" + missionFederationDBRetentionDays
 				+ ", missionFederationRecencySeconds=" + missionFederationRecencySeconds
 				+ ", missionFederationDisruptionMaxFileSizeBytes=" + missionFederationDisruptionMaxFileSizeBytes
-				+ ", missionFederationDisruptionEnabled=" + missionFederationDisruptionEnabled + "]";
+				+ ", missionFederationDisruptionEnabled=" + missionFederationDisruptionEnabled
+				+ ", federationTokenAuthServers=" + federationTokenAuthServers + ", maxExpectedConnectedFederates="
+				+ maxExpectedConnectedFederates + ", cloudwatchNamespace=" + cloudwatchNamespace + ", cloudwatchName="
+				+ cloudwatchName + ", cloudwatchMetricsBatchSize=" + cloudwatchMetricsBatchSize + ", cloudwatchEnable="
+				+ cloudwatchEnable + "]";
 	}
 	
 	@JsonIgnoreProperties(ignoreUnknown = true)

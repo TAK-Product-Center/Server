@@ -88,7 +88,7 @@ public class SecurityConfig {
 		
 		http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.ALWAYS);
 
-		http.authorizeHttpRequests().requestMatchers(getMatchers("/error","/oauth/**", "/login**", "/login/**", "/bowerDependencies/**", "/favicon.ico")).permitAll()
+		http.authorizeHttpRequests().requestMatchers(getMatchers("/error","/oauth/**", "/login**", "/login/**", "/node_modules/**", "/favicon.ico")).permitAll()
 			.anyRequest().authenticated();
 
 		http.exceptionHandling().authenticationEntryPoint((request, response, ex) -> {

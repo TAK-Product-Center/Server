@@ -2,22 +2,23 @@ package tak.server.federation;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.atakmap.Tak.BinaryBlob;
 import com.atakmap.Tak.ClientHealth;
+import com.atakmap.Tak.FederateGroupHopLimit;
+import com.atakmap.Tak.FederateGroupHopLimits;
 import com.atakmap.Tak.FederateGroups;
 import com.atakmap.Tak.FederateHops;
 import com.atakmap.Tak.FederateProvenance;
 import com.atakmap.Tak.FederatedEvent;
-import com.atakmap.Tak.Identity.ConnectionType;
 import com.atakmap.Tak.ROL;
 import com.atakmap.Tak.Subscription;
 import com.google.common.base.Strings;
@@ -25,8 +26,8 @@ import com.google.common.base.Strings;
 import io.grpc.ClientCall;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.CallStreamObserver;
 import io.grpc.stub.StreamObserver;
-import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
 
 /*
  *
@@ -34,337 +35,336 @@ import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
  *
  */
 public class GuardedStreamHolder<T> {
+	private static final Logger logger = LoggerFactory.getLogger(GuardedStreamHolder.class);
 
-    private static final Logger logger = LoggerFactory.getLogger(GuardedStreamHolder.class);
+	protected CallStreamObserver<T> clientStream;
+	protected ClientCall<T, Subscription> clientCall;
+	protected long lastHealthTime;
+	protected ClientHealth lastHealthStatus;
+	protected FederateIdentity federateIdentity;
+	protected Subscription subscription;
+	protected int maxFederateHops = -1;
+	protected String clientFingerprint;
+	protected FederateProvenance federateProvenance;
 
-    private StreamObserver<T> clientStream;
-    private ClientCall<T, Subscription> clientCall;
-    private long lastHealthTime;
-    private ClientHealth lastHealthStatus;
-    private FederateIdentity federateIdentity;
-    private Subscription subscription;
-    private int maxFederateHops = -1;
-    private String clientFingerprint;
-    private List<String> clientGroups;
-    
-    private boolean isRunningInHub = false;
+	public static AtomicLong totalMessagesDropped = new AtomicLong();
 
-    private final Set<T> cache;
+	// for outgoing connections
+	public GuardedStreamHolder(ClientCall<T, Subscription> clientCall, String fedId,
+			FederateProvenance federateProvenance) {
 
-    public Set<T> getCache() {
-        return cache;
-    }
-    
-    // for outgoing connections
-    public GuardedStreamHolder(ClientCall<T, Subscription> clientCall, String fedId, Comparator<T> comp, boolean isRunningInHub) {
+		requireNonNull(clientCall, "FederatedEvent groupCall");
 
-    	requireNonNull(clientCall, "FederatedEvent groupCall");
+		this.federateIdentity = new FederateIdentity(fedId);
 
-        requireNonNull(comp, "comparator");
-        
-        this.isRunningInHub = isRunningInHub;
+		this.clientCall = clientCall;
 
-        this.cache = new ConcurrentSkipListSet<T>(comp);
-        
-        this.federateIdentity = new FederateIdentity(fedId);
+		this.federateProvenance = federateProvenance;
 
-        this.clientCall = clientCall;
-        
-        lastHealthTime = System.currentTimeMillis();
-        lastHealthStatus = ClientHealth.newBuilder().setStatus(ClientHealth.ServingStatus.SERVING).build();
-    }
+		lastHealthTime = System.currentTimeMillis();
+		lastHealthStatus = ClientHealth.newBuilder().setStatus(ClientHealth.ServingStatus.SERVING).build();
+	}
 
-    // for incoming connections
-    public GuardedStreamHolder(StreamObserver<T> clientStream, String clientName, String certHash, String sessionId, Subscription subscription, Comparator<T> comp, boolean isRunningInHub) {
+	// for incoming connections
+	public GuardedStreamHolder(StreamObserver<T> clientStream, String clientName, String certHash, String sessionId,
+			Subscription subscription, FederateProvenance federateProvenance) {
 
-        requireNonNull(clientStream, "FederatedEvent client stream");
+		requireNonNull(clientStream, "FederatedEvent client stream");
 
-        requireNonNull(subscription, "client subscription");
-        requireNonNull(comp, "comparator");
-        
-        this.isRunningInHub = isRunningInHub;
-        
-        this.cache = new ConcurrentSkipListSet<T>(comp);
+		requireNonNull(subscription, "client subscription");
 
-        if (Strings.isNullOrEmpty(clientName)) {
-            throw new IllegalArgumentException("empty client name - invalid stream");
-        }
-
-        if (Strings.isNullOrEmpty(certHash)) {
-            throw new IllegalArgumentException("empty cert hash - invalid stream");
-        }
-
-        // new takservers will send their CoreConfig serverId. if present, use it, otherwise generate a random unique identifier
-        String serverId = subscription.getIdentity().getServerId();
-        if (Strings.isNullOrEmpty(serverId)) {
-        	serverId = sessionId;
-        }
-        String fedId = clientName + "-" + certHash  + "-" + serverId;
-
-        this.subscription = subscription;
-
-        this.federateIdentity = new FederateIdentity(fedId);
-
-        this.clientStream = clientStream;
-        lastHealthTime = System.currentTimeMillis();
-        lastHealthStatus = ClientHealth.newBuilder().setStatus(ClientHealth.ServingStatus.SERVING).build();
-    }
-    
-    public void setSubscription(Subscription sub) {
-    	this.subscription = sub;
-    }
-
-    public void updateClientHealth(ClientHealth healthCheck) {
-        this.lastHealthTime = System.currentTimeMillis();
-        this.lastHealthStatus = healthCheck;
-    }
-
-    public boolean isClientHealthy(long clientTimeoutTime) {
-        if (lastHealthStatus.getStatus() == ClientHealth.ServingStatus.SERVING) {
-            long now = System.currentTimeMillis();
-            long diff = (now - lastHealthTime) / 1000;
-            if (logger.isDebugEnabled()) {
-                logger.debug("now: " + now + " lastHealthTime: " + lastHealthTime + " diff: " + diff + " clientTimeoutTime: " + clientTimeoutTime);
-            }
-
-            if (diff < clientTimeoutTime) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public synchronized void send(T event) {
-        if (event == null) {
-            return;
-        }
-        
-        T modifiedEvent = null;
-        if (isRunningInHub) {
-        	// since hub outgoing connections can forward traffic to other hubs, we need to keep a list of visited nodes
-            // so that we can stop cycles
-            FederateProvenance prov = FederateProvenance.newBuilder()
-        			.setFederationServerId(FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager().getConfig().getFullId())
-        			.setFederationServerName(FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager().getConfig().getServerName())
-        			.build();
-            
-            Set<FederateProvenance> federateProvenances = new HashSet<>();
-            federateProvenances.add(prov);
-            
-            modifiedEvent = addPropertiesToEvent(event, federateProvenances);
-        } else {
-        	modifiedEvent = addPropertiesToEvent(event, null);
-        }
-        
-        // possible reasons for null: message is at its hop limit
-    	if (modifiedEvent == null) {
-    		return;
-    	}
-    	    	        
-        // clientStream = stream of messages going from server to a connected outgoing client
-        if (clientStream != null) 
-        	clientStream.onNext(modifiedEvent);
-        
-        // clientCall = stream of messages going from outgoing client to a server
-        if (clientCall != null)  {
-        	clientCall.sendMessage(modifiedEvent);
-        }
-    }
-    
-    public T addPropertiesToEvent(T event, Set<FederateProvenance> federateProvenances) {
-        if (event instanceof FederatedEvent) {
-        	FederatedEvent fedEvent = (FederatedEvent) event;
-        	FederatedEvent.Builder builder = fedEvent.toBuilder();
-        	
-        	// if hops exist, check/increment them, if no hops exist, we need to add them
-        	FederateHops federateHops = fedEvent.hasFederateHops() ? checkHops(event, fedEvent.getFederateHops()) : 
-        		FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
-        	
-        	if (federateHops == null) {
-        		return null;
-        	} else {
-        		builder.setFederateHops(federateHops);
-        	}
-        	
-        	if (federateProvenances != null) {
-        		federateProvenances.addAll(fedEvent.getFederateProvenanceList());
-        		builder.clearFederateProvenance();
-        		builder.addAllFederateProvenance(federateProvenances);
-        	}
-        	
-        	return (T) builder.build();
-        }
-        
-        if (event instanceof FederateGroups) {
-        	FederateGroups fedGroup = (FederateGroups) event;
-        	FederateGroups.Builder builder = fedGroup.toBuilder();
-        	
-        	// if hops exist, check/increment them, if no hops exist, we need to add them
-        	FederateHops federateHops = fedGroup.hasFederateHops() ? checkHops(event, fedGroup.getFederateHops()) : 
-        		FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
-        	
-        	if (federateHops == null) {
-        		return null;
-        	} else {
-        		builder.setFederateHops(federateHops);
-        	}
-        	
-        	if (federateProvenances != null) {
-        		federateProvenances.addAll(fedGroup.getFederateProvenanceList());
-        		builder.clearFederateProvenance();
-        		builder.addAllFederateProvenance(federateProvenances);
-        	}
-        	
-        	return (T) builder.build();
-        }
-        
-        if (event instanceof ROL) {
-        	ROL rol = (ROL) event;
-        	ROL.Builder builder = rol.toBuilder();
-        	
-        	// if hops exist, check/increment them, if no hops exist, we need to add them
-        	FederateHops federateHops = rol.hasFederateHops() ? checkHops(event, rol.getFederateHops()) : 
-        		FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
-        	
-        	if (federateHops == null) {
-        		return null;
-        	} else {
-        		builder.setFederateHops(federateHops);
-        	}
-        	
-        	if (federateProvenances != null) {
-        		federateProvenances.addAll(rol.getFederateProvenanceList());
-        		builder.clearFederateProvenance();
-        		builder.addAllFederateProvenance(federateProvenances);
-        	}
-        	
-        	return (T) builder.build();
-        }
-        
-        if (event instanceof BinaryBlob) {
-        	BinaryBlob blob = (BinaryBlob) event;
-        	BinaryBlob.Builder builder = blob.toBuilder();
-        	
-        	// if hops exist, check/increment them, if no hops exist, we need to add them
-        	FederateHops federateHops = blob.hasFederateHops() ? checkHops(event, blob.getFederateHops()) : 
-        		FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
-        	
-        	if (federateHops == null) {
-        		return null;
-        	} else {
-        		builder.setFederateHops(federateHops);
-        	}
-        	
-        	if (federateProvenances != null) {
-        		federateProvenances.addAll(blob.getFederateProvenanceList());
-        		builder.clearFederateProvenance();
-        		builder.addAllFederateProvenance(federateProvenances);
-        	}
-        	
-        	return (T) builder.build();
-        }
-        
-		return null;
-    }
-    
-    private FederateHops checkHops(T event, FederateHops federateHops) {
-    	long maxHops = federateHops.getMaxHops();
-		long currentHops = federateHops.getCurrentHops() + 1;
-		
-		if (currentHops > maxHops && maxHops != -1) {
-			if (logger.isDebugEnabled()) {
-				logger.debug("dropping message because of hop limit " + event);
-			}
-			return null;
-		} 
-		// if there is only 1 hop left and the next hop is to a federation hub,
-		// just drop the message now because the next hub will not be allowed to send it
-		// further anyways
-		else if (isHubSubscription() && currentHops == maxHops) {  
-			if (logger.isDebugEnabled()) {
-				logger.debug("dropping message because of hop limit (1 hop left but next destination is a hub) " + event);
-			}
-			return null;
-		} else {
-			return FederateHops.newBuilder().setCurrentHops(currentHops).setMaxHops(maxHops).build();
+		if (Strings.isNullOrEmpty(clientName)) {
+			throw new IllegalArgumentException("empty client name - invalid stream");
 		}
-    }
 
-    // if the subscription associated with this connection is a federation hub
-    private boolean isHubSubscription() {
-    	return subscription != null && 
-    			(subscription.getIdentity().getType() == ConnectionType.FEDERATION_HUB_CLIENT 
-    			|| subscription.getIdentity().getType() == ConnectionType.FEDERATION_HUB_SERVER);
-    }
-    
-    public void throwDeadlineExceptionToClient() {
-        try {
-        	if (clientStream != null)
-        		clientStream.onError(new StatusRuntimeException(Status.DEADLINE_EXCEEDED));
-        } catch (Exception e) {
-            logger.warn("exception sending StatusRuntimeException - DEADLINE_EXCEEDED to client", e);
-        }
-    }
-    
-    public void throwCanceledExceptionToClient() {
-        try {
-        	if (clientStream != null)
-        		clientStream.onError(new StatusRuntimeException(Status.CANCELLED));
-        } catch (Exception e) {
-            logger.warn("exception sending StatusRuntimeException - CANCELLED to client", e);
-        }
-    }
-    
-    public void throwPermissionDeniedToClient() {
-        try {
-        	if (clientStream != null)
-        		clientStream.onError(new StatusRuntimeException(Status.PERMISSION_DENIED));
-        } catch (Exception e) {
-            logger.warn("exception sending StatusRuntimeException - PERMISSION_DENIED to client", e);
-        }
-    }
-    
-    public void cancel(String message, Throwable cause) {
-    	if (clientCall != null) {
-    		clientCall.cancel(message, cause);
-    	}
-    	if (clientStream != null) {
-    		clientStream.onError(cause);
-    	}
-    }
+		if (Strings.isNullOrEmpty(certHash)) {
+			throw new IllegalArgumentException("empty cert hash - invalid stream");
+		}
 
-    public FederateIdentity getFederateIdentity() {
-        return federateIdentity;
-    }
+		// new takservers will send their CoreConfig serverId. if present, use it,
+		// otherwise generate a random unique identifier
+		String serverId = subscription.getIdentity().getServerId();
+		if (Strings.isNullOrEmpty(serverId)) {
+			serverId = sessionId;
+		}
+		String fedId = clientName + "-" + certHash + "-" + serverId;
 
-    public Subscription getSubscription() {
-        return subscription;
-    }
-    
-    public void setMaxFederateHops(int maxFederateHops) {
-    	this.maxFederateHops = maxFederateHops;
-    }
+		this.subscription = subscription;
 
-	public String getClientFingerprint() {
-		return clientFingerprint;
+		this.federateIdentity = new FederateIdentity(fedId);
+
+		this.clientStream = (CallStreamObserver<T>) clientStream;
+
+		this.federateProvenance = federateProvenance;
+
+		lastHealthTime = System.currentTimeMillis();
+		lastHealthStatus = ClientHealth.newBuilder().setStatus(ClientHealth.ServingStatus.SERVING).build();
 	}
 
-	public void setClientFingerprint(String clientFingerprint) {
-		this.clientFingerprint = clientFingerprint;
+	public void setSubscription(Subscription sub) {
+		this.subscription = sub;
 	}
 
-	public List<String> getClientGroups() {
-		return clientGroups;
+	public void updateClientHealth(ClientHealth healthCheck) {
+		this.lastHealthTime = System.currentTimeMillis();
+		this.lastHealthStatus = healthCheck;
 	}
 
-	public void setClientGroups(List<String> clientGroups) {
-		this.clientGroups = clientGroups;
+	public boolean isClientHealthy(long clientTimeoutTime) {
+		if (lastHealthStatus.getStatus() == ClientHealth.ServingStatus.SERVING) {
+			long now = System.currentTimeMillis();
+			long diff = (now - lastHealthTime) / 1000;
+			if (logger.isDebugEnabled()) {
+				logger.debug("now: " + now + " lastHealthTime: " + lastHealthTime + " diff: " + diff
+						+ " clientTimeoutTime: " + clientTimeoutTime);
+			}
+
+			if (diff < clientTimeoutTime) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public synchronized void send(T event) {
+		if (event == null) {
+			return;
+		}
+
+		T modifiedEvent = null;
+
+		modifiedEvent = addPropertiesToEvent(event);
+
+		// possible reasons for null: message is at its hop limit
+		if (modifiedEvent == null) {
+			return;
+		}
+
+		// clientStream = stream of messages going from server to a connected outgoing
+		// client
+		if (clientStream != null) {
+			if (isWritable(modifiedEvent)) {
+				clientStream.onNext(modifiedEvent);
+			} else {
+				totalMessagesDropped.getAndIncrement();
+			}
+		}
+
+		// clientCall = stream of messages going from outgoing client to a server
+		if (clientCall != null) {
+			if (isWritable(modifiedEvent)) {
+				clientCall.sendMessage(modifiedEvent);
+			} else {
+				totalMessagesDropped.getAndIncrement();
+			}
+		}
+	}
+
+	protected long getFreeMemory() {
+		long usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+		return Runtime.getRuntime().maxMemory() - usedMemory;
+	}
+
+	protected long getMaxMemeory() {
+		return Runtime.getRuntime().maxMemory();
+	}
+
+	protected boolean isWritable(T event) {
+		double freeMem = getFreeMemory();
+		double maxMem = getMaxMemeory();
+
+		if (event instanceof FederatedEvent) {
+			// allow buffering of federated events up to 75% of the max process memory
+			return (freeMem / maxMem) > 0.25;
+		} else if (event instanceof FederateGroups) {
+			return ((FederateGroups) event).getSerializedSize() < freeMem;
+		} else if (event instanceof ROL) {
+			return ((ROL) event).getSerializedSize() < freeMem;
+		} else if (event instanceof BinaryBlob) {
+			return ((BinaryBlob) event).getSerializedSize() < freeMem;
+		} else {
+			return true;
+		}
+	}
+
+	public T addPropertiesToEvent(T event) {
+		Set<FederateProvenance> federateProvenances = new HashSet<>();
+		federateProvenances.add(federateProvenance);
+
+		if (event instanceof FederatedEvent) {
+			FederatedEvent fedEvent = (FederatedEvent) event;
+			FederatedEvent.Builder builder = fedEvent.toBuilder();
+
+			// update limits
+			List<FederateGroupHopLimit> updatedLimits = fedEvent.getFederateGroupHopLimits().getLimitsList().stream()
+					.map(limit -> {
+						return limit.toBuilder().setCurrentHops(limit.getCurrentHops() + 1).build();
+					}).collect(Collectors.toList());
+
+			FederateGroupHopLimits limits = fedEvent.getFederateGroupHopLimits().toBuilder().clearLimits()
+					.addAllLimits(updatedLimits).build();
+
+			builder.setFederateGroupHopLimits(limits);
+
+			// add message maxHops
+			FederateHops federateHops = FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
+			builder.setFederateHops(federateHops);
+
+			federateProvenances.addAll(fedEvent.getFederateProvenanceList());
+			builder.clearFederateProvenance();
+			builder.addAllFederateProvenance(federateProvenances);
+
+			return (T) builder.build();
+		}
+
+		if (event instanceof FederateGroups) {
+			FederateGroups fedGroup = (FederateGroups) event;
+			FederateGroups.Builder builder = fedGroup.toBuilder();
+
+			// update limits
+			List<FederateGroupHopLimit> updatedLimits = fedGroup.getFederateGroupHopLimits().getLimitsList().stream()
+					.map(limit -> {
+						return limit.toBuilder().setCurrentHops(limit.getCurrentHops() + 1).build();
+					}).collect(Collectors.toList());
+
+			FederateGroupHopLimits limits = fedGroup.getFederateGroupHopLimits().toBuilder().clearLimits()
+					.addAllLimits(updatedLimits).build();
+
+			builder.setFederateGroupHopLimits(limits);
+
+			// add message maxHops
+			FederateHops federateHops = FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
+			builder.setFederateHops(federateHops);
+
+			federateProvenances.addAll(fedGroup.getFederateProvenanceList());
+			builder.clearFederateProvenance();
+			builder.addAllFederateProvenance(federateProvenances);
+
+			return (T) builder.build();
+		}
+
+		if (event instanceof ROL) {
+			ROL rol = (ROL) event;
+			ROL.Builder builder = rol.toBuilder();
+
+			// update limits
+			List<FederateGroupHopLimit> updatedLimits = rol.getFederateGroupHopLimits().getLimitsList().stream()
+					.map(limit -> {
+						return limit.toBuilder().setCurrentHops(limit.getCurrentHops() + 1).build();
+					}).collect(Collectors.toList());
+
+			FederateGroupHopLimits limits = rol.getFederateGroupHopLimits().toBuilder().clearLimits()
+					.addAllLimits(updatedLimits).build();
+
+			builder.setFederateGroupHopLimits(limits);
+
+			// add message maxHops
+			FederateHops federateHops = FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
+			builder.setFederateHops(federateHops);
+
+			federateProvenances.addAll(rol.getFederateProvenanceList());
+			builder.clearFederateProvenance();
+			builder.addAllFederateProvenance(federateProvenances);
+
+			return (T) builder.build();
+		}
+
+		if (event instanceof BinaryBlob) {
+			BinaryBlob blob = (BinaryBlob) event;
+			BinaryBlob.Builder builder = blob.toBuilder();
+
+			// update limits
+			List<FederateGroupHopLimit> updatedLimits = blob.getFederateGroupHopLimits().getLimitsList().stream()
+					.map(limit -> {
+						return limit.toBuilder().setCurrentHops(limit.getCurrentHops() + 1).build();
+					}).collect(Collectors.toList());
+
+			FederateGroupHopLimits limits = blob.getFederateGroupHopLimits().toBuilder().clearLimits()
+					.addAllLimits(updatedLimits).build();
+
+			builder.setFederateGroupHopLimits(limits);
+
+			// add message maxHops
+			FederateHops federateHops = FederateHops.newBuilder().setCurrentHops(1).setMaxHops(maxFederateHops).build();
+			builder.setFederateHops(federateHops);
+
+			federateProvenances.addAll(blob.getFederateProvenanceList());
+			builder.clearFederateProvenance();
+			builder.addAllFederateProvenance(federateProvenances);
+
+			return (T) builder.build();
+		}
+
+		return null;
+	}
+
+	public void throwDeadlineExceptionToClient() {
+		try {
+			if (clientStream != null) {
+				clientStream.onError(new StatusRuntimeException(Status.DEADLINE_EXCEEDED));
+			}
+			if (clientCall != null) {
+				clientCall.cancel(Status.DEADLINE_EXCEEDED.getDescription(),
+						new StatusRuntimeException(Status.DEADLINE_EXCEEDED));
+			}
+		} catch (Exception e) {
+			logger.warn("exception sending StatusRuntimeException - DEADLINE_EXCEEDED to client", e);
+		}
+	}
+
+	public void throwCanceledExceptionToClient() {
+		try {
+			if (clientStream != null) {
+				clientStream.onError(new StatusRuntimeException(Status.CANCELLED));
+			}
+
+			if (clientCall != null) {
+				clientCall.cancel(Status.CANCELLED.getDescription(), new StatusRuntimeException(Status.CANCELLED));
+			}
+		} catch (Exception e) {
+			logger.warn("exception sending StatusRuntimeException - CANCELLED to client", e);
+		}
+	}
+
+	public void throwPermissionDeniedToClient() {
+		try {
+			if (clientStream != null) {
+				clientStream.onError(new StatusRuntimeException(Status.PERMISSION_DENIED));
+			}
+			if (clientCall != null) {
+				clientCall.cancel(Status.PERMISSION_DENIED.getDescription(),
+						new StatusRuntimeException(Status.PERMISSION_DENIED));
+			}
+		} catch (Exception e) {
+			logger.warn("exception sending StatusRuntimeException - PERMISSION_DENIED to client", e);
+		}
+	}
+
+	public void cancel(String message, Throwable cause) {
+		if (clientCall != null) {
+			clientCall.cancel(message, cause);
+		}
+		if (clientStream != null) {
+			clientStream.onError(cause);
+		}
+	}
+
+	public FederateIdentity getFederateIdentity() {
+		return federateIdentity;
+	}
+
+	public Subscription getSubscription() {
+		return subscription;
+	}
+
+	public void setMaxFederateHops(int maxFederateHops) {
+		this.maxFederateHops = maxFederateHops;
 	}
 
 	@Override
 	public String toString() {
 		return "GuardedStreamHolder [clientStream=" + clientStream + ", clientCall=" + clientCall + ", lastHealthTime="
 				+ lastHealthTime + ", lastHealthStatus=" + lastHealthStatus + ", federateIdentity=" + federateIdentity
-				+ ", subscription=" + subscription + ", cache=" + cache + "]";
+				+ ", subscription=" + subscription + "]";
 	}
 }

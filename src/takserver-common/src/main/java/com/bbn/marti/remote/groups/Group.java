@@ -43,9 +43,11 @@ public class Group implements Node, Comparable<Group>, Serializable {
         this.name = name;
         this.direction = direction;
     }
-    
+
     protected String name;
-    
+
+    protected String distinguishedName;
+
     protected Direction direction;
     
     protected Date created;
@@ -112,6 +114,10 @@ public class Group implements Node, Comparable<Group>, Serializable {
     public String getDescription() { return description; }
 
     public void setDescription(String description) { this.description = description; }
+
+    public String getDistinguishedName() { return distinguishedName; }
+
+    public void setDistinguishedName(String distinguishedName) { this.distinguishedName = distinguishedName; }
 
     @Override
     public int hashCode() {

@@ -27,6 +27,8 @@ public interface FederationPolicyGraph {
      * This has no usage in policy decisions.
      */
     public String getName();
+    
+    public String getVersion();
 
     /*
      * True if the graph object has no nodes, and false if it has any nodes.
@@ -151,31 +153,11 @@ public interface FederationPolicyGraph {
     public FederateEdge getEdge(FederationNode source, FederationNode destination);
 
     /*
-     * Returns a list of filters along the path between the
-     * source and destination node.
-     */
-    public List<FederationFilter> getFiltersAlongPath(FederationNode source,
-        FederationNode destination);
-
-    /*
-     * Returns a list of filters along the path between the
-     * source and destination node.
-     */
-    public List<FederationFilter> getFiltersAlongPath(String sourceUid,
-        String destinationUid);
-
-    /*
      * Get the set of all edges in the graph. Required for serialization frameworks.
      */
     public Set<FederateEdge> getEdgeSet();
 
     public Collection<FederationNode> getNodes();
-
-    /*
-     * Get the configured set of fully-qualified names of
-     * singleton objects containing lambda filter implementations.
-     */
-    public Set<String> getFilterObjectSet();
 
     public Map<String, Object> getAdditionalData();
 

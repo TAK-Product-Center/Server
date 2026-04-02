@@ -3,6 +3,7 @@ package com.bbn.marti.sync.federation;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.InvalidParameterException;
+import java.util.Date;
 import java.util.Objects;
 
 import org.slf4j.Logger;
@@ -11,20 +12,20 @@ import org.slf4j.LoggerFactory;
 import com.atakmap.Tak.BinaryBlob;
 import com.atakmap.Tak.ROL;
 import com.atakmap.Tak.ROL.Builder;
-import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.sync.MissionChangeType;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.sync.MissionExpiration;
 import com.bbn.marti.remote.sync.MissionHierarchy;
 import com.bbn.marti.remote.sync.MissionUpdateDetails;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForLogEntry;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayer;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayerType;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayer;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayerType;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForExternalData;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.model.Mission;
-import com.bbn.marti.sync.model.MissionLayer;
 import com.bbn.marti.sync.model.Resource;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -99,9 +100,9 @@ public class MissionActionROLConverter {
 		return ROL.newBuilder().setProgram("delete data_feed\n" + mapper.writeValueAsString(meta) + ";").build();
 	}
 	
-	public ROL addMissionContentToROL(MissionContent content, String missionName, String creatorUid, Mission mission) {
+	public ROL addMissionContentToROL(MissionContent content, String missionName, String creatorUid, Mission mission, Date date, String xmlContentForNotification) {
 		
-		return remoteUtil.getROLforMissionChange(content, missionName, creatorUid, mission.getCreatorUid(), mission.getChatRoom(), mission.getTool(), mission.getDescription());
+		return remoteUtil.getROLforMissionChange(content, missionName, creatorUid, mission.getCreatorUid(), mission.getChatRoom(), mission.getTool(), mission.getDescription(), date, xmlContentForNotification);
 	}
 	
 	public ROL deleteMissionContentToROL(String missionName, String hash, String uid, String creatorUid, Mission mission) throws JsonProcessingException {
@@ -267,5 +268,15 @@ public class MissionActionROLConverter {
 		}
 		
 		return ROL.newBuilder().setProgram("update mission\n" + mapper.writeValueAsString(missionUpdateDetailsForMapLayer) + ";").build();
+	}
+
+	public ROL setExternalMissionDataToROL(MissionUpdateDetailsForExternalData missionUpdateDetailsForExternalData) throws JsonProcessingException {
+
+		return ROL.newBuilder().setProgram("update mission\n" + mapper.writeValueAsString(missionUpdateDetailsForExternalData) + ";").build();
+	}
+
+	public ROL logEntryROL(MissionUpdateDetailsForLogEntry missionUpdateDetailsForLogEntry) throws JsonProcessingException {
+
+		return ROL.newBuilder().setProgram("update mission\n" + mapper.writeValueAsString(missionUpdateDetailsForLogEntry) + ";").build();
 	}
 }

@@ -44,8 +44,8 @@ public interface MissionLayerRepository extends JpaRepository<MissionLayer, Stri
     void fixupAfter(@Param("uid") String uid, @Param("parent_node_uid") String parent_node_uid, @Param("after") String after);
 
     @Query(value = "select uid, name, type, parent_node_uid, null as mission_id, after " +
-            "from mission_layer where uid = :uid ", nativeQuery = true)
-    MissionLayer findByUidNoMission(@Param("uid") String uid);
+            "from mission_layer where uid = :uid and mission_id = :missionId ", nativeQuery = true)
+    MissionLayer findByUidNoMission(@Param("uid") String uid, @Param("missionId") Long missionId);
 
     @Query(value = "select ml.uid, ml.name, ml.type, ml.parent_node_uid, null as mission_id, ml.after " +
             "from mission_layer ml inner join mission m on m.id = ml.mission_id where lower(m.name) = lower(:missionName) and ml.parent_node_uid is null ", nativeQuery = true)

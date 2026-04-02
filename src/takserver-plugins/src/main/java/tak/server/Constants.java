@@ -126,7 +126,6 @@ public class Constants {
 	public static final String CERTIFICATE_CACHE = "certificate-cache";
 	public static final String VIDEO_CACHE = "video-cache";
 	public static final String DATA_FEED_CACHE = "data-feed-cache";
-	public static final String EXCHECK_CACHE = "excheck-cache";
 
 
 	// distributed message topics (ignite)
@@ -169,13 +168,14 @@ public class Constants {
 	public static final String OFFLINE_CHANGE_TIME_KEY = "offlineChangeTime";
 	public static final String CLIENT_UID_KEY = "clientUid";
 	public static final String DO_NOT_BROKER_KEY = "brokering.needed";
+	public static final String FEDERATE_ONLY_KEY = "federate.brokering.only";
 	public static final String ARCHIVE_EVENT_KEY = "respository.archive"; // value is a Boolean
 	public static final String SUBSCRIBER_HITS_KEY = "SUBSCRIBER_HITS_KEY";
 	public static final String CONNECTION_ID_KEY = "connection.id";
 	public static final String COT_MESSENGER_TOPIC_KEY = "tak.messenger.topic";
 	public static final String PROCESSED_COUNT = "processed.count";
 	public static final String MESSAGING_ARCHIVER = "messaging.archiver"; // value is a String
-	public static final String PLUGIN_PROVENANCE = "plugin.provenance";
+	public static final String MESSAGE_PROVENANCE = "message.provenance";
 	public static final String STORE_FORWARD_KEY = "storeforward";
 	public static final String DATA_FEED_KEY = "data.feed";
 	public static final String DATA_FEED_UUID_KEY = "data.feed.uuid";
@@ -217,6 +217,8 @@ public class Constants {
     public static final String DISTRIBUTED_CONFIGURATION_BEAN = "distributedConfigurationBean";
     public static final String MESSAGING_CORE_CONFIG_PROXY_BEAN = "messagingCoreConfigProxyBean";
 
+	public static final String MESSAGING_METRICS_SERVICE_NAME = "messagingMetricsService";
+
     public static final String MARTI_XPATH = "/event/detail/marti";
 
     // loggers
@@ -225,6 +227,13 @@ public class Constants {
     // metrics
     public static final String METRIC_MESSAGE_READ_COUNT = "message.read";
     public static final String METRIC_MESSAGE_WRITE_COUNT = "message.write";
+    public static final String METRIC_NATS_MESSAGE_WRITE_COUNT = "message.nats.write";
+    public static final String METRIC_NATS_MESSAGE_READ_COUNT = "message.nats.read";
+
+
+    public static final String METRIC_MESSAGE_WRITE_COUNT_WEBSOCKET = "message.write.websocket";
+	public static final String METRIC_MESSAGE_READ_COUNT_UDP = "message.read.udp";
+
     public static final String METRIC_MESSAGE_PRECONVERT_COUNT = "message.preconverted";
 
 
@@ -266,5 +275,6 @@ public class Constants {
     // Provenance keys used in Message
     public static final String PLUGIN_MANAGER_PROVENANCE = "PluginManager";
     public static final String PLUGIN_INTERCEPTOR_PROVENANCE = "PluginInterceptor";
+    public static final String FEDERATION_PROVENANCE = "FederationProvenance";
 
 }

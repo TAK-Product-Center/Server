@@ -1,0 +1,122 @@
+<h1 mat-dialog-title class="dialogHeader">{{editorTitle}} CA Group</h1>
+<!-- 
+<mat-dialog-content class="mat-typography">
+  <button class="btn btn-primary" type="button" (click)="modifyCa()">Remove CA's</button>
+  <button *ngIf="editExisting" class="btn btn-primary" type="button" (click)="showActiveConnections()">Show Active Connections</button>
+</mat-dialog-content> -->
+
+<mat-dialog-content class="mat-typography">
+  <button *ngIf="editExisting" class="btn btn-primary" type="button" (click)="showActiveConnections()">Show Active Connections</button>
+  <form (ngSubmit)="onSave(federation)" #userForm="ngForm">
+    <div class="form-group">
+      <label for="name">Federate Identity</label>
+      <input
+        type="text"
+        id="name"
+        class="form-control"
+        [(ngModel)]="federation.name"
+        name="name"
+        required
+        disabled="true"
+      />
+      <div *ngIf="existingCaNameIdentity()" class="text-danger">
+        This CA identity already exists on the graph!
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="id">Graph Name</label>
+      <input
+        type="text"
+        id="stringId"
+        class="form-control"
+        [(ngModel)]="federation.stringId"
+        name="stringId"
+        required
+      />
+      <div *ngIf="existingName()" class="text-danger">
+        This name already exists!
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="description">Description</label>
+      <input
+        type="text"
+        id="description"
+        class="form-control"
+        [(ngModel)]="federation.description"
+        name="description"
+        maxlength="75"
+      />
+      <small class="form-text text-muted">{{ federation.description ? (75 - federation.description.length) : 75 }} characters remaining</small>
+    </div>
+
+    <div class="form-group">
+      <label for="issuer">CA Group (issuer)</label>
+      <select class="form-control"[(ngModel)]="federation.name" name="issuer" required>
+        <option disabled selected value> -- select an identity -- </option>
+        <option *ngFor="let ca of knownCas" value="{{ca.uid}}">
+          {{ ca.issuer }}
+        </option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="subject">CA Group (subject)</label>
+      <select class="form-control" [(ngModel)]="federation.name" name="subject" required>
+        <option disabled selected value> -- select an identity -- </option>
+        <option *ngFor="let ca of knownCas" value="{{ca.uid}}">
+          {{ ca.subject }}
+        </option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Interconnected</label>
+      <div>
+        <input
+          type="checkbox"
+          name="interconnected"
+          [(ngModel)]="federation.interconnected"
+        />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Allow Token Auth</label>
+      <div>
+        <input
+          type="checkbox"
+          name="allowTokenAuth"
+          [(ngModel)]="federation.allowTokenAuth"
+        />
+      </div>
+    </div>
+    <div *ngIf="federation.allowTokenAuth" class="form-group">
+      <label for="tokenAuthDuration">Token Auth Duration</label>
+      <input
+        type="number"
+        min="-1"
+        id="tokenAuthDuration"
+        class="form-control"
+        [(ngModel)]="federation.tokenAuthDuration"
+        name="tokenAuthDuration"
+        required
+      />
+      <span>
+        <button (click)="federation.tokenAuthDuration = -1">No Exp</button>
+        <button (click)="federation.tokenAuthDuration = 3600000">1 Hour</button>
+        <button (click)="federation.tokenAuthDuration = 86400000">1 Day</button>
+        <button (click)="federation.tokenAuthDuration = 604800000">1 Week</button>
+        <button (click)="federation.tokenAuthDuration = 18144000000">1 Month</button>
+        <button (click)="federation.tokenAuthDuration = 31536000000">1 Year</button>
+    </span>
+    </div>
+    <!-- <button type="submit" class="btn btn-primary" [disabled]="userForm.invalid">Submit</button> -->
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button (click)="onCancel()" mat-button mat-dialog-close class="btn btn-just-outline border-radius margin-right">Cancel</button>
+  <button class="btn btn-primary" (click)="onSave(federation)" [disabled]="userForm.invalid || existingName() || existingCaNameIdentity()" [mat-dialog-close]="true">Save</button>
+</mat-dialog-actions>
+

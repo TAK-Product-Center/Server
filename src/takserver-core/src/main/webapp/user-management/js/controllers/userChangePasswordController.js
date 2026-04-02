@@ -1,5 +1,7 @@
 app.controller('userChangePasswordController', function($scope, $http) {
-
+    
+    $scope.reset_draggables()
+    
     $scope.reset_form = function(){
         // Reset the form model.
         $scope.user_to_change_password = {

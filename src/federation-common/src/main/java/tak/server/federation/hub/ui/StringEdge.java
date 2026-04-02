@@ -11,7 +11,6 @@ public class StringEdge {
 
     private String source;
     private String destination;
-    private String filterExpression;
     private Set<String> allowedGroups;
     private Set<String> disallowedGroups;
     private GroupFilterType groupsFilterType;
@@ -45,14 +44,6 @@ public class StringEdge {
 	public void setGroupsFilterType(GroupFilterType groupFilterType) {
 		this.groupsFilterType = groupFilterType;
 	}
-
-	public String getFilterExpression() {
-        return filterExpression;
-    }
-
-    public void setFilterExpression(String filterExpression) {
-        this.filterExpression = filterExpression;
-    }
 
     public String getSource() {
         return source;

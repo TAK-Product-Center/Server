@@ -261,6 +261,8 @@ public class MissionPackageCreatorServlet extends EnterpriseSyncServlet {
 			zipFileName = ensureEndsIn(zipFileName, ".zip");
 			toStore.set(Metadata.Field.Name, zipFileName);
 
+			toStore.set(Metadata.Field.MIMEType, "application/x-zip-compressed");
+
 			toStore.set(Metadata.Field.SubmissionUser, SecurityContextHolder.getContext().getAuthentication().getName());
 			// Insert into the data store
 			uploadedMetadata = enterpriseSyncService.insertResource(toStore, zippedBytes, groupVector);

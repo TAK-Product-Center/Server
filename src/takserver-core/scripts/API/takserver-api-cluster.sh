@@ -2,6 +2,4 @@
 
 . ./setenv.sh
 
-java -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=api,consolelog -jar takserver.war $@
-
-# To run with plugin support enable in CoreConfig and place plugin jars in /opt/tak/lib.
+exec java -server -XX:+AlwaysPreTouch -XX:+UseG1GC -XX:+ScavengeBeforeFullGC -XX:+DisableExplicitGC -XX:MaxRAMPercentage=${MAX_HEAP_PERCENT} -Dspring.profiles.active=api,consolelog -Dkeystore.pkcs12.legacy -jar takserver.war $@

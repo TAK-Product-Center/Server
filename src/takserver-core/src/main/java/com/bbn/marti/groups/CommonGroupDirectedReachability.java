@@ -122,7 +122,7 @@ public class CommonGroupDirectedReachability implements Reachability<User>, Seri
 			if (inGroup.getDirection().equals(Direction.IN)) {
 				// get the corresponding OUT group (expected average case O(1) lookup)
 				Group outGroup = groupManager.getGroup(inGroup.getName(), Direction.OUT);
-
+				
 				// If there is no corresponding OUT group registered, keep looking
 				if (outGroup == null) {
 					continue;

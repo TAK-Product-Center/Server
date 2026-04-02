@@ -1,0 +1,44 @@
+<div class="container mt-4">
+    <h4 class="text-center">Active Federation Hub Connections</h4>
+  
+    <!-- Filter Dropdown -->
+    <div class="d-flex justify-content-between my-3">
+      <select (change)="filterActiveConnections()" [(ngModel)]="selectedCa" class="form-select w-25">
+        <option value="All">All</option>
+        <option *ngFor="let ca of knownCas" value="{{ca.uid}}">{{ca.uid}}</option>
+      </select>
+      <button (click)="onClose()" class="btn btn-primary">Close</button>
+    </div>
+  
+    <!-- Table -->
+    <div class="table-wrapper">
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>Connection Id</th>
+              <th>Local Connection Type</th>
+              <th>Remote Connection Type</th>
+              <th>Remote Address</th>
+              <th>Federation Protocol Version</th>
+              <th>Group Identities</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let connection of filteredActiveConnections">
+              <td data-bs-toggle="tooltip" title="{{connection.connectionId}}">
+                <div>
+                  {{ connectionIdPreview(connection.connectionId) }}
+                </div>
+                <button type="button" (click)="disconnect(connection)" class="btn-danger btn">Disconnect</button>
+              </td>
+              <td>{{ connection.localConnectionType }}</td>
+              <td>{{ connection.remoteConnectionType }}</td>
+              <td>{{ connection.remoteAddress }}</td>
+              <td>{{ connection.federationProtocolVersion }}</td>
+              <td>{{ connection.groupIdentities }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>      
+  </div>
+  

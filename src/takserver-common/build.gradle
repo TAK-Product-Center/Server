@@ -28,13 +28,9 @@ dependencies {
        exclude group: 'xpp'
   }   */
 
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
-//  implementation group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
+
   api group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
+  api group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-aarch_64'
 
   implementation 'org.apache.commons:commons-lang3:' + commons_lang_version
   implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
@@ -134,3 +130,13 @@ task jaxb {
   }
 }
 compileJava.dependsOn jaxb
+
+task igniteExtensions(type: Jar) {
+    archiveBaseName.set('ignite-extensions')
+    destinationDirectory.set(layout.buildDirectory.dir('libs'))
+
+    // Include only the specific class file from the compiled classes
+    from(sourceSets.main.output) {
+        include 'tak/server/ignite/cache/IgniteCacheSqlHelperFunctions.class'
+    }
+}

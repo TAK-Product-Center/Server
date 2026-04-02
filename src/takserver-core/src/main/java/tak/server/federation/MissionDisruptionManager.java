@@ -1,12 +1,7 @@
 package tak.server.federation;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableSet;
-import java.util.Set;
+import java.time.Instant;
+import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
@@ -42,6 +37,7 @@ import mil.af.rl.rol.value.MissionMetadata;
 import tak.server.Constants;
 
 import com.bbn.marti.remote.config.CoreConfigFacade;
+import tak.server.cot.CotEventContainer;
 
 /*
  */
@@ -105,7 +101,7 @@ public class MissionDisruptionManager {
 				logger.info("first federate connection for " + federate.getName() + " - syncing all missions subject to recency configuration");
 				lastEventTime = new Date(0);
 			} else {
-				lastEventTime = (Date) lastEvent.get(0);
+				lastEventTime = Date.from((Instant) lastEvent.get(0));
 				lastEventType = (String) lastEvent.get(1);
 				
 				
@@ -254,7 +250,9 @@ public class MissionDisruptionManager {
 				long bestMissionRecencyMillis = lastEventTime.getTime() > maxMissionRecencyMillis ? lastEventTime.getTime() : maxMissionRecencyMillis;
 				
 				Date bestRecencyDate = new Date(bestMissionRecencyMillis);
-				
+
+				missionService.getMissionByNameCheckGroups(fedMission.getName(), groupVector);
+
 				Set<MissionChange> missionChanges = missionService.getMissionChanges(fedMission.getName(), groupVector, null, bestRecencyDate, now, true);
 
 				if (logger.isDebugEnabled()) {
@@ -296,7 +294,23 @@ public class MissionDisruptionManager {
 
 							try {
 
-								fedSubscription.submit(missionService.getLatestCotEventContainerForUid(change.getContentUid(), groupVector));
+								CotEventContainer cec = missionService.getLatestCotEventContainerForUid(change.getContentUid(), groupVector);
+
+								Collection<Group> allOutGroups = groupManager.getAllGroups();
+								Collection<Group> allInGroups = allOutGroups.stream()
+										.map(group -> groupManager.hydrateGroup(
+												new Group(group.getName(), Direction.IN)))
+										.collect(Collectors.toSet());
+
+								NavigableSet<Group> groups = new ConcurrentSkipListSet<>();
+								groups.addAll(RemoteUtil.getInstance().getGroupsForBitVectorString(
+										fedMission.getGroupVector(), allInGroups));
+
+								logger.debug("adding groups to cot event container context for mission add content: {}", groups);
+
+								cec.setContext(Constants.GROUPS_KEY, groups);
+
+								fedSubscription.submit(cec);
 
 							} catch (Exception e) {
 								if (logger.isDebugEnabled()) {
@@ -305,8 +319,7 @@ public class MissionDisruptionManager {
 							}
 						}
 
-
-						changeROL = malrc.addMissionContentToROL(mc, fedMission.getName(), change.getCreatorUid(), fedMission);
+						changeROL = malrc.addMissionContentToROL(mc, fedMission.getName(), change.getCreatorUid(), fedMission, change.getTimestamp(), change.getXmlContentForNotification());
 
 						break;
 					case DELETE_MISSION:
@@ -404,9 +417,7 @@ public class MissionDisruptionManager {
 
 
 		} catch (Exception e) {
-			if (logger.isDebugEnabled()) {
-				logger.debug("exception in federate connection event", e);
-			}
+			logger.error("exception in federate connection event", e);
 		}
 
 		return rols;

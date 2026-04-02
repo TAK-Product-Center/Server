@@ -3,12 +3,13 @@ package tak.server.messaging;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.rmi.RemoteException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import gov.tak.cop.proto.v1.Binarypayload;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
@@ -47,6 +48,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import atakmap.commoncommo.protobuf.v1.MessageOuterClass.Message;
 import atakmap.commoncommo.protobuf.v1.Missionannouncement.MissionAnnouncement;
 import atakmap.commoncommo.protobuf.v1.Takmessage.TakMessage;
+import gov.tak.cop.proto.v1.Binarypayload;
 import tak.server.Constants;
 import tak.server.cluster.ClusterManager.ClusterMissionAnnouncementDetail;
 import tak.server.cluster.ClusterMessageWrapper;
@@ -139,7 +141,7 @@ public class MessageConverter {
 		}
 
 		@SuppressWarnings("unchecked")
-		List<String> provenance = (List<String>)message.getContextValue(Constants.PLUGIN_PROVENANCE);
+		Set<String> provenance = (Set<String>)message.getContextValue(Constants.MESSAGE_PROVENANCE);
 		if (provenance != null) {
 		    mb.addAllProvenance(provenance);
 		}
@@ -246,7 +248,6 @@ public class MessageConverter {
 	
 	// Convert proto-encoded cluster message to CoT
 	public CotEventContainer dataMessageToCot(Message m, boolean setClusterKey) throws DocumentException, RemoteException {
-
 		if (cotParser.get() == null) {
 			cotParser.set(CotParserCreator.newInstance());
 		}
@@ -295,7 +296,7 @@ public class MessageConverter {
 
 		List<String> provenance = m.getProvenanceList();
 		if (provenance != null) {
-			cot.setContextValue(Constants.PLUGIN_PROVENANCE, provenance);
+			cot.setContextValue(Constants.MESSAGE_PROVENANCE, new HashSet<>(provenance));
 		}
 		
 		if (provenance != null && provenance.contains(Constants.PLUGIN_MANAGER_PROVENANCE)) {
@@ -311,7 +312,7 @@ public class MessageConverter {
 		if (destCallsigns != null && !destCallsigns.isEmpty()) {
 			cot.setContext(StreamingEndpointRewriteFilter.EXPLICIT_CALLSIGN_KEY, destCallsigns);
 		}
-
+		
 		if (logger.isTraceEnabled()) {
 			logger.trace("CoT from data message: " + cot.asXml());
 		}

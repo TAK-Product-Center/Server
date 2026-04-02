@@ -1,0 +1,67 @@
+<configuration xmlns="http://ch.qos.logback/xml/ns/logback">
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="STDOUT-INFO"  class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
+    </appender>
+
+    <appender name="TakclProfilingLogger" class="ch.qos.logback.core.FileAppender">
+        <file>takcl-profiling.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="TakclDebugLogger" class="ch.qos.logback.core.FileAppender">
+        <file>takcl-debug.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd-HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO, DEBUG, TRACE</level>
+        </filter>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+    <logger name="com.bbn" level="TRACE"/>
+    <logger name="javax.net" level="TRACE"/>
+    <logger name="javax.nio" level="TRACE"/>
+
+    <logger name="org.apache.ignite" level="INFO" additivity="false">
+        <appender-ref ref="TakclDebugLogger"/>
+    </logger>
+
+    <logger name="com.bbn.marti.test" level="DEBUG" additivity="false">
+        <appender-ref ref="TakclDebugLogger"/>
+        <appender-ref ref="STDOUT-INFO"/>
+    </logger>
+    <logger name="com.bbn.marti.tests" level="DEBUG" additivity="false">
+        <appender-ref ref="TakclDebugLogger"/>
+        <appender-ref ref="STDOUT-INFO"/>
+    </logger>
+    <logger name="com.bbn.marti.takcl" level="DEBUG" additivity="false">
+        <appender-ref ref="TakclDebugLogger"/>
+        <appender-ref ref="STDOUT-INFO"/>
+    </logger>
+
+
+    <logger name="com.bbn.marti.takcl.TAKCLProfilingLogging" additivity="false">
+        <appender-ref ref="TakclProfilingLogger"/>
+    </logger>
+
+</configuration>

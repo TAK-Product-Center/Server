@@ -31,10 +31,10 @@ import tak.server.federation.FederationPolicyGraph;
 public class FederationPolicyGraphImpl implements FederationPolicyGraph, Serializable {
 	private static final long serialVersionUID = -7327365173619071592L;
 	private String name;
+	private String version;
     private ConcurrentHashMap<FederateIdentity, FederationNode> nodeMap;
 //    private ConcurrentHashMap<FederateIdentity, FederateGroup> groupMap;
     private Set<FederateEdge> edgeSet;
-    private Set<String> filterObjectSet;
     private Map<String, Object> additionalData;
 
     private static final Logger logger = LoggerFactory.getLogger(FederationPolicyGraphImpl.class);
@@ -76,6 +76,11 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
     @Override
     public String getName() {
         return name;
+    }
+    
+    @Override
+    public String getVersion() {
+        return version;
     }
 
     @Override
@@ -120,18 +125,13 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
         }
         return allReceivableFederates(federationNode);
     }
-    
-    @Override
-    public List<FederationFilter> getFiltersAlongPath(String s, String s1) {
-        return null;
-    }
 
-    public FederationPolicyGraphImpl(String name, Set<String> filterObjectSet) {
+    public FederationPolicyGraphImpl(String name, String version) {
 
-        logger.trace("Creating federation graph object: " + name + " " + filterObjectSet);
+        logger.trace("Creating federation graph object: " + name);
 
         this.name = name;
-        this.filterObjectSet = filterObjectSet;
+        this.version = version;
 
         nodeMap = new ConcurrentHashMap<>();
         edgeSet = ConcurrentHashMap.newKeySet();
@@ -181,31 +181,39 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
     }
 
     @Override
-    public Federate getFederate(String s) {
-        FederationNode node = nodeMap.get(new FederateIdentity(s));
+    public Federate getFederate(String federate) {
+    	if (federate == null) return null;
+    	
+        FederationNode node = nodeMap.get(new FederateIdentity(federate));
         if (node instanceof Federate) {
             return (Federate) node;
         }
         return null;
     }
 
-    @Override
-    public Federate getFederate(FederateIdentity federateIdentity) {
-    	 FederationNode node = nodeMap.get(federateIdentity);
-        if (node instanceof Federate) {
-            return (Federate) node;
-        }
-        return null;
-    }
+	@Override
+	public Federate getFederate(FederateIdentity federateIdentity) {
+		if (federateIdentity == null) return null;
+		
+		FederationNode node = nodeMap.get(federateIdentity);
+		if (node instanceof Federate) {
+			return (Federate) node;
+		}
+		return null;
+	}
 
     @Override
     public FederationNode getNode(String key) {
+    	if (key == null) return null;
+    	
         return nodeMap.get(new FederateIdentity(key));
     }
 
     @Override
-    public FederateGroup getGroup(String s) {
-        FederationNode node = nodeMap.get(new FederateIdentity(s));
+    public FederateGroup getGroup(String group) {
+    	if (group == null) return null;
+    	
+        FederationNode node = nodeMap.get(new FederateIdentity(group));
         if (node instanceof FederateGroup) {
             return (FederateGroup) node;
         }
@@ -214,6 +222,8 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
 
     @Override
     public FederateGroup getGroup(FederateIdentity federateIdentity) {
+    	if (federateIdentity == null) return null;
+    	
         FederationNode node = nodeMap.get(federateIdentity);
         if (node instanceof FederateGroup) {
             return (FederateGroup) node;
@@ -251,8 +261,8 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
                         FederateGroup group = this.getGroup(groupIdentity);
                         if (group.isInterconnected()) {
                         	// interconnected connections will be forced to share all groups
-                            federateEdge = new FederateEdge(source.getFederateIdentity(), destination.getFederateIdentity(), group.getFilterExpression(), 
-                            		new HashSet<String>(), new HashSet<String>(), FederateEdge.GroupFilterType.ALL);
+                            federateEdge = new FederateEdge(source.getFederateIdentity(), destination.getFederateIdentity(), new HashSet<String>(), 
+                            		new HashSet<String>(), FederateEdge.GroupFilterType.ALL);
                             return federateEdge;
                         }
                     }
@@ -279,11 +289,6 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
         edgeSet.add(federateEdge);
         nodeMap.get(federateEdge.getSourceIdentity()).addOutgoingEdge(federateEdge);
         nodeMap.get(federateEdge.getDestinationIdentity()).addIncomingEdge(federateEdge);
-    }
-
-    @Override
-    public List<FederationFilter> getFiltersAlongPath(FederationNode federationNode, FederationNode federationNode1) {
-        return null;
     }
 
     @Override
@@ -438,11 +443,6 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
 
     public Set<FederateEdge> getEdgeSet() {
         return edgeSet;
-    }
-
-    @Override
-    public Set<String> getFilterObjectSet() {
-        return filterObjectSet;
     }
 
     @Override

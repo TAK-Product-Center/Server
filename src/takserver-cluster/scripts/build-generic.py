@@ -13,10 +13,9 @@ import sys
 import time
 import urllib.request
 import xml.etree.ElementTree as ET
+import yaml
 from enum import Enum
 from typing import Optional, Union, List, Dict
-
-import yaml
 
 # URLs to fetch deployment dependencies
 KUBCTL_URL = 'https://dl.k8s.io/release/{version}/bin/{os}/{arch}/kubectl'
@@ -248,6 +247,11 @@ class Configuration:
         self.minikube_memory = env_str_req('TAK_MINIKUBE_MEMORY')
         self.minikube_cpus = env_str_req('TAK_MINIKUBE_CPUS')
         self.minikube_delete_existing_instance = env_bool_req("TAK_MINIKUBE_DELETE_EXISTING_INSTANCE")
+        self.tooling_download_dir = env_str_opt('TAK_TOOLING_DOWNLOAD_DIR')
+        if self.tooling_download_dir is None:
+            self.tooling_download_dir = os.path.join(SCRIPT_DIR, 'setup-bins')
+        elif not os.path.abspath(self.tooling_download_dir):
+            print('The value for TAK_TOOLING_DOWNLOAD_DIR')
 
 
 # Kubectl Releases: https://kubernetes.io/docs/tasks/tools/
@@ -272,7 +276,6 @@ class SoftwareLoadout(Enum):
             self._arch = self._python_arch
         else:
             halt_on_failure(f'Deployment from {python_platform} - {python_arch} is currently not supported!')
-        self.bin_dir = os.path.join(SCRIPT_DIR, 'setup-bins')
         self._kubectl_path = None
         self._helm_path = None
         self._minikube_path = None
@@ -306,7 +309,7 @@ class SoftwareLoadout(Enum):
         err_msg = (f'Could not autodetect supported platform! Supported Platforms:{", ".join(loadout_identifiers)}')
         halt_on_failure(err_msg)
 
-    def _download_binary(self, name: str, version: str, fetch_url: str) -> str:
+    def _download_binary(self, name: str, version: str, fetch_url: str, target_dir: str) -> str:
         """
         Downloads a binary file
         :param name: The name of the binary
@@ -314,14 +317,15 @@ class SoftwareLoadout(Enum):
         :param fetch_url: The URL for the binary
         :return: The path to the downloaded binary
         """
-        target = os.path.join(self.bin_dir, f'{name}-{version}-{self._platform}-{self._arch}')
+        target = os.path.join(target_dir, f'{name}-{version}-{self._platform}-{self._arch}')
+        short_target = os.path.relpath(target, os.getcwd())
         fetch_url = fetch_url.format(version=version, os=self._platform, arch=self._arch)
         if not os.path.exists(target):
             print(f'Fetching {name} {version} from {fetch_url}...')
             urllib.request.urlretrieve(fetch_url, target)
             os.chmod(target, os.stat(target).st_mode | stat.S_IEXEC)
 
-        path = os.path.join(self.bin_dir, name)
+        path = os.path.join(target_dir, name)
         if os.path.exists(path):
             os.remove(path)
         os.symlink(target, path)
@@ -333,28 +337,33 @@ class SoftwareLoadout(Enum):
         :param config: The configuration to fetch necessary software for
         :return: This software loadout instance
         """
-        if not os.path.exists(self.bin_dir):
-            os.mkdir(self.bin_dir)
+        target_dir = config.tooling_download_dir
+        if not os.path.exists(target_dir):
+            os.mkdir(target_dir)
 
-        self._kubectl_path = self._download_binary('kubectl', config.kubernetes_version, KUBCTL_URL)
+        self._kubectl_path = self._download_binary('kubectl', config.kubernetes_version, KUBCTL_URL, target_dir)
 
         if config.deployment_target == DeploymentTarget.MINIKUBE:
-            self._minikube_path = self._download_binary('minikube', config.minikube_version, MINIKUBE_URL)
+            self._minikube_path = self._download_binary('minikube', config.minikube_version, MINIKUBE_URL, target_dir)
 
-        helm_target = os.path.join(self.bin_dir, f'helm-{config.helm_version}-{self._platform}-{self._arch}')
+        helm_target = os.path.join(target_dir, f'helm-{config.helm_version}-{self._platform}-{self._arch}')
+        helm_short_target = os.path.relpath(helm_target, os.getcwd())
+
         fetch_url = HELM_URL.format(version=config.helm_version, os=self._platform, arch=self._arch)
 
-        print(f'Fetching helm {config.helm_version} from {fetch_url}...')
-        if not os.path.exists(helm_target):
-            target_zip = os.path.join(self.bin_dir, f'helm-{config.helm_version}-{self._platform}-{self._arch}.tar.gz')
+        if os.path.exists(helm_target):
+            print(f'Using helm {config.helm_version} located at {helm_short_target}')
+        else:
+            print(f'Fetching Helm {config.helm_version} from {fetch_url}...')
+            target_zip = os.path.join(target_dir, f'helm-{config.helm_version}-{self._platform}-{self._arch}.tar.gz')
             urllib.request.urlretrieve(fetch_url, target_zip)
-            shutil.unpack_archive(target_zip, self.bin_dir)
-            shutil.move(os.path.join(self.bin_dir, f'{self._platform}-{self._arch}', 'helm'), helm_target)
+            shutil.unpack_archive(target_zip, target_dir)
+            shutil.move(os.path.join(target_dir, f'{self._platform}-{self._arch}', 'helm'), helm_target)
             os.chmod(helm_target, os.stat(helm_target).st_mode | stat.S_IEXEC)
             os.remove(target_zip)
-            shutil.rmtree(os.path.join(self.bin_dir, f'{self._platform}-{self._arch}'))
+            shutil.rmtree(os.path.join(target_dir, f'{self._platform}-{self._arch}'))
 
-        self._helm_path = os.path.join(self.bin_dir, 'helm')
+        self._helm_path = os.path.join(target_dir, 'helm')
 
         if os.path.exists(self._helm_path):
             os.remove(self._helm_path)
@@ -506,6 +515,7 @@ class DockerImages(Enum):
     DatabaseSetup = ('docker-files/Dockerfile.database-setup', 'takserver-database-setup')
     CaSetup = ('docker-files/Dockerfile.ca', 'takserver-ca-setup')
     Plugins = ('docker-files/Dockerfile.takserver-plugins', 'takserver-plugins')
+    Ignite = ('docker-files/Dockerfile.takserver-ignite', 'takserver-ignite')
 
     def __init__(self, dockerfile: str, base_image_name: str):
         """
@@ -586,22 +596,30 @@ class DeploymentContainers(Enum):
     """
     The deployed container types
     """
-    Config = ('config', DockerImages.Config, TAK_CONFIG_NODE_MULTIPLIER)
-    Messaging = ('messaging', DockerImages.Messaging, TAK_MESSAGING_NODE_MULTIPLIER)
-    Api = ('api', DockerImages.Api, TAK_API_NODE_MULTIPLIER)
-    Plugins = ('plugins', DockerImages.Plugins, TAK_PLUGIN_NODE_MULTIPLIER)
-    DatabaseSetup = ('takserverDatabaseSetup', DockerImages.DatabaseSetup, TAK_DATABASE_SETUP_MULTIPLIER)
+    Config = (['takserver', 'config'], DockerImages.Config, TAK_CONFIG_NODE_MULTIPLIER)
+    Messaging = (['takserver', 'messaging'], DockerImages.Messaging, TAK_MESSAGING_NODE_MULTIPLIER)
+    Api = (['takserver', 'api'], DockerImages.Api, TAK_API_NODE_MULTIPLIER)
+    Plugins = (['takserver', 'plugins'], DockerImages.Plugins, TAK_PLUGIN_NODE_MULTIPLIER)
+    DatabaseSetup = (['takserver', 'takserverDatabaseSetup'], DockerImages.DatabaseSetup, TAK_DATABASE_SETUP_MULTIPLIER)
+    Ignite = (['ignite'], DockerImages.Ignite, TAK_IGNITE_NODE_MULTIPLIER)
 
-    def __init__(self, config_name: str, docker_image: DockerImages, replica_multiplier: int):
+    def __init__(self, values_config_path: List[str], docker_image: DockerImages, replica_multiplier: int):
         """
-        :param config_name: The name of the configuration in the yaml files
+        :param : The name of the configuration in the yaml files
+        :param: values_config_path: The path in the production-values.yaml file to the service settings
         :param docker_image: The docker image object used by the container
         :param replica_multiplier: The multiplier for now many instances should be deployed based on the takserver node
                                    count. At least one will always be deployed.
         """
-        self._config_name = config_name
+        self._values_config_path = values_config_path
         self._docker_image = docker_image
         self._replica_multiplier = replica_multiplier
+        self._cpu_count_override = os.environ.get(f'TAK_{values_config_path[-1].upper()}_CPUS_OVERRIDE', None)
+        self._memory_gb_override = os.environ.get(f'TAK_{values_config_path[-1].upper()}_MEMORY_GB_OVERRIDE', None)
+        self._replicas_override = os.environ.get(f'TAK_{values_config_path[-1].upper()}_REPLICAS_OVERRIDE', None)
+        print(f'{values_config_path[-1].upper()} CPU OVERRIDE: {self._cpu_count_override}')
+        print(f'{values_config_path[-1].upper()} MEMORY OVERRIDE: {self._memory_gb_override}')
+        print(f'{values_config_path[-1].upper()} REPLICA OVERRIDE: {self._replicas_override}')
 
     def update_helm_config(self, deployment_values: Dict, tak_cluster_node_count: int):
         """
@@ -610,7 +628,11 @@ class DeploymentContainers(Enum):
         :param tak_cluster_node_count: The defined TAK cluster node count. Standard multipliers for each node type will
                                        be multiplied by this to get the desired replica count.
         """
-        container = deployment_values['takserver'][self._config_name]
+
+        container = deployment_values
+
+        for value in self._values_config_path:
+            container = container[value]
 
         if self._docker_image.enabled:
             container['enabled'] = True
@@ -618,25 +640,44 @@ class DeploymentContainers(Enum):
             container['image']['repository'] = self._docker_image.repository
             container['image']['tag'] = self._docker_image.tag
 
-            if tak_cluster_node_count == 0:
-                print(f'Setting {self.name} replicas to 1')
-                container['replicas'] = 1
-                if 'resources' not in container:
-                    container['resources'] = dict()
-                if 'requests' not in container['resources']:
-                    container['resources']['requests'] = dict()
-                if 'limits' not in container['resources']:
-                    container['resources']['limits'] = dict()
-                container['resources']['requests']['cpu'] = 2
-                container['resources']['limits']['cpu'] = 2
-                container['resources']['requests']['memory'] = '2Gi'
-                container['resources']['limits']['memory'] = '2Gi'
+            if 'resources' not in container:
+                container['resources'] = dict()
+            if 'requests' not in container['resources']:
+                container['resources']['requests'] = dict()
+            if 'limits' not in container['resources']:
+                container['resources']['limits'] = dict()
+
+            container_requests = container['resources']['requests']
+            container_limits = container['resources']['limits']
+
+            cpu_limit = self._cpu_count_override or (2 if tak_cluster_node_count == 0 else None)
+            memory_limit = self._memory_gb_override or (2 if tak_cluster_node_count == 0 else None)
+            memory_limit = f'{memory_limit}Gi' if memory_limit is not None else None
+
+            replicas = self._replicas_override or 1 if tak_cluster_node_count == 0 else \
+                max(1, int(round(tak_cluster_node_count * self._replica_multiplier)))
+
+            container['replicas'] = replicas
+
+            if cpu_limit is not None:
+                container_requests['cpu'] = cpu_limit
+                container_limits['cpu'] = cpu_limit
+                cpu_count = f'{cpu_limit} cpus'
             else:
-                replicas = max(1, int(round(tak_cluster_node_count * self._replica_multiplier)))
-                print(f'Setting {self.name} replicas to {replicas}')
-                container['replicas'] = replicas
+                cpu_count = f'{container_limits["cpu"]} cpus' if 'cpu' in container_limits else 'no cpu limits'
+
+            if memory_limit is not None:
+                container_requests['memory'] = memory_limit
+                container_limits['memory'] = memory_limit
+                memory_count = f'{memory_limit} GB of memory'
+            else:
+                memory_count = (f'{container_limits["memory"]} GB of memory' if 'memory' in container_limits else
+                                'no memory limits')
+
+            print(f'Starting {replicas} {self.name} instances with {cpu_count} and {memory_count} each')
 
         else:
+            print(f'Disabling {self.name}')
             container['enabled'] = False
 
 
@@ -751,6 +792,8 @@ class ClusterDeployer:
         tic_tree.getroot().attrib['igniteClusterNamespace'] = namespace
         tic_tree.write('TAKIgniteConfig.xml')
 
+        print('Loading Ignite Extensions into the cluster ConfigMap.')
+
     def deploy(self):
         """
         Deploys the configuration to the k8s cluster
@@ -788,6 +831,11 @@ class ClusterDeployer:
                  f'--from-file={os.path.join(CLUSTER_ROOT, "CoreConfig.xml")}',
                  '--dry-run=client', '--output=yaml'],
                 stdout_filepath=os.path.join(CLUSTER_ROOT, 'deployments/helm/templates/core-config.yaml'))
+
+        kubectl(['create', 'configmap', 'ignite-extensions',
+                 f'--from-file={os.path.join(CLUSTER_ROOT, "takserver-core/ignite-extensions.jar")}',
+                 '--dry-run=client', '--output=yaml'],
+                stdout_filepath=os.path.join(CLUSTER_ROOT, 'deployments/helm/templates/ignite-extensions.yaml'))
 
         # DO NOT run helm commands within the deployments/helm directory as it may result in additional files being
         # placed in there and deployment failures!
@@ -938,8 +986,8 @@ class ClusterDeployer:
 
         for service in service_list:
             if ('status' in service and 'loadBalancer' in service['status'] and
-                    'ingress' in service['status']['loadBalancer'] and
-                    len(service['status']['loadBalancer']['ingress']) > 0):
+                'ingress' in service['status']['loadBalancer'] and
+                len(service['status']['loadBalancer']['ingress']) > 0):
                 ip = service['status']['loadBalancer']['ingress'][0]['ip']
             else:
                 try:
@@ -1016,7 +1064,7 @@ class ClusterDeployer:
 
         if self._configuration.deployment_target == DeploymentTarget.MINIKUBE:
             print('Run "scripts/setup-bins/minikube delete" if you would like to delete the host minikube instance ' +
-                  ' including the database.')
+                  'including the database.')
 
         result = None
         while result != '':

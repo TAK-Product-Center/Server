@@ -2,49 +2,68 @@
 
 package com.bbn.marti.sync;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+import java.util.zip.GZIPOutputStream;
 
 import javax.naming.NamingException;
 
+import org.apache.catalina.util.URLEncoder;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
+import com.bbn.marti.sync.service.MissionService;
+import com.bbn.marti.util.CommonUtil;
 import com.bbn.security.web.SecurityUtils;
 import com.google.common.base.Strings;
 import com.google.common.io.ByteStreams;
 
 import io.micrometer.core.instrument.Metrics;
 import jakarta.servlet.AsyncContext;
+import jakarta.servlet.AsyncEvent;
+import jakarta.servlet.AsyncListener;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import tak.server.Constants;
+
+
 /**
  * Servlet for retrieving the content
  */
 @WebServlet("/sync/content")
-public class ContentServlet extends EnterpriseSyncServlet {
+public class ContentServlet extends EnterpriseSyncServlet implements AsyncListener {
     
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(ContentServlet.class);
 
 	private static final long serialVersionUID = -4951951000582076313L;
 	public static final String DEFAULT_FILENAME="EnterpriseSync.dat";
-	
+
+	@Autowired
+	private MissionService missionService;
+
+	@Autowired
+	private CommonUtil martiUtil;
+
 	/**
 	 * Enum of the HTTP request parameters supported by this servlet. 
 	 *
@@ -52,21 +71,21 @@ public class ContentServlet extends EnterpriseSyncServlet {
 	public enum RequestParameters {
 		UID,
 		Hash,
-		offset
+		offset,
+		length
 	}
 
 	private static final int DEFAULT_PARAMETER_LENGTH = 1024;
 
-	private void getResource(AsyncContext async, HttpMethod method) throws ServletException, IOException {
+	private void getResource(AsyncContext async, HttpMethod method, boolean isAdmin, String groupVector) throws ServletException, IOException {
 		
-		HttpServletRequest request = (HttpServletRequest) async.getRequest();
+		logger.debug("is admin: {}", isAdmin);
+		
 		HttpServletResponse response = (HttpServletResponse) async.getResponse();
 		
 		Metrics.counter("DownloadMissionContent", "missions", "content").increment();
 
-		initAuditLog(request);
-		// Get group vector for the user associated with this session
-		String groupVector = commonUtil.getGroupBitVector(request);
+		initAuditLog((HttpServletRequest) async.getRequest());
 
 		if (Strings.isNullOrEmpty(groupVector)) {
 			throw new IllegalStateException("empty group vector");
@@ -80,22 +99,23 @@ public class ContentServlet extends EnterpriseSyncServlet {
 		Metadata match = null;
 		List<Metadata> matches = null;
 		try {
-			String requestHost = request.getRemoteHost();
+			String requestHost = ((HttpServletRequest) async.getRequest()).getRemoteHost();
 			if (requestHost != null && validator != null) {
 				remoteHost = validator.getValidInput(context, requestHost, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
 			}
 			// Parse & validate the request parameters
-			String uid = getUid(request.getParameterMap());
-			String hash = getHash(request.getParameterMap());
-			Integer offset = getOffset(request.getParameterMap());
+			String uid = getParameter(((HttpServletRequest) async.getRequest()).getParameterMap(), RequestParameters.UID);
+			String hash = getParameter(((HttpServletRequest) async.getRequest()).getParameterMap(), RequestParameters.Hash);
+			Integer offset = getIntegerParameter(((HttpServletRequest) async.getRequest()).getParameterMap(), RequestParameters.offset);
+			Integer length = getIntegerParameter(((HttpServletRequest) async.getRequest()).getParameterMap(), RequestParameters.length);
 
-			String query = "uid: " + uid + "; hash: " + hash + "; offset " + offset;
+			String query = "uid: " + uid + "; hash: " + hash + "; offset " + offset + "; length " + length;
 			if (logger.isDebugEnabled()) {
 				logger.debug(query);
 			}
 
 			if (hash != null) {
-				contentStream = enterpriseSyncService.getContentStreamByHash(hash, groupVector);
+				contentStream = enterpriseSyncService.getContentStreamByHash(hash, groupVector, isAdmin);
 				
 				try {
 					matches = enterpriseSyncService.getMetadataByHash(hash, groupVector);
@@ -105,9 +125,11 @@ public class ContentServlet extends EnterpriseSyncServlet {
 					}
 				}
 			} else if (uid != null){
-				contentStream = enterpriseSyncService.getContentStreamByUid(uid, groupVector);
+				contentStream = enterpriseSyncService.getContentStreamByUid(uid, groupVector, isAdmin);
 				matches = enterpriseSyncService.getMetadataByUid(uid, groupVector);
 			}
+
+			response.addHeader("api-version", Constants.API_VERSION);
 
 			if (matches == null || matches.isEmpty()) {
 				throw new NotFoundException("no metadata results for " + query);
@@ -120,13 +142,13 @@ public class ContentServlet extends EnterpriseSyncServlet {
 				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 				return;
 			}
+			
+			logger.debug("non-null content stream {} for hash {}", contentStream, hash);
 
 			// Just take the first one on the list, which is the most recent
 			match = matches.get(0);
 
-			if (logger.isDebugEnabled()) {
-				logger.debug("Metadata is: " + match.toJSONObject().toString());
-			}
+			logger.debug("first found file metadata {}", match.toJSONObject());
 
 			String mimeType = match.getFirst(Metadata.Field.MIMEType);
 			if (validator != null && validator.isValidInput("MIME Type", mimeType, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false)) {
@@ -153,7 +175,7 @@ public class ContentServlet extends EnterpriseSyncServlet {
 				logger.debug("enterprise sync filename: " + filename);
 			}
 
-			String contentDisposition = "inline; filename=" + filename;
+			String contentDisposition = "inline; filename=\"" + URLEncoder.DEFAULT.encode(filename, StandardCharsets.UTF_8) + "\"";
 			if (validator != null && validator.isValidInput("Content Disposition", contentDisposition, "Filename", DEFAULT_PARAMETER_LENGTH, false)) {
 				if (response.containsHeader("Content-Disposition")) {
 					response.setHeader("Content-Disposition", contentDisposition);
@@ -161,6 +183,24 @@ public class ContentServlet extends EnterpriseSyncServlet {
 					response.addHeader("Content-Disposition", contentDisposition);
 				}
 			}
+
+			String accept = ((HttpServletRequest) async.getRequest()).getHeader("Accept-Encoding");
+			if (accept != null && accept.toLowerCase().contains("gzip")) {
+
+				// gzip the content stream
+				ByteArrayOutputStream gzipStream = new ByteArrayOutputStream();
+				gzip(contentStream, gzipStream);
+				contentStream = new ByteArrayInputStream(gzipStream.toByteArray());
+
+				// Set encoding type of HTTP response
+				if (response.containsHeader("Content-Encoding")) {
+					response.setHeader("Content-Encoding", "gzip");
+				} else {
+					response.addHeader("Content-Encoding", "gzip");
+				}
+			}
+
+			int totalSize = contentStream.available();
 
 			response.setStatus(HttpServletResponse.SC_OK);
 
@@ -175,9 +215,16 @@ public class ContentServlet extends EnterpriseSyncServlet {
 						throw new TakException("error applying offset parameter in request " + offset, e);
 					}
 
-					if (logger.isInfoEnabled()) {
-						logger.info("applying offset " + offset);
+					if (logger.isDebugEnabled()) {
+						logger.debug("applying offset " + offset);
 					}
+				} else {
+					offset = 0;
+				}
+
+				if (length != null && length > 0
+						&& offset + length < totalSize) {
+					response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
 				}
 
 				try (OutputStream outStream = response.getOutputStream()) {
@@ -188,10 +235,14 @@ public class ContentServlet extends EnterpriseSyncServlet {
 						return;
 					}
 
-					// use guava buffered stream conversion to copy data stream from database to servlet request OutputStream
-					ByteStreams.copy(contentStream, outStream);
+					if (length != null && length > 0) {
+						IOUtils.copyLarge(contentStream, outStream, 0, length);
+					} else {
+						// use guava buffered stream conversion to copy data stream from database to servlet request OutputStream
+						ByteStreams.copy(contentStream, outStream);
+					}
 				}
-			}		
+			}
 
 		} catch (NamingException | SQLException ex) {
 			logger.error("error fetching file " + ex.getMessage(), ex);
@@ -223,6 +274,18 @@ public class ContentServlet extends EnterpriseSyncServlet {
 		}
 	}
 
+	public static void gzip(InputStream is, OutputStream os) throws IOException {
+		GZIPOutputStream gzipOs = new GZIPOutputStream(os);
+		byte[] buffer = new byte[1024];
+		int bytesRead = 0;
+		while ((bytesRead = is.read(buffer)) > -1) {
+			gzipOs.write(buffer, 0, bytesRead);
+		}
+		is.close();
+		os.close();
+		gzipOs.close();
+	}
+
 	/**
 	 * Get the content for the resource identified by UID or primary key.
 	 * Request parameters must include exactly one of: <code>Metadata.Field.UID</code>
@@ -241,8 +304,17 @@ public class ContentServlet extends EnterpriseSyncServlet {
 	@Override
 	protected void doGet(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
+		
+		final boolean isAdmin = commonUtil.isAdmin((HttpServletRequest) request);
+		final String groupVector = commonUtil.getGroupBitVector((HttpServletRequest) request);
+		
+		logger.debug("is admin: {}", isAdmin);
+		
+		Metrics.counter("DownloadMissionContent", "missions", "content").increment();
 
 		AsyncContext async = request.startAsync();
+
+		async.addListener(this);
 
 		if (logger.isDebugEnabled()) {
 			logger.debug("GET resource");
@@ -253,7 +325,7 @@ public class ContentServlet extends EnterpriseSyncServlet {
 
 		async.start(() -> {
 			try {
-				getResource(async, HttpMethod.GET);
+				getResource(async, HttpMethod.GET, isAdmin, groupVector);
 			} catch (Exception e) {
 				logger.error("error processing getResource", e);
 			} 
@@ -262,6 +334,11 @@ public class ContentServlet extends EnterpriseSyncServlet {
 
 	@Override
 	protected void doHead(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		
+		final boolean isAdmin = commonUtil.isAdmin((HttpServletRequest) request);
+		final String groupVector = commonUtil.getGroupBitVector((HttpServletRequest) request);
+		
+		logger.debug("is admin: {}", isAdmin);
 		
 		AsyncContext async = request.startAsync();
 
@@ -274,7 +351,7 @@ public class ContentServlet extends EnterpriseSyncServlet {
 		
 		async.start(() -> {
 			try {
-				getResource(async, HttpMethod.HEAD);
+				getResource(async, HttpMethod.HEAD, isAdmin, groupVector);
 			} catch (Exception e) {
 				logger.error("error processing HEAD getResource", e);
 			} 
@@ -293,69 +370,70 @@ public class ContentServlet extends EnterpriseSyncServlet {
 		response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
 	}
 
-	/**
-	 * Finds the value of RequestParameter.UID using case-insensitve match and performs input validation
-	 * @param parameters parameter map of the HTTP request
-	 * @return the value of the parameter named, approximately, "UID;" or null if no match found
-	 * @throws IntrusionException 
-	 * @throws ValidationException 
-	 */
-	private String getUid(Map<String, String[]> parameters) throws ValidationException, IntrusionException {
-		String uid = null;
-		String[] values = SecurityUtils.getCaseInsensitiveParameter(parameters, RequestParameters.UID.toString());
+	private String getParameter(Map<String, String[]> parameters, RequestParameters parameter) throws ValidationException, IntrusionException {
+		String result = null;
+		String[] values = SecurityUtils.getCaseInsensitiveParameter(parameters, parameter.toString());
 		if (values != null && values.length > 0) {
-			uid = values[0];
+			result = values[0];
 			if (validator != null) {
-				uid = validator.getValidInput("Parsing UID", uid, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
+				result = validator.getValidInput("Parsing " + parameter.name(), result, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
 			}
 		}
-		return uid;
+		return result;
 	}
 
-	/**
-	 * Finds the value of RequestParameter.Hash using case-insensitve match and performs input validation
-	 * @param parameters parameter map of the HTTP request
-	 * @return the value of the parameter named, approximately, "Hash;" or null if no match found
-	 * @throws IntrusionException
-	 * @throws ValidationException
-	 */
-	private String getHash(Map<String, String[]> parameters) throws ValidationException, IntrusionException {
-		String hash = null;
-		String[] values = SecurityUtils.getCaseInsensitiveParameter(parameters, RequestParameters.Hash.toString());
-		if (values != null && values.length > 0) {
-			hash = values[0];
-			if (validator != null) {
-				hash = validator.getValidInput("Parsing Hash", hash, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
+	private Integer getIntegerParameter(Map<String, String[]> parameters, RequestParameters parameter) throws ValidationException, IntrusionException {
+		try {
+			String result = getParameter(parameters, parameter);
+			if (result != null) {
+				return Integer.parseInt(result);
+			} else {
+				return null;
 			}
+		} catch (Exception e) {
+			logger.error("exception in getIntegerParameter", e);
+			return null;
 		}
-		return hash;
 	}
-	
-	private Integer getOffset(Map<String, String[]> parameters) throws ValidationException, IntrusionException {
-        String offset = null;
-        String[] values = SecurityUtils.getCaseInsensitiveParameter(parameters, RequestParameters.offset.toString());
-        if (values != null && values.length > 0) {
-            offset = values[0];
-            if (validator != null) {
-                offset = validator.getValidInput("Parsing offset", offset, "MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
-            }
-            
-            Integer result = Integer.parseInt(offset);
-            
-            if (result < 0) {
-                throw new IllegalArgumentException("invalid offset: " + result);
-            }
-            
-            return result;
-        }
-        
-        return null;      
-    }
-	
+
 	@Override
 	protected void initalizeEsapiServlet() {
 		 this.log = Logger.getLogger(ContentServlet.class.getCanonicalName());	
 	}
-	
-	
+
+	@Override
+	public void onComplete(AsyncEvent event) {
+		try {
+			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue()
+					.getMissionConcurrentDownloadLimit() == null) {
+				return;
+			}
+
+			int status = ((HttpServletResponse)event.getSuppliedResponse()).getStatus();
+			String feedName = event.getSuppliedRequest().getParameter("feedName");
+
+			if (status == HttpServletResponse.SC_OK && !Strings.isNullOrEmpty(feedName)) {
+				String hash = event.getSuppliedRequest().getParameter("hash");
+				missionService.checkAndSendPendingNotifications(feedName, hash, 1,
+						martiUtil.getGroupVectorBitString(((HttpServletRequest)event.getSuppliedRequest())));
+			}
+		} catch (Exception e) {
+			logger.error("exception in AsyncListener.onComplete", e);
+		}
+	}
+
+	@Override
+	public void onTimeout(AsyncEvent event) {
+		logger.error("async timeout occurred");
+	}
+
+	@Override
+	public void onError(AsyncEvent event) {
+		logger.error("async error occurred");
+	}
+
+	@Override
+	public void onStartAsync(AsyncEvent event) {
+		logger.error("onStartAsync should not be called");
+	}
 }

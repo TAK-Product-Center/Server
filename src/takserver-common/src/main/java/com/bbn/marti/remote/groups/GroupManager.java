@@ -160,9 +160,14 @@ public interface GroupManager {
     AuthResult authenticate(String type, User user);
 
     /*
+     * Sychronously authenticate, choose the authenticator type based on attributes of the user
+     */
+    AuthResult authenticate(User user);
+
+    /*
      * Finds all active Core users for the current username and reauthenticates them
      */
-    void authenticateCoreUsers(String username);
+    boolean authenticateCoreUsers(String username);
 
     /**
      * Searches ldap groups (e.g., to help user configure items that require a group distinguished name reference)
@@ -222,4 +227,6 @@ public interface GroupManager {
     NavigableSet<Group> groupVectorToGroupSet(String groupVector, int direction);
 
     public List<User> getConnectedUsersById(String id);
+
+    String validateAccess(String[] requestedGroupNames, String userGroupVector);
 }

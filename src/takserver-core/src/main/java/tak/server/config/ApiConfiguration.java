@@ -131,11 +131,14 @@ import com.bbn.marti.xmpp.XmppAPI;
 import com.bbn.metrics.MetricsCollector;
 import com.bbn.metrics.endpoint.ClusterMetricsEndpoint;
 import com.bbn.metrics.endpoint.CpuMetricsEndpoint;
+import com.bbn.metrics.endpoint.DiskMetricsEndpoint;
 import com.bbn.metrics.endpoint.DatabaseMetricsEndpoint;
 import com.bbn.metrics.endpoint.MemoryMetricsEndpoint;
 import com.bbn.metrics.endpoint.QueueMetricsEndpoint;
 import com.bbn.metrics.service.ActuatorMetricsService;
 import com.bbn.metrics.service.DatabaseMetricsService;
+import com.bbn.metrics.messaging.MessagingMetricsService;
+import com.bbn.metrics.messaging.MessagingMetricsDependencyInjectionProxy;
 import com.bbn.tak.tls.CertManager;
 import com.bbn.tak.tls.CertManagerAdminApi;
 import com.bbn.tak.tls.CertManagerApi;
@@ -583,6 +586,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	}
 
 	@Bean
+	public DiskMetricsEndpoint diskMetricsEndpoint() {
+		return new DiskMetricsEndpoint();
+	}
+
+	@Bean
 	public QueueMetricsEndpoint queueMetricsEndpoint(@Lazy MetricsCollector metricsCollector) {
 		return new QueueMetricsEndpoint(metricsCollector);
 	}
@@ -975,4 +983,12 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	public void configurePathMatch(PathMatchConfigurer configurer) {
 		configurer.setUseTrailingSlashMatch(true);
 	}
+
+	@Bean
+	@Profile(Constants.API_PROFILE_NAME)
+	public MessagingMetricsService messagingMetricsService(Ignite ignite) {
+		return ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite))
+				.serviceProxy(Constants.MESSAGING_METRICS_SERVICE_NAME, MessagingMetricsService.class, false);
+	}
+
 }

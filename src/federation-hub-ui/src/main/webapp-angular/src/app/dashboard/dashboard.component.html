@@ -1,0 +1,145 @@
+<h1>Federation Hub Metrics</h1>
+
+<div class="dashboard-container">
+  <div class="chart-card">
+    <h3>Heap Memory Usage</h3>
+    <div class="chart-with-legend">
+      <div class="chart-container">
+        <ngx-charts-area-chart
+          [results]="heapMemoryData"
+          [xAxis]="xAxis"
+          [yAxis]="yAxis"
+          [legend]="legend"
+          [legendPosition]="legendPosition"
+          [showXAxisLabel]="true"
+          [showYAxisLabel]="true"
+          [xAxisLabel]="xAxisLabel"
+          [yAxisLabel]="heapChartYAxisLabelHeap"
+          [scheme]="colorScheme"
+          [yScaleMax]="heapChartYScaleMax"
+          [animations]="false"
+          [autoScale]="true">
+        </ngx-charts-area-chart>
+      </div>
+    </div>
+    <div class="custom-legend">
+      <div class="legend-item">
+        <span class="legend-color" style="background-color: #ff7300;"></span>
+        Heap Allocated
+      </div>
+      <div class="legend-item">
+        <span class="legend-color" style="background-color: #007bff;"></span>
+        Heap Utilized
+      </div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <h3><strong>CPU Usage</strong></h3>
+    <p><strong>Cores:</strong> {{ totalCores }} | <strong>Usage:</strong> {{ (cpuUtilized * totalCores).toFixed(2) }}/{{ totalCores * 100 }}</p>
+    <div class="gauge-wrapper">
+      <ngx-charts-gauge
+        [view]="gaugeView"
+        [results]="cpuUsageData"
+        [min]="0"
+        [max]="100"
+        [angleSpan]="240"
+        [startAngle]="-120"
+        [scheme]="colorScheme"
+        [units]="'%'">
+      </ngx-charts-gauge>
+    </div>
+  </div>
+
+  <div class="metric-card full-width">
+    <h3>Total Connections</h3>
+    <p>{{ totalConnections }}</p>
+  </div>
+
+  <div class="metric-card">
+    <h3>Total Writes</h3>
+    <p>{{ totalWrites }}</p>
+  </div>
+
+  <div class="metric-card">
+    <h3>Total Reads</h3>
+    <p>{{ totalReads }}</p>
+  </div>
+
+  <div class="chart-card">
+    <h3>Writes Per Second</h3>
+    <div class="chart-container">
+      <ngx-charts-line-chart
+        [results]="writesPerSecondData"
+        [xAxis]="xAxis"
+        [yAxis]="yAxis"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="xAxisLabel"
+        [yAxisLabel]="writesChartYAxisLabelHeap"
+        [scheme]="colorScheme2"
+        [yScaleMax]="writesYScaleMax"
+        [animations]="false"
+        [autoScale]="true">
+      </ngx-charts-line-chart>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h3>Reads Per Second</h3>
+    <div class="chart-container">
+      <ngx-charts-line-chart
+        [results]="readsPerSecondData"
+        [xAxis]="xAxis"
+        [yAxis]="yAxis"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="xAxisLabel"
+        [yAxisLabel]="readsChartYAxisLabelHeap"
+        [scheme]="colorScheme2"
+        [yScaleMax]="readsYScaleMax"
+        [animations]="false"
+        [autoScale]="true">
+      </ngx-charts-line-chart>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h3>Bytes Written Per Second</h3>
+    <div class="chart-container">
+      <ngx-charts-line-chart
+        [results]="bytesWrittenPerSecondData"
+        [xAxis]="xAxis"
+        [yAxis]="yAxis"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="xAxisLabel"
+        [yAxisLabel]="bytesWrittenChartYAxisLabelHeap"
+        [scheme]="colorScheme3"
+        [yScaleMax]="bytesWrittenYScaleMax"
+        [animations]="false"
+        [autoScale]="true">
+      </ngx-charts-line-chart>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h3>Bytes Read Per Second</h3>
+    <div class="chart-container">
+      <ngx-charts-line-chart
+        [results]="bytesReadPerSecondData"
+        [xAxis]="xAxis"
+        [yAxis]="yAxis"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="xAxisLabel"
+        [yAxisLabel]="bytesReadChartYAxisLabelHeap"
+        [scheme]="colorScheme3"
+        [yScaleMax]="bytesReadYScaleMax"
+        [animations]="false"
+        [autoScale]="true">
+      </ngx-charts-line-chart>
+    </div>
+  </div>
+
+</div>

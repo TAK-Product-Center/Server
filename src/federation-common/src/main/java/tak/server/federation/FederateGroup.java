@@ -1,6 +1,7 @@
 package tak.server.federation;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /*
@@ -13,14 +14,14 @@ import java.util.Set;
  */
 public class FederateGroup extends FederationNode {
     private boolean interconnected;
-    private String filterExpression;
+    private boolean allowTokenAuth;
+    private long tokenAuthDuration;
     private final Set<Federate> federatesInGroup;
 
     public FederateGroup(FederateIdentity federateIdentity) {
         super(federateIdentity);
         this.interconnected = true;
         this.federatesInGroup = new HashSet<>();
-        this.filterExpression = "";
     }
 
 
@@ -32,14 +33,6 @@ public class FederateGroup extends FederationNode {
         this.interconnected = interconnected;
     }
 
-    public String getFilterExpression() {
-        return filterExpression;
-    }
-
-    public void setFilterExpression(String filterExpression) {
-        this.filterExpression = filterExpression;
-    }
-
     public Set<Federate> getFederatesInGroup() {
         return federatesInGroup;
     }
@@ -48,39 +41,46 @@ public class FederateGroup extends FederationNode {
         federatesInGroup.add(federate);
     }
 
+    public boolean isAllowTokenAuth() {
+		return allowTokenAuth;
+	}
+
+
+	public void setAllowTokenAuth(boolean allowTokenAuth) {
+		this.allowTokenAuth = allowTokenAuth;
+	}
+
+
+	public long getTokenAuthDuration() {
+		return tokenAuthDuration;
+	}
+
+
+	public void setTokenAuthDuration(long tokenAuthDuration) {
+		this.tokenAuthDuration = tokenAuthDuration;
+	}
+
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		FederateGroup other = (FederateGroup) obj;
+		return allowTokenAuth == other.allowTokenAuth && Objects.equals(federatesInGroup, other.federatesInGroup)
+				&& interconnected == other.interconnected && tokenAuthDuration == other.tokenAuthDuration;
+	}
+
     @Override
-    public boolean equals(Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (other == null || getClass() != other.getClass()) {
-            return false;
-        }
-        if (!super.equals(other)) {
-            return false;
-        }
-
-        FederateGroup that = (FederateGroup) other;
-
-        if (interconnected != that.interconnected) {
-            return false;
-        }
-        if (filterExpression != null
-                ? !filterExpression.equals(that.filterExpression)
-                : that.filterExpression != null) {
-            return false;
-        }
-        return federatesInGroup.equals(that.federatesInGroup);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = super.hashCode();
-        result = 31 * result + (interconnected ? 1 : 0);
-        result = 31 * result + (filterExpression != null ? filterExpression.hashCode() : 0);
-        result = 31 * result + federatesInGroup.hashCode();
-        return result;
-    }
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + Objects.hash(allowTokenAuth, federatesInGroup, interconnected, tokenAuthDuration);
+		return result;
+	}
 
     @Override
     public String toString() {

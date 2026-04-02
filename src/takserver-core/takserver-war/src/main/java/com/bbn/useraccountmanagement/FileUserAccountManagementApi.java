@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bbn.marti.groups.value.FileAuthenticatorControl;
+import com.bbn.marti.remote.groups.Direction;
+import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.FileUserManagementInterface;
 import com.bbn.marti.remote.groups.SimpleGroupWithUsersModel;
 import com.bbn.marti.xml.bindings.UserAuthenticationFile;
@@ -30,6 +32,7 @@ import com.bbn.useraccountmanagement.model.UserGenerationInBulkModel;
 import com.bbn.useraccountmanagement.model.UserPasswordModel;
 import com.bbn.useraccountmanagement.model.UsernameModel;
 
+import tak.server.CommonConstants;
 import tak.server.util.PasswordUtils;
 import tak.server.util.UsernameUtils;
 
@@ -43,7 +46,11 @@ public class FileUserAccountManagementApi implements FileUserAccountManagementAp
     @Autowired
     @Qualifier("myFileUserManagementInterface")
     FileUserManagementInterface myFileUserManagementInterface;
-  
+
+	@Autowired
+	@Qualifier(CommonConstants.MESSENGER_GROUPMANAGER_NAME)
+	private GroupManager groupManager;
+
 /*
 i.	Entering user name
 ii.	Entering password (and confirming compliance of password complexity)
@@ -195,8 +202,8 @@ iii.	System produces output file with user/pass combos as a one-time accessible 
 		} 
     }
     
-//  d. Ability to add groups 
-//  e. Ability to remove groups
+//  d. i. Ability to add groups 
+//  e. i. Ability to remove groups
     @Override
     @RequestMapping(value = "/update-groups", method = RequestMethod.PUT)
     public void updateGroupsForUser(@RequestBody SimpleUserGroupModel simpleUserModel) {
@@ -218,7 +225,10 @@ iii.	System produces output file with user/pass combos as a one-time accessible 
 			newUser.setRole(userPre.getRole());
 			newUser.setFingerprint(userPre.getFingerprint());
 			
-			myFileUserManagementInterface.addOrUpdateUser(newUser, true, userPre); 
+			myFileUserManagementInterface.addOrUpdateUser(newUser, true, userPre);
+
+			// reauthenticate currently connected streaming clients for this username
+			groupManager.authenticateCoreUsers(simpleUserModel.getUsername());
 			
 	    	logger.info("Updated groups for user {}", simpleUserModel.getUsername());
 	    	
@@ -227,11 +237,96 @@ iii.	System produces output file with user/pass combos as a one-time accessible 
 			throw new RuntimeException(e);
 		} 
     }
-    
+	
+	private enum GroupListType {
+		IN_GROUP, 	// Direction.IN
+		OUT_GROUP, 	// Direction.OUT
+		BOTH_GROUP
+	}
+	
+	private void updateUsersForGroupHelper(String username, GroupListType groupListType, String groupName) {
+		UserAuthenticationFile.User userPre = myFileUserManagementInterface.getFirstUser(username);
+
+		if (userPre == null) {
+			throw new InvalidParameterException("User not found!");
+		}
+
+		try {
+			// add group name to respective group list
+			switch (groupListType) {
+				case IN_GROUP:
+					userPre.getGroupListIN().add(groupName);
+					// remove from OUT or BOTH directions, if present
+					if (!userPre.getGroupListOUT().remove(groupName)) userPre.getGroupList().remove(groupName);
+					break;
+				case OUT_GROUP:
+					userPre.getGroupListOUT().add(groupName);
+					// remove from IN or BOTH directions, if present
+					if (!userPre.getGroupListIN().remove(groupName)) userPre.getGroupList().remove(groupName);
+					break;
+				case BOTH_GROUP:
+					userPre.getGroupList().add(groupName);
+					// remove from IN or OUT directions, if present
+					if (!userPre.getGroupListIN().remove(groupName)) userPre.getGroupListOUT().remove(groupName);
+					break;
+			}
+
+			// create updated user included updated group list
+			UserAuthenticationFile.User newUser = new UserAuthenticationFile.User();
+			newUser.setIdentifier(userPre.getIdentifier());
+			newUser.getGroupList().addAll(userPre.getGroupList());
+			newUser.getGroupListIN().addAll(userPre.getGroupListIN());
+			newUser.getGroupListOUT().addAll(userPre.getGroupListOUT());
+			newUser.setPassword(userPre.getPassword());
+			newUser.setPasswordHashed(true);
+			newUser.setRole(userPre.getRole());
+			newUser.setFingerprint(userPre.getFingerprint());
+			
+			myFileUserManagementInterface.addOrUpdateUser(newUser, true, userPre);
+
+			logger.info("Updated groups for user {}", username);
+
+		} catch (Exception e) {
+			logger.error("Error in updateGroupsForUsers: {}", username, e);
+			throw new RuntimeException(e);
+		}
+	}
+	
+//  d. ii. Ability to add users to groups 
+//  e. ii. Ability to remove users from groups
+	@Override
+	@RequestMapping(value = "/update-group-users", method = RequestMethod.PUT)
+	public void updateUsersForGroup(@RequestBody SimpleGroupWithUsersModel simpleGroupModel) {
+
+		// remove all existing users from this group
+		SimpleGroupWithUsersModel existingUsers =
+				myFileUserManagementInterface.getUsersInGroup(simpleGroupModel.getGroupname());
+		for (String existingUser : existingUsers.getUsersInGroupListIN()) {
+			myFileUserManagementInterface.removeUserFromGroup(existingUser, simpleGroupModel.getGroupname(), Direction.IN);
+		}
+		for (String existingUser : existingUsers.getUsersInGroupListOUT()) {
+			myFileUserManagementInterface.removeUserFromGroup(existingUser, simpleGroupModel.getGroupname(), Direction.OUT);
+		}
+		for (String existingUser : existingUsers.getUsersInGroupList()) {
+			myFileUserManagementInterface.removeUserFromGroup(existingUser, simpleGroupModel.getGroupname());
+		}
+
+		// iterate over each list of users and add this group to that user's respective group list
+		for (String username : simpleGroupModel.getUsersInGroupListIN()) {
+			updateUsersForGroupHelper(username, GroupListType.IN_GROUP, simpleGroupModel.getGroupname());
+		}
+		for (String username : simpleGroupModel.getUsersInGroupListOUT()) {
+			updateUsersForGroupHelper(username, GroupListType.OUT_GROUP, simpleGroupModel.getGroupname());
+		}
+		for (String username : simpleGroupModel.getUsersInGroupList()) {
+			updateUsersForGroupHelper(username, GroupListType.BOTH_GROUP, simpleGroupModel.getGroupname());
+		}
+	}
+	
 //  f.	Ability to delete user
     @Override
     @RequestMapping(value = "/delete-user/{username}", method = RequestMethod.DELETE)
-    public void deleteUser(@PathVariable String username) {
+    public void deleteUser(@PathVariable("username") String username) {
 
     	FileAuthenticatorControl control;
     	try {
@@ -254,6 +349,7 @@ iii.	System produces output file with user/pass combos as a one-time accessible 
     	Set<GroupNameModel> re = new HashSet<>();
     	
         Set<String> groupNames = myFileUserManagementInterface.getGroupNames();
+
         groupNames.forEach(groupName ->{
     		re.add(new GroupNameModel(groupName));
         });

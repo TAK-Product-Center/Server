@@ -14,6 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.Key;
@@ -44,14 +46,15 @@ public class JwtUtils {
     private static JwtUtils instance = null;
 
     private KeyPair loadKeyPair(String keyStoreType, String keyStoreFile, String keyStorePass) {
+        InputStream keyStoreStream = null;
         try {
             KeyStore keyStore = KeyStore.getInstance(keyStoreType);
-            keyStore.load(new FileInputStream(keyStoreFile), keyStorePass.toCharArray());
+            keyStoreStream = new FileInputStream(keyStoreFile);
+            keyStore.load(keyStoreStream, keyStorePass.toCharArray());
 
             PrivateKey privateKeyTmp = null;
             PublicKey publicKeyTmp = null;
 
-            PrivateKey search = null;
             Enumeration<String> aliases = keyStore.aliases();
             while (aliases.hasMoreElements() && privateKeyTmp == null) {
                 String alias = aliases.nextElement();
@@ -68,6 +71,14 @@ public class JwtUtils {
         } catch (Exception e) {
             logger.error("exception in loadKeyPair", e);
             return null;
+        } finally {
+        	if (keyStoreStream != null) {
+        		try {
+					keyStoreStream.close();
+				} catch (IOException e) {
+					logger.error("Error closing keystore file stream", e);
+				}
+        	}
         }
     }
 
@@ -247,7 +258,7 @@ public class JwtUtils {
         return jwtParser.parseClaimsJws(token).getBody();
     }
 
-    public Claims parseClaims(String token, List<JwtParser> jwtParsers) {
+    public Claims parseClaims(String token, List<JwtParser> jwtParsers, boolean ignoreExpiredToken) {
         for (JwtParser jwtParser : jwtParsers) {
             try {
                 Claims claims = parseClaim(token, jwtParser);
@@ -255,6 +266,9 @@ public class JwtUtils {
                     return claims;
                 }
             } catch (ExpiredJwtException exp) {
+                if (ignoreExpiredToken) {
+                    return exp.getClaims();
+                }
                 throw exp;
             } catch (Exception e) {
                 if (logger.isDebugEnabled()) {
@@ -266,11 +280,11 @@ public class JwtUtils {
         return null;
     }
 
-    public Claims parseClaims(String token, SignatureAlgorithm signatureAlgorithm) {
+    public Claims parseClaims(String token, SignatureAlgorithm signatureAlgorithm, boolean ignoreExpiredToken) {
         List<JwtParser> jwtParsers = getExternalParsers(signatureAlgorithm);
         jwtParsers.add(getParser(signatureAlgorithm, privateKey));
 
-        return parseClaims(token, jwtParsers);
+        return parseClaims(token, jwtParsers, ignoreExpiredToken);
     }
 
     public Claims parseMissionTokenClaims(String token) {
@@ -288,7 +302,7 @@ public class JwtUtils {
             logger.error("exception adding missionTls keystores", e);
         }
 
-        return parseClaims(token, jwtParsers);
+        return parseClaims(token, jwtParsers, false);
     }
 
 }

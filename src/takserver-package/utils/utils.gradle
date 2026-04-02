@@ -65,30 +65,37 @@ task constructDockerZip(type: Zip) { Task task ->
             ':takserver-cluster:moveCoreConfig')
 }
 
+task constructIntegrationTesterDir(type: Copy) { task ->
+    duplicatesStrategy DuplicatesStrategy.FAIL
+    destinationDir(file("$buildDir/integrationTesterDir"))
+
+    with takserverDockerCommonSpec(task)
+    with copyDockerCoreConfigExampleSpec()
+    with copyDockerScriptsSpec()
+    with copyDockerDbScriptsSpec()
+
+    with copyFullFedhubSpec(task, true)
+    with copyIntegrationTestAdditionsSpec(task)
+}
+
+task updateIntegrationTesterCore(type: Copy) { task ->
+    with copyBaseTakJarsAndWarsSpec(task).into('tak')
+    with copyIntegrationTestAdditionsSpec(task).into('tak')
+    destinationDir(file("$buildDir/integrationTesterDir"))
+}
+
 task constructIntegrationTesterZip(type: Zip) { task ->
+    dependsOn(constructIntegrationTesterDir)
     archiveName "takserver-integration-tester-${project.version}.zip"
     duplicatesStrategy DuplicatesStrategy.FAIL
     destinationDir(file("$buildDir/distributions"))
-    into("takserver-integration-tester-${project.version}")
-
-    with takserverDockerCommonSpec(task).into('tak')
-    with copyDockerCoreConfigExampleSpec().into('tak')
-    with copyDockerScriptsSpec().into('tak')
-    with copyDockerDbScriptsSpec().into('tak')
-
-
-//    with copyCoreScriptsSpec().into('tak')
-//    with copyDbScriptsSpec().into('tak')
-//    with copyLauncherAndConfigAndMessagingScriptsSpec().into('tak')
-    with copyFullFedhubSpec(task).into('tak')
-//    with copyDockerDbScriptsSpec().into('tak')
-//    with copyDockerCoreConfigExampleSpec().into('tak')
-    with copyIntegrationTestAdditionsSpec(task).into('tak')
+    from("$buildDir/integrationTesterDir")
+    into("takserver-integration-tester-${project.version}/tak")
 }
 
 task fetchRpmsForHardenedDocker(type: Exec) {
     dependsOn(':takserver-package:prePackage')
-    def epelFilename = "epel-release-latest-8.noarch.rpm"
+    def epelFilename = "epel-release-latest-9.noarch.rpm"
     def outputfilepath = "${hardened_rpm_download_directory}/${epelFilename}"
     outputs.file(outputfilepath)
     commandLine "curl", "--create-dirs", "https://dl.fedoraproject.org/pub/epel/${epelFilename}", "--output", outputfilepath
@@ -263,3 +270,81 @@ task copyHealthCheckScripts(type: Copy) {
     from project(':takserver-core').file('docker/hardened/tak/health')
     into "$buildDir/docker/hardened/takArtifacts/health"
 }
+
+ext.takserver_systemd_setup_script = '''\
+# install takserver service if we are on a RHEL or rocky distribution
+if [ -f /etc/redhat-release ] || [ -f /etc/rocky-release ]; then
+    echo "Putting tak server service into systemd"
+    sudo bash -c 'cat > /etc/systemd/system/takserver.service <<EOF
+[Unit]
+Description=TAK Server Service
+After=network.target
+Conflicts=takserver-noplugins.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tak
+ExecStart=/bin/bash -c "./takserver-config.sh & ./takserver-messaging.sh & ./takserver-api.sh & ./takserver-plugins.sh & ./takserver-retention.sh"
+RemainAfterExit=yes
+User=tak
+Group=tak
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
+EOF'
+
+    echo "Creating takserver no plugins service in systemd"
+    sudo bash -c 'cat > /etc/systemd/system/takserver-noplugins.service <<EOF
+[Unit]
+Description=TAK Server Service (No Plugins)
+After=network.target
+Conflicts=takserver.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tak
+ExecStart=/bin/bash -c "./takserver-config.sh & ./takserver-messaging.sh & ./takserver-api.sh"
+RemainAfterExit=yes
+User=tak
+Group=tak
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
+EOF'
+
+    sudo systemctl daemon-reload
+fi
+'''
+
+ext.federation_hub_systemd_setup_script = '''\
+# install federation hub service if we are on a RHEL or rocky distribution
+if [ -f /etc/redhat-release ] || [ -f /etc/rocky-release ]; then
+    echo "Putting federation-hub service into systemd"
+    sudo bash -c 'cat > /etc/systemd/system/federation-hub.service <<EOF
+[Unit]
+Description=Federation Hub Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tak/federation-hub/scripts
+
+ExecStart=/bin/bash -c "./federation-hub-policy.sh & ./federation-hub-ui.sh & ./federation-hub-broker.sh"
+RemainAfterExit=yes
+User=tak
+Group=tak
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
+EOF'
+
+    sudo systemctl daemon-reload
+fi
+'''
+

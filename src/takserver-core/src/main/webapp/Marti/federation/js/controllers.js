@@ -35,6 +35,59 @@ federationManagerControllers.controller('FederatesListCtrl', ['$scope',
         $scope.maxConnections = 0;
         $scope.actualNum = 0;
 
+        $scope.federationTokens = []
+
+        $scope.generateToken = function() {
+            let now = Date.now();
+            let expiration = $scope.newTokenExpiration === -1 ? -1 
+                : $scope.newTokenExpiration + now
+
+            $http({
+                url: '/Marti/api/generateAndSaveFederationJwtToken',
+                method: "POST",
+                data: {
+                  "name": $scope.newTokenName,
+                  "expiration": expiration
+                }
+            })
+            .then(function(apiResponse) {
+                $scope.federationTokens.push(apiResponse.data.data)
+                $scope.newTokenName = ''
+                FederatesService.query(
+                    function (apiResponse) {
+                        $scope.federates = apiResponse.data;
+                        $scope.showRmiError = false;
+                    },
+                    function () {
+                        $scope.showRmiError = true;
+                });
+            }, 
+            function(apiResponse) { 
+               alert('An error occured generating federation token');
+            });
+        };
+
+        $scope.federateNameExists = function(name) {
+            if (!$scope.federates) {
+                return false
+            }
+            else {
+                return $scope.federates.find(f => f.name === name)
+            }
+        }
+
+        $scope.previewToken = function(token) {
+            return token.substring(0,8) + '...' + token.substring(token.length-8);
+        };
+
+        $scope.getDisplayDate = function(milliseconds) {
+            return milliseconds === -1 ? -1 : new Date(milliseconds)
+        };
+
+        $scope.copyToken = function(token) {
+            if (navigator && navigator.clipboard)
+                navigator.clipboard.writeText(token)
+        };
 
         (function dynamicUpdate() {
             ActiveConnectionsService.query(
@@ -57,6 +110,13 @@ federationManagerControllers.controller('FederatesListCtrl', ['$scope',
 
             FederatesService.query(
                 function (apiResponse) {
+                     apiResponse.data.forEach(f => {
+                         if (f.tokenFederate) {
+                             f.isTokenExpired = f.tokenExpiration === -1 ? false 
+                                 : new Date() > new Date(f.tokenExpiration)
+                         }
+                     })
+
                     $scope.federates = apiResponse.data;
                     $scope.showRmiError = false;
                 },
@@ -196,6 +256,7 @@ federationManagerControllers.controller('FederatesListCtrl', ['$scope',
 
 federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
     '$location',
+    '$http',
     'FederateGroupsService',
     'FederateGroupsMapService',
     'FederateGroupsMapAddService',
@@ -208,6 +269,7 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
     function (
         $scope,
         $location,
+        $http,
         FederateGroupsService,
         FederateGroupsMapService,
         FederateGroupsMapAddService,
@@ -225,10 +287,11 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
         $scope.federateGroups = [];
         $scope.federateGroupsMap = [];
         $scope.federateRemoteGroups = {};
+        $scope.groupHopLimits = {};
         $scope.submitInProgress = false;
 
         $scope.getFederateGroups = function () {
-            $scope.federateGroups = FederateGroupsService.query({
+            FederateGroupsService.query({
                     federateId: $scope.federateId
                 },
                 function (apiResponse) {
@@ -252,19 +315,18 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
         }
 
         $scope.getFederateRemoteGroups = function () {
-                    $scope.federateGroups = FederateRemoteGroupsService.query({
-                            federateId: $scope.federateId
-                        },
-                        function (apiResponse) {
-                            $scope.federateRemoteGroups = apiResponse.data;
-                        },
-                        function (apiResponse) {
-                            alert('An unexpected error occurred retrieving the list of federate groups.');
-                        });
+            FederateRemoteGroupsService.query({
+                    federateId: $scope.federateId
+                },
+                function (apiResponse) {
+                    $scope.federateRemoteGroups = apiResponse.data;
+                },
+                function (apiResponse) {
+                    alert('An unexpected error occurred retrieving the list of federate groups.');
+                });
         }
 
         $scope.backToFederates = function () {
-            console.log('back to federates');
             window.history.back();
         };
 
@@ -294,6 +356,7 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
                     FederateGroupsService.save(federateGroupAssociation,
                         function (apiResponse) {
                             $scope.getFederateGroups();
+                            $scope.getFederateGroupHopLimits();
                         },
                         function (apiResponse) {
                             $scope.serviceReportedMessages = true;
@@ -378,10 +441,16 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
                 },
                 function (apiResponse) {
                     $scope.getFederateGroups();
+                    $scope.getFederateGroupHopLimits();
                 },
                 function (apiResponse) {
                     alert("An unexpected error occurred deleting the requested federate group.");
                 });
+
+            // if the group is outbound, also delete it's group hop limit entry
+            if (direction === "OUT") {
+                $scope.deleteHopLimitForGroup(group)
+            }
         }
 
         $scope.save = function () {
@@ -417,9 +486,70 @@ federationManagerControllers.controller('FederateGroupsCtrl', ['$scope',
                 });
         }
 
+        $scope.getHopLimitForGroup = function (group) {
+            let foundVal =  $scope.groupHopLimits[group];
+            return foundVal ? foundVal : '-1'
+        }
+
+        $scope.getFederateGroupHopLimits = function() {
+            $scope.groupHopLimits = {}
+            $http.get('/Marti/api/federate-outbound-groups-hop-limit/' + $scope.federateId).then(function (response) {
+                let groupHopLimits = response.data.data;
+
+                groupHopLimits.forEach(groupHopLimit => {
+                    $scope.groupHopLimits[groupHopLimit.groupName] = groupHopLimit.hopLimit
+                })
+            })
+        }
+
+        $scope.setHopLimitForGroup = function (elemId, groupName) {
+            if (!groupName || !elemId) return;
+
+            let hopInput = document.getElementById(elemId)
+            let hops = hopInput.value
+
+            $http({
+                url: '/Marti/api/federate-outbound-groups-hop-limit/'+ $scope.federateId,
+                method: "POST",
+                data: {
+                        groupName: groupName,
+                        hopLimit: hops
+                    }
+            })
+            .then(function(apiResponse) {
+                $scope.groupHopLimits[groupName] = parseInt(hops)
+            }, 
+            function(apiResponse) { 
+               alert('An error occured setting hop limit');
+            });
+        }
+
+        $scope.deleteHopLimitForGroup = function (groupName) {
+            $http({
+                url: '/Marti/api/federate-outbound-groups-hop-limit/'+ $scope.federateId + '?group=' + groupName,
+                method: "DELETE",
+            })
+            .then(function(apiResponse) {
+                delete $scope.groupHopLimits[groupName]
+            }, 
+            function(apiResponse) { 
+               alert('An error occured setting hop limit');
+            });
+        }
+
+        $scope.getAvailableHopLimitGroups = function() {
+            let groups = $scope.federateGroups
+                    .filter(g => g.direction === "OUTBOUND")
+                    .filter(g => !(g.group in $scope.groupHopLimits))
+                    .map(g => g.group)
+
+            return groups
+        }
+
         $scope.getFederateGroups();
         $scope.getFederateGroupsMap();
         $scope.getFederateRemoteGroups();
+        $scope.getFederateGroupHopLimits();
     }
 ]);
 
@@ -694,6 +824,12 @@ federationManagerControllers.controller('OutgoingConnectionCreationCtrl', ['$sco
                 }
             }
         }
+
+        $scope.toggleUseToken = function(outgoingConnection) {
+            if (outgoingConnection.useToken && !outgoingConnection.tokenType) {
+                outgoingConnection.tokenType = 'manual'
+            }
+        }
     }
 ]);
 
@@ -786,6 +922,12 @@ federationManagerControllers.controller('OutgoingConnectionModificationCtrl', ['
                         return
                     }
                 }
+            }
+        }
+
+        $scope.toggleUseToken = function(outgoingConnection) {
+            if (outgoingConnection.useToken && !outgoingConnection.tokenType) {
+                outgoingConnection.tokenType = 'manual'
             }
         }
     }
@@ -888,12 +1030,14 @@ federationManagerControllers.controller('GroupSearchCtrl', ['$scope',
 
 federationManagerControllers.controller('FederateDetailsCtrl', ['$scope',
     '$location',
+    '$http',
     'FederateDetailsService',
     '$routeParams',
     '$modal',
     function (
         $scope,
         $location,
+        $http,
         FederateDetailsService,
         $routeParams,
         $modal
@@ -902,6 +1046,30 @@ federationManagerControllers.controller('FederateDetailsCtrl', ['$scope',
         $scope.federateName = $routeParams.name;
 
         $scope.submitInProgress = false;
+
+        $scope.regenerateToken = function() {
+            let now = Date.now();
+            let expiration = $scope.federateDetails.newTokenExpiration === -1 ? -1 
+                : $scope.federateDetails.newTokenExpiration + now
+
+
+            $http({
+                url: '/Marti/api/generateFederationJwtToken',
+                method: "POST",
+                data: {
+                  "name": $scope.federateDetails.name,
+                  "expiration": expiration
+                }
+            })
+            .then(function(apiResponse) {
+                $scope.federateDetails.id = apiResponse.data.data.token
+                $scope.federateDetails.tokenExpiration = expiration
+                alert('Federation token has been regenerated. Please save the form.');
+            }, 
+            function(apiResponse) { 
+               alert('An error occured generating federation token');
+            });
+        };
 
         $scope.cancel = function () {
             $location.path("/");

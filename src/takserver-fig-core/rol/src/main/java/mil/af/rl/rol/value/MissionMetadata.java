@@ -125,10 +125,9 @@ public class MissionMetadata extends Parameters {
 	public String toString() {
 		return "MissionMetadata [type=" + type + ", name=" + name + ", creatorUid=" + creatorUid + ", description="
 				+ description + ", chatRoom=" + chatRoom + ", tool=" + tool + ", boundingPolygon=" + boundingPolygon
-				+ ", bbox=" + bbox + ", passwordHash=" + passwordHash + ", path=" + path + ", classification="
-				+ classification + ", baseLayer=" + baseLayer + ", parentMissionId=" + parentMissionId
-				+ ", defaultRoleId=" + defaultRoleId + ", expiration=" + expiration + ", inviteOnly=" + inviteOnly
-				+ ", guid=" + guid + "]";
+				+ ", bbox=" + bbox + ", path=" + path + ", classification=" + classification + ", baseLayer="
+				+ baseLayer + ", parentMissionId=" + parentMissionId + ", defaultRoleId=" + defaultRoleId
+				+ ", expiration=" + expiration + ", inviteOnly=" + inviteOnly + ", guid=" + guid + "]";
 	}
 
 }

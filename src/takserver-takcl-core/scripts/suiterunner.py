@@ -25,9 +25,10 @@ RESULTS_ROOT = os.path.abspath('TESTRUNNER_RESULTS')
 
 ALL_TESTS = {
     # 'FedHubTests',
-    'FedHubTests.advancedFedHubTest',
+    'FedHubTests.basicFedHubGroupMappingTest',
     'FedHubTests.basicFedHubTest',
     'FedHubTests.basicMultiInputFedHubTest',
+    'FedHubTests.advancedFedHubTest',
     # 'FederationV1Tests',
     'FederationV1Tests.advancedFederationTest',
     'FederationV1Tests.basicFederationTest',
@@ -85,9 +86,10 @@ ALL_TESTS = {
 
 TEST_EXECUTION_LIST = [
     # 'FedHubTests',
-    'FedHubTests.advancedFedHubTest',
+    'FedHubTests.basicFedHubGroupMappingTest',
     'FedHubTests.basicFedHubTest',
     'FedHubTests.basicMultiInputFedHubTest',
+    'FedHubTests.advancedFedHubTest',
     # 'FederationV1Tests',
     # 'FederationV1Tests.advancedFederationTest',
     # 'FederationV1Tests.basicFederationTest',

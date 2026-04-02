@@ -97,6 +97,7 @@
         </xs:annotation>
       </xs:attribute>
       <xs:attribute name="enableCachePersistence" type="xs:boolean" default="false"/>
+      <xs:attribute name="metricsLogFrequency" type="xs:long" default="60000"/>
     </xs:complexType>
   </xs:element>
 </xs:schema>

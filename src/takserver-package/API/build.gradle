@@ -49,9 +49,7 @@ chown tak:tak /opt/tak/logs
 mkdir -p /opt/tak/lib
 chown tak:tak /opt/tak/lib
 
-cp /opt/tak/certs-tmp/cert-metadata.sh /opt/tak/certs/. 2>/dev/null || :
-cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
-rm -rf /opt/tak/certs-tmp
+''' + _installer_sections.restore_config + '''
 
 # rename old tomcat if it exists
 if [ -f "/opt/tak/apache-tomcat" ]; then
@@ -87,6 +85,7 @@ ospackage {
     summary = _summary
 
     preInstall _preinstall_script
+    preUninstall _preuninstall_script
     postInstall postinstall_script_api
     postUninstall _postuninstall_script
 

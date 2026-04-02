@@ -228,11 +228,10 @@ public class EnterpriseSyncCacheHelper {
 				fileWrapper = new FileWrapper();
 				
 				if (queryResults.next()) {
-					
-					InputStream contentStream = queryResults.getBinaryStream(1);
-					long contentLen = queryResults.getLong(3);
-					
-					logger.debug("content length {}, stream {}, ", contentLen, contentStream);
+					try (InputStream contentStream = queryResults.getBinaryStream(1)) {
+						long contentLen = queryResults.getLong(3);
+						logger.debug("content length {}, stream {}, ", contentLen, contentStream);
+					}
 					
 					fileWrapper.setInputStream(queryResults.getBinaryStream(1));
 					fileWrapper.setHash(hash);
@@ -247,6 +246,8 @@ public class EnterpriseSyncCacheHelper {
 			logger.error(msg, e);
 			throw new TakException(msg, e);
 		}
+		
+		logger.debug("for hash {} fetched FileWrapper: {}", hash, fileWrapper);
 
 		return fileWrapper;
 
@@ -290,7 +291,7 @@ public class EnterpriseSyncCacheHelper {
 	}
 
 	private boolean isCacheEsync() {
-		return esyncEnableCache || (clusterConfig.isEnabled() && clusterConfig.isKubernetes());
+		return esyncEnableCache;
 	}
 
 	private boolean isCacheSpring() {

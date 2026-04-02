@@ -14,6 +14,7 @@ import com.bbn.marti.config.GeospatialFilter;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.socket.SituationAwarenessMessage;
+import tak.server.cot.CotEventContainer;
 
 public interface SubscriptionManagerLite {
 
@@ -45,10 +46,12 @@ public interface SubscriptionManagerLite {
     void removeAllMissionSubscriptions(UUID missionGuid);
 
     List<String> getMissionSubscriptions(UUID missionGuid, boolean connectedOnly);
-    void announceMissionChange(UUID missionGuid, String missionName, ChangeType changeType, String creatorUid, String tool, String changes, String xmlContentForNotification);
-    void announceMissionChange(UUID missionGuid, String missionName, ChangeType changeType, String creatorUid, String tool, String changes);
-    void announceMissionChange(UUID missionGuid, String missionName, String creatorUid, String tool, String changes);
-    
+    CotEventContainer createMissionChangeMessage(UUID missionGuid, String missionName, ChangeType changeType, String authorUid, String tool, String changes, String xmlContentForNotification);
+    CotEventContainer announceMissionChange(UUID missionGuid, String missionName, ChangeType changeType, String creatorUid, String tool, String changes, String xmlContentForNotification);
+    CotEventContainer announceMissionChange(UUID missionGuid, String missionName, ChangeType changeType, String creatorUid, String tool, String changes);
+    CotEventContainer announceMissionChange(UUID missionGuid, String missionName, String creatorUid, String tool, String changes);
+    void submitAnnounceMissionChangeCot(String uid, CotEventContainer changeMessage);
+
     void broadcastMissionAnnouncement(UUID missionGuid, String missionName, String groupVector, String creatorUid, ChangeType changeType, String tool);
     void sendMissionInvite(UUID missionGuid, String missionName, String[] uids, String authorUid, String tool, String token, String roleXml);
     void sendMissionRoleChange(UUID missionGuid, String missionName, String uid, String authorUid, String tool, String roleXml);
@@ -73,12 +76,16 @@ public interface SubscriptionManagerLite {
 	boolean deleteSubscriptionFromUI(String uid);
 
 	void sendLatestReachableSA(String username);
+	void sendUpdatedGroupsLatestReachableSA(String username);
+    void sendReachableDisconnectMessage(String username);
 	void sendGroupsUpdatedMessage(String username, String clientUid);
-	
+
 	/**
 	 * Return a list of active subscriptions, with filtering options.
 	 */
 	List<RemoteSubscription> getSubscriptionsWithGroupAccess(String groupVector, boolean noFederates, Set<Group> filterWriteOnlyGroups);
+	List<RemoteSubscriptionLite> getSubscriptionsWithGroupAccessLite(String groupVector, boolean noFederates, Set<Group> filterWriteOnlyGroups);
+	List<RemoteSubscriptionLiteWithUser> getSubscriptionsWithGroupAccessLiteWithUser(String groupVector, boolean noFederates, Set<Group> filterWriteOnlyGroups);
 	
 	
 	String linkWebsocketToExistingSub(String connectionId, String clientUid, String username);

@@ -97,7 +97,7 @@ public class ProfileService {
             files.addAll(profileFileRepository.findAllByProfileIdOrderById(profile.getId()));
         }
 
-        if (applyOnEnrollment) {
+        if (applyOnEnrollment || applyOnConnect) {
             Auth.Ldap ldap = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap();
 
             // if we've got any of the user attributes set, go ahead and build the user preferences

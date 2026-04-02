@@ -73,11 +73,21 @@ public interface EngineInterface {
 
 	void offlineAddFederate(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate);
 
+	void offlineSetFederateMaxHops(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, int maxHops);
+
 	void offlineAddOutboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String outboundGroupIdentifier);
+
+	void offlineAddOutboundFederateGroupHopLimit(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String outboundGroupIdentifier, int hopLimit);
+	
+	void offlineEnableFederatedGroupMapping(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, boolean enabled);
 
 	void offlineAddInboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String inboundGroupIdentifier);
 
+	void offlineAddInboundFederateGroupMapping(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String remoteGroupIdentifier, @NotNull String localGroupIdentifier);
+
 	void onlineAddUser(@NotNull AbstractUser user);
+
+	void addUserThroughUserManager(@NotNull AbstractUser user);
 
 	void onlineRemoveUsers(@NotNull AbstractServerProfile server, @NotNull MutableUser... users);
 

@@ -28,102 +28,101 @@ import org.xml.sax.SAXParseException;
 import tak.server.cot.CotParser.ValidationErrorCallback.ErrorLevel;
 
 public class CotParser {
-    public static final String SCHEMA_FILE = "Event_modified.xsd";
+	public static final String SCHEMA_FILE = "Event_modified.xsd";
 
-    private static final Logger logger = LoggerFactory.getLogger(CotParser.class);
+	private static final Logger logger = LoggerFactory.getLogger(CotParser.class);
 
-    /////////////////////////////////////////////
-    // Individual parsers
+	/////////////////////////////////////////////
+	// Individual parsers
 
-    private SAXReader reader = null;
+	private SAXReader reader = null;
 
-    public interface ValidationErrorCallback {
-        enum ErrorLevel {
-            WARNING,
-            ERROR,
-            FATAL
-        };
-        public void onValidationError(ErrorLevel level, Exception saxParseException);
-    }
+	public interface ValidationErrorCallback {
+		enum ErrorLevel {
+			WARNING,
+			ERROR,
+			FATAL
+		};
+		public void onValidationError(ErrorLevel level, Exception saxParseException);
+	}
 
-    public CotParser(boolean isValidating) {
-        this(null, isValidating);
-    }
+	public CotParser(boolean isValidating) {
+		this(null, isValidating);
+	}
 
-    private static ThreadLocal<SAXParserFactory> factory = new ThreadLocal<>();
+	private static ThreadLocal<SAXParserFactory> factory = new ThreadLocal<SAXParserFactory>() {
+		@Override public SAXParserFactory initialValue() {
+			return SAXParserFactory.newInstance();
+		}
+	};
 
-    private CotParser(ValidationErrorCallback errback, boolean isValidating) {
+	private CotParser(ValidationErrorCallback errback, boolean isValidating) {
 
-        if (factory.get() == null) {
-            factory.set(SAXParserFactory.newInstance());
+		try {
+			factory.get().setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+			factory.get().setFeature("http://xml.org/sax/features/external-general-entities", false);
+			factory.get().setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+			factory.get().setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+			factory.get().setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+			factory.get().setXIncludeAware(false);
 
-            try {
+		} catch (ParserConfigurationException | SAXNotRecognizedException | SAXNotSupportedException e) {
+			logger.error("exception enabling secure processing", e);
+		}
 
-                factory.get().setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-                factory.get().setFeature("http://xml.org/sax/features/external-general-entities", false);
-                factory.get().setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-                factory.get().setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-                factory.get().setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-                factory.get().setXIncludeAware(false);
+		if (isValidating) {
+			if (new File(SCHEMA_FILE).canRead()) {
+				try {
+					factory.get().setSchema(
+							SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI).newSchema(
+									new Source[]{new StreamSource(SCHEMA_FILE)}));
+				} catch (SAXException e) {
 
-            } catch (ParserConfigurationException | SAXNotRecognizedException | SAXNotSupportedException e) {
-                logger.error("exception enabling secure processing", e);
-            }
+					// ignore, don't validate
+					isValidating = false;
+				}
+			}
+		}
 
-            if (isValidating) {
-                if (new File(SCHEMA_FILE).canRead()) {
-                    try {
-                        factory.get().setSchema(
-                                SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI).newSchema(
-                                        new Source[]{new StreamSource(SCHEMA_FILE)}));
-                    } catch (SAXException e) {
+		// Setup the XML parser
+		try {
+			SAXParser parser = factory.get().newSAXParser();
+			reader = new SAXReader(parser.getXMLReader());
+			reader.setValidation(false);
 
-                        // ignore, don't validate
-                        isValidating = false;
-                    }
-                }
-            }
-        }
+			// If we are going to be validating...
+			if (isValidating) {
+				final ValidationErrorCallback errorCallback = errback;
+				reader.setErrorHandler(new ErrorHandler() {
+					@Override
+					public void warning(SAXParseException exception) throws SAXException {
+						if (errorCallback != null)
+							errorCallback.onValidationError(ErrorLevel.WARNING, exception);
+						throw exception;
+					}
 
-        // Setup the XML parser
-        try {
-            SAXParser parser = factory.get().newSAXParser();
-            reader = new SAXReader(parser.getXMLReader());
-            reader.setValidation(false);
+					@Override
+					public void fatalError(SAXParseException exception) throws SAXException {
+						if (errorCallback != null)
+							errorCallback.onValidationError(ErrorLevel.FATAL, exception);
+						throw exception;
+					}
 
-            // If we are going to be validating...
-            if (isValidating) {
-                final ValidationErrorCallback errorCallback = errback;
-                reader.setErrorHandler(new ErrorHandler() {
-                    @Override
-                    public void warning(SAXParseException exception) throws SAXException {
-                        if (errorCallback != null)
-                            errorCallback.onValidationError(ErrorLevel.WARNING, exception);
-                        throw exception;
-                    }
+					@Override
+					public void error(SAXParseException exception) throws SAXException {
+						if (errorCallback != null)
+							errorCallback.onValidationError(ErrorLevel.ERROR, exception);
+						throw exception;
+					}
+				});
+			}
+		} catch (Exception e) {
+			// ignore, and don't validate
+		}
+	}
 
-                    @Override
-                    public void fatalError(SAXParseException exception) throws SAXException {
-                        if (errorCallback != null)
-                            errorCallback.onValidationError(ErrorLevel.FATAL, exception);
-                        throw exception;
-                    }
-
-                    @Override
-                    public void error(SAXParseException exception) throws SAXException {
-                        if (errorCallback != null)
-                            errorCallback.onValidationError(ErrorLevel.ERROR, exception);
-                        throw exception;
-                    }
-                });
-            }
-        } catch (Exception e) {
-            // ignore, and don't validate
-        }
-    }
-
-    public Document parse(String xml) throws DocumentException {
-        return reader.read(new InputSource(new StringReader(xml)));
-    }
+	public Document parse(String xml) throws DocumentException {
+		return reader.read(new InputSource(new StringReader(xml)));
+	}
 
 }

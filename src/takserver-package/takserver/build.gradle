@@ -76,26 +76,7 @@ chown root:root  /opt/tak/retention/takserver-retention
 chmod 755 /opt/tak/retention/takserver-retention
 cp /opt/tak/retention/takserver-retention /etc/init.d
 
-# Reinstate existing retention config files
-if [ -f /opt/tak/conf/retention/retention-policy_bak.yml ]; then
-    echo "Restoring retention policy configuration from backup"
-    mv /opt/tak/conf/retention/retention-policy_bak.yml /opt/tak/conf/retention/retention-policy.yml
-fi
-
-if [ -f /opt/tak/conf/retention/retention-service_bak.yml ]; then
-    echo "Restoring retention service configuration from backup"
-    mv /opt/tak/conf/retention/retention-service_bak.yml /opt/tak/conf/retention/retention-service.yml
-fi
-
-if [ -f /opt/tak/conf/retention/mission-archiving-config_bak.yml ]; then
-    echo "Restoring existing mission archive configuration from backup"
-    mv /opt/tak/conf/retention/mission-archiving-config_bak.yml /opt/tak/conf/retention/mission-archiving-config.yml
-fi
-
-if [ -f /opt/tak/mission-archive/mission-store_bak.yml ]; then
-    echo "Restoring existing mission store from backup"
-    mv /opt/tak/mission-archive/mission-store_bak.yml /opt/tak/mission-archive/mission-store.yml
-fi
+''' + _installer_sections.restore_config + '''
 
 chown -fR tak:tak /opt/tak/conf
 chown -fR tak:tak /opt/tak/mission-archive
@@ -134,10 +115,6 @@ chown tak:tak /opt/tak/logs
 mkdir -p /opt/tak/lib
 chown tak:tak /opt/tak/lib
 
-cp /opt/tak/certs-tmp/cert-metadata.sh /opt/tak/certs/. 2>/dev/null || :
-cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
-rm -rf /opt/tak/certs-tmp
-
 # rename old tomcat if it exists
 if [ -f "/opt/tak/apache-tomcat" ]; then
     mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED >/dev/null 2>&1
@@ -147,6 +124,8 @@ fi
 if [ -f /etc/debian_version ]; then
     sh /opt/tak/setup-for-extracted-war.sh
 fi
+
+''' + takserver_systemd_setup_script + '''
 
 cat <<- "EOF"
 
@@ -182,11 +161,6 @@ chown postgres:postgres /opt/tak/db-utils/clear-old-data.sql
 # setup a default DB password
 sh /opt/tak/db-utils/setupDefaultPassword.sh
 
-if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
-    mv /opt/tak/db-utils/clear-old-data.sql /opt/tak/db-utils/clear-old-data.sql.dist.$tak_full_version
-    mv /opt/tak/db-utils/clear-old-data.sql.bak /opt/tak/db-utils/clear-old-data.sql
-fi
-
 sudo /opt/tak/db-utils/takserver-setup-db.sh
 
 '''
@@ -217,6 +191,7 @@ ospackage {
 }
 
 task prePackage(type: Copy) { task ->
+
     with takserverCommonSpec(task)
     with copyCoreConfigExampleSpec()
     with copyConfigScriptsSpec()
@@ -229,7 +204,7 @@ task prePackage(type: Copy) { task ->
     with copyDbScriptsSpec()
 
     // Ideally deconfliction would be done, but that requires more time
-    duplicatesStrategy DuplicatesStrategy.INCLUDE
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     destinationDir = file("$buildDir/takArtifacts")
 
 

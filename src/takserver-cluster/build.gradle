@@ -28,7 +28,13 @@ task pullTakserverCore(type: Copy, dependsOn: ':takserver-core:setupCluster') {
     into "$buildDir/takserver-core"
 }
 
-task pullTakcl(type: Copy, dependsOn: ':takserver-takcl-core:publicJar') {
+task igniteExtensions(type: Copy, dependsOn: ':takserver-common:igniteExtensions') {
+    from project(':takserver-common').file("build/libs/ignite-extensions-${version}.jar")
+    into "$buildDir/takserver-core"
+    rename "ignite-extensions-${version}.jar", "ignite-extensions.jar"
+}
+
+task pullTakcl(type: Copy, dependsOn: ':takserver-takcl-core:shadowJar') {
     from project(':takserver-takcl-core').file("build/libs/takcl-${version}-exe.jar")
     into "$buildDir/takserver-takcl-core"
     rename "takcl-${version}-exe.jar", "takcl.jar"
@@ -100,6 +106,7 @@ task zipCluster(type: Zip) {
     dependsOn pullSchemaManager
     dependsOn pullUserManager
 //    dependsOn pullTakcl
+    dependsOn igniteExtensions
     dependsOn deleteCoreConfig
     dependsOn copyClusterScripts
     dependsOn copyDeployments
@@ -137,6 +144,7 @@ task zipClusterHelm(type: Zip) {
     dependsOn pullSchemaManager
     dependsOn pullUserManager
 //    dependsOn pullTakcl
+    dependsOn igniteExtensions
     dependsOn deleteCoreConfig
     dependsOn copyClusterScripts
     dependsOn copyDbConfigurations

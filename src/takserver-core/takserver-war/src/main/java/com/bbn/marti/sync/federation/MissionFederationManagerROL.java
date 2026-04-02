@@ -3,6 +3,8 @@ package com.bbn.marti.sync.federation;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
+import java.util.Date;
+import java.util.List;
 import java.util.NavigableSet;
 
 import javax.naming.NamingException;
@@ -17,8 +19,10 @@ import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.sync.MissionContent;
 import com.bbn.marti.remote.sync.MissionExpiration;
 import com.bbn.marti.remote.sync.MissionHierarchy;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForLogEntry;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayer;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayer;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForExternalData;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.DataPackageFileBlocker;
 import com.bbn.marti.sync.EnterpriseSyncService;
@@ -231,7 +235,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 	}
 
 	@Override
-	public void addMissionContent(String missionName, MissionContent content, String creatorUid, NavigableSet<Group> groups) {
+	public void addMissionContent(String missionName, MissionContent content, String creatorUid, NavigableSet<Group> groups, Date date, String xmlContentForNotification) {
 		
 		// TODO: When mission federation is updated to support federating guids, update this code accordingly. Mission guids
 		// will extra handling in federated case.
@@ -260,22 +264,27 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 				return;
 			}
 			// TODO: this does not handle the case where the content is a zip format file, e.g, ODT or PDF?
-			if (isBlockedFileEnabled()) {
-				MissionChange latestMission = missionService.getLatestMissionChangeForContentHash(fedMission.getGuidAsUUID(), content.getHashes().get(0));
-				String fileExt = "." + CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
+			if (isBlockedFileEnabled() && content.getHashes() != null) {
+				for (String contentHash : content.getHashes()) {
+					MissionChange latestMission = missionService.getLatestMissionChangeForContentHash(fedMission.getGuidAsUUID(), contentHash);
 
-				String name = latestMission.getContentResource().getName();
-				// TODO do we need to check file name instead?
-				if (name != null) {
-					if (name.endsWith(fileExt)) {
-						logger.debug(" not federating blocked file in add mission content " + name + " file ext: " + fileExt);
-						return;
+					String name = latestMission.getContentResource().getName();
+					// TODO do we need to check file name instead?
+					if (name != null) {
+						CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().stream().forEach(
+								fileExt -> {
+									if (name.trim().toLowerCase().endsWith(fileExt.trim().toLowerCase())) {
+										logger.debug(" not federating blocked file in add mission content " + name + " file ext: " + fileExt);
+										return;
+									}
+								}
+						);
 					}
 				}
 			}
 
 			try {
-				fedMgr.submitMissionFederateROL(malrc.addMissionContentToROL(content, missionName, creatorUid, mission), groups, missionName);
+				fedMgr.submitMissionFederateROL(malrc.addMissionContentToROL(content, missionName, creatorUid, mission, date, xmlContentForNotification), groups, missionName);
 			} catch (Exception e) {
 				logger.warn("remote exception sending ROL", e);
 			}
@@ -422,7 +431,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 		}
 
 		if (isBlockedFileEnabled()) {
-			String fileExt = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
+			List<String> fileExt = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFileFilter().getFileExtension();
 			try {
 				byte[] filteredContent = DataPackageFileBlocker.blockResourceContent(metadata, content, fileExt);
 				if (filteredContent != null) {
@@ -516,7 +525,7 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 				logger.error("exception fetching content for file " + metadata.getHash() + " - not federating this file");
 				return;
 			}
-			String fileExt = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
+			List<String> fileExt = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFileFilter().getFileExtension();
 			try {
 				byte[] filteredContent = DataPackageFileBlocker.blockResourceContent(metadata, content, fileExt);
 				if (filteredContent != null) {
@@ -677,13 +686,46 @@ public class MissionFederationManagerROL implements MissionFederationManager {
 				logger.debug("exception constructing or sending updateMapLayer federated ROL", e);
 			}
 		}
+	}
 
+	@Override
+	public void updateExternalData(MissionUpdateDetailsForExternalData missionUpdateDetailsForExternalData, NavigableSet<Group> groups) {
+
+		if (!(CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+
+		try {
+			fedMgr.submitMissionFederateROL(malrc.setExternalMissionDataToROL(missionUpdateDetailsForExternalData),
+					groups, missionUpdateDetailsForExternalData.getMissionName());
+
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending setExternalMissionData federated ROL", e);
+			}
+		}
+	}
+
+	@Override
+	public void addUpdateDeleteLogEntry(MissionUpdateDetailsForLogEntry missionUpdateDetailsForLogEntry, NavigableSet<Group> groups) {
+		if (!(CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowMissionFederation())) {
+			return;
+		}
+
+		try {
+			// only submit the first mission name from the log entry with the ROL
+			fedMgr.submitMissionFederateROL(malrc.logEntryROL(missionUpdateDetailsForLogEntry),
+					groups, missionUpdateDetailsForLogEntry.getLogEntry().getMissionNames().iterator().next());
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception constructing or sending addUpdateDeleteLogEntry federated ROL", e);
+			}
+		}
 	}
 
 	private boolean isBlockedFileEnabled() {
-		String fileExt = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().get(0).trim().toLowerCase();
-		return (CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isEnableDataPackageAndMissionFileFilter() &&
-				(! fileExt.isEmpty()));
+		return CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isEnableDataPackageAndMissionFileFilter() &&
+				!CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFileFilter().getFileExtension().isEmpty();
 	}
 
 	private boolean isMissionAllowed(String tool) {

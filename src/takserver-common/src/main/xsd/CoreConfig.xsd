@@ -36,7 +36,7 @@
         <xs:element ref="vbm" minOccurs="0"/>
         <xs:element ref="profile" minOccurs="0"/>
       </xs:all>
-      <xs:attribute name="forceLowConcurrency" type="xs:boolean" default="true"/>
+      <xs:attribute name="forceLowConcurrency" type="xs:boolean" default="false"/>
     </xs:complexType>
   </xs:element>
   <xs:element name="network">
@@ -54,6 +54,17 @@
             <xs:annotation>
               <xs:documentation>HTTP Connector</xs:documentation>
             </xs:annotation>
+            <xs:sequence>
+              <xs:element name="header" minOccurs="0" maxOccurs="unbounded" >
+                <xs:complexType>
+                  <xs:annotation>
+                    <xs:documentation>Custom http header</xs:documentation>
+                  </xs:annotation>
+                  <xs:attribute name="key" type="xs:string" use="required" />
+                  <xs:attribute name="value" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
             <xs:attribute name="port" type="xs:int" use="required"/>
             <xs:attribute name="tls" type="xs:boolean" default="true"/>
             <xs:attribute name="useFederationTruststore" type="xs:boolean" default="false"/>
@@ -126,9 +137,19 @@
           <xs:documentation>Explicity set the size for Tomcat service thread pool. multiplier for autodetected ignite thread pool size. The optimal value varies based on system capabilities (CPU core count).</xs:documentation>
         </xs:annotation>
       </xs:attribute>
-      <xs:attribute name="tomcatPoolMultiplier" type="xs:int" default="32">
+      <xs:attribute name="tomcatPoolMultiplier" type="xs:int" default="2">
         <xs:annotation>
           <xs:documentation>Set the multiplier for autodetected ignite thread pool size. The optimal value varies based on system capabilities (CPU core count).</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="apiAsyncExecutorMultiplier" type="xs:int" default="2">
+        <xs:annotation>
+          <xs:documentation>Set the multiplier for size of async executor pool used by REST APIs.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="apiAsyncExecutorQueueSize" type="xs:int" default="64">
+        <xs:annotation>
+          <xs:documentation>Set the async executor pool queue size (used by REST APIs.)</xs:documentation>
         </xs:annotation>
       </xs:attribute>
       <xs:attribute name="cloudwatchNamespace" type="xs:string" default="takserver"/>
@@ -136,11 +157,15 @@
       <xs:attribute name="cloudwatchEnable" type="xs:boolean" default="false"/>
       <xs:attribute name="cloudwatchName" type="xs:string" default=""/>
       <xs:attribute name="missionCopTool" type="xs:string" default="vbm"/>
-      <xs:attribute name="pingTimeoutSeconds" type="xs:int"/>
-      <xs:attribute name="pingTimeoutCheckIntervalSeconds" type="xs:int" default="60"/>
+      <xs:attribute name="reportTimeoutSeconds" type="xs:int"/>
+      <xs:attribute name="reportTimeoutCheckIntervalSeconds" type="xs:int" default="60"/>
       <xs:attribute name="alwaysArchiveMissionCot" type="xs:boolean" default="false"/>
       <xs:attribute name="MissionCreateGroupsRegex" type="xs:string" use="optional"/>
       <xs:attribute name="MissionDeleteRequiresOwner" type="xs:boolean" default="false"/>
+      <xs:attribute name="MissionUseGroupsForContents" type="xs:boolean" default="false"/>
+      <xs:attribute name="MissionAllowGroupChange" type="xs:boolean" default="false"/>
+      <xs:attribute name="MissionStrictUidMissionMembership" type="xs:boolean" default="true"/>
+      <xs:attribute name="MissionBrokerUidAddsFromApi" type="xs:boolean" default="true"/>
     </xs:complexType>
   </xs:element>
 
@@ -165,7 +190,7 @@
       <xs:annotation>
         <xs:documentation>Authentication</xs:documentation>
       </xs:annotation>
-      <xs:choice minOccurs="0" maxOccurs="1">
+      <xs:sequence>
         <xs:element name="ldap" minOccurs="0" maxOccurs="1">
           <xs:complexType>
             <xs:annotation>
@@ -179,13 +204,13 @@
             <xs:attribute name="updateinterval" type="xs:int" use="optional"/>
             <xs:attribute name="groupprefix" type="xs:string" default=""/>
             <xs:attribute name="groupNameExtractorRegex" type="xs:string" default="CN=(.*?)(?:,|$)"/>
-            <xs:attribute name="style" type="ldapStyle" use="required"/>
+            <xs:attribute name="style" type="ldapStyle" default="DS"/>
             <xs:attribute name="ldapSecurityType" type="ldapSecurityType" default="simple"/>
             <xs:attribute name="serviceAccountDN" type="xs:string" use="optional"/>
             <xs:attribute name="serviceAccountCredential" type="xs:string" use="optional"/>
             <xs:attribute name="groupObjectClass" type="xs:string" default="group"/>
             <xs:attribute name="userObjectClass" type="xs:string" default="user"/>
-            <xs:attribute name="groupBaseRDN" type="xs:string" use="required"/>
+            <xs:attribute name="groupBaseRDN" type="xs:string" use="optional"/>
             <xs:attribute name="userBaseRDN" type="xs:string" use="optional"/>
             <xs:attribute name="x509groups" type="xs:boolean" default="true"/>
             <xs:attribute name="x509addAnonymous" type="xs:boolean" default="false"/>
@@ -217,7 +242,7 @@
           </xs:complexType>
         </xs:element>
         <xs:element ref="oauth" minOccurs="0"/>
-      </xs:choice>
+      </xs:sequence>
       <xs:attribute name="default" type="xs:string" default="file"/>
       <xs:attribute name="DNUsernameExtractorRegex" type="xs:string" default="CN=(.*?)(?:,|$)"/>
       <xs:attribute name="x509groups" type="xs:boolean" default="true"/>
@@ -225,10 +250,12 @@
       <xs:attribute name="x509addAnonymous" type="xs:boolean" default="false"/>
       <xs:attribute name="x509useGroupCache" type="xs:boolean" default="false"/>
       <xs:attribute name="x509useGroupCacheDefaultActive" type="xs:boolean" default="false"/>
+      <xs:attribute name="x509useGroupCacheDefaultUpdatesActive" type="xs:boolean" default="false"/>
       <xs:attribute name="x509useGroupCacheRequiresActiveGroup" type="xs:boolean" default="false"/>
       <xs:attribute name="x509useGroupCacheRequiresExtKeyUsage" type="xs:boolean" default="true"/>
       <xs:attribute name="x509checkRevocation" type="xs:boolean" default="false"/>
       <xs:attribute name="x509tokenAuth" type="xs:boolean" default="false"/>
+      <xs:attribute name="x509assignAdminAllGroups" type="xs:boolean" default="true"/>
     </xs:complexType>
   </xs:element>
 
@@ -249,6 +276,7 @@
         <xs:element name="latestSA" minOccurs="1" maxOccurs="1">
           <xs:complexType>
             <xs:attribute name="enable" type="xs:boolean" default="false"/>
+            <xs:attribute name="validateClientUid" type="xs:boolean" default="false"/>
           </xs:complexType>
         </xs:element>
       </xs:all>
@@ -280,6 +308,7 @@
       <xs:attribute name="defaultExecQueueSize" type="xs:int" default="1024"/>
       <xs:attribute name="defaultMaxPoolSize" type="xs:int" default="8"/>
       <xs:attribute name="defaultMaxPoolFactor" type="xs:int" default="2"/>
+      <xs:attribute name="defaultCoreMaxPoolFactor" type="xs:int" default="2"/>
       <xs:attribute name="messageWriteQueueSize" type="xs:int" default="32"/>
       <xs:attribute name="messageWriteExecutorQueueSize" type="xs:int" default="16384"/>
       <xs:attribute name="codecViewPendingCapacity" type="xs:int" default="2048"/>
@@ -296,6 +325,7 @@
       <xs:attribute name="websocketSendTimeoutMs" type="xs:int" default="5000"/>
       <xs:attribute name="missionUidLimit" type="xs:int" default="8192"/>
       <xs:attribute name="missionContentLimit" type="xs:int" default="4096"/>
+      <xs:attribute name="missionConcurrentDownloadLimit" type="xs:int"/>
       <xs:attribute name="nearCacheMaxSize" type="xs:int" default="0"/>
       <xs:attribute name="cotCacheMaxSize" type="xs:int" default="0"/>
       <xs:attribute name="cotCacheBatchSize" type="xs:int" default="-1"/>
@@ -323,6 +353,12 @@
         <xs:annotation>
           <xs:documentation>Cache TTL for caffeine file cache (if enabled). Default 120 seconds.</xs:documentation>
         </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="groupDescriptionCacheSeconds" type="xs:int" default="300"/>
+      <xs:attribute name="missionCacheLockTimeoutMilliseconds" type="xs:int" default="10000">
+       <xs:annotation>
+         <xs:documentation>Default timeout to acquire lock for get mission query.</xs:documentation>
+       </xs:annotation>
       </xs:attribute>
     </xs:complexType>
   </xs:element>
@@ -458,11 +494,12 @@
     <xs:attribute name="keystoreFile" type="xs:string" use="required"/>
     <xs:attribute name="keystorePass" type="xs:string" use="required"/>
     <xs:attribute name="validityDays" type="xs:int" default="365"/>
+    <xs:attribute name="validityHours" type="xs:int"/>
     <xs:attribute name="validityNotBeforeOffsetMinutes" type="xs:int" default="720"/>
     <xs:attribute name="signatureAlg" type="xs:string" use="required"/>
     <xs:attribute name="CAkey" type="xs:string" use="optional"/>
     <xs:attribute name="CAcertificate" type="xs:string" use="optional"/>
-
+    <xs:attribute name="useTokenExpiration" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <xs:complexType name="MicrosoftCAConfig">
@@ -622,7 +659,10 @@
       <xs:attribute name="writeGroupSuffix" type="xs:string" default="_WRITE"/>
       <xs:attribute name="groupsClaim" type="xs:string" default="groups"/>
       <xs:attribute name="usernameClaim" type="xs:string" />
+      <xs:attribute name="scopeClaim" type="xs:string" default="scope"/>
+      <xs:attribute name="webtakScope" type="xs:string" />
       <xs:attribute name="groupprefix" type="xs:string" default=""/>
+      <xs:attribute name="allowUriQueryParameter" type="xs:boolean" default="false"/>
     </xs:complexType>
   </xs:element>
 
@@ -917,6 +957,12 @@
                   <xs:attribute name="tlsVersion" type="xs:string" default="TLSv1.2"/>
                 </xs:complexType>
               </xs:element>
+              <xs:element name="federation-token-authentication" minOccurs="1" maxOccurs="1">
+                <xs:complexType>
+                  <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+                  <xs:attribute name="port" type="xs:int" default="9002"/>
+                </xs:complexType>
+              </xs:element>
             </xs:sequence>
             <xs:attribute name="port" type="xs:int" default="9000"/>
             <xs:attribute name="coreVersion" type="xs:int" default="2"/>
@@ -952,6 +998,8 @@
             <xs:attribute name="maxRetries" type="xs:int" default = "0" use="optional"/>
             <xs:attribute name="unlimitedRetries" type="xs:boolean" default="true"/>
             <xs:attribute name="connectionToken" type="xs:string" default=""/>
+            <xs:attribute name="useToken" type="xs:boolean" default="false"/>
+            <xs:attribute name="tokenType" type="xs:string" default=""/>
           </xs:complexType>
         </xs:element>
         
@@ -988,11 +1036,13 @@
                     <xs:documentation>Name of the local group to which federated traffic from the specified federate will be assigned.</xs:documentation>
                   </xs:annotation>
                 </xs:element>
+               
                 <xs:element name="outboundGroup" type="xs:string" minOccurs="0" maxOccurs="unbounded">
                   <xs:annotation>
                     <xs:documentation>Name of a local group whose traffic will be shared with the specified federate.</xs:documentation>
                   </xs:annotation>
                 </xs:element>
+               
                 <xs:element name="missionFederateDefault" type="xs:boolean" minOccurs="0" maxOccurs="1" default="true">
                   <xs:annotation>
                     <xs:documentation>This value will be applied for new missions as well as missions whose federation value are not specifically set in the mission lists</xs:documentation>
@@ -1007,6 +1057,12 @@
                     <xs:attribute name="enabled" type="xs:boolean" use="required" />
                   </xs:complexType>
                 </xs:element>
+                <xs:element name="outboundGroupHopLimit" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="groupName" type="xs:string" use="required"/>
+                  <xs:attribute name="hopLimit" type="xs:int" default="-1"/>
+                </xs:complexType>
+              </xs:element>
               </xs:sequence>
               <xs:attribute name="id" type="xs:string" use="required">
                 <xs:annotation>
@@ -1048,11 +1104,26 @@
                   <xs:documentation>How many hops a federate message can make</xs:documentation>
                 </xs:annotation>
               </xs:attribute>	  
+              <xs:attribute name="useGroupHopLimiting"  type="xs:boolean" default="false">
+                <xs:annotation>
+                  <xs:documentation>If individual group hop limiting should be used over max hop limiting</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>	
               <xs:attribute name="fallbackWhenNoGroupMappings" type="xs:boolean" default="false">
                 <xs:annotation>
                   <xs:documentation>How many hops a federate message can make</xs:documentation>
                 </xs:annotation>
-              </xs:attribute>	            	
+              </xs:attribute>	 
+              <xs:attribute name="tokenFederate" type="xs:boolean" use="optional" default="false">
+				<xs:annotation>
+				  <xs:documentation>If this federate represents a Federate Token</xs:documentation>
+				</xs:annotation>
+			  </xs:attribute>  
+			  <xs:attribute name="tokenExpiration" type="xs:long" use="optional">
+				<xs:annotation>
+				  <xs:documentation>Token Expiration MS</xs:documentation>
+				</xs:annotation>
+			  </xs:attribute>           	
             </xs:complexType>
           </xs:element>
         </xs:sequence>
@@ -1087,6 +1158,8 @@
                 </xs:annotation>
               </xs:attribute>	
               <xs:attribute name="maxHops" type="xs:int" default="-1"/>
+              <xs:attribute name="allowTokenAuth" type="xs:boolean" default="false"/>
+              <xs:attribute name="tokenAuthDuration" type="xs:long" default="-1"/>
             </xs:complexType>
           </xs:element>
         </xs:sequence>
@@ -1101,7 +1174,7 @@
       <xs:attribute name="allowDataFeedFederation" type="xs:boolean" default="true" />
       <xs:attribute name="enableMissionFederationDisruptionTolerance" type="xs:boolean" default="true" />
       <xs:attribute name="missionFederationDisruptionToleranceRecencySeconds" type="xs:long" default="43200" />
-      <xs:attribute name="federateOnlyPublicMissions" type="xs:boolean" default="true" />
+      <xs:attribute name="federateOnlyPublicMissions" type="xs:boolean" default="false" />
       <xs:attribute name="enableFederation" type="xs:boolean" default="false"/>
       <xs:attribute name="enableDataPackageAndMissionFileFilter" type="xs:boolean" default="false" />
     </xs:complexType>
@@ -1192,6 +1265,24 @@
         <xs:documentation>Plugin Configuration</xs:documentation>
       </xs:annotation>
       <xs:attribute name="usePluginMessageQueue" type="xs:boolean" default="true" />
+      <xs:attribute name="allowPluginContacts" type="xs:boolean" default="false" />
+      <xs:attribute name="pluginContactCleanupFrequencySeconds" type="xs:int" default="60" />
+      <xs:attribute name="interceptorParallelismLevel" type="xs:int" default="-1">
+      	<xs:annotation>
+    		<xs:documentation>
+    			Default level of parallelism for Interceptor pluggins. Default (-1) will autodetect based on the number of available cores (processors). 
+    		</xs:documentation>
+  		</xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="interceptorThreadPoolMaxSize" type="xs:int" default="-1">
+      	<xs:annotation>
+    		<xs:documentation>
+    			Default max size of thread pool used by Interceptor plugins. Default (-1) will autodetect based on the number of available cores (processors). 
+    		</xs:documentation>
+  		</xs:annotation>
+      </xs:attribute>
+      
+      
     </xs:complexType>
   </xs:element>
   
@@ -1205,7 +1296,8 @@
       <xs:attribute name="natsClusterID" type="xs:string" default="takserver-nats-streaming" />
       <xs:attribute name="kubernetes" type="xs:boolean" default="false" />
       <xs:attribute name="cacheConfig" type="xs:boolean" default="true" />
-      <xs:attribute name="metricsIntervalSeconds" type="xs:int" default="5" />
+      <xs:attribute name="metricsIntervalDelaySeconds" type="xs:int" default="5" />
+      <xs:attribute name="metricsIntervalSeconds" type="xs:int" default="60" />
     </xs:complexType>
   </xs:element>
 
@@ -1279,6 +1371,8 @@
 			use="optional" />
 		<xs:attribute name="archiveOnly" type="xs:boolean"
 			default="false" />
+        <xs:attribute name="federateOnly" type="xs:boolean"
+                    default="false" />
 		<xs:attribute name="coreVersion" type="xs:int" default="2" />
 		<xs:attribute name="syncCacheRetentionSeconds" type="xs:int" default="3600" />
 		<xs:attribute name="maxMessageReadSizeBytes" type="xs:int" default="2048"/>

@@ -126,7 +126,7 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 			}
 
 			try {
-				System.out.println(
+				logger.debug(
 						"Starting TAKServer in directory\n\t'" + processBuilder.directory().getAbsolutePath() +
 								"'\nWith command: [\n\t" + String.join("  \\\n\t", command) + "\n]" +
 								"\nWith additional environment variables [\n\t" + String.join("\n\t,", envVarLines) + "\n]"
@@ -162,11 +162,19 @@ public class LocalRunnableServer extends AbstractRunnableServer {
 	public static final String REMOTE_DEBUG_ARGS = "-agentlib:jdwp=transport=dt_socket,server=n,address=localhost:5005,suspend=y";
 
 	private static final List<String> JDK_JAVA_OPTIONS = Arrays.asList(
-			"-Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/",
-			"-Djava.net.preferIPv4Stack=true",
-			"-Djava.security.egd=file:/dev/./urandom",
-			"-DIGNITE_UPDATE_NOTIFIER=false",
-			"-Djdk.tls.client.protocols=TLSv1.2"
+        "-Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/",
+        "-Dio.netty.tmpdir=${DEPLOYMENT_DIR}/",
+        "-Djava.io.tmpdir=${DEPLOYMENT_DIR}/",
+        "-Dio.netty.native.workdir=${DEPLOYMENT_DIR}/",
+        "-Djava.net.preferIPv4Stack=true",
+        "-Djava.security.egd=file:/dev/./urandom",
+        "-DIGNITE_UPDATE_NOTIFIER=false",
+        "-Djdk.tls.client.protocols=TLSv1.2",
+        "-Dlogging.level.com.bbn=DEBUG",
+        "-Dlogging.level.tak=DEBUG",
+        "-Dio.netty.incubator=DEBUG",
+        "-Xmx2000m",
+        "-XX:+HeapDumpOnOutOfMemoryError"
 	);
 
 	public LocalRunnableServer(AbstractServerProfile serverIdentifier) {

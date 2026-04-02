@@ -59,6 +59,8 @@ public class RemoteSubscription implements Serializable {
     @JsonIgnore @QuerySqlField public AtomicLong lastProcTime = new AtomicLong(0L);
 
     @JsonIgnore @QuerySqlField public AtomicLong lastPingTime = new AtomicLong(0L);
+    
+    @JsonIgnore @QuerySqlField public AtomicLong lastReportTime = new AtomicLong(0L);
 
     @JsonIgnore public AtomicBoolean hasUpdate = new AtomicBoolean(false);
     
@@ -149,6 +151,7 @@ public class RemoteSubscription implements Serializable {
         this.writeQueueDepth = toCopy.writeQueueDepth;
         this.lastProcTime = toCopy.lastProcTime;
         this.lastPingTime = toCopy.lastPingTime;
+        this.lastReportTime = toCopy.lastReportTime;
         this.notes = toCopy.notes;
         this.callsign = toCopy.callsign;
         this.clientUid = toCopy.clientUid;

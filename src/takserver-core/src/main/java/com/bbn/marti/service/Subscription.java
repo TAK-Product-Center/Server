@@ -165,7 +165,6 @@ public class Subscription extends RemoteSubscription {
 		}
 		
 		totalSubmitted.incrementAndGet();
-
 		// increment the hit time in the super class
 		super.incHit(hitTime);
 		
@@ -291,6 +290,7 @@ public class Subscription extends RemoteSubscription {
 		result.numHits = original.numHits;
 		result.writeQueueDepth = original.writeQueueDepth;
 		result.lastProcTime = original.lastProcTime;
+		result.lastReportTime = original.lastReportTime;
 		result.notes = original.notes;
 		result.callsign = original.callsign;
 		result.clientUid = original.clientUid;

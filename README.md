@@ -1,7 +1,7 @@
 # TAK Server Development
 *Requires Java 17*
 
-* Linux or MacOS is recommended for development. If using Windows, replace "gradlew" with "gradlew.bat" in commands below. An x86-64 architecture CPU is required to build from source, including on MacOS. M1 or M2 Apple silicon is not supported.
+* Linux or MacOS is recommended for development. If using Windows, replace "gradlew" with "gradlew.bat" in commands below.
 
 Links:
  * [Test Execution](src/takserver-takcl-core/docs/testing.md)
@@ -187,5 +187,6 @@ cd <repo-home>/src
 ./gradlew clean build bootWar bootJar
 ```
 
+## TAK Server Documentation
 
-
+The documentation for TAK server is contained in the [config-guide repository](https://git.tak.gov/core/tak-docs/takserver/config-guide). This repository contains a README with instructions on how to update the documentation, and also the relationship between the configuration guide repository branches and this repository's branches. 

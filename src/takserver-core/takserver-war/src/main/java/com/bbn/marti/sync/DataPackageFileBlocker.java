@@ -12,6 +12,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import javax.xml.XMLConstants;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
@@ -36,6 +37,10 @@ public class DataPackageFileBlocker {
 
     public static byte[] blockCoT(Metadata metadata, byte[] content, String cotFilter) {
         try {
+            // dont attempt to block content
+            if (metadata.getKeywords() == null) {
+                return content;
+            }
 
             if (Arrays.asList(metadata.getKeywords()).contains("missionpackage")) {
                 // iterate across the contents of the mission package
@@ -63,16 +68,14 @@ public class DataPackageFileBlocker {
         }
     }
 
-    public static byte[] blockResourceContent(Metadata metadata, byte[] content, String fileExt) {
+    public static byte[] blockResourceContent(Metadata metadata, byte[] content, List<String> fileExtensions) {
 
         Resource res = new Resource(metadata);
         Objects.requireNonNull(res, "resource metadata");
         Objects.requireNonNull(content, "resource content bytes");
 
         String resourceFileName = res.getFilename();
-        debugInfo(fileExt, res, resourceFileName);
-
-        final String finalFileExt = "." + fileExt;
+        debugInfo(fileExtensions, res, resourceFileName);
 
         if (res.getKeywords().contains("ARCHIVED_MISSION")) {
             if (logger.isDebugEnabled()) {
@@ -80,33 +83,40 @@ public class DataPackageFileBlocker {
             }
             return content;
         }
+
         // handle mission packages and data packages
         if (res.getKeywords().contains("missionpackage")) {
             logger.debug(" mission package");
-            if (!containsEntry(zipEntry -> zipEntry.getName().endsWith(finalFileExt), content)) {
-                logger.info("blocked files are not contained in the resource: " + finalFileExt);
-                return content;
-            } else {
-                logger.debug(" updating manifest for mission package");
-                return updateManifestInMissionPackage(content, finalFileExt);
+
+            for (String fileExt : fileExtensions) {
+                final String finalFileExt = "." + fileExt.trim().toLowerCase();
+                if (containsEntry(zipEntry -> zipEntry.getName().trim().toLowerCase().endsWith(finalFileExt), content)) {
+                    logger.debug(" updating manifest for mission package");
+                    content = updateManifestInMissionPackage(content, finalFileExt);
+                }
+            }
+
+            return content;
+        }
+
+        for (String fileExt : fileExtensions) {
+            final String finalFileExt = "." + fileExt.trim().toLowerCase();
+
+            // adding a file to a mission, check if file is blocked
+            if (resourceFileName.trim().toLowerCase().endsWith(finalFileExt)) {
+                logger.debug(" file is blocked, not submitting to federate rol: " + resourceFileName);
+                return null;  // skip this file, single files are not mission packages
             }
         }
-        // logger.debug(" is there a blocked file in the contents " + containsEntry(zipEntry -> zipEntry.getName().endsWith(finalFileExt), content));
 
-        // adding a file to a mission, check if file is blocked
-        if (resourceFileName.endsWith(finalFileExt)) {
-            logger.debug(" file is blocked, not submitting to federate rol: " + resourceFileName);
-            return null;  // skip this file, single files are not mission packages
-        } else {
-            logger.debug(" file is not blocked, submitting to federate rol: " + resourceFileName);
-            return content; // file is not blocked so submit it
-        }
+        logger.debug(" file is not blocked, submitting to federate rol: " + resourceFileName);
+        return content; // file is not blocked so submit it
     }
 
-    private static void debugInfo(String fileExt, Resource res, String resourceFileName) {
+    private static void debugInfo(List<String> fileExts, Resource res, String resourceFileName) {
         if (logger.isTraceEnabled()) {
             logger.trace(" what are the keywords: " + res.getKeywords());
-            logger.trace(" what is  the fileExt from the server: " + fileExt);
+            logger.trace(" what is  the fileExt from the server: " + String.join(",", fileExts ));
             logger.trace(" what is the file name: " + resourceFileName);
         }
     }
@@ -208,7 +218,10 @@ public class DataPackageFileBlocker {
     private static byte [] removeFileEntry(String manifest, String fileExt) {
         byte[] updatedManifest = null;
         try {
-            Transformer transformer = TransformerFactory.newInstance().newTransformer();
+        	TransformerFactory factory = TransformerFactory.newInstance();
+        	factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        	Transformer transformer = factory.newTransformer();
+        	
             ByteArrayOutputStream bout = new ByteArrayOutputStream();
             StreamResult result = new StreamResult(bout);
 

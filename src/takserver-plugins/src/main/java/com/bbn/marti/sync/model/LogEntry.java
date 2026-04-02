@@ -74,8 +74,6 @@ public class LogEntry implements Serializable, Comparable<LogEntry> {
     }
      
     @Id
-    @GeneratedValue(generator = "system-uuid")
-    @GenericGenerator(name = "system-uuid", strategy = "uuid2") // tell hibernate to use java.util.UUID to generate 
     @Column(name = "id", unique = true, nullable = false)
     public String getId() {
         return id;

@@ -7,6 +7,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -114,9 +115,13 @@ public class IconsetUploadProcessorImpl implements IconsetUploadProcessor {
     @Async
     public void process(String filename) {
 
-        // This try block just captures any exceptions that would otherwise disappear, since this method runs in a thread from the thread pool and so exception would not propagate back to the caller.
+		// This try block just captures any exceptions that would otherwise disappear,
+		// since this method runs in a thread from the thread pool and so exception
+		// would not propagate back to the caller.
+		InputStream fis = null;
+		ZipInputStream zis = null;
+		ZipEntry zipEntry = null;
         try {
-            
             // initialize the audit log with the current username and roles (optional), so that they will be reflected in the data access audit log
             AuditLogUtil.init(getUsername(), getRoles(), getRequestPath());
 
@@ -124,25 +129,10 @@ public class IconsetUploadProcessorImpl implements IconsetUploadProcessor {
             long reconcileDuration;
             
             logger.info("processing uploaded iconset zipfile: " + filename);
-
-            ZipInputStream zis = null;
-            ZipEntry zipEntry = null;
-
+            
             try {
-                zis = new ZipInputStream(new FileInputStream(filename));
-            } catch (IOException e) {
-                logger.error("IOException opening zipfile " + filename, e);
-            }
-
-            while((zipEntry = zis.getNextEntry()) != null) {
-                logger.debug("simple zip entry name: " + zipEntry.getName());
-            }
-
-            zis = null;
-            zipEntry = null;
-
-            try {
-                zis = new ZipInputStream(new FileInputStream(filename));
+            	fis = new FileInputStream(filename);
+                zis = new ZipInputStream(fis);
             } catch (IOException e) {
                 logger.error("IOException opening zipfile " + filename, e);
             }
@@ -257,6 +247,7 @@ public class IconsetUploadProcessorImpl implements IconsetUploadProcessor {
                 reconcileDuration = System.currentTimeMillis();
                 zis.closeEntry();
                 zis.close();
+                fis.close();
 
                 logger.debug("number of images retrieved from zip file: " + zipEntryIconList.size());
 
@@ -323,6 +314,17 @@ public class IconsetUploadProcessorImpl implements IconsetUploadProcessor {
             logger.debug("zip processing duration: " + zipDuration + " ms list reconciliation duration: " + reconcileDuration + " ms persist duration: " + persistDuration + " ms");
         } catch (Throwable t) {
             logger.warn("exception processing iconset zipfile", t);
+        } finally {
+        	try {
+        		if (zis != null) {
+            		zis.close();
+            	}
+            	if (fis != null) {
+            		fis.close();
+            	}
+        	} catch (Exception e) {
+        		logger.error("Error closing zip file", e);
+			}
         }
     }
 

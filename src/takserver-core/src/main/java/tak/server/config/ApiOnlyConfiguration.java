@@ -25,10 +25,10 @@ import org.springframework.context.support.SimpleThreadScope;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter;
 import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.marti.config.Auth;
 import com.bbn.marti.groups.DistributedPersistentGroupManager;
 import com.bbn.marti.groups.GroupDao;
@@ -39,17 +39,17 @@ import com.bbn.marti.groups.PersistentGroupDao;
 import com.bbn.marti.remote.ContactManager;
 import com.bbn.marti.remote.RepeaterManager;
 import com.bbn.marti.remote.ServerInfo;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.service.MissionCacheWarmer;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.bbn.marti.util.spring.RequestHolderBean;
 import com.bbn.marti.util.spring.MissionRoleAssignmentRequestHolderFilterBean;
+import com.bbn.marti.util.spring.RequestUtilBean;
 import com.bbn.metrics.MetricsCollector;
 import com.bbn.metrics.service.DatabaseMetricsService;
-import com.bbn.marti.remote.config.CoreConfigFacade;
 
 import tak.server.CommonConstants;
 import tak.server.Constants;
@@ -224,9 +224,8 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 	}
 
 	@Bean
-	@Scope(scopeName = "thread", proxyMode = ScopedProxyMode.TARGET_CLASS)
-	public RequestHolderBean requestHolderBean() {
-		return new RequestHolderBean();
+	public RequestUtilBean requestHolderBean() {
+		return new RequestUtilBean();
 	}
 
 	@Bean
@@ -251,9 +250,9 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 		int numProc = Runtime.getRuntime().availableProcessors();
 
 		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-		executor.setCorePoolSize(numProc * 3);
-		executor.setMaxPoolSize(numProc * 32);
-		executor.setQueueCapacity(1024 * 32);
+		executor.setCorePoolSize(numProc);
+		executor.setMaxPoolSize(numProc * CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getApiAsyncExecutorMultiplier());
+		executor.setQueueCapacity(CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getApiAsyncExecutorQueueSize());
 		executor.setThreadNamePrefix("takserver-api-async-executor-");
 		executor.initialize();
 
@@ -280,6 +279,11 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
     @Bean
 	public MessageDeliveryStrategy mds() {
 		return new MessageDeliveryStrategy();
+	}
+    
+    @Bean
+    SecurityContextHolderAwareRequestFilter scharf() {
+		return new SecurityContextHolderAwareRequestFilter();
 	}
 
 }

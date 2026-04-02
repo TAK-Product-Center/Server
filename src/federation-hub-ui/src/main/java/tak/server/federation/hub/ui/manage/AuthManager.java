@@ -2,9 +2,8 @@ package tak.server.federation.hub.ui.manage;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -13,25 +12,26 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.NoSuchAlgorithmException;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
-import jakarta.xml.bind.DatatypeConverter;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+
+import jakarta.xml.bind.DatatypeConverter;
 import tak.server.federation.hub.ui.FederationHubUIConfig;
 
 /* Configuration program to authorize users to access UI. */
@@ -84,7 +84,7 @@ public class AuthManager {
         X509Certificate cert;
         try {
             cert = getCertificate(file.toString());
-        } catch (CertificateException | FileNotFoundException e) {
+        } catch (CertificateException | IOException e) {
             System.err.println("Could not get certificate from " + file.toString() + ": " + e);
             return;
         }
@@ -111,10 +111,14 @@ public class AuthManager {
     }
 
     private static X509Certificate getCertificate(String filepath)
-            throws CertificateException, FileNotFoundException {
-        InputStream fileInputStream = new FileInputStream(filepath);
-        CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-        return (X509Certificate)certificateFactory.generateCertificate(fileInputStream);
+            throws CertificateException, IOException {
+
+    	X509Certificate cert = null;
+    	try (InputStream fileInputStream = new FileInputStream(filepath)) {
+        	CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+    		cert = (X509Certificate)certificateFactory.generateCertificate(fileInputStream);
+    	}
+        return cert;
     }
 
     public static String getCertificateFingerprint(X509Certificate certificate)

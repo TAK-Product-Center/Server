@@ -21,8 +21,9 @@ app.config(function($routeProvider) {
       templateUrl : "user_change_password.view.html",
       controller: "userChangePasswordController"
     })
-    .when("/group_list_users", {
-      templateUrl : "group_list_users.view.html"
+    .when("/group_edit_users", {
+      templateUrl : "group_edit_users.view.html",
+      controller: "groupEditUsersController"
     })
     .otherwise({ redirectTo: '/' });
   });

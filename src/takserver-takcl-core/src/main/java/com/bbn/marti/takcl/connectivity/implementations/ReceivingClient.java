@@ -51,7 +51,7 @@ public class ReceivingClient extends Thread implements ReceivingInterface {
 		this.user = user;
 		this.listener = listener;
 		this.log = LoggerFactory.getLogger(ReceivingClient.class);
-		this.dl = new DurationLogger(user.getConsistentUniqueReadableIdentifier(), log);
+		this.dl = new DurationLogger(user.getConsistentUniqueReadableIdentifier(), "ReceivingClient");
 		start();
 	}
 
@@ -88,7 +88,7 @@ public class ReceivingClient extends Thread implements ReceivingInterface {
 
 	private void runSSL() {
 		try {
-			tcpSocket = SSLHelper.getInstance().createSSLServerSocket(user.getConnection().getPort());
+			tcpSocket = SSLHelper.getInstance().createSSLServerSocket(user.getServer(), user.getConnection().getPort());
 			dl.begin(LogActivity.connect);
 			Socket connectionSocket = tcpSocket.accept();
 			dl.end(LogActivity.connect);

@@ -11,8 +11,6 @@ jar {
     enabled = false
 }
 
-compileJava.dependsOn(':takserver-takcl-core:compileCursedtakJava')
-
 shadowJar {
     dependsOn compileJava
     baseName = 'UserManager'
@@ -38,6 +36,11 @@ sourceSets {
             srcDir 'src/integrationTest/resources'
         }
     }
+}
+
+compileJava {
+    // Necessary to parse parameter names for Method -> CLI functionality
+    options.compilerArgs << '-parameters'
 }
 
 task integrationTest(type: Test) {
@@ -105,45 +108,33 @@ task integrationTest(type: Test) {
     dependsOn(':takserver-package:prePackage')
 }
 
+configurations.all {
+    // Exclude unused dependencies from upstream project dependencies to keep the jar size down
+    exclude group: 'org.springframework.security', module: 'spring-security-core'
+    exclude group: 'org.springframework', module: 'spring-context'
+    exclude group: 'org.springframework.boot', module: 'spring-boot-starter-data-mongodb'
+    exclude group: 'org.hibernate.orm', module: 'hibernate-core'
+    exclude group: 'org.hibernate.orm', module: 'hibernate-entitymanager'
+    exclude group: 'org.apache.ignite', module: 'ignite-indexing'
+    exclude group: 'org.antlr', module: 'antlr4'
+}
+
 dependencies {
-    implementation(project(':takserver-takcl-core')) {
-        exclude group: 'io.kubernetes', module: 'client-java'
-        exclude group: 'org.springframework', module: 'spring-context'
-        exclude group: 'org.springframework.security', module: 'spring-security-core'
-        exclude group: 'org.springframework', module: 'spring-context'
-        exclude group: 'org.springframework', module: 'spring-beans'
-        exclude group: 'org.springframework', module: 'spring-context'
-        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-data-mongodb'
-        exclude group: 'org.hibernate.orm', module: 'hibernate-core'
-        exclude group: 'org.hibernate.orm', module: 'hibernate-entitymanager'
-        exclude group: 'org.apache.ignite', module: 'ignite-indexing'
-        exclude group: 'org.hibernate.orm', module: 'hibernate-core'
-        exclude group: 'org.apache.ignite', module: 'ignite-indexing'
-        exclude group: 'org.antlr', module: 'antlr4'
-    }
-    implementation(project(':takserver-common')) {
-        exclude group: 'org.hibernate.orm', module: 'hibernate-core'
-        exclude group: 'org.apache.ignite', module: 'ignite-indexing'
-        exclude group: 'org.antlr', module: 'antlr4'
-    }
+    implementation(project(':takserver-common'))
+    implementation(project(':federation-common'))
 
     implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
     implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
     implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
     implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
+    implementation group: 'commons-io', name: 'commons-io', version: commons_io_version
+    implementation group: 'org.springframework.security', name: 'spring-security-crypto', version: spring_security_version
+    implementation group: 'org.springframework', name: 'spring-core', version: spring_version
 
-    // required to fix version conflict for h2 between ignite and spring boot
-    implementation group: 'com.h2database', name: 'h2', version: h2_version
-
+    integrationTestImplementation sourceSets.main.output
+    integrationTestImplementation sourceSets.main.compileClasspath
     integrationTestImplementation project(':takserver-takcl-core')
-    integrationTestImplementation project(':takserver-common')
-    integrationTestImplementation group: 'commons-io', name: 'commons-io', version: commons_io_version
-    integrationTestImplementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
     integrationTestImplementation group: 'junit', name: 'junit', version: junit_version
-    integrationTestImplementation group: 'xerces', name: 'xercesImpl', version: xerces_version
-
-    // required to fix version conflict for h2 between ignite and spring boot
-    integrationTestImplementation group: 'com.h2database', name: 'h2', version: h2_version
 }
 
 task copyJar(type: Copy, dependsOn: shadowJar) {

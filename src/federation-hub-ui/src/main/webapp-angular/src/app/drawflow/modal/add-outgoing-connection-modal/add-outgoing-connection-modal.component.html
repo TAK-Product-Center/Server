@@ -1,0 +1,131 @@
+<h1 mat-dialog-title class="dialogHeader">{{editorTitle}} Outgoing</h1>
+<mat-dialog-content class="mat-typography">
+  <form (ngSubmit)="onSave(federation)" #userForm="ngForm">
+    <div class="form-group">
+      <label for="stringId">Outgoing Name</label>
+      <input
+        type="text"
+        id="stringId"
+        class="form-control"
+        [(ngModel)]="federation.stringId"
+        name="stringId"
+        required
+      />
+      <div *ngIf="existingName()" class="text-danger">
+        This name already exists!
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="descriptionAnnotation">Description</label>
+      <input
+        type="text"
+        id="descriptionAnnotation"
+        class="form-control"
+        [(ngModel)]="federation.description"
+        name="description"
+        maxlength="75"
+      />
+    </div>
+
+    <small class="form-text text-muted">{{ federation.description ? (75 - federation.description.length) : 75 }} characters remaining</small>
+
+    <div class="form-group">
+      <label for="description">Host</label>
+      <input
+        type="text"
+        id="host"
+        class="form-control"
+        [(ngModel)]="federation.host"
+        name="host"
+        required
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="description">Port</label>
+      <input
+        type="number"
+        min="1" 
+        max="65535"
+        id="port"
+        class="form-control"
+        [(ngModel)]="federation.port"
+        name="port"
+        required
+      />
+    </div>
+
+    <div class="form-group" style="margin-top: 10px;">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        id="useToken"
+        name="useToken"
+        [(ngModel)]="federation.useToken"
+      />
+      <label class="form-check-label" for="useToken">
+        Use Token Authentication <span class="text-muted small">(optional)</span>
+      </label>
+    </div>
+    
+    <div *ngIf="federation.useToken" style="margin-left: 5%;">
+      <div class="form-group">
+        <input
+          class="form-check-input"
+          type="radio"
+          id="useAutomaticToken"
+          name="useAutomaticToken"
+          [(ngModel)]="federation.tokenType"
+          [value]="'automatic'"
+        />
+        <label class="form-check-label" for="useAutomaticToken">
+          Use Automatic Token
+        </label>
+      </div>
+    
+      <div class="form-group">
+        <input
+          class="form-check-input"
+          type="radio"
+          id="useManualToken"
+          name="useManualToken"
+          [(ngModel)]="federation.tokenType"
+          [value]="'manual'"
+        />
+        <label class="form-check-label" for="useManualToken">
+          Use Manual Token
+        </label>
+      </div>
+
+      <div class="mt-2">
+        <input
+          type="text"
+          id="tokenInput"
+          name="tokenInput"
+          class="form-control"
+          [disabled]="federation.tokenType !== 'manual'"
+          [(ngModel)]="federation.token"
+        />
+      </div>
+    </div>     
+
+    <div class="form-group" style="margin-top: 10px;">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        id="outgoingEnabled"
+        name="outgoingEnabled"
+        [(ngModel)]="federation.outgoingEnabled"
+      />
+      <label class="form-check-label" for="outgoingEnabled">
+        Outgoing Enabled
+      </label>
+    </div>
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button (click)="onCancel()" mat-button mat-dialog-close class="btn btn-just-outline border-radius margin-right">Cancel</button>
+  <button class="btn btn-primary" (click)="onSave(federation)" [disabled]="userForm.invalid || existingName()" [mat-dialog-close]="true">Save</button>
+</mat-dialog-actions>
+

@@ -94,7 +94,7 @@ public class PluginService implements CommandLineRunner {
 				600000, 52428800, 52428800, -1,
 				false, -1.f, false, false,
 				-1, false, 300000, 300000,
-				600000);
+				600000, 60000);
 		IgniteConfigurationHolder.getInstance().setTAKIgniteConfiguration(takIgniteConfiguration);
 		IgniteConfigurationHolder.getInstance().setIgniteConfiguration(
 				IgniteConfigurationHolder.getInstance().getIgniteConfiguration(PluginManagerConstants.PLUGIN_MANAGER_IGNITE_PROFILE, takIgniteConfiguration));

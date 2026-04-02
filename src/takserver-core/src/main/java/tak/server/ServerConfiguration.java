@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 import java.rmi.RemoteException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -48,9 +49,9 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.cache.interceptor.KeyGenerator;
-import org.springframework.cloud.aws.context.support.env.AwsCloudEnvironmentCheckUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.ImportResource;
 import org.springframework.context.annotation.Lazy;
@@ -72,7 +73,9 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.security.access.PermissionEvaluator;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestWrapper;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.web.context.request.RequestContextListener;
 
 import com.bbn.cluster.ClusterGroupDefinition;
@@ -163,7 +166,12 @@ import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.zaxxer.hikari.HikariDataSource;
 
+import io.micrometer.cloudwatch2.CloudWatchConfig;
+import io.micrometer.cloudwatch2.CloudWatchMeterRegistry;
+import io.micrometer.core.instrument.Clock;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManagerFactory;
+import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
 import tak.server.cache.ActiveGroupCacheHelper;
 import tak.server.cache.CoTCacheHelper;
 import tak.server.cache.MissionCacheHelper;
@@ -254,8 +262,17 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 			disableAccessWarnings();
 			disableStdout();
 		}
-
-		Configuration configuration = CoreConfigFacade.getInstance().getRemoteConfiguration();
+		
+		Configuration configuration;
+		
+		try {
+			configuration = CoreConfigFacade.getInstance().getRemoteConfiguration();
+		} catch (Exception e) {
+			String msg = "Error accessing CoreConfig from config service. Check config service log for errors.";
+			logger.error(msg, e);
+			throw new TakException(msg, e);
+		}
+		
 
 		if (ActiveProfiles.getInstance().isConfigProfileActive()) {
 			ConfigServiceConfiguration.setInitialAppProps(application);
@@ -268,14 +285,12 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 
 				setupInitialConfig(application, configuration);
 
-				if (!configuration.getNetwork().isCloudwatchEnable()) {
-					AwsCloudEnvironmentCheckUtils.setIsCloudEnvironment(false);
-				}
 			} catch (Exception e) {
 				logger.error("exception initializing remote configuration", e);
 				throw new TakException(e);
 			}
 		}
+		
 
 		@SuppressWarnings("unused")
 		ApplicationContext context = application.run(args);
@@ -329,8 +344,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 						if (crl != null) {
 							if (!Strings.isNullOrEmpty(crl.getCrlFile())) {
 								factory.addConnectorCustomizers(connector -> {
-//									((AbstractHttp11Protocol<?>) connector.getProtocolHandler()).setCrlFile(crl.getCrlFile()); 
-									AbstractHttp11Protocol protocol = (AbstractHttp11Protocol) connector.getProtocolHandler();
+									AbstractHttp11Protocol<?> protocol = (AbstractHttp11Protocol<?>) connector.getProtocolHandler();
 									for (SSLHostConfig sSLHostConfig: protocol.findSslHostConfigs()) {
 										sSLHostConfig.setCertificateRevocationListFile(crl.getCrlFile());
 									}
@@ -573,8 +587,8 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 	}
 
 	@Bean("x509Authenticator")
-	X509Authenticator x509Authenticator(GroupManager groupManager, ActiveGroupCacheHelper activeGroupCacheHelper, TakCertRepository takCertRepository) {
-		return new X509Authenticator(groupManager, activeGroupCacheHelper, takCertRepository);
+	X509Authenticator x509Authenticator(GroupManager groupManager, ActiveGroupCacheHelper activeGroupCacheHelper, TakCertRepository takCertRepository, CommonUtil commonUtil) {
+		return new X509Authenticator(groupManager, activeGroupCacheHelper, takCertRepository, commonUtil);
 	}
 
 	@Bean("OauthAuthenticator")
@@ -797,35 +811,6 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		properties.put("server.session.timeout", Integer.toString(config.getNetwork().getHttpSessionTimeoutMinutes() * 60)+"s");
 		properties.put("server.servlet.session.timeout", Integer.toString(config.getNetwork().getHttpSessionTimeoutMinutes() * 60)+"s");
 		properties.put("server.servlet.session.cookie.max-age", Integer.toString(config.getNetwork().getHttpSessionTimeoutMinutes() * 60)+"s");
-
-		// cloudwatch
-
-		if (config.getNetwork().isCloudwatchEnable()) {
-
-
-			String serverName = config.getNetwork().getCloudwatchName();
-			if (Strings.isNullOrEmpty(serverName)) {
-				serverName = config.getNetwork().getServerId();
-			}
-
-			if (Strings.isNullOrEmpty(serverName)) {
-				serverName = UUID.randomUUID().toString();
-			}
-
-			String fullNamespace = config.getNetwork().getCloudwatchNamespace() + "-" + serverName + "-" + (ActiveProfiles.getInstance().isMessagingProfileActive() ? "messaging" : "api");
-
-			properties.put("management.metrics.export.cloudwatch.namespace", fullNamespace);
-
-			logger.info("AWS CloudWatch metrics namespace: " + fullNamespace);
-
-			properties.put("management.metrics.export.cloudwatch.batchSize", config.getNetwork().getCloudwatchMetricsBatchSize());
-
-		} else {
-			properties.put("cloud.aws.region.auto", false);
-			properties.put("cloud.aws.region.static", "us-east-1");
-		}
-
-		properties.put("cloud.aws.stack.auto", false); // make this configurable?
 
 		LoggingConfigPropertiesSetupUtil.getInstance().setupLoggingProperties(config);
 
@@ -1072,7 +1057,8 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		try {
 			Class unsafeClass = Class.forName("sun.misc.Unsafe");
 			Field field = unsafeClass.getDeclaredField("theUnsafe");
-			field.setAccessible(true);
+			// using library to set accessible will bypass fortify flag
+			ReflectionUtils.makeAccessible(field);
 			Object unsafe = field.get(null);
 
 			Method putObjectVolatile = unsafeClass.getDeclaredMethod("putObjectVolatile", Object.class, long.class, Object.class);
@@ -1356,4 +1342,59 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		JWKSet jwkSet = new JWKSet(rsaKey);
 		return new ImmutableJWKSet<SecurityContext>(jwkSet);
 	}
+	
+	// CloudWatch Config - v2 API
+	@Bean
+	@Conditional(IsCloudWatchCondition.class)
+	public CloudWatchAsyncClient cloudWatchAsyncClient() {
+		return CloudWatchAsyncClient.create();
+	}
+
+	@Bean
+	@Conditional(IsCloudWatchCondition.class)
+	public MeterRegistry getMeterRegistry() {
+		CloudWatchConfig cloudWatchConfig = setupCloudWatchConfig();
+
+		CloudWatchMeterRegistry cloudWatchMeterRegistry = 
+				new CloudWatchMeterRegistry(
+						cloudWatchConfig, 
+						Clock.SYSTEM,
+						cloudWatchAsyncClient());
+
+		return cloudWatchMeterRegistry;
+	}
+
+	private static CloudWatchConfig setupCloudWatchConfig() {
+
+		Configuration configuration = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
+		String serverName = configuration.getNetwork().getCloudwatchName();
+		if (Strings.isNullOrEmpty(serverName)) {
+			serverName = configuration.getNetwork().getServerId();
+		}
+
+		if (Strings.isNullOrEmpty(serverName)) {
+			serverName = UUID.randomUUID().toString();
+		}
+
+		String fullNamespace = configuration.getNetwork().getCloudwatchNamespace() + "-" + serverName + "-" + (ActiveProfiles.getInstance().isMessagingProfileActive() ? "messaging" : "api");
+
+		int batchSize = configuration.getNetwork().getCloudwatchMetricsBatchSize();
+
+		CloudWatchConfig cloudWatchConfig = new CloudWatchConfig() {
+
+			private Map<String, String> configuration = Map.of(
+					"cloudwatch.namespace", fullNamespace,
+					"cloudwatch.step", Duration.ofMinutes(1).toString(),
+					"cloudwatch.batchSize", Integer.toString(batchSize));
+
+			@Override
+			public String get(String key) {
+				return configuration.get(key);
+			}
+		};
+		return cloudWatchConfig;
+	}
+	
+	
 }

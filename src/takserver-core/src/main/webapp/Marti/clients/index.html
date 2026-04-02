@@ -140,6 +140,46 @@ PostgreSQL database configuration suggestion <a href="/Marti/database/index.html
 				<button class="btn btn-primary" type="button" ng-click="$ctrl.ok()">OK</button>
 			</div>
 		</script>
+	
+	
+		<script type="text/ng-template" id="controlGroupsModal.html">
+			<div class="modal-header">
+				<h3 class="modal-title" id="groups_modal-title">Control Groups</h3>
+			</div>
+			<div class="modal-body" id="groups_modal-body">
+				<table>
+					<thead>
+					<tr>
+						<th class="col-name">GROUP NAME</th>
+						<th class="col-in">IN</th>
+						<th class="col-out">OUT</th>
+						<th class="col-actions">BOTH</th>
+					</tr>
+					</thead>
+					<tbody>
+					<tr ng-repeat="groupData in displayedGroups">
+						<td class="col-name">{{groupData.IN ? groupData.IN.name : groupData.OUT.name}}</td>
+						<td class="col-in">
+							<input type="checkbox" ng-model="groupData.IN.active"
+								   ng-disabled="!groupData.IN">
+						</td>
+						<td class="col-out">
+							<input type="checkbox" ng-model="groupData.OUT.active"
+								   ng-disabled="!groupData.OUT">
+						</td>
+						<td class="col-actions">
+							<button class="btn btn-success" type="button" ng-click="setBoth(groupData, true)">ON</button>
+							<button class="btn btn-danger" type="button" ng-click="setBoth(groupData, false)">OFF</button>
+						</td>
+					</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="modal-footer">
+				<button class="btn btn-primary" type="button" ng-click="$groups_ctrl.save()">SAVE</button>
+			</div>
+		</script>
+	
 		<div uib-alert ng-repeat="alert in alerts"
 		ng-class="'alert-' + (alert.type || 'success')"
 		close="closeAlert($index)" dismiss-on-timeout="4000">{{alert.msg}}
@@ -225,6 +265,7 @@ PostgreSQL database configuration suggestion <a href="/Marti/database/index.html
 									<div class="dropdown-content" ng-attr-id="{{ sub.subscriptionUid }}">
 										<a data-ng-click="deleteSubscription(sub)">Delete</a>
 										<a data-ng-click="sub.incognito = !sub.incognito; toggleIncognito(sub)">Incognito</a>
+										<a data-ng-click="openGroupsControl(sub)">Control Groups</a>
 									</div>
 								</div>
 							</td>

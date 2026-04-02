@@ -52,10 +52,10 @@
         <h3>Users <button style="font-size:20px;" ng-click="refresh_users()"> <i class="fa fa-refresh"></i> </button> </h3> 
         <p>Search <input type="text" ng-model="user_search_term"></p>
 
-        <div class="list_container">
+        <div class="list_container" ng-drop="isUserListDraggable()" ng-drop-success="onDropCompleteToUserListRepo($data,$event)" > 
             <div ng-repeat="x in users | filter:{username:user_search_term} | orderBy:'username' ">
 
-                <div class="dropright user_object" id="button_user_{{ x.username }}">
+                <div class="dropright user_object" id="button_user_{{ x.username }}" ng-drag="isUserListDraggable()" ng-drag-data="{'username': x.username, 'from': 'UserListRepo'}" data-allow-transform="true" ng-drag-success="onDragComplete($data,$event)">
                     <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton_user_{{ x.username }}" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         {{ x.username }}
                     </button>
@@ -84,22 +84,24 @@
         
         <p style="margin-top:10px;">Search <input type="text" ng-model="group_search_term"></p>
 
-        <div class="list_container" ng-drop="true" ng-drop-success="onDropCompleteToGroupListRepo($data,$event)" > 
+        <div class="list_container" ng-drop="isGroupListDraggable()" ng-drop-success="onDropCompleteToGroupListRepo($data,$event)" > 
             <div ng-repeat="x in groupnames | filter:{groupname:group_search_term} | orderBy:'groupname' ">
                 
-                <div class="dropright group_object" id="button_group_{{ x.groupname }}" ng-drag="true" ng-drag-data="{'groupname': x.groupname, 'from': 'GroupListRepo'}" data-allow-transform="true" ng-drag-success="onDragComplete($data,$event)">
+                <div class="dropright group_object" id="button_group_{{ x.groupname }}" ng-drag="isGroupListDraggable()" ng-drag-data="{'groupname': x.groupname, 'from': 'GroupListRepo'}" data-allow-transform="true" ng-drag-success="onDragComplete($data,$event)">
                     <button class="btn btn-info dropdown-toggle" type="button" id="dropdownMenuButton_group_{{ x.groupname }}" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         {{ x.groupname }}
                     </button>
                     <div class="dropdown-menu" aria-labelledby="dropdownMenuButton_group_{{ x.groupname }}">
-                      <a class="dropdown-item" href="#!group_list_users" ng-click="group_list_users(x.groupname)">List users</a>
+                      <a class="dropdown-item" href="#!group_edit_users" ng-click="group_edit_users(x.groupname)">View/Edit users</a>
                     </div>
                 </div>
 
             </div>
         </div>
         <div ng-drag-clone="">
-            <button class="btn btn-info" type="button">{{ clonedData.groupname }}</button>
+            <button class="btn" ng-class="clonedData.groupname ? 'btn-info' : 'btn-secondary'" type="button">
+                {{ clonedData.groupname || clonedData.username }}
+            </button>
         </div>
 
     </div>
@@ -115,6 +117,7 @@
 <script src="js/controllers/newUsersController.js"></script>
 <script src="js/controllers/newGroupController.js"></script>
 <script src="js/controllers/userEditGroupsController.js"></script>
+<script src="js/controllers/groupEditUsersController.js"></script>
 <script src="js/controllers/userChangePasswordController.js"></script>
 
 </body>

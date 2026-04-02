@@ -1,5 +1,6 @@
 package tak.db.profiler.table;
 
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -31,7 +32,11 @@ public class GroupsTable {
 	
 	public void initializeTable(DataSource dataSource) {
 		try {
-			ResultSet rs = dataSource.getConnection().prepareStatement("select bitpos from groups;").executeQuery();
+			PreparedStatement ps = dataSource.getConnection().prepareStatement("select bitpos from groups;");
+
+			logger.info("Executing: " + ps.toString());
+			
+			ResultSet rs = ps.executeQuery();
 			
 			while(rs.next()) {
 				int bitpos = rs.getInt("bitpos");

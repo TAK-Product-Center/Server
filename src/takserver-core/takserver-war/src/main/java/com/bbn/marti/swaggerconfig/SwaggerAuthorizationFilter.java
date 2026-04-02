@@ -1,28 +1,29 @@
 package com.bbn.marti.swaggerconfig;
 
+import java.io.IOException;
+
+import org.springframework.web.filter.OncePerRequestFilter;
+
 import com.bbn.marti.config.Docs;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.UnauthorizedException;
-import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
-import org.springframework.web.filter.OncePerRequestFilter;
+import com.bbn.marti.util.CommonUtil;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
 
 public class SwaggerAuthorizationFilter extends OncePerRequestFilter {
 
-	volatile CommonUtil martiUtil;
+	volatile CommonUtil commonUtil;
 
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws IOException, ServletException {
 
-        if (adminOnly() && !martiUtil().isAdmin()) {
+        if (adminOnly() && !martiUtil().isAdmin(req)) {
             throw new UnauthorizedException();
         }
 
@@ -45,15 +46,15 @@ public class SwaggerAuthorizationFilter extends OncePerRequestFilter {
     }
 
     private CommonUtil martiUtil() {
-        if (martiUtil == null) {
+        if (commonUtil == null) {
             synchronized(this) {
-                if (martiUtil == null) {
+                if (commonUtil == null) {
                     if (SpringContextBeanForApi.getSpringContext() != null) {
-                        martiUtil = SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class);
+                        commonUtil = SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class);
                     }
                 }
             }
         }
-        return martiUtil;
+        return commonUtil;
     }
 }

@@ -3,6 +3,7 @@ package tak.server.federation.hub.ui.graph;
 import tak.server.federation.hub.ui.JsonRawValueDeserializer;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -14,6 +15,7 @@ import java.util.Map;
 /**
  * Created on 5/15/2017.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include= JsonTypeInfo.As.PROPERTY, property="graphType")
 @JsonSubTypes({ @JsonSubTypes.Type(value = FederateCell.class, name = "FederateCell"),
                 @JsonSubTypes.Type(value = GroupCell.class, name= "GroupCell"),
@@ -24,29 +26,12 @@ public abstract class PolicyObjectCell {
 
     private String id;
 
-    /**
-     * Special field for storing UI attributes. These attributes sometimes
-     * have Json fields that start with a '.', which is not allowed in Mongo,
-     * so we just store the entire attrs as a raw value.
-     */
-    @JsonRawValue
-    @JsonDeserialize(using = JsonRawValueDeserializer.class)
-    private Object attrs;
-
     public String getId() {
         return id;
     }
 
     public void setId(String id) {
         this.id = id;
-    }
-
-    public Object getAttrs() {
-        return attrs;
-    }
-
-    public void setAttrs(Object attrs) {
-        this.attrs = attrs;
     }
 
     /**

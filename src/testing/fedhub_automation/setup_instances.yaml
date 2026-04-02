@@ -79,7 +79,7 @@
         key_name: "{{ key_name }}"
         instance_type: "{{ fedhub_instance_type }}"
         image_id: "{{ fedhub_ami_id }}"
-        security_group: sg-b721f0f8
+        security_group: sg-0808f37c2d7ad06e2
         region: "{{ region }}"
         aws_secret_key: "{{ aws_secret_key }}"
         aws_access_key: "{{ aws_access_key }}"
@@ -88,6 +88,7 @@
         wait: true
         count: 1
         detailed_monitoring: true
+        iam_instance_profile: MyCloudWatchAgent
       register: ec2_output
     - set_fact:
         ec2_fedhubs: "{{ ec2_output }}"
@@ -128,7 +129,7 @@
         key_name: "{{ key_name }}"
         instance_type: "{{ takserver_instance_type }}"
         image_id: "{{ takserver_ami_id }}"
-        security_group: sg-0a127f08b303384b3
+        security_group: sg-0808f37c2d7ad06e2
         region: "{{ region }}"
         aws_secret_key: "{{ aws_secret_key }}"
         aws_access_key: "{{ aws_access_key }}"
@@ -223,7 +224,7 @@
       delegate_to: "{{ ec2_takservers.instances[0].public_ip_address }}"
     - name: copy files from first instance to other instances
       ansible.builtin.shell:
-        cmd: scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "{{ key_name }}".pem takserver_config_"{{ iteration + 1 }}"/* "{{ takserver_user_name }}"@"{{ item.public_ip_address }}":/home/"{{ takserver_user_name }}"/
+        cmd: scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "{{ key_name }}".pem takserver_config_"{{ iteration + 1 }}"/* "{{ takserver_user_name }}"@"{{ item.private_ip_address }}":/home/"{{ takserver_user_name }}"/
         chdir: /home/{{ takserver_user_name }}
       when: ec2_takservers.instances | length > 1  # Ensure there is more than one instance
       loop: "{{ ec2_takservers.instances[1:] }}"  # Start from the second instance
@@ -259,11 +260,13 @@
         cmd: |
           sudo dnf --disablerepo=* -y install https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
           sudo dnf update -y
-          sudo dnf install java-17-openjdk-devel -y
-          sudo yum install takserver-fed-hub-*.noarch.rpm -y
+          sudo dnf install java-17-openjdk -y
+          sudo yum install {{ fedhub_version }} -y
           sudo cp federation-hub-broker.yml /opt/tak/federation-hub/configs/federation-hub-broker.yml
           sudo cp federation-hub-ui.yml /opt/tak/federation-hub/configs/federation-hub-ui.yml
           sudo dnf install checkpolicy
+          sudo dnf install epel-release -y
+          sudo dnf install collectd -y
           cd /opt/tak/federation-hub && sudo ./apply-selinux.sh && sudo semodule -l | grep takserver
           cd /home/{{ hostvars.localhost.fedhub_user_name }}
           sudo cp /opt/tak/federation-hub/scripts/db/mongodb-org.repo /etc/yum.repos.d/mongodb-org.repo
@@ -272,7 +275,7 @@
           sudo systemctl enable mongod
           sudo systemctl restart mongod
           sudo /opt/tak/federation-hub/scripts/db/configure.sh
-          sudo alternatives --set java /usr/lib/jvm/java-17-openjdk-17.0.12.0.7-2.el8.x86_64/bin/java
+          sudo alternatives --set java /usr/lib/jvm/java-17-openjdk-17.0.14.0.7-3
           sudo cp -r fedhub_files /opt/tak/federation-hub/certs/files
           sudo mv ui_generated_policy.json /opt/tak/federation-hub/
           sudo chmod 777 -R /opt/tak/federation-hub
@@ -282,6 +285,11 @@
           sudo java -jar /opt/tak/federation-hub/jars/federation-hub-manager.jar /opt/tak/federation-hub/certs/files/admin.pem
           sudo dnf install xorg-x11-xauth xorg-x11-utils xorg-x11-fonts* -y
           sudo dnf install unzip -y
+          sudo dnf install wget -y
+          # wget https://amazoncloudwatch-agent.s3.amazonaws.com/redhat/amd64/latest/amazon-cloudwatch-agent.rpm
+          # sudo rpm -U ./amazon-cloudwatch-agent.rpm
+          # sudo mv config.json /opt/aws/amazon-cloudwatch-agent/bin/config.json
+          # sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json
         chdir: /home/{{ hostvars.localhost.fedhub_user_name }}/
 
 - name: provisioning pytak instances
@@ -300,7 +308,7 @@
         key_name: "{{ key_name }}"
         instance_type: "{{ pytak_instance_type }}"
         image_id: "{{ pytak_ami_id }}"
-        security_group: sg-b721f0f8
+        security_group: sg-0808f37c2d7ad06e2
         region: "{{ region }}"
         aws_secret_key: "{{ aws_secret_key }}"
         aws_access_key: "{{ aws_access_key }}"
@@ -334,7 +342,7 @@
       delegate_to: localhost
     - name: copy files from first takserver instance to pytak instances
       ansible.builtin.shell:
-        cmd: scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "{{ key_name }}".pem takserver_config_{{ iteration // pytak_num_instances }}/{{ pytak_config_files_dir }}/load_test "{{ pytak_user_name }}"@"{{ item.public_ip_address }}":/home/"{{ pytak_user_name }}"/
+        cmd: scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "{{ key_name }}".pem takserver_config_{{ iteration // pytak_num_instances }}/{{ pytak_config_files_dir }}/load_test "{{ pytak_user_name }}"@"{{ item.private_ip_address }}":/home/"{{ pytak_user_name }}"/
         chdir: /home/{{ takserver_user_name }}
       when: ec2_pytaks.instances | length > 1  # Ensure there is more than one instance
       loop: "{{ ec2_pytaks.instances }}"  # Start from the second instance

@@ -25,6 +25,7 @@ import org.springframework.security.oauth2.server.resource.InvalidBearerTokenExc
 import com.bbn.marti.config.Auth;
 import com.bbn.marti.config.Oauth;
 import com.bbn.marti.jwt.JwtUtils;
+import com.bbn.marti.oauth.AuthCookieUtils;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.AuthCallback;
@@ -123,10 +124,10 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
         try {
 
             String token = user.getName();
-            Claims claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256);
+            Claims claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256, user.getCert() != null);
             if (claims == null) {
                 token = user.getToken();
-                claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256);
+                claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256, user.getCert() != null);
                 if (claims == null) {
                     throw new InvalidBearerTokenException("Unable to parse claims from token : " + token);
                 }
@@ -339,7 +340,10 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                 }
             }
 
-            AuthenticatorUtil.setUserRolesBasedOnRequestPort(user, logger);
+            boolean userHasWebtakAccess = AuthCookieUtils.userHasWebtakAccess(oauthConf, claims);
+
+            AuthenticatorUtil.setUserRolesBasedOnRequestPort(user, logger, userHasWebtakAccess);
+
         } catch (InvalidBearerTokenException invalidBearerTokenException) {
             logger.error("rethrowing InvalidBearerTokenException in OAuthAuthenticator!", invalidBearerTokenException);
             throw invalidBearerTokenException;

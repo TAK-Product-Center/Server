@@ -19,7 +19,8 @@ public class MethodNameMultiStringArgCacheKeyGenerator implements KeyGenerator {
         
         for (int i = 0; i < params.length; i++) {
         	keyBuilder.append("_");
-            keyBuilder.append(Hashing.sha256().hashBytes(params[i].toString().getBytes()).toString());
+            keyBuilder.append(params[i] == null ? "null" :
+                    Hashing.sha256().hashBytes(params[i].toString().getBytes()).toString());
         }
 
     	return keyBuilder.toString();

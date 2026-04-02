@@ -2,6 +2,8 @@
 
 package com.bbn.marti.groups;
 
+import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Hashtable;
@@ -37,6 +39,7 @@ import com.bbn.marti.config.LdapSecurityType;
 import com.bbn.marti.config.LdapStyle;
 import com.bbn.marti.remote.LdapGroup;
 import com.bbn.marti.remote.RemoteSubscription;
+import com.bbn.marti.remote.exception.ForbiddenException;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.AuthResult;
@@ -52,6 +55,7 @@ import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.groups.UserClassification;
 import com.bbn.marti.remote.LdapUser;
 import com.bbn.marti.remote.util.RemoteUtil;
+import com.bbn.marti.service.Resources;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.google.common.base.Strings;
 import com.google.common.collect.Sets;
@@ -167,8 +171,17 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         groupStore().getUserGroupMap().putIfAbsent(user, new ConcurrentSkipListSet<Group>());
         
         if (shouldCacheUser(user)) {
-        	IgniteCacheHolder.getIgniteUserOutboundGroupCache().put(user.getConnectionId(), getOutboundGroupVector(user));
-            IgniteCacheHolder.getIgniteUserInboundGroupCache().put(user.getConnectionId(), getInboundGroupVector(user));
+        	final User fuser = user;
+
+        	Resources.igniteSubscriptionCacheAddingPool.execute(() -> {
+
+        		try {
+        			IgniteCacheHolder.getIgniteUserOutboundGroupCache().put(fuser.getConnectionId(), getOutboundGroupVector(fuser));
+        			IgniteCacheHolder.getIgniteUserInboundGroupCache().put(fuser.getConnectionId(), getInboundGroupVector(fuser));
+        		} catch (Exception e) {
+        			logger.error("error caching user in ignite");
+        		}
+        	});
         }
     }
     
@@ -187,8 +200,18 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         user.getConnectionType();
 
         if (shouldCacheUser(user)) {
-        	IgniteCacheHolder.getIgniteUserOutboundGroupCache().put(connectionId, getOutboundGroupVector(user));
-            IgniteCacheHolder.getIgniteUserInboundGroupCache().put(connectionId, getInboundGroupVector(user));
+        	
+        	final User fuser = user;
+        	
+        	Resources.igniteSubscriptionCacheAddingPool.execute(() -> {
+
+        		try {
+        			IgniteCacheHolder.getIgniteUserOutboundGroupCache().put(connectionId, getOutboundGroupVector(fuser));
+        			IgniteCacheHolder.getIgniteUserInboundGroupCache().put(connectionId, getInboundGroupVector(fuser));
+        		} catch (Exception e) {
+        			logger.error("error caching user in ignite", e);
+        		}
+        	});
         }
     }
     
@@ -207,8 +230,17 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         }
         
         if (shouldCacheUser(user)) {
-        	 IgniteCacheHolder.getIgniteUserOutboundGroupCache().remove(user.getConnectionId());
-             IgniteCacheHolder.getIgniteUserInboundGroupCache().remove(user.getConnectionId());
+        	Resources.igniteSubscriptionCacheRemovalPool.execute(() -> {
+        		
+        		final User fuser = user;
+        		
+        		try {
+        			IgniteCacheHolder.getIgniteUserOutboundGroupCache().remove(fuser.getConnectionId());
+        			IgniteCacheHolder.getIgniteUserInboundGroupCache().remove(fuser.getConnectionId());
+        		} catch (Exception e) {
+        			logger.error("error deleting user {} from ignite group cache ", fuser);
+        		}
+        	});
         }
         
         User removedUser = groupStore().getConnectionIdUserMap().remove(user.getConnectionId());
@@ -253,13 +285,25 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         // add this group to the user group list for this user if not already present
         userGroups.add(storedGroup);
         
-        if (shouldCacheUser(user)) {
-        	IgniteCacheHolder.getIgniteUserOutboundGroupCache().put(user.getConnectionId(), getOutboundGroupVector(user));
-            IgniteCacheHolder.getIgniteUserInboundGroupCache().put(user.getConnectionId(), getInboundGroupVector(user));
-        }
+        final User fuser = user;
+        final Group fgroup = group;
         
-        if (logger.isDebugEnabled()) {
-        	logger.debug("add user " + user.getId() + " to " + group);
+
+        if (shouldCacheUser(user)) {
+        	Resources.igniteSubscriptionCacheAddingPool.execute(() -> {
+
+        		try {
+        			IgniteCacheHolder.getIgniteUserOutboundGroupCache().put(user.getConnectionId(), getOutboundGroupVector(fuser));
+        			IgniteCacheHolder.getIgniteUserInboundGroupCache().put(user.getConnectionId(), getInboundGroupVector(fuser));
+        		} catch (Exception e) {
+        			logger.error("error caching user in ignite", e);
+        		}
+
+
+        		if (logger.isDebugEnabled()) {
+        			logger.debug("add user " + fuser.getId() + " to " + fgroup);
+        		}
+        	});
         }
     }
 
@@ -341,8 +385,17 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         }
         
         if (shouldCacheUser(user)) {
-        	IgniteCacheHolder.getIgniteUserOutboundGroupCache().put(user.getConnectionId(), getOutboundGroupVector(user));
-            IgniteCacheHolder.getIgniteUserInboundGroupCache().put(user.getConnectionId(), getInboundGroupVector(user));
+        	
+        	final User fuser = user;
+        	
+        	Resources.igniteSubscriptionCacheAddingPool.execute(() -> {
+        		try {
+        			IgniteCacheHolder.getIgniteUserOutboundGroupCache().put(fuser.getConnectionId(), getOutboundGroupVector(fuser));
+        			IgniteCacheHolder.getIgniteUserInboundGroupCache().put(fuser.getConnectionId(), getInboundGroupVector(fuser));
+        		} catch (Exception e) {
+        			logger.error("error caching user in ignite", e);
+        		}
+        	});
         }
     }
 
@@ -358,15 +411,18 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
     public Collection<Group> getAllGroups() {
         
         logger.debug("getAllGroups");
-        
-        NavigableSet<Group> allGroups = groupDao().fetchAll();
-        
-        for (Group group : allGroups) {
-        	groupStore().getGroups().putIfAbsent(getGroupMapKey(group), group);
+
+        if (!config().getRepository().isEnable()) {
+            return new ConcurrentSkipListSet<>();
         }
-        
-       return allGroups;
-        
+
+        NavigableSet<Group> allGroups = groupDao().fetchAll();
+
+        for (Group group : allGroups) {
+            groupStore().getGroups().putIfAbsent(getGroupMapKey(group), group);
+        }
+
+        return allGroups;
     }
     
     @Override
@@ -568,18 +624,25 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
     }
 
     @Override
-    public void authenticateCoreUsers(String username) {
+    public AuthResult authenticate(User user) {
+
+        String type = "X509";
+        if (user.getCert() == null) {
+            type = "oauth";
+        }
+
+        return authenticate(type, user);
+    }
+
+    @Override
+    public boolean authenticateCoreUsers(String username) {
+        boolean found = false;
         try {
             for (User user : getAllUsers()) {
                 if (user.getConnectionType() == ConnectionType.CORE && user.getName().equals(username)) {
+                    found = true;
                     try {
-
-                        String type = "X509";
-                        if (user.getCert() == null) {
-                            type = "oauth";
-                        }
-
-                        authenticate(type, user);
+                        authenticate(user);
                     } catch (Exception e) {
                         logger.error("exception in authenticateCoreUsers for user : " + username, e);
                     }
@@ -588,6 +651,7 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         } catch (Exception e) {
             logger.error("exception in authenticateCoreUsers!", e);
         }
+        return found;
     }
 
     @Override
@@ -829,11 +893,10 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
 			SearchControls searchControls = new SearchControls();
 
 			searchControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-			String[] attributeNames = new String[4];
+			String[] attributeNames = new String[3];
 			attributeNames[0] = CN_ATTR_NM;
-			attributeNames[1] = getDnAttributeName();
-			attributeNames[2] = DESCRIPTION_ATTR_NM;
-			attributeNames[3] = MEMBER_ATTR_NM;
+			attributeNames[1] = DESCRIPTION_ATTR_NM;
+			attributeNames[2] = MEMBER_ATTR_NM;
 
 			searchControls.setReturningAttributes(attributeNames);
 			
@@ -856,8 +919,8 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
                 }
 
                 try {
-                    if (searchResult.getAttributes().get(getDnAttributeName()) != null) {
-                        dn = ((String) searchResult.getAttributes().get(getDnAttributeName()).get());
+                    if (searchResult.getName() != null) {
+                        dn = searchResult.getName();
                     }
                 } catch (Exception e) {
                     logger.error("exception getting DN", e);
@@ -923,6 +986,17 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         }
 
         try {
+            if (ldapConfig.isLoginWithEmail()) {
+                String email = username;
+                username =  LdapAuthenticator.getInstance().getUsernameByEmail(email);
+                if (username == null) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("getUsernameByEmail lookup failed for : " + email);
+                    }
+                    return null;
+                }
+            }
+
             context = connectLdap();
 
             String logonNameAttr = "sAMAccountName";
@@ -1128,4 +1202,28 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
 		ConnectionType connectionType = user.getConnectionType();
 		return connectionType == ConnectionType.CORE || connectionType == ConnectionType.FEDERATE;
 	}
+
+    @Override
+	public String validateAccess(String[] requestedGroupNames, String userGroupVector) {
+        Set<Group> requestedGroups = findGroups(Arrays.asList(requestedGroupNames));
+        String requestedGroupVector = RemoteUtil.getInstance().bitVectorToString(
+                RemoteUtil.getInstance().getBitVectorForGroups(requestedGroups));
+        BigInteger requestedBitVector = RemoteUtil.getInstance().bitVectorStringToInt(requestedGroupVector);
+        BigInteger userBitVector = RemoteUtil.getInstance().bitVectorStringToInt(userGroupVector);
+
+        if (requestedBitVector.compareTo(BigInteger.ZERO) == 0) {
+            throw new ForbiddenException("Missing groups for requested resource!");
+        }
+
+        if (userBitVector.compareTo(BigInteger.ZERO) == 0) {
+            throw new ForbiddenException("Missing groups for user!");
+        }
+
+        // ensure that the user has access to all groups that are being requested
+        if (userBitVector.and(requestedBitVector).compareTo(requestedBitVector) != 0) {
+            throw new ForbiddenException("Illegal attempt to set groupVector!");
+        }
+
+        return requestedGroupVector;
+    }
 }

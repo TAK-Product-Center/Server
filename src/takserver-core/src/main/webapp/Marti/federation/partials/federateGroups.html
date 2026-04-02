@@ -60,6 +60,8 @@
     </p>
     <p>
     When events arrive from this federate, you may direct them to devices that belong to any of the local inbound groups configured below. Similarly, you may send events to this federate from devices that belong to any of the local outbound groups configured.
+
+    For Example, if you had the outbound group: "A", any event associated with group "A" would be sent to this federate. If you had inbound group: "A", any events received from this federate will be sent to all local users / devices that are in group "A".
     </p>
     <p>Note: Adding and Removing groups affects the runtime environment
     immediately, and changes are saved to the configuration file.  This
@@ -99,9 +101,9 @@
 			  			<td class="rowHeader"><label style="font-weight:normal;" for="direction">Direction</label></td>
 			  			<td class="rowValue">
 					    	<select name="direction" data-ng-model="direction" required>
-							<option value="BOTH">Both (Inbound/Outbound)</option>
+								<option value="BOTH">Both (Inbound/Outbound)</option>
 				      			<option value="INBOUND">Inbound</option>
-							<option value="OUTBOUND">Outbound</option>
+								<option value="OUTBOUND">Outbound</option>
 							</select>
 			  			</td>
 			  			<td></td>
@@ -150,7 +152,7 @@
 
 				<div style="border: 1px solid gray; padding:5px;">
 					<p>
-						When group mapping is enabled, the local incoming groups defined above will not be used (unless 'fallback when no group mappings' is enabled). Events that arrive will have the remote groups they originated from attached to them. This allows you to map a specific remote groups directly to any local groups.
+						When group mapping is enabled, the local inbound groups defined above will not be used (unless 'fallback when no group mappings' is enabled). Events that arrive will have the remote groups they originated from attached to them. This allows you to map a specific remote groups directly to any local groups.
 					</p>
 					<p>
 						The Remote Group List below will only be populated when the federate
@@ -230,8 +232,45 @@
 				<div data-ng-show="federateGroupsMap.length == 0">
 					<table class="tablesorter"><tr><td colspan="2">No Groups Configured</td></tr></table>
 				</div>
-
 				<br/>
+				Federate Group Mapping Group Hop Limits:
+				<table id="groupMappingHopsList" class="tablesorter" style="border-collapse:separate;border-spacing:2px;">
+			    	<thead>
+					  	<tr>
+						  	<th>Group</th>		  
+						  	<th>Hop Limit</th>
+						  	<th>&nbsp;</th>
+						</tr>
+					</thead>
+					
+					<tbody>
+						<tr data-ng-repeat="(key, value) in groupHopLimits">
+						    <td data-ng-bind="key"></td>
+						    <td>
+						    	<input data-ng-model="groupHopLimits[key]" data-ng-change="setHopLimitForGroup('hops-' + key, key)" id="{{ 'hops-' + key }}" type="number" ng-value="value" min="-1">
+						    </td>
+						    <td>
+						    	 <a class="nav" data-ng-click="deleteHopLimitForGroup(key);">Remove</a>
+						    </td>
+						</tr>
+						<tr>
+						    <td>
+						    	<select name="newGroupHopLimitName" data-ng-model="newGroupHopLimitName" id="newGroupHopLimitName" data-ng-click="remoteGroup(remoteGroup)">
+									<option value ="">-- Select Group -- </option>
+									<option data-ng-repeat="group in getAvailableHopLimitGroups()" value="{{group}}">{{group}}</option>
+								</select>
+						    </td>
+						    <td>
+						    	<input id="newGroupHopLimitInput" data-ng-model="newGroupHopLimitInput" type="number" ng-value="-1" min="-1">
+						    </td>
+						    <td>
+						    	 <a data-ng-click="setHopLimitForGroup('newGroupHopLimitInput', newGroupHopLimitName)" class="nav">Add</a>
+						    </td>
+						</tr>
+					</tbody>
+				</table>
+				<br/>
+
 				<input type="button" data-ng-click="backToFederates()" value="Back To Federates" />&nbsp;
 				<br/><br/>
 		</form>

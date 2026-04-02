@@ -37,7 +37,6 @@ import java.util.stream.Collectors;
 import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
 
-import com.bbn.marti.remote.groups.*;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.cache.query.ContinuousQuery;
@@ -58,6 +57,7 @@ import org.springframework.context.event.EventListener;
 import com.atakmap.Tak.BinaryBlob;
 import com.atakmap.Tak.CRUD;
 import com.atakmap.Tak.ContactListEntry;
+import com.atakmap.Tak.FederateGroupHopLimits;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.ROL;
 import com.bbn.cluster.ClusterGroupDefinition;
@@ -66,6 +66,8 @@ import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
 import com.bbn.marti.config.Federation.Federate.Mission;
+import com.bbn.marti.config.Federation.Federate.OutboundGroupHopLimit;
+import com.bbn.marti.config.Federation.FederateCA;
 import com.bbn.marti.config.Federation.FederationOutgoing;
 import com.bbn.marti.config.Federation.FederationServer.FederationPort;
 import com.bbn.marti.config.Filter;
@@ -89,6 +91,13 @@ import com.bbn.marti.remote.RemoteContact;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.DuplicateFederateException;
 import com.bbn.marti.remote.exception.TakException;
+import com.bbn.marti.remote.groups.ConnectionInfo;
+import com.bbn.marti.remote.groups.Direction;
+import com.bbn.marti.remote.groups.FederateUser;
+import com.bbn.marti.remote.groups.Group;
+import com.bbn.marti.remote.groups.GroupManager;
+import com.bbn.marti.remote.groups.GroupMapping;
+import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.service.DistributedSubscriptionManager;
@@ -96,6 +105,7 @@ import com.bbn.marti.service.FederatedSubscriptionManager;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SSLConfig;
 import com.bbn.marti.service.Subscription;
+import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
@@ -132,7 +142,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	private static final String SSL_TRUSTSTORE_KEY = "fed-ssl-truststore";
 
-	private final AtomicReference<Messenger<CotEventContainer>> cotMessenger = new AtomicReference<>();
+	private final AtomicReference<Messenger<CotEventContainer>> cotMessenger = new AtomicReference<>(null);
 
 	private final AtomicInteger counter = new AtomicInteger();
 
@@ -147,12 +157,8 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 	@SuppressWarnings("unchecked")
 	private Messenger<CotEventContainer> messenger() {
-		if (cotMessenger.get() == null) {
-			synchronized (this) {
-				if (cotMessenger.get() == null) {
-					cotMessenger.set((Messenger<CotEventContainer>) SpringContextBeanForApi.getSpringContext().getBean(Constants.DISTRIBUTED_COT_MESSENGER));
-				}
-			}
+		if(cotMessenger.get() == null) {
+			cotMessenger.compareAndSet(null, (Messenger<CotEventContainer>) SpringContextBeanForApi.getSpringContext().getBean(Constants.DISTRIBUTED_COT_MESSENGER));
 		}
 
 		return cotMessenger.get();
@@ -480,6 +486,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 	 * Add a federate to the fed config
 	 *
 	 */
+	@Override
 	public void addFederateToConfig(@NotNull Federate federate) {
 		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
@@ -499,6 +506,17 @@ public class DistributedFederationManager implements FederationManager, Service 
 		List<Federate> federates = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederate();
 		for (Federate f : federates) {
 			if (f != null && f.getId() != null && f.getId().equals(federateUID)) {
+				return f;
+			}
+		}
+		return null;
+	}
+	
+	@Override
+	public FederateCA getFederateCA(String fingerprint) {
+		List<FederateCA> federates = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederateCA();
+		for (FederateCA f : federates) {
+			if (f != null && f.getFingerprint() != null && f.getFingerprint().equals(fingerprint)) {
 				return f;
 			}
 		}
@@ -586,17 +604,6 @@ public class DistributedFederationManager implements FederationManager, Service 
 			}
 		}
 		return new ArrayList<String>();
-	}
-
-	@Override
-	public int getCAMaxHops(@NotNull String caID) {
-		List<Federation.FederateCA> federateCAs = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederateCA();
-		for (Federation.FederateCA ca : federateCAs) {
-			if (ca.getFingerprint().compareTo(caID) == 0) {
-				return ca.getMaxHops();
-			}
-		}
-		return -1;
 	}
 
 	@Override
@@ -890,6 +897,59 @@ public class DistributedFederationManager implements FederationManager, Service 
 		}
 		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
+	
+	@Override
+	public List<OutboundGroupHopLimit> getGroupHopLimitsForFederate(String fedId) {
+		Federate federate = getFederate(fedId);
+		return federate == null ? new ArrayList<>() : federate.getOutboundGroupHopLimit();
+	}
+
+	@Override
+	public void setFederateOutboundGroupHopLimit(String federateUID, String groupName, Integer hopLimit) {
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
+		List<Federate> federates = fedConfig.getFederate();
+		
+		// find matching federate
+		for (Federate f : federates) {
+			if (f.getId().compareTo(federateUID) == 0) {
+				List<OutboundGroupHopLimit> hopLimits = f.getOutboundGroupHopLimit();
+				boolean outboundGroupFound = false;
+				// find matching outbound group
+				for (OutboundGroupHopLimit h : hopLimits) {
+					// if the outbound group already exists, update the hops value
+					if (h.getGroupName().compareTo(groupName) == 0) {
+						h.setHopLimit(hopLimit);
+						outboundGroupFound = true;
+						break;
+					}
+				}
+				// if the outbound group doesn't exist, add the group and value
+				if (!outboundGroupFound) {
+					OutboundGroupHopLimit outboundGroupHopLimit = new OutboundGroupHopLimit();
+					outboundGroupHopLimit.setGroupName(groupName);
+					outboundGroupHopLimit.setHopLimit(hopLimit);
+					f.getOutboundGroupHopLimit().add(outboundGroupHopLimit);
+				}
+				
+				break;
+			}
+		}
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
+	}
+
+	@Override
+	public void removeFederateOutboundGroupHopLimit(String federateUID, String outboundGroup) {
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
+		List<Federate> federates = fedConfig.getFederate();
+		
+		for (Federate f : federates) {
+			if (f.getId().compareTo(federateUID) == 0) {
+				f.getOutboundGroupHopLimit().removeIf(h -> h.getGroupName().equals(outboundGroup));
+				break;
+			}
+		}
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
+	}
 
 	@Override
 	public synchronized void removeInboundGroupFromCA(@NotNull String caID, @NotNull Set<String> localGroupNames) {
@@ -950,6 +1010,40 @@ public class DistributedFederationManager implements FederationManager, Service 
 					Federation.FederateCA federateCA = new Federation.FederateCA();
 					federateCA.setFingerprint(caID);
 					federateCA.setMaxHops(maxHops);
+					fedConfig.getFederateCA().add(federateCA);
+					break;
+				}
+			}
+		}
+
+		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
+	}
+	
+	@Override
+	public synchronized void setCATokenAuthentication(String caID, boolean allowTokenAuth, long duration) {
+		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
+
+		List<Federation.FederateCA> federateCAs = fedConfig.getFederateCA();
+		boolean foundCA = false;
+		for (Federation.FederateCA ca : federateCAs) {
+			if (ca.getFingerprint().compareTo(caID) == 0) {
+				foundCA = true;
+				ca.setAllowTokenAuth(allowTokenAuth);				
+				ca.setTokenAuthDuration(duration);
+				break;
+			}
+		}
+		// If the CA doesn't exist yet in the CoreConfig.xml, see if it exists in
+		// overall CA store
+		if (!foundCA) {
+			RemoteUtil remoteUtil = RemoteUtil.getInstance();
+			for (X509Certificate cert : getCAList()) {
+				if (caID.compareTo(remoteUtil.getCertSHA256Fingerprint(cert)) == 0) {
+					// Add CA to the CoreConfig
+					Federation.FederateCA federateCA = new Federation.FederateCA();
+					federateCA.setFingerprint(caID);
+					federateCA.setAllowTokenAuth(allowTokenAuth);				
+					federateCA.setTokenAuthDuration(duration);
 					fedConfig.getFederateCA().add(federateCA);
 					break;
 				}
@@ -1324,29 +1418,16 @@ public class DistributedFederationManager implements FederationManager, Service 
 	}
 
 	@Override
-	public synchronized void addOutgoingConnection(String name, String host, int port, int reconnect, int maxRetries,
-			boolean unlimitedRetries, boolean enable, int protocolVersion, String fallback, String token) {
+	public synchronized void addOutgoingConnection(Federation.FederationOutgoing outgoing) {
 
 		// check for dupes by name in the cache
-		if (SubscriptionStore.getInstanceFederatedSubscriptionManager().getCachedFederationConnectionStatus(name) != null) {
-			throw new DuplicateFederateException("outgoing " + name + " already exists");
+		if (SubscriptionStore.getInstanceFederatedSubscriptionManager().getCachedFederationConnectionStatus(outgoing.getDisplayName()) != null) {
+			throw new DuplicateFederateException("outgoing " + outgoing.getDisplayName() + " already exists");
 		}
 
-		if (!getOutgoingConnections(host, port).isEmpty()) {
-			throw new DuplicateFederateException("outgoing for " + host + ", " + port + " already exists");
+		if (!getOutgoingConnections(outgoing.getAddress(), outgoing.getPort()).isEmpty()) {
+			throw new DuplicateFederateException("outgoing for " + outgoing.getAddress() + ", " + outgoing.getPort() + " already exists");
 		}
-
-		Federation.FederationOutgoing outgoing = new Federation.FederationOutgoing();
-		outgoing.setEnabled(enable);
-		outgoing.setAddress(host);
-		outgoing.setDisplayName(name);
-		outgoing.setPort(port);
-		outgoing.setReconnectInterval(reconnect);
-		outgoing.setProtocolVersion(protocolVersion);
-		outgoing.setFallback(fallback);
-		outgoing.setMaxRetries(maxRetries);
-		outgoing.setUnlimitedRetries(unlimitedRetries);
-		outgoing.setConnectionToken(token);
 
 		Federation federationConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
@@ -1354,10 +1435,10 @@ public class DistributedFederationManager implements FederationManager, Service 
 
 		CoreConfigFacade.getInstance().setAndSaveFederation(federationConfig);
 
-		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingNumRetries(name);
-		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingRetryScheduled(name);
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingNumRetries(outgoing.getDisplayName());
+		SubscriptionStore.getInstanceFederatedSubscriptionManager().putOutgoingRetryScheduled(outgoing.getDisplayName());
 
-		if (enable) {
+		if (outgoing.isEnabled()) {
 
 			ConnectionStatus status = new ConnectionStatus(ConnectionStatusValue.CONNECTING);
 
@@ -1425,6 +1506,8 @@ public class DistributedFederationManager implements FederationManager, Service 
 				f.setMaxRetries(update.getMaxRetries());
 				f.setUnlimitedRetries(update.isUnlimitedRetries());
 				f.setConnectionToken(update.getConnectionToken());
+				f.setUseToken(update.isUseToken());
+				f.setTokenType(update.getTokenType());
 				
 				CoreConfigFacade.getInstance().setAndSaveFederation(federationConfig);
 
@@ -1756,6 +1839,12 @@ public class DistributedFederationManager implements FederationManager, Service 
 						return;
 					}
 				}
+				
+				Set<String> provenances = (Set<String>) cot.getContext(Constants.MESSAGE_PROVENANCE);
+				if (provenances == null)
+					provenances = new HashSet<>();
+				provenances.add(Constants.FEDERATION_PROVENANCE);
+				cot.setContext(Constants.MESSAGE_PROVENANCE, provenances);
 
 				cot.setContext(GroupFederationUtil.FEDERATE_ID_KEY, fedId);
 				// burn handler and protocol into message context map
@@ -1960,33 +2049,36 @@ public class DistributedFederationManager implements FederationManager, Service 
 		rc.setUid(contact.getUid());
 		switch (contact.getOperation()) {
 		case DELETE:
-			if (logger.isDebugEnabled()) {
-				logger.debug("processing DELETE Remote contact: " + rc.getUid() + ":" + rc.getContactName() + " "
-						+ contact.getOperation().toString());
-			}
-			// logger.debug("Got a delete contact request: " + contact.getUid());
-			if (SubscriptionStore.getInstanceFederatedSubscriptionManager().getRemoteContactsMapByChannelHandler(handler) != null) {
-				// doing this loop stinks, but needed as long as we need the callsignmap in
-				// submgr
-				Iterator<RemoteContactWithSA> i = SubscriptionStore.getInstanceFederatedSubscriptionManager()
-						.getRemoteContactsMapByChannelHandler(handler)
-						.values()
-						.iterator();
-				while (i.hasNext()) {
-					RemoteContact r = i.next();
-					if (r.getUid().compareTo(contact.getUid()) == 0) {
-						DistributedSubscriptionManager.getInstance()
-								.removeClientFromSubscription(r.getUid(), r.getContactName(), handler);
-						break;
-					}
+			try {
+				if (logger.isDebugEnabled()) {
+					logger.debug("processing DELETE Remote contact: " + rc.getUid() + ":" + rc.getContactName() + " "
+							+ contact.getOperation().toString());
 				}
-				// if we didn't need to find the callsign, we could just do this
-				SubscriptionStore.getInstanceFederatedSubscriptionManager()
-						.getRemoteContactsMapByChannelHandler(handler)
-						.remove(rc.getUid());
+				// logger.debug("Got a delete contact request: " + contact.getUid());
+				if (SubscriptionStore.getInstanceFederatedSubscriptionManager().getRemoteContactsMapByChannelHandler(handler) != null) {
+					// doing this loop stinks, but needed as long as we need the callsignmap in
+					// submgr
+					Iterator<RemoteContactWithSA> i = SubscriptionStore.getInstanceFederatedSubscriptionManager()
+							.getRemoteContactsMapByChannelHandler(handler)
+							.values()
+							.iterator();
+					while (i.hasNext()) {
+						RemoteContact r = i.next();
+						if (r.getUid().compareTo(contact.getUid()) == 0) {
+							getSubscriptionManager().removeClientFromSubscription(r.getUid(), r.getContactName(), handler);
+							break;
+						}
+					}
+					// if we didn't need to find the callsign, we could just do this
+					SubscriptionStore.getInstanceFederatedSubscriptionManager()
+					.getRemoteContactsMapByChannelHandler(handler)
+					.remove(rc.getUid());
 
-			} else {
-				logger.warn("Got delete contact for federate that had no contacts, ignoring");
+				} else {
+					logger.warn("Got delete contact for federate that had no contacts, ignoring");
+				}
+			} catch (Exception e) {
+				logger.error("Error processing DELETE federated contact message", e);
 			}
 			break;
 		case UPDATE:
@@ -2013,13 +2105,13 @@ public class DistributedFederationManager implements FederationManager, Service 
 						+ SubscriptionStore.getInstanceFederatedSubscriptionManager().getRemoteContactsMapByChannelHandler(handler));
 			}
 
-			Subscription s = DistributedSubscriptionManager.getInstance().getSubscriptionByClientUid(contact.getUid());
-			if (s == null) {
-				if (logger.isDebugEnabled()) {
-					logger.debug("Remote contact: " + rc.getUid() + ":" + rc.getContactName() + " " + contact.getOperation());
-				}
-				DistributedSubscriptionManager.getInstance().setClientForSubscription(contact.getUid(), contact.getCallsign(), handler, false);
+			if (logger.isDebugEnabled()) {
+				logger.debug("Remote contact: " + rc.getUid() + ":" + rc.getContactName() + " " + contact.getOperation());
 			}
+
+			DistributedSubscriptionManager.getInstance().setClientForSubscription(
+					contact.getUid(), contact.getCallsign(), handler, false);
+
 			break;
 		case READ:
 			logger.warn("someone sent a non-sensical read operation");
@@ -2067,11 +2159,20 @@ public class DistributedFederationManager implements FederationManager, Service 
 				if (commonGroupNames.size() == 0) {
 					continue;
 				}
+				
 
 				// apply the common groups to the federated contact event and send it
-				FederatedEvent f = FederatedEvent.newBuilder().setContact(newContact).
-						addAllFederateGroups(commonGroupNames).build();
-				destSub.submitLocalContact(f, System.currentTimeMillis());
+				FederatedEvent.Builder messageBuilder = FederatedEvent.newBuilder().setContact(newContact)
+						.addAllFederateGroups(commonGroupNames);
+				
+				if (destSub instanceof FigFederateSubscription) {
+					FigFederateSubscription figFederateSubscription = (FigFederateSubscription) destSub;
+					FederateGroupHopLimits groupHopsLimits = GroupFederationUtil.getInstance().getFederateGroupHopsLimitsForFederate(
+							figFederateSubscription.getFederate(), commonGroupNames);
+					messageBuilder.setFederateGroupHopLimits(groupHopsLimits);
+				}
+				
+				destSub.submitLocalContact(messageBuilder.build(), System.currentTimeMillis());
 			}
 
 		} catch (Exception e) {
@@ -2106,15 +2207,25 @@ public class DistributedFederationManager implements FederationManager, Service 
 					.filter(g -> g.getDirection() == Direction.OUT)
 					.map(g -> g.getName())
 					.collect(Collectors.toList());
+			
+			
 
-			FederatedEvent f = FederatedEvent.newBuilder().setContact(newContact).addAllFederateGroups(srcGroups).build();
+			FederatedEvent.Builder messageBuilder = FederatedEvent.newBuilder().setContact(newContact).addAllFederateGroups(srcGroups);
 
 			Set<Subscription> reachable = GroupFederationUtil.getInstance().getReachableSubscriptionsSet(srcSub);
 			reachable.addAll(GroupFederationUtil.getInstance().getReachableFederatedGroupMappingSubscriptons(srcSub));
 
 			for (Subscription s : reachable) {
 				if (s instanceof FederateSubscription) {
-					((FederateSubscription) s).submitLocalContact(f, System.currentTimeMillis());
+					
+					if (s instanceof FigFederateSubscription) {
+						FigFederateSubscription figFederateSubscription = (FigFederateSubscription) s;
+						FederateGroupHopLimits groupHopsLimits = GroupFederationUtil.getInstance().getFederateGroupHopsLimitsForFederate(
+								figFederateSubscription.getFederate(), srcGroups);
+						messageBuilder.setFederateGroupHopLimits(groupHopsLimits);
+					}
+					
+					((FederateSubscription) s).submitLocalContact(messageBuilder.build(), System.currentTimeMillis());
 				}
 			}
 		} catch (NumberFormatException e) {
@@ -2256,22 +2367,38 @@ public class DistributedFederationManager implements FederationManager, Service 
 	}
 
 	@Override
-	public void updateFederateDetails(String federateId, boolean archive, boolean shareAlerts, boolean federatedGroupMapping, boolean automaticGroupMapping, boolean fallbackWhenNoGroupMappings, String notes, int maxHops) {
+	public void updateFederateDetails(Federate update) {
 
 		Federation fedConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation();
 
 		List<Federate> federates = fedConfig.getFederate();
 
 		for (Federate f : federates) {
-			if (f.getId().equals(federateId)) {
-				f.setArchive(archive);
-				f.setShareAlerts(shareAlerts);
-				f.setFederatedGroupMapping(federatedGroupMapping);
-				f.setAutomaticGroupMapping(automaticGroupMapping);
-				f.setFallbackWhenNoGroupMappings(fallbackWhenNoGroupMappings);
-				f.setNotes(notes);
-				f.setMaxHops(maxHops);
-				break;
+			if (update.isTokenFederate()) {
+				if (f.getName().equals(update.getName())) {
+					f.setId(update.getId());
+					f.setTokenExpiration(update.getTokenExpiration());
+
+					f.setArchive(update.isArchive());
+					f.setShareAlerts(update.isShareAlerts());
+					f.setFederatedGroupMapping(update.isFederatedGroupMapping());
+					f.setAutomaticGroupMapping(update.isAutomaticGroupMapping());
+					f.setFallbackWhenNoGroupMappings(update.isFallbackWhenNoGroupMappings());
+					f.setNotes(update.getNotes());
+					f.setMaxHops(update.getMaxHops());
+					break;
+				}
+			} else {
+				if (f.getId().equals(update.getId())) {
+					f.setArchive(update.isArchive());
+					f.setShareAlerts(update.isShareAlerts());
+					f.setFederatedGroupMapping(update.isFederatedGroupMapping());
+					f.setAutomaticGroupMapping(update.isAutomaticGroupMapping());
+					f.setFallbackWhenNoGroupMappings(update.isFallbackWhenNoGroupMappings());
+					f.setNotes(update.getNotes());
+					f.setMaxHops(update.getMaxHops());
+					break;
+				}
 			}
 		}
 		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
@@ -2281,17 +2408,17 @@ public class DistributedFederationManager implements FederationManager, Service 
 			if (sub instanceof FigServerFederateSubscription) {
 				FigServerFederateSubscription figServerSub = (FigServerFederateSubscription) sub;
 
-				if (federateId.equals(figServerSub.getFederate().getId())) {
-					figServerSub.lazyGetClientStream().setMaxFederateHops(maxHops);
-					figServerSub.lazyGetGroupClientStream().setMaxFederateHops(maxHops);
-					figServerSub.lazyGetROLClientStream().setMaxFederateHops(maxHops);
+				if (update.getId().equals(figServerSub.getFederate().getId())) {
+					figServerSub.lazyGetClientStream().setMaxFederateHops(update.getMaxHops());
+					figServerSub.lazyGetGroupClientStream().setMaxFederateHops(update.getMaxHops());
+					figServerSub.lazyGetROLClientStream().setMaxFederateHops(update.getMaxHops());
 				}
 			} else if (sub instanceof FigFederateSubscription) {
 				FigFederateSubscription figSub = (FigFederateSubscription) sub;
-				if (federateId.equals(figSub.getFederate().getId())) {
-					figSub.getFigClient().getRolCall().setMaxFederateHops(maxHops);
-					figSub.getClientCallHolder().setMaxFederateHops(maxHops);
-					figSub.getGroupsCallHolder().setMaxFederateHops(maxHops);
+				if (update.getId().equals(figSub.getFederate().getId())) {
+					figSub.getFigClient().getRolCall().setMaxFederateHops(update.getMaxHops());
+					figSub.getClientCallHolder().setMaxFederateHops(update.getMaxHops());
+					figSub.getGroupsCallHolder().setMaxFederateHops(update.getMaxHops());
 				}
 			}
 		});
@@ -2373,7 +2500,9 @@ public class DistributedFederationManager implements FederationManager, Service 
 							if (fileBytes.length > CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getMaxMessageSizeBytes()) {
 								logger.info("File payload size " + fileBytes.length + " exceeds the max size! Not attaching file to " + rol);
 							} else {
-								BinaryBlob filePayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(fileBytes))).build();
+								BinaryBlob filePayload = BinaryBlob.newBuilder()
+										.setData(ByteString.readFrom(new ByteArrayInputStream(fileBytes)))
+										.build();
 
 								ROL.Builder rolBuilder = rol.toBuilder();
 
@@ -2418,7 +2547,12 @@ public class DistributedFederationManager implements FederationManager, Service 
 								if (federate.isFederatedGroupMapping()) {
 									Set<String> outGroups = GroupFederationUtil.getInstance().filterFedOutboundGroups(
 											federate.getOutboundGroup(), groups, federate.getId());
+									
+									FederateGroupHopLimits groupHopsLimits = GroupFederationUtil.getInstance()
+											.getFederateGroupHopsLimitsForFederate(federate, outGroups);
+									
 									builder.addAllFederateGroups(outGroups);
+									builder.setFederateGroupHopLimits(groupHopsLimits);
 								}
 
 								ROL rolWithGroups = builder.build();
@@ -2564,7 +2698,12 @@ public class DistributedFederationManager implements FederationManager, Service 
 								if (federate.isFederatedGroupMapping()) {
 									Set<String> outGroups = GroupFederationUtil.getInstance().filterFedOutboundGroups(
 											federate.getOutboundGroup(), groups, federate.getId());
+									
+									FederateGroupHopLimits groupHopsLimits = GroupFederationUtil.getInstance()
+											.getFederateGroupHopsLimitsForFederate(federate, outGroups);
+									
 									builder.addAllFederateGroups(outGroups);
+									builder.setFederateGroupHopLimits(groupHopsLimits);
 								}
 
 								ROL rolWithGroups = builder.build();
@@ -2691,4 +2830,19 @@ public class DistributedFederationManager implements FederationManager, Service 
 		}
 		CoreConfigFacade.getInstance().setAndSaveFederation(fedConfig);
 	}
+	
+	@Override
+	public void addFederationProvenance(CotEventContainer cot) {
+		Set<String> provenances = (Set<String>) cot.getContext(Constants.MESSAGE_PROVENANCE);
+		if (provenances == null)
+			provenances = new HashSet<>();
+		provenances.add(Constants.FEDERATION_PROVENANCE);
+		cot.setContext(Constants.MESSAGE_PROVENANCE, provenances);
+	}
+	
+	private SubscriptionManager getSubscriptionManager() {
+		return MessagingDependencyInjectionProxy.getInstance().subscriptionManager();
+	}
+	
+	
 }

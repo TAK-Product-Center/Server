@@ -117,7 +117,7 @@ public class UidCotTagInjector implements Injector<RemoteSubscription, CotEventC
         injectionfilter.setEnable(true);
         injectionfilter.getUidInject().add(uidInject);
 
-        CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
+        CoreConfigFacade.getInstance().setAndSaveInjector(injectionfilter);
     }
 
     protected void deleteUidInject(String uid, String toInject) {
@@ -145,7 +145,7 @@ public class UidCotTagInjector implements Injector<RemoteSubscription, CotEventC
             }
         }
 
-        CoreConfigFacade.getInstance().saveChangesAndUpdateCache();
+        CoreConfigFacade.getInstance().setAndSaveInjector(injectionfilter);
     }
 
     private static UidCotTagInjector instance = null; 

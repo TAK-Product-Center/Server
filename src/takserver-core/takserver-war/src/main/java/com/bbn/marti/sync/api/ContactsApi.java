@@ -30,6 +30,8 @@ import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationManager;
 import com.bbn.marti.remote.RemoteContact;
 import com.bbn.marti.remote.RemoteSubscription;
+import com.bbn.marti.remote.RemoteSubscriptionLite;
+import com.bbn.marti.remote.RemoteSubscriptionLiteWithUser;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
@@ -61,9 +63,103 @@ public class ContactsApi extends BaseRestController {
 
 	@Autowired
 	private CommonUtil martiUtil;
+	
+	@RequestMapping(value = "/contacts/all", method = RequestMethod.GET)
+	ResponseEntity<List<RemoteSubscriptionLite>> getAllContactsLite(
+			@RequestParam(value = "sortBy", defaultValue = "CALLSIGN") SubscriptionSortField sortBy,
+			@RequestParam(value = "direction", defaultValue = "ASCENDING") SubscriptionSortOrder direction,
+			@RequestParam(value = "noFederates", defaultValue = "false") boolean noFederates) throws RemoteException {
+
+		String groupVector = null;
+
+		Set<Group> inWriteOnlyFilteredGroups = new ConcurrentSkipListSet<>();
+
+		try {
+			// Get group vector for the user associated with this session
+			groupVector = martiUtil.getGroupBitVector(request, Direction.OUT);
+
+			Set<Group> groups = martiUtil.getGroupsFromActiveRequest();
+
+			if (groups != null) {
+				if (!CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getContactApi().isEmpty()) {
+					for (ContactApi filter : CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getContactApi()) {
+						if (filter.isWriteOnly() && !Strings.isNullOrEmpty(filter.getGroupName())) {
+							if (martiUtil.hasAccessWriteOnly(groups, filter.getGroupName())) {
+								inWriteOnlyFilteredGroups.add(new Group(filter.getGroupName(), Direction.IN));
+							}
+						}
+					}
+				}
+			}
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("groups bit vector: " + groupVector);
+				logger.debug("inWriteOnlyFilteredGroups: " + inWriteOnlyFilteredGroups);
+			}
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception getting group membership for current web user " + e.getMessage());
+			}
+		}
+
+		List<RemoteSubscriptionLite> subscriptions = subMgr.getSubscriptionsWithGroupAccessLite(groupVector, noFederates, inWriteOnlyFilteredGroups);
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("get all contacts (subscriptions): " + subscriptions);
+		}
+
+		return new ResponseEntity<List<RemoteSubscriptionLite>>(subscriptions, new HttpHeaders(), HttpStatus.OK);
+	}
+	
+	@RequestMapping(value = "/contacts/all/lite", method = RequestMethod.GET)
+	ResponseEntity<List<RemoteSubscriptionLiteWithUser>> getAllContactsLiteWithUser(
+			@RequestParam(value = "sortBy", defaultValue = "CALLSIGN") SubscriptionSortField sortBy,
+			@RequestParam(value = "direction", defaultValue = "ASCENDING") SubscriptionSortOrder direction,
+			@RequestParam(value = "noFederates", defaultValue = "false") boolean noFederates) throws RemoteException {
+
+		String groupVector = null;
+
+		Set<Group> inWriteOnlyFilteredGroups = new ConcurrentSkipListSet<>();
+
+		try {
+			// Get group vector for the user associated with this session
+			groupVector = martiUtil.getGroupBitVector(request, Direction.OUT);
+
+			Set<Group> groups = martiUtil.getGroupsFromActiveRequest();
+
+			if (groups != null) {
+				if (!CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getContactApi().isEmpty()) {
+					for (ContactApi filter : CoreConfigFacade.getInstance().getRemoteConfiguration().getFilter().getContactApi()) {
+						if (filter.isWriteOnly() && !Strings.isNullOrEmpty(filter.getGroupName())) {
+							if (martiUtil.hasAccessWriteOnly(groups, filter.getGroupName())) {
+								inWriteOnlyFilteredGroups.add(new Group(filter.getGroupName(), Direction.IN));
+							}
+						}
+					}
+				}
+			}
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("groups bit vector: " + groupVector);
+				logger.debug("inWriteOnlyFilteredGroups: " + inWriteOnlyFilteredGroups);
+			}
+		} catch (Exception e) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("exception getting group membership for current web user " + e.getMessage());
+			}
+		}
+
+		List<RemoteSubscriptionLiteWithUser> subscriptions = subMgr.getSubscriptionsWithGroupAccessLiteWithUser(groupVector, noFederates, inWriteOnlyFilteredGroups);
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("get all contacts (subscriptions): " + subscriptions);
+		}
+
+		return new ResponseEntity<List<RemoteSubscriptionLiteWithUser>>(subscriptions, new HttpHeaders(), HttpStatus.OK);
+	}
 
 	// GET all subscriptions
-	@RequestMapping(value = "/contacts/all", method = RequestMethod.GET)
+	@RequestMapping(value = "/contacts/all/full", method = RequestMethod.GET)
 	ResponseEntity<List<RemoteSubscription>> getAllContacts(
 			@RequestParam(value = "sortBy", defaultValue = "CALLSIGN") SubscriptionSortField sortBy,
 			@RequestParam(value = "direction", defaultValue = "ASCENDING") SubscriptionSortOrder direction,

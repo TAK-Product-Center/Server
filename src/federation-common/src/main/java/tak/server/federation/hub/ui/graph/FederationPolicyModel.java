@@ -34,6 +34,7 @@ public class FederationPolicyModel {
     private String type;
     private String description;
     private String thumbnail;
+    private Map<String, Object> settings;
     Collection<PolicyObjectCell> cells;
 
     // TODO holdover AMT field until we fully convert frontend
@@ -91,17 +92,25 @@ public class FederationPolicyModel {
         this.thumbnail = thumbnail;
     }
 
-    @JsonIgnore
+    public Map<String, Object> getSettings() {
+		return settings;
+	}
+
+	public void setSettings(Map<String, Object> settings) {
+		this.settings = settings;
+	}
+
+	@JsonIgnore
     public FederationPolicyGraph getPolicyGraphFromModel() {
-        FederationPolicyGraph policyGraph = new FederationPolicyGraphImpl(this.name, new HashSet<>());
+        FederationPolicyGraph policyGraph = new FederationPolicyGraphImpl(this.name, this.version);
 
         cells.stream().filter(cell -> cell instanceof GroupCell).forEach(cell -> {
             GroupCell groupCell = (GroupCell) cell;
             FederateIdentity identity = new FederateIdentity(groupCell.getProperties().getName());
             FederateGroup group = new FederateGroup(identity);
-            group.getAttributes().putAll(groupCell.getProperties().attributesToMap());
             group.setInterconnected(groupCell.getProperties().isInterconnected());
-            group.setFilterExpression(groupCell.getProperties().getFilterExpression());
+            group.setAllowTokenAuth(groupCell.getProperties().isAllowTokenAuth());
+            group.setTokenAuthDuration(groupCell.getProperties().getTokenAuthDuration());
             policyGraph.addGroup(group);
         });
         
@@ -109,9 +118,7 @@ public class FederationPolicyModel {
         	FederationTokenGroupCell tokenGroupCell = (FederationTokenGroupCell) cell;
             FederateIdentity identity = new FederateIdentity(tokenGroupCell.getProperties().getName());
             FederateGroup group = new FederateGroup(identity);
-            group.getAttributes().putAll(tokenGroupCell.getProperties().attributesToMap());
             group.setInterconnected(tokenGroupCell.getProperties().isInterconnected());
-            group.setFilterExpression(tokenGroupCell.getProperties().getFilterExpression());
             policyGraph.addGroup(group);
         });
 
@@ -120,7 +127,6 @@ public class FederationPolicyModel {
             FederateCell federateCell = (FederateCell) cell;
             FederateIdentity identity = new FederateIdentity(federateCell.getProperties().getName());
             Federate federateNode = new Federate(identity);
-            federateNode.getAttributes().putAll(federateCell.getProperties().attributesToMap());
             federateNode.getGroupIdentities().addAll(stringsToFederateIdentity(federateCell
                                                     .getProperties().getGroupIdentities()));
             policyGraph.addNode(federateNode);
@@ -130,7 +136,6 @@ public class FederationPolicyModel {
         	FederationOutgoingCell federateCell = (FederationOutgoingCell) cell;
             FederateIdentity identity = new FederateIdentity(federateCell.getProperties().getName());
             Federate federateOutgoing = new Federate(identity);
-            federateOutgoing.getAttributes().putAll(federateCell.getProperties().attributesToMap());
             policyGraph.addNode(federateOutgoing);
         });
 
@@ -139,16 +144,12 @@ public class FederationPolicyModel {
             FederationNode sourceNode = policyGraph.getNode(getCellNameFromId(edgeCell.getSourceId()));
             FederationNode destinationNode = policyGraph.getNode(getCellNameFromId(edgeCell.getDestinationId()));
             try {
-                policyGraph.addEdge(new FederateEdge(sourceNode.getFederateIdentity(), destinationNode.getFederateIdentity(), edgeCell.getProperties().getFilterExpression(),
-                		new HashSet<String>(edgeCell.getProperties().getAllowedGroups()), new HashSet<String>(edgeCell.getProperties().getDisallowedGroups()), 
-                		FederateEdge.getGroupFilterType(edgeCell.getProperties().getGroupsFilterType())));
-               
-                for (FilterNode node : edgeCell.getProperties().getFilters()) {
-                    policyGraph.getFilterObjectSet().add(node.getFilter().getFilterObject());
-                }
-            } catch (FederationException e) {
+                policyGraph.addEdge(new FederateEdge(sourceNode.getFederateIdentity(), destinationNode.getFederateIdentity(), new HashSet<String>(edgeCell.getProperties().getAllowedGroups()),
+                		new HashSet<String>(edgeCell.getProperties().getDisallowedGroups()), FederateEdge.getGroupFilterType(edgeCell.getProperties().getGroupsFilterType())));
+            } catch (Exception e) {
                 // UI should provide this check for us, so just log error
                 LOGGER.error("There was an error converting the graph model to a policy object");
+                e.printStackTrace();
             }
         });
 
@@ -176,7 +177,6 @@ public class FederationPolicyModel {
             cells.stream().filter(cell -> cell instanceof FederateCell).forEach(cell -> {
                 FederateCell federateCell = (FederateCell) cell;
                 UidHolder federate =  new UidHolder(federateCell.getProperties().getName());
-                federate.setAttributes(federateCell.getProperties().attributesToMap());
                 federate.setGroups(federateCell.getProperties().getGroupIdentities());
                 policy.getFederate_nodes().add(federate);
             });
@@ -190,32 +190,24 @@ public class FederationPolicyModel {
             cells.stream().filter(cell -> cell instanceof EdgeCell).forEach(cell -> {
                 EdgeCell edgeCell = (EdgeCell) cell;
                 StringEdge stringEdge = new StringEdge(getCellNameFromId(edgeCell.getSourceId()), getCellNameFromId(edgeCell.getDestinationId()));
-                stringEdge.setFilterExpression(edgeCell.getProperties().getFilterExpression());
                 stringEdge.setAllowedGroups(new HashSet<>(edgeCell.getProperties().getAllowedGroups()));
                 stringEdge.setDisallowedGroups(new HashSet<>(edgeCell.getProperties().getDisallowedGroups()));
                 stringEdge.setGroupsFilterType(FederateEdge.getGroupFilterType(edgeCell.getProperties().getGroupsFilterType()));
                 policy.getFederate_edges().add(stringEdge);
-                for (FilterNode node : edgeCell.getProperties().getFilters()) {
-                    policy.getFilter_objects().add(node.getFilter().getFilterObject());
-                }
 
             });
 
             cells.stream().filter(cell -> cell instanceof GroupCell).forEach(cell -> {
                 GroupCell groupCell = (GroupCell) cell;
                 GroupHolder group = new GroupHolder(groupCell.getProperties().getName());
-                group.setAttributes(groupCell.getProperties().attributesToMap());
                 group.setInterconnected(groupCell.getProperties().isInterconnected());
-                group.setFilterExpression(groupCell.getProperties().getFilterExpression());
                 policy.getGroups().add(group);
             });
             
             cells.stream().filter(cell -> cell instanceof FederationTokenGroupCell).forEach(cell -> {
             	FederationTokenGroupCell federationTokenGroupCell = (FederationTokenGroupCell) cell;
                 GroupHolder group = new GroupHolder(federationTokenGroupCell.getProperties().getName());
-                group.setAttributes(federationTokenGroupCell.getProperties().attributesToMap());
                 group.setInterconnected(federationTokenGroupCell.getProperties().isInterconnected());
-                group.setFilterExpression(federationTokenGroupCell.getProperties().getFilterExpression());
                 policy.getGroups().add(group);
             });
         }
@@ -294,7 +286,6 @@ public class FederationPolicyModel {
         properties.setInterconnected(group.isInterconnected());
         properties.setName(group.getFederateIdentity().getFedId());
         properties.setId(group.getName());
-        properties.setFilters(filterExpressionToFilterNodes(group.getFilterExpression()));
 
         return groupCell; 
     }
@@ -303,16 +294,6 @@ public class FederationPolicyModel {
         EdgeCell edgeCell = new EdgeCell();
         return edgeCell;
     }
-
-    private static List<Object> mapToAttributes(Map<String, Object> attributeMap) {
-        List<Object> attributeList = new LinkedList<>();
-        return attributeList;
-    }
-
-    private static List<FilterNode> filterExpressionToFilterNodes(String filterExpression) {
-        return FilterUtils.filterExpressionsToFilterNodes(filterExpression);
-    }
-
 
     // TODO Holdover getters and setters
 
