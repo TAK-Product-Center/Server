@@ -1,0 +1,18 @@
+.data-flowing {
+  stroke: green !important;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% {
+      stroke-width: 2px
+  }
+
+  50% {
+      stroke-width: 4px
+  }
+
+  to {
+      stroke-width: 2px
+  }
+}

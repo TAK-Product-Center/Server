@@ -25,7 +25,12 @@ import tak.server.proto.StreamingProtoBufHelper;
 
 public class SingleProtobufOrCotProtocol extends AbstractBroadcastingProtocol<CotEventContainer> {
 	
-	private ThreadLocal<CotParser> cotParser = new ThreadLocal<>(); 
+	private static ThreadLocal<CotParser> cotParser =
+			new ThreadLocal<CotParser>() {
+				@Override public CotParser initialValue() {
+					return CotParserCreator.newInstance();
+				}
+			}; 
 	
     private final static Logger log = Logger.getLogger(SingleProtobufOrCotProtocol.class);
 
@@ -98,6 +103,10 @@ public class SingleProtobufOrCotProtocol extends AbstractBroadcastingProtocol<Co
     @Override
     public String toString() {
         return "SingleProtobufOrCotProtocol";
+    }
+    
+    public static CotEventContainer byteBufToCot(ByteBuffer buffer, ChannelHandler handler) {
+    	return byteBufToCot(buffer, handler, cotParser.get()); 
     }
     
     public static CotEventContainer byteBufToCot(ByteBuffer buffer, ChannelHandler handler, CotParser cotParser) {

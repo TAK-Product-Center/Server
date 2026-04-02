@@ -21,7 +21,7 @@ public class MissionLayerCacheResolver extends TakCacheManagerResolver {
     @Override
     public Collection<? extends Cache> resolveCaches(CacheOperationInvocationContext<?> context) {
         try {
-            String cacheName = (String) context.getArgs()[0] + SUFFIX;
+            String cacheName = ((String) context.getArgs()[0]).toLowerCase() + SUFFIX;
             List<Cache> caches = new CopyOnWriteArrayList<>();
             caches.add(getCacheManager().getCache(cacheName));
 

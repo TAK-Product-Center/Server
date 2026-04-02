@@ -284,15 +284,15 @@ public class VideoManagerService {
     			}
     		}
 
-//    		if (includeV2) {
-//    			VideoCollections videoCollections = getVideoCollections(null, false, groupVector);
-//    			for (VideoConnection videoConnection : videoCollections.getVideoConnections()) {
-//    				for (FeedV2 feedV2 : videoConnection.getFeeds()) {
-//						Feed feedV1 = new Feed(feedV2);
-//						videoConnections.getFeeds().add(feedV1);
-//					}
-//				}
-//			}
+    		if (includeV2) {
+    			VideoCollections videoCollections = getVideoCollections(null, false, groupVector);
+    			for (VideoConnection videoConnection : videoCollections.getVideoConnections()) {
+    				for (FeedV2 feedV2 : videoConnection.getFeeds()) {
+						Feed feedV1 = new Feed(feedV2);
+						videoConnections.getFeeds().add(feedV1);
+					}
+				}
+			}
 
     	} catch (NamingException | SQLException e) {
     		logger.error("Exception!", e);

@@ -1,5 +1,9 @@
 #!/bin/sh
-cat '/logs/takserver-api.log' | grep -q 'Tomcat started on port(s)'
+cat '/logs/takserver-api.log' | grep -q 'Tomcat started on port'
+RVAL=$?
+if [ $RVAL != 0 ];then
+  exit $RVAL
+fi
 
 nc -zw3 $POSTGRES_HOST $POSTGRES_PORT
 RVAL=$?

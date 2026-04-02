@@ -1,6 +1,7 @@
 package com.bbn.roger.fig;
 
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -8,10 +9,23 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
@@ -22,6 +36,7 @@ import com.google.common.hash.Hashing;
 import jakarta.xml.bind.DatatypeConverter;
 
 public class FederationUtils {
+	private static final Logger logger = LoggerFactory.getLogger(FederationUtils.class);
 
     private static final String CONNECTION_REFUSED_MSG = "connection refused, check network connectivity to federate";
     private static final String CONNECTION_CLOSED_MSG = " Network closed for unknown reason, check if remote federate is down";
@@ -40,19 +55,18 @@ public class FederationUtils {
      * @param name  name of a file in src/main/resources/certs.
      */
     public static File loadCert(String name) throws IOException {
-        InputStream in = FederationUtils.class.getResourceAsStream(name);
-        File tmpFile = File.createTempFile(name, "");
+    	File tmpFile = File.createTempFile(name, "");
         tmpFile.deleteOnExit();
 
-        BufferedWriter writer = new BufferedWriter(new FileWriter(tmpFile));
-        try {
-            int b;
-            while ((b = in.read()) != -1) {
-                writer.write(b);
-            }
-        } finally {
-            writer.close();
-        }
+		try (InputStream in = FederationUtils.class.getResourceAsStream(name);
+				FileWriter fw = new FileWriter(tmpFile);
+				BufferedWriter writer = new BufferedWriter(fw)) {
+			
+			int b;
+			while ((b = in.read()) != -1) {
+				writer.write(b);
+			}
+		}
 
         return tmpFile;
     }
@@ -65,11 +79,8 @@ public class FederationUtils {
     public static X509Certificate loadX509CertResource(String resourceName) throws CertificateException, IOException {
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
 
-        InputStream in = FederationUtils.class.getResourceAsStream("/certs/" + resourceName);
-        try {
+        try (InputStream in = FederationUtils.class.getResourceAsStream("/certs/" + resourceName)) {
             return (X509Certificate) cf.generateCertificate(in);
-        } finally {
-            in.close();
         }
     }
 
@@ -94,6 +105,28 @@ public class FederationUtils {
         }
     }
 
+    /**
+     * Loads an X.509 certificate from a .jks file (returns first cert found)
+     */
+    public static X509Certificate loadX509CertFromJKSFile(String keystorePath, String keystorePassword) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
+    	X509Certificate cert = null;
+    	
+    	// Load the keystore
+        KeyStore keystore = KeyStore.getInstance("JKS");
+        try (FileInputStream fis = new FileInputStream(keystorePath)) {
+            keystore.load(fis, keystorePassword.toCharArray());
+        }
+
+        // Iterate through all aliases
+        Enumeration<String> aliases = keystore.aliases();
+        while (aliases.hasMoreElements()) {
+            String alias = aliases.nextElement();
+            cert = (X509Certificate) keystore.getCertificate(alias);
+        }
+		return cert;
+    }
+
+    
     public static String authorityFromHostAndPort(String host, int port) {
         try {
             return new URI(null, null, host, port, null, null, null).getAuthority();
@@ -173,5 +206,51 @@ public class FederationUtils {
         } else {
             return "Unexpected exception: root cause message is null";
         }
+    }
+    
+    public static X509Certificate loadX509CertFromBytes(byte[] cert) throws CertificateException, IOException {
+
+		if (cert == null) {
+			throw new IllegalArgumentException("empty cert");
+		}
+
+		CertificateFactory cf = CertificateFactory.getInstance("X.509");
+
+		try (InputStream is = new ByteArrayInputStream(cert)) {
+			return (X509Certificate) cf.generateCertificate(is);
+		}
+	}
+    
+    // a method to manually verify that a client certificate is trusted by a CA in a given truststore 
+    public static List<X509Certificate> verifyTrustedClientCert(TrustManagerFactory tmf, X509Certificate clientCert) {
+    	if (logger.isDebugEnabled()) {
+    		logger.debug("Trying to verify client cert against truststore CAs: " + clientCert);
+    	}
+    	
+    	List<X509Certificate> signingCa = new ArrayList<>();
+    	for (TrustManager trustManager : tmf.getTrustManagers()) {
+			if (trustManager instanceof X509TrustManager) {
+				try {
+					X509TrustManager x509TrustManager = (X509TrustManager) trustManager;
+					
+					// find the CA(s) that signed the client certificate
+					for (X509Certificate trustedCa : x509TrustManager.getAcceptedIssuers()) {
+						try {
+							clientCert.verify(trustedCa.getPublicKey());
+							signingCa.add(trustedCa);
+							if (logger.isDebugEnabled()) {
+					    		logger.debug("Client Cert Trusted by: " + trustedCa);
+					    	}
+						} catch (Exception e) {
+							if (logger.isDebugEnabled()) {
+					    		logger.debug("Client Cert NOT Trusted by: " + trustedCa);
+					    	}
+						}
+					}
+				} catch (Exception e) {}
+			}
+		}
+    	
+    	return signingCa;
     }
 }

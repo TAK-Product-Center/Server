@@ -39,19 +39,19 @@ public final class MetadataUtils {
 		// we only want to recognize it, not use it based on the file extension
 		mimeTypeToFileExtension.put("application/x-zip-compressed", ".zip");
 
-		InputStream inputStream = MetadataUtils.class.getClassLoader().getResourceAsStream(DEFAULT_FILE_NAME);
-		BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
-		String fileLine = reader.readLine();
-		while (fileLine != null){
-			String[] mimeTypeInfo = fileLine.toLowerCase(Locale.ENGLISH).split(","); // split values of CSV
-			// index 0 is description, don't need for now
-			fileExtensionToMimeTypeString.put(mimeTypeInfo[2], mimeTypeInfo[1]);
-			mimeTypeToFileExtension.put(mimeTypeInfo[1], mimeTypeInfo[2]);
+		try (InputStream inputStream = MetadataUtils.class.getClassLoader().getResourceAsStream(DEFAULT_FILE_NAME);
+				InputStreamReader isr = new InputStreamReader(inputStream, "UTF-8");
+				BufferedReader reader = new BufferedReader(isr)) {
+			String fileLine = reader.readLine();
+			while (fileLine != null) {
+				String[] mimeTypeInfo = fileLine.toLowerCase(Locale.ENGLISH).split(","); // split values of CSV
+				// index 0 is description, don't need for now
+				fileExtensionToMimeTypeString.put(mimeTypeInfo[2], mimeTypeInfo[1]);
+				mimeTypeToFileExtension.put(mimeTypeInfo[1], mimeTypeInfo[2]);
 
-			fileLine = reader.readLine();
+				fileLine = reader.readLine();
+			}
 		}
-		reader.close();
-
 	}
 	@SuppressWarnings("PMD.AvoidSynchronizedAtMethodLevel")
 	public static synchronized MetadataUtils getInstance() throws IOException{

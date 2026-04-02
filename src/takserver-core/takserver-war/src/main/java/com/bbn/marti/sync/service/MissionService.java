@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import org.springframework.jdbc.core.ResultSetExtractor;
 
@@ -26,7 +27,6 @@ import com.bbn.marti.sync.model.MissionRole;
 import com.bbn.marti.sync.model.MissionSubscription;
 import com.bbn.marti.sync.model.Resource;
 import com.bbn.marti.sync.model.UidDetails;
-import com.bbn.marti.sync.service.MissionTokenUtils.TokenType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -86,23 +86,23 @@ public interface MissionService {
 
     List<CotElement> getAllCotForUid(String uid, Date start, Date end, String groupVector);
 
-    String getCachedCot(String missionName, Set<String> uids, String groupVector);
+    String getCachedCot(String missionName, Set<String> uids, String path, String groupVector);
     
-    String getCachedCot(UUID missionGuid, Set<String> uids, String groupVector);
+    String getCachedCot(UUID missionGuid, Set<String> uids, String path, String groupVector);
 
-    List<CotElement> getCotElementsByTimeAndBbox(Date start, Date end, GeospatialFilter.BoundingBox boundingBox, String groupVector);
+    List<CotElement> getCotElementsByTimeAndBbox(Date start, Date end, GeospatialFilter.BoundingBox boundingBox, String groupVector, boolean isFiltered);
 
     List<CotElement> getLatestCotForUids(Set<String> uids, String groupVector);
 
     boolean deleteAllCotForUids(List<String> uids, String groupVector);
 
-    void missionInvite(UUID missionGuid, String invitee, MissionInvitation.Type type, MissionRole role, String creatorUid, String groupVector);
+    boolean missionInvite(UUID missionGuid, String invitee, MissionInvitation.Type type, MissionRole role, String creatorUid, String groupVector);
 
-    void missionInvite(Mission mission, MissionInvitation missionInvitation);
+    boolean missionInvite(Mission mission, MissionInvitation missionInvitation);
 
     void missionUninvite(UUID missionGuid, String invitee, MissionInvitation.Type type, String creatorUid, String groupVector);
 
-    Set<MissionInvitation> getAllMissionInvitationsForClient(String clientUid, String groupVector);
+    CompletableFuture<Set<MissionInvitation>> getAllMissionInvitationsForClient(String clientUid, String groupVector, String username);
 
     List<MissionInvitation> getMissionInvitations(String missionName);
     
@@ -110,14 +110,16 @@ public interface MissionService {
 
     List<Mission> getInviteOnlyMissions(String userName, String tool, NavigableSet<Group> groups);
 
-    MissionSubscription missionSubscribe(UUID missionGuid, String clientUid, String groupVector);
+    CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, String clientUid, String groupVector);
 
-    MissionSubscription missionSubscribe(UUID missionGuid, String clientUid, MissionRole missionRole, String groupVector);
+    CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, String clientUid, MissionRole missionRole, String groupVector);
 
-    MissionSubscription missionSubscribe(UUID missionGuid, Long missionId, String clientUid, String username, MissionRole role, String groupVector);
+    CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, Long missionId, String clientUid, String username, MissionRole role, String groupVector);
 
     void missionUnsubscribe(UUID missionGuid, String uid, String username, String groupVector, boolean disconnectOnly);
-    
+
+    void brokerMissionUids(Mission mission, MissionContent missionContent, String creatorUid, String groupVector);
+
     Mission addMissionContent(UUID missionGuid, MissionContent content, String creatorUid, String groupVector);
     
 	Mission addMissionContentAtTime(UUID missionGuid, MissionContent missionContent, String creatorUid, String groupVector, Date date, String xmlContentForNotification);
@@ -168,7 +170,7 @@ public interface MissionService {
 
     void validateMission(Mission mission, String missionName);
     
-	void validateMissionByGuid(Mission mission);
+	void validateMissionByGuid(Mission mission, String missionGuid);
     
     void invalidateMissionCache(String cacheName); // invalidate by name only
     
@@ -212,7 +214,7 @@ public interface MissionService {
 
     boolean validateMissionCreateGroupsRegex(HttpServletRequest request);
 
-    MissionRole getRoleForRequest(Mission mission, HttpServletRequest request);
+    MissionRole getRoleForRequest(Mission mission, HttpServletRequest request, boolean isAdmin);
 
     boolean validateRoleAssignment(Mission mission, HttpServletRequest request, MissionRole attemptAssign);
 
@@ -248,7 +250,9 @@ public interface MissionService {
     Mission getMissionByNameCheckGroups(String missionName, boolean hydrateDetails, String groupVector);
 
     Mission getMissionByNameCheckGroups(String missionName, String groupVector);
-	
+
+    UUID getMissionGuidByNameCheckGroups(String missionName, String groupVector);
+
 	Mission getMissionByGuidCheckGroups(UUID missionGuid, String groupVector);
 
     boolean setExpiration(String missionName, Long ttl, String groupVector);
@@ -342,5 +346,9 @@ public interface MissionService {
     List<MissionSubscription> getMissionSubscriptionsByMissionGuidNoMissionNoToken(UUID missionGuid);
 
 	List<String> getAllMissionsGuids(boolean passwordProtected, boolean defaultRole, String tool);
-    
+
+    void checkAndSendPendingNotifications(String missionName, String hash, int count, String groupVector);
+
+    void checkAndSendPendingNotifications(UUID missionGuid, String hash, int count);
+
 }

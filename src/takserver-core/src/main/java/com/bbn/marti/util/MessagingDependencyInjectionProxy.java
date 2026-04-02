@@ -2,9 +2,6 @@
 
 package com.bbn.marti.util;
 
-import com.bbn.marti.network.PluginDataFeedJdbc;
-import com.bbn.marti.nio.netty.NioNettyBuilder;
-import com.bbn.marti.remote.util.RemoteUtil;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -14,13 +11,18 @@ import org.springframework.context.ApplicationEventPublisher;
 import com.bbn.marti.groups.FileAuthenticator;
 import com.bbn.marti.groups.GroupDao;
 import com.bbn.marti.groups.GroupStore;
+import com.bbn.marti.network.PluginDataFeedJdbc;
+import com.bbn.marti.nio.netty.NioNettyBuilder;
 import com.bbn.marti.remote.ContactManager;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.SubscriptionManagerLite;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.GroupManager;
+import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.repeater.RepeaterStore;
 import com.bbn.marti.service.SubmissionService;
+import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.sync.EnterpriseSyncService;
 import com.bbn.marti.sync.repository.DataFeedRepository;
@@ -30,7 +32,6 @@ import com.bbn.marti.sync.repository.MissionRoleRepository;
 import com.bbn.marti.sync.repository.MissionSubscriptionRepository;
 import com.bbn.marti.sync.service.MissionService;
 
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cache.DatafeedCacheHelper;
 import tak.server.cluster.ClusterManager;
@@ -363,7 +364,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return mdoss;
 	}
 
-	private VersionBean vb = null;
+	private volatile VersionBean vb = null;
 
 	public VersionBean versionBean() {
 
@@ -378,7 +379,7 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		return vb;
 	}
 
-	private QoSManager qm = null;
+	private volatile QoSManager qm = null;
 
 	public QoSManager qosManager() {
 
@@ -454,6 +455,20 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		}
 
 		return subscriptionManagerLite;
+	}
+	
+	private volatile SubscriptionManager subscriptionManager = null;
+
+	public SubscriptionManager subscriptionManager() {
+		if (subscriptionManager == null) {
+			synchronized (this) {
+				if (subscriptionManager == null) {
+					subscriptionManager = springContext.getBean(SubscriptionManager.class);
+				}
+			}
+		}
+
+		return subscriptionManager;
 	}
 
 	private volatile MissionRoleRepository missionRoleRepository = null;

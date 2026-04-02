@@ -120,6 +120,15 @@
                     <td>Enable Mission Federation Disruption Tolerance:</td>
                     <td><input type="checkbox" data-ng-model="fedConfig.enableMissionFederationDisruptionTolerance" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
                   </tr>
+                  <tr>
+                    <td>Enable Federation Token Authentication:</td>
+                    <td><input type="checkbox" data-ng-model="fedConfig.federationTokenAuthentication.enabled" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
+                  </tr>
+                  <tr>
+                    <td>Enable Federation Token Port:</td>
+                    <td><input type="number" required  min="1" max="65535" data-ng-model="fedConfig.federationTokenAuthentication.port" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled || !fedConfig.federationTokenAuthentication.enabled"></td>
+                  </tr>
+
                 </table>
               </td>
             </tr>
@@ -138,10 +147,10 @@
                   <tr>
                     <td>Send Changes Newer Than:</td>
                     <td>
-                      <input type="number" required min="0" data-ng-model="cache_length_num" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || unlimited">
+                      <input type="number" required min="0" data-ng-model="cache_length_num" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled || unlimited">
                     </td>
                     <td>
-                      <select data-ng-model="cache_length_type" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || unlimited">
+                      <select data-ng-model="cache_length_type" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled || unlimited">
                         <option value="seconds">Seconds</option>
                         <option value="hours">Hours</option>
                         <option value="days">Days</option>
@@ -155,24 +164,24 @@
                         <tr data-ng-repeat="mission_cache in mission_caches">
                           <td>Mission: </td>
                           <td>
-                            <select data-ng-model="mission_cache.name" data-ng-change="determineUsedMissions()" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled">
+                            <select data-ng-model="mission_cache.name" data-ng-change="determineUsedMissions()" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled">
                               <option data-ng-repeat="mission in mission_list" data-ng-disabled="used_missions[mission] && mission != mission_cache.name" data-ng-value="mission">{{mission}}</option>
                             </select>
                           </td>
-                          <td><input type="number" data-ng-model="mission_cache.time" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || mission_cache.unlimited"></td>
+                          <td><input type="number" data-ng-model="mission_cache.time" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled || mission_cache.unlimited"></td>
                           <td>
-                            <select data-ng-model="mission_cache.time_type" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled || mission_cache.unlimited">
+                            <select data-ng-model="mission_cache.time_type" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled || mission_cache.unlimited">
                               <option value="seconds">Seconds</option>
                               <option value="hours">Hours</option>
                               <option value="days">Days</option>
                             </select>
                           </td>
                           <td class="tooltip2">
-                            Unlimited: <input type="checkbox" data-ng-model="mission_cache.unlimited" data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled">
+                            Unlimited: <input type="checkbox" data-ng-model="mission_cache.unlimited" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled">
                             <span class="tooltiptext">This may use a lot of bandwidth</span>
                           </td>
-                          <td><button data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled" type="button" data-ng-click="removeMissionCache($index)">-</button></td>
-                          <td data-ng-if="$last && mission_caches.length != mission_list.length"><button data-ng-disabled="!fedConfig.serverPortEnabled || !fedConfig.enabled" type="button" data-ng-click="addMissionCache()">+</button></td>
+                          <td><button data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled" type="button" data-ng-click="removeMissionCache($index)">-</button></td>
+                          <td data-ng-if="$last && mission_caches.length != mission_list.length"><button data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled" type="button" data-ng-click="addMissionCache()">+</button></td>
                         </tr>
                       </table>
                 </table>

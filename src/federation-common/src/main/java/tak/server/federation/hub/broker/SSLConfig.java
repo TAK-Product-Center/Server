@@ -44,7 +44,9 @@ public class SSLConfig {
             if (Strings.isNullOrEmpty(config.getKeystorePassword())) {
                 throw new IllegalArgumentException("empty or null key store password ");
             }
-            self.load(getFileOrResource(config.getKeystoreFile()), config.getKeystorePassword().toCharArray());
+            try (InputStream is = getFileOrResource(config.getKeystoreFile())) {
+                self.load(is, config.getKeystorePassword().toCharArray());
+            }
             keyMgrFactory = KeyManagerFactory.getInstance(config.getKeyManagerType());
             keyMgrFactory.init(self, config.getKeystorePassword().toCharArray());
 
@@ -54,7 +56,10 @@ public class SSLConfig {
             if (Strings.isNullOrEmpty(config.getTruststorePassword())) {
                 throw new IllegalArgumentException("empty or null truststore password ");
             }
-            trust.load(getFileOrResource(config.getTruststoreFile()), config.getTruststorePassword().toCharArray());
+            
+            try (InputStream is = getFileOrResource(config.getTruststoreFile())) {
+                trust.load(is, config.getTruststorePassword().toCharArray());
+            }
             trustMgrFactory.init(trust);
 
             sslContextClientAuth = GrpcSslContexts.configure(SslContextBuilder.forServer(keyMgrFactory), SslProvider.OPENSSL) // this ensures that we are using OpenSSL, not JRE SSL
@@ -111,7 +116,9 @@ public class SSLConfig {
             String truststorePassword = config.getTruststorePassword();
 
             trust = KeyStore.getInstance(truststoreType);
-            trust.load(new FileInputStream(truststoreFile), truststorePassword.toCharArray());
+            try (InputStream is = new FileInputStream(truststoreFile)) {
+            	trust.load(is, truststorePassword.toCharArray());
+            }
             trustManagerFactory.init(trust);
             return trust;
         } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {

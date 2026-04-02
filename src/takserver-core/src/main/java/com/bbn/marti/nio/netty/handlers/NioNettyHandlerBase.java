@@ -20,13 +20,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ssl.SSLPeerUnverifiedException;
 
-import com.google.common.base.Strings;
-
-import io.micrometer.core.instrument.Metrics;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.ssl.SslHandler;
-
 import org.apache.log4j.Logger;
 
 import com.bbn.marti.config.DataFeed;
@@ -45,21 +38,26 @@ import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
 import com.bbn.marti.nio.protocol.connections.StreamingProtoBufOrCoTProtocol;
 import com.bbn.marti.nio.server.Server;
 import com.bbn.marti.remote.InputMetric;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.GroupManager;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.Subscription;
+import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.TransportCotEvent;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
-import com.bbn.marti.remote.util.SpringContextBeanForApi;
+import com.google.common.base.Strings;
 
-import com.bbn.marti.remote.config.CoreConfigFacade;
+import io.micrometer.core.instrument.Metrics;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.ssl.SslHandler;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
-import tak.server.cot.CotParser;
 import tak.server.federation.DistributedFederationManager;
 import tak.server.qos.MessageDOSStrategy;
 import tak.server.qos.MessageDeliveryStrategy;
@@ -103,7 +101,7 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 		return SubmissionService.getInstance();
 	}
 	
-	protected DistributedSubscriptionManager subscriptionManager() {
+	protected SubscriptionManager subscriptionManager() {
 		return DistributedSubscriptionManager.getInstance();
 	}
 	
@@ -121,16 +119,6 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 	
 	protected CoreConfigFacade config() {
 		return CoreConfigFacade.getInstance();
-	}
-	
-	private ThreadLocal<CotParser> cotParser = new ThreadLocal<>();
-	
-	protected CotParser cotParser() {
-		if (cotParser.get() == null) {
-			cotParser.set(new CotParser(false));
-		}
-		
-		return cotParser.get();
 	}
 
 	@FunctionalInterface
@@ -393,6 +381,12 @@ public abstract class NioNettyHandlerBase extends SimpleChannelInboundHandler<by
 		if (!input.isArchive()) {
 			protocol.addProtocolListener(SubmissionService.InputListenerAuxillaryRouter.onNoArchiveDataReceivedCallback
 					.newInstance(channelHandler, protocol));
+		}
+
+		if (input.isFederateOnly()) {
+			protocol.addProtocolListener(
+					SubmissionService.InputListenerAuxillaryRouter.onFederateOnlyDataReceivedCallback
+							.newInstance(channelHandler, protocol));
 		}
 
 		protocol.addProtocolListener(submissionService().onDataReceivedCallback.newInstance(channelHandler, protocol));

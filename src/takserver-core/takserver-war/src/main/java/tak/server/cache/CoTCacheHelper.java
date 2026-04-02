@@ -14,23 +14,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import jakarta.annotation.PostConstruct;
 import javax.sql.DataSource;
 
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.apache.commons.lang3.StringEscapeUtils;
-import org.apache.ignite.Ignite;
-import org.apache.ignite.IgniteCache;
-import org.apache.ignite.cache.CacheAtomicityMode;
-import org.apache.ignite.cache.eviction.fifo.FifoEvictionPolicyFactory;
-import org.apache.ignite.configuration.CacheConfiguration;
-import org.apache.ignite.configuration.NearCacheConfiguration;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.context.event.EventListener;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.Cache;
+import org.springframework.cache.Cache.ValueWrapper;
+import org.springframework.cache.CacheManager;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.w3c.dom.Document;
@@ -40,7 +34,7 @@ import org.w3c.dom.NodeList;
 
 import com.bbn.marti.dao.kml.JDBCCachingKMLDao;
 import com.bbn.marti.logging.AuditLogUtil;
-import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.util.RemoteUtil;
@@ -51,6 +45,7 @@ import com.bbn.marti.sync.model.UidDetails;
 import com.google.common.base.Strings;
 import com.google.common.collect.Sets;
 
+import jakarta.annotation.PostConstruct;
 import tak.server.Constants;
 import tak.server.cot.CotElement;
 import tak.server.cot.CotEventContainer;
@@ -59,13 +54,18 @@ import tak.server.cot.CotEventContainer;
 public class CoTCacheHelper {
 
 	@Autowired
-	private Ignite ignite;
-
-	@Autowired
 	private RemoteUtil remoteUtil;
 
 	@Autowired
 	private DataSource dataSource;
+	
+	// ignite
+    @Autowired
+    private CacheManager cacheManager;
+	
+	@Autowired
+    @Qualifier("caffineCacheManager")
+    private CacheManager caffeineCacheManager;
 
 	private boolean messagingProfileActive = false;
 
@@ -76,57 +76,7 @@ public class CoTCacheHelper {
 	@PostConstruct
 	private void postConstruct() {
 		maxCacheSize = CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getCotCacheMaxSize();
-	}
-
-	private IgniteCache<Object, Object> getCoTCache() {
-
-		CacheConfiguration<Object, Object> cacheConfig = new CacheConfiguration<>(Constants.LATEST_COT_CACHE);
-		cacheConfig.setAtomicityMode(CacheAtomicityMode.ATOMIC);
-
-		IgniteCache<Object, Object> cache = null;
-
-		String profilesActive = System.getProperty("spring.profiles.active");
-
-		if (profilesActive != null) {
-			// Due to initialization order, can't use spring environment and therefore
-			// ProfileTracker class yet, so look at the expected system property.
-
-			if (profilesActive.toLowerCase().contains(Constants.MESSAGING_PROFILE_NAME)) {
-				messagingProfileActive = true;
-			}
-		}
-
-		CoreConfig coreConfig = CoreConfigFacade.getInstance();
-		// use on-heap memory
-		boolean onHeapEnabled = coreConfig.getRemoteConfiguration().getBuffer().getQueue().isOnHeapEnabled();
-		cacheConfig.setOnheapCacheEnabled(onHeapEnabled);
-		if (onHeapEnabled) {
-
-			int cotCacheMaxSize = coreConfig.getRemoteConfiguration().getBuffer().getQueue().getCotCacheMaxSize();
-			int cotCacheBatchSize = coreConfig.getRemoteConfiguration().getBuffer().getQueue().getCotCacheBatchSize();
-			int cotCacheMaxMemorySize = coreConfig.getRemoteConfiguration().getBuffer().getQueue().getCotCacheMaxMemorySize();
-
-			if (cotCacheBatchSize == -1 || cotCacheMaxMemorySize == -1) {
-				cacheConfig.setEvictionPolicyFactory(new FifoEvictionPolicyFactory<>(cotCacheMaxSize));
-			} else {
-				cacheConfig.setEvictionPolicyFactory(new FifoEvictionPolicyFactory<>(
-						cotCacheMaxSize, cotCacheBatchSize, cotCacheMaxMemorySize));
-			}
-
-		}
-
-		if (!messagingProfileActive) {
-
-			NearCacheConfiguration<Object, Object> nearCfg =  new NearCacheConfiguration<>();
-			nearCfg.setNearEvictionPolicyFactory(new FifoEvictionPolicyFactory<>((int) coreConfig.getRemoteConfiguration().getBuffer().getQueue().getCotCacheMaxSize()));
-
-			cache = ignite.getOrCreateCache(cacheConfig, nearCfg);
-
-		} else {
-			cache = ignite.getOrCreateCache(cacheConfig);
-		}
-
-		return cache;
+		logger.info("CoT cache " + (isCacheDisabled() ? "disabled" : "enabled"));
 	}
 
 	public String getKeyGetCachedClientEndpointData(boolean connected, boolean recent) {
@@ -135,7 +85,7 @@ public class CoTCacheHelper {
 
 	public void cacheCoT(CotEventContainer cot, String groupsBitVectorString) {
 
-		if (isDisabled()) {
+		if (isCacheDisabled()) {
 			if (logger.isTraceEnabled()) {
 				logger.trace("CoT cache disabled");
 			}
@@ -162,7 +112,7 @@ public class CoTCacheHelper {
 			wrapper.setCotElement(cotElement);
 			wrapper.setUidDetails(hydratedUidDetails);
 
-			getCoTCache().putAsync(wrapper.getUid(), wrapper);
+			getCotCache().put(wrapper.getUid(), wrapper);
 
 			if (logger.isDebugEnabled()) {
 				logger.debug("cached CoT: " + wrapper);
@@ -174,6 +124,10 @@ public class CoTCacheHelper {
 			}
 		}
 
+	}
+	
+	private Cache getCotCache() {
+		return getCacheManager().getCache(Constants.LATEST_COT_CACHE);
 	}
 
 	private UidDetails generateUidDetails(@NotNull UidDetails uidDetails, @NotNull CotElement cotElement) {
@@ -298,32 +252,35 @@ public class CoTCacheHelper {
 
 	public CotCacheWrapper getLatestCotWrapperForUid(String uid, String groupVector) {
 
-		if (!isDisabled()) {
-
-			CotCacheWrapper cacheWrapper = (CotCacheWrapper) getCoTCache().get(uid);
-
-			if (cacheWrapper != null && cacheWrapper.getCotElement() != null) {
-
-				if (logger.isDebugEnabled()) {
-					logger.debug("CoT cache hit: " + cacheWrapper);
+		if (!isCacheDisabled()) {
+			
+			ValueWrapper vw = getCotCache().get(uid);
+			
+			if (vw != null) {
+				
+				if (!(vw.get() instanceof CotCacheWrapper)) {
+					throw new IllegalArgumentException("illegal cached type " + vw.get().getClass().getName());
 				}
+				
+				CotCacheWrapper cw = (CotCacheWrapper) vw.get();
 
-				// validate group visibility for this CoT
+				if (cw != null && cw.getCotElement() != null) {
 
-				if (remoteUtil.isGroupVectorAllowed(groupVector, cacheWrapper.getGroupsBitVectorString())) {
-					return cacheWrapper;
+					logger.debug("CoT cache hit: {}", cw);
+
+					// validate group visibility for this CoT
+
+					if (remoteUtil.isGroupVectorAllowed(groupVector, cw.getGroupsBitVectorString())) {
+						return cw;
+					}
+
+					throw new TakException("not allowed for uid " + uid);
 				}
-
-				throw new TakException("not allowed");
 			}
-
-			if (logger.isDebugEnabled()) {
-				logger.debug("CoT cache miss for uid: " + uid);
-			}
+			
+			logger.debug("CoT cache miss for uid: {}", uid);
 		} else {
-			if (logger.isTraceEnabled()) {
-				logger.trace("CoT cache disabled");
-			}
+			logger.debug("CoT cache disabled {}", "");
 		}
 
 		CotElement cotElement = queryLatestCotElementForUid(uid, groupVector);
@@ -332,10 +289,8 @@ public class CoTCacheHelper {
 			throw new NotFoundException("CoT for uid " + uid + " not found in database ");
 		}
 
-		if (logger.isDebugEnabled()) {
-			logger.debug("groups from CoT query result: " + cotElement.groupString + " groups parameter: " + groupVector);
-		}
-
+		logger.debug("groups from CoT query result: {} groups parameter: {}", cotElement.groupString, groupVector);
+		
 		UidDetails uidDetails = generateUidDetails(new UidDetails(), cotElement);
 
 		CotCacheWrapper wrapper = new CotCacheWrapper();
@@ -345,20 +300,13 @@ public class CoTCacheHelper {
 		wrapper.setCotElement(cotElement);
 		wrapper.setUidDetails(uidDetails);
 
-		if (!isDisabled()) {
-			getCoTCache().put(uid, wrapper);
-		} else {
-			if (logger.isTraceEnabled()) {
-				logger.trace("CoT cache disabled");
-			}
-		}
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("cached CoT due to miss: " + wrapper);
-		}
-
+		if (!isCacheDisabled()) {
+			getCotCache().put(uid, wrapper);
+		} 
+	
+		logger.debug("cached CoT due to miss: {}", wrapper);
+		
 		// validate group visibility for this CoT
-
 		if (remoteUtil.isGroupVectorAllowed(groupVector, wrapper.getGroupsBitVectorString())) {
 			return wrapper;
 		}
@@ -370,16 +318,14 @@ public class CoTCacheHelper {
 
 		Collection<CotCacheWrapper> results = new HashSet<>();
 
-		if (isDisabled()) {
-
-			if (logger.isTraceEnabled()) {
-				logger.trace("CoT cache disabled");
-			}
+		if (isCacheDisabled()) {
+			
+			logger.debug("CoT cache disabled");
 
 			Map<Object, Object> cachePutMap = new ConcurrentHashMap<>();
 
 			Collection<CotElement> cot = queryLatestCotElementsForUids(uids, groupVector);
-			Iterator it = cot.iterator();
+			Iterator<?> it = cot.iterator();
 			while (it.hasNext()) {
 				CotElement cotElement = (CotElement)it.next();
 
@@ -418,17 +364,36 @@ public class CoTCacheHelper {
 
 			return results;
 		}
+		
+		logger.debug("CoT cache enabled");
+		
+		Set<String> uidsNotCached = new HashSet<>();
 
-		Map<?, ?> cacheWrapperMap = getCoTCache().getAll(uids);
-
-		Set<String> uidsNotCached = Sets.difference(uids, cacheWrapperMap.keySet());
-
-		if (logger.isTraceEnabled()) {
-			logger.trace("uids not cached: " + uidsNotCached);
+		int cachedCount = 0;
+		
+		for (String uid : uids) {
+			ValueWrapper vw = getCotCache().get(uid);
+			
+			if (vw != null) {
+				
+				if (!(vw.get() instanceof CotCacheWrapper)) {
+					logger.warn("illegal cached type " + vw.get().getClass().getName());
+					continue;
+				}
+				
+				CotCacheWrapper cw = (CotCacheWrapper) vw.get();
+				
+				results.add(cw);
+				
+				cachedCount++;
+				
+			} else {
+				uidsNotCached.add(uid);
+			}
 		}
-
-		Map<Object, Object> cachePutMap = new ConcurrentHashMap<>();
-
+		
+		logger.debug("got {} cached cot elements. non-cached: {}", Integer.toString(cachedCount), uidsNotCached);
+		
 		for (CotElement cotElement : queryLatestCotElementsForUids(uidsNotCached, groupVector)) {
 			UidDetails uidDetails = generateUidDetails(new UidDetails(), cotElement);
 
@@ -438,31 +403,15 @@ public class CoTCacheHelper {
 			wrapper.setUid(cotElement.uid);
 			wrapper.setCotElement(cotElement);
 			wrapper.setUidDetails(uidDetails);
-
-			cachePutMap.put(cotElement.uid, wrapper);
-		}
-
-		if (logger.isTraceEnabled()) {
-			logger.trace("caching " + cachePutMap.size() + " wrappers");
-		}
-
-		getCoTCache().putAll(cachePutMap);
-
-		for (Object val : cacheWrapperMap.values()) {
-
-			if (addDetails || remoteUtil.isGroupVectorAllowed(groupVector, ((CotCacheWrapper) val).getGroupsBitVectorString())) {
-				results.add((CotCacheWrapper) val);
+			
+			getCotCache().put(cotElement.uid, wrapper);
+			
+			if (addDetails || remoteUtil.isGroupVectorAllowed(groupVector, wrapper.getGroupsBitVectorString())) {
+				results.add(wrapper);
 			}
 		}
-
-		for (Object val : cachePutMap.values()) {
-			if (addDetails || remoteUtil.isGroupVectorAllowed(groupVector, ((CotCacheWrapper) val).getGroupsBitVectorString())) {
-				results.add((CotCacheWrapper) val);
-			}
-		}
-
+		
 		return results;
-
 	}
 
 	private CotElement queryLatestCotElementForUid(String uid, String groupVector) {
@@ -526,6 +475,8 @@ public class CoTCacheHelper {
 					+ " 	group by uid ) ";
 
 			AuditLogUtil.auditLog(sql + "uids: " + uids + " groupVector: " + groupVector);
+			
+			logger.debug("query latest CoT for {}", uids);
 
 			Array uidArray = connection.createArrayOf("varchar", uids.toArray());
 
@@ -559,6 +510,8 @@ public class CoTCacheHelper {
 
 								cotElements.add(cotElement);
 							}
+							
+							logger.debug("fetched cot {}", cotElements);
 
 							return cotElements;
 						}
@@ -570,8 +523,16 @@ public class CoTCacheHelper {
 		}
 	}
 
-
-	private boolean isDisabled() {
+	private boolean isCacheDisabled() {
 		return maxCacheSize < 1;
 	}
+	
+	// For standalone mode (non-cluster) - get the caffeine cache manager. Otherwise, use ignite.
+	public CacheManager getCacheManager() {
+    	if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+    		return cacheManager;
+    	} else {
+    		return caffeineCacheManager;
+    	}
+    }
 }

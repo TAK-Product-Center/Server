@@ -48,7 +48,7 @@ public class FileWrapper implements Serializable {
 	}
 	@Override
 	public String toString() {
-		return "FileHolder [contents=" + Arrays.toString(contents) + ", hash=" + hash + ", uid=" + uid
+		return "FileHolder [contents=" + contents + ", hash=" + hash + ", uid=" + uid
 				+ ", groupVector=" + groupVector + "]";
 	}
 

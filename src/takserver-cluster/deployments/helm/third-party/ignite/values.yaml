@@ -2,9 +2,9 @@
 replicaCount: 2
 
 image:
-  repository: apacheignite/ignite
-  tag: 2.15.0-jdk11
-  pullPolicy: IfNotPresent
+  repository: docker-devtest-local.artifacts.tak.gov/takserver-cluster/takserver-ignite
+  tag: 2.17.0
+  pullPolicy: Always
 
 nameOverride: ""
 fullnameOverride: ""
@@ -20,7 +20,9 @@ dataStorage:
   config: |-
 
 env:
-  OPTION_LIBS: "ignite-kubernetes,ignite-rest-http"
+  # Ideally OPTION_LIBS would be defined within the Takserver charts but it isn't clear how to do that.
+  # It also isn't clear if all of these are necessary, but better safe than sorry.
+  OPTION_LIBS: "ignite-kubernetes,ignite-rest-http,ignite-json,ignite-rest-http,ignite-slf4j,ignite-urideploy,ignite-web"
   IGNITE_QUIET: "false"
   JVM_OPTS: "-Djava.net.preferIPv4Stack=true"
 peerClassLoadingEnabled: false

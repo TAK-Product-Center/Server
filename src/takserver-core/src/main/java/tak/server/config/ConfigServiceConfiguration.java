@@ -1,30 +1,27 @@
 package tak.server.config;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
-import tak.server.util.ActiveProfiles;
-import com.google.common.base.Strings;
-import org.apache.ignite.Ignite;
+import java.util.Properties;
+import java.util.UUID;
 
+import org.apache.ignite.Ignite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
-import org.springframework.cloud.aws.context.support.env.AwsCloudEnvironmentCheckUtils;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.marti.remote.config.DistributedConfiguration;
 import com.bbn.marti.remote.config.LocalConfiguration;
+import com.google.common.base.Strings;
 
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
-
-import java.util.Properties;
-import java.util.UUID;
+import tak.server.util.ActiveProfiles;
 
 
 @Configuration
@@ -93,11 +90,7 @@ public class ConfigServiceConfiguration {
 		}
 
 		properties.put("cloud.aws.stack.auto", false); // make this configurable?
-
-		if (!config.getConfiguration().getNetwork().isCloudwatchEnable()) {
-			AwsCloudEnvironmentCheckUtils.setIsCloudEnvironment(false);
-		}
-
+		
 		try {
 			properties.put("takserver.iconsets.dir", config.getConfiguration().getRepository().getIconsetDir());
 		} catch (Exception e) {

@@ -1,0 +1,271 @@
+
+
+<h1>TAK Server Metrics Dashboard</h1>
+
+<!-- Row 0: Basic Server Info -->
+<button (click)="rowCollapsed[0] = !rowCollapsed[0]" class="collapse-btn">
+  {{ rowCollapsed[0] ? '+' : '-' }}
+</button>
+<div class="dashboard-row three-columns" *ngIf="!rowCollapsed[0]">
+  <div class="metric-card">
+    <h3><u>TAK Server Version</u></h3>
+    <p>{{ takVersion }}</p>
+
+    <h3><u>Node ID</u></h3>
+    <p>{{ nodeId }}</p>
+
+    <h3><u>Server Start Time</u></h3>
+    <p>{{ serverStartTime }}</p>
+
+  </div>
+
+  <div class="metric-card">
+    <h3><u>Server Up Time</u></h3>
+    <p>{{ serverUpTime }}</p>
+
+    <h3><u>Clients Connected</u></h3>
+    <p>{{ totalConnections }}</p>
+
+    <h3><u>Disk Usage</u></h3>
+    <p>{{ diskUsedMB }} MB / {{ diskTotalMB }} MB ({{ diskUsedPercentage }}%)</p>
+
+    <h3><u>Usable Space</u></h3>
+    <p>{{ diskUsableMB }} MB</p>
+  </div>
+
+  <div class="metric-card">
+    <h3><strong>System CPU Usage</strong></h3>
+    <p>
+      <strong>Cores:</strong> {{ totalCores }}
+      | <strong>Usage:</strong> {{ (cpuUtilized * 100).toFixed(2) }}%
+    </p>
+    <div class="gauge-wrapper">
+      <ngx-charts-gauge
+        [view]="gaugeView"
+        [results]="cpuUsageData"
+        [min]="0"
+        [max]="100"
+        [angleSpan]="240"
+        [startAngle]="-120"
+        [scheme]="colorScheme"
+        [units]="'%'">
+      </ngx-charts-gauge>
+    </div>
+  </div>
+</div>
+
+<hr class="row-separator">
+
+<!-- Row 1: API Heap -->
+<button (click)="rowCollapsed[1] = !rowCollapsed[1]" class="collapse-btn">
+  {{ rowCollapsed[1] ? '+' : '-' }}
+</button>
+<div class="dashboard-row one-columns" *ngIf="!rowCollapsed[1]">
+  <div class="chart-card full-width">
+    <h3>API Heap Memory Usage</h3>
+    <div class="chart-container">
+      <ngx-charts-area-chart
+        [results]="heapMemoryData"
+        [xAxis]="xAxis"
+        [yAxis]="yAxis"
+        [legend]="legend"
+        [legendPosition]="legendPosition"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="xAxisLabel"
+        [yAxisLabel]="heapChartYAxisLabelHeap"
+        [scheme]="colorScheme"
+        [yScaleMax]="heapChartYScaleMax"
+        [animations]="false"
+        [autoScale]="true">
+      </ngx-charts-area-chart>
+    </div>
+    <div class="custom-legend">
+      <div class="legend-item"><span class="legend-color" style="background-color: #ff7300;"></span> Heap Allocated</div>
+      <div class="legend-item"><span class="legend-color" style="background-color: #007bff;"></span> Heap Utilized</div>
+    </div>
+  </div>
+</div>
+
+<hr class="row-separator">
+
+<!-- Row 2: Messaging Heap -->
+<button (click)="rowCollapsed[2] = !rowCollapsed[2]" class="collapse-btn">
+  {{ rowCollapsed[2] ? '+' : '-' }}
+</button>
+<div class="dashboard-row one-columns" *ngIf="!rowCollapsed[2]">
+
+  <div class="chart-card full-width">
+    <h3>Messaging Heap Memory Usage</h3>
+    <div class="chart-container">
+      <ngx-charts-area-chart
+        [results]="messagingHeapMemoryData"
+        [xAxis]="xAxis"
+        [yAxis]="yAxis"
+        [legend]="legend"
+        [legendPosition]="legendPosition"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="xAxisLabel"
+        [yAxisLabel]="heapChartYAxisLabelHeap"
+        [scheme]="colorScheme"
+        [yScaleMax]="messagingHeapChartYScaleMax"
+        [animations]="false"
+        [autoScale]="true">
+      </ngx-charts-area-chart>
+    </div>
+    <div class="custom-legend">
+      <div class="legend-item"><span class="legend-color" style="background-color: #ff7300;"></span> Heap Allocated</div>
+      <div class="legend-item"><span class="legend-color" style="background-color: #007bff;"></span> Heap Utilized</div>
+    </div>
+  </div>
+</div>
+
+<hr class="row-separator">
+
+<!-- Row 3: Network I/O -->
+<button (click)="rowCollapsed[3] = !rowCollapsed[3]" class="collapse-btn">
+  {{ rowCollapsed[3] ? '+' : '-' }}
+</button>
+<div class="dashboard-row two-columns" *ngIf="!rowCollapsed[3]">
+  <div class="chart-card">
+    <h3>Network I/O (Bytes Read / Second)</h3>
+    <div class="chart-container">
+      <ngx-charts-line-chart
+        [results]="bytesReadPerSecondData"
+        [xAxis]="xAxis"
+        [yAxis]="yAxis"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="xAxisLabel"
+        [yAxisLabel]="bytesReadChartYAxisLabelHeap"
+        [scheme]="colorScheme3"
+        [yScaleMax]="bytesReadYScaleMax"
+        [animations]="false"
+        [autoScale]="true">
+      </ngx-charts-line-chart>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h3>Network I/O (Bytes Written / Second)</h3>
+    <div class="chart-container">
+      <ngx-charts-line-chart
+        [results]="bytesWrittenPerSecondData"
+        [xAxis]="xAxis"
+        [yAxis]="yAxis"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="xAxisLabel"
+        [yAxisLabel]="bytesWrittenChartYAxisLabelHeap"
+        [scheme]="colorScheme3"
+        [yScaleMax]="bytesWrittenYScaleMax"
+        [animations]="false"
+        [autoScale]="true">
+      </ngx-charts-line-chart>
+    </div>
+  </div>
+</div>
+
+<hr class="row-separator">
+
+<!-- Row 4: Reads/Writes per second -->
+<button (click)="rowCollapsed[4] = !rowCollapsed[4]" class="collapse-btn">
+  {{ rowCollapsed[4] ? '+' : '-' }}
+</button>
+<div class="dashboard-row two-columns" *ngIf="!rowCollapsed[4]">
+  <div class="chart-card">
+    <h3>Reads Per Second</h3>
+    <div class="chart-container">
+      <ngx-charts-line-chart
+        [results]="readsPerSecondData"
+        [xAxis]="xAxis"
+        [yAxis]="yAxis"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="xAxisLabel"
+        [yAxisLabel]="readsChartYAxisLabelHeap"
+        [scheme]="colorScheme2"
+        [yScaleMax]="readsYScaleMax"
+        [animations]="false"
+        [autoScale]="true">
+      </ngx-charts-line-chart>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h3>Writes Per Second</h3>
+    <div class="chart-container">
+      <ngx-charts-line-chart
+        [results]="writesPerSecondData"
+        [xAxis]="xAxis"
+        [yAxis]="yAxis"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="xAxisLabel"
+        [yAxisLabel]="writesChartYAxisLabelHeap"
+        [scheme]="colorScheme2"
+        [yScaleMax]="writesYScaleMax"
+        [animations]="false"
+        [autoScale]="true">
+      </ngx-charts-line-chart>
+    </div>
+  </div>
+</div>
+
+<hr class="row-separator">
+
+<!-- Row 5: Queue gauges -->
+<button (click)="rowCollapsed[5] = !rowCollapsed[5]" class="collapse-btn">
+  {{ rowCollapsed[5] ? '+' : '-' }}
+</button>
+<div class="dashboard-row three-columns" *ngIf="!rowCollapsed[5]">
+  <div class="metric-card">
+    <h3><strong>Submission Queue</strong></h3>
+    <p><strong>Current Size:</strong> {{ submissionQueueCurrentSize }} | <strong>Capacity:</strong> {{ submissionQueueCapacity }}</p>
+    <div class="gauge-wrapper">
+      <ngx-charts-gauge
+        [view]="gaugeView"
+        [results]="submissionQueueUsageData"
+        [min]="0"
+        [max]="100"
+        [angleSpan]="240"
+        [startAngle]="-120"
+        [scheme]="colorScheme"
+        [units]="'%'">
+      </ngx-charts-gauge>
+    </div>
+  </div>
+  <div class="metric-card">
+    <h3><strong>Broker Queue</strong></h3>
+    <p><strong>Current Size:</strong> {{ brokerQueueCurrentSize }} | <strong>Capacity:</strong> {{ brokerQueueCapacity }}</p>
+    <div class="gauge-wrapper">
+      <ngx-charts-gauge
+        [view]="gaugeView"
+        [results]="brokerQueueUsageData"
+        [min]="0"
+        [max]="100"
+        [angleSpan]="240"
+        [startAngle]="-120"
+        [scheme]="colorScheme"
+        [units]="'%'">
+      </ngx-charts-gauge>
+    </div>
+  </div>
+  <div class="metric-card">
+    <h3><strong>Repository Queue</strong></h3>
+    <p><strong>Current Size:</strong> {{ repositoryQueueCurrentSize }} | <strong>Capacity:</strong> {{ repositoryQueueCapacity }}</p>
+    <div class="gauge-wrapper">
+      <ngx-charts-gauge
+        [view]="gaugeView"
+        [results]="repositoryQueueUsageData"
+        [min]="0"
+        [max]="100"
+        [angleSpan]="240"
+        [startAngle]="-120"
+        [scheme]="colorScheme"
+        [units]="'%'">
+      </ngx-charts-gauge>
+    </div>
+  </div>
+</div>

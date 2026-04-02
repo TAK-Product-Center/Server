@@ -4,6 +4,10 @@ buildscript {
     }
 }
 
+plugins {
+    id "com.github.node-gradle.node" version "3.1.1"
+}
+
 import java.nio.file.Files
 import java.nio.file.Paths
 
@@ -11,7 +15,6 @@ apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
 apply plugin: 'war'
-
 
 task unpack(type: Copy) {
     dependsOn bootWar
@@ -121,7 +124,7 @@ bootWar {
     enabled = true
 
     manifest {
-      attributes 'Main-Class': 'org.springframework.boot.loader.PropertiesLauncher'
+      attributes 'Main-Class': 'org.springframework.boot.loader.launch.PropertiesLauncher'
     }
 }
 
@@ -134,20 +137,12 @@ war {
 
 dependencies {
 
-  implementation group: 'io.netty', name: 'netty-handler', version: netty_handler_version
+  implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: httpcomponents_version
+  implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5-fluent', version: httpcomponents_version
 
-  // gRPC
-  //  implementation group: 'io.grpc', name: 'grpc-netty', version: grpc_version
-//  implementation group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
-//  implementation group: 'io.grpc', name: 'grpc-stub', version: grpc_version
+  implementation group: 'joda-time', name: 'joda-time', version: joda_version // Used in TakFigClient.java
 
-  // Google's OpenSSL variant
-  // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
+  implementation group: 'org.dom4j', name: 'dom4j', version: dom4j_version
 
   implementation "io.netty.incubator:netty-incubator-codec-native-quic:$netty_quic_version:linux-x86_64"
   implementation "io.netty.incubator:netty-incubator-codec-native-quic:$netty_quic_version:linux-aarch_64"
@@ -157,17 +152,11 @@ dependencies {
 
   implementation group: 'io.netty', name: 'netty-tcnative-classes', version: netty_tcnative_version
 
-//  implementation group: 'io.netty', name: 'netty-tcnative-boringssl-static', version: netty_tcnative_version
-//  implementation group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
-//  implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
-
   implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
 
   implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
   implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
   implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-
-
 
 
   // required to fix version conflict for h2 between ignite and spring boot
@@ -180,7 +169,7 @@ dependencies {
     exclude group: 'org.slf4j'
     exclude group: 'log4j', module: 'log4j'
     // Added to exclude dom4j 1.6.1, a transitive dependency
-    exclude group: 'dom4j', module: 'dom4j'
+    //exclude group: 'dom4j', module: 'dom4j'
   }
 
   implementation project(':takserver-common')
@@ -189,11 +178,10 @@ dependencies {
   //implementation group: 'org.locationtech.spatial4j', name: 'spatial4j', version: '0.8'
   //implementation group: 'org.locationtech.jts', name: 'jts-core', version: jts_version
 
-  implementation group: 'org.dom4j', name: 'dom4j', version: dom4j_version
+
   implementation group: 'com.google.code.gson', name: 'gson', version: gson_version
 
   // apache ignite (cache)
-//  implementation group: 'org.apache.ignite', name: 'ignite-spring-cache-ext', version: ignite_spring_cache_version
   implementation group: 'org.apache.ignite', name: 'ignite-core', version: ignite_version
   implementation ("org.apache.ignite:ignite-spring:$ignite_version") {
 	exclude group: 'org.springframework', module: 'spring-context'
@@ -206,7 +194,7 @@ dependencies {
   implementation group: 'io.micrometer', name: 'micrometer-core', version: micrometer_version
 
   // cloudwatch metrics
-  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_version
+  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch2', version: cloudwatch_version
 
   implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
   implementation group: 'org.slf4j', name: 'jul-to-slf4j', version: slf4j_version
@@ -219,9 +207,6 @@ dependencies {
   implementation group: 'org.apache.tomcat', name: 'tomcat-el-api', version: tomcat_version
   implementation group: 'org.apache.tomcat', name: 'tomcat-annotations-api', version: tomcat_version
 
-
-  //implementation group: 'javax.servlet', name: 'jstl', version: jstl_version
-  //implementation group: 'javax.mail', name: 'javax.mail-api', version: mail_api_version
   implementation group: 'jakarta.mail', name: 'jakarta.mail-api', version: jakarta_mail_api_version
   implementation group: 'org.apache.tomcat.embed', name: 'tomcat-embed-core', version: tomcat_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-tomcat', version: spring_boot_version
@@ -229,14 +214,17 @@ dependencies {
   implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-mail', version: spring_boot_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-websocket', version: spring_boot_version
+  implementation group: 'org.springframework.retry', name: 'spring-retry', version: spring_retry_version
   implementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
   implementation group: 'org.springframework.security', name: 'spring-security-config', version: spring_security_version
   implementation group: 'org.springframework.security', name: 'spring-security-messaging', version: spring_security_version
   implementation group: 'org.springframework.security', name: 'spring-security-web', version: spring_security_version
-  //implementation group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
-  //implementation group: 'org.hibernate', name: 'hibernate-entitymanager', version: hibernate_version
-  implementation group: 'org.springframework.security', name: 'spring-security-oauth2-authorization-server', version: spring_security_oauth2_authorization_server_version
-  implementation group: 'org.springframework.security', name: 'spring-security-oauth2-core', version: spring_security_version
+  
+  implementation ("org.springframework.ldap:spring-ldap-core:$spring_ldap_version") {
+	exclude group: 'org.springframework', module: 'spring-core'
+	exclude group: 'org.springframework', module: 'spring-beans'
+	exclude group: 'org.springframework', module: 'spring-tx'
+  }
   
   implementation group: 'org.hibernate.orm', name: 'hibernate-core', version: hibernate_version
   implementation group: 'org.hibernate.orm', name: 'hibernate-entitymanager', version: hibernate_entitymanager_version
@@ -248,18 +236,14 @@ dependencies {
   implementation group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
   implementation 'org.apache.commons:commons-lang3:' + commons_lang_version
   implementation group: 'commons-collections', name: 'commons-collections', version: '3.2.2'
-  //implementation group: 'org.apache.httpcomponents', name: 'fluent-hc', version: httpcomponents_version
-  //implementation group: 'org.apache.httpcomponents', name: 'httpclient', version: httpcomponents_version
-  //implementation group: 'org.apache.httpcomponents', name: 'httpmime', version: httpcomponents_version
 
-  implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: httpcomponents_version
-  implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5-fluent', version: httpcomponents_version
+
   implementation group: 'org.apache.httpcomponents', name: 'httpmime', version: httpcomponents_httpmime_version
 
   // nats message queue
   implementation group: 'io.nats', name: 'jnats', version: nats_version
   
-    // apache ignite (cache and distributed service grid)
+  // apache ignite (cache and distributed service grid)
   testImplementation group: 'org.apache.ignite', name: 'ignite-indexing', version: ignite_version
   testImplementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
   testImplementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
@@ -282,17 +266,18 @@ dependencies {
   integrationTestImplementation group: 'org.dom4j', name: 'dom4j', version: dom4j_version
 
   integrationTestImplementation project(':federation-common')
-  integrationTestImplementation project(':takserver-takcl-core')
+  integrationTestImplementation project(':takserver-usermanager')
+    integrationTestImplementation project(':takserver-takcl-core')
 
   // required to fix version conflict for h2 between ignite and spring boot
   integrationTestImplementation group: 'com.h2database', name: 'h2', version: h2_version
   integrationTestImplementation group: 'xerces', name: 'xercesImpl', version: xerces_version
 
   implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: jakarta_xml_bind_api_version	
+  implementation group: 'uk.m0nom', name: 'javaapiforkml', version: javaapiforkml_version
 
-  //implementation group: 'org.springframework.security', name: 'spring-security-oauth2-authorization-server', version: '1.1.2'
-
-    implementation group: 'uk.m0nom', name: 'javaapiforkml', version: javaapiforkml_version
+  implementation group: 'org.springframework.security', name: 'spring-security-oauth2-authorization-server', version: spring_security_oauth2_authorization_server_version
+  implementation group: 'org.springframework.security', name: 'spring-security-oauth2-core', version: spring_security_version
 }
 
 clean {
@@ -379,3 +364,41 @@ configurations {
         exclude group: 'commons-logging', module: 'commons-logging'
     }
 }
+
+node {
+    version = "22.13.1"
+    download = true
+}
+
+task webappAngularNpmInstall(type: NpmTask) {
+    workingDir = file("${project.projectDir}/src/main/webapp-angular")
+    args = ['install', '--force']
+}
+
+task bundleAngularWebApp(type: NpmTask, dependsOn: webappAngularNpmInstall) {
+    workingDir = file("${project.projectDir}/src/main/webapp-angular")
+    args = ['run', 'build', '--', '--base-href', '/Marti/metrics/browser/']
+}
+
+task deployMetricsDashboard(dependsOn: bundleAngularWebApp) {
+    doFirst {
+        // Delete previous Angular 19 build output from Marti/metrics
+        delete './src/main/webapp/Marti/metrics/browser'
+        delete './src/main/webapp/Marti/metrics/prerendered-routes.json'
+        delete './src/main/webapp/Marti/metrics/3rdpartylicenses.txt'
+    }
+    doLast {
+        copy {
+            from './src/main/webapp-angular/dist/webapp-angular/browser'
+            into './src/main/webapp/Marti/metrics/browser'
+        }
+        copy {
+            from './src/main/webapp-angular/dist/webapp-angular/'
+            include 'prerendered-routes.json', '3rdpartylicenses.txt'
+            into './src/main/webapp/Marti/metrics'
+        }
+    }
+}
+
+bootJar.dependsOn deployMetricsDashboard
+bootWar.dependsOn deployMetricsDashboard

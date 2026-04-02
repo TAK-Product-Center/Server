@@ -7,6 +7,8 @@ import com.bbn.marti.test.shared.data.users.AbstractUser;
 import com.bbn.marti.test.shared.engines.ActionEngine;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -23,6 +25,8 @@ import static com.bbn.marti.takcl.connectivity.missions.MissionModels.MissionUse
  * Created on 1/19/18.
  */
 public class EnvironmentState {
+
+    private static final Logger logger = LoggerFactory.getLogger(EnvironmentState.class);
 
 	private final TreeMap<String, MissionState> missionNameStateMap = new TreeMap<>();
 
@@ -277,11 +281,11 @@ public class EnvironmentState {
 	}
 
 	protected synchronized void updateState() {
-		System.out.println("--- ActionEngine.data.getAllClients().size: " + ActionEngine.data.getAllClients().size());
+		logger.debug("--- ActionEngine.data.getAllClients().size: " + ActionEngine.data.getAllClients().size());
 
 		for (ActionEngine.ActionClient client : ActionEngine.data.getAllClients()) {
 			
-			System.out.println("\t--- EnvironmentState updateState client: " + client + ". Will updateConnectivityState userstate to: "+client.getConnectivityState());
+			logger.debug("\t--- EnvironmentState updateState client: " + client + ". Will updateConnectivityState userstate to: "+client.getConnectivityState());
 
 			UserState user = getState(client.getProfile());
 			user.updateLatestSA(client.getLatestSA());

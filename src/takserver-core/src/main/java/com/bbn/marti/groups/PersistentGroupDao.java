@@ -16,7 +16,6 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -87,7 +86,9 @@ public class PersistentGroupDao implements GroupDao {
                                             throw new IllegalStateException("unable to increment bit position");
                                         }}});
 
-                            logger.debug("allocated new bit position: " + bitpos);
+                            if (logger.isDebugEnabled()) {
+                                logger.debug("allocated new bit position: " + bitpos);
+                            }
 
                             template.update("insert into groups (name, bitpos, create_ts, type) values (?, ?, now(), ?)", // SQL
                                     new Object[] {group.getName(), bitpos, group.getType().ordinal()}); // SQL params
@@ -95,7 +96,9 @@ public class PersistentGroupDao implements GroupDao {
                             // group does exist in db - so update fields from the saved object
                             group.update(existing);
 
-                            logger.debug("group exists: not saving " + existing);
+                            if (logger.isDebugEnabled()) {
+                                logger.debug("group exists: not saving " + existing);
+                            }
                             return existing;
                         }
 
@@ -103,17 +106,14 @@ public class PersistentGroupDao implements GroupDao {
                             group.setBitpos(bitpos);
                         }
                     } catch (Exception e) {
-
-                        logger.debug("exception persisting group " + group);
-
-                        logger.debug("exception saving group " + group + " " + e.getMessage(), e);
+                        logger.error("exception saving group " + group + " " + e.getMessage(), e);
                     } 
                     
                     return group;
                 }
             });
-		} catch (CannotCreateTransactionException e) {
-			logger.info("Could not save group. " + e.getMessage());
+		} catch (Exception e) {
+            logger.error("exception saving group " + group + " " + e.getMessage(), e);
 		}
         
         return group;

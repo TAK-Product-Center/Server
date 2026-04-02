@@ -3,6 +3,7 @@ package tak.server.federation.hub.ui;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -42,7 +43,6 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import tak.server.federation.hub.FederationHubConstants;
 import tak.server.federation.hub.FederationHubUtils;
-import tak.server.federation.hub.broker.FederationHubBroker;
 import tak.server.federation.hub.broker.FederationHubBrokerProxyFactory;
 import tak.server.federation.hub.policy.FederationHubPolicyManagerProxyFactory;
 import tak.server.federation.hub.ui.keycloak.KeycloakTokenParser;
@@ -87,9 +87,11 @@ public class FederationHubUIServer {
         List<String> profiles = new ArrayList<String>();
         application.setAdditionalProfiles(profiles.toArray(new String[0]));
         Properties properties = new Properties();
+       
         properties.put("cloud.aws.region.auto", false);
         properties.put("cloud.aws.region.static", "us-east-1");
         properties.put("cloud.aws.stack.auto", false);
+
         application.setDefaultProperties(properties);
     }
 
@@ -186,13 +188,15 @@ public class FederationHubUIServer {
             throws JsonParseException, JsonMappingException, FileNotFoundException, IOException {
         if (getClass().getResource(configFile) != null) {
             // It's a resource.
-            return new ObjectMapper(new YAMLFactory()).readValue(getClass().getResourceAsStream(configFile),
-                FederationHubUIConfig.class);
+        	try (InputStream is = getClass().getResourceAsStream(configFile)) {
+                return new ObjectMapper(new YAMLFactory()).readValue(is, FederationHubUIConfig.class);
+        	}
         }
 
         // It's a file.
-        return new ObjectMapper(new YAMLFactory()).readValue(new FileInputStream(configFile),
-            FederationHubUIConfig.class);
+        try (InputStream is = new FileInputStream(configFile)) {
+        	 return new ObjectMapper(new YAMLFactory()).readValue(is, FederationHubUIConfig.class);
+        }
     }
 
     @Bean
@@ -222,10 +226,5 @@ public class FederationHubUIServer {
     @Bean
     public KeycloakTokenParser keycloakTokenParser(FederationHubUIConfig getFedHubConfig) {
     	return new KeycloakTokenParser(getFedHubConfig);
-    }
-
-    @Bean
-    public FederationHubBrokerMetricsPoller federationHubBrokerMetricsPoller(FederationHubBroker fedHubBroker) {
-        return new FederationHubBrokerMetricsPoller(fedHubBroker);
     }
 }

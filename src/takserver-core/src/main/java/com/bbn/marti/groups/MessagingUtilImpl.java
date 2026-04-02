@@ -257,7 +257,41 @@ public class MessagingUtilImpl implements MessagingUtil {
 			}
 		}
 	}
-	
+
+	@Override
+	public void sendUpdatedGroupsLatestSA(User destUser) {
+		if (destUser == null || groupManager == null || subscriptionManager == null) {
+			throw new IllegalArgumentException("null user, GroupManager or SubscriptionManager");
+		}
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("sendLatestReachableChannelsSA " + destUser);
+		}
+
+		Subscription destSubscription = subscriptionManager.getSubscription(destUser);
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("sendLatestReachableChannelsSA destSubscription " + destSubscription);
+		}
+
+		if (destSubscription == null) {
+			throw new IllegalStateException("subscription not found for " + destUser);
+		}
+
+		CotEventContainer latestSA = destSubscription.getLatestSA();
+
+		// strip off the flow tag filter so we can resend from this server again
+		flowTagFilter.unfilter(latestSA);
+
+		// update groups on latest SA for new channels
+		NavigableSet<Group> groups = groupManager.getGroups(destUser);
+		// Only put IN groups in the message - out groups do not matter here
+		latestSA.setContext(Constants.GROUPS_KEY, groupFederationUtil.filterGroupDirection(Direction.IN, groups));
+
+		// send the message
+		cotMessenger().send(latestSA);
+	}
+
 	private void sendLatestFeedEventsToSub(Subscription sub) {
 		try {
 			if (CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled()) return;

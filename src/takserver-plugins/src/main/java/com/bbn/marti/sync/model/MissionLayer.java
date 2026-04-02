@@ -56,6 +56,7 @@ public class MissionLayer {
     protected Type type;
     protected String after;
 
+    protected MissionLayer prev;
     protected MissionLayer parent;
     protected List<MissionLayer> children = new CopyOnWriteArrayList<>();
 
@@ -173,36 +174,28 @@ public class MissionLayer {
         return basePath + "/" + getName();
     }
 
-    public static <T> String getAfter(T data) {
-        if (data instanceof MissionLayer) {
-            return ((MissionLayer)data).getAfter();
-        }
-        return null;
-    }
+    private static MissionLayer getPrevious(MissionLayer data, List<MissionLayer> layers) {
 
-    public static <T> String getCompare(T data) {
-        if (data instanceof MissionLayer) {
-            return ((MissionLayer)data).getUid();
+        if (data.prev != null) {
+            return data.prev;
         }
-        return null;
-    }
 
-    public static <T> T getAfter(T data, List<T> layers) {
-        for (T t : layers) {
-            if (getCompare(t).equals(getAfter(data))) {
+        for (MissionLayer t : layers) {
+            if (t.getUid().equals(data.getAfter())) {
+                data.prev = t;
                 return t;
             }
         }
         return null;
     }
 
-    public static <T> boolean hasCycle(String missionName, T check, List<T> layers) {
-        T temp = check;
-        Set<T> processed = new HashSet<T>();
+    private static boolean hasCycle(String missionName, MissionLayer check, List<MissionLayer> layers) {
+        MissionLayer temp = check;
+        Set<MissionLayer> processed = new HashSet<MissionLayer>();
         processed.add(temp);
-        while ((temp = getAfter(temp, layers)) != null) {
+        while ((temp = getPrevious(temp, layers)) != null) {
             if (processed.contains(temp)) {
-                logger.error("found cycle for " + getCompare(temp) + " in " + missionName);
+                logger.error("found cycle for " + temp.getUid() + " in " + missionName);
                 return true;
             }
             processed.add(temp);
@@ -213,27 +206,27 @@ public class MissionLayer {
     //
     // Sorts a list of layer objects
     //
-    public static <T> List<T> sort(String missionName, List<T> unsorted) {
+    private static List<MissionLayer> sort(String missionName, List<MissionLayer> unsorted) {
 
         // make sure that we dont have two items pointing to the same after
         Set<String> afters = new HashSet<>();
-        Set<String> compares = new HashSet<>();
-        for (T t : unsorted) {
-            if (afters.contains(getAfter(t))) {
-                logger.error("found duplicate after " + getAfter(t) + " in " + missionName);
+        Set<String> uids = new HashSet<>();
+        for (MissionLayer t : unsorted) {
+            if (afters.contains(t.getAfter())) {
+                logger.error("found duplicate after " + t.getAfter() + " in " + missionName);
                 return unsorted;
-            } else if (compares.contains(getCompare(t))) {
-                logger.error("found duplicate compare " + getCompare(t) + " in " + missionName);
+            } else if (uids.contains(t.getUid())) {
+                logger.error("found duplicate uid " + t.getUid() + " in " + missionName);
                 return unsorted;
             } else if (hasCycle(missionName, t, unsorted)) {
                 return unsorted;
             }
-            afters.add(getAfter(t));
-            compares.add(getCompare(t));
+            afters.add(t.getAfter());
+            uids.add(t.getUid());
         }
 
         afters.remove(null);
-        Set<String> difference = Sets.difference(afters, compares);
+        Set<String> difference = Sets.difference(afters, uids);
         if (difference.size() != 0) {
             for (String after : difference) {
                 if (logger.isDebugEnabled()) {
@@ -243,7 +236,7 @@ public class MissionLayer {
             return unsorted;
         }
 
-        List<T> sorted = new LinkedList<T>(unsorted);
+        List<MissionLayer> sorted = new LinkedList<MissionLayer>(unsorted);
         boolean moved;
         do {
             moved = false;
@@ -254,21 +247,21 @@ public class MissionLayer {
                     }
 
                     // is inner after outer?
-                    if (getAfter(sorted.get(inner)) != null && getAfter(sorted.get(inner)).equals(
-                            getCompare(sorted.get(outer)))) {
+                    if (sorted.get(inner).getAfter() != null && sorted.get(inner).getAfter().equals(
+                            sorted.get(outer).getUid())) {
                         // do the indices check out
                         if (inner != outer + 1) {
                             if (outer + 1 == sorted.size()) {
                                 // move inner to the end
                                 if (logger.isDebugEnabled()) {
-                                    logger.debug("moving " + getCompare(sorted.get(inner)) + " to the end");
+                                    logger.debug("moving " + sorted.get(inner).getUid() + " to the end");
                                 }
                                 sorted.add(sorted.remove(inner));
                             } else {
                                 // swap inner with whatever is currently after outer
                                 if (logger.isDebugEnabled()) {
-                                    logger.debug("swapping " + getCompare(sorted.get(inner))
-                                            + " and " + getCompare(sorted.get(outer + 1)));
+                                    logger.debug("swapping " + sorted.get(inner).getUid()
+                                            + " and " + sorted.get(outer + 1).getUid());
                                 }
                                 Collections.swap(sorted, inner, outer + 1);
                             }

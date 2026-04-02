@@ -1,21 +1,32 @@
 package tak.server.federation.hub.broker;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+
+import tak.server.federation.FederateIdentity;
 
 /*
  * An addressable entity is a wrapper that holds information
  * about a remote entity on a network. This entity may be
  * identified by a URI, or something else, like a UID or a callsign.
  */
-public class AddressableEntity<T> implements Serializable, Comparable<AddressableEntity<?>>{
+public class AddressableEntity implements Serializable, Comparable<AddressableEntity> {
     private static final long serialVersionUID = 1124681280265508465L;
-    protected final T entity;
+    protected final FederateIdentity entity;
+    protected Collection<String> entityGroups = new ArrayList<>();
 
-    public AddressableEntity(T entity) {
+
+    public AddressableEntity(FederateIdentity entity) {
         this.entity = entity;
     }
+    
+    public AddressableEntity(FederateIdentity entity, Collection<String> entityGroups) {
+        this.entity = entity;
+        this.entityGroups = entityGroups;
+    }
 
-    public T getEntity() {
+    public FederateIdentity getEntity() {
         return entity;
     }
 
@@ -23,7 +34,15 @@ public class AddressableEntity<T> implements Serializable, Comparable<Addressabl
         return entity.getClass().getName();
     }
 
-    @Override
+    public Collection<String> getEntityGroups() {
+		return entityGroups;
+	}
+
+	public void setEntityGroups(Collection<String> entityGroups) {
+		this.entityGroups = entityGroups;
+	}
+
+	@Override
     public String toString() {
         return "AddressableEntity{" +
                 "entity=" + entity + ", type=" + getType() +
@@ -39,7 +58,7 @@ public class AddressableEntity<T> implements Serializable, Comparable<Addressabl
             return false;
         }
 
-        AddressableEntity<?> that = (AddressableEntity<?>) object;
+        AddressableEntity that = (AddressableEntity) object;
 
         return entity.equals(that.entity);
 
@@ -52,7 +71,7 @@ public class AddressableEntity<T> implements Serializable, Comparable<Addressabl
 
     @SuppressWarnings("unchecked")
     @Override
-    public int compareTo(AddressableEntity<?> other) {
+    public int compareTo(AddressableEntity other) {
         String thisType = this.getType();
         String otherType = other.getType();
 
@@ -64,8 +83,8 @@ public class AddressableEntity<T> implements Serializable, Comparable<Addressabl
 
         /* Types are the same, entities should have the same class. */
         if (Comparable.class.isAssignableFrom(this.entity.getClass())){
-            Comparable<T> thisEntity = (Comparable<T>) entity;
-            T oEntity = (T) other.entity;
+            Comparable<FederateIdentity> thisEntity = (Comparable<FederateIdentity>) entity;
+            FederateIdentity oEntity = other.entity;
             return thisEntity.compareTo(oEntity);
         } else {
             return this.entity.toString().compareTo(other.entity.toString());

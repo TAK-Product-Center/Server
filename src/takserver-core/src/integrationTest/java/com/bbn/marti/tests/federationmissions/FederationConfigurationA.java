@@ -32,7 +32,7 @@ public abstract class FederationConfigurationA extends AbstractSingleServerTestC
     protected static final byte[] dataA = Util.generateDummyData(524288);
     protected static final byte[] dataB = Util.generateDummyData(524288);
 
-    protected static final AbstractUser admin = ImmutableUsers.s0_authstcp_authwssuser012_012f;
+    protected static final AbstractUser admin = ImmutableUsers.s0_authstcpadmin_authwssuser012;
     protected static final AbstractUser missionOwner = ImmutableUsers.s1_authstcp_authwssuser012_012fA;
     protected static final AbstractUser existingMember = ImmutableUsers.s1_authstcp_authwssuser0_0f;
     protected static final AbstractUser newMember = ImmutableUsers.s1_authstcp_authwssuser2_2f;
@@ -83,11 +83,9 @@ public abstract class FederationConfigurationA extends AbstractSingleServerTestC
             onfam0.init(ImmutableServerProfiles.SERVER_0);
             onfam1.init(ImmutableServerProfiles.SERVER_1);
 
-            onfam0.certmod(admin.getCertPublicPemPath().toString(), null, null, true, null, admin.getDefinedGroupSet().stringArray(), null, null);
-            StateEngine.data.getState(admin).overrideAdminStatus(true);
-            onfam1.certmod(missionOwner.getCertPublicPemPath().toString(), null, null, false, null, missionOwner.getDefinedGroupSet().stringArray(), null, null);
-            onfam1.certmod(existingMember.getCertPublicPemPath().toString(), null, null, false, null, existingMember.getDefinedGroupSet().stringArray(), null, null);
-            onfam1.certmod(nonMember.getCertPublicPemPath().toString(), null, null, false, null, nonMember.getDefinedGroupSet().stringArray(), null, null);
+            onfam1.certmod(missionOwner.getCertPublicPemPath().toString(), null, null, false, null, missionOwner.getDefinedGroupSet().stringArray(), null, null, false, false, false);
+            onfam1.certmod(existingMember.getCertPublicPemPath().toString(), null, null, false, null, existingMember.getDefinedGroupSet().stringArray(), null, null, false, false, false);
+            onfam1.certmod(nonMember.getCertPublicPemPath().toString(), null, null, false, null, nonMember.getDefinedGroupSet().stringArray(), null, null, false, false, false);
 
             engine.connectClientAndVerify(true, admin);
             engine.connectClientAndVerify(true, existingMember);

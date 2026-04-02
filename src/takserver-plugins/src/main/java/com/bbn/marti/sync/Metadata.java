@@ -56,7 +56,9 @@ public class Metadata implements Serializable {
 		CreatorUid(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS, false, false),
 		Tool(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS, false, false),
 		EXPIRATION(MartiValidatorConstants.Regex.Double, MartiValidatorConstants.SHORT_STRING_CHARS, false, false),
-		PluginClassName(MartiValidatorConstants.Regex.Filename, MartiValidatorConstants.DEFAULT_STRING_CHARS, false, false);
+		PluginClassName(MartiValidatorConstants.Regex.Filename, MartiValidatorConstants.DEFAULT_STRING_CHARS, false, false),
+		Groups(MartiValidatorConstants.Regex.MartiSafeString, MartiValidatorConstants.DEFAULT_STRING_CHARS, true, false),
+		MissionName(MartiValidatorConstants.Regex.Filename, MartiValidatorConstants.DEFAULT_STRING_CHARS, false, false);
 
 		/**
 		 * Validation pattern to be used by ESAPI for input validation.

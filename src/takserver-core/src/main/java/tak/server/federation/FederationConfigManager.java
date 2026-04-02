@@ -48,6 +48,7 @@ public class FederationConfigManager implements FederationConfigInterface {
                                         fedConfig.getFederationServer().getTls().getTruststorePass(),
                                         fedConfig.getFederationServer().getTls().getContext(),
                                         fedConfig.getFederationServer().getWebBaseUrl(),
+                                        fedConfig.getFederationServer().getFederationTokenAuthentication(),
                                         fedConfig.isAllowMissionFederation(),
                                         fedConfig.isAllowDataFeedFederation(),
                                         fedConfig.isAllowFederatedDelete(),
@@ -76,6 +77,7 @@ public class FederationConfigManager implements FederationConfigInterface {
         fedConfig.getFederationServer().getTls().setTruststorePass(info.getTruststorePass());
         fedConfig.getFederationServer().getTls().setContext(info.getTlsVersion());
         fedConfig.getFederationServer().setWebBaseUrl(info.getWebBaseURL());
+        fedConfig.getFederationServer().setFederationTokenAuthentication(info.getFederationTokenAuthentication());
         fedConfig.setAllowMissionFederation(info.isAllowMissionFederation());
         fedConfig.setAllowDataFeedFederation(info.isAllowDataFeedFederation());
         fedConfig.setAllowFederatedDelete(info.isAllowFederatedDelete());

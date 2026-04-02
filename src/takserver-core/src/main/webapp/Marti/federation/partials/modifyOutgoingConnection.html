@@ -175,13 +175,46 @@
               </td>
             </tr>
             <tr>
-              <td class="rowHeader"><label for="connectionToken">Federation Connection Token</label></td>
+              <td class="rowHeader"><label for="useToken">Use Token Auth</label></td>
               <td class="rowValue">
-                <input type="text" data-ng-model="modifiedOutgoing.connectionToken" name="connectionToken"/>
+                <input type="checkbox" data-ng-model="modifiedOutgoing.useToken" name="useToken" data-ng-change="toggleUseToken(modifiedOutgoing)"/>
                 <br/>
                 <span class="inlineHelp">This field is used for creating a federation connection using token authentication rather than X509 client mutual authentication.</span>
+              </td>
+            </tr>
+
+
+             <tr data-ng-show="modifiedOutgoing.useToken">
+              <td class="rowHeader">
+                <label for="connectionToken">Federation Connection Token</label>
                 <br/>
-                <span style="color: red; font-size: 12px" data-ng-show="modifiedOutgoing.connectionToken.length > 0">Warning!! X509 mutual authentication is disabled and is being replaced by token authentication.</span>
+                <span style="color: red; font-size: 12px">Warning!! X509 mutual authentication is disabled and is being replaced by token authentication.</span>
+              </td>
+              <td class="rowValue">
+                <div class="form-group">
+                  <label>
+                    <input
+                      type="radio"
+                      ng-model="modifiedOutgoing.tokenType"
+                      value="automatic"
+                      name="tokenTypeAutomatic"
+                    />
+                    Use Automatic Token
+                  </label>
+                </div>
+
+                <div class="form-group">
+                  <label>
+                    <input
+                      type="radio"
+                      ng-model="modifiedOutgoing.tokenType"
+                      value="manual"
+                      name="tokenTypeManual"
+                    />
+                    Use Manual Token
+                  </label>
+                </div>
+                <input data-ng-disabled="modifiedOutgoing.tokenType !== 'manual'" type="text" data-ng-model="modifiedOutgoing.connectionToken" name="connectionToken"/>
               </td>
             </tr>
           </table>

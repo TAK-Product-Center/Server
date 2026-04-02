@@ -264,6 +264,9 @@ public class EngineHelper {
 		ServerState sourceServerState = sourceUser.getServerState();
 		ServerState targetServerState = targetUser.getServerState();
 		
+		AbstractServerProfile sourceServer = sourceServerState.getProfile();
+		AbstractServerProfile targetServer = targetServerState.getProfile();
+		
 		ImmutableServerProfiles[] hubs = { ImmutableServerProfiles.FEDHUB_0, ImmutableServerProfiles.FEDHUB_1 };
 		for (ImmutableServerProfiles hub : hubs) {
 			// if the hub isn't running, skip it
@@ -277,9 +280,33 @@ public class EngineHelper {
 			boolean bothConnectedToHub = sourceServerState.federation.isOutgoingConnection(hub) && targetServerState.federation.isOutgoingConnection(hub);			
 			boolean sameGroups = targetUser.getProfile().getActualGroupSetAccess().groupSet != null && sourceUser.getProfile().getActualGroupSetAccess().groupSet != null;
 			boolean groupsAreOutbound = hasIntersection(sourceUser.getProfile().getActualGroupSetAccess().groupSet, sourceServerState.federation.getFederateState(hub).getOutboundGroups());
-			boolean groupsAreInbound = hasIntersection(targetUser.getProfile().getActualGroupSetAccess().groupSet, targetServerState.federation.getFederateState(hub).getInboundGroups());
 			
-			if (federationEnabled && bothConnectedToHub && sameGroups && groupsAreOutbound && groupsAreInbound) return true; 
+			boolean targetUserHasInboundGroups;
+			// if group mapping is enabled, we need extra logic to see if the remote group maps to a local group
+			// for the target user
+			if (targetServerState.federation.getFederateState(hub).isGroupMappingEnabled()) {
+				Map<String, Set<String>> inboundGroupMappings = targetServerState.federation.getFederateState(hub)
+						.getInboundGroupMappings();
+
+				// collect a list of target local groups that the source federate can send to
+				Set<String> receivableTargetLocalGroups = sourceServerState.federation
+						// get the outbound groups from the source server
+						.getFederateState(hub).getOutboundGroups().stream()
+						// collect any outbound groups from source server that have a group mapping on
+						// the target server
+						.filter(g -> inboundGroupMappings.containsKey(g))
+						// take the found target group mappings and flatmap the local groups into one
+						// list
+						.map(g -> inboundGroupMappings.get(g)).flatMap(x -> x.stream()).collect(Collectors.toSet());
+
+				targetUserHasInboundGroups = hasIntersection(targetUser.getProfile().getActualGroupSetAccess().groupSet,
+						receivableTargetLocalGroups);
+			} else {
+				targetUserHasInboundGroups = hasIntersection(targetUser.getProfile().getActualGroupSetAccess().groupSet,
+						targetServerState.federation.getFederateState(hub).getInboundGroups());
+			}
+			
+			if (federationEnabled && bothConnectedToHub && sameGroups && groupsAreOutbound && targetUserHasInboundGroups) return true; 
 		}
 
 		return false;

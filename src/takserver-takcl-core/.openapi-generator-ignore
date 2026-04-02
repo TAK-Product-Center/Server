@@ -1,0 +1,16 @@
+**/build.gradle
+**/build.sbt
+**/.github/
+**/.gitignore
+**/git_push.sh
+**/gradle/
+**/gradle.properties
+**/gradlew
+**/gradlew.bat
+**/.openapi-generator-ignore
+**/pom.xml
+**/README.md
+**/settings.gradle
+**/.travis.yml
+**/src/main/java/org/openapitools/
+**/src/main/resources/application.properties

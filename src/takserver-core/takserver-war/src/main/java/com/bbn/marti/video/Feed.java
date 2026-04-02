@@ -88,6 +88,7 @@ public class Feed {
         this.fov = feedV2.fov;
         this.heading = feedV2.heading;
         this.range = feedV2.range;
+        this.type = Type.VIDEO;
     }
 
 

@@ -173,36 +173,106 @@ ext {
         }
     }
 
-    copyFullFedhubSpec = { task ->
-        // Add jar task dependencies
+
+    /**
+     * This copy spec specifically focuses on the 'tak' directory. Anything outside of that (such as in the docker
+     * bundle) is handled in the parent task that utilizes this spec
+     */
+    copyFullFedhubSpec = { Task task, boolean dockerMode ->
         task.dependsOn(':federation-hub-broker:build')
         task.dependsOn(':federation-hub-policy:build')
         task.dependsOn(':federation-hub-ui:bootWar')
         task.dependsOn(':federation-hub-ui:shadowJar')
-        return copySpec {
-            // Add the jars
-            with copySpec {
-                from getRootProject().subprojects.collect { "${it.buildDir}/libs" }
-                include 'federation-hub-*-' + version + '.jar', 'federation-hub-ui-' + version + '.war'
-                rename 'federation-hub-broker-*' + version + '.jar', 'federation-hub/federation-hub-broker.jar'
-                rename 'federation-hub-policy-*' + version + '.jar', 'federation-hub/federation-hub-policy.jar'
-                rename 'federation-hub-ui-*' + version + '.war', 'federation-hub/federation-hub-ui.war'
-                rename 'federation-hub-manager-*' + version + '.jar', 'federation-hub/federation-hub-manager.jar'
-            }
-            // Add the configuration files
-            with copySpec {
-                from getRootProject().subprojects.collect { "${it.projectDir}/src/main/resources" }
-                include 'federation-hub-*.yml', 'logback-*.xml'
-                rename('(.*)', 'federation-hub/configs/$1')
-            }
-        }
-    }
 
-    copyFedhubConfigsSpec = {
         return copySpec {
-            from getRootProject().subprojects.collect { "${it.projectDir}/src/main/resources" }
-            include 'federation-hub-*.yml', 'logback-*.xml'
-            rename('(.*)', 'federation-hub/configs/$1')
+            project(':federation-hub-broker') { proj ->
+                from(proj.file('build/libs')) {
+                    include 'federation-hub-broker-*' + version + '.jar'
+                    rename 'federation-hub-broker-*' + version + '.jar', 'federation-hub/jars/federation-hub-broker.jar'
+                }
+                from(proj.file('src/main/resources')) {
+                    include 'federation-hub-*.yml', '/logback-*.xml'
+                    if (dockerMode) {
+                        exclude('federation-hub-broker.yml')
+                        rename('federation-hub-broker-docker.yml', 'federation-hub-broker.yml')
+                        rename('(.*)', 'federation-hub/configs/$1')
+                    } else {
+                        rename('(.*)', 'federation-hub/default-configs/$1')
+                    }
+                }
+                from(proj.file('scripts')) {
+                    include 'federation-hub*'
+                    rename('(.*)', 'federation-hub/scripts/$1')
+                }
+                from(proj.file('scripts/db')) {
+                    rename('(.*)', 'federation-hub/scripts/db/$1')
+                }
+            }
+
+            project(':federation-hub-policy') { proj ->
+                from(proj.file('build/libs')) {
+                    include 'federation-hub-policy-*' + version + '.jar'
+                    rename 'federation-hub-policy-*' + version + '.jar', 'federation-hub/jars/federation-hub-policy.jar'
+                }
+                from(proj.file('src/main/resources')) {
+                    include 'federation-hub-*.yml', 'logback-*.xml'
+                    if (dockerMode) {
+                        rename('(.*)', 'federation-hub/configs/$1')
+                    } else {
+                        rename('(.*)', 'federation-hub/default-configs/$1')
+                    }
+                }
+                from(proj.file('scripts')) {
+                    include 'federation-hub*'
+                    rename('(.*)', 'federation-hub/scripts/$1')
+                }
+            }
+
+            project(':federation-hub-ui') { proj ->
+                from(proj.file('build/libs')) {
+                    include 'federation-hub-ui-*' + version + '.war', 'federation-hub-manager-*' + version + '.jar'
+                    rename 'federation-hub-ui-*' + version + '.war', 'federation-hub/jars/federation-hub-ui.war'
+                    rename 'federation-hub-manager-*' + version + '.jar', 'federation-hub/jars/federation-hub-manager.jar'
+                }
+                from(proj.file('src/main/resources')) {
+                    include 'federation-hub-*.yml', 'logback-*.xml'
+                    if (dockerMode) {
+                        rename('(.*)', 'federation-hub/configs/$1')
+                    } else {
+                        rename('(.*)', 'federation-hub/default-configs/$1')
+                    }
+                }
+                from(proj.file('scripts')) {
+                    include 'federation-hub*'
+                    rename('(.*)', 'federation-hub/scripts/$1')
+                }
+            }
+
+            project(':takserver-core') { proj ->
+                from(proj.file('scripts')) {
+                    include 'apply-selinux.sh'
+                    rename('(.*)', 'federation-hub/$1')
+                }
+                from(proj.file('scripts/utils')) {
+                    include 'takserver-policy.te'
+                    rename('(.*)', 'federation-hub/$1')
+                }
+                from(proj.file('scripts/certs')) {
+                    rename('(.*)', 'federation-hub/certs/$1')
+                }
+            }
+
+            from(rootProject.file('docs')) {
+                include 'README_fedhub.md', 'README_fedhub_docker.md'
+                rename 'README_fedhub.md', 'federation-hub/docs/README.md'
+                rename 'README_fedhub_docker.md', 'federation-hub/docs/README_fedhub_docker.md'
+            }
+
+            if (dockerMode) {
+                from(project(':federation-common').file('scripts')) {
+                    rename('configureInDocker.sh', 'federation-hub/scripts/configureInDocker.sh')
+                }
+            }
         }
     }
 
@@ -224,7 +294,7 @@ ext {
 
     copyIntegrationTestAdditionsSpec = { task ->
         // Add jar task dependency
-        task.dependsOn(':takserver-takcl-core:publicJar')
+        task.dependsOn(':takserver-takcl-core:shadowJar')
         return copySpec {
             // Copy the jar
             from(project(':takserver-takcl-core').file('build/libs')) {
@@ -256,14 +326,6 @@ ext {
         task.dependsOn(createVersionFile)
         return copySpec {
             from("$buildDir/takVersionDir/version.txt")
-        }
-    }
-
-    copyPluginTestLibsSpec = { task ->
-        return copySpec {
-            from(project(':takserver-takcl-core').file('plugin-test-libs')) {
-                rename('(.*)', 'lib/$1')
-            }
         }
     }
 }

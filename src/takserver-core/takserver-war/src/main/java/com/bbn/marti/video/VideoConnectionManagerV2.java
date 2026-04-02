@@ -1,8 +1,11 @@
 package com.bbn.marti.video;
 
 import com.bbn.marti.network.BaseRestController;
+import com.bbn.marti.remote.exception.ForbiddenException;
 import com.bbn.marti.remote.exception.TakException;
+import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.util.CommonUtil;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -36,6 +39,10 @@ public class VideoConnectionManagerV2 extends BaseRestController {
     @Autowired
     private CommonUtil martiUtil;
 
+    @Autowired
+    private GroupManager groupManager;
+
+
     @RequestMapping(value = "/video", method = RequestMethod.GET)
     @ResponseBody
     public VideoCollections getVideoCollections(@RequestParam(value = "protocol", required = false) String protocol) {
@@ -50,10 +57,21 @@ public class VideoConnectionManagerV2 extends BaseRestController {
 
     @RequestMapping(value = "/video", method = RequestMethod.POST)
     public void createVideoConnection(
-            @RequestBody VideoCollections videoCollection) {
+            @RequestBody VideoCollections videoCollection,
+            @RequestParam(value = "group", required = false) String[] groups) {
         try {
+
             String groupVector = martiUtil.getGroupVectorBitString(request);
+
+            if (groups != null) {
+                String videoGroupVector = groupManager.validateAccess(groups, groupVector);
+                groupVector = videoGroupVector;
+            }
+
             videoManagerService.createVideoCollections(videoCollection, groupVector);
+        } catch (ForbiddenException e) {
+            logger.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             throw new TakException("exception in createVideoConnection", e);
         }

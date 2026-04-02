@@ -16,6 +16,7 @@ spec:
       containers:
         - name: takserver-messaging
           image: "{{ .Values.takserver.messaging.image.repository }}:{{ .Values.takserver.messaging.image.tag }}"
+          imagePullPolicy: Always
           env:
             - name: "spring_profiles_active"
               value: "k8cluster"
@@ -44,9 +45,8 @@ spec:
             initialDelaySeconds: 80
             periodSeconds: 5
           livenessProbe:
-            exec:
-              command:
-              - /messaging-readiness.sh
+            tcpSocket:
+              port: 10800
             initialDelaySeconds: 120
             periodSeconds: 30
             failureThreshold: 6
@@ -91,6 +91,7 @@ spec:
       containers:
         - name: takserver-api 
           image: "{{ .Values.takserver.api.image.repository }}:{{ .Values.takserver.api.image.tag }}"
+          imagePullPolicy: Always
           env:
             - name: POSTGRES_HOST
               value: "{{ .Values.global.postgresql.host }}"
@@ -119,9 +120,8 @@ spec:
             initialDelaySeconds: 1
             periodSeconds: 1
           livenessProbe:
-            exec:
-              command:
-              - /api-readiness.sh
+            tcpSocket:
+              port: 8443
             initialDelaySeconds: 180
             periodSeconds: 30
             failureThreshold: 6
@@ -160,6 +160,7 @@ spec:
       containers:
         - name: takserver-config 
           image: "{{ .Values.takserver.config.image.repository }}:{{ .Values.takserver.config.image.tag }}"
+          imagePullPolicy: Always
           resources:
             requests:
               cpu: "{{ .Values.takserver.config.resources.requests.cpu }}"

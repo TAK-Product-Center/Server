@@ -8,7 +8,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.bbn.marti.remote.config.CoreConfigFacade;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.bbn.marti.config.DataFeed;
@@ -20,7 +21,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import tak.server.cot.CotEventContainer;
 
 public class DataFeedCotCacheHelper {
-	private static final Logger logger = Logger.getLogger(DataFeedCotCacheHelper.class);
+	private static final Logger logger = LoggerFactory.getLogger(DataFeedCotCacheHelper.class);
 
 	private volatile static DataFeedCotCacheHelper instance;
 	public static DataFeedCotCacheHelper getInstance() {

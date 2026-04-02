@@ -11,7 +11,6 @@ public class UidHolder {
 
     private String uid;
     private List<String> groups;
-    Map<String, Object> attributes;
 
     public String getUid() {
         return uid;
@@ -21,14 +20,6 @@ public class UidHolder {
         this.uid = uid;
     }
 
-    public Map<String, Object> getAttributes() {
-        return attributes;
-    }
-
-    public void setAttributes(Map<String, Object> newAttributes) {
-        attributes = newAttributes;
-    }
-
     public List<String> getGroups() {
         return groups;
     }
@@ -36,11 +27,7 @@ public class UidHolder {
     public void setGroups(List<String> groups) {
         this.groups = groups;
     }
-
-    public UidHolder() {
-        attributes = new HashMap<>();
-    }
-
+    
     public UidHolder(String uid) {
         super();
         this.uid = uid;

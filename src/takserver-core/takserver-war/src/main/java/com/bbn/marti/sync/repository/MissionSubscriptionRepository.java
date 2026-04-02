@@ -34,7 +34,7 @@ public interface MissionSubscriptionRepository extends JpaRepository<MissionSubs
     @Modifying
     @Transactional
     @Query(value = "delete from mission_subscription where client_uid = :clientUid and mission_id in " +
-            "( select id from mission where guid = uuid(:missionGuid))  ", nativeQuery = true)
+            "( select id from mission where guid = uuid(:missionGuid) ) ", nativeQuery = true)
     @CacheEvict(value = Constants.MISSION_SUBSCRIPTION_CACHE, allEntries = true)
     void deleteByMissionGuidAndClientUid(@Param("missionGuid") String missionGuid, @Param("clientUid") String clientUid);
 
@@ -48,7 +48,7 @@ public interface MissionSubscriptionRepository extends JpaRepository<MissionSubs
     @Modifying
     @Transactional
     @Query(value = "delete from mission_subscription where client_uid = :clientUid and ( username is null or username = :username ) and mission_id in " +
-            "( select id from mission where guid = uuid(:missionGuid)) )  ", nativeQuery = true)
+            "( select id from mission where guid = uuid(:missionGuid) ) ", nativeQuery = true)
     @CacheEvict(value = Constants.MISSION_SUBSCRIPTION_CACHE, allEntries = true)
     void deleteByMissionGuidAndClientUidAndUsername(@Param("missionGuid") String missionGuid, @Param("clientUid") String clientUid, @Param("username") String username);
 

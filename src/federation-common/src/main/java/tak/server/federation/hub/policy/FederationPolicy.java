@@ -20,7 +20,6 @@ public class FederationPolicy {
     private Set<UidHolder> federate_nodes;
     private Set<StringEdge> federate_edges;
     private Set<GroupHolder> groups;
-    private Set<String> filter_objects;
     private Map<String, Object> additionalData;
 
 
@@ -28,7 +27,6 @@ public class FederationPolicy {
         federate_nodes = new HashSet<>();
         federate_edges = new HashSet<>();
         groups = new HashSet<>();
-        filter_objects = new HashSet<>();
         additionalData = new HashMap<>();
     }
 
@@ -78,14 +76,6 @@ public class FederationPolicy {
 
     public void setGroups(Set<GroupHolder> federation_groups) {
         this.groups = federation_groups;
-    }
-
-    public Set<String> getFilter_objects() {
-        return filter_objects;
-    }
-
-    public void setFilter_objects(Set<String> filter_objects) {
-        this.filter_objects = filter_objects;
     }
 
     public Map<String, Object> getAdditionalData() {

@@ -1,0 +1,35 @@
+<h1 mat-dialog-title class="dialogHeader">New Policy</h1>
+<mat-dialog-content class="mat-typography">
+  <form (ngSubmit)="onSave()" #userForm="ngForm">
+    <div class="form-group">
+      <label for="name">Policy Name</label>
+      <input
+        type="text"
+        id="name"
+        class="form-control"
+        [(ngModel)]="policy.name"
+        name="name"
+        required
+      />
+      <div *ngIf="existingPolicyName()" class="text-danger">
+        This name already exists!
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="description">Description</label>
+      <input
+        type="text"
+        id="description"
+        class="form-control"
+        [(ngModel)]="policy.description"
+        name="description"
+      />
+    </div>
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button class="btn btn-just-outline margin-right" mat-button mat-dialog-close>Cancel</button>
+  <button class="btn btn-primary" (click)="onSave()" [disabled]="userForm.invalid || existingPolicyName()" [mat-dialog-close]="true">Save</button>
+</mat-dialog-actions>
+

@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.codec.binary.Base64;
+import org.dom4j.Attribute;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.DocumentHelper;
@@ -23,6 +24,7 @@ import com.atakmap.Tak.CRUD;
 import com.atakmap.Tak.ContactListEntry;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.GeoEvent;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.google.common.base.Strings;
@@ -133,7 +135,33 @@ public class ProtoBufHelper {
 		} catch (Exception e) {
 			throw new IllegalArgumentException("exception setting how", e);
 		}
-		
+
+		try {
+			String access = cot.getAccess();
+			if (!Strings.isNullOrEmpty(access)) {
+				geoBuilder.setAccess(access);
+			}
+		} catch (Exception e) {
+			throw new IllegalArgumentException("exception setting access", e);
+		}
+
+		try {
+			String caveat = cot.getCaveat();
+			if (!Strings.isNullOrEmpty(caveat)) {
+				geoBuilder.setCaveat(caveat);
+			}
+		} catch (Exception e) {
+			throw new IllegalArgumentException("exception setting caveat", e);
+		}
+
+		try {
+			String releaseableTo = cot.getReleaseableTo();
+			if (!Strings.isNullOrEmpty(releaseableTo)) {
+				geoBuilder.setReleaseableTo(releaseableTo);
+			}
+		} catch (Exception e) {
+			throw new IllegalArgumentException("exception setting releaseableTo", e);
+		}
 
 		if (detailE != null) {
 			try {
@@ -145,9 +173,9 @@ public class ProtoBufHelper {
 				}
 
 				Element statusE = detailE.element("status");
-				if (statusE != null && statusE.attribute("battery") != null) {
+				if (statusE != null && statusE.attribute("battery") != null && statusE.attribute("readiness") == null) {
 					detailE.remove(statusE);
-					geoBuilder.setBattery(Integer.parseInt(statusE.attribute("battery").getText()));
+					geoBuilder.setBattery(NumericUtil.parseIntOrDefault(statusE.attribute("battery").getText(), 0));
 				}
 
 				Element plocE = detailE.element("precisionlocation");
@@ -194,6 +222,10 @@ public class ProtoBufHelper {
 			}
 		}
 
+		if (cot.getBinaryPayloads() != null && !cot.getBinaryPayloads().isEmpty()) {
+			geoBuilder.addAllBloads(cot.getBinaryPayloads());
+		}
+
 		return geoBuilder.build();
 	}
 
@@ -221,24 +253,54 @@ public class ProtoBufHelper {
 		.addAttribute("time",  DateUtil.toCotTime(geo.getSendTime()))
 		.addAttribute("start", DateUtil.toCotTime(geo.getStartTime()))
 		.addAttribute("stale", DateUtil.toCotTime(geo.getStaleTime()));
+
+		if (!Strings.isNullOrEmpty(geo.getAccess())) {
+			rootE.addAttribute("access", geo.getAccess());
+		}
+
+		if (!Strings.isNullOrEmpty(geo.getCaveat())) {
+			rootE.addAttribute("caveat", geo.getCaveat());
+		}
+
+		if (!Strings.isNullOrEmpty(geo.getReleaseableTo())) {
+			rootE.addAttribute("releaseableTo", geo.getReleaseableTo());
+		}
+
 		rootE.addElement("point")
 		.addAttribute("lat", Double.toString(geo.getLat()))
 		.addAttribute("lon", Double.toString(geo.getLon()))
 		.addAttribute("hae", Double.toString(geo.getHae()))
 		.addAttribute("ce", Double.toString(geo.getCe()))
 		.addAttribute("le", Double.toString(geo.getLe()));
+
+		Element detailE = null;
+
 		if (!Strings.isNullOrEmpty(geo.getOther())) {
 			try {
 				Document otherDoc = DocumentHelper.parseText(geo.getOther());
-				Element detailE = otherDoc.getRootElement();
+				detailE = otherDoc.getRootElement();
+
 				detailE.addElement("track")
-				.addAttribute("speed", Double.toString(geo.getSpeed()))
-				.addAttribute("course", Double.toString(geo.getCourse()));
-				detailE.addElement("status")
-				.addAttribute("battery", Integer.toString(geo.getBattery()));
-				detailE.addElement("precisionlocation")
-				.addAttribute("geopointsrc", geo.getPloc())
-				.addAttribute("altsrc", geo.getPalt());
+					.addAttribute("speed", Double.toString(geo.getSpeed()))
+					.addAttribute("course", Double.toString(geo.getCourse()));
+
+				if (detailE.element("status") == null) {
+					detailE.addElement("status")
+							.addAttribute("battery", Integer.toString(geo.getBattery()));
+				}
+
+				if (detailE.element("precisionlocation") == null) {
+					if (!Strings.isNullOrEmpty(geo.getPloc()) || !Strings.isNullOrEmpty(geo.getPalt())) {
+						Element precisionlocationElement = detailE.addElement("precisionlocation");
+						if (!Strings.isNullOrEmpty(geo.getPloc())) {
+							precisionlocationElement.addAttribute("geopointsrc", geo.getPloc());
+						}
+						if (!Strings.isNullOrEmpty(geo.getPalt())) {
+							precisionlocationElement.addAttribute("altsrc", geo.getPalt());
+						}
+					}
+				}
+
 				if (geo.hasBinary() && geo.getBinary().getType() == BINARY_TYPES.IMAGE &&
 						detailE.element("image") != null) {
 					detailE.element("image").setText(
@@ -276,13 +338,54 @@ public class ProtoBufHelper {
 				l.add(geo.getMissionNames(i));
 			}
 			rval.setContextValue("explicitBrokeringMission", l);
+
+			if (detailE != null) {
+				Element marti = detailE.addElement("marti");
+				for(int i = 0; i < geo.getMissionNamesCount(); ++i) {
+					marti.addElement("dest").addAttribute("mission", geo.getMissionNames(i));
+					fixupMissionChat(rval, geo.getMissionNames(i));
+				}
+			}
 		}
-		
+
 		if (!Strings.isNullOrEmpty(geo.getFeedUid())) {
 			rval.setContextValue(Constants.DATA_FEED_UUID_KEY, geo.getFeedUid());
 		}
 
+		if (geo.getBloadsCount() > 0) {
+			rval.setBinaryPayloads(geo.getBloadsList());
+		}
+
 		return rval;
+	}
+
+	private void fixupMissionChatAttr(Attribute attribute, String missionName, String takServerHost) {
+		if (attribute == null || missionName == null || takServerHost == null) {
+			logger.error("fixupMissionChatAttr unable to fixup federated mission chat");
+			return;
+		}
+
+		String newValue = takServerHost + "-8443-ssl-" + missionName;
+		attribute.setValue(newValue);
+	}
+
+	private void fixupMissionChat(CotEventContainer cot, String missionName) {
+		try {
+			// fixup mission chat messages received over federation to reference local takServerHost
+			Element chatElement = (Element) cot.getDocument().selectSingleNode("/event/detail/__chat");
+			if (chatElement != null) {
+				String takServerHost = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().
+						getTakServerHost();
+				fixupMissionChatAttr(chatElement.attribute("id"), missionName, takServerHost);
+				Element chatGrp = chatElement.element("chatgrp");
+				if (chatGrp != null) {
+					fixupMissionChatAttr(chatGrp.attribute("uid1"), missionName, takServerHost);
+					fixupMissionChatAttr(chatGrp.attribute("id"), missionName, takServerHost);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("exception fixing up federated mission chat", e);
+		}
 	}
 
 	public CotEventContainer protoBuf2delContact(ContactListEntry contact) {

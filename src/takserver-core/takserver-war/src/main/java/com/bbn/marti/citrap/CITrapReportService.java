@@ -167,7 +167,7 @@ public class CITrapReportService {
         
         Mission citrapMission = missionService.getMissionByNameCheckGroups(CI_TRAP_MISSION, groupVector);
         
-        missionService.addMissionContent(citrapMission.getGuidAsUUID(), content, clientUid, groupVector);
+        missionService.addMissionContent(citrapMission.getGuidAsUUID(), content, clientUid, citrapMission.getGroupVector());
 
         // create a new mission for this report and add the report
         Mission reportMission = missionService.createMission(report.getId(), clientUid, groupVector, null, null, null, null, null, null,
@@ -177,7 +177,7 @@ public class CITrapReportService {
         	throw new IllegalStateException("CI Trap report mission " + report.getId() + " has no guid.");
         }
         
-        missionService.addMissionContent(reportMission.getGuidAsUUID(), content, clientUid, groupVector);
+        missionService.addMissionContent(reportMission.getGuidAsUUID(), content, clientUid, reportMission.getGroupVector());
 
         // subscribe for notifications to the new report
         try {
@@ -245,7 +245,7 @@ public class CITrapReportService {
         
         Mission reportMission = missionService.getMissionByNameCheckGroups(report.getId(), groupVector);
         
-        missionService.addMissionContent(reportMission.getGuidAsUUID(), content, clientUid, groupVector);
+        missionService.addMissionContent(reportMission.getGuidAsUUID(), content, clientUid, reportMission.getGroupVector());
         return report;
     }
 
@@ -266,8 +266,8 @@ public class CITrapReportService {
         Mission citrapMission = missionService.getMissionByNameCheckGroups(CI_TRAP_MISSION, groupVector);
 
         // remove the report from the top level ci-trap mission and delete the entire report specific mission
-        missionService.deleteMissionContent(citrapMission.getGuidAsUUID(), null, id, clientUid, groupVector);
-        missionService.deleteMission(id, clientUid, groupVector, true);
+        missionService.deleteMissionContent(citrapMission.getGuidAsUUID(), null, id, clientUid, citrapMission.getGroupVector());
+        missionService.deleteMission(id, clientUid, citrapMission.getGroupVector(), true);
         return true;
     }
 

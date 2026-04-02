@@ -174,12 +174,12 @@ public class UserManagerTestEngine {
 		switch (modMode) {
 			case CERT_MOD:
 				Assert.assertNotNull("Certpath cannot be null for certmod!", certpath);
-				ofam.certmod(certpath, delete, password, administrator, fingerprint, group, null, null);
+				ofam.certmod(certpath, delete, password, administrator, fingerprint, group, null, null, null, null, null);
 				break;
 
 			case USER_MOD:
 				Assert.assertNotNull("Username cannot be null for usermod!", username);
-				ofam.usermod(username, delete, password, certpath, administrator, fingerprint, group, null, null);
+				ofam.usermod(username, delete, password, certpath, administrator, fingerprint, group, null, null, null, null, null);
 				break;
 
 			default:

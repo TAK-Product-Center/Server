@@ -66,7 +66,7 @@ public class NioNettyBuilder implements Serializable {
 	public static int flushThreshold;
 	public static int maxOptimalMessagesPerMinute;
 	private final boolean isEpoll;
-	private EventLoopGroup udpBossGroup;
+	private EventLoopGroup udpWorkerGroup;
 	private EventLoopGroup workerGroup;
 	private EventLoopGroup bossGroup;
 	private final FederationServer federationServer = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer();
@@ -107,7 +107,7 @@ public class NioNettyBuilder implements Serializable {
 		new Thread(() -> {
 			try {
 				Bootstrap bootstrap = new Bootstrap();
-				bootstrap.group(udpBossGroup)
+				bootstrap.group(udpWorkerGroup)
 						.channelFactory(new ChannelFactory<NioDatagramChannel>() {
 							@Override
 							public NioDatagramChannel newChannel() {
@@ -157,7 +157,7 @@ public class NioNettyBuilder implements Serializable {
 		new Thread(() -> {
 			try {
 				Bootstrap bootstrap = new Bootstrap();
-				bootstrap.group(udpBossGroup)
+				bootstrap.group(udpWorkerGroup)
 						.channelFactory(new ChannelFactory<NioDatagramChannel>() {
 							@Override
 							public NioDatagramChannel newChannel() {
@@ -305,9 +305,7 @@ public class NioNettyBuilder implements Serializable {
 				ChannelFuture channelFuture = clientBootstrap.connect().sync();
 				channelFuture.channel().closeFuture().sync();
 			} catch (Exception e) {
-				if (log.isDebugEnabled()) {
-					log.error("error initializing netty static sub client ", e);
-				}
+				log.error("error initializing netty static sub client ", e);
 			}
 		});
 	}
@@ -333,14 +331,22 @@ public class NioNettyBuilder implements Serializable {
 	}
 
 	private void checkAndCreateEventLoopGroups() {
+		
+		// Use core count * buffer.queue.defaultCoreMaxPoolFactor to size worker groups
+		int workerPoolSize = CoreConfigFacade.getInstance().getCachedConfiguration().getBuffer().getQueue().getDefaultCoreMaxPoolFactor() * Runtime.getRuntime().availableProcessors();
+		
+		log.info("netty worker pool size " + workerPoolSize);
+		
 		if (bossGroup == null) {
             bossGroup = isEpoll ? new EpollEventLoopGroup(1) : new NioEventLoopGroup(1);
         }
-		if (udpBossGroup == null) {
-			udpBossGroup = new NioEventLoopGroup(1);
+		if (udpWorkerGroup == null) {
+			udpWorkerGroup = new NioEventLoopGroup(workerPoolSize);
         }
 		if (workerGroup == null) {
-            workerGroup = isEpoll ? new EpollEventLoopGroup() : new NioEventLoopGroup();
+			
+			
+            workerGroup = isEpoll ? new EpollEventLoopGroup(workerPoolSize) : new NioEventLoopGroup(workerPoolSize);
         }
 	}
 

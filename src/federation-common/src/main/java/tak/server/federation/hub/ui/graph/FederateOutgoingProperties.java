@@ -6,6 +6,9 @@ public class FederateOutgoingProperties extends NodeProperties {
     private String host;
     private int port;
     private boolean outgoingEnabled;
+    private boolean useToken;
+    private String tokenType;
+    private String token;
     
 	public String getOutgoingName() {
 		return outgoingName;
@@ -32,9 +35,29 @@ public class FederateOutgoingProperties extends NodeProperties {
 	public void setOutgoingEnabled(boolean outgoingEnabled) {
 		this.outgoingEnabled = outgoingEnabled;
 	}
+	public String getToken() {
+		return token;
+	}
+	public void setToken(String token) {
+		this.token = token;
+	}
+	
+	public boolean isUseToken() {
+		return useToken;
+	}
+	public void setUseToken(boolean useToken) {
+		this.useToken = useToken;
+	}
+	public String getTokenType() {
+		return tokenType;
+	}
+	public void setTokenType(String tokenType) {
+		this.tokenType = tokenType;
+	}
 	@Override
 	public String toString() {
 		return "FederateOutgoingProperties [outgoingName=" + outgoingName + ", host=" + host + ", port=" + port
-				+ ", outgoingEnabled=" + outgoingEnabled + "]";
+				+ ", outgoingEnabled=" + outgoingEnabled + ", useToken=" + useToken + ", tokenType=" + tokenType
+				+ ", token=" + token + "]";
 	}
 }

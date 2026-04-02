@@ -1,13 +1,96 @@
 buildscript {
-  dependencies {
-   classpath 'com.netflix.nebula:gradle-ospackage-plugin:' + gradle_ospackage_version
-  }
+    dependencies {
+        classpath 'com.netflix.nebula:gradle-ospackage-plugin:' + gradle_ospackage_version
+    }
 }
 
 apply plugin: 'nebula.ospackage'
 apply from: "utils/utils.gradle"
 
 ext {
+    _installer_sections = [
+            backup_config : '''\
+
+backupFile() {
+    if [ -f ${1} ] ; then
+        echo Backing up ${1}
+        cp ${1} ${1}.bak
+    fi
+}
+
+# Backup existing db clearing script
+backupFile /opt/tak/db-utils/clear-old-data.sql
+
+# Backup existing certificate configuration fies
+backupFile /opt/tak/certs/cert-metadata.sh
+backupFile /opt/tak/certs/config.cfg
+
+# Backup existing retention config files
+backupFile  /opt/tak/conf/retention/retention-policy.yml
+backupFile /opt/tak/conf/retention/retention-service.yml
+backupFile /opt/tak/conf/retention/mission-archiving-config.yml
+backupFile /opt/tak/mission-archive/mission-store.yml
+
+''',
+
+            restore_config: '''\
+
+export tak_full_version=''' + takversion + '''-''' + takrelease + '''
+
+restoreFile() {
+    unset TAK_BACKUP_FILE
+    if [ -f "${1}.bak" ] ; then
+        echo CANDIDATE: ${1}.bak
+        TAK_BACKUP_FILE=${1}.bak
+    else
+        # Supporting legacy backup syntax for files left by the deb uninstaller
+        TAK_BACKUP_NAME=$(echo "${1}" | cut -d'.' -f1)
+        TAK_BACKUP_EXTENSION=$(echo "${1}" | cut -d'.' -f2)
+        TAK_BACKUP_CANDIDATE="${TAK_BACKUP_NAME}_bak.${TAK_BACKUP_EXTENSION}"
+        echo CANDIDATE: ${TAK_BACKUP_CANDIDATE}
+        if [ -f "${TAK_BACKUP_CANDIDATE}" ];then
+            TAK_BACKUP_FILE="${TAK_BACKUP_CANDIDATE}"
+        fi
+    fi
+    
+    if [ "${TAK_BACKUP_FILE}" != "" ] ; then
+        if [ -f "${1}" ] ; then
+            BACKUP_CONTENTS=$(cat "${TAK_BACKUP_FILE}")
+            TARGET_CONTENTS=$(cat "${1}")
+            if [ "${BACKUP_CONTENTS}" = "${TARGET_CONTENTS}" ] ; then
+                echo Skipping restoration of ${TAK_BACKUP_FILE} since file is unchanged
+                rm "${TAK_BACKUP_FILE}"
+            else
+                echo Restoring ${TAK_BACKUP_FILE}
+                mv "${TAK_BACKUP_FILE}" "${1}"
+            fi
+        else
+            echo Restoring "${TAK_BACKUP_FILE}"
+            mv ${TAK_BACKUP_FILE} "${1}"
+        fi
+    fi
+}
+
+restoreFile /opt/tak/certs/cert-metadata.sh
+restoreFile /opt/tak/certs/config.cfg
+
+if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
+    if [ -f /opt/tak/db-utils/clear-old-data.sql ] ; then
+        # If a new one exists it should be backed up as different file
+        mv /opt/tak/db-utils/clear-old-data.sql /opt/tak/db-utils/clear-old-data.sql.dist.$tak_full_version
+    fi
+fi
+restoreFile /opt/tak/db-utils/clear-old-data.sql
+
+# Reinstate existing retention config file
+restoreFile  /opt/tak/conf/retention/retention-policy.yml
+restoreFile /opt/tak/conf/retention/retention-service.yml
+restoreFile /opt/tak/conf/retention/mission-archiving-config.yml
+restoreFile /opt/tak/mission-archive/mission-store.yml
+'''
+    ]
+
+
     // rpm preinstall script
     _preinstall_script = '''\
 echo "takserver-package: preinstall $1 $2"
@@ -30,40 +113,15 @@ set +e
 uid=`id -u tak 2>/dev/null`
 set -e
 if [ -z "$uid" ] ; then
-    # User id 1491 is arbitrary
+    # User id 889 is arbitrary
     echo "Adding 'tak' user"
-    useradd tak -r -u 1491 --no-create-home -d /opt/tak
+    useradd tak -r -u 889 --no-create-home -d /opt/tak
 fi
-
-if [ -f /opt/tak/db-utils/clear-old-data.sql ] ; then
-    mv /opt/tak/db-utils/clear-old-data.sql /opt/tak/db-utils/clear-old-data.sql.bak
-fi
-
-mkdir -p /opt/tak/certs-tmp
-cp /opt/tak/certs/cert-metadata.sh /opt/tak/certs-tmp/. 2>/dev/null || :
-cp /opt/tak/certs/config.cfg /opt/tak/certs-tmp/. 2>/dev/null || :
 
 if [ ! -f /etc/debian_version ]; then
-    # Backup existing retention config files
-    if [ -f /opt/tak/conf/retention/retention-policy.yml ]; then
-        echo "Backing up existing retention policy configuration"
-        cp /opt/tak/conf/retention/retention-policy.yml /opt/tak/conf/retention/retention-policy_bak.yml
-    fi
 
-    if [ -f /opt/tak/conf/retention/retention-service.yml ]; then
-        echo "Backing up existing retention service configuration"
-        cp /opt/tak/conf/retention/retention-service.yml /opt/tak/conf/retention/retention-service_bak.yml
-    fi
+''' + ext._installer_sections.backup_config + '''
 
-    if [ -f /opt/tak/conf/retention/mission-archiving-config.yml ]; then
-        echo "Backing up existing mission archive configuration"
-        cp /opt/tak/conf/retention/mission-archiving-config.yml /opt/tak/conf/retention/mission-archiving-config_bak.yml
-    fi
-    
-    if [ -f /opt/tak/mission-archive/mission-store.yml ]; then
-        echo "Backing up existing mission store"
-        cp /opt/tak/mission-archive/mission-store.yml /opt/tak/mission-archive/mission-store_bak.yml
-    fi
 fi
 '''
 
@@ -72,26 +130,9 @@ echo "takserver-package: preuninstall $1 $2"
 case "$1" in
     1|upgrade)
         if [ -f /etc/debian_version ]; then
-            # Backup existing retention config files
-            if [ -f /opt/tak/conf/retention/retention-policy.yml ]; then
-                echo "Backing up existing retention policy configuration"
-                cp /opt/tak/conf/retention/retention-policy.yml /opt/tak/conf/retention/retention-policy_bak.yml
-            fi
+        
+''' + ext._installer_sections.backup_config + '''
 
-            if [ -f /opt/tak/conf/retention/retention-service.yml ]; then
-                echo "Backing up existing retention service configuration"
-                cp /opt/tak/conf/retention/retention-service.yml /opt/tak/conf/retention/retention-service_bak.yml
-            fi
-
-            if [ -f /opt/tak/conf/retention/mission-archiving-config.yml ]; then
-                echo "Backing up existing mission archive configuration"
-                cp /opt/tak/conf/retention/mission-archiving-config.yml /opt/tak/conf/retention/mission-archiving-config_bak.yml
-            fi
-            
-            if [ -f /opt/tak/mission-archive/mission-store.yml ]; then
-                echo "Backing up existing mission store"
-                cp /opt/tak/mission-archive/mission-store.yml /opt/tak/mission-archive/mission-store_bak.yml
-            fi
         fi
 esac
 '''
@@ -104,6 +145,10 @@ case "$1" in
         # uninstall
         echo "Deleting tak user"
         userdel tak
+        echo "Removing takserver.service file"
+        sudo rm -f /etc/systemd/system/takserver.service
+        echo "Removing takserver-noplugins.service file"
+        sudo rm -f /etc/systemd/system/takserver-noplugins.service
         ;;
  1|upgrade)
         # this is an upgrade, do nothing
@@ -175,10 +220,6 @@ chown tak:tak /opt/tak/logs
 mkdir -p /opt/tak/lib
 chown tak:tak /opt/tak/lib
 
-cp /opt/tak/certs-tmp/cert-metadata.sh /opt/tak/certs/. 2>/dev/null || :
-cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
-rm -rf /opt/tak/certs-tmp
-
 # rename old tomcat if it exists
 if [ -f "/opt/tak/apache-tomcat" ]; then
     mv /opt/tak/apache-tomcat /opt/tak/apache-tomcat_NO_LONGER_USED >/dev/null 2>&1
@@ -187,31 +228,7 @@ fi
 # setup a default DB password
 sh /opt/tak/db-utils/setupDefaultPassword.sh
 
-if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
-    mv /opt/tak/db-utils/clear-old-data.sql /opt/tak/db-utils/clear-old-data.sql.dist.$tak_full_version
-    mv /opt/tak/db-utils/clear-old-data.sql.bak /opt/tak/db-utils/clear-old-data.sql
-fi
-
-# Reinstate existing retention config files
-if [ -f /opt/tak/conf/retention/retention-policy_bak.yml ]; then
-    echo "Restoring retention policy configuration from backup"
-    mv /opt/tak/conf/retention/retention-policy_bak.yml /opt/tak/conf/retention/retention-policy.yml
-fi
-
-if [ -f /opt/tak/conf/retention/retention-service_bak.yml ]; then
-    echo "Restoring retention service configuration from backup"
-    mv /opt/tak/conf/retention/retention-service_bak.yml /opt/tak/conf/retention/retention-service.yml
-fi
-
-if [ -f /opt/tak/conf/retention/mission-archiving-config_bak.yml ]; then
-    echo "Restoring existing mission archive configuration from backup"
-    mv /opt/tak/conf/retention/mission-archiving-config_bak.yml /opt/tak/conf/retention/mission-archiving-config.yml
-fi
-
-if [ -f /opt/tak/mission-archive/mission-store_bak.yml ]; then
-    echo "Restoring existing mission store from backup"
-    mv /opt/tak/mission-archive/mission-store_bak.yml /opt/tak/mission-archive/mission-store.yml
-fi
+''' + ext._installer_sections.restore_config + '''
 
 # extract takserver.war on Debian based installs
 if [ -f /etc/debian_version ]; then
@@ -229,42 +246,41 @@ echo "Follow the instructions in the Installation section of the configuration g
 '''
 
 ospackage {
- packageName = 'takserver-combined'
- version = takversion
- release = takreleaserpm
- os = LINUX
- user = _user
- permissionGroup = _permission_group
- packageGroup = _package_group
- packageDescription = _package_description
- license = _license
- url = _url
- summary = _summary
+    packageName = 'takserver-combined'
+    version = takversion
+    release = takreleaserpm
+    os = LINUX
+    user = _user
+    permissionGroup = _permission_group
+    packageGroup = _package_group
+    packageDescription = _package_description
+    license = _license
+    url = _url
+    summary = _summary
 
- preUninstall _preuninstall_script
- preInstall _preinstall_script
- postInstall postinstall_script
- postUninstall _postuninstall_script
+    preUninstall _preuninstall_script
+    preInstall _preinstall_script
+    postInstall postinstall_script
+    postUninstall _postuninstall_script
 
- from ("$buildDir/takArtifacts") {
-   into 'opt/tak'
-   fileMode = 444
-   dirMode = 755
- }
+    from("$buildDir/takArtifacts") {
+        into 'opt/tak'
+        fileMode = 444
+        dirMode = 755
+    }
 }
-
 
 
 task prePackage(type: Copy) { task ->
     with takserverCommonSpec(task)
-	with copySchemaManagerJarSpec(task)
+    with copySchemaManagerJarSpec(task)
     with copyCoreConfigExampleSpec()
     with copyCoreScriptsSpec()
     with copyDbScriptsSpec()
     with copySwaggerSpec()
     with copyConfigScriptsSpec()
     with copyAPIScriptsSpec()
-	with copyFullPluginManagerSpec(task)
+    with copyFullPluginManagerSpec(task)
     with copyFullRetentionServiceSpec(task)
 
     // Ideally deconfliction would be done, but that requires more time
@@ -282,31 +298,29 @@ buildRpm.dependsOn prePackage
 buildDeb.dependsOn prePackage
 
 
-
-
 buildRpm {
-  requires('java-17-openjdk-devel')
-  requires('postgis33_15')
-  requires('postgis33_15-utils')
-  requires('postgresql15-server')
-  requires('postgresql15-contrib')
+    requires('java-17-openjdk-devel')
+    requires('postgis33_15')
+    requires('postgis33_15-utils')
+    requires('postgresql15-server')
+    requires('postgresql15-contrib')
 }
 
 // NB can configure deb package generation here
 buildDeb {
-  requires('openjdk-17-jdk')
-  requires('postgresql-15')
-  requires('postgresql-15-postgis-3')
+    requires('openjdk-17-jdk')
+    requires('postgresql-15')
+    requires('postgresql-15-postgis-3')
 }
 
 task bundleRpm(type: Zip) {
     archiveName 'takserver-bundle-' + takversion + '-' + takrelease + branch + '.zip'
     destinationDir(file('build/'))
     from('takserver/build/distributions/') {}
-    from ('takserver/build/takArtifacts/docs/') {
+    from('takserver/build/takArtifacts/docs/') {
         include 'TAK_Server_Configuration_Guide.pdf'
     }
-    into ('multiprocess')  {
+    into('multiprocess') {
         from('database/build/distributions/', 'launcher/build/distributions/')
     }
 }
@@ -314,18 +328,19 @@ task bundleRpm(type: Zip) {
 task bundleRpmCoreDb(type: Zip) {
     archiveName 'takserver-rpm-core-db-' + takversion + '-' + takrelease + branch + '.zip'
     from('database/build/distributions/', 'launcher/build/distributions/')
-    from ('takserver/build/takArtifacts/docs/') {
+    from('takserver/build/takArtifacts/docs/') {
         include 'TAK_Server_Configuration_Guide.pdf'
     }
 }
 
 task bundlePublishArtifacts(type: Copy) {
-   dependsOn('database:buildRpm', 'federation-hub:buildRpm', 'takserver:buildRpm', 'launcher:buildRpm', 'database:buildDeb', 'federation-hub:buildDeb', 'takserver:buildDeb', 'launcher:buildDeb', 'buildDocker', 'buildIronBankDB', 'buildHardenedDocker', 'buildFullDocker','buildHardenedFullDocker','buildFedhubDocker', 'createCIVersionArtifacts', ':takserver-cluster:buildCluster')
+    dependsOn('database:buildRpm', 'federation-hub:buildRpm', 'takserver:buildRpm', 'launcher:buildRpm', 'database:buildDeb', 'federation-hub:buildDeb', 'takserver:buildDeb', 'launcher:buildDeb', 'buildDocker', 'buildIronBankDB', 'buildHardenedDocker', 'buildFullDocker', 'buildHardenedFullDocker', 'buildFedhubDocker', 'createCIVersionArtifacts', ':takserver-cluster:buildCluster')
 
     def rpmv = "${takversion}-${takreleaserpm}"
     def zipv = "${takversion}-${takrelease}"
     from("resources/takserver-public-gpg.key",
             "takserver/build/takArtifacts/docs/TAK_Server_Configuration_Guide.pdf",
+            "takserver/build/takArtifacts/docs/Federation_Hub_Configuration_Guide.pdf",
             "takserver/build/distributions/takserver-${rpmv}.noarch.rpm",
             "build/distributions/takserver-docker-${zipv}.zip",
             "build/distributions/takserver-ironbank-db-${zipv}.zip",
@@ -346,28 +361,28 @@ task bundlePublishArtifacts(type: Copy) {
 }
 
 task buildFedhubDocker(type: GradleBuild) {
-  description = 'Builds takserver-fedhub-' + takversion + '-' + takreleaserpm + '.zip'
-  dependsOn('federation-hub:constructFedhubDockerZip')
+    description = 'Builds takserver-fedhub-' + takversion + '-' + takreleaserpm + '.zip'
+    dependsOn('federation-hub:constructFedhubDockerZip')
 }
 
 task buildDocker {
-  description = 'Builds takserver-docker-' + takversion + '-' + takreleaserpm + '.zip'
-  dependsOn constructDockerZip
+    description = 'Builds takserver-docker-' + takversion + '-' + takreleaserpm + '.zip'
+    dependsOn constructDockerZip
 }
 
 task buildIronBankDB {
-  description = 'takserver-ironbank-db-' + takversion + '-' + takreleaserpm + '.zip'
-  dependsOn constructIronbankDBZip
+    description = 'takserver-ironbank-db-' + takversion + '-' + takreleaserpm + '.zip'
+    dependsOn constructIronbankDBZip
 }
 
 task buildHardenedDocker {
-  description = 'Builds takserver-docker-hardened-' + takversion + '-' + takreleaserpm + '.zip'
-  dependsOn constructHardenedDockerZip
+    description = 'Builds takserver-docker-hardened-' + takversion + '-' + takreleaserpm + '.zip'
+    dependsOn constructHardenedDockerZip
 }
 
 task buildFullDocker {
-  description = 'Builds takserver-docker-full-' + takversion + '-' + takreleaserpm + '.zip'
-  dependsOn constructFullDockerZip
+    description = 'Builds takserver-docker-full-' + takversion + '-' + takreleaserpm + '.zip'
+    dependsOn constructFullDockerZip
 }
 
 
@@ -379,6 +394,16 @@ task buildHardenedFullDocker {
 task buildIntegrationTester {
     description = 'Builds takserver-integration-tester-' + takversion + '-' + takreleaserpm + '.zip'
     dependsOn constructIntegrationTesterZip
+}
+
+task buildIntegrationTesterDir {
+    description = 'Builds the integration tester in takserver-package/build/integrationTesterDir'
+    dependsOn constructIntegrationTesterDir
+}
+
+task updateIntegrationTesterDirCore {
+    description = 'Updates the core takserver files in takserver-package/build/integrationTesterDir'
+    dependsOn updateIntegrationTesterCore
 }
 
 task createCIVersionArtifact() {
@@ -416,5 +441,5 @@ task createCIVersionArtifact() {
 task buildAll(type: DefaultTask) {
     dependsOn('buildRpm', 'buildDeb', 'buildDocker', 'buildFullDocker', 'buildHardenedDocker',
             'buildHardenedFullDocker', 'buildFedhubDocker', ':takserver-cluster:buildCluster', 'bundlePublishArtifacts',
-            ':takserver-takcl-core:publicJar', ':takserver-plugins:publish')
+            ':takserver-takcl-core:shadowJar', ':takserver-plugins:publish')
 }

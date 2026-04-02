@@ -229,7 +229,7 @@ public class X509AuthCodec extends AbstractAuthCodec implements ByteCodec {
                 throw new TakException("found expired certificate : " + cert.getSubjectDN());
             }
 
-            logger.debug("cert: " + cert);
+            logger.debug("cert: {}", cert);
 
             if (cert.getSubjectDN() != null) {
                 username = usernameExtractor.extractUsername(cert);
@@ -253,20 +253,19 @@ public class X509AuthCodec extends AbstractAuthCodec implements ByteCodec {
 
             AuthStatus tlsAuthStatus = X509Authenticator.getInstance().authenticate(user, input);
 
-            logger.debug("Core X509 auth status: " + tlsAuthStatus);
+            logger.debug("Core X509 auth status: {}", tlsAuthStatus);
 
             authStatus.set(tlsAuthStatus);
 
         } catch (Exception e) {
             
-            // TODO:
             if (username != null) {
             	
-            	logger.error("X509 auth exception info: CN: " + username + ". Message: {}", e.getMessage(), e);
+            	logger.error("X509 auth exception info: CN: {}", username, e);
 
             } else {
             	
-                logger.error("X509 auth exception {}", e.getMessage(), e);
+                logger.error("X509 auth exception {}", e);
                 
             }
 

@@ -7,6 +7,7 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.security.SecureRandom;
 
 import jakarta.mail.internet.MimeMessage;
 
@@ -77,7 +78,7 @@ public class UserRegistrationService {
             // set username to username from email + random 5 digit number
             String username = emailAddress.substring(0, emailAddress.indexOf("@")).toLowerCase();
             username = StringUtils.substring(username, 0, 15);
-            Random r = new Random(System.currentTimeMillis());
+            SecureRandom r = new SecureRandom();
             int suffix = ((1 + r.nextInt(2)) * 10000 + r.nextInt(10000));
             username += new Integer(suffix).toString();
 

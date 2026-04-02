@@ -1,0 +1,16 @@
+.form-group {
+  margin-bottom: 15px;
+}
+
+button {
+  margin-top: 10px;
+}
+
+.text-danger {
+  font-size: 12px;
+  color: red;
+}
+
+.progress {
+  height: 20px;
+}

@@ -51,36 +51,12 @@ POSTGRES_USER=martiuser
 POSTGRES_DB=cot
 POSTGRES_PORT=5432
 
-ARTIFACT_TEMPLATE_DIR="$(pwd)/takserver-package/build/takArtifacts"
-ARTIFACT_SRC="$(pwd)/takserver-package/build/testrunnerArtifacts"
+ARTIFACT_SRC="$(pwd)/takserver-package/build/integrationTesterDir"
 
-if [[ ! -f "${ARTIFACT_TEMPLATE_DIR}/takserver.war" ]] || [[ ! -d "takserver-package/federation-hub/build/artifacts/jars" ]] || [[ ! -d "takserver-package/federation-hub/build/artifacts/configs" ]];then
-	echo Please build the project with './gradlew clean buildDocker buildRpm' to populate the tak root source! Future executions will automatically update takserver.war but require setting variables at the top of this script to true for everything else!
-	exit 1
+if [[ ! -d "${ARTIFACT_SRC}" ]];then
+    echo You must run './gradlew takserver-package:buildIntegrationTesterDir' before running this script!
+    exit 1
 fi
-
-if [[ -d "${ARTIFACT_SRC}" ]];then
-  rm -r "${ARTIFACT_SRC}"
-fi
-
-mkdir "${ARTIFACT_SRC}"
-
-if [[ ! -d "${ARTIFACT_SRC}/federation-hub" ]];then
-  mkdir "${ARTIFACT_SRC}/federation-hub"
-fi
-
-if [[ ! -d "${ARTIFACT_SRC}/lib" ]];then
-  mkdir "${ARTIFACT_SRC}/lib"
-fi
-
-cp -r ${ARTIFACT_TEMPLATE_DIR}/* ${ARTIFACT_SRC}/
-cp takserver-package/federation-hub/build/artifacts/jars/* "${ARTIFACT_SRC}/federation-hub/"
-cp -r takserver-package/federation-hub/build/artifacts/configs "${ARTIFACT_SRC}/federation-hub/configs"
-cp federation-hub-broker/src/main/resources/federation-hub-broker.yml "${ARTIFACT_SRC}/federation-hub/configs/"
-cp takserver-takcl-core/plugin-test-libs/* "${ARTIFACT_SRC}/lib/"
-
-
-
 
 if [[ "${1}" == "run" ]];then
 	if [[ "${2}" == "" ]];then
@@ -200,7 +176,9 @@ else
 	fi
 
 	CMD="${CMD}
-	java ${JARGS} -jar /opt/tak/utils/takcl.jar tests ${1} ${2};
+	java ${JARGS} -jar /opt/tak/utils/takcl.jar tests ${1} ${2} || true;
+	cp takcl-debug.log /opt/tak/TEST_RESULTS/TEST_ARTIFACTS/;
+	cp takcl-profiling.log /opt/tak/TEST_RESULTS/TEST_ARTIFACTS/;
 	chmod -R 777 /opt/tak/TEST_RESULTS/TEST_ARTIFACTS/*"
 
 	docker run -it --rm --name temptaktest \

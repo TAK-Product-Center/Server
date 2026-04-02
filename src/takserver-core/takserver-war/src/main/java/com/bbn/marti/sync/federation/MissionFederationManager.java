@@ -1,16 +1,17 @@
 package com.bbn.marti.sync.federation;
 
 import java.io.InputStream;
+import java.util.Date;
 import java.util.NavigableSet;
 
-import com.bbn.marti.maplayer.model.MapLayer;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.sync.MissionContent;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForExternalData;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForLogEntry;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayer;
 import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayer;
 import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.model.Mission;
-import com.bbn.marti.sync.model.MissionLayer;
 
 import mil.af.rl.rol.value.DataFeedMetadata;
 import mil.af.rl.rol.value.MissionMetadata;
@@ -28,7 +29,7 @@ public interface MissionFederationManager {
 
 	void deleteMission(String name, String creatorUid, NavigableSet<Group> groups);
 
-	void addMissionContent(String missionName, MissionContent content, String creatorUid, NavigableSet<Group> groups);
+	void addMissionContent(String missionName, MissionContent content, String creatorUid, NavigableSet<Group> groups, Date date, String xmlContentForNotification);
 	
 	void createMissionFeed(Mission mission, DataFeedMetadata missionMeta, NavigableSet<Group> groups);
 	
@@ -67,7 +68,10 @@ public interface MissionFederationManager {
 	void updateMapLayer(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer, NavigableSet<Group> groups);
 	
 	void removeMapLayerFromMission(MissionUpdateDetailsForMapLayer missionUpdateDetailsForMapLayer, NavigableSet<Group> groups);
-	
+
+	void updateExternalData(MissionUpdateDetailsForExternalData missionUpdateDetailsForExternalData, NavigableSet<Group> groups);
+
+	void addUpdateDeleteLogEntry(MissionUpdateDetailsForLogEntry missionUpdateDetailsForLogEntry, NavigableSet<Group> groups);
 }
 
     

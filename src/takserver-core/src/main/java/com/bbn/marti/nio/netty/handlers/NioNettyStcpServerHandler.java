@@ -4,8 +4,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ScheduledFuture;
 
-import org.apache.log4j.Logger;
-
 import com.bbn.cot.filter.DataFeedFilter;
 import com.bbn.marti.config.AuthType;
 import com.bbn.marti.config.DataFeed;
@@ -96,7 +94,7 @@ public class NioNettyStcpServerHandler extends NioNettyHandlerBase {
 			if (msgBuf == null || msgBuf.remaining() == 0) return;
 			
 			StreamingCotProtocol
-				.add(builder, Charsets.UTF_8.decode(msgBuf), cotParser(), channelHandler)
+				.add(builder, Charsets.UTF_8.decode(msgBuf), channelHandler)
 				.forEach(c -> {
 					if (isNotDOSLimited(c)  && isNotReadLimited(c)) {
 						if (isDataFeedInput()) {

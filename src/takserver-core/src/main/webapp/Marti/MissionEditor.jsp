@@ -31,7 +31,7 @@
 <script language="javascript" type="text/javascript">
 
     <% CommonUtil martiUtil = SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class); %>
-    var isAdmin = <%= martiUtil.isAdmin() %>
+    var isAdmin = <%= martiUtil.isAdmin(request) %>
 
     $(document).ready(function() {
 

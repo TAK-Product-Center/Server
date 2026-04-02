@@ -149,5 +149,44 @@ certificateManagerControllers.controller('FederateCAGroupsCtrl', ['$scope', '$lo
 
     }]);
 
+certificateManagerControllers.controller('FederateCATokenAuthCtrl', ['$scope', '$location', 'FederateCertificatesService','FederateCATokenAuthService', '$routeParams',
+
+    function ($scope, $location, FederateCertificatesService, FederateCATokenAuthService, $routeParams) {
+        $scope.caId = $routeParams.id;
+        $scope.ca = {}
+
+        $scope.submitInProgress = false;
+
+        $scope.getFederateCertificates = function() {
+            FederateCertificatesService.query(
+                    function(apiResponse) {
+                        $scope.ca = apiResponse.data.find(ca => ca.fingerPrint === $scope.caId)
+                    }, 
+                    function() {$scope.showRmiError = true;});                
+        }
+
+        $scope.backToCAs = function(){
+            $location.path("/");
+        };
+
+        $scope.saveConfig = function() {
+            FederateCATokenAuthService.save($scope.ca,
+                function(apiResponse){
+                     alert('Federate CA Token Auth Config Saved!');
+                },
+                function(apiResponse) {
+                    $scope.serviceReportedMessages = true;
+                    $scope.messages = apiResponse.data.messages;
+                    alert('An error occurred saving the federate ca token auth config.');
+                    $scope.submitInProgress = false;
+                    console.log(apiResponse)
+                }
+            );
+        }
+
+        $scope.getFederateCertificates();
+
+    }]);
+
 
 

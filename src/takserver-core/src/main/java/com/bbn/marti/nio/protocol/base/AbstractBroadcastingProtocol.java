@@ -64,7 +64,7 @@ public abstract class AbstractBroadcastingProtocol<T> implements Protocol<T> {
 					log.debug("listener " + listener.toString() + " removed for protocol " + this.toString());
 				}
 			} else {
-				log.warn("listener " + listener.toString() + " removal faild for protocol " + this.toString());
+				log.warn("listener {} removal failed for protocol {} because the listener was not found in the protocol.", listener, this);
 			}
 		} catch (Exception e) {
 			log.error("Error removing protocol listener (" + listener + ") from listeners list for " + this, e);

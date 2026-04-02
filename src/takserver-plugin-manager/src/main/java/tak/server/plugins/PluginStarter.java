@@ -29,6 +29,10 @@ import io.nats.client.Dispatcher;
 import io.nats.client.Nats;
 import tak.server.CommonConstants;
 import tak.server.messaging.Messenger;
+import com.bbn.marti.config.Plugins;
+import java.util.concurrent.TimeUnit;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+
 
 public class PluginStarter {
 
@@ -56,8 +60,8 @@ public class PluginStarter {
 
 	private final ExecutorService starterPool;
 	
-	private final ForkJoinPool interceptorSendPool = newForkJoinPool("plugin-interceptor-send-worker");
-	private final ForkJoinPool interceptorProcessPool = newForkJoinPool("plugin-interceptor-process-worker");
+	private final ForkJoinPool interceptorSendPool;
+	private final ForkJoinPool interceptorProcessPool;
 	
 	private final ServerInfo serverInfo;
 	private final PluginApi pluginApi;
@@ -66,6 +70,23 @@ public class PluginStarter {
 		starterPool = Executors.newWorkStealingPool(Runtime.getRuntime().availableProcessors() * 2);
 		this.serverInfo = serverInfo;
 		this.pluginApi = pluginApi;
+		
+		Plugins pluginsConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getPlugins();
+		
+		int parallelism = Runtime.getRuntime().availableProcessors();
+		int poolSize = Runtime.getRuntime().availableProcessors();
+		
+		if (pluginsConfig.getInterceptorParallelismLevel() > 0) {
+			parallelism = pluginsConfig.getInterceptorParallelismLevel();
+		}
+		
+		if (pluginsConfig.getInterceptorThreadPoolMaxSize() > 0) {
+			poolSize = pluginsConfig.getInterceptorThreadPoolMaxSize();
+		}
+		
+		
+		interceptorSendPool = newForkJoinPool(parallelism, poolSize, "plugin-interceptor-send-worker");
+		interceptorProcessPool = newForkJoinPool(parallelism, poolSize, "plugin-interceptor-process-worker");
 	}
 
 	@EventListener(PluginsLoadedEvent.class)
@@ -128,22 +149,23 @@ public class PluginStarter {
 					if (f != null) {
 
 						final Messenger<Message> fpm = pluginMessenger;
-
-						try {
-							
-							// block, get result
-							Message processedMessage = f.get();
-							
-						    Message.Builder mb = processedMessage.toBuilder();
-		                    
-		                    // add default provenance to guard against loops
-		                    mb.addProvenance(tak.server.Constants.PLUGIN_MANAGER_PROVENANCE);
-		                    mb.addProvenance(tak.server.Constants.PLUGIN_INTERCEPTOR_PROVENANCE);
-		                    
-							fpm.send(mb.build());
-						} catch (InterruptedException | ExecutionException e) {
-							logger.warn("interupted plugin send " + message);
-						}
+						
+				        f.thenAccept(processedMessage -> {
+				            try {
+				                Message.Builder mb = processedMessage.toBuilder();
+				                
+				                // add default provenance to guard against loops
+				                mb.addProvenance(tak.server.Constants.PLUGIN_MANAGER_PROVENANCE);
+				                mb.addProvenance(tak.server.Constants.PLUGIN_INTERCEPTOR_PROVENANCE);
+				                
+				                fpm.send(mb.build());
+				            } catch (Exception e) {
+				                logger.warn("Exception sending processed message {}", message, e);
+				            }
+				        }).exceptionally(ex -> {
+				            logger.warn("interupted plugin send {}", message, ex);
+				            return null;
+				        });
 					}
 				} catch (Exception e) {
 					logger.warn("exception processing intercept plugin", e);
@@ -271,11 +293,16 @@ public class PluginStarter {
 		return senderReceiverPlugins.values();
 	}
 
+	public Collection<MessageInterceptor> getInterceptorPlugins() {
+		return interceptorPlugins.values();
+	}
+
 	public Collection<PluginLifecycle> getAllPlugins() {
 		Collection<PluginLifecycle> plugins = new ArrayList<>();
 		plugins.addAll(getReceiverPlugins());
 		plugins.addAll(getSenderPlugins());
 		plugins.addAll(getSenderReceiverPlugins());
+		plugins.addAll(getInterceptorPlugins());
 
 		return plugins;
 	}
@@ -302,7 +329,21 @@ public class PluginStarter {
     	};
     }
 
-    private ForkJoinPool newForkJoinPool(String poolWorkerbaseName) {
-    	return new ForkJoinPool(Runtime.getRuntime().availableProcessors(), newWorkerFactory(poolWorkerbaseName), new TakServerExceptionHandler(), false); 
+    private ForkJoinPool newForkJoinPool(int parallelism, int maxThreads, String poolWorkerbaseName) {
+    	
+    	ForkJoinPool fjp = new ForkJoinPool(
+            parallelism, 
+            newWorkerFactory(poolWorkerbaseName),
+            new TakServerExceptionHandler(),
+            false,
+            parallelism,
+            maxThreads,
+            1,
+            null,
+            60,
+            TimeUnit.SECONDS
+        );
+    	
+    	return fjp;
     }
 }

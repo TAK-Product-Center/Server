@@ -215,11 +215,17 @@ public class ActiveGroupCacheHelper {
 
         // find groups that need to get added to the cache
         Set<Group> adds = Sets.difference(groups, cacheGroups);
-        activeGroups.addAll(adds);
 
-        for (Group group : adds) {
-            group.setActive(CoreConfigFacade.getInstance().getRemoteConfiguration()
-                    .getAuth().isX509UseGroupCacheDefaultActive());
+        if (!adds.isEmpty()) {
+            activeGroups.addAll(adds);
+            boolean active = cacheGroups.isEmpty() ?
+                    CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth()
+                            .isX509UseGroupCacheDefaultActive() :
+                    CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth()
+                            .isX509UseGroupCacheDefaultUpdatesActive();
+            for (Group group : adds) {
+                group.setActive(active);
+            }
         }
 
         // if we only have one group, make sure its active

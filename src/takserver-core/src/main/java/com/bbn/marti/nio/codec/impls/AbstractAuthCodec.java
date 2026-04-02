@@ -33,6 +33,7 @@ import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.SecureXmlParser;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.Subscription;
+import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.marti.util.concurrent.future.AsyncFutures;
@@ -90,15 +91,11 @@ public abstract class AbstractAuthCodec implements ByteCodec {
         }
     }
     
-    private final AtomicReference<GroupManager> groupManagerRef = new AtomicReference<>();
+    private final AtomicReference<GroupManager> groupManagerRef = new AtomicReference<>(null);
 	
 	private GroupManager getGroupManager() {
-		if (groupManagerRef.get() == null) {
-			synchronized (this) {
-				if (groupManagerRef.get() == null) {
-					groupManagerRef.set(SpringContextBeanForApi.getSpringContext().getBean(GroupManager.class));
-				}
-			}
+		if(groupManagerRef.get() == null) {
+			groupManagerRef.compareAndSet(null, SpringContextBeanForApi.getSpringContext().getBean(GroupManager.class));
 		}
 		
 		return groupManagerRef.get();
@@ -366,7 +363,7 @@ public abstract class AbstractAuthCodec implements ByteCodec {
                         // TODO: This really shouldn't be done here and in the SubmissionService. THere should ideally be an additional "onAccessGranted" call or something similar to handle this...
                         // set user on subscription, so that message brokering will be able to find the user
                         
-                        DistributedSubscriptionManager subscriptionManager = DistributedSubscriptionManager.getInstance();
+                        SubscriptionManager subscriptionManager = DistributedSubscriptionManager.getInstance();
                         
                         Subscription subscription = SubscriptionStore.getInstance().getSubscriptionByConnectionInfo(connectionInfo);
 

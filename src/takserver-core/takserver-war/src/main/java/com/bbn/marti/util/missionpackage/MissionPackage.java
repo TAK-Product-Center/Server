@@ -152,9 +152,7 @@ public class MissionPackage {
             bos.flush();
             bos.close();
 
-            String filename = entry.getName();
-            filename = filename.substring(filename.lastIndexOf("/") + 1);
-            files.put(filename, bos.toByteArray());
+            files.put(entry.getName(), bos.toByteArray());
         }
         zis.close();
 

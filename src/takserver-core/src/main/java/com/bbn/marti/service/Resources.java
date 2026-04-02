@@ -41,9 +41,9 @@ public class Resources {
 
 	private static final int NUM_AVAIL_CORES = Runtime.getRuntime().availableProcessors();
 
-	private static final int DEFAULT_POOL_MAX = NUM_AVAIL_CORES;
+	private static final int DEFAULT_POOL_MAX;
 
-	private static final int POOL_SIZE_MAX = DEFAULT_POOL_MAX < queue.getDefaultMaxPoolSize() ? queue.getDefaultMaxPoolSize() : DEFAULT_POOL_MAX;
+	private static final int POOL_SIZE_MAX;
 
 	public static final int EXEC_QUEUE_SIZE = config.getBuffer().getQueue().getDefaultExecQueueSize() * NUM_AVAIL_CORES;
 	
@@ -57,6 +57,10 @@ public class Resources {
 	
 	// create a minimal set of executors if low core mode is enabled
 	static {
+		
+		// base the "low-core" pool size on number of cores * a configurable multiplier
+		DEFAULT_POOL_MAX = queue.getDefaultCoreMaxPoolFactor() * NUM_AVAIL_CORES;
+		
 		if (IS_LOW_CORE) {
 			lowCoreOrderedExecutor = newOrderedExecutor("takserver-ordered", queue.getCoreExecutorCapacity(), POOL_SIZE_INITIAL, DEFAULT_POOL_MAX);
 			lowCoreExecutorService = newExecutorService("takserver", POOL_SIZE_INITIAL, DEFAULT_POOL_MAX);
@@ -70,6 +74,10 @@ public class Resources {
 			lowCoreGrpcExecutorService = null;
 			lowCoreGrpcEventLoopGroup = null;
 		}
+		
+		POOL_SIZE_MAX = DEFAULT_POOL_MAX < queue.getDefaultMaxPoolSize() ? queue.getDefaultMaxPoolSize() : DEFAULT_POOL_MAX;
+		
+		System.out.println("DEFAULT_POOL_MAX: " + DEFAULT_POOL_MAX);
 	}
 	
 	// pools that are always used
@@ -79,50 +87,80 @@ public class Resources {
 	public static final ExecutorService missionContentProcessor = newExecutorService("MissionContentProcessor",  POOL_SIZE_INITIAL, POOL_SIZE_MAX * 2);
 	public static final ExecutorService messagePersistenceProcessor = newExecutorService("MessagePersistence",  POOL_SIZE_INITIAL, POOL_SIZE_MAX * 2);
 	public static final ExecutorService callsignAuditExecutor = newExecutorService("CallsignAuditPersistenceExecutor", POOL_SIZE_INITIAL, POOL_SIZE_MAX * 2);
+	// Pool used for submission service to send message for brokering internally 
+	public static final ExecutorService injectorMessageReceiveProcessor = newExecutorService("InjectorMessageReceivedProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX * POOL_SIZE_MAX);
+	// pool used for determining src / dest matching
+	public static final ExecutorService brokerMatchingProcessor = newExecutorService("BrokerMatchingProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+	// pool used for processing messages
+	public static final ExecutorService messageProcessor = newExecutorService("MessageProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+	
+	// pool used to parse messages for UDP
+	public static final ExecutorService udpReadParseProcessor = newExecutorService("UDPReadParseProcessor", POOL_SIZE_MAX, POOL_SIZE_MAX * POOL_SIZE_MAX);
+	
+	// pool used for UDP submission onDataReceived logic
+	public static final ExecutorService udpReadDataReceivedProcessor = newExecutorService("UDPReadDataReceivedProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+	
+	// Pool used for outgoing static subscription messaging connections
+	public static final ExecutorService tcpStaticSubProcessor = newExecutorService("TcpStaticSubProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX * POOL_SIZE_MAX);
+	
+	// Pool used for flow tag processing on message submission
+	public static final ExecutorService flowTagProcessor = newExecutorService("FlowTagProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX * POOL_SIZE_MAX);
+	
+	// Pool used for contact message submission on message submission
+	public static final ExecutorService contactProcessor = newExecutorService("ContactProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX * POOL_SIZE_MAX);
+	
+	// pool used for processing group information.
+	public static final OrderedExecutor groupProcessor = newOrderedExecutor("GroupProcessor", EXEC_QUEUE_SIZE, POOL_SIZE_INITIAL, POOL_SIZE_MAX * 2);
+	
+	public static final ScheduledExecutorService metricsReportingPool = newScheduledExecutor("MetricsReportingPool", 1);
+	
+	// pool for listener removal
+	public static ExecutorService removeListenerPool = newExecutorService("removeListenerPool", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+
+	// pool for listener removal
+	public static ScheduledExecutorService removeProtoListenerPool = newScheduledExecutor("removeProtoListenerPool", POOL_SIZE_MAX);
+	
+	// pool used for message brokering
+	public static final ExecutorService brokerProcessor = newExecutorService("BrokerProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+
+	// pool used for determining message destinations
+	public static final ExecutorService brokerDestinationsProcessor = newExecutorService("BrokerDestinationsProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+
+	// pool used for handling publishing of state information to cluster
+	public static final ExecutorService clusterStateProcessor = newExecutorService("ClusterStateProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+	
+	public static final ExecutorService clusterMissionStateProcessor = newExecutorService("ClusterMissionStateProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+	
+	// pool for persisting callsign audit activity
+	public static final ExecutorService callsignAssignmentExecutor = newExecutorService("CallsignAssignmentExecutor", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+
+	// pool for listener addition
+	public static ExecutorService addListenerPool = newExecutorService("addListenerPool", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+	
+	// pool used for handling publishing of state information to cluster
+	public static final ScheduledExecutorService scheduledClusterStateExecutor = newScheduledExecutor("ScheduleClusterStateExecutor", POOL_SIZE_MAX);
+	
+	// pool used for copying messages
+	public static final ExecutorService messageCopyProcessor = newExecutorService("MessageCopyProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+
+	// pool used for proto negotiation
+	public static final ExecutorService negotiationProcessor = newExecutorService("NegotiationProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+	
+	// single threaded executor used by the broker service for ordered deliver of store/forward messages
+	public static final ExecutorService storeForwardChatProcessor = newExecutorService("storeForwardChatProcessor", 1, 1);
 	
 	// other pools
 	public static final ExecutorService qosCacheProcessor = !IS_LOW_CORE ? newExecutorService("QoSCacheExectuor",  POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
 	
-	// pool used for handling accept/connect operations
-	public static final OrderedExecutor acceptAndConnectProcessor = !IS_LOW_CORE ? newOrderedExecutor("AcceptConnect", queue.getCoreExecutorCapacity(), POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreOrderedExecutor;
-
 	// pool used for handling read/write operations
 	public static final OrderedExecutor tcpProcessor = !IS_LOW_CORE ? newOrderedExecutor("TcpProcessor", queue.getCoreExecutorCapacity(), POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreOrderedExecutor;
-
-	// pool used for handling publishing of state information to cluster
-	public static final ExecutorService clusterStateProcessor = !IS_LOW_CORE ? newExecutorService("ClusterStateProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-	
-	public static final ExecutorService clusterMissionStateProcessor = !IS_LOW_CORE ? newExecutorService("ClusterMissionStateProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-
-	// pool used for handling publishing of state information to cluster
-	public static final ScheduledExecutorService scheduledClusterStateExecutor = !IS_LOW_CORE ? newScheduledExecutor("ScheduleClusterStateExecutor", POOL_SIZE_MAX) : lowCoreScheduledExecutorService;
-
-	// pool used for copying messages
-	public static final ExecutorService messageCopyProcessor = !IS_LOW_CORE ? newExecutorService("MessageCopyProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-
-	// pool used for processing messages
-	public static final ExecutorService messageProcessor = !IS_LOW_CORE ? newExecutorService("MessageProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-
-	public static final ExecutorService tcpStaticSubProcessor = !IS_LOW_CORE ? newExecutorService("TcpStaticSubProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-
-	// pool used for proto negotiation
-	public static final ExecutorService negotiationProcessor = !IS_LOW_CORE ? newExecutorService("NegotiationProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
 
 	// pool used for handling udp read/write operations
 	public static final OrderedExecutor udpProcessor = !IS_LOW_CORE ? newOrderedExecutor("UdpProcessor", queue.getCoreExecutorCapacity(), POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreOrderedExecutor;
 
 	// pool used for handling message injection.
 	public static final OrderedExecutor injectionProcessor = !IS_LOW_CORE ? newOrderedExecutor("InjectionProcessor", EXEC_QUEUE_SIZE, POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreOrderedExecutor;
-
-	// pool used for message brokering
-	public static final ExecutorService brokerProcessor = !IS_LOW_CORE ? newExecutorService("BrokerProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-
-	// pool used for determining message destinations
-	public static final ExecutorService brokerDestinationsProcessor = !IS_LOW_CORE ? newExecutorService("BrokerDestinationsProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-
-	// pool used for determining src / dest matching
-	public static final ExecutorService brokerMatchingProcessor = !IS_LOW_CORE ? newExecutorService("BrokerMatchingProcessor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-
+	
 	// pool used for message brokering
 	public static final ExecutorService fedMissionPackageExecutor = !IS_LOW_CORE ? newExecutorService("FedMissionPackageExecutor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
 	
@@ -134,6 +172,15 @@ public class Resources {
 
 	// pool used for closing tcp connections
 	public static final ScheduledExecutorService tcpCloseThreadPool = !IS_LOW_CORE ? newScheduledExecutor("TcpCloseProcessor", POOL_SIZE_MAX) : lowCoreScheduledExecutorService;
+	
+	// pool used for subscription removal and cleanup
+	public static final ExecutorService removeSubscriptionPool = newExecutorService("RemoveSubscriptionPool", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+	
+	// pool used for ignite subscription cache and group cache removal
+	public static final ExecutorService igniteSubscriptionCacheRemovalPool = newExecutorService("IgniteSubscriptionRemovalPool", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
+	
+	// pool used for ignite subscription cache and group cache adding
+	public static final ExecutorService igniteSubscriptionCacheAddingPool = newExecutorService("IgniteSubscriptionAddingPool", POOL_SIZE_INITIAL, POOL_SIZE_MAX);
 
 	public static final ScheduledExecutorService flushPool = !IS_LOW_CORE ? newScheduledExecutor("FlushPool", POOL_SIZE_MAX) : lowCoreScheduledExecutorService;
 
@@ -146,23 +193,11 @@ public class Resources {
 	// pool for repeaters and federate health check messages
 	public static final ScheduledExecutorService repeaterPool = !IS_LOW_CORE ? newScheduledExecutor("RepeaterPool", 1) : lowCoreScheduledExecutorService;
 
-	// pool for repeaters and federate health check messages
-	public static final ScheduledExecutorService metricsReportingPool = !IS_LOW_CORE ? newScheduledExecutor("MetricsReportingPool", 1) : lowCoreScheduledExecutorService;
-
 	// pool for running the ghost connection cleanup check
 	public static final ScheduledExecutorService ghostConnectionCleanupPool = !IS_LOW_CORE ? newScheduledExecutor("GhostConnectionCleanupPool", 1) : lowCoreScheduledExecutorService;
-
-	// pool for listener removal
-	public static ExecutorService removeListenerPool = !IS_LOW_CORE ? newExecutorService("removeListenerPool", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
-
-	// pool for listener removal
-	public static ScheduledExecutorService removeProtoListenerPool = !IS_LOW_CORE ? newScheduledExecutor("removeProtoListenerPool", POOL_SIZE_MAX) : lowCoreScheduledExecutorService;
-
-	// pool for listener addition
-	public static ExecutorService addListenerPool = !IS_LOW_CORE ? newExecutorService("addListenerPool", 1, 1) : lowCoreExecutorService;
-
-	// pool used for processing group information. Using a single thread for now.
-	public static final OrderedExecutor groupProcessor = !IS_LOW_CORE ? newOrderedExecutor("GroupProcessor", EXEC_QUEUE_SIZE, 1, 1) : lowCoreOrderedExecutor;
+	
+	// pool for running the plugin Contact SA cleanup check
+	public static final ScheduledExecutorService pluginContactCleanupPool = !IS_LOW_CORE ? newScheduledExecutor("PluginContactCleanupPool", 1) : lowCoreScheduledExecutorService;
 
 	// pool used for x509-ldap group lookup
 	public static final ExecutorService x509ldapProcessor = !IS_LOW_CORE ? newExecutorService("x509ldap", 1, 5) : lowCoreExecutorService;
@@ -174,12 +209,6 @@ public class Resources {
 
 	// pool for store/forward of missed chat messages, handles the processing of db results and submission of messages
 	public static final ScheduledExecutorService storeForwardChatSendExecutor = newScheduledExecutor("storeForwardChatSendExecutor", POOL_SIZE_MAX);
-
-	// single threaded executor used by the broker service for ordered deliver of store/forward messages
-	public static final ExecutorService storeForwardChatProcessor = newExecutorService("storeForwardChatProcessor", 1, 1);
-
-	// pool for persisting callsign audit activity
-	public static final ExecutorService callsignAssignmentExecutor = !IS_LOW_CORE ? newExecutorService("CallsignAssignmentExecutor", POOL_SIZE_INITIAL, POOL_SIZE_MAX) : lowCoreExecutorService;
 
 	// producer-consumer pool for message writes. This pool will be busy under load.
 	public static final ExecutorService messageWritePoolExecutor = !IS_LOW_CORE ? newExecutorService("messageWritePoolExecutor", 1, 1, queue.getMessageWriteExecutorQueueSize()) : lowCoreExecutorService;

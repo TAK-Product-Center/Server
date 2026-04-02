@@ -9,6 +9,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Strings;
+
+import io.micrometer.core.instrument.Metrics;
 import io.nats.client.Connection;
 import io.nats.client.Nats;
 
@@ -18,6 +20,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteAtomicLong;
+import org.apache.ignite.cluster.ClusterGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
@@ -33,15 +36,17 @@ import atakmap.commoncommo.protobuf.v1.Missionannouncement.MissionAnnouncement;
 import com.atakmap.Tak.ROL;
 
 import tak.server.util.ActiveProfiles;
+
+import com.bbn.cluster.ClusterGroupDefinition;
 import com.bbn.marti.config.Cluster;
 import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.Subscription;
+import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
-
 
 import mil.af.rl.rol.RolLexer;
 import mil.af.rl.rol.RolParser;
@@ -66,7 +71,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 	private final CoreConfigFacade coreConfig = CoreConfigFacade.getInstance();
 
 	private final Cluster config = coreConfig.getRemoteConfiguration().getCluster();
-	
+
 	private static final String SUBSCRIPTION_COUNTER = "subscriptionCounter";
 
 	private static final String MESSAGES_RECEIVED_COUNTER = "messagesReceivedCounter";
@@ -104,7 +109,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 
 		return instance;
 	}
-	
+
 	// After the spring context is initialized, set up the message clustering and
 	// metrics
 	@Override
@@ -116,18 +121,20 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 				logger.warn("error establishing NATS connection", e);
 			}
 		}
-		
 
 		if (ActiveProfiles.getInstance().isMessagingProfileActive()) {
 			Resources.clusterStateProcessor.execute(() -> {
 				try {
 					natsConnection.createDispatcher().subscribe(Constants.CLUSTER_DATA_MESSAGE, m -> {
-						try {		
-							
+						try {
+
 							countClusterMessageRecieved();
-							
+
+							Metrics.counter(Constants.METRIC_NATS_MESSAGE_READ_COUNT, "takserver", "messaging")
+									.increment();
+
 							CotEventContainer clusterCot = clusterMessageConverter.dataMessageToCot(m.getData());
-						
+
 							String sourceClusterNodeId = (String) clusterCot.getContext(Constants.CLUSTER_MESSAGE_KEY);
 
 							if (sourceClusterNodeId == null || sourceClusterNodeId.toLowerCase(Locale.ENGLISH)
@@ -137,8 +144,9 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 								}
 								return;
 							}
-										
-							MessagingDependencyInjectionProxy.getInstance().submissionService().addToInputQueue(clusterCot);
+
+							MessagingDependencyInjectionProxy.getInstance().submissionService()
+									.addToInputQueue(clusterCot);
 						} catch (Exception e) {
 							logger.warn("exception processing clustered message", e);
 						}
@@ -155,47 +163,50 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 					try {
 						natsConnection.createDispatcher().subscribe(CommonConstants.CLUSTER_PLUGIN_PUBLISH_TOPIC, m -> {
 							try {
-								CotEventContainer pluginCotEvent = clusterMessageConverter.dataMessageToCot((byte[]) m.getData(), false);
+								CotEventContainer pluginCotEvent = clusterMessageConverter
+										.dataMessageToCot((byte[]) m.getData(), false);
 								pluginCotEvent.setContextValue(Constants.PLUGIN_MESSAGE_KEY, Boolean.TRUE);
 								MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
 							} catch (Exception e) {
 								logger.error("exception connecting to NATS server to receive messages", e);
-							} 
+							}
 						});
 					} catch (Exception e2) {
 						logger.error("exception subscribing to " + CommonConstants.CLUSTER_PLUGIN_PUBLISH_TOPIC, e2);
 					}
 				}
-			});	
-			
+			});
+
 			// Receive cluster mission data messages
 			Resources.clusterMissionStateProcessor.execute(() -> {
 				try {
 					natsConnection.createDispatcher().subscribe(Constants.CLUSTER_MISSION_DATA_MESSAGE, m -> {
 						try {
 							countClusterMessageRecieved();
-							
-							MissionAnnouncement missionannouncement = MissionAnnouncement.parseFrom(m.getData());	
-							CotEventContainer missionCot = clusterMessageConverter.getCotFromMissionAnnouncement(missionannouncement);
-							
-							
-							
-							switch (ClusterMissionAnnouncementType.valueOf(missionannouncement.getMissionAnnouncementType())) {
+
+							MissionAnnouncement missionannouncement = MissionAnnouncement.parseFrom(m.getData());
+							CotEventContainer missionCot = clusterMessageConverter
+									.getCotFromMissionAnnouncement(missionannouncement);
+
+							switch (ClusterMissionAnnouncementType
+									.valueOf(missionannouncement.getMissionAnnouncementType())) {
 							case AnnounceMissionChange:
-								DistributedSubscriptionManager.getInstance()
-									.submitAnnounceMissionChangeCot(missionannouncement.getMissionName(), UUID.fromString(missionannouncement.getMissionGuid()), missionCot);
+								DistributedSubscriptionManager.getInstance().submitAnnounceMissionChangeCot(
+										missionannouncement.getMissionName(),
+										UUID.fromString(missionannouncement.getMissionGuid()), missionCot);
 								break;
 							case BroadcastMissionAnnouncement:
-								DistributedSubscriptionManager.getInstance()
-									.submitBroadcastMissionAnnouncementCot(missionannouncement.getCreatorUid(), missionannouncement.getGroupVector(), missionCot);
+								DistributedSubscriptionManager.getInstance().submitBroadcastMissionAnnouncementCot(
+										missionannouncement.getCreatorUid(), missionannouncement.getGroupVector(),
+										missionCot);
 								break;
 							case SendMissionInvite:
-								DistributedSubscriptionManager.getInstance()
-									.submitSendMissionInviteCot(missionannouncement.getUidsList().stream().toArray(String[]::new), missionCot);
+								DistributedSubscriptionManager.getInstance().submitSendMissionInviteCot(
+										missionannouncement.getUidsList().stream().toArray(String[]::new), missionCot);
 								break;
 							case SendMissionRoleChange:
 								DistributedSubscriptionManager.getInstance()
-									.submitSendMissionRoleChangeCot(missionannouncement.getClientUid(), missionCot);
+										.submitSendMissionRoleChangeCot(missionannouncement.getClientUid(), missionCot);
 								break;
 							default:
 								break;
@@ -247,7 +258,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 					logger.debug("error updating messages sent clustered counter", e);
 				}
 			}
-		}, config.getMetricsIntervalSeconds(), config.getMetricsIntervalSeconds(), TimeUnit.SECONDS);
+		}, config.getMetricsIntervalDelaySeconds(), config.getMetricsIntervalSeconds(), TimeUnit.SECONDS);
 
 		// Periodically updated clustered counter for messages received
 		Resources.scheduledClusterStateExecutor.scheduleWithFixedDelay(() -> {
@@ -260,7 +271,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 					logger.debug("error updating messages received clustered counter");
 				}
 			}
-		}, config.getMetricsIntervalSeconds(), config.getMetricsIntervalSeconds(), TimeUnit.SECONDS);
+		}, config.getMetricsIntervalDelaySeconds(), config.getMetricsIntervalSeconds(), TimeUnit.SECONDS);
 
 		// Periodically updated clustered messages clustered counter
 		Resources.scheduledClusterStateExecutor.scheduleWithFixedDelay(() -> {
@@ -268,7 +279,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 				if (clusterMessagesReceivedTempCounter.get() > 0) {
 					getClusterMessagesReceivedCounter().addAndGet(clusterMessagesReceivedTempCounter.getAndSet(0));
 				}
-				
+
 				if (clusterMessagesSentTempCounter.get() > 0) {
 					getClusterMessagesSentCounter().addAndGet(clusterMessagesSentTempCounter.getAndSet(0));
 				}
@@ -277,22 +288,24 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 					logger.debug("error updating messages clustered clustered counter");
 				}
 			}
-		}, config.getMetricsIntervalSeconds(), config.getMetricsIntervalSeconds(), TimeUnit.SECONDS);
-		
+		}, config.getMetricsIntervalDelaySeconds(), config.getMetricsIntervalSeconds(), TimeUnit.SECONDS);
+
 		// Periodically updated clustered subscription counter
 		Resources.scheduledClusterStateExecutor.scheduleWithFixedDelay(() -> {
 			try {
 				if (subscriptionsTempCounter.get() != 0) {
 					int total = (int) getSubscriptionCounter().addAndGet(subscriptionsTempCounter.getAndSet(0));
-					// when in the cluster, make sure our message strategies for limiting traffic get updated with global subscription metrics					
-					SpringContextBeanForApi.getSpringContext().getBeansOfType(MessageBaseStrategy.class).values().forEach(ms -> ms.changeRateLimitIfRequired(total));
+					// when in the cluster, make sure our message strategies for limiting traffic
+					// get updated with global subscription metrics
+					SpringContextBeanForApi.getSpringContext().getBeansOfType(MessageBaseStrategy.class).values()
+							.forEach(ms -> ms.changeRateLimitIfRequired(total));
 				}
 			} catch (Exception e) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("error updating subscription clustered counter");
 				}
 			}
-		}, config.getMetricsIntervalSeconds(), config.getMetricsIntervalSeconds(), TimeUnit.SECONDS);
+		}, config.getMetricsIntervalDelaySeconds(), config.getMetricsIntervalSeconds(), TimeUnit.SECONDS);
 
 	}
 
@@ -303,13 +316,15 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 			if (logger.isDebugEnabled()) {
 				logger.debug("not clustering already clustered message");
 			}
-			
+
 			return;
 		}
 
-		try {	
+		try {
 			message.setContext(Constants.NATS_MESSAGE_KEY, true);
 			natsConnection.publish(Constants.CLUSTER_DATA_MESSAGE, clusterMessageConverter.cotToDataMessage(message));
+
+			Metrics.counter(Constants.METRIC_NATS_MESSAGE_WRITE_COUNT, "takserver", "messaging").increment();
 		} catch (NotFoundException nfe) {
 			// will be thrown by
 			// clusterMessageConverter.cotEventContainerToClusterMessageJson if message has
@@ -322,7 +337,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 			logger.error("exception publishing clustered data message", e);
 		}
 	}
-	
+
 	public void onPluginMessage(byte[] rawMessage) {
 		try {
 			natsConnection.publish(CommonConstants.CLUSTER_PLUGIN_SUBSCRIBE_TOPIC, rawMessage);
@@ -354,7 +369,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 			logger.debug("about to process ROL control message: " + clusterControl.getProgram());
 		}
 	}
-	
+
 	public void onAnnounceMissionChangeMessage(CotEventContainer changeMessage, String missionName, UUID missionGuid) {
 		ClusterMissionAnnouncementDetail missionDetail = new ClusterMissionAnnouncementDetail();
 		missionDetail.cot = changeMessage;
@@ -363,8 +378,9 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 		missionDetail.missionGuid = missionGuid;
 		publishMissionMessage(missionDetail);
 	}
-	
-	public void onBroadcastMissionAnnouncementMessage(CotEventContainer message, String creatorUid, String groupVector) {
+
+	public void onBroadcastMissionAnnouncementMessage(CotEventContainer message, String creatorUid,
+			String groupVector) {
 		ClusterMissionAnnouncementDetail missionDetail = new ClusterMissionAnnouncementDetail();
 		missionDetail.cot = message;
 		missionDetail.missionAnnouncementType = ClusterMissionAnnouncementType.BroadcastMissionAnnouncement.name();
@@ -372,7 +388,7 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 		missionDetail.groupVector = groupVector;
 		publishMissionMessage(missionDetail);
 	}
-	
+
 	public void onSendMissionInviteMessage(CotEventContainer inviteMessage, String[] uids) {
 		ClusterMissionAnnouncementDetail missionDetail = new ClusterMissionAnnouncementDetail();
 		missionDetail.cot = inviteMessage;
@@ -380,20 +396,21 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 		missionDetail.uids = uids;
 		publishMissionMessage(missionDetail);
 	}
-	
+
 	public void onSendMissionRoleChangeMessage(CotEventContainer roleChangeMessage, String clientUid) {
 		ClusterMissionAnnouncementDetail missionDetail = new ClusterMissionAnnouncementDetail();
 		missionDetail.cot = roleChangeMessage;
 		missionDetail.missionAnnouncementType = ClusterMissionAnnouncementType.SendMissionRoleChange.name();
 		missionDetail.clientUid = clientUid;
 		publishMissionMessage(missionDetail);
-	} 
-	
+	}
+
 	private void publishMissionMessage(ClusterMissionAnnouncementDetail missionDetail) {
 		// convert to clustered message format, and publish the message to cluster
 		try {
 			missionDetail.cot.setContext(Constants.NATS_MESSAGE_KEY, true);
-			natsConnection.publish(Constants.CLUSTER_MISSION_DATA_MESSAGE, clusterMessageConverter.missionAnnouncementToDataMessage(missionDetail));
+			natsConnection.publish(Constants.CLUSTER_MISSION_DATA_MESSAGE,
+					clusterMessageConverter.missionAnnouncementToDataMessage(missionDetail));
 		} catch (Exception e) {
 			logger.error("exception publishing clustered mission message", e);
 		}
@@ -411,15 +428,15 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 	public static void removeSubscription(final Subscription subscription) {
 		subscriptionsTempCounter.decrementAndGet();
 	}
-	
+
 	public long getSubscriptionCount() {
 		return getSubscriptionCounter().get();
 	}
-	
+
 	private IgniteAtomicLong getSubscriptionCounter() {
 		return ignite.atomicLong(SUBSCRIPTION_COUNTER, 0, true);
 	}
-	
+
 	public static void countMessageReceived() {
 		messagesReceivedTempCounter.incrementAndGet();
 	}
@@ -467,11 +484,11 @@ public class ClusterManager implements ApplicationContextAware, ApplicationListe
 	private IgniteAtomicLong getMessagesSentCounter() {
 		return ignite.atomicLong(MESSAGES_SENT_COUNTER, 0, true);
 	}
-	
+
 	public static enum ClusterMissionAnnouncementType {
 		AnnounceMissionChange, BroadcastMissionAnnouncement, SendMissionInvite, SendMissionRoleChange;
 	}
-	
+
 	public static class ClusterMissionAnnouncementDetail {
 		public CotEventContainer cot;
 		public String missionAnnouncementType;

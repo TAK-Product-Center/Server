@@ -1,0 +1,57 @@
+<div class="d-flex justify-content-center align-items-center">
+  <div class="container p-4 border rounded shadow" style="width: 50%; min-width: 300px;">
+    <!-- Centered Icon and Title -->
+    <div class="d-flex justify-content-center align-items-center mb-4">
+      <i class="fa fa-sitemap fa-5x" style="font-size: 2rem; margin-right: 10px;"></i>
+      <h2 class="mb-0">Federation Policy Selection</h2>
+    </div>
+
+    <!-- Buttons -->
+    <div class="row">
+      <div class="col-6 mb-3">
+        <button (click)="onNew()" class="btn btn-primary w-100">New</button>
+      </div>
+      <div class="col-6 mb-3">
+        <button (click)="onLoad()" [disabled]="!itemSelected" class="btn btn-secondary w-100">Load</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Second Section: List of Items for Load -->
+<div class="d-flex justify-content-center align-items-center mb-5">
+  <div class="container p-4 border rounded shadow" style="width: 50%; min-width: 300px;">
+    <h4 class="text-center mb-3">Select Policy to Load</h4>
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th st-sort="name">Diagram Name</th>
+          <th st-sort="creatorName">Creator</th>
+          <th st-sort="creationDate">Creation Date</th>
+          <th st-sort="modifiedDate">Modified Date</th>
+          <th>Description</th>
+          <th>Thumbnail</th>
+        </tr>
+        <tr>
+          <th colspan="6">
+            <input [(ngModel)]="searchTerm" (input)="filterItems()" placeholder="global search..." class="input-sm form-control"
+            type="text" /></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          *ngFor="let row of displayedCollection; let i = index"
+          [class.table-success]="selectedPolicy === row"
+          (click)="selectRow(row)"
+        >
+        <td>{{row.name}}</td>
+        <td>{{row.creatorName}}</td>
+        <td>{{row.creationDate }}</td>
+        <td>{{row.modifiedDate }}</td>
+        <td>{{row.description}}</td>
+        <td><img width=150 height=75 src="{{row.thumbnail}}"/></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

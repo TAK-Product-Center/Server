@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 import com.bbn.marti.config.Federation.FederationServer.FederationPort;
+import com.bbn.marti.config.Federation.FederationServer.FederationTokenAuthentication;
 import com.bbn.marti.config.Federation.FederationServer.V1Tls;
 import com.bbn.marti.config.Federation.MissionDisruptionTolerance.Mission;;
 
@@ -21,6 +22,7 @@ public class FederationConfigInfo implements Serializable {
 	private String truststorePass;
 	private String tlsVersion;
 	private String webBaseURL;
+	private FederationTokenAuthentication federationTokenAuthentication;
 	private boolean allowMissionFederation;
 	private boolean allowDataFeedFederation;
 	private boolean allowFederatedDelete;
@@ -38,7 +40,7 @@ public class FederationConfigInfo implements Serializable {
 
 	public FederationConfigInfo(boolean isEnabled, List<V1Tls> v1Tls, List<FederationPort> v1Ports, int serverPortv1, int serverPortv2, boolean serverPortEnabled,
 								boolean serverPortEnabledv2, String truststorePath, String truststorePass, String tlsVersion,
-								String webBaseURL, boolean allowMissionFederation, boolean allowDataFeedFederation, boolean allowFederatedDelete, boolean enableMissionFederationDisruptionTolerance,
+								String webBaseURL, FederationTokenAuthentication federationTokenAuthentication, boolean allowMissionFederation, boolean allowDataFeedFederation, boolean allowFederatedDelete, boolean enableMissionFederationDisruptionTolerance,
 								long missionFederationDisruptionToleranceRecencySeconds, List<Mission> missionInterval, int coreVersion,
 								boolean enableDataPackageAndMissionFileFilter, List<String> fileExtension) {
 
@@ -52,6 +54,7 @@ public class FederationConfigInfo implements Serializable {
 		this.truststorePass = truststorePass;
 		this.tlsVersion = tlsVersion;
 		this.webBaseURL = webBaseURL;
+		this.federationTokenAuthentication = federationTokenAuthentication;
 		this.allowMissionFederation = allowMissionFederation;
 		this.allowDataFeedFederation = allowDataFeedFederation;
 		this.allowFederatedDelete = allowFederatedDelete;
@@ -150,6 +153,14 @@ public class FederationConfigInfo implements Serializable {
 
 	public void setWebBaseURL(String webBaseURL) {
 		this.webBaseURL = webBaseURL;
+	}
+
+	public FederationTokenAuthentication getFederationTokenAuthentication() {
+		return federationTokenAuthentication;
+	}
+
+	public void setFederationTokenAuthentication(FederationTokenAuthentication federationTokenAuthentication) {
+		this.federationTokenAuthentication = federationTokenAuthentication;
 	}
 
 	public boolean isAllowMissionFederation() {
@@ -333,11 +344,12 @@ public class FederationConfigInfo implements Serializable {
 	public String toString() {
 		return "FederationConfigInfo [isEnabled=" + isEnabled + ", serverPortEnabled=" + serverPortEnabled
 				+ ", serverPortv1=" + serverPortv1 + ", serverPortv2=" + serverPortv2 + ", serverPortEnabledv2="
-				+ serverPortEnabledv2 + ", truststorePath=" + truststorePath + ", truststorePass=" + truststorePass
-				+ ", tlsVersion=" + tlsVersion + ", webBaseURL=" + webBaseURL + ", allowMissionFederation="
-				+ allowMissionFederation + ", allowDataFeedFederation=" + allowDataFeedFederation
-				+ ", allowFederatedDelete=" + allowFederatedDelete + ", enableMissionFederationDisruptionTolerance="
-				+ enableMissionFederationDisruptionTolerance + ", missionFederationDisruptionToleranceRecencySeconds="
+				+ serverPortEnabledv2 + ", truststorePath=" + truststorePath + ", tlsVersion=" + tlsVersion
+				+ ", webBaseURL=" + webBaseURL + ", federationTokenAuthentication=" + federationTokenAuthentication
+				+ ", allowMissionFederation=" + allowMissionFederation + ", allowDataFeedFederation="
+				+ allowDataFeedFederation + ", allowFederatedDelete=" + allowFederatedDelete
+				+ ", enableMissionFederationDisruptionTolerance=" + enableMissionFederationDisruptionTolerance
+				+ ", missionFederationDisruptionToleranceRecencySeconds="
 				+ missionFederationDisruptionToleranceRecencySeconds + ", missionInterval=" + missionInterval
 				+ ", coreVersion=" + coreVersion + ", v1Ports=" + v1Ports + ", v1Tls=" + v1Tls
 				+ ", enableDataPackageAndMissionFileFilter=" + enableDataPackageAndMissionFileFilter

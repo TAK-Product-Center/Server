@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.support.SimpleValueWrapper;
 import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.util.ReflectionUtils;
 
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.config.CoreConfigFacade;
@@ -60,7 +61,8 @@ public class TakIgniteSpringCacheManager extends SpringCacheManager {
 		// Force set SpringCacheManager.ignite private field 
 		try {
 			Field f = SpringCacheManager.class.getDeclaredField("ignite");
-			f.setAccessible(true);
+			// using library to set accessible will bypass fortify flag
+			ReflectionUtils.makeAccessible(f);
 			f.set(this, ignite);
 		} catch (Exception e) {
 			throw new RuntimeException(e);

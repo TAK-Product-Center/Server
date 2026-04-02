@@ -144,6 +144,7 @@
     <option value="http">http</option>
     <option value="https">https</option>
     <option value="raw">raw</option>
+    <option value="srt">srt</option>
   </select>
 </td></tr>
 <tr><td>Address</td><td><input type="text" name="address" style="width:250px" <%=setValue(address)%> /></td></tr>

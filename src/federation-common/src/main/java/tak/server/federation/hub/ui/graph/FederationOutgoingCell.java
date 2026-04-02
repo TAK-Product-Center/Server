@@ -28,4 +28,8 @@ public class FederationOutgoingCell extends PolicyObjectCell {
         this.properties = properties;
     }
 
+	@Override
+	public String toString() {
+		return "FederationOutgoingCell [type=" + type + ", properties=" + properties + "]";
+	}
 }

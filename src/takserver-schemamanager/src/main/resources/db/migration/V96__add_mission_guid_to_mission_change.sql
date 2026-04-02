@@ -1,0 +1,1 @@
+ALTER TABLE public.mission_change ADD COLUMN mission_guid uuid;

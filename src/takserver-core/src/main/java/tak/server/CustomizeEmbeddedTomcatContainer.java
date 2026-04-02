@@ -36,7 +36,7 @@ public class CustomizeEmbeddedTomcatContainer implements WebServerFactoryCustomi
 			/**
 			 * for pattern format see https://tomcat.apache.org/tomcat-7.0-doc/api/org/apache/catalina/valves/AccessLogValve.html
 			 */
-			accessLogValve.setPattern("request: method=%m uri=\"%U\" response: statuscode=%s bytes=%b duration=%D(ms) client: remoteip=%a user=%u useragent=\"%{User-Agent}i\"");
+			accessLogValve.setPattern("request: method=%m uri=\"%U\" response: statuscode=%s bytes=%b duration=%D(ms) client: remoteip=%a user=%{username}s useragent=\"%{User-Agent}i\"");
 
 			factory.addContextValves(accessLogValve);
 		}

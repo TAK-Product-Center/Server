@@ -37,6 +37,7 @@ public class LdapSSLSocketFactory extends SSLSocketFactory {
     public LdapSSLSocketFactory() {
         super();
 
+        InputStream keyStoreStream = null;
         try {
             CoreConfigFacade config = CoreConfigFacade.getInstance();
             if (config.getRemoteConfiguration() == null || config.getRemoteConfiguration().getAuth() == null ||
@@ -62,7 +63,8 @@ public class LdapSSLSocketFactory extends SSLSocketFactory {
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
                     TrustManagerFactory.getDefaultAlgorithm());
             KeyStore keyStore = KeyStore.getInstance(truststore);
-            keyStore.load(new FileInputStream(truststoreFile), truststorePass.toCharArray());
+            keyStoreStream = new FileInputStream(truststoreFile);
+            keyStore.load(keyStoreStream, truststorePass.toCharArray());
             trustManagerFactory.init(keyStore);
             Tls tlsConfig = config.getRemoteConfiguration().getSecurity().getTls();
             SSLContext sslContext = SSLContext.getInstance(tlsConfig.getContext());
@@ -73,6 +75,14 @@ public class LdapSSLSocketFactory extends SSLSocketFactory {
 
         } catch (Exception e) {
             logger.error("Exception in LdapSSLSocketFactory()!, " + e.getMessage());
+        } finally {
+        	if (keyStoreStream != null) {
+        		try {
+					keyStoreStream.close();
+				} catch (IOException e) {
+					logger.error("Error closing keystore file stream", e);
+				}
+        	}
         }
     }
 

@@ -1,0 +1,7 @@
+<div>
+    <div class="title-box"><img [attr.width]="properties.image_width" [attr.height]="properties.image_height" src="{{ properties.image }}"> CA Group </div>
+    <div [hidden]="!federation || !federation.stringId" class="box">
+        <div><b>Name: {{ federation.stringId }}</b></div>
+        <div class="description">{{ federation.description }}</div>
+    </div>
+</div>

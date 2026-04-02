@@ -7,6 +7,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.sql.Connection;
@@ -296,7 +298,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
 
     	logger.debug("groups for current user: " + userGroups);
 
-    	if (!martiUtil.isAdmin()) {
+    	if (!martiUtil.isAdmin(request)) {
     		// validate membership in the requested filter groups. Let admin filter on any group.
     		for (Group filterGroup : filterGroups) {
 
@@ -481,6 +483,11 @@ public class MissionKMLServlet extends LatestKMLServlet {
     						logger.trace("processing track for uid: " + uid);
     					}
 
+						if (cot.uid == null) {
+							logger.error("found null cot uid!");
+							continue;
+						}
+
     					if (cot.uid.equals(uid)) {
     						qrs.add(cot);
     					} else {
@@ -655,8 +662,11 @@ public class MissionKMLServlet extends LatestKMLServlet {
     				log.warning(ex.getMessage());
     				response.sendError(HttpServletResponse.SC_BAD_REQUEST, ex.getMessage());
     			} catch (Exception ex) {
-    				log.severe(ex.getMessage());
-    				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Exception generating KML" + ex.getMessage());
+					StringWriter sw = new StringWriter();
+					ex.printStackTrace(new PrintWriter(sw));
+					String exceptionAsString = sw.toString();
+					log.severe(ex.getMessage() + ", " + exceptionAsString);
+    				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Exception generating KML " + ex.getMessage());
     			} finally {
     				if (zip != null) {
     					try {

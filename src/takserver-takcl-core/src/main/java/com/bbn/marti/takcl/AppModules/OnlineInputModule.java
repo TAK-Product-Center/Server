@@ -1,31 +1,82 @@
 package com.bbn.marti.takcl.AppModules;
 
-import java.util.Collection;
-
-import org.jetbrains.annotations.NotNull;
-
-import com.bbn.marti.config.Input;
-import com.bbn.marti.remote.InputMetric;
-import com.bbn.marti.remote.groups.ConnectionModifyResult;
-import com.bbn.marti.remote.groups.NetworkInputAddResult;
-import com.bbn.marti.remote.service.InputManager;
-import com.bbn.marti.takcl.TakclIgniteHelper;
 import com.bbn.marti.takcl.AppModules.generic.ServerAppModuleInterface;
 import com.bbn.marti.takcl.cli.simple.Command;
 import com.bbn.marti.takcl.config.common.TakclRunMode;
+import com.bbn.marti.takcl.connectivity.TakserverClient;
 import com.bbn.marti.test.shared.data.connections.AbstractConnection;
 import com.bbn.marti.test.shared.data.connections.BaseConnections;
 import com.bbn.marti.test.shared.data.protocols.ProtocolProfiles;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import com.bbn.marti.test.shared.data.templates.ImmutableConnectionsTemplate_471E9257;
+import org.jetbrains.annotations.NotNull;
+import tak.server.api.client.SubmissionApiApi;
+import tak.server.api.client.models.ApiResponseSortedSetInputMetric;
+import tak.server.api.client.models.DataFeed;
+import tak.server.api.client.models.Input;
+
+import java.io.IOException;
+import java.util.ArrayList;
 
 /**
  * Used to modify the server's inputs through an online remote interface. Will not work if there is no server to connect to.
  */
 public class OnlineInputModule implements ServerAppModuleInterface {
 
-    InputManager inputManager = null;
+    public static Input createApiInput(AbstractConnection connection) {
+        if (connection.getConnectionType() != ProtocolProfiles.ConnectionType.INPUT) {
+            throw new RuntimeException(("Cannot generate an input for for connection '" + connection.getConsistentUniqueReadableIdentifier() + "' because it is not an input type!"));
+        }
+        Input input = new Input();
+        input.setName(connection.getConsistentUniqueReadableIdentifier());
+        input.setProtocol(connection.getProtocol().getValue());
+        input.setPort(connection.getPort());
+        input.setAuth(Input.AuthEnum.valueOf(connection.getAuthType().name()));
+        input.setGroup(connection.getMCastGroup());
+        input.setAnongroup(connection.getRawAnonAccessFlag());
+        Integer networkVersion = connection.getProtocol().getCoreNetworkVersion();
+        if (networkVersion != null) {
+            input.setCoreVersion(networkVersion);
+        }
+        if (connection.getGroupSet().groupSet != null) {
+            if (input.getFiltergroup() == null) {
+                input.setFiltergroup(new ArrayList<>(connection.getGroupSet().groupSet));
+            } else {
+                input.getFiltergroup().addAll(connection.getGroupSet().groupSet);
+            }
+        }
+        return input;
+    }
+
+    public static DataFeed createApiDataFeed(AbstractConnection connection) {
+        if (connection.getConnectionType() != ProtocolProfiles.ConnectionType.DATAFEED) {
+            throw new RuntimeException(("Cannot generate a datafeed for connection '" + connection.getConsistentUniqueReadableIdentifier() + "' because it is not an datafeed type!"));
+        }
+        DataFeed dataFeed = new DataFeed();
+        dataFeed.setName(connection.getConsistentUniqueReadableIdentifier());
+        dataFeed.setProtocol(connection.getProtocol().getValue());
+        dataFeed.setPort(connection.getPort());
+        dataFeed.setAuth(DataFeed.AuthEnum.valueOf(connection.getAuthType().name()));
+        dataFeed.setGroup(connection.getMCastGroup());
+        dataFeed.setAnongroup(connection.getRawAnonAccessFlag());
+        dataFeed.setType(connection.getType());
+        Integer networkVersion = connection.getProtocol().getCoreNetworkVersion();
+        if (networkVersion != null) {
+            dataFeed.setCoreVersion(networkVersion);
+        }
+        if (connection.getGroupSet().groupSet != null) {
+            if (dataFeed.getFiltergroup() == null) {
+                dataFeed.setFiltergroup(new ArrayList<>(connection.getGroupSet().groupSet));
+            } else {
+                dataFeed.getFiltergroup().addAll(connection.getGroupSet().groupSet);
+            }
+        }
+        return dataFeed;
+    }
+
+    private TakserverClient client;
+    private SubmissionApiApi submissionApi;
 
     private AbstractServerProfile server;
 
@@ -51,42 +102,12 @@ public class OnlineInputModule implements ServerAppModuleInterface {
     @Override
     public synchronized void init(@NotNull AbstractServerProfile server) {
         this.server = server;
-        if (inputManager == null) {
-            inputManager = TakclIgniteHelper.getInputManager(server);
-        }
+        this.client = TakserverClient.getInstance(server);
+        this.submissionApi = this.client.getSubmissionApi();
     }
 
     @Override
     public void halt() {
-        if (server != null) {
-            TakclIgniteHelper.closeAssociatedIgniteInstance(server);
-        }
-    }
-
-    /**
-     * Adds a network interface to the server with the specified parameters
-     *
-     * @param protocol The protocol to add
-     * @param port     The port to add
-     * @param name     The getConsistentUniqueReadableIdentifier of the input
-     * @return The result of the add attempt
-     */
-    @Command(description = "Adds a network input with the specified getConsistentUniqueReadableIdentifier, protocol, and port to the server.")
-    public NetworkInputAddResult add(@NotNull ProtocolProfiles protocol, @NotNull String port, @NotNull String name) {
-        Input input = new Input();
-        input.setName(name);
-        input.setProtocol(protocol.getValue());
-        input.setPort(Integer.parseInt(port));
-        Integer protocolVersion = protocol.getCoreNetworkVersion();
-        if (protocolVersion != null) {
-            input.setCoreVersion(protocolVersion);
-        }
-
-        return inputManager.createInput(input, true);
-    }
-
-    public NetworkInputAddResult add(Input input) {
-        return inputManager.createInput(input, true);
     }
 
     /**
@@ -113,11 +134,21 @@ public class OnlineInputModule implements ServerAppModuleInterface {
     }
 
     public void add(AbstractConnection networkInput) {
-        inputManager.createInput(networkInput.getConfigInput(), true);
+        Input input = createApiInput(networkInput);
+        try {
+            submissionApi.createInput(input).execute();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public void addDataFeed(AbstractConnection networkInput) {
-        inputManager.createDataFeed(networkInput.getConfigDataFeed(), true);
+        DataFeed dataFeed = createApiDataFeed(networkInput);
+        try {
+            submissionApi.createDataFeed(dataFeed).execute();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -127,7 +158,11 @@ public class OnlineInputModule implements ServerAppModuleInterface {
      */
     @Command
     public void remove(BaseConnections input) {
-        inputManager.deleteInput(input.name(), true);
+        try {
+            submissionApi.deoleteInput(input.name()).execute();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -147,7 +182,11 @@ public class OnlineInputModule implements ServerAppModuleInterface {
      */
     @Command(description = "Removes the input with the specified getConsistentUniqueReadableIdentifier.")
     public void remove(String name) {
-        inputManager.deleteInput(name, true);
+        try {
+            submissionApi.deoleteInput(name).execute();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -157,11 +196,19 @@ public class OnlineInputModule implements ServerAppModuleInterface {
      */
     @Command(description = "Removes the data feed with the specified getConsistentUniqueReadableIdentifier.")
     public void removeDataFeed(String name) {
-        inputManager.deleteDataFeed(name, true);
+        try {
+            submissionApi.deleteDataFeed(name).execute();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public Collection<InputMetric> getInputMetricList() {
-        return inputManager.getInputMetrics(false);
+    public ApiResponseSortedSetInputMetric getInputMetricList() {
+        try {
+            return submissionApi.getInputMetrics(false).execute().body();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -171,11 +218,11 @@ public class OnlineInputModule implements ServerAppModuleInterface {
      */
     @Command(description = "Gets a list of the currently enabled inputs.")
     public String getList() {
-        Collection<InputMetric> inputMetrics = getInputMetricList();
+        ApiResponseSortedSetInputMetric inputMetrics = getInputMetricList();
         String printString = "";
 
-        for (InputMetric inputMetric : inputMetrics) {
-            Input input = inputMetric.getInput();
+        for (tak.server.api.client.models.InputMetric inputMetric : inputMetrics.getData()) {
+            tak.server.api.client.models.Input input = inputMetric.getInput();
             String groupString = null;
 
             for (String group : input.getFiltergroup()) {
@@ -201,43 +248,54 @@ public class OnlineInputModule implements ServerAppModuleInterface {
 //        }
 //    }
 //
-    public ConnectionModifyResult addInputToGroup(@NotNull String inputIdentifier, @NotNull String groupName) {
-        Collection<InputMetric> inputMetrics = inputManager.getInputMetrics(false);
-        Input modInput = null;
+    public void tryAddInputToGroup(@NotNull String inputIdentifier, @NotNull String groupName) {
+        try {
+            ApiResponseSortedSetInputMetric inputMetrics = getInputMetricList();
+            tak.server.api.client.models.Input modInput = null;
 
-        for (InputMetric im : inputMetrics) {
-            if (im.getInput().getName().equals(inputIdentifier)) {
-                modInput = im.getInput();
+            for (tak.server.api.client.models.InputMetric im : inputMetrics.getData()) {
+                if (im.getInput().getName().equals(inputIdentifier)) {
+                    modInput = im.getInput();
+                }
             }
-        }
 
-        if (modInput == null) {
-            return ConnectionModifyResult.FAIL_NONEXISTENT;
-        }
+            // It's unclear if this is ideal, but since the prior version's response wasn't checked, this
+            // provides consistent behavior
+            if (modInput == null) {
+                return;
+            }
 
-        modInput.getFiltergroup().add(groupName);
-        return inputManager.modifyInput(inputIdentifier, modInput, true);
+            modInput.getFiltergroup().add(groupName);
+            submissionApi.modifyInput(inputIdentifier, modInput).execute();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public ConnectionModifyResult removeInputFromGroup(@NotNull String inputIdentifier, @NotNull String groupName) {
-        Collection<InputMetric> inputMetrics = inputManager.getInputMetrics(false);
-        Input modInput = null;
+    public void tryRemoveInputFromGroup(@NotNull String inputIdentifier, @NotNull String groupName) {
+        try {
+            ApiResponseSortedSetInputMetric inputMetrics = getInputMetricList();
+            tak.server.api.client.models.Input modInput = null;
 
-        for (InputMetric im : inputMetrics) {
-            if (im.getInput().getName().equals(inputIdentifier)) {
-                modInput = im.getInput();
+            for (tak.server.api.client.models.InputMetric im : inputMetrics.getData()) {
+                if (im.getInput().getName().equals(inputIdentifier)) {
+                    modInput = im.getInput();
+                }
             }
+
+            // It's unclear if this is ideal, but since the prior version's response wasn't checked, this
+            // provides consistent behavior
+            if (modInput == null) {
+                return;
+            }
+
+            if (modInput.getFiltergroup().contains(groupName)) {
+                modInput.getFiltergroup().remove(groupName);
+            }
+
+            submissionApi.modifyInput(inputIdentifier, modInput).execute();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
-
-        if (modInput == null) {
-            return ConnectionModifyResult.FAIL_NONEXISTENT;
-        }
-
-        if (modInput.getFiltergroup().contains(groupName)) {
-            modInput.getFiltergroup().remove(groupName);
-        }
-
-
-        return inputManager.modifyInput(inputIdentifier, modInput, true);
     }
 }

@@ -258,10 +258,10 @@ public class CertManagerAdminApi extends BaseRestController {
             // save the pem file to a temporary directory
             //
             File tempFile = File.createTempFile("revoke-", ".pem");
-            BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(tempFile));
-            bufferedWriter.write(cert.getCertificate());
-            bufferedWriter.flush();
-            bufferedWriter.close();
+			try (BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(tempFile))) {
+				bufferedWriter.write(cert.getCertificate());
+				bufferedWriter.flush();
+			}
 
             //
             // grab the CertificateSigning config element

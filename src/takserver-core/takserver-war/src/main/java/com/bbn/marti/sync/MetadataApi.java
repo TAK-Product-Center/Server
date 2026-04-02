@@ -50,19 +50,23 @@ public class MetadataApi extends BaseRestController {
     @RequestMapping(value = "/sync/metadata/{hash}/{metadata}", method = RequestMethod.PUT)
     public ResponseEntity setMetadata(@PathVariable("hash") @NotNull String hash,
                                   @PathVariable("metadata") @NotNull String metadataField,
-                                  @RequestBody @NotNull String metadataValue, HttpServletRequest request)
+                                  @RequestBody(required = false) String metadataValue, HttpServletRequest request)
             throws ValidationException, IntrusionException, RemoteException {
         try {
             try {
                 validator.getValidInput("MetadataApi", hash,
-                		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+                		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
                 validator.getValidInput("MetadataApi", metadataField,
-                		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+                		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
                 validator.getValidInput("MetadataApi", metadataValue,
                 		MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
             } catch (com.bbn.marti.remote.exception.ValidationException e) {
                 logger.error("ValidationException in setMetadata!", e);
                 return new ResponseEntity(HttpStatus.BAD_REQUEST);
+            }
+
+            if (metadataValue == null) {
+                metadataValue = "";
             }
 
             boolean status = false;

@@ -17,6 +17,7 @@ import com.bbn.marti.remote.groups.ConnectionModifyResult;
 import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.FederationServer;
+import com.bbn.marti.config.Injectionfilter;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.config.Qos;
 import com.bbn.marti.config.Repository;
@@ -52,6 +53,8 @@ public interface CoreConfig {
 
 	void setAndSaveQos(Qos qos);
 
+    void setAndSaveInjector(Injectionfilter injectionfilter);
+
     void setAndSaveStoreForwardChatEnabled(boolean storeForwardChatEnabled);
 	
     void setAndSaveVbmConfiguration(Vbm vbm);
@@ -62,7 +65,7 @@ public interface CoreConfig {
 
     void addStaticSubscriptionAndSave(@NotNull Subscription.Static newStaticSubscription);
 
-    void removeStaticSubscriptionAndSave(@NotNull String subscriptionIdentifier);
+    boolean removeStaticSubscriptionAndSave(@NotNull String subscriptionIdentifier);
 
     boolean isContactApiFilter();
     

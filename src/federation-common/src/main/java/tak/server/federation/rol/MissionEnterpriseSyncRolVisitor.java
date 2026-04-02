@@ -5,6 +5,10 @@ import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.remote.sync.MissionHierarchy;
 import com.bbn.marti.remote.sync.MissionUpdateDetails;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForExternalData;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForLogEntry;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMapLayer;
+import com.bbn.marti.remote.sync.MissionUpdateDetailsForMissionLayer;
 import com.bbn.marti.sync.model.Resource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
@@ -168,6 +172,89 @@ public class MissionEnterpriseSyncRolVisitor extends RolBaseVisitor<String> {
                 }
             }
 
+            if (parameters == null) {
+                try {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("trying to parse as MissionUpdateDetailsForExternalData");
+                    }
+
+                    ObjectMapper objectMapper = new ObjectMapper();
+
+                    parameters = objectMapper.readValue(paramsText, MissionUpdateDetailsForExternalData.class);
+
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("parsed mission external data : " + parameters);
+                    }
+                } catch (Exception e) {
+
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("ROL JSON is not a MissionUpdateDetailsForExternalData object ");
+                    }
+                }
+            }
+
+            if (parameters == null) {
+                try {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("trying to parse as MissionUpdateDetailsForMapLayer");
+                    }
+
+                    ObjectMapper objectMapper = new ObjectMapper();
+
+                    parameters = objectMapper.readValue(paramsText, MissionUpdateDetailsForMapLayer.class);
+
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("parsed mission map layer data : " + parameters);
+                    }
+                } catch (Exception e) {
+
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("ROL JSON is not a MissionUpdateDetailsForMapLayer object ");
+                    }
+                }
+            }
+
+            if (parameters == null) {
+                try {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("trying to parse as MissionUpdateDetailsForMissionLayer");
+                    }
+
+                    ObjectMapper objectMapper = new ObjectMapper();
+
+                    parameters = objectMapper.readValue(paramsText, MissionUpdateDetailsForMissionLayer.class);
+
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("parsed mission layer data : " + parameters);
+                    }
+                } catch (Exception e) {
+
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("ROL JSON is not a MissionUpdateDetailsForMissionLayer object ");
+                    }
+                }
+            }
+
+            if (parameters == null) {
+                try {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("trying to parse as MissionUpdateDetailsForLogEntry");
+                    }
+
+                    ObjectMapper objectMapper = new ObjectMapper();
+
+                    parameters = objectMapper.readValue(paramsText, MissionUpdateDetailsForLogEntry.class);
+
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("parsed log entry data : " + parameters);
+                    }
+                } catch (Exception e) {
+
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("ROL JSON is not a MissionUpdateDetailsForLogEntry object ");
+                    }
+                }
+            }
         }
         
         if (logger.isDebugEnabled()) {

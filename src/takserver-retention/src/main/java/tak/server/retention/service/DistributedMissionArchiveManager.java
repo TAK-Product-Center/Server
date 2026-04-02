@@ -3,20 +3,21 @@ package tak.server.retention.service;
 import java.io.File;
 import java.io.IOException;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import org.apache.ignite.services.Service;
 import org.apache.ignite.services.ServiceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.support.CronSequenceGenerator;
-import tak.server.retention.SpringContextBeanForRetention;
-import tak.server.retention.config.MissionArchivingCronConfig;
-import tak.server.retention.scheduler.SingleTaskSchedulerService;
+import org.springframework.scheduling.support.CronExpression;
 
 import com.bbn.marti.remote.MissionArchiveConfig;
 import com.bbn.marti.remote.service.MissionArchiveManager;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+
+import tak.server.retention.SpringContextBeanForRetention;
+import tak.server.retention.config.MissionArchivingCronConfig;
+import tak.server.retention.scheduler.SingleTaskSchedulerService;
 
 public class DistributedMissionArchiveManager implements MissionArchiveManager, Service {
 	
@@ -86,8 +87,8 @@ public class DistributedMissionArchiveManager implements MissionArchiveManager, 
 		MissionArchivingCronConfig newCronConfig = new MissionArchivingCronConfig();
 		
 		String cronExpression = missionArchiveConfig.getCronExpression();
-
-		if (!CronSequenceGenerator.isValidExpression(cronExpression) && !cronExpression.equals("-")) {
+		
+		if (CronExpression.isValidExpression(cronExpression) && !cronExpression.equals("-")) {
 			logger.error(" Invalid cron expression " + cronExpression + " schedule not changed");
 		} else {
 			newCronConfig.setMissionCronExpression(cronExpression);

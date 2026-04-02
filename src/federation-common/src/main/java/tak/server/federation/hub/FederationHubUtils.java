@@ -65,7 +65,7 @@ public class FederationHubUtils {
 		}
     	
         IgniteConfiguration conf = new IgniteConfiguration();
-        
+        conf.setMetricsLogFrequency(igniteConfig.getMetricsLogFrequency());
         String defaultWorkDir = "/opt/tak/federation-hub";
 		try {
 			 defaultWorkDir = U.defaultWorkDirectory();
@@ -134,13 +134,15 @@ public class FederationHubUtils {
 			throws JsonParseException, JsonMappingException, FileNotFoundException, IOException {
 		if (getClass().getResource(configFile) != null) {
 			// It's a resource.
-			return new ObjectMapper(new YAMLFactory()).readValue(getClass().getResourceAsStream(configFile),
-					FederationHubIgniteConfig.class);
+			try (InputStream is = getClass().getResourceAsStream(configFile)) {
+				return new ObjectMapper(new YAMLFactory()).readValue(is, FederationHubIgniteConfig.class);
+			}
 		}
 
 		// It's a file.
-		return new ObjectMapper(new YAMLFactory()).readValue(new FileInputStream(configFile),
-				FederationHubIgniteConfig.class);
+		try (InputStream is = new FileInputStream(configFile)) {
+			return new ObjectMapper(new YAMLFactory()).readValue(is, FederationHubIgniteConfig.class);
+		}
 	}
 	
     public static String getCN(String dn) throws RuntimeException {
@@ -162,22 +164,6 @@ public class FederationHubUtils {
             throw new RuntimeException(e);
         }
     }
-    
-	public static X509Certificate loadX509CertFromBytes(byte[] cert) throws CertificateException, IOException {
-
-		if (cert == null) {
-			throw new IllegalArgumentException("empty cert");
-		}
-
-		CertificateFactory cf = CertificateFactory.getInstance("X.509");
-
-		InputStream is = new ByteArrayInputStream(cert);
-		try {
-			return (X509Certificate) cf.generateCertificate(is);
-		} finally {
-			is.close();
-		}
-	}
 
 	public static X509Certificate loadX509CertFile(String caFilename) throws CertificateException, IOException {
 
@@ -187,36 +173,10 @@ public class FederationHubUtils {
 
 		CertificateFactory cf = CertificateFactory.getInstance("X.509");
 
-		InputStream is = new FileInputStream(caFilename);
-		try {
+		try (InputStream is = new FileInputStream(caFilename)) {
 			return (X509Certificate) cf.generateCertificate(is);
-		} finally {
-			is.close();
-		}
+		} 
 	}
-    
-    public static List<X509Certificate> verifyTrustedClientCert(TrustManagerFactory tmf, X509Certificate clientCert) {
-    	List<X509Certificate> signingCa = new ArrayList<>();
-    	for (TrustManager trustManager : tmf.getTrustManagers()) {
-			if (trustManager instanceof X509TrustManager) {
-				try {
-					X509TrustManager x509TrustManager = (X509TrustManager) trustManager;
-					
-					// first validate and check if client certificate is trusted
-					x509TrustManager.checkClientTrusted(new X509Certificate[] { clientCert }, "RSA");
-
-					// next find the CA(s) that signed the client certificate
-					for (X509Certificate trustedCa : x509TrustManager.getAcceptedIssuers()) {
-						try {
-							clientCert.verify(trustedCa.getPublicKey());
-							signingCa.add(trustedCa);
-						} catch (Exception e) {}
-					}
-				} catch (Exception e) {}
-			}
-		}
-    	return signingCa;
-    }
     
     public static List<String> getCaGroupIdsFromCerts(Certificate[] peerCertificates) {
     	List<String> caCertGroups = new LinkedList<>();

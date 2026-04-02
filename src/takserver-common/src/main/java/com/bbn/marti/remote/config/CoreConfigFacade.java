@@ -135,6 +135,11 @@ public class CoreConfigFacade implements CoreConfig {
         notifyConfigDirty();
     }
 
+    public void setAndSaveInjector(Injectionfilter injectionfilter) {
+        coreConfig.setAndSaveInjector(injectionfilter);
+        notifyConfigDirty();
+    }
+
     public void setAndSaveStoreForwardChatEnabled(boolean storeForwardChatEnabled) {
         coreConfig.setAndSaveStoreForwardChatEnabled(storeForwardChatEnabled);
         notifyConfigDirty();
@@ -160,9 +165,12 @@ public class CoreConfigFacade implements CoreConfig {
         notifyConfigDirty();
     }
 
-    public void removeStaticSubscriptionAndSave(@NotNull String subscriptionIdentifier) {
-        coreConfig.removeStaticSubscriptionAndSave(subscriptionIdentifier);
-        notifyConfigDirty();
+    public boolean removeStaticSubscriptionAndSave(@NotNull String subscriptionIdentifier) {
+        boolean removed = coreConfig.removeStaticSubscriptionAndSave(subscriptionIdentifier);
+        if (removed) {
+            notifyConfigDirty();
+        }
+        return removed;
     }
 
     public boolean isContactApiFilter() {
@@ -179,7 +187,9 @@ public class CoreConfigFacade implements CoreConfig {
 
     public NetworkInputAddResult addInputAndSave(@NotNull Input input) {
         NetworkInputAddResult nia = coreConfig.addInputAndSave(input);
-        notifyConfigDirty();
+        if (nia == NetworkInputAddResult.SUCCESS) {
+            notifyConfigDirty();
+        }
         return nia;
     }
 

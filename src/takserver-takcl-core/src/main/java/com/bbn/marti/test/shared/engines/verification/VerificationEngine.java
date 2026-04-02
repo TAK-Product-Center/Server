@@ -1,5 +1,6 @@
 package com.bbn.marti.test.shared.engines.verification;
 
+import com.bbn.marti.config.AuthType;
 import com.bbn.marti.takcl.TestExceptions;
 import com.bbn.marti.takcl.connectivity.missions.MissionModels;
 import com.bbn.marti.takcl.connectivity.server.ServerProcessConfiguration;
@@ -23,6 +24,8 @@ import com.bbn.marti.test.shared.engines.state.UserState;
 import com.bbn.marti.tests.Assert;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -37,6 +40,7 @@ import static com.bbn.marti.tests.Assert.SampleObjects;
  */
 public class VerificationEngine implements EngineInterface {
 
+    private static final Logger logger = LoggerFactory.getLogger(VerificationEngine.class);
     private static final int ReturnCodeSuccess = 200;
     private static final int ReturnCodeUnauthorized = 403;
 
@@ -125,23 +129,60 @@ public class VerificationEngine implements EngineInterface {
         data.engineIterationDataClear();
 
     }
+    
+    @Override
+	public void offlineSetFederateMaxHops(AbstractServerProfile federatedServer, AbstractServerProfile federate,
+			int maxHops) {
+    	 data.engineIterationDataClear();
+		
+	}
+    
+    @Override
+	public void offlineEnableFederatedGroupMapping(AbstractServerProfile federatedServer, AbstractServerProfile federate,
+			boolean enable) {
+    	 data.engineIterationDataClear();
+		
+	}
 
     @Override
     public void offlineAddOutboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String outboundGroupIdentifier) {
         data.engineIterationDataClear();
 
     }
+    
+    @Override
+	public void offlineAddOutboundFederateGroupHopLimit(AbstractServerProfile federatedServer,
+			AbstractServerProfile federate, String outboundGroupIdentifier, int hopLimit) {
+    	 data.engineIterationDataClear();
+		
+	}
 
     @Override
     public void offlineAddInboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String inboundGroupIdentifier) {
         data.engineIterationDataClear();
 
     }
+    
+    @Override
+	public void offlineAddInboundFederateGroupMapping(AbstractServerProfile federatedServer,
+			AbstractServerProfile federate, String remoteGroupIdentifier, String localGroupIdentifier) {
+    	 data.engineIterationDataClear();
+		
+	}
 
     @Override
     public void onlineAddUser(@NotNull AbstractUser user) {
         data.engineIterationDataClear();
 
+    }
+
+    @Override
+    public void addUserThroughUserManager(@NotNull AbstractUser user) {
+        if (user.getConnection().getAuthType() == AuthType.FILE) {
+            Integer commandReturnCode = ActionEngine.data.getCommandReturnCode();
+            Assert.assertEquals("The command return code for adding a user should be 0!", 0, commandReturnCode);
+        }
+        data.engineIterationDataClear();
     }
 
     @Override
@@ -280,7 +321,7 @@ public class VerificationEngine implements EngineInterface {
 
                 for (UserState userState : StateEngine.data.getUserStates()) {
                     // TODO Missions: Add Mission flow verification within EngineHelper. Include mission, check recipients, ad to outcomes
-                    System.out.println("\t --- setUserExpectations userState.getProfile(): " + userState.getProfile() + ", userState.getConnectivityState(): " + userState.getConnectivityState());
+                    logger.debug("\t --- setUserExpectations userState.getProfile(): " + userState.getProfile() + ", userState.getConnectivityState(): " + userState.getConnectivityState());
                     data.setUserExpectations(userState.getProfile(), outcomeMap.get(userState.getProfile()), userState.getConnectivityState());
                 }
 
@@ -292,7 +333,7 @@ public class VerificationEngine implements EngineInterface {
                     label = "Sent";
                 }
 
-                System.out.println("--- VerificationEngine attemptSendFromUserAndVerify label: " + label);
+                logger.debug("--- VerificationEngine attemptSendFromUserAndVerify label: " + label);
 
                 data.validateAllUserExpectations(label);
             }
@@ -303,7 +344,7 @@ public class VerificationEngine implements EngineInterface {
     @Override
     public void verifyReceivedMessageSentFromPlugin(@NotNull AbstractUser sendingPlugin, @NotNull AbstractUser... receivedUsers) {
 
-        System.out.println("--- VerificationEngine verifyReceivedMessageSentFromPlugin, sendingPlugin: " + sendingPlugin);
+        logger.debug("--- VerificationEngine verifyReceivedMessageSentFromPlugin, sendingPlugin: " + sendingPlugin);
         if (sendingPlugin.doValidation()) {
 
             TreeSet<AbstractUser> expectedSenders = new TreeSet<>();
@@ -311,10 +352,10 @@ public class VerificationEngine implements EngineInterface {
 
             for (AbstractUser receivedUser : receivedUsers) {
                 if (StateEngine.data.getUserState(receivedUser.getDynamicName()) != null) {
-                    System.out.println("\t --- setUserExpectations receivedUser: " + receivedUser);
+                    logger.debug("\t --- setUserExpectations receivedUser: " + receivedUser);
                     data.setUserExpectations(receivedUser, expectedSenders, StateEngine.data.getUserState(receivedUser.getDynamicName()).getConnectivityState());
                 } else {
-                    System.out.println("\t --- StateEngine.data.getUserState(receivedUser.getDynamicName() is null. Thus, setUserExpectations to ConnectedAuthenticatedIfNecessary");
+                    logger.debug("\t --- StateEngine.data.getUserState(receivedUser.getDynamicName() is null. Thus, setUserExpectations to ConnectedAuthenticatedIfNecessary");
                     data.setUserExpectations(receivedUser, expectedSenders, TestConnectivityState.ConnectedAuthenticatedIfNecessary);
                 }
             }

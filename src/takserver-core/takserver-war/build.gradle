@@ -21,17 +21,22 @@ javadoc {
 
 dependencies {
 
+  // override beanutils version in esapi
+  implementation group: 'commons-beanutils', name: 'commons-beanutils', version: beanutils_version
+
+  implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: httpcomponents_version
+
+  implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: httpcomponents_version
+  implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5-fluent', version: httpcomponents_version
+
+  implementation group: 'org.dom4j', name: 'dom4j', version: dom4j_version
+
   providedCompile group: 'javax.servlet', name: 'javax.servlet-api', version: servlet_api_version
   //providedCompile group: 'javax.mail', name: 'javax.mail-api', version: mail_api_version
   implementation group: 'jakarta.mail', name: 'jakarta.mail-api', version: jakarta_mail_api_version
   providedCompile group: 'org.apache.tomcat', name: 'tomcat-catalina', version: tomcat_version
 
   // swagger
-//  implementation ("org.springdoc:springdoc-openapi-ui:$springdoc_version") {
-  	  // Added to exclude dom4j 1.6.1, a transitive dependency
-//  	  exclude group: 'dom4j', module: 'dom4j'
-//  }
-    
   implementation group: 'org.springdoc', name: 'springdoc-openapi-starter-webmvc-ui', version: springdoc_version
   
   implementation(project(':takserver-common'))
@@ -39,7 +44,9 @@ dependencies {
   
 
   // cloudwatch metrics
-  api group: 'io.awspring.cloud', name: 'spring-cloud-starter-aws', version: spring_cloud_starter_version
+//  api group: 'io.awspring.cloud', name: 'spring-cloud-starter-aws', version: spring_cloud_starter_version // TODO replace with current
+  implementation group: 'io.awspring.cloud', name: 'spring-cloud-aws-dependencies', version: spring_cloud_aws_version
+
   implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_version
   implementation group: 'io.micrometer', name: 'micrometer-core', version: micrometer_version
 
@@ -101,8 +108,8 @@ dependencies {
   implementation group: 'org.springframework', name: 'spring-beans', version: spring_version
   implementation group: 'org.springframework', name: 'spring-context', version: spring_version
   implementation group: 'org.springframework', name: 'spring-context-support', version: spring_version
-  implementation group: 'org.springframework.data', name: 'spring-data-commons', version: spring_data_commons_version
-  implementation group: 'org.springframework.data', name: 'spring-data-jpa', version: spring_data_version
+  implementation group: 'org.springframework.data', name: 'spring-data-commons', version: spring_boot_version
+  implementation group: 'org.springframework.data', name: 'spring-data-jpa', version: spring_boot_version
   implementation group: 'org.springframework', name: 'spring-expression', version: spring_version
   implementation group: 'org.springframework', name: 'spring-beans', version: spring_version
   implementation group: 'org.springframework', name: 'spring-jdbc', version: spring_version
@@ -113,6 +120,7 @@ dependencies {
   implementation group: 'org.springframework', name: 'spring-web', version: spring_version
   implementation group: 'org.springframework', name: 'spring-webmvc', version: spring_version
   implementation group: 'org.springframework', name: 'spring-websocket', version: spring_version
+  implementation group: 'org.springframework.retry', name: 'spring-retry', version: spring_retry_version
   implementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
   implementation group: 'org.springframework.security', name: 'spring-security-config', version: spring_security_version
   implementation group: 'org.springframework.security', name: 'spring-security-messaging', version: spring_security_version

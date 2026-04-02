@@ -2,5 +2,5 @@
 
 . ./setenv.sh
 
-java -Xmx${API_MAX_HEAP}m -Dspring.profiles.active=config,consolelog -Dkeystore.pkcs12.legacy -jar takserver.war $@
+exec java -server -XX:+AlwaysPreTouch -XX:+UseG1GC -XX:+ScavengeBeforeFullGC -XX:+DisableExplicitGC -XX:MaxRAMPercentage=${MAX_HEAP_PERCENT} -Dspring.profiles.active=config,consolelog -Dkeystore.pkcs12.legacy -jar takserver.war $@
 

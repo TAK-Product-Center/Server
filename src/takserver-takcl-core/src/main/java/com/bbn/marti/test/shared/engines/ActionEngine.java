@@ -33,7 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import retrofit2.Response;
 
-import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.security.cert.CertificateException;
 import java.util.*;
@@ -55,7 +55,7 @@ public class ActionEngine implements EngineInterface {
      */
     public static class ActionClient extends UnifiedClient implements Comparable<ActionClient> {
 
-        private final Logger logger = LoggerFactory.getLogger(ActionClient.class);
+        private static final Logger logger = LoggerFactory.getLogger(ActionClient.class);
 
         private ClientResponseListener innerListener = new ClientResponseListener() {
             @Override
@@ -197,6 +197,7 @@ public class ActionEngine implements EngineInterface {
 
         private TreeMap<AbstractServerProfile, AbstractUser> serverUserCallsignKnownMap = new TreeMap<>();
         private TreeMap<AbstractServerProfile, AbstractUser> serverUserUidKnownMap = new TreeMap<>();
+        private Integer commandReturnCode;
 
         private synchronized ActionClient getClient(AbstractUser user) {
             if (!clients.containsKey(user)) {
@@ -209,10 +210,19 @@ public class ActionEngine implements EngineInterface {
             return getClient(user);
         }
 
+        public synchronized void setCommandReturnCode(int value) {
+            this.commandReturnCode = value;
+        }
+
+        public synchronized Integer getCommandReturnCode() {
+            return this.commandReturnCode;
+        }
+
         private synchronized void engineIterationDataClear() {
             for (ActionClient client : clients.values()) {
                 client.clearIterationData();
             }
+            commandReturnCode = null;
         }
 
         public synchronized TreeSet<ActionClient> getAllClients() {
@@ -241,6 +251,8 @@ public class ActionEngine implements EngineInterface {
             clients.clear();
         }
     }
+
+    private static final Logger logger = LoggerFactory.getLogger(ActionEngine.class);
 
     public static final ActionEngineData data = new ActionEngineData();
 
@@ -433,7 +445,7 @@ public class ActionEngine implements EngineInterface {
         sendingClient.sentCotMessage = sendMessage;
 
         sendingClient.sendMessage(sendMessage);
-        System.out.println("--- ActionEngine: attemptSendFromUserAndVerify sendMessage: " + sendMessage.asXML());
+        logger.debug("--- ActionEngine: attemptSendFromUserAndVerify sendMessage: " + sendMessage.asXML());
 
         String message = sendingClient + " attempted to send a message" +
             (senderIdentification == UserIdentificationData.UID_AND_CALLSIGN ? " with UID and Callsign " :
@@ -466,7 +478,7 @@ public class ActionEngine implements EngineInterface {
             message += ".";
         }
 
-        System.out.println("--- ActionEngine: attemptSendFromUserAndVerify message: " + message);
+        logger.debug("--- ActionEngine: attemptSendFromUserAndVerify message: " + message);
 
         sleep(SLEEP_TIME_SEND_MESSAGE);
     }
@@ -476,7 +488,7 @@ public class ActionEngine implements EngineInterface {
         data.engineIterationDataClear();
         for (AbstractUser receivedUser : receivedUsers) {
             ActionClient sendingClient = data.getClient(receivedUser);
-            System.out.println("--- Initiate ActionClient: " + sendingClient);
+            logger.debug("--- Initiate ActionClient: " + sendingClient);
         }
         sleep(SLEEP_TIME_SEND_MESSAGE);
     }
@@ -492,7 +504,7 @@ public class ActionEngine implements EngineInterface {
     public void onlineAddInputToGroup(@NotNull MutableConnection input, @NotNull GroupProfiles group) {
         data.engineIterationDataClear();
         System.out.println("Adding input '" + input + "' to group '" + group.name() + "'.");
-        serverManager.getServerInstance(input.getServer()).getOnlineInputModule().addInputToGroup(input.getConsistentUniqueReadableIdentifier(), group.name());
+        serverManager.getServerInstance(input.getServer()).getOnlineInputModule().tryAddInputToGroup(input.getConsistentUniqueReadableIdentifier(), group.name());
         input.addToGroup(group);
         sleep(SLEEP_TIME_GROUP_MANIPULATION);
     }
@@ -501,7 +513,7 @@ public class ActionEngine implements EngineInterface {
     public void onlineRemoveInputFromGroup(@NotNull MutableConnection input, @NotNull GroupProfiles group) {
         data.engineIterationDataClear();
         System.out.println("Removing input '" + input + "' from group '" + group.name() + "'.");
-        serverManager.getServerInstance(input.getServer()).getOnlineInputModule().removeInputFromGroup(input.getConsistentUniqueReadableIdentifier(), group.name());
+        serverManager.getServerInstance(input.getServer()).getOnlineInputModule().tryRemoveInputFromGroup(input.getConsistentUniqueReadableIdentifier(), group.name());
         input.removeFromGroup(group);
         sleep(SLEEP_TIME_GROUP_MANIPULATION);
     }
@@ -539,7 +551,7 @@ public class ActionEngine implements EngineInterface {
         sleep(SLEEP_ADDREMOVE_INPUT);
 
         for (GroupProfiles group : input.getGroupSet().getGroups()) {
-            serverManager.getServerInstance(input.getServer()).getOnlineInputModule().addInputToGroup(input.getConsistentUniqueReadableIdentifier(), group.name());
+            serverManager.getServerInstance(input.getServer()).getOnlineInputModule().tryAddInputToGroup(input.getConsistentUniqueReadableIdentifier(), group.name());
             sleep(SLEEP_TIME_GROUP_MANIPULATION);
         }
     }
@@ -556,7 +568,7 @@ public class ActionEngine implements EngineInterface {
         sleep(SLEEP_ADDREMOVE_INPUT);
 
         for (GroupProfiles group : dataFeed.getGroupSet().getGroups()) {
-            serverManager.getServerInstance(dataFeed.getServer()).getOnlineInputModule().addInputToGroup(dataFeed.getConsistentUniqueReadableIdentifier(), group.name());
+            serverManager.getServerInstance(dataFeed.getServer()).getOnlineInputModule().tryAddInputToGroup(dataFeed.getConsistentUniqueReadableIdentifier(), group.name());
             sleep(SLEEP_TIME_GROUP_MANIPULATION);
         }
     }
@@ -677,20 +689,47 @@ public class ActionEngine implements EngineInterface {
     public void offlineAddFederate(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate) {
         data.engineIterationDataClear();
         serverManager.getServerInstance(federatedServer).getOfflineConfigModule().addFederate(federate);
-    }
+    }    
+    
+	@Override
+	public void offlineEnableFederatedGroupMapping(AbstractServerProfile federatedServer,
+			AbstractServerProfile federate, boolean enable) {
+		data.engineIterationDataClear();
+		serverManager.getServerInstance(federatedServer).getOfflineConfigModule().enableFederatedGroupMapping(federate, enable);
+	}
+
+	@Override
+	public void offlineSetFederateMaxHops(AbstractServerProfile federatedServer, AbstractServerProfile federate,
+			int maxHops) {
+		 data.engineIterationDataClear();
+		 serverManager.getServerInstance(federatedServer).getOfflineConfigModule().addFederateMaxHops(federate, maxHops);
+	}
 
     @Override
     public void offlineAddOutboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String outboundGroupIdentifier) {
         data.engineIterationDataClear();
         serverManager.getServerInstance(federatedServer).getOfflineConfigModule().addFederateOutboundGroup(federate, outboundGroupIdentifier);
-
     }
+    
+	@Override
+	public void offlineAddOutboundFederateGroupHopLimit(AbstractServerProfile federatedServer,
+			AbstractServerProfile federate, String outboundGroupIdentifier, int hopLimit) {
+		 data.engineIterationDataClear();
+		 serverManager.getServerInstance(federatedServer).getOfflineConfigModule().addFederateOutboundGroupHopLimit(federate, outboundGroupIdentifier, hopLimit);
+	}
 
     @Override
     public void offlineAddInboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String inboundGroupIdentifier) {
         data.engineIterationDataClear();
         serverManager.getServerInstance(federatedServer).getOfflineConfigModule().addFederateInboundGroup(federate, inboundGroupIdentifier);
     }
+
+	@Override
+	public void offlineAddInboundFederateGroupMapping(AbstractServerProfile federatedServer,
+			AbstractServerProfile federate, String remoteGroupIdentifier, String localGroupIdentifier) {
+		 data.engineIterationDataClear();
+		 serverManager.getServerInstance(federatedServer).getOfflineConfigModule().addFederateInboundGroupMapping(federate, remoteGroupIdentifier, localGroupIdentifier);
+	}
 
     @Override
     public void onlineAddUser(@NotNull AbstractUser user) {
@@ -707,7 +746,7 @@ public class ActionEngine implements EngineInterface {
                     if (fingerprint != null) {
                         module.setUserFingerprint(user.getUserName(), fingerprint);
                     }
-                } catch (CertificateException | FileNotFoundException e) {
+                } catch (CertificateException | IOException e) {
                     throw new RuntimeException(e);
                 }
             }
@@ -716,7 +755,40 @@ public class ActionEngine implements EngineInterface {
                 module.addUsersToGroup(group.name(), user.getUserName());
             }
         }
+        System.out.println("Added user '" + user.getConsistentUniqueReadableIdentifier() + "'");
+    }
 
+    @Override
+    public void addUserThroughUserManager(@NotNull AbstractUser user) {
+        data.engineIterationDataClear();
+        if (user.getConnection().getAuthType() == AuthType.FILE && user.getUserName() != null && user.getPassword() != null) {
+
+            List<String> cmd = new LinkedList<>();
+            cmd.add("usermod");
+            cmd.add("--password");
+            cmd.add(user.getPassword());
+
+            Path certPath = user.getCertPublicPemPath();
+            if (certPath != null) {
+                try {
+                    String fingerprint = SSLHelper.getUserFingerprintIfAvailable(user);
+                    if (fingerprint != null) {
+                        cmd.add("--fingerprint");
+                        cmd.add(fingerprint);
+                    }
+                } catch (CertificateException | IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            for (GroupProfiles group : user.getDefinedGroupSet().getGroups()) {
+                cmd.add("--group");
+                cmd.add(group.name());
+            }
+            cmd.add(user.getUserName());
+            int returnCode = serverManager.getServerInstance(user.getServer()).issueUserManagerJarCommand(cmd);
+            data.setCommandReturnCode(returnCode);
+        }
         System.out.println("Added user '" + user.getConsistentUniqueReadableIdentifier() + "'");
     }
 
@@ -781,7 +853,7 @@ public class ActionEngine implements EngineInterface {
     public synchronized void offlineAddUsersAndConnectionsIfNecessary(@NotNull AbstractUser... users) {
         data.engineIterationDataClear();
         for (AbstractUser user : users) {
-            System.out.println("--- ActionEngine offlineAddUsersAndConnectionsIfNecessary user: " + user);
+            logger.debug("--- ActionEngine offlineAddUsersAndConnectionsIfNecessary user: " + user);
 
             AbstractRunnableServer server = getRunnableInstanceAndBuildIfnecessary(user.getServer());
 
@@ -798,7 +870,7 @@ public class ActionEngine implements EngineInterface {
                 if (connection.getAuthType() == AuthType.FILE && (username != null && password != null) || fingerprint != null) {
                     server.getOfflineFileAuthModule().addUpdateUser(username, password, fingerprint, user.getBaseGroupSetAccess().groupSet);
                 }
-            } catch (CertificateException | FileNotFoundException e) {
+            } catch (CertificateException | IOException e) {
                 throw new RuntimeException(e);
             }
 
@@ -832,7 +904,7 @@ public class ActionEngine implements EngineInterface {
         } else if (client.isConnected()) {
             System.err.println("User " + client.toString() + " is already connected!");
         } else {
-            System.out.println("--- ActionEngine connectClientAndSendData: client: " + client + ", xmlData:" + xmlData);
+            logger.debug("--- ActionEngine connectClientAndSendData: client: " + client + ", xmlData:" + xmlData);
             client.connect(doAuthIfNecessary, xmlData);
         }
 

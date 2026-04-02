@@ -1,0 +1,10 @@
+<div>
+    <div class="title-box"><img [attr.width]="properties.image_width" [attr.height]="properties.image_height" src="{{ properties.image }}"> Token Group </div>
+    <div [hidden]="!federation || !federation.stringId" class="box">
+        <div><b>Name: {{ federation.stringId }}</b></div>
+        <div *ngIf="federation && federation.tokens"><b># Tokens: {{ federation.tokens.length }}</b></div>
+    </div>
+    <div class="box">
+    <div class="description">{{ federation.description }}</div>
+    </div>
+</div>

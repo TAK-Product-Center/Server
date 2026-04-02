@@ -21,10 +21,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import jakarta.servlet.http.HttpServletRequest;
 import javax.xml.transform.stream.StreamResult;
 
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.owasp.esapi.Validator;
@@ -36,8 +34,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.oxm.Marshaller;
 
 import com.bbn.marti.config.Federation.Federate;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.FederationManager;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.Group;
@@ -51,12 +49,13 @@ import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.Metadata;
 import com.bbn.marti.sync.Metadata.Field;
-import com.bbn.marti.util.spring.RequestHolderBean;
+import com.bbn.marti.util.spring.RequestUtilBean;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import jakarta.servlet.http.HttpServletRequest;
 import tak.server.Constants;
 
 /*
@@ -75,7 +74,7 @@ public class CommonUtil {
 	private FederationManager federationConfigurator;
 
 	@Autowired
-	private RequestHolderBean requestBean;
+	private RequestUtilBean requestBean;
 
 	@Autowired
 	private Marshaller marshaller;
@@ -101,7 +100,7 @@ public class CommonUtil {
 	 */
 	public NavigableSet<Group> getGroupsFromRequest(HttpServletRequest request) {
 		try {
-			return getGroupsFromSessionId(request.getSession().getId());
+			return getGroupsFromSessionId(request.getSession().getId(), isAdmin(request));
 		} catch (RemoteException re) { // minimize the scope of RemoteException pollution
 			throw new TakException(re);
 		}
@@ -116,7 +115,9 @@ public class CommonUtil {
 
 		try {
 
-			return getGroupsFromSessionId(requestBean.getRequest().getSession().getId());
+			HttpServletRequest request = requestBean.getRequest();
+			
+			return getGroupsFromSessionId(request.getSession().getId(), isAdmin(request));
 
 		} catch (RemoteException re) {
 			throw new TakException(re);
@@ -128,13 +129,13 @@ public class CommonUtil {
 	 * active HttpServletRequest
 	 *
 	 */
-	public NavigableSet<Group> getGroupsFromSessionId(String sessionId) throws RemoteException {
+	public NavigableSet<Group> getGroupsFromSessionId(String sessionId, boolean isAdmin) throws RemoteException {
 
 		if (Strings.isNullOrEmpty(sessionId)) {
 			throw new IllegalArgumentException("empty HTTP session ID");
 		}
 
-		if (isAdmin()) {
+		if (isAdmin) {
 			return getAllInOutGroups();
 		}
 
@@ -250,15 +251,11 @@ public class CommonUtil {
 	 *
 	 */
 	public User getUserFromActiveRequest() throws RemoteException {
-
 		return groupManager.getUserByConnectionId(requestBean.getRequest().getSession().getId());
 	}
 
-
-
 	/*
-	 * Get the group vector corresponding to the authenticated for the currently
-	 * active HttpServletRequest
+	 * Get the group vector for the given HttpServletRequest
 	 *
 	 */
 	public String getGroupBitVector(HttpServletRequest request) throws RemoteException {
@@ -272,7 +269,7 @@ public class CommonUtil {
 	 */
 	public String getGroupBitVector(HttpServletRequest request, Direction direction) throws RemoteException {
 
-		if (isAdmin()) {
+		if (isAdmin(request)) {
 			return RemoteUtil.getInstance().getBitStringAllGroups();
 		}
 
@@ -282,10 +279,8 @@ public class CommonUtil {
 			groups.removeIf(g -> g.getDirection() != direction);
 		}
 
-		if (logger.isDebugEnabled()) {
-			logger.debug("group list: " + groups);
-		}
-
+		logger.debug("group list: {}", groups);
+		
 		String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
 
 		return groupVector;
@@ -321,32 +316,13 @@ public class CommonUtil {
 		return groupVector;
 	}
 
-	public String getGroupVectorBitString(String sessionId) {
-
-		String groupVector = null;
-
-		try {
-			// Get group vector for the user associated with this session
-			return RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(getGroupsFromSessionId(sessionId)));
-
-		} catch (Exception e) {
-			logger.debug("exception getting group membership for current web user " + e.getMessage(), e);
-		}
-
-		if (Strings.isNullOrEmpty(groupVector)) {
-			throw new IllegalStateException("empty group vector");
-		}
-
-		return groupVector;
-	}
-
 	public NavigableSet<Group> getUserGroups(HttpServletRequest request) {
 
 		if (request == null) {
 			throw new IllegalArgumentException("no active HttpServletRequest");
 		}
 
-		if (isAdmin()) {
+		if (isAdmin(request)) {
 			return getAllInOutGroups();
 		}
 
@@ -355,13 +331,13 @@ public class CommonUtil {
 		return groupManager.getGroups(user);
 	}
 
-	public NavigableSet<Group> getUserGroups(String sessionId) {
+	public NavigableSet<Group> getUserGroups(String sessionId, HttpServletRequest request) {
 
 		if (Strings.isNullOrEmpty(sessionId)) {
 			throw new IllegalArgumentException("empty sessionId");
 		}
 
-		if (isAdmin()) {
+		if (isAdmin(request)) {
 			return getAllInOutGroups();
 		}
 
@@ -647,9 +623,9 @@ public class CommonUtil {
 
 		return new ScheduledThreadPoolExecutor(size, threadFactory);
 	}
-
-	public boolean isAdmin() {
-		return requestBean.isAdmin();
+	
+	public boolean isAdmin(HttpServletRequest request) {
+		return requestBean.isAdmin(request);
 	}
 
 	public static String getFileTransferCotMessage(

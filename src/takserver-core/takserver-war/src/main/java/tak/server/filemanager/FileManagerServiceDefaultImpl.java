@@ -76,7 +76,7 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 	}
 	 
 	public List<Resource> getMissionPackageResources(int limit, int offset, String sort, Boolean ascending, String name, String groupVector){
-		String sql = "select hash, name, octet_length(data), submitter, groups, submissiontime, mimetype, expiration, uid "
+		String sql = "select hash, name, octet_length(data), submitter, groups, submissiontime, mimetype, expiration, uid, tool "
 				   + "from resource where 'missionpackage' = ANY(keywords) AND " + RemoteUtil.getInstance().getGroupClause();
 		List<Object> params = new ArrayList<>();
 		params.add(groupVector);
@@ -112,7 +112,7 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 	}
 	
 	public List<Resource> findAllFiles(int limit, int offset, String sort, Boolean ascending, String groupVector){
-		String sql = "select hash, name, octet_length(data), submitter, groups, submissiontime, mimetype, expiration, uid "
+		String sql = "select hash, name, octet_length(data), submitter, groups, submissiontime, mimetype, expiration, uid, tool "
 				   + "from resource where " + RemoteUtil.getInstance().getGroupClause();;
 		List<Object> params = new ArrayList<>();
 		params.add(groupVector);
@@ -144,7 +144,7 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 	}
 	
 	public List<Resource> findByName(int limit, int offset, String sort, Boolean ascending, String name, String groupVector){
-		String sql = "select hash, name, octet_length(data), submitter, groups, submissiontime, mimetype, expiration, uid "
+		String sql = "select hash, name, octet_length(data), submitter, groups, submissiontime, mimetype, expiration, uid, tool "
 				   + "from resource where " + RemoteUtil.getInstance().getGroupClause();;
 		List<Object> params = new ArrayList<>();
 		params.add(groupVector);
@@ -182,7 +182,7 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 
 	@Override
 	public List<Resource> getResourcesByMission(String mission, int limit, int offset, String sort, Boolean ascending, String name, String groupVector) {
-		String sql = "select r.hash, r.name, octet_length(data), r.submitter, r.groups, r.submissiontime, r.mimetype, r.expiration, r.uid "
+		String sql = "select r.hash, r.name, octet_length(data), r.submitter, r.groups, r.submissiontime, r.mimetype, r.expiration, r.uid, r.tool "
 				   + "from resource r inner join mission_resource mr on r.id = mr.resource_id "
 				   + "inner join mission mi on mr.mission_id = mi.id where mi.name = ? AND " + RemoteUtil.getInstance().getGroupClause("r");;
 		List<Object> params = new ArrayList<>();
@@ -308,6 +308,7 @@ private static final Logger logger = LoggerFactory.getLogger(FileManagerServiceD
 			value.setMimeType(results.getString(7));
 			value.setExpiration(results.getLong(8));
 			value.setUid(results.getString(9));
+			value.setTool(results.getString(10));
 		} catch (SQLException e) {
 			logger.error("Failed parsing SQL: ",e);
 		}

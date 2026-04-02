@@ -1,0 +1,6 @@
+.scroll-container {
+    max-height: 600px; /* or however tall you want the table area */
+    overflow-y: auto;
+    border: 1px solid #ddd;
+  }
+  

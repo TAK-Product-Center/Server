@@ -46,7 +46,7 @@ public class ConnectibleClient implements ConnectingInterface {
 	private final AbstractConnection connection;
 
 	private TestConnectivityState _connectivityState;
-	private final Logger log;
+	private final Logger logger;
 	private final DurationLogger dl;
 
 	@Override
@@ -84,8 +84,8 @@ public class ConnectibleClient implements ConnectingInterface {
 		this.connection = connection;
 		this.stateChangeListener = listener;
 		this._connectivityState = TestConnectivityState.Disconnected;
-		this.log = LoggerFactory.getLogger(ConnectibleClient.class);
-		this.dl = new DurationLogger(user.getConsistentUniqueReadableIdentifier(), log);
+		this.logger = LoggerFactory.getLogger(ConnectibleClient.class);
+		this.dl = new DurationLogger(user.getConsistentUniqueReadableIdentifier(), "ConnectibleClient");
 	}
 
 
@@ -123,11 +123,11 @@ public class ConnectibleClient implements ConnectingInterface {
 
 			try {
 				if (connection.getProtocol().isTLS()) {
-					socket = SSLHelper.getInstance().createSSLSocket();
-					InetSocketAddress address = new InetSocketAddress(user.getServer().getUrl(), connection.getPort());
+					socket = SSLHelper.getInstance().createSSLSocket(user.getServer());
+					InetSocketAddress address = new InetSocketAddress(user.getServer().getHost(), connection.getPort());
 					socket.connect(address);
 				} else {
-					socket = new Socket(user.getServer().getUrl(), connection.getPort());
+					socket = new Socket(user.getServer().getHost(), connection.getPort());
 				}
 
 				socketOutputStream = new DataOutputStream(socket.getOutputStream());

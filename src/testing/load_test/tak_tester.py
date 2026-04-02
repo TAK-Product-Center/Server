@@ -4,6 +4,7 @@ import argparse
 import logging
 import socket
 import time
+import random
 import sys
 from multiprocessing import Lock, Manager, Pool
 from pprint import pformat
@@ -22,9 +23,9 @@ from utils import IgnoreHostNameAdapter, p12_to_pem, print_data_dict
 from stats import Stats
 from cloud_watch import cloud_watch_process, print_info_without_sending_to_cloud_watch_process
 from multiprocessing import Process, Value, Array
+from create_proto import CotProtoMessage, get_msg_size
 
-
-global logger
+logger = logging.getLogger("tak_tester")
 
 def test_mission_api(host, port, cert, password, verbose=True):
     mission_api = "https://{host}:{port}/Marti/api/".format(host=host, port=port)
@@ -188,7 +189,10 @@ def test_streaming_proto(host, port, cert, password,
                          ping_interval=1000,
                          send_metrics=False,
                          send_metrics_interval=60,
-                         cloudwatch_namespace="pyTAK-test"):
+                         cloudwatch_namespace="pyTAK-test",
+                         track_file=None,
+                         track_start_delay=0):
+    
     if sequential_uids:
         uids = ["PyTAK-%04d" % i for i in range(clients)]
     else:
@@ -235,11 +239,15 @@ def test_streaming_proto(host, port, cert, password,
                                            cert=cert, password=password,
                                            uid=uids[i],
                                            self_sa_delta=self_sa_delta,
+                                           track_write_delta=track_write_delta,
+                                           num_tracks_per_delta=num_tracks_per_delta,
                                            mission_config=mission_api_config,
                                            data_dict=data_dict,
                                            ping=ping,
                                            ping_interval=ping_interval,
-                                           arr = arr)
+                                           arr = arr,
+                                           track_file=track_file,
+                                           track_start_delay=track_start_delay)
             procs.append(p)
             p.start()
 
@@ -375,31 +383,126 @@ def test_udp_wrapper(args_and_kwargs):
     args, kwargs = args_and_kwargs
     return test_udp(*args, **kwargs)
 
-def test_udp(host, port, interval=0.25, track_uid=None):
+def test_tcp_wrapper(args_and_kwargs):
+    
+    args, kwargs = args_and_kwargs
+    return test_tcp(*args, **kwargs)
+
+def test_udp(host, port, track_write_delta=1.0, num_tracks_per_delta=1):
 
     sock = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
 
-    sock.settimeout(1.0)
+    sock.settimeout(10.0)
 
-    if not track_uid:
-        track_uid = id_gen()
+    track_uids = [CotProtoMessage().uid for _ in range(num_tracks_per_delta)]
 
-    lat = 40
-    lon = -65
-
-    logger.debug("------------- Testing UDP ---------------------")
-    logger.debug(track_uid + " is going to be trying to send things on udp port")
+    logger.info("------------- Testing UDP ---------------------")
+    logger.info("Sending " + str(num_tracks_per_delta) + " tracks at interval " + str(track_write_delta))
     while True:
         try:
-            m = CotMessage(uid=track_uid, lat=str(lat), lon=str(lon))
-            sock.sendto(m.to_string(), (host, port))
+            for i in range(num_tracks_per_delta):
+                track_uid = track_uids[i]
+                track_location = (random.uniform(-70, 70), random.uniform(-130, 130))
+                track_message = CotMessage(uid=track_uid, lat=str(track_location[0]), lon=str(track_location[1]))
+                track_message.add_callsign_detail(group_name="Blue", platform="PyTAKStreamingCot")
+                # track_message = CotProtoMessage(uid=track_uid, lat=str(track_location[0]), lon=str(track_location[1]))
+                # track_message.add_callsign_detail(group_name="Blue", platform="PyTAKStreamingProto")
+                logger.info("sending track " + str(track_message.to_string()))
+                sock.sendto(track_message.to_string(), (host, port))
+                # sock.sendto(track_message.serialize(), (host, port))
+                logger.info("Sent track with id " + str(track_uid))
 
-
-            time.sleep(interval)
+            logger.info("Waiting for " + str(track_write_delta) + " until sending more tracks")
+            time.sleep(track_write_delta)
         except KeyboardInterrupt:
             return
 
+def test_tcp(host, port, track_write_delta=1.0, num_tracks_per_delta=1, track_file=None, track_start_delay=0):
+    logger.info("------------- Testing TCP ---------------------")
+    logger.info(f"Connecting to {host}:{port} and sending {num_tracks_per_delta} tracks every {track_write_delta}s")
 
+    track_points = []
+    if track_file:
+        logger.info(f"Loading track points from {track_file}")
+        with open(track_file, "r") as f:
+            lines = f.read().strip().splitlines()
+            
+        if not lines:
+            logger.error(f"Track file {track_file} is empty!")
+            return
+
+        header = lines[0].strip().split(",")
+        if len(header) < 2:
+            logger.error(f"Track file first line must contain callsign,uid")
+            return
+
+        callsign_str, uid_str = lines[0].strip().split(",", 1)
+        replay_callsign = callsign_str.strip()
+        replay_uid = uid_str.strip()
+        
+        parsed_points = []
+        for idx, line in enumerate(lines[1:]):  # preserve index in file (line 0 is header)
+            try:
+                delay, lat, lon = map(float, line.strip().split(",")[:3])
+                if delay >= track_start_delay:
+                    parsed_points.append((idx, delay, lat, lon))
+            except ValueError:
+                logger.warning(f"Skipping malformed line: {line}")
+                
+        # Normalize delay so that first retained track starts at 0.0
+        track_points = [(idx, delay - track_start_delay, lat, lon) for (idx, delay, lat, lon) in parsed_points]
+                                                                    
+        logger.info(f"Loaded {len(track_points)} track points from file.")
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, port))
+
+        track_uids = [CotProtoMessage().uid for _ in range(num_tracks_per_delta)]
+        replay_index = 0
+        replay_start_time = time.time()
+
+        while True:
+            if track_points:
+                now = time.time()
+                if replay_index < len(track_points):
+                    original_idx, delay, lat, lon = track_points[replay_index]                
+                    current_delay_since_start = now - replay_start_time
+                    logger.info("current delay since start: " + str(current_delay_since_start))
+                    if (now - replay_start_time) >= delay:
+                        track_message = CotMessage(uid=replay_uid, lat=str(lat), lon=str(lon))
+                        track_message.add_callsign_detail(group_name="Replay", platform="PyTAKStreamingTCP", callsign=replay_callsign)
+                        sock.sendall(track_message.to_string())
+                        logger.info(f"Sent replayed track #{original_idx} at lat={lat}, lon={lon}")                
+                        replay_index += 1
+                    else:
+                        logger.debug(f"Waiting to send replay track, time since start={now - replay_start_time:.2f}s, next delay={delay}s")
+                        time.sleep(1.0)
+                        continue
+                else:
+                    logger.info("All replay tracks sent. Stopping.")
+                    return
+
+            else:
+                for i in range(num_tracks_per_delta):
+                    # fallback to random track
+                    track_location = (random.uniform(-70, 70), random.uniform(-130, 130))
+                    track_uid = track_uids[i]
+                    track_message = CotMessage(uid=track_uid, lat=str(track_location[0]), lon=str(track_location[1]))
+                    track_message.add_callsign_detail(group_name="Blue", platform="PyTAKStreamingTCP")
+                    sock.sendall(track_message.to_string())
+                    logger.info(f"Sent random track with id {track_uid}")
+                    
+                logger.info(f"Waiting for {track_write_delta}s until sending more tracks")
+                time.sleep(track_write_delta)
+                
+    except KeyboardInterrupt:
+        logger.info("TCP test interrupted by user.")
+    except Exception as e:
+        logger.error(f"TCP connection failed: {e}")
+    finally:
+        sock.close()
+                                                                                                                                                                                                    
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -416,6 +519,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--udp", help="specify udp port", type=int)
     parser.add_argument("--test-udp", help="perform the udp test", action="store_true")
+
+    parser.add_argument("--tcp", help="specify tcp port", type=int)
+    parser.add_argument("--test-tcp", help="perform the tcp test", action="store_true")
 
 
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -436,6 +542,14 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--interval",
                         help="how many seconds between self-sa messages (default 5 seconds)",
                         type=int)
+
+    parser.add_argument("--track-interval",
+                        help="Time interval for writing track data (default 1 second)",
+                        type=float)
+    
+    parser.add_argument("--num-tracks-per-delta",
+                        help="Number of tracks per track write interval",
+                        type=int)        
 
     parser.add_argument("--offset",
                         help="how many seconds between starting each new client (default 1 second)",
@@ -472,6 +586,10 @@ if __name__ == "__main__":
 
     parser.add_argument("--cloudwatch-namespace", help="CloudWatch namespace to send metrics to")
 
+    parser.add_argument("--track-file", help="Path to track replay file")
+    
+    parser.add_argument("--track-start-delay", type=float, default=0.0, help="Initial delay in seconds before first replay point")
+
     args = parser.parse_args()
 
     if args.verbose:
@@ -485,7 +603,6 @@ if __name__ == "__main__":
     handler = logging.FileHandler(filename="loadTest.log")
     handler.setFormatter(formatter)
     handler.setLevel(level)
-    logger = logging.getLogger("tak_tester")
     logger.addHandler(handler)
 
     config_file = args.config
@@ -521,6 +638,8 @@ if __name__ == "__main__":
         pytak_conf = config.get('PyTAK')
         if pytak_conf:
             self_sa_delta = args.interval or pytak_conf.get('self_sa_delta', 5.0)
+            track_write_delta = args.track_interval or pytak_conf.get('track_write_delta', 1.0)
+            num_tracks_per_delta = args.num_tracks_per_delta or pytak_conf.get('num_tracks_per_delta', 0.0)
 
             offset = args.offset or pytak_conf.get('offset', 1.0)
             pytak_clients = args.clients or pytak_conf.get('clients', 1)
@@ -546,6 +665,7 @@ if __name__ == "__main__":
 
 
     else: # no config file
+
         cert = args.cert
         if cert is None:
             print("-c/--cert CERT required")
@@ -557,6 +677,7 @@ if __name__ == "__main__":
         https = args.https
         tls = args.tls
         udp = args.udp
+        tcp = args.tcp
 
 
         interval = args.interval
@@ -564,14 +685,18 @@ if __name__ == "__main__":
 
         offset = args.offset
 
-        pytak_clients = udp_clients = args.clients or 1
+        pytak_clients = tcp_clients = udp_clients = args.clients or 1
 
         ping = args.ping or False
         ping_interval = args.ping_interval or 1000
         send_metrics = args.send_metrics or False
+        track_write_delta = args.track_interval
+        num_tracks_per_delta = getattr(args, "num_tracks_per_delta", 0) or 0
         send_metrics_interval = args.send_metrics_interval or 60
         cloudwatch_namespace = args.cloudwatch_namespace
-        
+        track_file = args.track_file
+        track_start_delay = args.track_start_delay
+        websocket_path = 'takproto/1'
         config = {}
 
     if args.aws:
@@ -613,6 +738,7 @@ if __name__ == "__main__":
         logger.info("")
         logger.info("---------- testing streaming with protocol buffer ----------")
         logger.info("testing host: {}:{}".format(host, tls))
+
         test_streaming_proto(host, tls, cert, password,
                              clients=pytak_clients,
                              self_sa_delta=self_sa_delta,
@@ -625,7 +751,9 @@ if __name__ == "__main__":
                              ping_interval=ping_interval,
                              send_metrics=send_metrics,
                              send_metrics_interval=send_metrics_interval,
-                             cloudwatch_namespace=cloudwatch_namespace
+                             cloudwatch_namespace=cloudwatch_namespace,
+                             track_file=track_file,
+                             track_start_delay=track_start_delay
                             )
 
     if args.test_websocket_proto:
@@ -646,10 +774,22 @@ if __name__ == "__main__":
         logger.info("")
         logger.info("----------- testing the udp transport -------------------")
         logger.info("testing host: {}:{}".format(host, udp))
-        args_and_kwargs = lambda x: ((host, udp), {"track_uid": str(x), "interval": udp_interval})
+        args_and_kwargs = lambda x: ((host, udp), {"track_write_delta": track_write_delta, "num_tracks_per_delta": num_tracks_per_delta})
         worker_data = [args_and_kwargs(i) for i in range(udp_clients)]
         p = Pool(udp_clients)
         try:
             res = p.map(test_udp_wrapper, worker_data)
+        except KeyboardInterrupt:
+            exit()
+
+    if args.test_tcp:
+        logger.info("")
+        logger.info("----------- testing the tcp transport -------------------")
+        logger.info("testing host: {}:{}".format(host, tcp))
+        args_and_kwargs = lambda x: ((host, tcp), {"track_write_delta": track_write_delta, "num_tracks_per_delta": num_tracks_per_delta, "track_file": track_file, "track_start_delay": track_start_delay})
+        worker_data = [args_and_kwargs(i) for i in range(tcp_clients)]
+        p = Pool(tcp_clients)
+        try:
+            res = p.map(test_tcp_wrapper, worker_data)
         except KeyboardInterrupt:
             exit()

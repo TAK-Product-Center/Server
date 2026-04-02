@@ -1,0 +1,63 @@
+<div>
+<h2>Group-Users Management</h2>
+
+<div class="rowFF">
+    <div class="columnFF">Edit users in group <b>{{ list_users_in_group.groupname }} </b></div>
+    <div class="columnFF" style="text-align: right;">
+        <div style="text-align: right;">
+            <button class="btn btn-primary" ng-click="saveUsersForGroup()"><i class="fa fa-floppy-o" style="font-size:24px;" aria-hidden="true"></i>&nbsp;Update</button>
+            <button class="btn btn-primary" ng-click="getAssignedUsersForGroup()"><i class="fa fa-eraser" style="font-size:24px;" aria-hidden="true"></i>&nbsp;Reset</button>
+
+        </div>
+    </div>
+</div>
+<!-- list_users_in_group = {
+    "groupname": "Group Apple", 
+    "usersInGroupList": ["user_1", "user_2"], 
+    "usersInGroupListIN": [], 
+    "usersInGroupListOUT": ["user3"]
+}
+
+} -->
+
+<div>Drag the users on the <b>left</b> panel and drop to the boxes below. <br/>(To remove a user from the boxes, drag it back to the left panel)</div>
+
+<div class="dropbox_group" id="dropbox_in_group" ng-drop="true" ng-drop-success="onDropCompleteUserToGroupIN($data,$event)">
+    <div style="text-align: center;"> <b>In Group</b></div>
+    
+    <div ng-repeat="x in list_users_in_group.usersInGroupListIN | orderBy:'username' ">
+
+        <button class="btn btn-secondary user_button" type="button" id="dropdownMenuButton_user_{{ x }}" ng-drag="true" ng-drag-data="{'username':x, 'from':'usersInGroupListIN'}" ng-drag-success="onDragComplete($data,$event)">
+            {{ x }}
+        </button>
+
+    </div>
+
+</div>
+
+<div class="dropbox_group" id="dropbox_out_group" ng-drop="true" ng-drop-success="onDropCompleteUserToGroupOUT($data,$event)">
+    <div style="text-align: center;"> <b>Out Group</b></div>
+
+    <div ng-repeat="x in list_users_in_group.usersInGroupListOUT | orderBy:'username' ">
+
+        <button class="btn btn-secondary user_button" type="button" id="dropdownMenuButton_user_{{ x }}" ng-drag="true" ng-drag-data="{'username':x, 'from':'usersInGroupListOUT'}" ng-drag-success="onDragComplete($data,$event)">
+            {{ x }}
+        </button>
+
+    </div>
+
+</div>
+<div class="dropbox_group" id="dropbox_in_out_group" ng-drop="true" ng-drop-success="onDropCompleteUserToGroup($data,$event)">
+    <div style="text-align: center;"> <b>Both</b></div>
+
+    <div ng-repeat="x in list_users_in_group.usersInGroupList | orderBy:'username' ">
+
+        <button class="btn btn-secondary user_button" type="button" id="dropdownMenuButton_user_{{ x }}" ng-drag="true" ng-drag-data="{'username':x, 'from':'usersInGroupList'}" ng-drag-success="onDragComplete($data,$event)">
+            {{ x }}
+        </button>
+
+    </div>
+
+</div>
+
+</div>

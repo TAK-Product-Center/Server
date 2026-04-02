@@ -60,8 +60,6 @@
 		<!-- Add additional entries to this list to require HTTPS for all the specified path prefixes -->
         <!-- NB: be careful about specifying very short strings here that could match a lot of paths -->
 	    <util:list id="httpsOnlyPathPrefixes">
-    		<value>/Marti/cop</value>
-    		<value>/Marti/api/cop</value>
 		</util:list>
 	
       <!--  Spring Security configuration -->
@@ -104,6 +102,10 @@
 	     	  <!--  set federate groups mapping security -->
 			  <sec:intercept-url pattern="/Marti/api/federategroupsmap/**" access="ROLE_ADMIN" />
 			  <sec:intercept-url pattern="/Marti/api/federategroupsmap/**" method="DELETE" access="ROLE_ADMIN" />
+			  
+			   <!--  set federate groups hop limiting security -->
+			  <sec:intercept-url pattern="/Marti/api/federate-outbound-groups-hop-limit/**" access="ROLE_ADMIN" />
+			  <sec:intercept-url pattern="/Marti/api/federate-outbound-groups-hop-limit/**" method="DELETE" access="ROLE_ADMIN" />
 
 			  <!--  set federate ca groups security -->
 	  	      <sec:intercept-url pattern="/Marti/api/federatecagroups/**" access="ROLE_ADMIN" />
@@ -210,6 +212,8 @@
               
               <!--  Group API -->
 			  <sec:intercept-url pattern="/Marti/api/groups/update/**" access="ROLE_ADMIN" />
+				<sec:intercept-url pattern="/Marti/api/groups/activeForce" access="ROLE_ADMIN" />
+				<sec:intercept-url pattern="/Marti/api/groups/user" access="ROLE_ADMIN" />
               <sec:intercept-url pattern="/Marti/api/groups/**" access="ROLE_ANONYMOUS" />
 
 			  <sec:intercept-url pattern="/Marti/api/device/profile/tool/**" method="GET" access="ROLE_ANONYMOUS" />
@@ -357,8 +361,7 @@
 			  <sec:intercept-url pattern="/Marti/favicon.ico" access="ROLE_NON_ADMIN_UI" />
 			  <sec:intercept-url pattern="/Marti/tablesorter/**" access="ROLE_NON_ADMIN_UI" />
 			  <sec:intercept-url pattern="/Marti/static/**" access="ROLE_NON_ADMIN_UI" />
-			  <sec:intercept-url pattern="/Marti/jquery/**" access="ROLE_NON_ADMIN_UI" />
-			  
+
 			  <!-- require admin for other /Marti paths -->
 			  <sec:intercept-url pattern="/Marti/**" access="ROLE_ADMIN" />
 
@@ -464,6 +467,8 @@
 	<bean id="unforgivingAuthFailureProvider" class="com.bbn.marti.util.spring.UnforgivingAuthenticationFailureHandler" />
 
 	<bean id="CorsProcessingFilter" class="com.bbn.marti.util.spring.CorsProcessingFilter" />
+
+	<bean id="AccessLogUserFilter" class="com.bbn.marti.util.spring.AccessLogUserFilter" />
 
 	<bean id="BasicAuthenticationFilter" class="org.springframework.security.web.authentication.www.BasicAuthenticationFilter">
 		<constructor-arg ref="martiAuthenticationManager" />

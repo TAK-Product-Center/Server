@@ -13,6 +13,7 @@ import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 import javax.security.auth.x500.X500Principal;
@@ -41,7 +42,6 @@ import com.bbn.marti.config.CertificateConfig;
 import com.bbn.marti.config.CertificateSigning;
 import com.bbn.marti.config.TAKServerCAConfig;
 import com.bbn.marti.network.BaseRestController;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -98,6 +98,7 @@ public class CertManagerApi extends BaseRestController {
     
     @RequestMapping(value = "/tls/makeClientKeyStore", method = RequestMethod.GET)
     ResponseEntity<byte[]> makeKeyStore(@RequestParam(value = "cn", required = false) String cn,
+                                        @RequestParam(value = "clientUid", required = false) String clientUid,
                                         @RequestParam(value = "password", required = false,
                                                 defaultValue = DEFAULT_PASSWORD) String password) throws Exception {
         if (cn == null || cn.isEmpty()) {
@@ -137,6 +138,10 @@ public class CertManagerApi extends BaseRestController {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
 
+            TakCert takCert = new TakCert(cert, signingCertChain,
+                    getHttpUser(), cn, new Date(), clientUid, null);
+            takCertRepository.save(takCert);
+
             return new ResponseEntity<byte[]>(result, headers, HttpStatus.OK);
         } catch (Exception e) {
             logger.error("Exception making client certificate for: " + cn + " on behalf of " + getHttpUser(), e);
@@ -169,8 +174,14 @@ public class CertManagerApi extends BaseRestController {
             throw new TakException("TAKServerCAConfig element not found in CoreConfig!");
         }
 
+        long validityDays = subMgr.getSigningValidity();
+        Integer validityHours = takServerCAConfig.getValidityHours();
+        long validitySeconds = validityHours != null ?
+                validityHours * 60 * 60 :
+                validityDays * 60 * 60 * 24;
+
         CertKey clientCert = certManager.makeClientCert(
-                new X500Principal(dn).getName(), subMgr.getSigningValidity(), takServerCAConfig.getSignatureAlg());
+                new X500Principal(dn).getName(), validitySeconds, takServerCAConfig.getSignatureAlg());
         CertKey signedClient =
                 new CertKey(certManager.signCertificate(clientCert.cert, signingCert, CERTTYPE.CLIENT), clientCert.key);
         return signedClient;

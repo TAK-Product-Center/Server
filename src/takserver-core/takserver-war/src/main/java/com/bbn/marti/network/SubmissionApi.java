@@ -13,10 +13,8 @@ import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import jakarta.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,9 +33,9 @@ import com.bbn.marti.config.AuthType;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.feeds.DataFeedService;
-import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.MessagingConfigInfo;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.ConnectionModifyResult;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -50,6 +48,8 @@ import com.bbn.security.web.MartiValidator;
 import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.collect.ComparisonChain;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import tak.server.Constants;
 import tak.server.feeds.DataFeed;
 import tak.server.feeds.DataFeed.DataFeedType;
@@ -96,6 +96,9 @@ public class SubmissionApi extends BaseRestController {
 
 	@Autowired
 	DataSource ds;
+	
+	@Autowired
+	HttpServletRequest request;
 
 	@RequestMapping(value = "/datafeeds/{name}", method = RequestMethod.GET)
 	public ResponseEntity<ApiResponse<DataFeed>> getDataFeed(@PathVariable("name") String name) {
@@ -142,7 +145,7 @@ public class SubmissionApi extends BaseRestController {
 						DataFeed.class.getName(), null), HttpStatus.BAD_REQUEST);
 			} else {
 				// only check groups if not admin
-				if (!commonUtil.isAdmin()) {
+				if (!commonUtil.isAdmin(request)) {
 					dataFeeds = dataFeedRepository.getDataFeedByGroup(name, groupVector);
 					if (dataFeeds == null || dataFeeds.size() != 1) {
 						result = new ResponseEntity<ApiResponse<DataFeed>>(new ApiResponse<DataFeed>(Constants.API_VERSION,
@@ -441,7 +444,7 @@ public class SubmissionApi extends BaseRestController {
 	}
 
 	@RequestMapping(value = "/inputs/{name}", method = RequestMethod.DELETE)
-    public ResponseEntity<ApiResponse<Input>> deoleteInput(@PathVariable("name") String name) {
+    public ResponseEntity<ApiResponse<Input>> deleteInput(@PathVariable("name") String name) {
 
 		//Not clear what the payload for the ApiResponse should be here (Integer number of inputs deleted, the input itself). We don't have either of these returned by service
 		//layer for now, so just set payload to Input and set the value to null.

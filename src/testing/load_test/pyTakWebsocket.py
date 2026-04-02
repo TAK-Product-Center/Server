@@ -62,7 +62,7 @@ class PyTAKWebsocket:
         with p12_to_pem(self.certfile, self.password) as cert:
             self.ssl_context.load_cert_chain(cert)
 
-        self.location = (random.uniform(-90, 90), random.uniform(-180, 180))
+        self.location = (random.uniform(-75, 75), random.uniform(-170, 170))
         self.data_dict = data_dict if data_dict is not None else {}
         self.data_dict[self.uid] = {'write': 0, 'read': 0, 'connected': False}
 
@@ -74,9 +74,9 @@ class PyTAKWebsocket:
         async for message in websocket:
             if self.mission_config.get("react_to_change_message", False):
                 await self.read_socket.send(message)
-            # connection_data = self.data_dict[self.uid]
-            # connection_data['read'] += 1
-            # self.data_dict[self.uid] = connection_data
+            connection_data = self.data_dict[self.uid]
+            connection_data['read'] += 1
+            self.data_dict[self.uid] = connection_data
 
     async def send_self_sa(self, websocket):
         self_sa_message = CotProtoMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]))
@@ -168,8 +168,6 @@ class PyTAKWebsocket:
                         await asyncio.sleep(1)
                     
                     # get list of recent client connect / disconnect events
-                    self.data_sync_sess.get_client_endpoints()
-
                     read_task = asyncio.ensure_future(self.read_handler(ws))
                     write_task = asyncio.ensure_future(self.write_handler(ws))
                     done, pending = await asyncio.wait([read_task, write_task], return_when=asyncio.FIRST_COMPLETED)

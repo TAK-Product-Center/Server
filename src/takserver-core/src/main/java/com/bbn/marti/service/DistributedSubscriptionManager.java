@@ -6,6 +6,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -40,6 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.bbn.marti.config.*;
 import org.apache.ignite.events.DiscoveryEvent;
 import org.apache.ignite.events.EventType;
 import org.apache.ignite.lang.IgnitePredicate;
@@ -61,11 +63,6 @@ import com.bbn.cot.filter.DropEventFilter;
 import com.bbn.cot.filter.GeospatialEventFilter;
 import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
 import com.bbn.marti.classification.service.ClassificationService;
-import com.bbn.marti.config.CertificateSigning;
-import com.bbn.marti.config.Dropfilter;
-import com.bbn.marti.config.Filter;
-import com.bbn.marti.config.GeospatialFilter;
-import com.bbn.marti.config.TAKServerCAConfig;
 import com.bbn.marti.groups.CommonGroupDirectedReachability;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.groups.MessagingUtil;
@@ -79,6 +76,8 @@ import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
 import com.bbn.marti.nio.server.NioServer;
 import com.bbn.marti.nio.websockets.NioWebSocketHandler;
 import com.bbn.marti.remote.RemoteSubscription;
+import com.bbn.marti.remote.RemoteSubscriptionLite;
+import com.bbn.marti.remote.RemoteSubscriptionLiteWithUser;
 import com.bbn.marti.remote.RemoteSubscriptionMetrics;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.config.CoreConfigFacade;
@@ -145,13 +144,13 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 	}
     
-	private volatile static DistributedSubscriptionManager instance = null;
+	private volatile static SubscriptionManager instance = null;
 	
-    public static synchronized DistributedSubscriptionManager getInstance() {
+    public static synchronized SubscriptionManager getInstance() {
 		if (instance == null) {
 			synchronized (DistributedSubscriptionManager.class) {
 				if (instance == null) {
-					instance = SpringContextBeanForApi.getSpringContext().getBean(DistributedSubscriptionManager.class);
+					instance = SpringContextBeanForApi.getSpringContext().getBean(SubscriptionManager.class);
 				}
 			}
 		}
@@ -167,43 +166,32 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		return validator;
 	}
 
-    private final AtomicReference<GroupManager> groupManager = new AtomicReference<>();
+    private final AtomicReference<GroupManager> groupManager = new AtomicReference<>(null);
 	
 	private GroupManager groupManager() {
-		if (groupManager.get() == null) {
-			synchronized (this) {
-				if (groupManager.get() == null) {
-					groupManager.set(SpringContextBeanForApi.getSpringContext().getBean(GroupManager.class));
-				}
-			}
+		
+		if(groupManager.get() == null) {
+			groupManager.compareAndSet(null, SpringContextBeanForApi.getSpringContext().getBean(GroupManager.class));
 		}
 		
 		return groupManager.get();
 	}
 	
-	private final AtomicReference<CommonUtil> commonUtil = new AtomicReference<>();
+	private final AtomicReference<CommonUtil> commonUtil = new AtomicReference<>(null);
 	
 	private CommonUtil commonUtil() {
 		if (commonUtil.get() == null) {
-			synchronized (this) {
-				if (commonUtil.get() == null) {
-					commonUtil.set(SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class));
-				}
-			}
+			commonUtil.compareAndSet(null, SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class));
 		}
 		
 		return commonUtil.get();
 	}
 
-	private final AtomicReference<ClassificationService> classificationService = new AtomicReference<>();
+	private final AtomicReference<ClassificationService> classificationService = new AtomicReference<>(null);
 
 	private ClassificationService classificationService() {
-		if (classificationService.get() == null) {
-			synchronized (this) {
-				if (classificationService.get() == null) {
-					classificationService.set(SpringContextBeanForApi.getSpringContext().getBean(ClassificationService.class));
-				}
-			}
+		if(classificationService.get() == null) {
+			classificationService.compareAndSet(null, SpringContextBeanForApi.getSpringContext().getBean(ClassificationService.class));
 		}
 
 		return classificationService.get();
@@ -243,37 +231,24 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
         // load static subscriptions
         loadStaticSubscriptions();
-        schedulePeriodicSubscriptionCacheUpdates();
-		schedulePeriodicPingTimeoutCheck();
-        
+
+        schedulePeriodicReportTimeoutCheck();
+
 		clientCountRef.set(Metrics.gauge(Constants.METRIC_CLIENT_COUNT, clientCountRef.get()));
 
 		applyClassificationFilter = CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm() != null &&
 				CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled();
 	}
-	
-	private void schedulePeriodicSubscriptionCacheUpdates() {
-		Resources.metricsReportingPool.scheduleWithFixedDelay(() -> {
-			subscriptionStore()
-				.getAllSubscriptions()
-				.stream()
-				.filter(sub -> sub.hasUpdate.getAndSet(false))
-				.forEach(sub -> {
-					RemoteSubscription rs = new RemoteSubscription(sub);
-					IgniteCacheHolder.cacheRemoteSubscription(rs);
-				});
-		}, 5, 5, TimeUnit.SECONDS);
-	}
 
-	private void schedulePeriodicPingTimeoutCheck() {
-		Integer pingTimeoutSeconds = CoreConfigFacade.getInstance().
-				getRemoteConfiguration().getNetwork().getPingTimeoutSeconds();
-		if (pingTimeoutSeconds == null) {
+	private void schedulePeriodicReportTimeoutCheck() {
+		Integer reportTimeoutSeconds = CoreConfigFacade.getInstance().
+				getRemoteConfiguration().getNetwork().getReportTimeoutSeconds();
+		if (reportTimeoutSeconds == null) {
 			return;
 		}
 
-		int pingTimeoutCheckIntervalSeconds = CoreConfigFacade.getInstance().
-				getRemoteConfiguration().getNetwork().getPingTimeoutCheckIntervalSeconds();
+		int reportTimeoutCheckIntervalSeconds = CoreConfigFacade.getInstance().
+				getRemoteConfiguration().getNetwork().getReportTimeoutCheckIntervalSeconds();
 
 		Resources.ghostConnectionCleanupPool.scheduleWithFixedDelay(() -> {
 			subscriptionStore()
@@ -291,9 +266,9 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 								return;
 							}
 
-							if (sub.lastPingTime.longValue() != 0 &&
-									(new Date().getTime() - sub.lastPingTime.longValue()) >
-											(pingTimeoutSeconds * 1000)) {
+							if (sub.lastReportTime.longValue() != 0 &&
+									(new Date().getTime() - sub.lastReportTime.longValue()) >
+											(reportTimeoutSeconds * 1000)) {
 								deleteSubscription(sub.uid);
 								logger.error("cleaned up ghost connection for {} {}",
 										sub.callsign != null ? sub.callsign : "",
@@ -301,10 +276,10 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 							}
 
 						} catch (Exception e) {
-							logger.error("exception performing periodicPingTimeoutCheck", e);
+							logger.error("exception performing periodicReportTimeoutCheck", e);
 						}
 					});
-		}, pingTimeoutCheckIntervalSeconds, pingTimeoutCheckIntervalSeconds, TimeUnit.SECONDS);
+		}, reportTimeoutCheckIntervalSeconds, reportTimeoutCheckIntervalSeconds, TimeUnit.SECONDS);
 	}
 
 	private void setupIgniteListeners() {
@@ -351,6 +326,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 	}
 	
+	@Override
 	public void addFilterToSub(Subscription subscription, Filter filter) {
 		if (filter != null && subscription != null) {
 			if (filter.getGeospatialFilter() != null) {
@@ -574,7 +550,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		List<String> uidList = (List<String>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_UID_KEY);
 		List<String> feedUidList = (List<String>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_FEED_UID_KEY);
 		Set<String> missionSet = (Set<String>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_MISSION_KEY);
-				
+		Set<UUID> missionGuidSet = (Set<UUID>) c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_MISSION_KEY_GUID);
+
 		if (missionSet != null && !missionSet.isEmpty()) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("invalidate mission cache");
@@ -585,6 +562,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 				 (publishList != null && !publishList.isEmpty())) ||
 				 (uidList != null && !uidList.isEmpty()) ||
 				 (missionSet != null && !missionSet.isEmpty()) ||
+				 (missionGuidSet != null && !missionGuidSet.isEmpty()) ||
 				 feedUidList != null;
 	}
 
@@ -624,7 +602,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 		
 		try {
-			if (c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_MISSION_KEY) != null) {
+			if (c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_MISSION_KEY) != null
+			||	c.getContextValue(StreamingEndpointRewriteFilter.EXPLICIT_MISSION_KEY_GUID) != null) {
 				matches.addAll(getFederatedMissionMatches(c));
 			}
 		} catch (Exception e) {
@@ -812,6 +791,15 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
         		}
         	}
 
+        	if (cot.getContextValue(Constants.FEDERATE_ONLY_KEY) != null
+			&& ((Boolean) cot.getContextValue(Constants.FEDERATE_ONLY_KEY)).booleanValue() == true
+			&& !(destSubscription instanceof FederateSubscription)) {
+				if (logger.isTraceEnabled()) {
+					logger.trace("not brokering federate-only message");
+				}
+				continue;
+			}
+
         	// check if this subscriber is allowed to receive messages from the source groups
         	if (reachability().isReachable(srcGroupz, receiver)) {
 
@@ -939,7 +927,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 		
 	@Override
-	synchronized public void addSubscription(RemoteSubscription remote) {
+	public void addSubscription(RemoteSubscription remote) {
 		try {
 			String[] tokens = remote.to.split(":");
 			if (tokens.length < 3) {
@@ -959,7 +947,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 	
 	@Override
-	synchronized public void addSubscription(
+	public void addSubscription(
 	        final String uid,
 	        final NavigableSet<Group> groups,
 	        final User user,
@@ -1249,9 +1237,15 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		Subscription result = removeSubscriptionFromSubscriptionStore(uid);
 		
 		if (result != null) {
-			ClusterManager.removeSubscription(sub);
+			Resources.igniteSubscriptionCacheRemovalPool.execute(() -> {
+				try {
+					ClusterManager.removeSubscription(sub);
+				} catch (Exception e) {
+					logger.error("error removing subscription for uid {} from ignite subscription cache", uid);
+				}
+			});
 			midp().eventPublisher().publishEvent(new RemoveSubscriptionEvent(this));
-			
+
 			clientCount().decrementAndGet();
 		}
 
@@ -1302,7 +1296,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 
 	@Override
-	synchronized public boolean toggleIncognito(String uid) {
+	public boolean toggleIncognito(String uid) {
 		try {
 			Subscription sub = subscriptionStore().getBySubscriptionUid(uid);
 			sub.incognito = !sub.incognito;
@@ -1321,7 +1315,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	/**
 	* Searches for a subscription using the given handler, deleting the subscription if a mathcing one can be found
 	*/
-	synchronized public boolean removeSubscription(ChannelHandler handler) {
+	public boolean removeSubscription(ChannelHandler handler) {
 		
 		if (logger.isDebugEnabled()) {
 			logger.debug("remove subscription for handler " + handler);
@@ -1365,27 +1359,25 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
     }
 
 	/**
-	* converts all active subscriptions to a remote subscription list for viewing over the web
-	*/	
+	 * converts all active subscriptions to a remote subscription list for viewing over the web
+	 */	
 	@Override
-	public synchronized ArrayList<RemoteSubscription> getSubscriptionList() {
+	public ArrayList<RemoteSubscription> getSubscriptionList() {
 		ArrayList<RemoteSubscription> subscriptions = new ArrayList<RemoteSubscription>(subscriptionStore().sizeInt());
 		for(Subscription subscription : subscriptionStore().getAllSubscriptions()) {
-			synchronized(subscription) {
-				try {
-					if (!Strings.isNullOrEmpty(subscription.callsign)) {
-						getValidator().getValidInput("getSubscriptionList", subscription.callsign,
-								MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
-					}
-					RemoteSubscription remote = new RemoteSubscription(subscription);
-					remote.prepareForSerialization();
-					subscriptions.add(remote);
-				} catch (ValidationException validationException) {
-					logger.error("invalid callsign found in getSubscriptionList!");
+			try {
+				if (!Strings.isNullOrEmpty(subscription.callsign)) {
+					getValidator().getValidInput("getSubscriptionList", subscription.callsign,
+							MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 				}
+				RemoteSubscription remote = new RemoteSubscription(subscription);
+				remote.prepareForSerialization();
+				subscriptions.add(remote);
+			} catch (ValidationException validationException) {
+				logger.error("invalid callsign found in getSubscriptionList!");
 			}
 		}
-		
+
 		return subscriptions;
 	}
 	
@@ -1410,6 +1402,20 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 
 		return cachedSubscriptionList;
+	}
+	
+	@Override
+	public List<RemoteSubscriptionLiteWithUser> getSubscriptionsWithGroupAccessLiteWithUser(String groupVector, boolean noFederates, Set<Group> filterWriteOnlyGroups) {
+		List<RemoteSubscription> subs = getSubscriptionsWithGroupAccess(groupVector, noFederates, filterWriteOnlyGroups);		
+		
+		return subs.stream().map(rs -> new RemoteSubscriptionLiteWithUser(rs)).toList();
+	}
+	
+	@Override
+	public List<RemoteSubscriptionLite> getSubscriptionsWithGroupAccessLite(String groupVector, boolean noFederates, Set<Group> filterWriteOnlyGroups) {
+		List<RemoteSubscription> subs = getSubscriptionsWithGroupAccess(groupVector, noFederates, filterWriteOnlyGroups);		
+		
+		return subs.stream().map(rs -> new RemoteSubscriptionLite(rs)).toList();
 	}
 	
 	/**
@@ -1439,6 +1445,16 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 					logger.debug("Removing federate subscription from results: " + subscription);
 				}
 				iter.remove();
+				continue;
+			}
+			
+			if (subscription instanceof PluginBasedSubscription) {
+				if(logger.isDebugEnabled()) {
+					logger.debug("Adding plugin subscription: {}", subscription);
+				}
+				RemoteSubscription remote = new RemoteSubscription(subscription);
+				remote.prepareForSerialization();
+				subscriptions.add(remote);
 				continue;
 			}
 
@@ -1561,12 +1577,12 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
         }
     }
 
-	synchronized public void setClientForSubscription(Subscription sub) {
+	public void setClientForSubscription(Subscription sub) {
 		subscriptionStore().putSubscriptionToClientUid(sub.clientUid, sub);
 		subscriptionStore().putSubscriptionToCallsign(sub.callsign, sub);
     }
 
-	synchronized public void removeClientFromSubscription(String uid, String callsign, ChannelHandler handler) {
+	public void removeClientFromSubscription(String uid, String callsign, ChannelHandler handler) {
 		Subscription match = subscriptionStore().getByHandler(handler);
 		if (match != null) {
 			subscriptionStore().removeSubscriptionByClientUid(uid);
@@ -1620,17 +1636,17 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 
 
 	@Override
-	synchronized public Subscription getSubscriptionByClientUid(String cUid) {
+	public Subscription getSubscriptionByClientUid(String cUid) {
 	     return subscriptionStore().getSubscriptionByClientUid(cUid);
 	}
 	
 	@Override
-	synchronized public RemoteSubscription getRemoteSubscriptionByClientUid(String cUid) {
+	public RemoteSubscription getRemoteSubscriptionByClientUid(String cUid) {
 	     return Subscription.copyAsRemoteSubscription(subscriptionStore().getSubscriptionByClientUid(cUid));
 	}
 
 	@Override
-	synchronized public User getSubscriptionUserByClientUid(String cUid) {
+	public User getSubscriptionUserByClientUid(String cUid) {
 		Subscription sub = getSubscriptionByClientUid(cUid);
 		if (sub == null) {
 			logger.error("clientUidToSubMap failed to find : " + cUid);
@@ -1644,8 +1660,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		return subscriptionStore().getSubscriptionByUsersDisplayName(displayName);
 	}
 
-	// TODO: does this really need to be synchronized
-	synchronized public Subscription setUserForSubscription(User user, Subscription subscription) {
+	public Subscription setUserForSubscription(User user, Subscription subscription) {
 	    
 	    if (user == null) {
 	        return subscription;
@@ -1709,12 +1724,17 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		return new CotEventContainer(deleteMessage);
 	}
 
-	public CotEventContainer makeGroupChangeMessage() {
+	public CotEventContainer makeGroupChangeMessage(String clientUid) {
 		Document groupChangeMessage = (Document) groupChangeMessageSeed.clone();
 
 		// add unique uid, start/stale/time into event element
 		Element eventElem = groupChangeMessage.getRootElement();
-		eventElem.addAttribute("uid", MessageConversionUtil.generateUid());
+
+		String eventUid = MessageConversionUtil.generateUid();
+		if (clientUid != null) {
+			eventUid += "." + clientUid;
+		}
+		eventElem.addAttribute("uid", eventUid);
 
 		long millis = System.currentTimeMillis();
 		String startAndTime = DateUtil.toCotTime(millis);
@@ -1914,86 +1934,89 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
     }
 
 	@Override
-    public void announceMissionChange(UUID missionGuid, String missionName, String creatorUid, String tool, String changes) {
-		announceMissionChange(missionGuid, missionName, ChangeType.CONTENT, creatorUid, tool, changes);
+    public CotEventContainer announceMissionChange(UUID missionGuid, String missionName, String creatorUid, String tool, String changes) {
+		return announceMissionChange(missionGuid, missionName, ChangeType.CONTENT, creatorUid, tool, changes);
     }
 	
 	private AtomicInteger changeCount = new AtomicInteger();
 	private AtomicInteger changeHitCount = new AtomicInteger();
 
 	@Override
-    public void announceMissionChange(UUID missionGuid, String missionName, ChangeType changeType, String creatorUid, String tool, String changes) {
-		announceMissionChange(missionGuid, missionName, changeType, creatorUid, tool, changes, null);
+    public CotEventContainer announceMissionChange(UUID missionGuid, String missionName, ChangeType changeType, String creatorUid, String tool, String changes) {
+		return announceMissionChange(missionGuid, missionName, changeType, creatorUid, tool, changes, null);
    	}
 
    	@Override
-   	public void announceMissionChange(UUID missionGuid, String missionName, ChangeType changeType, String creatorUid, String tool, String changes, String xmlContentForNotification) {
+   	public CotEventContainer announceMissionChange(UUID missionGuid, String missionName, ChangeType changeType, String creatorUid, String tool, String changes, String xmlContentForNotification) {
 	   CotEventContainer changeMessage = createMissionChangeMessage(missionGuid, missionName, changeType, creatorUid, tool, changes, xmlContentForNotification);
 
 	   if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
-		
 		   MessagingDependencyInjectionProxy.getInstance().clusterManager().onAnnounceMissionChangeMessage(changeMessage, missionName, missionGuid);
 	   } else {
 		   submitAnnounceMissionChangeCot(missionName, missionGuid, changeMessage);
 	   }
+
+	   return changeMessage;
    	}
 
+	@Override
+	public void submitAnnounceMissionChangeCot(String uid, CotEventContainer changeMessage) {
+		Set<String> websocketHits = new ConcurrentSkipListSet<>();
+
+		if (changeLogger.isDebugEnabled()) {
+			changeHitCount.incrementAndGet();
+		}
+
+		if (changeLogger.isTraceEnabled()) {
+			changeLogger.trace("for uid " + uid + " mission change CoT message: " + changeMessage);
+		}
+
+		Subscription sub = getSubscriptionByClientUid(uid);
+
+		if (sub == null) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("subscription not found for uid " + uid);
+			}
+			return;
+		}
+
+		try {
+			if (sub.isWebsocket.get() && sub.getHandler() instanceof AbstractBroadcastingChannelHandler) {
+				websocketHits.add(((AbstractBroadcastingChannelHandler) sub.getHandler()).getConnectionId());
+			} else {
+				sub.submit(changeMessage);
+			}
+		} catch (Exception e) {
+			logger.warn("exception sending mission change message " + e.getMessage(), e);
+		}
+
+		if (changeLogger.isDebugEnabled()) {
+			changeLogger.debug("total change hits: " + changeHitCount.get());
+		}
+
+		if (!websocketHits.isEmpty()) {
+			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, changeMessage, CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId());
+		}
+	}
+
+	@Override
 	public void submitAnnounceMissionChangeCot(String missionName, UUID missionGuid, CotEventContainer changeMessage) {
 		changeLogger.debug("announce mission change for mission {} {} ", missionName, missionGuid);
 		changeCount.incrementAndGet();
         
         Set<String> explicitTopics = new HashSet<>();
-        Set<String> websocketHits = new ConcurrentSkipListSet<>();
-        
+
         // iterate through subscribers for this mission, and send them a change message 
-        for (String uid : subscriptionStore().getLocalUidsByMission(missionGuid)) {        	
-        	if (changeLogger.isDebugEnabled()) {
-        		changeHitCount.incrementAndGet();
-        	}
-
-        	if (changeLogger.isTraceEnabled()) {
-        		changeLogger.trace("for uid " + uid + " mission change CoT message: " + changeMessage);
-        	}
-
-            
+        for (String uid : subscriptionStore().getLocalUidsByMission(missionGuid)) {
             if (uid != null && uid.startsWith("topic:")) {
                 explicitTopics.add(uid.replaceFirst("topic:", ""));
-
             } else {
-
-                Subscription sub = getSubscriptionByClientUid(uid);
-
-                if (sub == null) {
-                	if (logger.isDebugEnabled()) {
-                		 logger.debug("subscription not found for uid " + uid);
-                	}
-                    continue;
-                }
-
-                try {
-                	if (sub.isWebsocket.get() && sub.getHandler() instanceof AbstractBroadcastingChannelHandler) {
-        				websocketHits.add(((AbstractBroadcastingChannelHandler) sub.getHandler()).getConnectionId());
-        			} else {
-        				sub.submit(changeMessage);
-        			}
-                } catch (Exception e) {
-                    logger.warn("exception sending mission change message " + e.getMessage(), e);
-                }
+            	submitAnnounceMissionChangeCot(uid, changeMessage);
             }
         }
-        
-        if (changeLogger.isDebugEnabled()) {
-    		changeLogger.debug("total change hits: " + changeHitCount.get());
-    	}
-        
-        if (!websocketHits.isEmpty()) {
-			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, changeMessage, CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId());
-		} 
-        
-        if (!explicitTopics.isEmpty()) {
-            
-            changeMessage.setContext(Constants.TOPICS_KEY, explicitTopics);
 
+        if (!explicitTopics.isEmpty()) {
+            changeMessage.setContext(Constants.TOPICS_KEY, explicitTopics);
         }
 
 		sendToPlugins(changeMessage);
@@ -2028,6 +2051,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 	}
 
+    @Override
 	public void submitBroadcastMissionAnnouncementCot(String creatorUid, String groupVector, CotEventContainer message) {
 		BigInteger groupVectorMission = RemoteUtil.getInstance().bitVectorStringToInt(groupVector);
 		Set<String> websocketHits = new ConcurrentSkipListSet<>();
@@ -2103,6 +2127,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 	}
 
+	@Override
 	public void submitSendMissionInviteCot(String[] uids, CotEventContainer inviteMessage) {
 		Set<String> websocketHits = new ConcurrentSkipListSet<>();
 
@@ -2150,6 +2175,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		}
 	}
 
+	@Override
 	public void submitSendMissionRoleChangeCot(String uid, CotEventContainer roleChangeMessage) {
 		Subscription sub = getSubscriptionByClientUid(uid);
 
@@ -2305,6 +2331,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 
 	@Override
 	public X509Certificate[] getSigningCertChain() {
+		InputStream keyStoreStream = null;
 		try {
 			TAKServerCAConfig takServerCAConfig = getTAKServerCAConfig();
 			if (takServerCAConfig == null) {
@@ -2313,8 +2340,9 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			}
 
 			KeyStore ks = KeyStore.getInstance(takServerCAConfig.getKeystore());
-			ks.load(new FileInputStream(new File(takServerCAConfig.getKeystoreFile())),
-					takServerCAConfig.getKeystorePass().toCharArray());
+			keyStoreStream = new FileInputStream(new File(takServerCAConfig.getKeystoreFile()));
+			
+			ks.load(keyStoreStream, takServerCAConfig.getKeystorePass().toCharArray());
 			
 			if (logger.isTraceEnabled()) {
 				logger.trace("Aliases in signing keystore: " + ks.aliases());
@@ -2337,11 +2365,20 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		} catch (Exception e) {
 			logger.error("exception in getSigningCertChain!", e);
 			return null;
-		}
+		} finally {
+        	if (keyStoreStream != null) {
+        		try {
+					keyStoreStream.close();
+				} catch (IOException e) {
+					logger.error("Error closing keystore file stream", e);
+				}
+        	}
+        }
 	}
 
 	@Override
 	public PrivateKey getSigningKey() {
+		InputStream keyStoreStream = null;
 		try {
 			TAKServerCAConfig takServerCAConfig = getTAKServerCAConfig();
 			if (takServerCAConfig == null) {
@@ -2350,8 +2387,8 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			}
 
 			KeyStore ks = KeyStore.getInstance(takServerCAConfig.getKeystore());
-			ks.load(new FileInputStream(new File(takServerCAConfig.getKeystoreFile())),
-					takServerCAConfig.getKeystorePass().toCharArray());
+			keyStoreStream = new FileInputStream(new File(takServerCAConfig.getKeystoreFile()));
+			ks.load(keyStoreStream, takServerCAConfig.getKeystorePass().toCharArray());
 			
 			if (logger.isTraceEnabled()) {
 				logger.trace("First alias in signing keystore: " + ks.aliases().nextElement());
@@ -2362,7 +2399,15 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 		} catch (Exception e) {
 			logger.error("exception in getSigningKey!", e);
 			return null;
-		}
+		} finally {
+        	if (keyStoreStream != null) {
+        		try {
+					keyStoreStream.close();
+				} catch (IOException e) {
+					logger.error("Error closing keystore file stream", e);
+				}
+        	}
+        }
 	}
 
 	@Override
@@ -2414,7 +2459,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 
 	@Override
-	synchronized public void setSubscriptionsMetricsForClientUid(
+	public void setSubscriptionsMetricsForClientUid(
 			String clientUid, RemoteSubscriptionMetrics subscriptionMetrics) {
 		subscriptionStore().putSubMetricsToClientUid(clientUid, subscriptionMetrics);
 	}
@@ -2543,6 +2588,29 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 
 	@Override
+	public void sendReachableDisconnectMessage(String username) {
+		try {
+			List<User> users = getUsersByUsername(username);
+			if (users == null || users.size() == 0) {
+				logger.error("sendReachableDisconnectMessage : User lookup failed for " + username);
+				return;
+			}
+
+			for (User user : users) {
+				try {
+					Subscription sub = getSubscription(user);
+					messagingUtil().sendDisconnect(sub.getLatestSA(), sub);
+				} catch (Exception e) {
+					logger.error("exception in sendReachableDisconnectMessage for user : " + username, e);
+				}
+			}
+
+		} catch (Exception e) {
+			logger.error("exception in sendReachableDisconnectMessage!", e);
+		}
+	}
+
+	@Override
 	public void sendLatestReachableSA(String username) {
 		try {
 			List<User> users = getUsersByUsername(username);
@@ -2565,6 +2633,29 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 	}
 
 	@Override
+	public void sendUpdatedGroupsLatestReachableSA(String username) {
+		try {
+			List<User> users = getUsersByUsername(username);
+			if (users == null || users.size() == 0) {
+				logger.error("sendUpdatedGroupsLatestReachableSA : User lookup failed for " + username);
+				return;
+			}
+
+			for (User user : users) {
+				try {
+					messagingUtil().sendLatestReachableSA(user);
+					messagingUtil().sendUpdatedGroupsLatestSA(user);
+				} catch (Exception e) {
+					logger.error("exception in sendUpdatedGroupsLatestReachableSA for user : " + username, e);
+				}
+			}
+
+		} catch (Exception e) {
+			logger.error("exception in sendUpdatedGroupsLatestReachableSA!", e);
+		}
+	}
+
+	@Override
 	public void sendGroupsUpdatedMessage(String username, String clientUid) {
 		try {
 			Set<String> websocketHits = new ConcurrentSkipListSet<>();
@@ -2575,7 +2666,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 				return;
 			}
 
-			CotEventContainer groupChangeMessage = makeGroupChangeMessage();
+			CotEventContainer groupChangeMessage = makeGroupChangeMessage(clientUid);
 
 			for (User user : users) {
 				try {
@@ -2604,8 +2695,10 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 				}
 			}
 
-			WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, groupChangeMessage,
-					CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId());
+			if (!websocketHits.isEmpty()) {
+				WebsocketMessagingBroker.brokerWebSocketMessage(websocketHits, groupChangeMessage,
+						CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId());
+			}
 
 		} catch (Exception e) {
 			logger.error("exception in sendGroupsUpdatedMessage!", e);

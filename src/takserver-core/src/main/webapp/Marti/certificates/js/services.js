@@ -18,3 +18,10 @@ services.factory('FederateCAHopsService', function($resource){
             }
       );
     });
+
+services.factory('FederateCATokenAuthService', function($resource){
+      return $resource('/Marti/api/federatecatokenauth', {}, {
+                 'query' : {method: 'GET', isArray: false}
+            }
+      );
+    });

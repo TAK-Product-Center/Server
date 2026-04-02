@@ -1,15 +1,10 @@
 package tak.server.federation.hub.ui.graph;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.util.List;
-
 public class GroupProperties extends NodeProperties {
     private boolean interconnected;
-    @JsonProperty("groupFilters")
-    private List<FilterNode> filters;
-
+    private boolean allowTokenAuth;
+    private long tokenAuthDuration;
+    
     public boolean isInterconnected() {
         return interconnected;
     }
@@ -18,27 +13,20 @@ public class GroupProperties extends NodeProperties {
         this.interconnected = interconnected;
     }
 
-    public List<FilterNode> getFilters() {
-        return filters;
-    }
+	public boolean isAllowTokenAuth() {
+		return allowTokenAuth;
+	}
 
-    public void setFilters(List<FilterNode> filters) {
-        this.filters = filters;
-    }
+	public void setAllowTokenAuth(boolean allowTokenAuth) {
+		this.allowTokenAuth = allowTokenAuth;
+	}
 
-    /**
-     * Returns the filter expression generated from the filter node tree of this edge.  If there are multiple top level
-     * nodes, they will be OR'ed.
-     */
-    @JsonIgnore
-    public String getFilterExpression() {
-        if (filters.size() < 1) {
-            return "";
-        } else if (filters.size() > 1) {
-            return FilterUtils.filterNodeToString(filters.get(0));
-        }
+	public long getTokenAuthDuration() {
+		return tokenAuthDuration;
+	}
 
-        return FilterUtils.oredFiltersToString(filters);
-    }
-
+	public void setTokenAuthDuration(long tokenAuthDuration) {
+		this.tokenAuthDuration = tokenAuthDuration;
+	}
+    
 }

@@ -2,6 +2,13 @@
 
 var clientDashboardControllers = angular.module('clientDashboardControllers', []);
 
+const BLANK_USER = {
+  clientUid: "",
+  callsign: "",
+  username: "",
+  groups: [{}],
+};
+
 // User List Controller
 clientDashboardControllers.controller('ClientDashboardController', ['$rootScope', '$scope', '$window','$http', '$timeout', '$uibModal', function ($rootScope, $scope, $window, $http, $timeout, $uibModal) {
 
@@ -12,6 +19,8 @@ clientDashboardControllers.controller('ClientDashboardController', ['$rootScope'
   $scope.clientsPerPage = 50;
   $scope.maxConnections = 0;
   $scope.actualNum = 0;
+  $scope.selectedUser = BLANK_USER;
+  $scope.subGroups = BLANK_USER.groups;
 
   $scope.visualizeConnection = function(uid){
     $window.location.href = '/Marti/metrics/index.html#!/connection/' + uid;
@@ -198,6 +207,125 @@ clientDashboardControllers.controller('ClientDashboardController', ['$rootScope'
         modalInstance.result.then(function() {}, function () {});
       }
 
+
+    /**
+     * Gets all groups for the user based on the given subscription.
+     * @async
+     * @param {object} sub - The user subscription, used to access connection/client uid and groups.
+     * @returns {Promise<array>} A promise that resolves with an array of all the user's assigned groups,
+     *  not just active groups provided by the user's subscription.
+     */
+    async function getAllGroups(sub) {
+      return $http
+        .get(
+          "/Marti/api/groups/user?username=" + sub.username,
+          { headers: { "Content-Type": "application/json" } }
+        )
+        .then(function (response) {
+          return response.data.data;
+        })
+        .catch(function (response) {
+          console.error(
+            "Failed to get user groups. Returning subscription's groups. Response:",
+            response
+          );
+          $rootScope.alerts.push({
+            msg:
+              "Failed to get all groups assigned to user " +
+              $scope.selectedUser.username,
+            type: "danger",
+          });
+          return sub.groups;
+        });
+      }
+
+    $scope.displayedGroups = []; 
+
+    /**
+     * Updates the groups controller for the given user.
+     * @async
+     * @param {object} sub - The user object to set as this scope's selected user.
+     * @returns {Promise<void>} A promise that resolves when the groups controller has been updated.
+     */
+    async function updateGroupsController(sub) {
+
+      $scope.selectedUser = BLANK_USER;
+      let groups = await getAllGroups(sub);
+      console.log(`User ${sub.username} groups:`, groups);
+      
+      // overwrite with given sub
+      $scope.selectedUser = sub;
+      $scope.selectedUser.groups = groups; // assign groups directly
+
+      // console.log($scope.selectedUser, sub, groups);
+      
+      $scope.displayedGroups = groupByDirection($scope.selectedUser.groups);
+
+    }
+
+    function groupByDirection(groups) {
+      const grouped = {};
+      groups.forEach(group => {
+        if (!grouped[group.name]) {
+          grouped[group.name] = {};
+        }
+        grouped[group.name][group.direction] = group; 
+      });
+      return Object.values(grouped); 
+    };
+    
+    $scope.setBoth = function(groupData, isActive = true) {
+      if (groupData.OUT) {
+        groupData.OUT.active = isActive;
+      }
+      if (groupData.IN) {
+        groupData.IN.active = isActive;
+      }
+    };
+
+    // method for UI dropdown "Control Groups" option onClick()
+    $scope.openGroupsControl = async function (sub) {
+      // update selected user for groups controller using this sub
+      await updateGroupsController(sub);
+
+      // configure and open Control Groups modal
+      var modalInstance = $uibModal.open({
+        animation: false,
+        templateUrl: 'controlGroupsModal.html',
+        controller: 'groupsModalInstanceCtrl',
+        controllerAs: '$groups_ctrl',
+        scope: $scope
+      });
+      modalInstance.result.then(function () { }, function () { });
+    }
+
+    // added to scope functions so that groupsModalInstanceCtrl has access
+    $scope.updateActiveGroups = function (groups) {
+      console.log(groups);
+      $http
+        .put(
+          "/Marti/api/groups/activeForce?username=" +
+            $scope.selectedUser.username,
+          JSON.stringify(groups),
+          { headers: { "Content-Type": "application/json" } }
+        )
+        .then(function (response) {
+          $rootScope.alerts.push({
+            msg:
+              "Updated active groups for username " +
+              $scope.selectedUser.username,
+            type: "success",
+          });
+        })
+        .catch(function (response) {
+          console.log(response);
+          $rootScope.alerts.push({
+            msg: "Subscription failed to update active groups",
+            type: "danger",
+          });
+        });
+    };
+
     $scope.toggleMenu = function (sub) {
         var dropdown = document.getElementById(sub.subscriptionUid);
 
@@ -238,6 +366,15 @@ clientDashboardControllers.controller('ModalInstanceCtrl', function ($uibModalIn
   $ctrl.ok = function () {
     $uibModalInstance.close();
   };
+});
+
+clientDashboardControllers.controller('groupsModalInstanceCtrl', function ($uibModalInstance, $scope) {
+  var $ctrl = this;
+
+  $ctrl.save = function () {
+    $scope.updateActiveGroups($scope.selectedUser.groups);
+    $uibModalInstance.close();
+  }
 });
 
 clientDashboardControllers.controller('AddStaticSubscriptionCtrl', ['$rootScope', '$scope', '$http', '$uibModal', function ($rootScope, $scope, $http, $uibModal){

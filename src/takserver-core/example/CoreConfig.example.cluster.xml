@@ -51,7 +51,7 @@
 
 	<buffer>
 		<latestSA enable="true" />
-		<queue enableCachePersistence="false" missionUidLimit="2048" missionContentLimit="2048" />
+		<queue missionUidLimit="2048" missionContentLimit="2048" />
 	</buffer>
 
 	<security>
@@ -72,6 +72,6 @@
 	  </federation-server>
 	</federation>
 
-	<cluster enabled="true" kubernetes="true" natsClusterID="takserver" natsURL="nats://nats-cluster:4222"/>
+	<cluster enabled="true" kubernetes="true" natsClusterID="takserver" natsURL="nats://takserver-nats:4222"/>
  
 </Configuration>
