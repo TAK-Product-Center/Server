@@ -192,6 +192,23 @@ public class SubscriptionApi extends BaseRestController {
         return new ResponseEntity<ApiResponse<Set<SubscriptionInfo>>>(new ApiResponse<Set<SubscriptionInfo>>(Constants.API_VERSION, SubscriptionInfo.class.getSimpleName(), subs), new HttpHeaders(), HttpStatus.OK);
     }
 
+	@RequestMapping(value = "/subscription/{uid}", method = RequestMethod.GET)
+	public ResponseEntity<ApiResponse<SubscriptionInfo>> getSubscription(
+			@PathVariable(value = "uid") String uid)  throws RemoteException {
+
+		Set<SubscriptionInfo> subscriptions = getAllSubscriptions(
+				SubscriptionSortField.CALLSIGN, SubscriptionSortOrder.ASCENDING, -1, -1)
+				.getBody().getData();
+
+		SubscriptionInfo result = subscriptions.stream().filter(
+				s -> s.clientUid.equals(uid))
+				.findFirst().orElse(null);
+
+		return new ResponseEntity<ApiResponse<SubscriptionInfo>>(new ApiResponse<SubscriptionInfo>(
+				Constants.API_VERSION, SubscriptionInfo.class.getSimpleName(), result), new HttpHeaders(),
+				result != null ? HttpStatus.OK : HttpStatus.NOT_FOUND);
+	}
+
     @RequestMapping(value = "/subscriptions/add", method = RequestMethod.POST)
     public ResponseEntity<ApiResponse<SubscriptionInfo>> addSubscription(@RequestBody tmpStaticSub tmpSub){
         try {

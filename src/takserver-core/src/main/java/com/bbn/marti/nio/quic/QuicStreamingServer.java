@@ -29,6 +29,7 @@ import io.netty.incubator.codec.quic.QuicServerCodecBuilder;
 import io.netty.incubator.codec.quic.QuicSslContext;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
 import io.netty.incubator.codec.quic.QuicTokenHandler;
+import tak.server.ignite.IgniteHolder;
 
 public class QuicStreamingServer {
 	private static final Logger log = LoggerFactory.getLogger(QuicStreamingServer.class);
@@ -104,6 +105,12 @@ public class QuicStreamingServer {
 						.streamHandler(new ChannelInitializer<QuicStreamChannel>() {
 							@Override
 		                    protected void initChannel(QuicStreamChannel ch)  {
+								if (!IgniteHolder.getInstance().isConnected()) {
+									log.info("Rejecting QUIC Server Connection Until Ignite Connects");
+									channel.close();
+									return;
+								}
+								
 								NioNettyQuicServerHandler quicHandler = new NioNettyQuicServerHandler(input, clientAddressMap);
 								
 								clientHandlerMap.put(ch.parent().id().asLongText(), quicHandler);

@@ -23,6 +23,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.xml.transform.stream.StreamResult;
 
+import org.dom4j.Attribute;
+import org.dom4j.Element;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.owasp.esapi.Validator;
@@ -57,6 +59,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import jakarta.servlet.http.HttpServletRequest;
 import tak.server.Constants;
+import tak.server.cot.CotEventContainer;
 
 /*
  * Shared utility functions
@@ -728,6 +731,37 @@ public class CommonUtil {
 					}
 				}
 			}
+		}
+	}
+
+	private static void fixupMissionChatAttr(Attribute attribute, String missionName, String takServerHost) {
+		if (attribute == null || missionName == null || takServerHost == null) {
+			logger.error("fixupMissionChatAttr unable to fixup federated mission chat");
+			return;
+		}
+
+		String newValue = takServerHost + "-8443-ssl-" + missionName;
+		attribute.setValue(newValue);
+	}
+
+	public static void fixupMissionChat(CotEventContainer cot, String missionName, String takServerHost) {
+		try {
+			if (Strings.isNullOrEmpty(missionName) || Strings.isNullOrEmpty(takServerHost)) {
+				return;
+			}
+
+			// fixup mission chat messages received over federation to reference local takServerHost
+			Element chatElement = (Element) cot.getDocument().selectSingleNode("/event/detail/__chat");
+			if (chatElement != null) {
+				fixupMissionChatAttr(chatElement.attribute("id"), missionName, takServerHost);
+				Element chatGrp = chatElement.element("chatgrp");
+				if (chatGrp != null) {
+					fixupMissionChatAttr(chatGrp.attribute("uid1"), missionName, takServerHost);
+					fixupMissionChatAttr(chatGrp.attribute("id"), missionName, takServerHost);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("exception fixing up federated mission chat", e);
 		}
 	}
 }

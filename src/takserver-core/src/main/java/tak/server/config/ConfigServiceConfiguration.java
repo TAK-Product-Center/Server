@@ -21,6 +21,7 @@ import com.google.common.base.Strings;
 
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.util.ActiveProfiles;
 
 
@@ -56,8 +57,11 @@ public class ConfigServiceConfiguration {
 		if (logger.isDebugEnabled()) {
 			logger.debug("Adding distributed configuration to ignite");
 		}
-		ignite.services(ClusterGroupDefinition.getConfigClusterDeploymentGroup(ignite)).deployNodeSingleton(
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getConfigClusterDeploymentGroup(ignite)).deployNodeSingleton(
 				Constants.DISTRIBUTED_CONFIGURATION, distributedConfiguration);
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
 
 		return distributedConfiguration;
 	}

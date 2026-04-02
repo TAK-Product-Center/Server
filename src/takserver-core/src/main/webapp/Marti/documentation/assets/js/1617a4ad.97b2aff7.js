@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkdocusaurus_static=self.webpackChunkdocusaurus_static||[]).push([[3817],{2651:s=>{s.exports=JSON.parse('{"name":"docusaurus-plugin-content-docs","id":"takserver-docs"}')}}]);

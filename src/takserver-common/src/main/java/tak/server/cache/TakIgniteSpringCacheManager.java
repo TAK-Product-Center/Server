@@ -29,6 +29,7 @@ import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 
 import tak.server.Constants;
+import tak.server.ignite.IgniteReconnectEventHandler;
 
 public class TakIgniteSpringCacheManager extends SpringCacheManager {
 
@@ -69,6 +70,12 @@ public class TakIgniteSpringCacheManager extends SpringCacheManager {
 		}
 
 		visibleIgnite = ignite;
+		
+		if (CoreConfigFacade.getInstance().getCachedConfiguration().getCluster().isEnabled()) {
+			IgniteReconnectEventHandler.registerPreAction(() -> {
+				caches.clear();
+			});	
+		}
 	}
 
 	@Override public void onApplicationEvent(ContextRefreshedEvent event) { 
@@ -78,7 +85,6 @@ public class TakIgniteSpringCacheManager extends SpringCacheManager {
 
 	/** {@inheritDoc} */
 	@Override public Cache getCache(String name) {
-
 		SpringCache cache = caches.get(name);
 
 		if (cache == null) {
@@ -223,12 +229,11 @@ class SpringCache implements Cache {
 	@SuppressWarnings("unchecked")
 	@Override public <T> T get(final Object key, final Callable<T> valLdr) {
 		Object val = cache.get(key);
-
-		if (val == null) {
-			IgniteLock lock = mgr.getSyncLock(cache.getName(), key);
-			lock.lock();
-
-			try {
+		
+		// do not lock in the cluster as it causes issues when ignite pods are brought up and down
+		// it may not be needed anymore in standalone deployment either and should be evaluated at some point
+		if (CoreConfigFacade.getInstance().getCachedConfiguration().getCluster().isEnabled()) {
+			if (val == null) {
 				val = cache.get(key);
 
 				if (val == null) {
@@ -244,8 +249,30 @@ class SpringCache implements Cache {
 					}
 				}
 			}
-			finally {
-				lock.unlock();
+		} else {
+			if (val == null) {
+				IgniteLock lock = mgr.getSyncLock(cache.getName(), key);
+				lock.lock();
+
+				try {
+					val = cache.get(key);
+
+					if (val == null) {
+						try {
+							T retVal = valLdr.call();
+
+							val = wrapNull(retVal);
+
+							cache.putAsync(key, val);
+						}
+						catch (Exception e) {
+							throw new ValueRetrievalException(key, valLdr, e);
+						}
+					}
+				}
+				finally {
+					lock.unlock();
+				}
 			}
 		}
 

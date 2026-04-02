@@ -65,6 +65,6 @@ public class ActuatorMetricsService {
 
 	private void logProcessIdentity() {
 		String pid = java.lang.management.ManagementFactory.getRuntimeMXBean().getName(); // e.g. "12345@hostname"
-		logger.info("Collecting CPU usage from process: {}", pid);
+		logger.debug("Collecting CPU usage from process: {}", pid);
 	}
 }

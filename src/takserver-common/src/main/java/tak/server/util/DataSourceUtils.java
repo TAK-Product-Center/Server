@@ -28,14 +28,18 @@ public class DataSourceUtils {
 	    	
 	        Properties props = new Properties();
 	        props.setProperty("user", coreDbConnection.getUsername());
-	        if (!coreDbConnection.isSslEnabled()) {
-	        	props.setProperty("password", coreDbConnection.getPassword());	        	
-	        }else {
-	        	props.setProperty("sslmode", coreDbConnection.getSslMode());
-	        	props.setProperty("sslcert", coreDbConnection.getSslCert());
-	        	props.setProperty("sslkey", coreDbConnection.getSslKey());
-	        	props.setProperty("sslrootcert", coreDbConnection.getSslRootCert());
-	        }
+          if (!coreDbConnection.isSslEnabled()) {
+            props.setProperty("password", coreDbConnection.getPassword());
+          }else {
+            props.setProperty("sslmode", coreDbConnection.getSslMode());
+            props.setProperty("sslrootcert", coreDbConnection.getSslRootCert());
+            if (!coreDbConnection.getPassword().isEmpty()){
+              props.setProperty("password", coreDbConnection.getPassword());
+            } else {
+              props.setProperty("sslcert", coreDbConnection.getSslCert());
+              props.setProperty("sslkey", coreDbConnection.getSslKey());
+            }
+          }
 	        
 	        try(java.sql.Connection conn = DriverManager.getConnection(coreDbConnection.getUrl(), props); ResultSet res = conn.createStatement().executeQuery("show max_connections")) {
 	            
@@ -77,9 +81,13 @@ public class DataSourceUtils {
     	    logger.info("SSL connection to database is enabled, client user: {}", coreDbConnection.getUsername());
         	hikariConfig.addDataSourceProperty("user", coreDbConnection.getUsername());
         	hikariConfig.addDataSourceProperty("sslmode", coreDbConnection.getSslMode());
-        	hikariConfig.addDataSourceProperty("sslcert", coreDbConnection.getSslCert());
-        	hikariConfig.addDataSourceProperty("sslkey", coreDbConnection.getSslKey());
         	hikariConfig.addDataSourceProperty("sslrootcert", coreDbConnection.getSslRootCert());
+            if (!coreDbConnection.getPassword().isEmpty()){
+                hikariConfig.addDataSourceProperty("password", coreDbConnection.getPassword());
+            } else {
+                hikariConfig.addDataSourceProperty("sslcert", coreDbConnection.getSslCert());
+                hikariConfig.addDataSourceProperty("sslkey", coreDbConnection.getSslKey());
+            }
         }
 
         if (!repository.isEnable()) {

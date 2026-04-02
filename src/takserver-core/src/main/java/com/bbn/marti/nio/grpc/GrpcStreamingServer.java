@@ -35,6 +35,7 @@ import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import io.grpc.ServerInterceptors;
+import io.grpc.Status;
 import io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.netty.channel.ChannelOption;
@@ -42,6 +43,7 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.SslContext;
 import tak.server.Constants;
+import tak.server.ignite.IgniteHolder;
 
 /*
  */
@@ -150,6 +152,15 @@ public class GrpcStreamingServer {
 			@Override
 			public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(ServerCall<ReqT, RespT> call,
 					final Metadata requestHeaders, ServerCallHandler<ReqT, RespT> next) {
+				
+				if (!IgniteHolder.getInstance().isConnected()) {
+					logger.info("Rejecting GRPC Connection Until Ignite Connects");
+					Status status = Status.UNAVAILABLE.withDescription("Rejecting GRPC Connection Until Ignite Connects");
+		        	call.close(status, new Metadata());
+		        	return new ServerCall.Listener<ReqT>() {
+						// noop
+					};
+				}
 
 				SSLSession sslSession = call.getAttributes().get(Grpc.TRANSPORT_ATTR_SSL_SESSION);
 				if (sslSession == null) {

@@ -324,4 +324,6 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
             nativeQuery = true)
     int countAllMissions(@Param("passwordProtected") boolean passwordProtected, @Param("defaultRole") boolean defaultRole);
 
+    @Query(value = "select name from mission, mission_uid where mission.id = mission_uid.mission_id and mission_uid.uid = :cot_uid limit 1", nativeQuery = true)
+    String getFirstMissionNameContainingUid(@Param("cot_uid") String uid);
 }

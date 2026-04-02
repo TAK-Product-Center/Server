@@ -34,7 +34,8 @@ case "$1" in
         echo -n "Starting $SERVICE: "
 		    service federation-hub-policy start
 		    service federation-hub-broker start
-		    service federation-hub-ui start
+            service federation-hub-ui start
+            service federation-hub-plugin-manager start
         touch "/var/lock/subsys/$SERVICE"
     ;;
     stop)
@@ -42,6 +43,7 @@ case "$1" in
 		    service federation-hub-ui stop
 		    service federation-hub-broker stop
 		    service federation-hub-policy stop
+            service federation-hub-plugin-manager stop
 	      rm -f "/var/lock/subsys/$SERVICE"
 	      echo "done."
     ;;
@@ -68,6 +70,16 @@ case "$1" in
             echo "federation-hub-ui is running with pid ${PID}"
         else
             echo "federation-hub-ui is not running."
+            RETVAL=1
+        fi
+
+        exit $RETVAL
+
+        PID=`pgrep -f "federation-hub-plugin-manager"`
+        if [ $? -eq 0 ] ; then
+            echo "federation-hub-plugin-manager is running with pid ${PID}"
+        else
+            echo "federation-hub-plugin-manager is not running."
             RETVAL=1
         fi
 

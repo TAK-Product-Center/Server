@@ -112,6 +112,14 @@ public class OutgoingConnectionSummary implements Serializable {
     public void setTokenType(String value) {
         this.outgoingConnection.setTokenType(value);
     }
+    
+    public boolean isTls() {
+        return outgoingConnection.isTls();
+    }
+
+    public void setTls(boolean value) {
+        this.outgoingConnection.setTls(value);
+    }
 
     public ConnectionInfoSummary getConnectionInfoSummary() {
 	return connectionInfoSummary;

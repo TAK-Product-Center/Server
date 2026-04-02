@@ -5,240 +5,183 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.util.Assert;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.google.common.base.Strings;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.json.simple.parser.ParseException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.SpringSecurityCoreVersion;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
-import org.springframework.util.Assert;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.util.ObjectUtils;
-import org.springframework.web.filter.OncePerRequestFilter;
-
-import com.google.common.base.Strings;
-
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.SignatureAlgorithm;
-import tak.server.federation.hub.ui.jwt.HubAuthUser;
-import tak.server.federation.hub.ui.keycloak.AuthCookieUtils;
-import tak.server.federation.hub.ui.keycloak.KeycloakTokenParser;
-
-@Component
 public class JwtTokenFilter extends OncePerRequestFilter {
-	private static final Logger logger = LoggerFactory.getLogger(JwtTokenFilter.class);
 
-	@Autowired
-	private JwtTokenUtil jwtUtil;
+    private JwtTokenUtil jwtUtil;
 
-	@Autowired
-	private KeycloakTokenParser keycloakTokenParser;
+    private FederationHubUIConfig fedHubConfig;
+    
+    public JwtTokenFilter(FederationHubUIConfig fedHubConfig, JwtTokenUtil jwtUtil) {
+    	this.jwtUtil = jwtUtil;
+    	this.fedHubConfig = fedHubConfig;
+    }
+    
+    private String extractAccessToken(Cookie[] cookies) {
+        if (cookies == null) return null;
+        for (Cookie cookie : cookies) {
+            if ("access_token".equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
+    }
+    
+    private String extractRefreshToken(Cookie[] cookies) {
+        if (cookies == null) return null;
+        for (Cookie cookie : cookies) {
+            if ("refresh_token".equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
+    }
 
-	@Autowired
-	FederationHubUIConfig fedHubConfig;
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+    	
+    	// Skip token check entirely for the login initiation endpoints
+        String uri = request.getRequestURI();
+        if (uri.equals("/api/oauth/login/auth") || uri.equals("/api/oauth/login/redirect")) {
+            chain.doFilter(request, response);
+            return;
+        }
 
-	@Override
-	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-			throws ServletException, IOException {
+        if (!uri.startsWith("/api")) {
+            chain.doFilter(request, response);
+            return;
+        }
 
-		// try cookie first
-		String cookieToken = null;
-		Cookie[] cookies = request.getCookies();
-		if (cookies != null) {
-			for (Cookie cookie : cookies) {
-				// for normal username + password auth from a file / DB
-				if ("hubState".equals(cookie.getName())) {
-					cookieToken = cookie.getValue();
-					if (!jwtUtil.validateAccessToken(cookieToken)) {
-						filterChain.doFilter(request, response);
-						return;
-					} else {
-						setAuthenticationContext(cookieToken, request);
-						filterChain.doFilter(request, response);
-						return;
-					}
-				}
+        String token = extractAccessToken(request.getCookies());
 
-				// for keycloak
-				if ("access_token".equals(cookie.getName())) {
-					cookieToken = cookie.getValue();
-					Claims claims = null;
-					try {
-						claims = keycloakTokenParser.parseClaims(cookieToken, SignatureAlgorithm.RS256);
-					} catch (io.jsonwebtoken.ExpiredJwtException e) {
-						// refresh the token if it expired
-						String refreshToken = (String) request.getSession().getAttribute(fedHubConfig.getKeycloakRefreshTokenName());
-						if (Strings.isNullOrEmpty(refreshToken)) {
-							SecurityContextHolder.clearContext();
-							AuthCookieUtils.logout(request, response);
-							return;
-						}
+        if (token != null) {
+            Claims claims = null;
 
-						// build up the parameters for the token request
-						MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<String, String>();
-						requestBody.add("grant_type", "refresh_token");
-						requestBody.add("refresh_token", refreshToken);
-						requestBody.add("client_id", fedHubConfig.getKeycloakClientId());
-						requestBody.add("client_secret", fedHubConfig.getKeycloakSecret());
+            try {
+                claims = jwtUtil.parseClaims(token, SignatureAlgorithm.RS256);
+            } catch (ExpiredJwtException e) {
+                token = handleRefreshToken(request, response);
+                if (token != null) {
+                	// successful refresh
+                    claims = jwtUtil.parseClaims(token, SignatureAlgorithm.RS256);
+                } else {
+                	// no refresh
+                    clearAuth(response, request);
+                    return;
+                }
+            } catch (Exception e) {
+            	logger.info("Cannot parse claims", e);
+                clearAuth(response, request);
+                return;
+            }
 
-						try {
-							cookieToken = jwtUtil.processAuthServerRequest(requestBody, request, response);
-							claims = keycloakTokenParser.parseClaims(cookieToken, SignatureAlgorithm.RS256);
-						} catch (ParseException ee) {
-							filterChain.doFilter(request, response);
-							return;
-						}
-					}
+            if (claims != null && isAuthorized(claims)) {
+                setAuthentication(token, request);
+            } else if (claims != null) {            	
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
+                return;
+            }
+        }
 
-					if (claims == null) {
-						throw new InvalidBearerTokenException("Unable to parse claims from token : " + cookieToken);
-					}
-										
-					// make sure the keycloak token has an email and contains the admin claim
-					if (claims.get("email") != null) {
-						boolean hasAuthorization = false;
-						
-						Object authClaim = claims.get(fedHubConfig.getKeycloakClaimName());
-						
-						if (authClaim instanceof ArrayList<?>) {
-							hasAuthorization = ((ArrayList<String>) authClaim).contains(fedHubConfig.getKeycloakAdminClaimValue());
-						}
-						
-						if (authClaim instanceof String) {
-							fedHubConfig.getKeycloakAdminClaimValue().equals((String) authClaim);
-						}
-												
-						if (hasAuthorization) {
-							setKeycloakAuth(cookieToken, request);
-							filterChain.doFilter(request, response);
-							return;
-						} else {
-							filterChain.doFilter(request, response);
-							return;
-						}
-					} else {
-						filterChain.doFilter(request, response);
-						return;
-					}
-				}
-			}
-		}
+        chain.doFilter(request, response);
+    }
 
-		// no cookies found, last resort is auth bearer
-		if (!hasAuthorizationBearer(request)) {
-			filterChain.doFilter(request, response);
-			return;
-		}
+    // Check if token has required claim and value
+    private boolean isAuthorized(Claims claims) {
+        Object authClaim = claims.get(fedHubConfig.getKeycloakClaimName());
 
-		String token = getAccessToken(request);
-		if (!jwtUtil.validateAccessToken(token)) {
-			filterChain.doFilter(request, response);
-			return;
-		}
+        if (authClaim instanceof ArrayList<?> list) {
+            return list.contains(fedHubConfig.getKeycloakAdminClaimValue());
+        } else if (authClaim instanceof String s) {
+            return s.equals(fedHubConfig.getKeycloakAdminClaimValue());
+        }
+        return false;
+    }
 
-		setAuthenticationContext(token, request);
-		filterChain.doFilter(request, response);
-	}
+    private void setAuthentication(String token, HttpServletRequest request) {
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        KeycloakToken authentication = new KeycloakToken(token, null, authorities);
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
 
-	private boolean hasAuthorizationBearer(HttpServletRequest request) {
-		String header = request.getHeader("Authorization");
-		if (ObjectUtils.isEmpty(header) || !header.startsWith("Bearer")) {
-			return false;
-		}
+    // Refresh expired token if refresh token is available
+    private String handleRefreshToken(HttpServletRequest request, HttpServletResponse response) {
+    	String refreshToken = extractRefreshToken(request.getCookies());
+                
+        if (Strings.isNullOrEmpty(refreshToken)) return null;
 
-		return true;
-	}
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("grant_type", "refresh_token");
+        body.add("refresh_token", refreshToken);
+        body.add("client_id", fedHubConfig.getKeycloakClientId());
+        body.add("client_secret", fedHubConfig.getKeycloakSecret());
 
-	private String getAccessToken(HttpServletRequest request) {
-		String header = request.getHeader("Authorization");
-		String token = header.split(" ")[1].trim();
-		return token;
-	}
-	
-	private void setKeycloakAuth(String token, HttpServletRequest request) {
-		List<GrantedAuthority> authorities = new ArrayList<GrantedAuthority>();
-		authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
-		Claims claims = keycloakTokenParser.parseClaims(token, SignatureAlgorithm.RS256);
+        try {
+            return jwtUtil.handleKeycloakTokenRequest(body, request, response);
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
-		KeycloakToken authentication = new KeycloakToken(token, null, authorities);
+    // Clear authentication and remove cookies
+    private void clearAuth(HttpServletResponse response, HttpServletRequest request) {
+        SecurityContextHolder.clearContext();
+        jwtUtil.logout(request, response);
+    }
 
-		authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+    // Custom authentication token
+    private static class KeycloakToken extends AbstractAuthenticationToken {
 
-		SecurityContextHolder.getContext().setAuthentication(authentication);
-	}
+        private final Object principal;
+        private Object credentials;
 
-	private void setAuthenticationContext(String token, HttpServletRequest request) {
-		UserDetails userDetails = getUserDetails(token);
+        public KeycloakToken(Object principal, Object credentials,
+                             Collection<? extends GrantedAuthority> authorities) {
+            super(authorities);
+            this.principal = principal;
+            this.credentials = credentials;
+            super.setAuthenticated(true);
+        }
 
-		UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null,
-				null);
+        @Override
+        public Object getCredentials() { return this.credentials; }
 
-		authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        @Override
+        public Object getPrincipal() { return this.principal; }
 
-		SecurityContextHolder.getContext().setAuthentication(authentication);
-	}
+        @Override
+        public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {
+            Assert.isTrue(!isAuthenticated,
+                    "Cannot set this token to trusted - use constructor with authorities");
+            super.setAuthenticated(false);
+        }
 
-	private UserDetails getUserDetails(String token) {
-		HubAuthUser userDetails = new HubAuthUser();
-        String[] jwtSubject = jwtUtil.getSubject(token).split(",");
-
-        userDetails.setUsername(jwtSubject[0]);
-
-		return userDetails;
-	}
-	
-	private static class KeycloakToken extends AbstractAuthenticationToken {
-
-		private static final long serialVersionUID = SpringSecurityCoreVersion.SERIAL_VERSION_UID;
-
-		private final Object principal;
-
-		private Object credentials;
-
-		public KeycloakToken(Object principal, Object credentials,
-				Collection<? extends GrantedAuthority> authorities) {
-			super(authorities);
-			this.principal = principal;
-			this.credentials = credentials;
-			super.setAuthenticated(true); // must use super, as we override
-		}
-
-		@Override
-		public Object getCredentials() {
-			return this.credentials;
-		}
-
-		@Override
-		public Object getPrincipal() {
-			return this.principal;
-		}
-
-		@Override
-		public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {
-			Assert.isTrue(!isAuthenticated,
-					"Cannot set this token to trusted - use constructor which takes a GrantedAuthority list instead");
-			super.setAuthenticated(false);
-		}
-
-		@Override
-		public void eraseCredentials() {
-			super.eraseCredentials();
-			this.credentials = null;
-		}
-	}
+        @Override
+        public void eraseCredentials() {
+            super.eraseCredentials();
+            this.credentials = null;
+        }
+    }
 }

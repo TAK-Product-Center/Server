@@ -73,6 +73,8 @@ public class FederationHubServerConfig {
     private long missionFederationRecencySeconds = 43200;
     private long missionFederationDisruptionMaxFileSizeBytes = 268435456;
     private boolean missionFederationDisruptionEnabled = false;
+
+    private double missionFederationDisruptionDynamicDelayMultiplier = 2.0;
     
     private List<TokenAuthServer> federationTokenAuthServers = new ArrayList<>();
     
@@ -423,6 +425,14 @@ public class FederationHubServerConfig {
 		this.cloudwatchStepSeconds = cloudwatchStepSeconds;
 	}
 
+    public double getMissionFederationDisruptionDynamicDelayMultiplier() {
+        return missionFederationDisruptionDynamicDelayMultiplier;
+    }
+
+    public void setMissionFederationDisruptionDynamicDelayMultiplier(double missionFederationDisruptionDynamicDelayMultiplier) {
+        this.missionFederationDisruptionDynamicDelayMultiplier = missionFederationDisruptionDynamicDelayMultiplier;
+    }
+
 	@Override
 	public String toString() {
 		return "FederationHubServerConfig [keystoreType=" + keystoreType + ", keystoreFile=" + keystoreFile
@@ -450,6 +460,7 @@ public class FederationHubServerConfig {
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	public static class TokenAuthServer {
 		private int port = 9103;
+		private boolean tls = true;
 		private String type = "jwt";
 		public int getPort() {
 			return port;
@@ -463,9 +474,15 @@ public class FederationHubServerConfig {
 		public void setType(String type) {
 			this.type = type;
 		}
+		public boolean isTls() {
+			return tls;
+		}
+		public void setTls(boolean tls) {
+			this.tls = tls;
+		}
 		@Override
 		public String toString() {
-			return "TokenAuthServer [port=" + port + ", type=" + type + "]";
+			return "TokenAuthServer [port=" + port + ", tls=" + tls + ", type=" + type + "]";
 		}
 	}
 }

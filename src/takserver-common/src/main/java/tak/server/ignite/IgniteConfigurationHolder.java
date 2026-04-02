@@ -19,6 +19,7 @@ import org.apache.ignite.configuration.DataPageEvictionMode;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
+import org.apache.ignite.events.EventType;
 import org.apache.ignite.failure.NoOpFailureHandler;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.logger.slf4j.Slf4jLogger;
@@ -257,6 +258,14 @@ public class IgniteConfigurationHolder {
 
 		if (takIgniteConfiguration.isClusterEnabled()) {
 			IgniteConfiguration clusterConf = new IgniteConfiguration();
+
+			clusterConf.setIncludeEventTypes(
+				    EventType.EVT_NODE_JOINED,
+				    EventType.EVT_NODE_LEFT,
+				    EventType.EVT_NODE_FAILED,
+				    EventType.EVT_CLIENT_NODE_DISCONNECTED,
+				    EventType.EVT_CLIENT_NODE_RECONNECTED
+				);
 			
 			TcpDiscoverySpi tds = new TcpDiscoverySpi();
 			if (takIgniteConfiguration.isClusterKubernetes()) {
@@ -283,20 +292,22 @@ public class IgniteConfigurationHolder {
 				//ipFinder.setMasterUrl("https://kubernetes.ignite.svc.cluster.local:443");
 
 				tds.setIpFinder(ipFinder);
-				clusterConf.setDiscoverySpi(tds);
 			} else {
-				TcpDiscoveryVmIpFinder ipFinder = new TcpDiscoveryVmIpFinder();
+				if (!takIgniteConfiguration.isIgniteMulticast()) {
 
-				String address = takIgniteConfiguration.getIgniteHost() + ":" + takIgniteConfiguration.getIgniteNonMulticastDiscoveryPort() +
-						".." + (takIgniteConfiguration.getIgniteNonMulticastDiscoveryPort() + takIgniteConfiguration.getIgniteNonMulticastDiscoveryPortCount());
-				ipFinder.setAddresses(Arrays.asList(address));
-				
-				logger.trace("ignite grid discovery address: {}", address);
+					TcpDiscoveryVmIpFinder ipFinder = new TcpDiscoveryVmIpFinder();
 
-				tds.setIpFinder(ipFinder);
+					String address = takIgniteConfiguration.getIgniteHost() + ":" + takIgniteConfiguration.getIgniteNonMulticastDiscoveryPort() +
+							".." + (takIgniteConfiguration.getIgniteNonMulticastDiscoveryPort() + takIgniteConfiguration.getIgniteNonMulticastDiscoveryPortCount());
+					ipFinder.setAddresses(Arrays.asList(address));
+					
+					logger.trace("ignite grid discovery address: {}", address);
 
-				tds.setLocalPort(takIgniteConfiguration.getIgniteNonMulticastDiscoveryPort());
-				tds.setLocalPortRange(takIgniteConfiguration.getIgniteNonMulticastDiscoveryPortCount());
+					tds.setIpFinder(ipFinder);
+
+					tds.setLocalPort(takIgniteConfiguration.getIgniteNonMulticastDiscoveryPort());
+					tds.setLocalPortRange(takIgniteConfiguration.getIgniteNonMulticastDiscoveryPortCount());
+				}
 			}
 
 			clusterConf.setDiscoverySpi(tds);

@@ -91,6 +91,10 @@ public class CotApi extends BaseRestController {
     			return new ResponseEntity<String>("", HttpStatus.NOT_FOUND);
     		}
 
+			if (cot.cottype != null && cot.cottype.startsWith("b-t-f")) {
+				cot = missionService.fixupMissionChat(cot, request.getServerName());
+			}
+
     		//
     		// ensure that the xml returned here matches what is used by StreamingProtobufProtocol.createFileTransferRequest
     		// fix hae precision to prevent double/string conversion issues, remove <marti> detail that gets stripped

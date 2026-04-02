@@ -4,7 +4,7 @@ buildscript {
     }
 }
 
-apply plugin: 'nebula.ospackage'
+apply plugin: 'com.netflix.nebula.ospackage'
 apply from: "../utils/utils.gradle"
 
 

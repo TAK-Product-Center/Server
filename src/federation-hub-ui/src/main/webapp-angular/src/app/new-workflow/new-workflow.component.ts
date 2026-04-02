@@ -20,12 +20,9 @@ export class NewWorkflowComponent {
       name: '',
       version: 'v2',
       type: '',
-      creatorName: '',
       description: '',
-      roleProductSet: '',
-      diagramType:  "Workflow",
-      federationId: '',
-      federationName: ''
+      graphData: {},
+      pluginsData: {}
   }
 
   constructor(@Inject(MAT_DIALOG_DATA) public data: any, private dataService: DataService, private workflowService: WorkflowService, private router: Router) {
@@ -40,7 +37,7 @@ export class NewWorkflowComponent {
   }
 
   onSave() {
-    this.workflowService.saveGraph(this.policy).subscribe({
+    this.workflowService.saveFederationPolicy(this.policy).subscribe({
       next: (v) => this.successFunc(v),
       error: (e) => this.failureFunc(e)
     })
@@ -49,8 +46,8 @@ export class NewWorkflowComponent {
   private successFunc(workflowList: Record<string, any>) {
     console.log("Saved: " + workflowList);
     // Go to  editor
-    this.dataService.setActivePolicy(this.policy)
-    this.router.navigate(['/drawflow'], { queryParams: { policy: this.policy.name }}); 
+    this.dataService.setActiveEditingPolicy(this.policy)
+    this.router.navigate(['/drawflow']); 
   }  
 
   private failureFunc(result: Error) {

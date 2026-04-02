@@ -1,0 +1,32 @@
+<h1 mat-dialog-title class="dialogHeader">{{editorTitle}} Grouping</h1>
+<mat-dialog-content class="mat-typography">
+  <form (ngSubmit)="onSave(federation)" #userForm="ngForm">
+    <div class="form-group">
+      <div class="form-group">
+        <label for="descriptionAnnotation">Title</label>
+        <input type="text" id="descriptionAnnotation" class="form-control" [(ngModel)]="federation.description"
+          name="description" maxlength="30" />
+      </div>
+      <small class="form-text text-muted">{{ federation.description ? (30 - federation.description.length) : 30 }}
+        characters remaining</small>
+    </div>
+
+    <div class="form-group">
+      <label for="annotationWidth">Grouping Width (500px - 1000px)</label>
+      <input type="number" id="annotationWidth" class="form-control" [(ngModel)]="federation.width"
+        name="annotationWidth" min="500" max="1000" step="100"/>
+    </div>
+    
+    <div class="form-group">
+      <label for="annotationWidth">Grouping Height (400px - 1000px)</label>
+      <input type="number" id="annotationHeight" class="form-control" [(ngModel)]="federation.height"
+        name="annotationWidth" min="400" max="1000" step="100"/>
+    </div>
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button (click)="onCancel()" mat-button mat-dialog-close
+    class="btn btn-just-outline border-radius margin-right">Cancel</button>
+  <button class="btn btn-primary" (click)="onSave(federation)" [disabled]="userForm.invalid"
+    [mat-dialog-close]="true">Save</button>
+</mat-dialog-actions>

@@ -26,7 +26,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.retry.annotation.EnableRetry;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -54,9 +53,13 @@ import com.bbn.marti.injector.UidCotTagInjector;
 import com.bbn.marti.network.PluginDataFeedJdbc;
 import com.bbn.marti.nio.netty.NioNettyBuilder;
 import com.bbn.marti.nio.server.NioServer;
+import com.bbn.marti.repeater.DistributedRepeaterManager;
+import com.bbn.marti.repeater.IgniteRepeaterStore;
+import com.bbn.marti.repeater.InMemoryRepeaterStore;
 import com.bbn.marti.remote.ContactManager;
 import com.bbn.marti.remote.DataFeedCotService;
 import com.bbn.marti.remote.FederationManager;
+import com.bbn.marti.remote.RepeaterManager;
 import com.bbn.marti.remote.ServerInfo;
 import com.bbn.marti.remote.groups.FileUserManagementInterface;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -65,8 +68,6 @@ import com.bbn.marti.remote.service.InputManager;
 import com.bbn.marti.remote.service.SecurityManager;
 import com.bbn.marti.remote.socket.TakMessage;
 import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.repeater.DistributedRepeaterManager;
-import com.bbn.marti.repeater.RepeaterStore;
 import com.bbn.marti.service.BrokerService;
 import com.bbn.marti.service.DistributedContactManager;
 import com.bbn.marti.service.DistributedSubscriptionManager;
@@ -117,6 +118,7 @@ import tak.server.federation.FederationServer;
 import tak.server.federation.MissionDisruptionManager;
 import tak.server.federation.TakFigClient;
 import tak.server.grid.PluginManagerProxyFactory;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.messaging.DistributedCotMessenger;
 import tak.server.messaging.DistributedPluginApi;
 import tak.server.messaging.DistributedPluginDataFeedApi;
@@ -162,7 +164,7 @@ public class MessagingConfiguration {
 	}
 
 	@Bean
-	public RepeaterService repeaterService(BrokerService brokerService, GroupManager groupManager, DistributedRepeaterManager repeaterManager) {
+	public RepeaterService repeaterService(BrokerService brokerService, GroupManager groupManager, RepeaterManager repeaterManager) {
 		return new RepeaterService(brokerService, groupManager, repeaterManager);
 	}
 
@@ -171,15 +173,22 @@ public class MessagingConfiguration {
 	public DistributedFederationManager distributedFederationManager(
 			Ignite ignite) throws RemoteException {
 		DistributedFederationManager distributedFederationManager = new DistributedFederationManager(ignite);
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_FEDERATION_MANAGER, distributedFederationManager);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_FEDERATION_MANAGER, distributedFederationManager);
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return distributedFederationManager;
 	}
 
 	@Bean
 	public FileUserManagementInterface distributedUserManager(Ignite ignite, FileAuthenticator fileAuthenticator) {
 		DistributedUserManager distributedUserManager =  new DistributedUserManager();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_USER_FILE_MANAGER, distributedUserManager);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_USER_FILE_MANAGER, distributedUserManager);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
 				.serviceProxy(Constants.DISTRIBUTED_USER_FILE_MANAGER, FileUserManagementInterface.class, false);
 	}
@@ -187,8 +196,11 @@ public class MessagingConfiguration {
 	@Bean
 	public SystemInfoApi distributedSystemInfoApi(Ignite ignite) {
 		DistributedSystemInfoApi distributedSystemInfoApi =  new DistributedSystemInfoApi();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SYSTEM_INFO_API, distributedSystemInfoApi);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SYSTEM_INFO_API, distributedSystemInfoApi);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
 				.serviceProxy(Constants.DISTRIBUTED_SYSTEM_INFO_API, SystemInfoApi.class, false);
 	}
@@ -260,7 +272,9 @@ public class MessagingConfiguration {
 	public SubscriptionManager distributedSubscriptionManager(Ignite ignite) throws RemoteException {
 		DistributedSubscriptionManager distributedSubscriptionManager =  new DistributedSubscriptionManager();
 
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SUBSCRIPTION_MANAGER, distributedSubscriptionManager);
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SUBSCRIPTION_MANAGER, distributedSubscriptionManager);
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
 		
 		return distributedSubscriptionManager;
 	}
@@ -270,17 +284,38 @@ public class MessagingConfiguration {
 	@Profile(Constants.CLUSTER_PROFILE_NAME)
 	public SubscriptionManager distributedSubscriptionManagerCluster(Ignite ignite) throws RemoteException {
 		DistributedSubscriptionManager distributedSubscriptionManager =  new DistributedSubscriptionManager();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SUBSCRIPTION_MANAGER, distributedSubscriptionManager);
+		
+		
+		Runnable serviceDeployment = () -> {
+			ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite))
+					.deployNodeSingleton(Constants.DISTRIBUTED_SUBSCRIPTION_MANAGER, distributedSubscriptionManager);
+		};
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
 
+		
+		Runnable deleteAllSubscriptions = () -> {
+			// if any type of ignite reconnection happens we need to restart the tcp
+			// connections
+			ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
+					.serviceProxy(Constants.DISTRIBUTED_SUBSCRIPTION_MANAGER, SubscriptionManager.class, false)
+					.deleteAllSubscriptions();
+		};
+
+		IgniteReconnectEventHandler.registerPostAction(deleteAllSubscriptions);
+		
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
 				.serviceProxy(Constants.DISTRIBUTED_SUBSCRIPTION_MANAGER, SubscriptionManager.class, false);
 	}
 
 	@Bean
-	public GroupManager groupManager(Ignite ignite, GroupStore groupStore) {
-		DistributedPersistentGroupManager distributedPersistentGroupManager = new DistributedPersistentGroupManager(groupStore);
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_GROUP_MANAGER, distributedPersistentGroupManager);
+	public GroupManager groupManager(Ignite ignite) {
+		DistributedPersistentGroupManager distributedPersistentGroupManager = new DistributedPersistentGroupManager();
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_GROUP_MANAGER, distributedPersistentGroupManager);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
 				.serviceProxy(Constants.DISTRIBUTED_GROUP_MANAGER, GroupManager.class, false);
 	}
@@ -363,8 +398,11 @@ public class MessagingConfiguration {
 	@Bean
 	public ContactManager contactManager(Ignite ignite) {
 		DistributedContactManager distributedContactManager = new DistributedContactManager();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_CONTACT_MANAGER, distributedContactManager);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_CONTACT_MANAGER, distributedContactManager);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
 				.serviceProxy(Constants.DISTRIBUTED_CONTACT_MANAGER, ContactManager.class, false);
 	}
@@ -375,16 +413,25 @@ public class MessagingConfiguration {
 	}
 
 	@Bean
-	public DistributedRepeaterManager repeaterManager(Ignite ignite) {
+	public RepeaterManager repeaterManager(Ignite ignite) {
 		DistributedRepeaterManager distributedRepeaterManager =  new DistributedRepeaterManager();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_REPEATER_MANAGER, distributedRepeaterManager);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_REPEATER_MANAGER, distributedRepeaterManager);
 
-		return distributedRepeaterManager;
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+
+		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
+				.serviceProxy(Constants.DISTRIBUTED_REPEATER_MANAGER, RepeaterManager.class, false);
 	}
 
 	@Bean
-	public RepeaterStore repeaterStore() {
-		return new RepeaterStore();
+	public IgniteRepeaterStore igniteRepeaterStore() {
+		return new IgniteRepeaterStore();
+	}
+
+	@Bean
+	public InMemoryRepeaterStore inMemoryRepeaterStore() {
+		return new InMemoryRepeaterStore();
 	}
 
 	// TODO: handle this for cluster
@@ -392,9 +439,10 @@ public class MessagingConfiguration {
 	@Primary
 	public ServerInfo serverInfo(Ignite ignite) {
 		DistributedServerInfo distributedServerInfo =  new DistributedServerInfo(ignite);
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SERVER_INFO, distributedServerInfo);
-
-		ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_SERVER_INFO, ServerInfo.class, false);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SERVER_INFO, distributedServerInfo);
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
 		
 		return distributedServerInfo;
 	}
@@ -402,9 +450,10 @@ public class MessagingConfiguration {
 	@Bean
 	public InputManager inputManager(Ignite ignite) {
 		DistributedInputManager distributedInputManager =  new DistributedInputManager();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_INPUT_MANAGER, distributedInputManager);
-
-		ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_INPUT_MANAGER, InputManager.class, false);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_INPUT_MANAGER, distributedInputManager);
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
 		
 		return distributedInputManager;
 	}
@@ -413,8 +462,11 @@ public class MessagingConfiguration {
 	@Bean
 	public SecurityManager SecurityManager(Ignite ignite) {
 		DistributedSecurityManager distributedSecurityManager =  new DistributedSecurityManager();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SECURITY_MANAGER, distributedSecurityManager);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_SECURITY_MANAGER, distributedSecurityManager);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
 				.serviceProxy(Constants.DISTRIBUTED_SECURITY_MANAGER, SecurityManager.class, false);
 	}
@@ -448,9 +500,9 @@ public class MessagingConfiguration {
 		metricsCollector.setMessagingDatabaseMetricsService(databaseMetricsService);
 		metricsCollector.setNetworkMetricsService(networkMetricsService);
 
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_METRICS_COLLECTOR, metricsCollector);
-
-		ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_METRICS_COLLECTOR, MetricsCollector.class, false);
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_METRICS_COLLECTOR, metricsCollector);
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
 		
 		return metricsCollector;
 	}
@@ -473,8 +525,11 @@ public class MessagingConfiguration {
 	@Bean
 	public InjectionService injectionService(Ignite ignite, UidCotTagInjector uidCotTagInjector) {
 		DistributedInjectionService distributedInjectionService =  new DistributedInjectionService();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_INJECTION_SERVICE, distributedInjectionService);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_INJECTION_SERVICE, distributedInjectionService);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite))
 				.serviceProxy(Constants.DISTRIBUTED_INJECTION_SERVICE, InjectionService.class, false);
 	}
@@ -516,8 +571,9 @@ public class MessagingConfiguration {
 	public QoSManager qosManager(Ignite ignite) {
 		DistributedQoSManager qosManager = new DistributedQoSManager();
 		
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_QOS_MANAGER, qosManager);
-		ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_QOS_MANAGER, QoSManager.class, false);
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_QOS_MANAGER, qosManager);
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
 		
 		return qosManager;
 	}
@@ -537,8 +593,10 @@ public class MessagingConfiguration {
 		
 		DistributedPluginDataFeedApi distributedPluginDataFeedApi =  new DistributedPluginDataFeedApi();
 		
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_DATA_FEED_API, distributedPluginDataFeedApi);
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_DATA_FEED_API, distributedPluginDataFeedApi);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_DATA_FEED_API, PluginDataFeedApi.class, false);
 
 	}
@@ -563,8 +621,10 @@ public class MessagingConfiguration {
 		
 		DistributedPluginApi distributedPluginApi =  new DistributedPluginApi();
 		
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_API, distributedPluginApi);
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_API, distributedPluginApi);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return distributedPluginApi;
 
 	}
@@ -574,8 +634,10 @@ public class MessagingConfiguration {
 		
 		DistributedPluginSelfStopApi distributedPluginSelfStopApi =  new DistributedPluginSelfStopApi();
 		
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_SELF_STOP_API, distributedPluginSelfStopApi);
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_SELF_STOP_API, distributedPluginSelfStopApi);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getMessagingLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_SELF_STOP_API, PluginSelfStopApi.class, false);
 	}
 	
@@ -586,8 +648,11 @@ public class MessagingConfiguration {
 	// without making remote calls to ignite for no reason
 	public DataFeedCotService distributedDataFeedCotService(Ignite ignite) {
 		DistributedDataFeedCotService distributedDataFeedCotService =  new DistributedDataFeedCotService();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_DATAFEED_COT_SERVICE, distributedDataFeedCotService);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_DATAFEED_COT_SERVICE, distributedDataFeedCotService);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return new DistributedDataFeedCotService();
 	}
 	
@@ -600,8 +665,12 @@ public class MessagingConfiguration {
 	@Profile(Constants.MESSAGING_PROFILE_NAME)
 	public MessagingMetricsService messagingMetricsService(Ignite ignite) {
 		MessagingMetricsServiceImpl service = new MessagingMetricsServiceImpl();
-		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).
 				deployNodeSingleton(Constants.MESSAGING_METRICS_SERVICE_NAME, service);
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return service;
 	}
 

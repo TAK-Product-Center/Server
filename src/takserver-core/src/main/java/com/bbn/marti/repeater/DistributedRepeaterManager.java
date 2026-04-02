@@ -66,7 +66,7 @@ public class DistributedRepeaterManager implements RepeaterManager, org.apache.i
 	}
 
 	public boolean isRepeating(String uid) {
-		return repeaterStore().getRepeatedMessages().get(uid) != null;
+		return repeaterStore().getRepeatedMessage(uid) != null;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -88,54 +88,49 @@ public class DistributedRepeaterManager implements RepeaterManager, org.apache.i
 		}
 
 		RepeatableContainer repeatableContainer = new RepeatableContainer(msg, repeatableType);
-		repeaterStore().getCancelledMessages().remove(msg.getUid());
-		repeaterStore().getRepeatedMessages().put(msg.getUid(), repeatableContainer);
-	}
-
-	public void addMessage(String msg, String type) {
-		try {
-			if (cotParser.get() == null) {
-				cotParser.set(CotParserCreator.newInstance());
-			}
-			CotEventContainer container = new CotEventContainer(cotParser.get().parse(msg));
-			addMessage(container, type);
-		} catch (DocumentException e) {
-			throw new TakException("Exception occurred parsing CoT message", e);
-		}
-	}
-
-	public CotEventContainer getMessageByUID(String uid) {
-		return repeaterStore().getRepeatedMessages().get(uid).getCotEventContainer();
+		repeaterStore().removeCancelledMessage(msg.getUid());
+		repeaterStore().addRepeatedMessage(msg.getUid(), repeatableContainer);
 	}
 
 	public Integer getRepeatableMessageCount() {
-		return repeaterStore().getRepeatedMessages().size();
+		return repeaterStore().getRepeatedMessageCount();
 	}
 
-	public boolean removeMessage(String uid, boolean generateMsg) {
-
+	public boolean removeRepeatedMessage(String uid, boolean generateMsg) {
 		try {
+			if (repeaterStore().getRepeatedMessage(uid) == null) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("could not find uid to remove {}", uid);
+				}
+				return false;
+			}
 
-			User user = (User) repeaterStore().getRepeatedMessages().get(uid).getCotEventContainer().getContextValue(Constants.USER_KEY);
+			User user = (User) repeaterStore().getRepeatedMessage(uid).getCotEventContainer().getContextValue(Constants.USER_KEY);
 
 			if (user != null) {
 				// remove the repeater's user
 				MessagingDependencyInjectionProxy.getInstance().groupManager().removeUser(user);
 			}
 
+			if (generateMsg) {
+				repeaterStore().addCancelledMessage(uid, repeaterStore().getRepeatedMessage(uid).getCotEventContainer());
+			}
+
+			return repeaterStore().removeRepeatedMessage(uid);
+
 		} catch (Exception e) {
 			logger.info("Exception removing user for repeater - uid: " + uid + " " + e.getMessage(), e);
+			return false;
 		}
+	}
 
-		if (generateMsg) {
-			repeaterStore().getCancelledMessages().put(uid, repeaterStore().getRepeatedMessages().get(uid).getCotEventContainer());
-		}
-		return repeaterStore().getRepeatedMessages().remove(uid) != null;
+	public boolean removeCancelledMessage(String uid) {
+		return repeaterStore().removeCancelledMessage(uid);
 	}
 
 	public Collection<CotEventContainer> getMessages() {
 		List<CotEventContainer> cotEvents = new ArrayList<CotEventContainer>();
-		for(RepeatableContainer repeatedMessage : repeaterStore().getRepeatedMessages().values()) {
+		for(RepeatableContainer repeatedMessage : repeaterStore().getRepeatedMessages()) {
 			cotEvents.add(repeatedMessage.getCotEventContainer());
 		}
 		return cotEvents;
@@ -143,7 +138,7 @@ public class DistributedRepeaterManager implements RepeaterManager, org.apache.i
 
 	public Collection<Repeatable> getRepeatableMessages() {
 		List<Repeatable> contentList = new ArrayList<Repeatable>();
-		for(RepeatableContainer repeatedMessage : repeaterStore().getRepeatedMessages().values()) {
+		for(RepeatableContainer repeatedMessage : repeaterStore().getRepeatedMessages()) {
 			contentList.add(repeatedMessage.getRepeatable());
 		}
 		return contentList;
@@ -157,13 +152,11 @@ public class DistributedRepeaterManager implements RepeaterManager, org.apache.i
 		CoreConfigFacade.getInstance().getRemoteConfiguration().getRepeater().setPeriodMillis(periodMillis);
 	}
 
-	public Map<String, CotEventContainer> getCancelledMessages() {
+	public Collection<CotEventContainer> getCancelledMessages() {
 		return repeaterStore().getCancelledMessages();
 	}
 
 	private RepeaterStore repeaterStore() {
 		return MessagingDependencyInjectionProxy.getInstance().repeaterStore();
 	}
-
-
 }

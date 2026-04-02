@@ -16,6 +16,7 @@ import org.springframework.cache.interceptor.CacheOperation;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 
 // this class is responsible for syncing caffine cache events between messaging and api processes
 // during a non cluster deployment
@@ -64,8 +65,11 @@ public final class SpringCacheOperationUpdater {
 		};
 		
 		// only need listener for non cluster deployment
-		if (!isCluster) 
-			IgniteHolder.getInstance().getIgnite().message().localListen(CAFFINE_CACHE_UPDATE_LISTENER, ignitePredicate);
+		if (!isCluster) {
+			IgniteReconnectEventHandler.registerListener(() -> {
+				IgniteHolder.getInstance().getIgnite().message().localListen(CAFFINE_CACHE_UPDATE_LISTENER, ignitePredicate);
+			});
+		}
 	}
 
 	public void publishCacheUpdate(CacheOperation operation, List<String> caches) {

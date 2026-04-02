@@ -21,6 +21,7 @@ import org.springframework.cache.annotation.Cacheable;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.google.common.io.ByteSource;
+import com.google.protobuf.ByteString;
 import com.mongodb.MongoException;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.gridfs.GridFSBucket;
@@ -157,28 +158,22 @@ public class FederationHubDatabaseServiceImpl implements FederationHubDatabaseSe
 	}
 	
 	@Override
-	public byte[] getResource(ObjectId resourceObjectId) {
+	public ByteString getResource(ObjectId resourceObjectId) {
 		if (!isDBConnected())
 			return null;
-		
-         try {
-             try (GridFSDownloadStream downloadStream = resourceCollection().openDownloadStream(resourceObjectId)) {
-                 int fileLength = (int) downloadStream.getGridFSFile().getLength();
-                 
-     			long maxSizeBytes = FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager().getConfig().getMissionFederationDisruptionMaxFileSizeBytes();
-    			if (fileLength > maxSizeBytes) {
-    				logger.info("File size of " + fileLength + " exceeds config limit of " + maxSizeBytes + "MB. Skipping " + downloadStream.getGridFSFile().getMetadata());
-    				return null;
-    			}
-                 
-                 byte[] bytesToWriteTo = new byte[fileLength];
-                 downloadStream.read(bytesToWriteTo);
-                 return bytesToWriteTo;
-             }
+		try (GridFSDownloadStream downloadStream = resourceCollection().openDownloadStream(resourceObjectId)) {
+			long fileLength = downloadStream.getGridFSFile().getLength();
+			long maxSizeBytes = FederationHubDependencyInjectionProxy.getInstance().fedHubServerConfigManager()
+					.getConfig().getMissionFederationDisruptionMaxFileSizeBytes();
+			if (fileLength > maxSizeBytes) {
+				logger.info("File size of " + fileLength + " exceeds config limit of " + maxSizeBytes + "MB. Skipping " + downloadStream.getGridFSFile().getMetadata());
+				return null;
+			}
+			return ByteString.readFrom(downloadStream);
 		} catch (Exception e) {
 			logger.error("Error reading resource", e);
+			return null;
 		}
-		return null;
 	}
 
 	@Override

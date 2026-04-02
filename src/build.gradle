@@ -171,12 +171,38 @@ subprojects {
         dirs project.rootDir.toString() + '/lib'
       }
     }
+    
+    // esapi_version = 2.5.2.0 is using commons-beanutils:commons-beanutils:1.9.4 which is flagged as 
+	// a high ulnerability. force it to use a newer version 
+    afterEvaluate { project ->
+	    project.configurations.all { config ->
+	        config.resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+	
+	            // commons-beanutils override
+	            if (details.requested.group == "commons-beanutils" &&
+	                details.requested.name == "commons-beanutils") {
+	                details.useVersion("${commons_beanutils_version}")
+	                details.because("Force upgrade due to security vulnerability in 1.9.4")
+	            }
+	
+	            // Netty core override — exclude tcnative and quic
+	            if (details.requested.group == "io.netty" &&
+	                !details.requested.name.startsWith("netty-tcnative") &&
+	                !details.requested.name.startsWith("netty-incubator-codec-quic")) {
+	                details.useVersion("${netty_version}")
+	                details.because("Force all core Netty modules to ${netty_version} due to security CVEs in 4.1.110")
+	            }
+	        }
+	    }
+	}
 
     dependencies {
       classpath 'gradle.plugin.com.github.johnrengelman:shadow:' + gradle_shadow_version
 //      classpath 'gradle.plugin.se.bjurr.violations:violations-gradle-plugin:1.52.2'
 //      classpath 'com.github.jk1:gradle-license-report:1.17'
     }
+    
+    
   }
 
 //  apply plugin: 'se.bjurr.violations.violations-gradle-plugin' // Normalizes quality reports for Gitlab CI

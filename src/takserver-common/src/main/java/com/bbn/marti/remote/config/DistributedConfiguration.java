@@ -58,6 +58,7 @@ import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.util.JAXBUtils;
 
 public class DistributedConfiguration implements CoreConfig, org.apache.ignite.services.Service {
@@ -79,7 +80,6 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     	return LocalConfiguration.getInstance().getConfiguration();
     }
 
-    private IgniteCache<String, Configuration> configurationCache;
     private ContinuousQuery<String, Configuration> continuousConfigurationQuery = new ContinuousQuery<>();
 
 	@Override
@@ -95,14 +95,16 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
     		loadConfigFromCache();
     	}
     	
-    	continuousConfigurationQuery.setLocalListener((evts) -> {
-    	     for (CacheEntryEvent<? extends String, ? extends Configuration> e : evts) {
-    	    	 this.setConfiguration(e.getValue());
-    	    	 saveChanges();
-    	     }
-      	 });
-    	
-    	getConfigurationCache().query(continuousConfigurationQuery);
+    	IgniteReconnectEventHandler.registerListener(() -> {
+    		continuousConfigurationQuery.setLocalListener((evts) -> {
+       	     for (CacheEntryEvent<? extends String, ? extends Configuration> e : evts) {
+       	    	 this.setConfiguration(e.getValue());
+       	    	 saveChanges();
+       	     }
+         	 });
+    		
+    		getConfigurationCache().query(continuousConfigurationQuery);	
+    	});
     	
 		if (logger.isDebugEnabled()) {
 			logger.debug("init method " + getClass().getSimpleName());
@@ -118,15 +120,11 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
 
     private IgniteCache<String, Configuration> getConfigurationCache() {
 
-		if (configurationCache == null) {
-			CacheConfiguration<String, Configuration> cfg = new CacheConfiguration<String, Configuration>();
+    	CacheConfiguration<String, Configuration> cfg = new CacheConfiguration<String, Configuration>();
 		
-			cfg.setName(Constants.CONFIGURATION_CACHE_NAME);
-			cfg.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);
-			configurationCache = IgniteHolder.getInstance().getIgnite().getOrCreateCache(cfg);
-		}
-		
-		return configurationCache;
+		cfg.setName(Constants.CONFIGURATION_CACHE_NAME);
+		cfg.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);
+		return IgniteHolder.getInstance().getIgnite().getOrCreateCache(cfg);
 	}
 
     public static DistributedConfiguration getInstance() {

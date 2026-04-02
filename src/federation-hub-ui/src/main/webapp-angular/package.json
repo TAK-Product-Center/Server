@@ -31,6 +31,7 @@
     "bootstrap-icons": "^1.11.3",
     "express": "^4.18.2",
     "jquery": "^3.7.1",
+    "material-design-icons": "^3.0.1",
     "metismenu": "^3.0.7",
     "ngx-cookie-service": "^19.1.0",
     "ngx-toastr": "^19.0.0",

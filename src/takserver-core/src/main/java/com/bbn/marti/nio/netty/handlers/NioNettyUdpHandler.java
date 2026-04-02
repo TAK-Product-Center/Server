@@ -29,6 +29,7 @@ import io.micrometer.core.instrument.Metrics;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.codec.MessageToMessageDecoder;
+import io.netty.util.ReferenceCountUtil;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 
@@ -51,6 +52,9 @@ public class NioNettyUdpHandler extends MessageToMessageDecoder<DatagramPacket> 
 	
 	@Override
 	protected void decode(ChannelHandlerContext ctx, DatagramPacket packet, List<Object> out) throws Exception {
+
+		ReferenceCountUtil.retain(packet.content());
+
 		ByteBuffer buffer = packet.content().nioBuffer();
 		
 		try {
@@ -76,34 +80,30 @@ public class NioNettyUdpHandler extends MessageToMessageDecoder<DatagramPacket> 
 	        }
 	        
 	        AbstractBroadcastingProtocol<CotEventContainer> anp = createAdaptedNettyProtocol(handler);
-	        
-	        if (protoSupported.get()) {
-	        	Resources.udpReadParseProcessor.submit(() -> {
-	        		final CotEventContainer cot = SingleProtobufOrCotProtocol.byteBufToCot(buffer, handler);
-	        		if (cot != null) {
-	        			if (anp != null) {
-	        				Resources.udpReadDataReceivedProcessor.submit(() -> {
-	        					anp.getProtocolListeners().forEach(listener -> listener.onDataReceived(cot, handler, protocol));
-	        					Metrics.counter(Constants.METRIC_MESSAGE_READ_COUNT_UDP, "takserver", "messaging").increment();
-	        				});
-	        			}	
-	        		}
-	        	});
-	        } else {
-	        	Resources.udpReadParseProcessor.submit(() -> {
-	        		final CotEventContainer cot = SingleCotProtocol.byteBufToCot(buffer, handler);
-	        		if (cot != null) {
-	        			if (anp != null) {
-	        				Resources.udpReadDataReceivedProcessor.submit(() -> {
-	        					anp.getProtocolListeners().forEach(listener -> listener.onDataReceived(cot, handler, protocol));
-	        					Metrics.counter(Constants.METRIC_MESSAGE_READ_COUNT_UDP, "takserver", "messaging").increment();
-	        				});
-	        			}
-	        		}
-	        	});
-	        }
+
+			Resources.udpReadParseProcessor.submit(() -> {
+				try {
+					final CotEventContainer cot = protoSupported.get() ?
+							SingleProtobufOrCotProtocol.byteBufToCot(buffer, handler) :
+							SingleCotProtocol.byteBufToCot(buffer, handler);
+					if (cot != null) {
+						if (anp != null) {
+							Resources.udpReadDataReceivedProcessor.submit(() -> {
+								anp.getProtocolListeners().forEach(listener -> listener.onDataReceived(cot, handler, protocol));
+								Metrics.counter(Constants.METRIC_MESSAGE_READ_COUNT_UDP, "takserver", "messaging").increment();
+							});
+						}
+					}
+				} catch (Exception e) {
+					log.error("exception in udpReadParseProcessor", e);
+				} finally {
+					ReferenceCountUtil.release(packet.content());
+				}
+			});
+
 		} catch (Exception e) {
-			log.error("cot error",e);
+			log.error("cot error", e);
+			ReferenceCountUtil.release(packet.content());
 		}
 	}
 	

@@ -1,0 +1,113 @@
+.dialog-title {
+  text-align: center;
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 8px;
+}
+
+.form-check {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 12px 0 20px 0;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.form-check-label {
+  margin-left: 8px;
+  font-weight: 500;
+}
+
+.all-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.destination-container {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.list-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.list-title {
+  text-align: center;
+  font-weight: bold;
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  color: #222; /* darker than row text */
+}
+
+.send-title {
+  background-color: #c2f0c2; /* darker green tint */
+  border: 1px solid #8ac98a;
+}
+
+.ignore-title {
+  background-color: #f5baba; /* darker red tint */
+  border: 1px solid #d18282;
+}
+
+.list-box {
+  border: 1px solid #ccc;
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  border-radius: 6px;
+  background-color: #fff;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.destination-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.destination-row-send {
+  background-color: #e0f9e0; /* slightly darker green than before */
+  border: 1px solid #a3d8a3;
+}
+
+.destination-row-ignore {
+  background-color: #f9dada; /* slightly darker red than before */
+  border: 1px solid #d8a3a3;
+}
+
+.destination-row:hover {
+  background-color: #f1f5ff;
+}
+
+.destination-text {
+  flex: 1;
+  text-align: left;
+  font-weight: 500;
+  color: #333;
+}
+
+.empty-text {
+  text-align: center;
+  font-style: italic;
+  color: #888;
+  padding: 12px;
+}

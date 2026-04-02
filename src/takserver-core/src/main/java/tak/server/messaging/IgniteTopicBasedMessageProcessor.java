@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 
+import tak.server.ignite.IgniteReconnectEventHandler;
+
 public abstract class IgniteTopicBasedMessageProcessor<T> implements MessageProcessor<T> {
 	
 	protected final String topic;
@@ -29,27 +31,29 @@ public abstract class IgniteTopicBasedMessageProcessor<T> implements MessageProc
 		if (logger.isDebugEnabled()) {
 			logger.debug(getClass().getSimpleName() + " init");
 		}
-		
-		// listen for messages
-        ignite.message().localListen(topic, (nodeId, message) -> {
-        	
-        	if (logger.isTraceEnabled()) {
-        		logger.trace(getClass().getSimpleName() + " received message " + message);
-        	}
-        	
-        	if (!(type.isInstance(message))) {
-        		
-        		if (logger.isDebugEnabled()) {
-        			logger.debug("ignoring unsupported message type " + message.getClass().getName());
-        		}
-        		
-        		return true;
-        	}
-        	
-        	process((T) message);
-        	
-        	// return true to continue listening
-        	return true;
-        });		
+		IgniteReconnectEventHandler.registerListener(() -> {
+
+			// listen for messages
+			ignite.message().localListen(topic, (nodeId, message) -> {
+
+				if (logger.isTraceEnabled()) {
+					logger.trace(getClass().getSimpleName() + " received message " + message);
+				}
+
+				if (!(type.isInstance(message))) {
+
+					if (logger.isDebugEnabled()) {
+						logger.debug("ignoring unsupported message type " + message.getClass().getName());
+					}
+
+					return true;
+				}
+
+				process((T) message);
+
+				// return true to continue listening
+				return true;
+			});
+		});
 	}
 }

@@ -5,8 +5,8 @@ import java.security.KeyManagementException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Base64;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
@@ -16,11 +16,14 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.google.common.base.Strings;
 import okhttp3.OkHttpClient;
 
+import org.jetbrains.annotations.NotNull;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -68,13 +71,15 @@ public class OAuthApi {
     @Autowired
     private Validator validator;
 
+    private volatile Cache<String, Oauth.AuthServer> oauthConfigurationCache;
+
     @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
     @RequestMapping(value = "/login/auth", method = RequestMethod.GET)
     public void handleAuthRequest(HttpServletRequest request, HttpServletResponse response) {
         try {
-            // get the auth server config
-            Oauth.AuthServer authServer = getAuthServerConfig();
-            if (authServer == null) {
+            // get the auth server config.
+            Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
+            if (knownConfigs == null) {
                 throw  new IllegalStateException("missing auth server config");
             }
 
@@ -89,6 +94,8 @@ public class OAuthApi {
                     "state", state, -1, false, request.isSecure()).toString());
 
             // build the auth url
+            Iterator<Map.Entry<String, Oauth.AuthServer>> entrySet = knownConfigs.entrySet().iterator();
+            Oauth.AuthServer authServer  =  entrySet.next().getValue();
             UriComponentsBuilder uriComponentBuilder =
                     UriComponentsBuilder.fromHttpUrl(authServer.getAuthEndpoint())
                             .queryParam("response_type", "code")
@@ -117,14 +124,15 @@ public class OAuthApi {
             throws NoSuchAlgorithmException, KeyManagementException, ParseException {
 
         // get the auth server config
-        Oauth.AuthServer authServer = getAuthServerConfig();
-        if (authServer == null) {
+        Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
+        if (knownConfigs.isEmpty()) {
             throw new IllegalStateException("missing auth server config");
         }
 
         // call the token endpoint
         RestTemplate restTemplate;
-
+        Iterator<Map.Entry<String, Oauth.AuthServer>> entrySet = knownConfigs.entrySet().iterator();
+        Oauth.AuthServer authServer  =  entrySet.next().getValue();
         if (authServer.isTrustAllCerts()) {
             TrustManager[] trustAllCerts = new TrustManager[]{
                     new X509TrustManager() {
@@ -172,7 +180,7 @@ public class OAuthApi {
         JSONObject tokenJson = (JSONObject) new JSONParser().parse(tokenResponse.getBody());
 
         if (!tokenJson.containsKey(authServer.getAccessTokenName())) {
-            throw new IllegalStateException("missing access_token in response");
+            throw new IllegalStateException(String.format("JWT Response did not include AccessToken field %s", authServer.getAccessTokenName()));
         }
 
         // store the access token in a cookie
@@ -228,11 +236,12 @@ public class OAuthApi {
                     "state", stateCookie, 0, false, request.isSecure()).toString());
 
             // get the auth server config
-            Oauth.AuthServer authServer = getAuthServerConfig();
-            if (authServer == null) {
+            Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
+            if (knownConfigs.isEmpty()) {
                 throw new IllegalStateException("missing auth server config");
             }
-
+            Iterator<Map.Entry<String, Oauth.AuthServer>> entrySet = knownConfigs.entrySet().iterator();
+            Oauth.AuthServer authServer  =  entrySet.next().getValue();
             // build up the parameters for the token request
             MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<String, String>();
             requestBody.add("grant_type", "authorization_code");
@@ -273,8 +282,10 @@ public class OAuthApi {
     public ModelAndView handleRefresh(
             HttpServletRequest request, HttpServletResponse response) {
         try {
-            Oauth.AuthServer authServer = getAuthServerConfig();
-            if (authServer != null) {
+            Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
+            if (!knownConfigs.isEmpty()) {
+                Iterator<Map.Entry<String, Oauth.AuthServer>> entrySet = knownConfigs.entrySet().iterator();
+                Oauth.AuthServer authServer  =  entrySet.next().getValue();
                 String refreshToken = (String) request.getSession().getAttribute(authServer.getRefreshTokenName());
                 if (Strings.isNullOrEmpty(refreshToken)) {
                     SecurityContextHolder.clearContext();
@@ -308,8 +319,11 @@ public class OAuthApi {
         String name = null;
         HttpStatus status = HttpStatus.NOT_FOUND;
 
-        if (getAuthServerConfig() != null) {
-            name = getAuthServerConfig().getName();
+        Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
+        if (!knownConfigs.isEmpty()) {
+            Iterator<Map.Entry<String, Oauth.AuthServer>> entrySet = knownConfigs.entrySet().iterator();
+            Oauth.AuthServer authServer  =  entrySet.next().getValue();
+            name = authServer.getName();
             status = HttpStatus.OK;
         }
 
@@ -326,9 +340,12 @@ public class OAuthApi {
     @RequestMapping(value = "/login/.well-known/openid-configuration", method = RequestMethod.GET)
     public OpoenIdConfigufation getOpenIdConfiguration() {
         OpoenIdConfigufation opoenIdConfigufation = new OpoenIdConfigufation();
-        if (getAuthServerConfig() != null) {
-            opoenIdConfigufation.authorization_endpoint = getAuthServerConfig().getAuthEndpoint();
-            opoenIdConfigufation.token_endpoint = getAuthServerConfig().getTokenEndpoint();
+        Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
+        if (!knownConfigs.isEmpty()) {
+            Iterator<Map.Entry<String, Oauth.AuthServer>> entrySet = knownConfigs.entrySet().iterator();
+            Oauth.AuthServer authServer  =  entrySet.next().getValue();
+            opoenIdConfigufation.authorization_endpoint = authServer.getAuthEndpoint();
+            opoenIdConfigufation.token_endpoint = authServer.getTokenEndpoint();
         }
         return opoenIdConfigufation;
     }
@@ -339,14 +356,20 @@ public class OAuthApi {
     }
 
     @RequestMapping(value = "/token/access", method = RequestMethod.GET)
-    public ApiResponse<String> getAccessToken(HttpServletRequest request) {
+    public ApiResponse<String> getAccessToken(HttpServletRequest request, HttpServletResponse response) {
         if (logger.isDebugEnabled()) {
             logger.debug("in getAccessToken");
         }
 
-        String token = ((MartiSocketUserDetailsImpl)SecurityContextHolder.getContext()
-                .getAuthentication().getPrincipal()).getToken();
+        Oauth oauthConf = getOuathConfig();
+        if (oauthConf == null || !oauthConf.isAllowAccessTokenRetrieval()) {
+            logger.error("illegal attempt to retrieve access token");
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            return null;
+        }
 
+        String token = ((MartiSocketUserDetailsImpl) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal()).getToken();
         return new ApiResponse<String>(Constants.API_VERSION, String.class.getSimpleName(), token);
     }
 
@@ -360,13 +383,61 @@ public class OAuthApi {
         return null;
     }
 
-    private Oauth.AuthServer getAuthServerConfig() {
+    private Cache<String, Oauth.AuthServer> getAuthServerConfig() {
+        Cache<String, Oauth.AuthServer> oAuthCache = getOrCreateOAuthCache();
+        if (oAuthCache .asMap().isEmpty()) {
+            ArrayList<Oauth.AuthServer> knownConfigs = new ArrayList<Oauth.AuthServer>();
+            knownConfigs.addAll(getManualConfigurations());
+            knownConfigs.addAll(getAutomatedConfigurations());
+            for (Oauth.AuthServer config : knownConfigs ){
+                oAuthCache.asMap().put(config.getName(), config);
+            }
+        }
+
+        return oAuthCache;
+    }
+
+    private @NotNull List<Oauth.AuthServer> getManualConfigurations() {
+        List<Oauth.AuthServer> knownConfigs = new ArrayList<Oauth.AuthServer>();
         if (getOuathConfig() != null &&
                 getOuathConfig().getAuthServer() != null &&
                 !getOuathConfig().getAuthServer().isEmpty()) {
-            return CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getAuthServer().get(0);
+            knownConfigs =  CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getAuthServer();
         }
-        return null;
+        return knownConfigs;
+    }
+
+    private @NotNull List<Oauth.AuthServer> getAutomatedConfigurations() {
+        List<Oauth.AuthServer> knownConfigs = new ArrayList<Oauth.AuthServer>();
+        if (getOuathConfig() != null &&
+                getOuathConfig().getOpenIdDiscoveryConfiguration() != null &&
+                !getOuathConfig().getOpenIdDiscoveryConfiguration().isEmpty()) {
+            List<Oauth.OpenIdDiscoveryConfiguration> trustedConfigs = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getOpenIdDiscoveryConfiguration();
+            for (Oauth.OpenIdDiscoveryConfiguration config : trustedConfigs) {
+                try {
+                    Oauth.AuthServer manualConfig = OAuthUtils.processTrustedAuthServerConfig(config);
+                    knownConfigs.add(manualConfig);
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
+
+            }
+        }
+        return knownConfigs;
+    }
+
+    private Cache<String, Oauth.AuthServer> getOrCreateOAuthCache() {
+        if (oauthConfigurationCache == null) {
+            synchronized (this) {
+                if (oauthConfigurationCache == null) {
+                    oauthConfigurationCache = Caffeine.newBuilder().expireAfterWrite(
+                            CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue()
+                                    .getOAuthConfigurationsCacheSeconds(), TimeUnit.SECONDS).build();
+                }
+            }
+        }
+
+        return oauthConfigurationCache;
     }
 
     private String sha256(String input) throws UnsupportedEncodingException, NoSuchAlgorithmException {

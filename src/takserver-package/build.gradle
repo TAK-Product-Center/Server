@@ -4,7 +4,7 @@ buildscript {
     }
 }
 
-apply plugin: 'nebula.ospackage'
+apply plugin: 'com.netflix.nebula.ospackage'
 apply from: "utils/utils.gradle"
 
 ext {
@@ -314,8 +314,9 @@ buildDeb {
 }
 
 task bundleRpm(type: Zip) {
-    archiveName 'takserver-bundle-' + takversion + '-' + takrelease + branch + '.zip'
-    destinationDir(file('build/'))
+    archiveFileName.set("takserver-bundle-${takversion}-${takrelease}${branch}.zip")
+	destinationDirectory.set(layout.buildDirectory)
+    
     from('takserver/build/distributions/') {}
     from('takserver/build/takArtifacts/docs/') {
         include 'TAK_Server_Configuration_Guide.pdf'
@@ -326,7 +327,9 @@ task bundleRpm(type: Zip) {
 }
 
 task bundleRpmCoreDb(type: Zip) {
-    archiveName 'takserver-rpm-core-db-' + takversion + '-' + takrelease + branch + '.zip'
+    archiveFileName.set("takserver-rpm-core-db-${takversion}-${takrelease}${branch}.zip")
+	destinationDirectory.set(layout.buildDirectory)
+	
     from('database/build/distributions/', 'launcher/build/distributions/')
     from('takserver/build/takArtifacts/docs/') {
         include 'TAK_Server_Configuration_Guide.pdf'

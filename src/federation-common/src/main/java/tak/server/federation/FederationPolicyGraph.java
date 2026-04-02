@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Set;
 
 import tak.server.federation.hub.policy.FederationPolicyGraphImpl.FederationPolicyReachabilityHolder;
+import tak.server.federation.hub.ui.graph.FederationUIPolicyModel;
 
 /*
  * Interface for a FederationPolicyGraph object to represent a federation
@@ -158,8 +159,7 @@ public interface FederationPolicyGraph {
     public Set<FederateEdge> getEdgeSet();
 
     public Collection<FederationNode> getNodes();
+    
+    public FederationUIPolicyModel getModel();
 
-    public Map<String, Object> getAdditionalData();
-
-    public void setAddtionalData(Map<String, Object> additionalData);
 }

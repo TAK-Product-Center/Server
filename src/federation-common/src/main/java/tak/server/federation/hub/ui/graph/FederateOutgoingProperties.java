@@ -7,6 +7,7 @@ public class FederateOutgoingProperties extends NodeProperties {
     private int port;
     private boolean outgoingEnabled;
     private boolean useToken;
+    private boolean tls = true;
     private String tokenType;
     private String token;
     
@@ -54,10 +55,17 @@ public class FederateOutgoingProperties extends NodeProperties {
 	public void setTokenType(String tokenType) {
 		this.tokenType = tokenType;
 	}
+	
+	public boolean isTls() {
+		return tls;
+	}
+	public void setTls(boolean tls) {
+		this.tls = tls;
+	}
 	@Override
 	public String toString() {
 		return "FederateOutgoingProperties [outgoingName=" + outgoingName + ", host=" + host + ", port=" + port
-				+ ", outgoingEnabled=" + outgoingEnabled + ", useToken=" + useToken + ", tokenType=" + tokenType
-				+ ", token=" + token + "]";
+				+ ", outgoingEnabled=" + outgoingEnabled + ", useToken=" + useToken + ", tls=" + tls + ", tokenType="
+				+ tokenType + ", token=" + token + "]";
 	}
 }

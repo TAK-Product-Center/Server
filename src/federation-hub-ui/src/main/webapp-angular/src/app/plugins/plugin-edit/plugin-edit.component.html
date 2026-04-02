@@ -1,0 +1,109 @@
+<h1 mat-dialog-title class="dialog-title">
+  Edit {{ data.plugin.type | titlecase }} Plugin - {{ data.plugin.name }}
+</h1>
+
+<mat-dialog-content>
+  <!-- Tab Group for Sender and Receiver -->
+  <mat-tab-group>
+    <mat-tab label="Send Destinations" *ngIf="data.plugin.type === 'sender'">
+      <br>
+
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="sendByDefault" [(ngModel)]="sendByDefault">
+        <label class="form-check-label" for="sendByDefault">
+          Send to new destinations by default
+        </label>
+      </div>
+      
+      <div class="all-buttons">
+        <button mat-raised-button (click)="moveAllRight(dontSend, send)" [disabled]="dontSend.length===0">
+          Move All →
+        </button>
+        <button mat-raised-button (click)="moveAllLeft(dontSend, send)" [disabled]="send.length===0">
+          ← Move All
+        </button>
+      </div>
+
+      <div class="destination-container">
+        <div class="list-wrapper">
+          <h4 class="list-title ignore-title">Ignore</h4>
+          <div class="list-box">
+            <div *ngFor="let d of dontSend" class="destination-row destination-row-ignore">
+              <span class="destination-text">{{ d.stringId }}</span>
+              <button mat-icon-button (click)="moveRight(dontSend, send, d)">
+                <mat-icon>arrow_forward</mat-icon>
+              </button>
+            </div>
+            <div *ngIf="dontSend.length === 0" class="empty-text">None</div>
+          </div>
+        </div>
+
+        <div class="list-wrapper">
+          <h4 class="list-title send-title">Send</h4>
+          <div class="list-box">
+            <div *ngFor="let d of send" class="destination-row destination-row-send">
+              <button mat-icon-button (click)="moveLeft(dontSend, send, d)">
+                <mat-icon>arrow_back</mat-icon>
+              </button>
+              <span class="destination-text">{{ d.stringId }}</span>
+            </div>
+            <div *ngIf="send.length === 0" class="empty-text">None</div>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Receive Sources" *ngIf="data.plugin.type === 'receiver' || data.plugin.type === 'interceptor'">
+      <br>
+
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="receiveByDefault" [(ngModel)]="receiveByDefault">
+        <label class="form-check-label" for="receiveByDefault">
+          Receive from new sources by default
+        </label>
+      </div>
+
+      <div class="all-buttons">
+        <button mat-raised-button (click)="moveAllRight(dontReceive, receive)" [disabled]="dontReceive.length===0">
+          Move All →
+        </button>
+        <button mat-raised-button (click)="moveAllLeft(dontReceive, receive)" [disabled]="receive.length===0">
+          ← Move All
+        </button>
+      </div>
+
+      <div class="destination-container">
+        <div class="list-wrapper">
+          <h4 class="list-title ignore-title">Ignore</h4>
+          <div class="list-box">
+            <div *ngFor="let d of dontReceive" class="destination-row destination-row-ignore">
+              <span class="destination-text">{{ d.stringId }}</span>
+              <button mat-icon-button (click)="moveRight(dontReceive, receive, d)">
+                <mat-icon>arrow_forward</mat-icon>
+              </button>
+            </div>
+            <div *ngIf="dontReceive.length === 0" class="empty-text">None</div>
+          </div>
+        </div>
+
+        <div class="list-wrapper">
+          <h4 class="list-title send-title">Receive</h4>
+          <div class="list-box">
+            <div *ngFor="let d of receive" class="destination-row destination-row-send">
+              <button mat-icon-button (click)="moveLeft(dontReceive, receive, d)">
+                <mat-icon>arrow_back</mat-icon>
+              </button>
+              <span class="destination-text">{{ d.stringId }}</span>
+            </div>
+            <div *ngIf="receive.length === 0" class="empty-text">None</div>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-flat-button color="warn" (click)="cancel()">Cancel</button>
+  <button mat-flat-button color="primary" (click)="save()">Save</button>
+</mat-dialog-actions>

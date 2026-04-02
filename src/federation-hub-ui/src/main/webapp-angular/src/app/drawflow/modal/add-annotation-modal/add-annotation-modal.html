@@ -10,6 +10,60 @@
       <small class="form-text text-muted">{{ federation.description ? (75 - federation.description.length) : 75 }}
         characters remaining</small>
     </div>
+    <div class="form-group">
+      <label for="textAlign">Text Alignment</label>
+      <select id="textAlign" class="form-control" [(ngModel)]="federation.textAlign" name="textAlign">
+        <option value="left">Left</option>
+        <option value="center">Center</option>
+        <option value="right">Right</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="fontSize">Font Size</label>
+      <select id="fontSize" class="form-control" [(ngModel)]="federation.fontSize" name="fontSize">
+        <option value="12px">Small</option>
+        <option value="16px">Medium</option>
+        <option value="20px">Large</option>
+        <option value="24px">X-Large</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="fontFamily">Font Family</label>
+      <select id="fontFamily" class="form-control" [(ngModel)]="federation.fontFamily" name="fontFamily">
+        <option value="Arial, sans-serif">Arial</option>
+        <option value="Verdana, sans-serif">Verdana</option>
+        <option value="Georgia, serif">Georgia</option>
+        <option value="Courier New, monospace">Courier New</option>
+        <option value="Times New Roman, serif">Times New Roman</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="bgColor">Background Color</label>
+      <input type="color" id="bgColor" class="form-control" [(ngModel)]="federation.bgColor" name="bgColor"
+        (ngModelChange)="onBgColorChange()" />
+    </div>
+
+    <div class="form-group">
+      <label for="annotationWidth">Annotation Width (200px - 500px)</label>
+      <input type="number" id="annotationWidth" class="form-control" [(ngModel)]="federation.width"
+        name="annotationWidth" min="200" max="500" step="25"/>
+    </div>
+
+    <div class="form-group">
+      <label>Preview</label>
+      <div class="preview-box" [ngStyle]="{
+                  'background-color': federation.bgColor,
+                  'color': federation.fontColor,
+                  'text-align': federation.textAlign,
+                  'justify-content': federation.textAlign,
+                  'font-size': federation.fontSize,
+                  'font-family': federation.fontFamily,
+                  'width': federation.width ? (federation.width + 'px') : 'auto' 
+                }">
+        <b>{{ federation.description || 'Preview Text' }}</b>
+      </div>
+    </div>
   </form>
 </mat-dialog-content>
 <mat-dialog-actions align="end">

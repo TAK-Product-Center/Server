@@ -1,0 +1,16 @@
+.login-container {
+  margin: 60px auto;
+  max-width: 400px;
+  text-align: center;
+}
+
+.login-btn {
+  padding: 12px 22px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.error {
+  color: red;
+  font-weight: bold;
+}

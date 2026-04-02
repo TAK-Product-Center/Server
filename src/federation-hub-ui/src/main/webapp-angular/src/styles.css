@@ -272,8 +272,14 @@ header a {
   -webkit-box-shadow: 0 2px 15px 2px var(--border-color);
   box-shadow: 0 2px 15px 2px var(--border-color);
   padding: 0px;
-  width: 200px;
+  max-width: 500px !important;
+  min-width: 200px !important;
 }
+
+.drawflow .drawflow-node.GroupingNode {
+  max-width: 1000px !important;
+}
+
 
 .drawflow .drawflow-node.selected {
   background: white;
@@ -769,4 +775,52 @@ tr.angular-ui-tree-empty {
 .description {
   max-height: 4rem;
   overflow-y: auto;
+}
+
+.preview-box {
+  width: 100%;
+  padding: 15px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  text-align: center;
+  margin-top: 10px;
+  min-height: 50px; /* Give it some height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s, color 0.3s; /* Smooth transition */
+}
+
+.full-width-input {
+  width: 100%;
+}
+
+.drawflow-node-group {
+  width: 400px;
+  height: 300px;
+  background-color: #f0f0f0;
+  border: 2px dashed #ccc;
+  z-index: 0;
+}
+
+.drawflow-node-group  {
+  background-color: #ddd;
+  padding: 5px;
+  cursor: move;
+  text-align: center;
+}
+
+.drawflow-node.hover-drop {
+  /* Example styling for a hovered group */
+  border: 2px dashed #4CAF50; /* A dashed green border */
+  box-shadow: 0 0 15px rgba(76, 175, 80, 0.5); /* A subtle green glow */
+  background-color: rgba(76, 175, 80, 0.1); /* A light green background tint */
+}
+
+.nodeHidden {
+  display: none !important;
+}
+
+.GroupingNode {
+  z-index: 1 !important;
 }

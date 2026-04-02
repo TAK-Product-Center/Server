@@ -352,9 +352,22 @@ public class SSLConfig implements SslSource, Serializable {
 	                if (securityProviders.length < 1) {
 	                    throw new IllegalStateException("No Java security providers configured.");
 	                }
-	                CertStore crlCertStore = CertStore.getInstance("Collection", certStoreParameters, securityProviders[0]);
 
-	                pkixParameters.addCertStore(crlCertStore);
+					for (Provider provider : securityProviders) {
+						CertStore crlCertStore;
+						try {
+							crlCertStore = CertStore.getInstance("Collection", certStoreParameters, provider);
+						} catch (NoSuchAlgorithmException e) {
+							logger.info("No such algorithm: " + e.getMessage());
+							continue;
+						} catch (InvalidAlgorithmParameterException e) {
+							logger.info("Invalid algorithm parameter: " + e.getMessage());
+							continue;
+						}
+
+						pkixParameters.addCertStore(crlCertStore);
+						break;
+					}
 	            }
 	            
 	            CertPathTrustManagerParameters trustManagerParameters = new CertPathTrustManagerParameters(pkixParameters);

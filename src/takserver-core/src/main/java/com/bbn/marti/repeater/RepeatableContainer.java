@@ -2,6 +2,7 @@
 
 package com.bbn.marti.repeater;
 
+import java.io.Serializable;
 import java.util.Date;
 
 import com.bbn.marti.remote.Repeatable;
@@ -14,7 +15,7 @@ import tak.server.cot.CotEventContainer;
  * 911, ring-the bell, etc.). This metadata along with some of the core fields are extracted to
  * the Repeatable class, to allow sending just that data to the MartiWebApps via RMI.
  */
-public class RepeatableContainer {
+public class RepeatableContainer implements Serializable {
 	private Repeatable repeatable;
 	private CotEventContainer cotEventContainer;
 	

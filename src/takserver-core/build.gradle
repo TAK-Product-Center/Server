@@ -194,7 +194,7 @@ dependencies {
   implementation group: 'io.micrometer', name: 'micrometer-core', version: micrometer_version
 
   // cloudwatch metrics
-  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch2', version: cloudwatch_version
+  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch2', version: micrometer_version
 
   implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: slf4j_version
   implementation group: 'org.slf4j', name: 'jul-to-slf4j', version: slf4j_version

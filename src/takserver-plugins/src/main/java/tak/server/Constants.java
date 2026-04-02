@@ -126,6 +126,8 @@ public class Constants {
 	public static final String CERTIFICATE_CACHE = "certificate-cache";
 	public static final String VIDEO_CACHE = "video-cache";
 	public static final String DATA_FEED_CACHE = "data-feed-cache";
+	public static final String REPEATED_MESSAGES_CACHE = "repeated-messages-cache";
+	public static final String CANCELLED_MESSAGES_CACHE = "cancelled-messages-cache";
 
 
 	// distributed message topics (ignite)

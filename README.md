@@ -189,4 +189,4 @@ cd <repo-home>/src
 
 ## TAK Server Documentation
 
-The documentation for TAK server is contained in the [config-guide repository](https://git.tak.gov/core/tak-docs/takserver/config-guide). This repository contains a README with instructions on how to update the documentation, and also the relationship between the configuration guide repository branches and this repository's branches. 
+The documentation for TAK server is contained in the [config-guide repository](https://git.tak.gov/core/tak-docs/takserver/config-guide). This repository contains a README with instructions on how to update the documentation, and also the relationship between the configuration guide repository branches and this repository's branches.

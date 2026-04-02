@@ -30,7 +30,8 @@ import tak.server.federation.hub.ui.graph.EdgeCell;
 import tak.server.federation.hub.ui.graph.EdgeProperties;
 import tak.server.federation.hub.ui.graph.FederateOutgoingProperties;
 import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
-import tak.server.federation.hub.ui.graph.FederationPolicyModel;
+import tak.server.federation.hub.ui.graph.FederationUIGraphPolicyModel;
+import tak.server.federation.hub.ui.graph.FederationUIPolicyModel;
 import tak.server.federation.hub.ui.graph.FilterNode;
 import tak.server.federation.hub.ui.graph.GroupCell;
 import tak.server.federation.hub.ui.graph.GroupProperties;
@@ -487,17 +488,18 @@ public class FedHubTests extends AbstractTestClass {
 	}
 
 	private void createPolicy(FederationHubServerConfig fedBrokerConfig, Collection<PolicyObjectCell> cells) {
-		FederationPolicyModel policyModel = new FederationPolicyModel();
-		policyModel.setCells(cells);
+		FederationUIGraphPolicyModel graphPolicyModel = new FederationUIGraphPolicyModel();
+		graphPolicyModel.setNodes(cells);
+		
+		FederationUIPolicyModel policyModel = new FederationUIPolicyModel();		
+		policyModel.setGraphData(graphPolicyModel);
 		policyModel.setName(this.getClass().getName());
 
 		String DEFAULT_FEDERATION_POLICY_CONFIG_FILE = "/opt/tak/federation-hub/ui_generated_policy.json";
 		ObjectMapper mapper = new ObjectMapper();
 		try {
-			policyModel.toString();
-			policyModel.getFederationPolicyObjectFromModel();
 			mapper.writerWithDefaultPrettyPrinter().writeValue(new File(DEFAULT_FEDERATION_POLICY_CONFIG_FILE),
-					policyModel.getFederationPolicyObjectFromModel());
+					policyModel);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("Could not write policy to file " + e.getStackTrace());

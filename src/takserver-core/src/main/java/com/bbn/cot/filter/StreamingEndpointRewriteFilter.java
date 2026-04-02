@@ -14,6 +14,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.naming.ldap.LdapName;
 
@@ -26,9 +27,12 @@ import org.springframework.context.ApplicationContext;
 
 import com.atakmap.Tak.ROL;
 import com.bbn.marti.config.Configuration;
+import com.bbn.marti.config.Input;
+import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.ForbiddenException;
+import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.FederateUser;
 import com.bbn.marti.remote.groups.GroupManager;
@@ -41,17 +45,17 @@ import com.bbn.marti.service.RepositoryService;
 import com.bbn.marti.service.Subscription;
 import com.bbn.marti.service.SubscriptionManager;
 import com.bbn.marti.service.SubscriptionStore;
-import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.model.MissionPermission;
 import com.bbn.marti.sync.model.MissionSubscription;
 import com.bbn.marti.sync.service.MissionService;
+import com.bbn.marti.util.CommonUtil;
 import com.google.common.base.Strings;
 
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 import tak.server.federation.DistributedFederationManager;
 
-public class StreamingEndpointRewriteFilter implements CotFilter {
+public class StreamingEndpointRewriteFilter {
 
 	public static String DEFAULT_STREAMINGENDPOINT_KEY = "filter.streamingbroker";
 	public static String EXPLICIT_PUBLISH_KEY = "explicitBrokeringPub";
@@ -102,8 +106,7 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 	}
 
 	@SuppressWarnings("unchecked")
-    @Override
-	public CotEventContainer filter(final CotEventContainer cot) {
+	public List<CotEventContainer> filter(final CotEventContainer cot) {
 		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
 		if (logger.isTraceEnabled()) {
@@ -263,8 +266,27 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
                 logger.debug("explicit callsigns for message " + cot.getUid() + " " + callsignList);
 
                 // use thread pool?
-    			processTracksByMissionName(cot, missionNames, clientUid, uids, missionNamePathMap, missionNameAfterMap);
-    			processTracksByMissionGuid(cot, missionGuids, clientUid, uids, missionGuidPathMap, missionGuidAfterMap);
+				List<CotEventContainer> tracksByNameResults = processTracksByMissionName(
+    					cot, missionNames, clientUid, uids, missionNamePathMap, missionNameAfterMap);
+
+				List<CotEventContainer> tracksByGuidResults = processTracksByMissionGuid(
+						cot, missionGuids, clientUid, uids, missionGuidPathMap, missionGuidAfterMap);
+
+				if (tracksByNameResults != null || tracksByGuidResults != null) {
+					List<CotEventContainer> results = new CopyOnWriteArrayList<>();
+
+					if (tracksByNameResults != null) {
+						results.addAll(tracksByNameResults);
+					}
+
+					if (tracksByGuidResults != null) {
+						results.addAll(tracksByGuidResults);
+					}
+
+					if (!results.isEmpty()) {
+						return results;
+					}
+				}
 
 				if (uids.size() > 0) {
 					cot.setContextValue(EXPLICIT_UID_KEY, new ArrayList<String>(uids));
@@ -278,10 +300,48 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 			martiElem.detach();
 		}
 
-		return cot;
+		return List.of(cot);
 	}
-	
-	private void processTracksByMissionName(
+
+	private List<CotEventContainer> fixupStreamingMissionChat(
+			CotEventContainer cot, String missionName, Set<String> uids) {
+
+		List<CotEventContainer> results = new CopyOnWriteArrayList<>();
+
+		try {
+
+			for (String uid : uids) {
+				Subscription subscription = subscriptionManager.getSubscriptionByClientUid(uid);
+				AbstractBroadcastingChannelHandler handler =
+						(AbstractBroadcastingChannelHandler) subscription.getHandler();
+				ConnectionInfo connectionInfo = handler.getConnectionInfo();
+				Input input = connectionInfo.getInput();
+
+				if (Strings.isNullOrEmpty(input.getTakServerHost())) {
+					continue;
+				}
+
+				CotEventContainer copy = cot.copy();
+
+				// remove marti element completely
+				Element martiElem = (Element) copy.getDocument().selectSingleNode(Constants.MARTI_XPATH);
+				if (martiElem != null) {
+					martiElem.detach();
+				}
+
+				CommonUtil.fixupMissionChat(copy, missionName, input.getTakServerHost());
+				copy.setContextValue(EXPLICIT_UID_KEY, new ArrayList<String>(List.of(uid)));
+				results.add(copy);
+			}
+
+		} catch (Exception e) {
+			logger.error("exception in fixupStreamingMissionChat", e);
+		}
+
+		return results;
+	}
+
+	private List<CotEventContainer> processTracksByMissionName(
 			final CotEventContainer cot,
 			Set<String> missionNames, String clientUid,
 			Set<String> uids,
@@ -360,136 +420,144 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 
 				// For inbound federated mission events we dont need to call addMissionContent since that's taken
 				// care of by ROL processor, and we don't want to re-federate the message, so just return
-				if (federateUser) {
-					return;
-				}
+				if (!federateUser) {
 
-				// final copy of variable to use in inner class
-				final String finClientUid = clientUid;
-				final String finGroupVector = groupVector;
+					// final copy of variable to use in inner class
+					final String finClientUid = clientUid;
+					final String finGroupVector = groupVector;
 
-				// TODO: refactor this for performance checks, separation of concerns
-				CotEventContainer copyCot = cot.copy();
+					// TODO: refactor this for performance checks, separation of concerns
+					CotEventContainer copyCot = cot.copy();
 
-				final String fclientUid = clientUid;
+					final String fclientUid = clientUid;
 
-				if (changeLogger.isDebugEnabled()) {
-					changeLogger.debug("sending change to executor for clientUid: " + fclientUid + " and add uid: " + copyCot.getUid());
-				}
-
-				// Don't add content if this message came over NATS. It was already added on the origin node
-				if (!cot.hasContextKey(Constants.NATS_MESSAGE_KEY)) {
-					try {
-						MissionContent missionContent = new MissionContent();
-						missionContent.getUids().add(copyCot.getUid());
-
-						if (missionPathMap.containsKey(missionName)) {
-
-							if (missionAfterMap.containsKey(missionName)) {
-								missionContent.setAfter(missionAfterMap.get(missionName));
-							}
-
-							MissionContent pathContent = new MissionContent();
-							pathContent.getOrCreatePaths().put(
-									missionPathMap.get(missionName), Arrays.asList(missionContent));
-							missionContent = pathContent;
-						}
-
-
-						Date timestamp = new Date();
-//						if (cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY) != null) {
-//							timestamp = (Date)cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY);
-//						}
-
-						missionService.addMissionContentAtTime(missionUuid, missionContent, finClientUid,
-								finGroupVector, timestamp, null);
-
-						//TODO - add case here for mission guid. Where to get it
-					} catch (Exception e) {
-						logger.error("exception adding content uid to mission " + e.getMessage(), e);
+					if (changeLogger.isDebugEnabled()) {
+						changeLogger.debug("sending change to executor for clientUid: " + fclientUid + " and add uid: " + copyCot.getUid());
 					}
-				}
 
-				if (config.getFederation().isEnableFederation()
-						&&	config.getFederation().isAllowMissionFederation()) {
-					// federate this mission update (subject to group filtering)
-					try {
+					// Don't add content if this message came over NATS. It was already added on the origin node
+					if (!cot.hasContextKey(Constants.NATS_MESSAGE_KEY)) {
+						try {
+							MissionContent missionContent = new MissionContent();
+							missionContent.getUids().add(copyCot.getUid());
 
-						NavigableSet<Group> groups = null;
+							if (missionPathMap.containsKey(missionName)) {
 
-						String uid = cot.getUid();
-
-						if (Strings.isNullOrEmpty(uid)) {
-							throw new IllegalArgumentException("empty uid in cot for mission content add");
-						}
-
-						MissionContent content = new MissionContent();
-						content.getUids().add(uid);
-
-						if (cot.getContextValue(Constants.GROUPS_KEY) != null) {
-							try {
-								groups = (NavigableSet<Group>) cot.getContextValue(Constants.GROUPS_KEY);
-
-								if (logger.isDebugEnabled()) {
-									logger.debug("groups for message: " + cot + ": " + groups);
+								if (missionAfterMap.containsKey(missionName)) {
+									missionContent.setAfter(missionAfterMap.get(missionName));
 								}
 
-							} catch (ClassCastException e) {
-								logger.debug("Not trying to get group info for message with invalid type of groups object: " + cot);
+								MissionContent pathContent = new MissionContent();
+								pathContent.getOrCreatePaths().put(
+										missionPathMap.get(missionName), Arrays.asList(missionContent));
+								missionContent = pathContent;
 							}
-						} else {
-							if (logger.isDebugEnabled()) {
-								logger.debug("Groups context key not set for message: " + cot);
-							}
+
+
+							Date timestamp = new Date();
+							//						if (cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY) != null) {
+							//							timestamp = (Date)cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY);
+							//						}
+
+							missionService.addMissionContentAtTime(missionUuid, missionContent, finClientUid,
+									finGroupVector, timestamp, null);
+
+							//TODO - add case here for mission guid. Where to get it
+						} catch (Exception e) {
+							logger.error("exception adding content uid to mission " + e.getMessage(), e);
 						}
+					}
 
-						if (groups != null) {
+					if (config.getFederation().isEnableFederation()
+							&& config.getFederation().isAllowMissionFederation()) {
+						// federate this mission update (subject to group filtering)
+						try {
 
-							MissionMetadata mission = repositoryService.getMissionMetadata(missionName);
+							NavigableSet<Group> groups = null;
 
-							if (mission == null) {
-								logger.debug("nothing to federate for non-existent mission {}", missionName);
-								return;
+							String uid = cot.getUid();
+
+							if (Strings.isNullOrEmpty(uid)) {
+								throw new IllegalArgumentException("empty uid in cot for mission content add");
 							}
 
+							MissionContent content = new MissionContent();
+							content.getUids().add(uid);
 
-							if (config.getFederation().isFederateOnlyPublicMissions()) {
-								if ("public".equals(mission.getTool())) {
-									// allow public. no action needed as of now
-								} else if (config.getNetwork().getMissionCopTool().equals(mission.getTool())) {
-									if (!config.getVbm().isEnabled()) {
-										logger.debug("not federating vbm mission action for mission " + missionName + " since vbm is disabled");
-										return;
+							if (cot.getContextValue(Constants.GROUPS_KEY) != null) {
+								try {
+									groups = (NavigableSet<Group>) cot.getContextValue(Constants.GROUPS_KEY);
+
+									if (logger.isDebugEnabled()) {
+										logger.debug("groups for message: " + cot + ": " + groups);
 									}
-								} else {
-									logger.debug("not federating non-public mission action for mission " + missionName);
-									return;
+
+								} catch (ClassCastException e) {
+									logger.debug("Not trying to get group info for message with invalid type of groups object: " + cot);
+								}
+							} else {
+								if (logger.isDebugEnabled()) {
+									logger.debug("Groups context key not set for message: " + cot);
 								}
 							}
+
+							if (groups != null) {
+
+								MissionMetadata mission = repositoryService.getMissionMetadata(missionName);
+
+								if (mission == null) {
+									logger.debug("nothing to federate for non-existent mission {}", missionName);
+									return null;
+								}
+
+
+								if (config.getFederation().isFederateOnlyPublicMissions()) {
+									if ("public".equals(mission.getTool())) {
+										// allow public. no action needed as of now
+									} else if (config.getNetwork().getMissionCopTool().equals(mission.getTool())) {
+										if (!config.getVbm().isEnabled()) {
+											logger.debug("not federating vbm mission action for mission " + missionName + " since vbm is disabled");
+											return null;
+										}
+									} else {
+										logger.debug("not federating non-public mission action for mission " + missionName);
+										return null;
+									}
+								}
 
 							ROL rol = RemoteUtil.getInstance().getROLforMissionChange(content, missionName, fclientUid, mission.getCreatorUid(), mission.getChatRoom(), mission.getTool(), mission.getDescription(), null, null, copyCot, groups);
 
-							if (logger.isDebugEnabled()) {
-								logger.debug("rol to federate for mission change " + rol + " to groups " + groups);
+								if (logger.isDebugEnabled()) {
+									logger.debug("rol to federate for mission change " + rol + " to groups " + groups);
+								}
+
+								federationManager.submitMissionFederateROL(rol, groups, missionName);
+
+							} else {
+								logger.warn("unable to federate mission uid add - cot message specified no groups");
 							}
 
-							federationManager.submitMissionFederateROL(rol, groups, missionName);
-
-						} else {
-							logger.warn("unable to federate mission uid add - cot message specified no groups");
+						} catch (Exception e) {
+							logger.debug("exception adding content uid to mission " + e.getMessage(), e);
 						}
+					}
+				}
 
-					} catch (Exception e) {
-						logger.debug("exception adding content uid to mission " + e.getMessage(), e);
+				if (cot.getType().startsWith("b-t-f")) {
+					List<CotEventContainer> results = fixupStreamingMissionChat(cot, missionName, uids);
+					if (!results.isEmpty()) {
+						return results;
 					}
 				}
 			}
 		} catch (Exception e) {
 			logger.debug("exception getting mission subscriber uids: " + e.getMessage(), e);
 		}
+
+		return null;
 	}
 	
-	private void processTracksByMissionGuid(
+	private List<CotEventContainer> processTracksByMissionGuid(
 			final CotEventContainer cot,
 			Set<UUID> missionGuids, String clientUid,
 			Set<String> uids,
@@ -563,140 +631,147 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 					changeLogger.debug("mission client uid for mission sub count: " + uids.size());
 				}
 
+				String missionName = missionService.getMissionNameByGuid(missionGuid);
+
 				// For inbound federated mission events we dont need to call addMissionContent since that's taken
 				// care of by ROL processor, and we don't want to re-federate the message, so just return
-				if (federateUser) {
-					return;
-				}
+				if (!federateUser) {
 
-				// final copy of variable to use in inner class
-				final String finClientUid = clientUid;
-				final String finGroupVector = groupVector;
+					// final copy of variable to use in inner class
+					final String finClientUid = clientUid;
+					final String finGroupVector = groupVector;
 
-				// TODO: refactor this for performance checks, separation of concerns
-				CotEventContainer copyCot = cot.copy();
+					// TODO: refactor this for performance checks, separation of concerns
+					CotEventContainer copyCot = cot.copy();
 
-				final String fclientUid = clientUid;
+					final String fclientUid = clientUid;
 
-				if (changeLogger.isDebugEnabled()) {
-					changeLogger.debug("sending change to executor for clientUid: " + fclientUid + " and add uid: " + copyCot.getUid());
-				}
+					if (changeLogger.isDebugEnabled()) {
+						changeLogger.debug("sending change to executor for clientUid: " + fclientUid + " and add uid: " + copyCot.getUid());
+					}
 
-				// Don't add content if this message came over NATS. It was already added on the origin node
-				if (!cot.hasContextKey(Constants.NATS_MESSAGE_KEY)) {
-					try {
-						MissionContent missionContent = new MissionContent();
-						missionContent.getUids().add(copyCot.getUid());
+					// Don't add content if this message came over NATS. It was already added on the origin node
+					if (!cot.hasContextKey(Constants.NATS_MESSAGE_KEY)) {
+						try {
+							MissionContent missionContent = new MissionContent();
+							missionContent.getUids().add(copyCot.getUid());
 
-						if (missionGuidPathMap.containsKey(missionGuid)) {
+							if (missionGuidPathMap.containsKey(missionGuid)) {
 
-							if (missionGuidAfterMap.containsKey(missionGuid)) {
-								missionContent.setAfter(missionGuidAfterMap.get(missionGuid));
+								if (missionGuidAfterMap.containsKey(missionGuid)) {
+									missionContent.setAfter(missionGuidAfterMap.get(missionGuid));
+								}
+
+								MissionContent pathContent = new MissionContent();
+								pathContent.getOrCreatePaths().put(
+										missionGuidPathMap.get(missionGuid), Arrays.asList(missionContent));
+								missionContent = pathContent;
 							}
 
-							MissionContent pathContent = new MissionContent();
-							pathContent.getOrCreatePaths().put(
-									missionGuidPathMap.get(missionGuid), Arrays.asList(missionContent));
-							missionContent = pathContent;
+							Date timestamp = new Date();
+							//						if (cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY) != null) {
+							//							timestamp = (Date)cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY);
+							//						}
+
+							missionService.addMissionContentAtTime(missionGuid, missionContent, finClientUid,
+									finGroupVector, timestamp, null);
+
+						} catch (Exception e) {
+							logger.error("exception adding content uid to mission " + e.getMessage(), e);
 						}
+					}
 
-						Date timestamp = new Date();
-//						if (cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY) != null) {
-//							timestamp = (Date)cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY);
-//						}
+					if (config.getFederation().isEnableFederation()
+							&& config.getFederation().isAllowMissionFederation()) {
+						// federate this mission update (subject to group filtering)
+						try {
 
-						missionService.addMissionContentAtTime(missionGuid, missionContent, finClientUid,
-								finGroupVector, timestamp, null);
+							NavigableSet<Group> groups = null;
 
-					} catch (Exception e) {
-						logger.error("exception adding content uid to mission " + e.getMessage(), e);
+							String uid = cot.getUid();
+
+							if (Strings.isNullOrEmpty(uid)) {
+								throw new IllegalArgumentException("empty uid in cot for mission content add");
+							}
+
+							MissionContent content = new MissionContent();
+							content.getUids().add(uid);
+
+							if (cot.getContextValue(Constants.GROUPS_KEY) != null) {
+								try {
+									groups = (NavigableSet<Group>) cot.getContextValue(Constants.GROUPS_KEY);
+
+									if (logger.isDebugEnabled()) {
+										logger.debug("groups for message: " + cot + ": " + groups);
+									}
+
+								} catch (ClassCastException e) {
+									logger.debug("Not trying to get group info for message with invalid type of groups object: " + cot);
+								}
+							} else {
+								if (logger.isDebugEnabled()) {
+									logger.debug("Groups context key not set for message: " + cot);
+								}
+							}
+
+							if (groups != null) {
+
+								MissionMetadata mission = repositoryService.getMissionMetadataByGuid(missionGuid);
+
+								if (mission == null) {
+									logger.debug("nothing to federate for non-existent mission {}", missionGuid);
+									return null;
+								}
+
+								if (config.getFederation().isFederateOnlyPublicMissions()) {
+									if ("public".equals(mission.getTool())) {
+										// allow public. no action needed as of now
+									} else if (config.getNetwork().getMissionCopTool().equals(mission.getTool())) {
+										if (!config.getVbm().isEnabled()) {
+											logger.debug("not federating vbm mission action for mission {} since vbm is disabled", missionGuid);
+											return null;
+										}
+									} else {
+										logger.debug("not federating non-public mission action for mission {} ", missionGuid);
+										return null;
+									}
+								}
+
+								if (!Strings.isNullOrEmpty(missionName)) {
+
+									// TODO: when implementing support for federating missions by guid, update this codepath to include the mission guid along with the mission name
+									ROL rol = RemoteUtil.getInstance().getROLforMissionChange(content, missionName, fclientUid, mission.getCreatorUid(), mission.getChatRoom(), mission.getTool(), mission.getDescription(), null, null);
+
+									if (logger.isDebugEnabled()) {
+										logger.debug("rol to federate for mission change " + rol + " to groups " + groups);
+									}
+
+									federationManager.submitMissionFederateROL(rol, groups, missionName);
+
+								} else {
+									logger.warn("no mission name found for mission guid {}. Nothing to federate", missionGuid);
+								}
+							} else {
+								logger.warn("unable to federate mission uid add - cot message specified no groups");
+							}
+
+						} catch (Exception e) {
+							logger.debug("exception adding content uid to mission " + e.getMessage(), e);
+						}
 					}
 				}
 
-				if (config.getFederation().isEnableFederation()
-						&&	config.getFederation().isAllowMissionFederation()) {
-					// federate this mission update (subject to group filtering)
-					try {
-
-						NavigableSet<Group> groups = null;
-
-						String uid = cot.getUid();
-
-						if (Strings.isNullOrEmpty(uid)) {
-							throw new IllegalArgumentException("empty uid in cot for mission content add");
-						}
-
-						MissionContent content = new MissionContent();
-						content.getUids().add(uid);
-
-						if (cot.getContextValue(Constants.GROUPS_KEY) != null) {
-							try {
-								groups = (NavigableSet<Group>) cot.getContextValue(Constants.GROUPS_KEY);
-
-								if (logger.isDebugEnabled()) {
-									logger.debug("groups for message: " + cot + ": " + groups);
-								}
-
-							} catch (ClassCastException e) {
-								logger.debug("Not trying to get group info for message with invalid type of groups object: " + cot);
-							}
-						} else {
-							if (logger.isDebugEnabled()) {
-								logger.debug("Groups context key not set for message: " + cot);
-							}
-						}
-
-						if (groups != null) {
-
-							MissionMetadata mission = repositoryService.getMissionMetadataByGuid(missionGuid);
-
-							if (mission == null) {
-								logger.debug("nothing to federate for non-existent mission {}", missionGuid);
-								return;
-							}
-
-
-							if (config.getFederation().isFederateOnlyPublicMissions()) {
-								if ("public".equals(mission.getTool())) {
-									// allow public. no action needed as of now
-								} else if (config.getNetwork().getMissionCopTool().equals(mission.getTool())) {
-									if (!config.getVbm().isEnabled()) {
-										logger.debug("not federating vbm mission action for mission {} since vbm is disabled", missionGuid);
-										return;
-									}
-								} else {
-									logger.debug("not federating non-public mission action for mission {} ", missionGuid);
-									return;
-								}
-							}
-							
-							String missionName = missionService.getMissionNameByGuid(missionGuid);
-							
-							if (!Strings.isNullOrEmpty(missionName)) {
-
-								// TODO: when implementing support for federating missions by guid, update this codepath to include the mission guid along with the mission name
-								ROL rol = RemoteUtil.getInstance().getROLforMissionChange(content, missionName, fclientUid, mission.getCreatorUid(), mission.getChatRoom(), mission.getTool(), mission.getDescription(), null, null);
-
-								if (logger.isDebugEnabled()) {
-									logger.debug("rol to federate for mission change " + rol + " to groups " + groups);
-								}
-
-								federationManager.submitMissionFederateROL(rol, groups, missionName);
-
-							} else {
-								logger.warn("no mission name found for mission guid {}. Nothing to federate", missionGuid);
-							}
-						} else {
-							logger.warn("unable to federate mission uid add - cot message specified no groups");
-						}
-
-					} catch (Exception e) {
-						logger.debug("exception adding content uid to mission " + e.getMessage(), e);
+				if (cot.getType().startsWith("b-t-f")) {
+					List<CotEventContainer> results = fixupStreamingMissionChat(cot, missionName, uids);
+					if (!results.isEmpty()) {
+						return results;
 					}
 				}
 			}
 		} catch (Exception e) {
 			logger.debug("exception getting mission subscriber uids: " + e.getMessage(), e);
 		}
+
+		return null;
 	}
 }

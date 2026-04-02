@@ -9,23 +9,23 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.concurrent.TimeUnit;
 
-import com.bbn.marti.config.Configuration;
 import org.apache.log4j.Logger;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
 import org.dom4j.Node;
 import org.dom4j.XPath;
 
+import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.Repeater;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.User;
+import com.bbn.marti.remote.RepeaterManager;
 import com.bbn.marti.remote.util.DateUtil;
-import com.bbn.marti.repeater.DistributedRepeaterManager;
 import com.bbn.marti.util.Tuple;
 
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 
@@ -57,7 +57,7 @@ public class RepeaterService extends BaseService {
 	private static final String[] DEFAULT_NAMES = { "In Contact", "Alert" };
 
 	// ** internal logic
-	private DistributedRepeaterManager repeaterManager;
+	private RepeaterManager repeaterManager;
 	private BrokerService brokerService;
 	private GroupManager groupManager;
 
@@ -67,7 +67,7 @@ public class RepeaterService extends BaseService {
 	private Map<String, Tuple<String, String>> repeatableTypes = new HashMap<String, Tuple<String, String>>();
 	private ThreadLocal<HashMap<String, XPath>> xpathMap = new ThreadLocal<HashMap<String, XPath>>();
 
-	public RepeaterService(BrokerService brokerService, GroupManager groupManager, DistributedRepeaterManager repeaterMgr) {
+	public RepeaterService(BrokerService brokerService, GroupManager groupManager, RepeaterManager repeaterMgr) {
 		this.brokerService = brokerService;
 		this.groupManager = groupManager;
 		this.repeaterManager = repeaterMgr;
@@ -183,7 +183,7 @@ public class RepeaterService extends BaseService {
 				return false;
 			}
 		} else if (isRepeatCancellationMessage(cotMsg)) {
-			if (repeaterManager.removeMessage(cotMsg.getUid(), false)) {
+			if (repeaterManager.removeRepeatedMessage(cotMsg.getUid(), false)) {
 				LOGGER.debug("Cancelling repeater treatment for " + cotMsg.getUid());
 				return true;
 			} else {
@@ -300,7 +300,7 @@ public class RepeaterService extends BaseService {
 
 			LinkedList<String> removedEntries = new LinkedList<String>();
 			for (CotEventContainer cotMsg : repeaterManager
-					.getCancelledMessages().values()) {
+					.getCancelledMessages()) {
 
 				long now = System.currentTimeMillis();
 				cotMsg.setTime(DateUtil.toCotTime(now));
@@ -324,14 +324,9 @@ public class RepeaterService extends BaseService {
 			}
 
 			for (String s : removedEntries) {
-				repeaterManager.getCancelledMessages().remove(s);
+				repeaterManager.removeCancelledMessage(s);
 
 			}
 		}
 	}
-
-	public DistributedRepeaterManager getRepeaterManager() {
-		return repeaterManager;
-	}
-
 }

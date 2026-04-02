@@ -51,13 +51,14 @@ export class CAManagerComponent {
       // automatically remove the active deleted ca and save
       activeCANodes.forEach((node: any) => editor.removeNodeId(`node-${node.id}`))
 
-      let policy = this.dataService.getActivePolicy()
-      policy.cells = this.dataService.getEditor().exportCells()
+      let policy = this.dataService.getActiveEditingPolicy()
+      policy['graphData']['nodes'] = this.dataService.getEditor().exportCells()
       policy.settings = this.dataService.getEditor().exportSettings()
       
-      this.workflowService.saveGraph(policy).subscribe({
+      this.workflowService.saveFederationGraphPolicy(policy).subscribe({
         next: (v) => {
-          this.workflowService.updateFederationManagerAndFile(policy.name).subscribe({
+          this.dataService.setActiveEditingPolicy(v)
+          this.workflowService.activateFederationPolicy(policy.name).subscribe({
             next: (v) => {},
             error: (e) => {}
           })

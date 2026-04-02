@@ -45,6 +45,7 @@ import tak.server.federation.hub.FederationHubUtils;
 import tak.server.federation.hub.broker.db.FederationHubDatabaseService;
 import tak.server.federation.hub.broker.db.FederationHubDatabaseServiceImpl;
 import tak.server.federation.hub.db.FederationHubDatabase;
+import tak.server.federation.hub.plugin.PluginRegistrySyncService;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
 import tak.server.federation.hub.policy.FederationHubPolicyManagerProxyFactory;
 import tak.server.federation.hub.broker.FederationHubBrokerMetricsPoller;
@@ -147,13 +148,14 @@ public class FederationHubServer implements CommandLineRunner {
 	@Order(Ordered.LOWEST_PRECEDENCE)
 	public FederationHubBrokerService FederationHubBrokerService(Ignite ignite, SSLConfig getSslConfig,
 			FederationHubServerConfigManager fedHubConfigManager, FederationHubPolicyManager fedHubPolicyManager,
-			HubConnectionStore hubConnectionStore, FederationHubMissionDisruptionManager federationHubMissionDisruptionManager,
-		 	FederationHubBrokerMetrics fedHubBrokerMetrics, FederationHubBrokerGlobalMetrics fedHubBrokerGlobalMetrics,
-																 ActuatorMetricsService actuatorMetricsService) {
+			HubConnectionStore hubConnectionStore,
+			FederationHubMissionDisruptionManager federationHubMissionDisruptionManager,
+			FederationHubBrokerMetrics fedHubBrokerMetrics, FederationHubBrokerGlobalMetrics fedHubBrokerGlobalMetrics,
+			ActuatorMetricsService actuatorMetricsService, PluginRegistrySyncService pluginRegistrySyncService) {
 
-		return new FederationHubBrokerService(ignite, getSslConfig, fedHubConfigManager,
-				fedHubPolicyManager, hubConnectionStore, federationHubMissionDisruptionManager,
-				fedHubBrokerMetrics, fedHubBrokerGlobalMetrics, actuatorMetricsService);
+		return new FederationHubBrokerService(ignite, getSslConfig, fedHubConfigManager, fedHubPolicyManager,
+				hubConnectionStore, federationHubMissionDisruptionManager, fedHubBrokerMetrics,
+				fedHubBrokerGlobalMetrics, actuatorMetricsService, pluginRegistrySyncService);
 	}
 
 	@Bean
@@ -190,6 +192,11 @@ public class FederationHubServer implements CommandLineRunner {
 		} else {
 			return new FederationHubDatabase();
 		}
+	}
+	
+	@Bean
+	public PluginRegistrySyncService pluginRegistrySyncService(Ignite ignite) {
+		return new PluginRegistrySyncService(ignite);
 	}
 	
 	@Bean

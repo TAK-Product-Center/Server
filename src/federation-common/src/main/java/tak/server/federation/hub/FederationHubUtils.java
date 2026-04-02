@@ -26,6 +26,7 @@ import javax.net.ssl.X509TrustManager;
 import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.configuration.ClientConnectorConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
+import org.apache.ignite.events.EventType;
 import org.apache.ignite.failure.NoOpFailureHandler;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.spi.communication.tcp.TcpCommunicationSpi;
@@ -126,7 +127,8 @@ public class FederationHubUtils {
         conf.setStripedPoolSize(poolSize);
         conf.setDataStreamerThreadPoolSize(poolSize);
         conf.setRebalanceThreadPoolSize(poolSize);
-
+        
+		conf.setIncludeEventTypes(EventType.EVT_NODE_LEFT, EventType.EVT_NODE_FAILED, EventType.EVT_NODE_JOINED);
         return conf;
     }
     

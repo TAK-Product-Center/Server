@@ -24,16 +24,15 @@ public class FederationHubUIConfig {
     private boolean allowOauth  = false;
     private Integer oauthPort;
     private String keycloakServerName;
-    private String keycloakDerLocation;
+    private String keycloakTlsCertFile;
     private String keycloakClientId;
     private String keycloakSecret;
     private String keycloakrRedirectUri;
-    private String keycloakAuthEndpoint;
-    private String keycloakTokenEndpoint;
+    private String keycloakConfigurationEndpoint;
     private String keycloakClaimName;
     private String keycloakAdminClaimValue;
-    private String keycloakAccessTokenName = "access_token";
-    private String keycloakRefreshTokenName = "refresh_token";
+    
+    private boolean oauthPortTls = true;
     
     private boolean enableFlowIndicators = true;
 
@@ -110,11 +109,11 @@ public class FederationHubUIConfig {
 	public void setKeycloakServerName(String keycloakServerName) {
 		this.keycloakServerName = keycloakServerName;
 	}
-	public String getKeycloakDerLocation() {
-		return keycloakDerLocation;
+	public String getKeycloakTlsCertFile() {
+		return keycloakTlsCertFile;
 	}
-	public void setKeycloakDerLocation(String keycloakDerLocation) {
-		this.keycloakDerLocation = keycloakDerLocation;
+	public void setKeycloakTlsCertFile(String keycloakTlsCertFile) {
+		this.keycloakTlsCertFile = keycloakTlsCertFile;
 	}
 	public String getKeycloakClientId() {
 		return keycloakClientId;
@@ -134,35 +133,11 @@ public class FederationHubUIConfig {
 	public void setKeycloakrRedirectUri(String keycloakrRedirectUri) {
 		this.keycloakrRedirectUri = keycloakrRedirectUri;
 	}
-	public String getKeycloakAuthEndpoint() {
-		return keycloakAuthEndpoint;
-	}
-	public void setKeycloakAuthEndpoint(String keycloakAuthEndpoint) {
-		this.keycloakAuthEndpoint = keycloakAuthEndpoint;
-	}
-	public String getKeycloakTokenEndpoint() {
-		return keycloakTokenEndpoint;
-	}
-	public void setKeycloakTokenEndpoint(String keycloakTokenEndpoint) {
-		this.keycloakTokenEndpoint = keycloakTokenEndpoint;
-	}
 	public boolean isAllowOauth() {
 		return allowOauth;
 	}
 	public void setAllowOauth(boolean allowOauth) {
 		this.allowOauth = allowOauth;
-	}
-	public String getKeycloakAccessTokenName() {
-		return keycloakAccessTokenName;
-	}
-	public void setKeycloakAccessTokenName(String keycloakAccessTokenName) {
-		this.keycloakAccessTokenName = keycloakAccessTokenName;
-	}
-	public String getKeycloakRefreshTokenName() {
-		return keycloakRefreshTokenName;
-	}
-	public void setKeycloakRefreshTokenName(String keycloakRefreshTokenName) {
-		this.keycloakRefreshTokenName = keycloakRefreshTokenName;
 	}
 	public String getKeycloakClaimName() {
 		return keycloakClaimName;
@@ -170,7 +145,6 @@ public class FederationHubUIConfig {
 	public void setKeycloakClaimName(String keycloakClaimName) {
 		this.keycloakClaimName = keycloakClaimName;
 	}
-
 	public String getKeycloakAdminClaimValue() {
 		return keycloakAdminClaimValue;
 	}
@@ -183,17 +157,35 @@ public class FederationHubUIConfig {
 	public void setEnableFlowIndicators(boolean enableFlowIndicators) {
 		this.enableFlowIndicators = enableFlowIndicators;
 	}
+	
+	public boolean isOauthPortTls() {
+		return oauthPortTls;
+	}
+	public void setOauthPortTls(boolean oauthPortTls) {
+		this.oauthPortTls = oauthPortTls;
+	}
+	public String getKeycloakConfigurationEndpoint() {
+		return keycloakConfigurationEndpoint;
+	}
+	public void setKeycloakConfigurationEndpoint(String keycloakConfigurationEndpoint) {
+		this.keycloakConfigurationEndpoint = keycloakConfigurationEndpoint;
+	}
+	public static String getAuthUserFileDefault() {
+		return AUTH_USER_FILE_DEFAULT;
+	}
+	public void setTruststorePassword(String truststorePassword) {
+		this.truststorePassword = truststorePassword;
+	}
 	@Override
 	public String toString() {
-		return "FederationHubUIConfig [" + "keystoreType=" + keystoreType
-				+ ", keystoreFile=" + keystoreFile + ", truststoreType=" + truststoreType + ", truststoreFile="
-				+ truststoreFile + ", keyAlias=" + keyAlias + ", authUsers=" + authUsers + ", port=" + port
-				+ ", allowOauth=" + allowOauth + ", oauthPort=" + oauthPort + ", keycloakServerName="
-				+ keycloakServerName + ", keycloakDerLocation=" + keycloakDerLocation + ", keycloakClientId="
-				+ keycloakClientId + ", keycloakrRedirectUri=" + keycloakrRedirectUri + ", keycloakAuthEndpoint="
-				+ keycloakAuthEndpoint + ", keycloakTokenEndpoint=" + keycloakTokenEndpoint + ", keycloakClaimName="
-				+ keycloakClaimName + ", keycloakAdminClaimValue=" + keycloakAdminClaimValue
-				+ ", keycloakAccessTokenName=" + keycloakAccessTokenName + ", keycloakRefreshTokenName="
-				+ keycloakRefreshTokenName + ", enableFlowIndicators=" + enableFlowIndicators + "]";
+		return "FederationHubUIConfig [keystoreType=" + keystoreType + ", keystoreFile="
+				+ keystoreFile + ", truststoreType=" + truststoreType + ", truststoreFile=" + truststoreFile
+				+ ", keyAlias=" + keyAlias + ", authUsers=" + authUsers + ", port=" + port + ", allowOauth="
+				+ allowOauth + ", oauthPort=" + oauthPort + ", keycloakServerName=" + keycloakServerName
+				+ ", keycloakTlsCertFile=" + keycloakTlsCertFile + ", keycloakClientId=" + keycloakClientId
+				+ ", keycloakrRedirectUri=" + keycloakrRedirectUri + ", keycloakConfigurationEndpoint="
+				+ keycloakConfigurationEndpoint + ", keycloakClaimName=" + keycloakClaimName
+				+ ", keycloakAdminClaimValue=" + keycloakAdminClaimValue + ", oauthPortTls=" + oauthPortTls
+				+ ", enableFlowIndicators=" + enableFlowIndicators + "]";
 	}
 }

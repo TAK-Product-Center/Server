@@ -10,7 +10,7 @@ export class ConfigService {
 
   private service = {};
   private ROGER_FEDERATION_PROTOCOL_STR = window.location.protocol;
-  private ROGER_FEDERATION_BASE_PATH = "/fig/";
+  private ROGER_FEDERATION_BASE_PATH = "/api/";
   private initialized = false;
   private localServerInfo: serverInfo = {
     roger_federation: {

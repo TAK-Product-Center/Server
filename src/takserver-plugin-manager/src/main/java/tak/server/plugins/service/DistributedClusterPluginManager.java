@@ -25,7 +25,6 @@ public class DistributedClusterPluginManager extends DistributedPluginManager {
 	private static final long serialVersionUID = 753070297094974770L;
 	private static final Logger logger = LoggerFactory.getLogger(DistributedClusterPluginManager.class);
 		
-	private IgniteCache<String, Boolean> pluginStartedCache;
     private ContinuousQuery<String, Boolean> continuousPluginQuery = new ContinuousQuery<>();
 
     @EventListener({ PluginsStartedEvent.class })
@@ -128,16 +127,11 @@ public class DistributedClusterPluginManager extends DistributedPluginManager {
 	}
 	
 	private IgniteCache<String, Boolean> getPluginStartedCache() {
-
-		if (pluginStartedCache == null) {
-			CacheConfiguration<String, Boolean> cfg = new CacheConfiguration<String, Boolean>();
-			
-			cfg.setName(CommonConstants.PLUGIN_CACHE);
-			cfg.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);				
-			pluginStartedCache = PluginManagerDependencyInjectionProxy.getInstance().ignite().getOrCreateCache(cfg);
-		}
+		CacheConfiguration<String, Boolean> cfg = new CacheConfiguration<String, Boolean>();
 		
-		return pluginStartedCache;
+		cfg.setName(CommonConstants.PLUGIN_CACHE);
+		cfg.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);				
+		return PluginManagerDependencyInjectionProxy.getInstance().ignite().getOrCreateCache(cfg);
 	}
 	
 	private void updateCache(String name, boolean status) {

@@ -74,6 +74,7 @@ public interface SubscriptionManagerLite {
     void setSubscriptionsMetricsForClientUid(String clientUid, RemoteSubscriptionMetrics subscriptionMetrics);
     RemoteSubscriptionMetrics getSubscriptionMetricsForClientUid(String clientUid);
 	boolean deleteSubscriptionFromUI(String uid);
+	void deleteAllSubscriptions();
 
 	void sendLatestReachableSA(String username);
 	void sendUpdatedGroupsLatestReachableSA(String username);

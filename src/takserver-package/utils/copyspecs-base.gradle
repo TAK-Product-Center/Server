@@ -181,6 +181,7 @@ ext {
     copyFullFedhubSpec = { Task task, boolean dockerMode ->
         task.dependsOn(':federation-hub-broker:build')
         task.dependsOn(':federation-hub-policy:build')
+        task.dependsOn(':federation-hub-plugin-manager:build')
         task.dependsOn(':federation-hub-ui:bootWar')
         task.dependsOn(':federation-hub-ui:shadowJar')
 
@@ -213,6 +214,25 @@ ext {
                 from(proj.file('build/libs')) {
                     include 'federation-hub-policy-*' + version + '.jar'
                     rename 'federation-hub-policy-*' + version + '.jar', 'federation-hub/jars/federation-hub-policy.jar'
+                }
+                from(proj.file('src/main/resources')) {
+                    include 'federation-hub-*.yml', 'logback-*.xml'
+                    if (dockerMode) {
+                        rename('(.*)', 'federation-hub/configs/$1')
+                    } else {
+                        rename('(.*)', 'federation-hub/default-configs/$1')
+                    }
+                }
+                from(proj.file('scripts')) {
+                    include 'federation-hub*'
+                    rename('(.*)', 'federation-hub/scripts/$1')
+                }
+            }
+
+            project(':federation-hub-plugin-manager') { proj ->
+                from(proj.file('build/libs')) {
+                    include 'federation-hub-plugin-manager-*' + version + '.jar'
+                    rename 'federation-hub-plugin-manager-*' + version + '.jar', 'federation-hub/jars/federation-hub-plugin-manager.jar'
                 }
                 from(proj.file('src/main/resources')) {
                     include 'federation-hub-*.yml', 'logback-*.xml'

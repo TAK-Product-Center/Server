@@ -143,6 +143,7 @@ import com.bbn.marti.util.GeomUtils;
 import com.bbn.marti.util.TimeUtils;
 import com.bbn.marti.util.missionpackage.ContentType;
 import com.bbn.marti.util.missionpackage.MissionPackage;
+import com.bbn.marti.util.spring.ThreadLocalRequestHolder;
 import com.beust.jcommander.internal.Lists;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -521,6 +522,15 @@ public class MissionServiceDefaultImpl implements MissionService {
 		for (CotCacheWrapper wrapper : cotCacheHelper.getLatestCotWrappersForUids(uids, groupVector, false)) {
 
 			CotElement element = wrapper.getCotElement();
+
+			try {
+				if (element.cottype != null && element.cottype.startsWith("b-t-f")) {
+					element = missionService.fixupMissionChat(element,
+							ThreadLocalRequestHolder.getRequest().getServerName());
+				}
+			} catch (Exception e) {
+				logger.error("exception calling fixupMissionChat", e);
+			}
 
 			if (element != null) {
 				cotElements.add(element);
@@ -1552,43 +1562,49 @@ public class MissionServiceDefaultImpl implements MissionService {
 		return missionInvitationRepository.findAllByMissionId(missionId);
 	}
 
-	public CompletableFuture<Set<MissionInvitation>> getAllMissionInvitationsForClient(String clientUid, String groupVector, String username) {
-	    return subscriptionManagerProxy.getSubscriptionManagerForClientUid(clientUid)
-	        .thenApply(subscriptionManager -> {
-	            Set<MissionInvitation> missionInvitations = new HashSet<>();
+	public Set<MissionInvitation> getAllMissionInvitationsForClient(String clientUid, String groupVector, String username) {
 
-	            // 1. Invitations for clientUid
-	            missionInvitations.addAll(
-	                missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
-	                    clientUid, MissionInvitation.Type.clientUid.name(), groupVector)
-	            );
+		Set<MissionInvitation> missionInvitations = new HashSet<>();
 
-	            // 2. Invitations for callsign (if any)
-	            RemoteSubscription subscription = subscriptionManager.getRemoteSubscriptionByClientUid(clientUid);
-	            if (subscription != null) {
-	                missionInvitations.addAll(
-	                    missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
-	                        subscription.callsign, MissionInvitation.Type.callsign.name(), groupVector)
-	                );
-	            }
+		try {
+			// 1. Invitations for clientUid
+			missionInvitations.addAll(
+					missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
+							clientUid, MissionInvitation.Type.clientUid.name(), groupVector)
+			);
 
-	            // 3. Invitations for authenticated username
-	            missionInvitations.addAll(
-	                missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
-	                    username, MissionInvitation.Type.userName.name(), groupVector)
-	            );
+			// 2. Invitations for authenticated username
+			missionInvitations.addAll(
+					missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
+							username, MissionInvitation.Type.userName.name(), groupVector)
+			);
 
-	            return missionInvitations;
-	        })
-	        .exceptionally(ex -> {
-	            logger.error("Exception in getAllMissionInvitationsForClient!", ex);
-	            return Collections.emptySet();
-	        });
+			// 3. Invitations for callsign (if any)
+			try {
+				subscriptionManagerProxy.getSubscriptionManagerForClientUid(clientUid)
+						.thenAccept(subscriptionManager -> {
+							RemoteSubscription subscription = subscriptionManager.getRemoteSubscriptionByClientUid(clientUid);
+							if (subscription != null) {
+								missionInvitations.addAll(
+										missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
+												subscription.callsign, MissionInvitation.Type.callsign.name(), groupVector)
+								);
+							}
+						}).get();
+			} catch (Exception e) {
+				logger.error("Exception in getting mission invitations for callsign", e);
+			}
+
+		} catch (Exception e) {
+			logger.error("Exception in getAllMissionInvitationsForClient", e);
+		}
+
+		return missionInvitations;
 	}
 
 	@Override
 	@Transactional
-	public CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, String clientUid, MissionRole missionRole, String groupVector) {
+	public MissionSubscription missionSubscribe(UUID missionGuid, String clientUid, MissionRole missionRole, String groupVector) {
 	    Mission mission = getMissionService().getMissionByGuid(missionGuid, groupVector);
 
 	    String username = "";
@@ -1605,54 +1621,60 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	@Override
 	@Transactional
-	public CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, String clientUid, String groupVector) {
+	public MissionSubscription missionSubscribe(UUID missionGuid, String clientUid, String groupVector) {
 	    Mission mission = getMissionService().getMissionByGuid(missionGuid, groupVector);
 	    MissionRole role = getDefaultRole(mission);
 	    return missionSubscribe(missionGuid, clientUid, role, groupVector);
 	}
 
 	@Override
-	public CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, Long missionId, String clientUid, String username, MissionRole role, String groupVector) {
-	    return subscriptionManagerProxy.getSubscriptionManagerForClientUid(clientUid)
-	        .thenApply(subscriptionManager -> {
-	            subscriptionManager.missionSubscribe(missionGuid, clientUid);
+	public MissionSubscription missionSubscribe(UUID missionGuid, Long missionId, String clientUid, String username, MissionRole role, String groupVector) {
 
-	            Mission m = getMissionByGuid(missionGuid, false);
-	            MissionSubscription missionSubscription = missionSubscriptionRepository
-	                .findByMissionGuidAndClientUidAndUsernameNoMission(missionGuid.toString(), clientUid, username);
+		try {
+			try {
+				subscriptionManagerProxy.getSubscriptionManagerForClientUid(clientUid)
+						.thenAccept(subscriptionManager -> {
+							subscriptionManager.missionSubscribe(missionGuid, clientUid);
+						}).get();
+			} catch (Exception e) {
+				logger.error("Exception calling subscriptionManager.missionSubscribe", e);
+			}
 
-	            if (missionSubscription == null) {
-	                String subscriptionUid = UUID.randomUUID().toString();
-	                String token = generateToken(subscriptionUid, missionGuid, m.getName(), MissionTokenUtils.TokenType.SUBSCRIPTION, -1);
+			Mission m = getMissionByGuid(missionGuid, false);
+			MissionSubscription missionSubscription = missionSubscriptionRepository
+					.findByMissionGuidAndClientUidAndUsernameNoMission(missionGuid.toString(), clientUid, username);
 
-	                logger.debug("Creating subscription with uid {}", subscriptionUid);
+			if (missionSubscription == null) {
+				String subscriptionUid = UUID.randomUUID().toString();
+				String token = generateToken(subscriptionUid, missionGuid, m.getName(), MissionTokenUtils.TokenType.SUBSCRIPTION, -1);
 
-	                missionSubscription = new MissionSubscription(subscriptionUid, token, null, clientUid, username, new Date(), role);
+				logger.debug("Creating subscription with uid {}", subscriptionUid);
 
-	                missionSubscriptionRepository.subscribe(
-	                    missionId, clientUid, new Date(), subscriptionUid, token, role.getId(), username);
-	            } else if (missionSubscription.getRole() != null
-	                    && missionSubscription.getRole().compareTo(role) != 0
-	                    && role.hasAllPermissions(missionSubscription.getRole())) {
+				missionSubscription = new MissionSubscription(subscriptionUid, token, null, clientUid, username, new Date(), role);
 
-	                logger.debug("Updating subscription role");
-	                missionSubscription.setRole(role);
+				missionSubscriptionRepository.subscribe(
+						missionId, clientUid, new Date(), subscriptionUid, token, role.getId(), username);
+			} else if (missionSubscription.getRole() != null
+					&& missionSubscription.getRole().compareTo(role) != 0
+					&& role.hasAllPermissions(missionSubscription.getRole())) {
 
-	                getMissionService().setRoleByClientUidOrUsername(missionId, clientUid, null, role.getId());
-	            }
+				logger.debug("Updating subscription role");
+				missionSubscription.setRole(role);
 
-	            return missionSubscription;
-	        })
-	        .exceptionally(ex -> {
-	            if (ex.getCause() instanceof DataIntegrityViolationException) {
-	                logger.debug("mission already contained subscription {} {}", missionGuid, clientUid);
-	            } else {
-	                logger.error("Exception in missionSubscribe!", ex);
-	            }
-	            return null;
-	        });
+				getMissionService().setRoleByClientUidOrUsername(missionId, clientUid, null, role.getId());
+			}
+
+			return missionSubscription;
+
+		} catch (Exception ex) {
+			if (ex.getCause() instanceof DataIntegrityViolationException) {
+				logger.debug("mission already contained subscription {} {}", missionGuid, clientUid);
+			} else {
+				logger.error("Exception in missionSubscribe!", ex);
+			}
+			return null;
+		}
 	}
-
 
 	@Override
 	@Transactional
@@ -5209,4 +5231,28 @@ public class MissionServiceDefaultImpl implements MissionService {
 			it.remove();
 		}
 	}
+
+	@Override
+	public CotElement fixupMissionChat(CotElement cotElement, String host) {
+		try {
+			if (!cotElement.cottype.startsWith("b-t-f")) {
+				return cotElement;
+			}
+
+			String missionName = missionRepository.getFirstMissionNameContainingUid(cotElement.uid);
+			if (Strings.isNullOrEmpty(missionName)) {
+				return cotElement;
+			}
+
+			CotEventContainer temp = new CotEventContainer(
+					new CotParser(false).parse(cotElement.toCotXml()));
+			CommonUtil.fixupMissionChat(temp, missionName, host);
+			return temp.asCotElement();
+
+		} catch (Exception e) {
+			logger.error("exception in fixupMissionChat", e);
+			return cotElement;
+		}
+	}
+
 }

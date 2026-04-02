@@ -2,6 +2,7 @@ package tak.server.federation;
 
 import static java.util.Objects.requireNonNull;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -78,6 +79,7 @@ import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
 import com.bbn.marti.config.Federation.FederateCA;
+import com.bbn.marti.config.Federation.FederationServer.FederationTokenAuthentication;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.groups.CommonGroupDirectedReachability;
@@ -115,7 +117,9 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.base.Charsets;
 import com.google.common.base.Strings;
 import com.google.common.hash.Hashing;
+import com.google.protobuf.ByteString;
 
+import io.grpc.Attributes;
 import io.grpc.Context;
 import io.grpc.Contexts;
 import io.grpc.Grpc;
@@ -125,6 +129,7 @@ import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import io.grpc.ServerInterceptors;
+import io.grpc.ServerTransportFilter;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NettyServerBuilder;
@@ -144,6 +149,7 @@ import mil.af.rl.rol.value.Parameters;
 import mil.af.rl.rol.value.ResourceDetails;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
+import tak.server.federation.hub.broker.FederationHubServerConfig;
 import tak.server.federation.jwt.FederationJwtUtils;
 import tak.server.federation.message.AddressableEntity;
 import tak.server.federation.message.Message;
@@ -388,11 +394,17 @@ public class FederationServer {
 				throw new TakException(e);
 			}
 
-			buildGrpcServer(config.getPort(), true);
+			buildHttpsGrpcServer(config.getPort(), true);
 			
-			// if a token authentication port is defined, start a second grpc server that runs without client auth
-			if (fedConfig().getFederationServer().getFederationTokenAuthentication().isEnabled()) {
-				buildGrpcServer(fedConfig().getFederationServer().getFederationTokenAuthentication().getPort(), false);
+			// if a token authentication is defined, start a grpc server that runs without client auth
+			for (FederationTokenAuthentication oauthServer: fedConfig().getFederationServer().getFederationTokenAuthentication()) {
+				if (oauthServer.isEnabled()) {
+					if (oauthServer.isTls()) {
+						buildHttpsGrpcServer(oauthServer.getPort(), false);
+					} else {
+						buildHttpGrpcServer(oauthServer.getPort());
+					}
+				}
 			}
 
 		} catch (Exception e) {
@@ -400,7 +412,7 @@ public class FederationServer {
 		}
 	}
 
-	private void buildGrpcServer(int port, boolean clientAuth) {
+	private void buildHttpsGrpcServer(int port, boolean clientAuth) {
 		NettyServerBuilder serverBuilder = NettyServerBuilder.forPort(port)
 				.maxInboundMessageSize(config.getMaxMessageSizeBytes()) // max message size. If not specified, defaults to 4MB
 				.sslContext(clientAuth ? sslConfig.getSslContext(): sslConfig.getSslContextNoAuth())
@@ -415,7 +427,7 @@ public class FederationServer {
 
 		FederatedChannelService service = new FederatedChannelService();
 
-		ServerInterceptor interceptor = clientAuth ? tlsInterceptor() : oauthInterceptor();
+		ServerInterceptor interceptor = clientAuth ? tlsInterceptor() : oauthInterceptor(true);
 		
 		Server server = serverBuilder
 				.addService(ServerInterceptors.intercept(service, interceptor))
@@ -449,7 +461,85 @@ public class FederationServer {
 
 					portToServerMap.get(port).start();
 
-					logger.info("Federation server (v2) started, listening on port " + port);
+					logger.info("Federation server (v2/https) started, listening on port " + port);
+
+					Runtime.getRuntime().addShutdownHook(new Thread() {
+						@Override
+						public void run() {
+							// Use stderr here since the logger may has been reset by its JVM shutdown hook.
+							System.err.println("*** shutting down gRPC server since JVM is shutting down");
+							FederationServer.this.stop();
+							keepRunning.set(false);
+							System.err.println("*** server shut down");
+						}
+					});
+				} catch (Exception e) {
+					logger.error("exception starting v2 fed server (inner)", e);
+				}
+			}
+		});
+	}
+	
+	private static final Attributes.Key<String> HTTP_SESSION_ID_KEY = Attributes.Key.create("http-session-id");
+	private void buildHttpGrpcServer(int port) {
+		NettyServerBuilder serverBuilder = NettyServerBuilder.forPort(port)
+				.maxInboundMessageSize(config.getMaxMessageSizeBytes()) // max message size. If not specified, defaults to 4MB
+				.executor(Resources.federationGrpcExecutor)
+				.workerEventLoopGroup(Resources.federationGrpcWorkerEventLoopGroup)
+				.bossEventLoopGroup(Resources.federationGrpcWorkerEventLoopGroup)
+				.channelType(NioServerSocketChannel.class)
+				.addTransportFilter(new ServerTransportFilter() {
+					private final AtomicLong connectionCounter = new AtomicLong(1);
+				    @Override
+				    public Attributes transportReady(Attributes transportAttrs) {
+				        return transportAttrs.toBuilder()
+				                .set(HTTP_SESSION_ID_KEY, String.valueOf(connectionCounter.getAndIncrement()))
+				                .build();
+				    }
+					
+				});
+
+		if (config.getMaxConcurrentCallsPerConnection() != null && config.getMaxConcurrentCallsPerConnection() > 0) {
+			serverBuilder.maxConcurrentCallsPerConnection(config.getMaxConcurrentCallsPerConnection());
+		}
+
+		FederatedChannelService service = new FederatedChannelService();
+
+		ServerInterceptor interceptor = oauthInterceptor(false);
+		
+		Server server = serverBuilder
+				.addService(ServerInterceptors.intercept(service, interceptor))
+				.build();
+		
+		portToServerMap.put(port, server);
+
+		service.binaryMessageStream(new StreamObserver<Empty>() {
+
+			@Override
+			public void onNext(Empty value) {}
+
+			@Override
+			public void onError(Throwable t) {}
+
+			@Override
+			public void onCompleted() {}});
+
+		Executors.newSingleThreadExecutor().submit(new Runnable() {
+
+			@Override
+			public void run() {
+
+				requireNonNull(config, "FIG configuration object");
+
+				try {
+
+					if (logger.isDebugEnabled()) {
+						logger.debug("in v2 fed start executor");
+					}
+
+					portToServerMap.get(port).start();
+
+					logger.info("Federation server (v2/http) started, listening on port " + port);
 
 					Runtime.getRuntime().addShutdownHook(new Thread() {
 						@Override
@@ -481,6 +571,25 @@ public class FederationServer {
 		private final FederationProcessorFactory federationProcessorFactory = new FederationProcessorFactory();
 
 		AtomicReference<Long> start = new AtomicReference<>();
+		
+		@Override
+		public void getx509Identity(Empty request, StreamObserver<BinaryBlob> responseObserver) {
+			try {
+				Tls tlsConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation()
+						.getFederationServer().getTls();
+				
+				X509Certificate clientCert = FederationUtils.loadX509CertFromJKSFile(tlsConfig.getKeystoreFile(),
+						tlsConfig.getKeystorePass());
+				
+				BinaryBlob certPayload = BinaryBlob.newBuilder()
+						.setData(ByteString.readFrom(new ByteArrayInputStream(clientCert.getEncoded()))).build();
+
+				responseObserver.onNext(certPayload);
+			} catch (Exception e) {
+				logger.error("Could not load server cert identity");
+				responseObserver.onError(e);
+			}
+		}
 		
 		@Override
 		public void getAuthTokenByX509(BinaryBlob request, StreamObserver<FederateTokenResponse> responseObserver) {
@@ -515,7 +624,7 @@ public class FederationServer {
 					
 					long duration = federateCA.getTokenAuthDuration();
 					long expiration = duration == -1 ? -1 : java.time.Instant.now().toEpochMilli() + federateCA.getTokenAuthDuration();
-
+					
 					token = jwt.createFederationTokenFromClientCert(fingerprint, caFingerprint, principalDN, issuerDN, expiration);
 
 				}
@@ -551,10 +660,10 @@ public class FederationServer {
 				@Override
 				public void onNext(BinaryBlob value) {
 
-					SSLSession session = (SSLSession) sslSessionKey.get(Context.current());
+					String sessionId = getCurrentSessionId();
 
 					// submit message
-					FederationServer.this.handleRead(value, session.getId());
+					FederationServer.this.handleRead(value, sessionId);
 				}
 
 				@Override
@@ -572,8 +681,6 @@ public class FederationServer {
 		@Override
 		public void sendOneBlob(BinaryBlob request, StreamObserver<Empty> resp) {
 			start.compareAndSet(null, System.currentTimeMillis());
-
-			SSLSession session = (SSLSession) sslSessionKey.get(Context.current());
 
 			long bytesPerSecond = -1;
 
@@ -597,7 +704,7 @@ public class FederationServer {
 			clientByteAccumulator.addAndGet(request.getSerializedSize());
 
 			// submit to orchestrator
-			FederationServer.this.handleRead(request, session.getId());
+			FederationServer.this.handleRead(request, getCurrentSessionId());
 		}
 
 		private final AtomicInteger clientEventStreamCounter = new AtomicInteger();
@@ -619,8 +726,6 @@ public class FederationServer {
 
 			int streamCount = clientEventStreamCounter.incrementAndGet();
 
-			SSLSession session = (SSLSession) sslSessionKey.get(Context.current());
-
 			GuardedStreamHolder<FederatedEvent> streamHolder = null;
 
 			if (fedHealthLogger.isDebugEnabled()) {
@@ -628,7 +733,7 @@ public class FederationServer {
 			}
 
 			try {
-				String sessionId =  sslSessionIdKey.get(Context.current());
+				String sessionId =  getCurrentSessionId();
 				String clientFingerprint =  fingerprintKey.get(Context.current());
 				
 				if (sessionId == null) {
@@ -745,7 +850,7 @@ public class FederationServer {
 					fedHealthLogger.debug("open federation clientROLStream " + subscription);
 				}
 
-				String sessionId =  sslSessionIdKey.get(Context.current());
+				String sessionId =  getCurrentSessionId();
 				String clientFingerprint =  fingerprintKey.get(Context.current());
 				
 				if (sessionId == null) {
@@ -1010,8 +1115,6 @@ public class FederationServer {
 
 						requireNonNull(resource.get(), "resource");
 						requireNonNull(operation.get(), "operation");
-
-						SSLSession session = (SSLSession) sslSessionKey.get(Context.current());
 
 						String sessionId = getCurrentSessionId();
 
@@ -1551,7 +1654,7 @@ public class FederationServer {
 			}
 
 			try {
-				String sessionId =  sslSessionIdKey.get(Context.current());
+				String sessionId =  getCurrentSessionId();
 				String clientFingerprint =  fingerprintKey.get(Context.current());
 				
 				if (sessionId == null) {
@@ -2128,19 +2231,17 @@ public class FederationServer {
 		}
 	}
  
-	private void handleRead(BinaryBlob event, byte[] sessionId) {
+	private void handleRead(BinaryBlob event, String sessionId) {
 		// do a read
 		// create a message
 		Message federatedMessage = new Message(new HashMap<>(), new BinaryBlobPayload(event));
 		long startTime = System.currentTimeMillis();
 		//        setMessageDestinations(federatedMessage);
-		federatedMessage.setMetadataValue(SSL_SESSION_ID, new String(sessionId, Charsets.UTF_8));
+		federatedMessage.setMetadataValue(SSL_SESSION_ID, sessionId);
 
-		String streamKey = new String(sessionId, Charsets.UTF_8);
+		federatedMessage.setMetadataValue(SSL_SESSION_ID, sessionId);
 
-		federatedMessage.setMetadataValue(SSL_SESSION_ID, streamKey);
-
-		GuardedStreamHolder<FederatedEvent> streamHolder = clientStreamMap.get(streamKey);
+		GuardedStreamHolder<FederatedEvent> streamHolder = clientStreamMap.get(sessionId);
 
 		if (streamHolder != null) {
 			federatedMessage.setMetadataValue(FEDERATED_ID_KEY, streamHolder.getFederateIdentity());
@@ -2162,7 +2263,7 @@ public class FederationServer {
 		//        }
 	}
 
-	final static private Context.Key<SSLSession> sslSessionKey = Context.key("SSLSession");
+	//final static private Context.Key<SSLSession> sslSessionKey = Context.key("SSLSession");
 	final static private Context.Key<String> sslSessionIdKey = Context.key("SSLSessionId");
 	final static private Context.Key<SocketAddress> remoteAddressKey = Context.key("RemoteAddress");
 	final static private Context.Key<SocketAddress> localAddressKey = Context.key("LocalAddress");
@@ -2197,7 +2298,6 @@ public class FederationServer {
 					String caFingerprint = RemoteUtil.getInstance().getCertSHA256Fingerprint(caCert);
 					
 					Context context = Context.current()
-							.withValue(sslSessionKey, sslSession)
 							.withValue(sslSessionIdKey, new BigInteger(sslSession.getId()).toString())
 							.withValue(remoteAddressKey, remoteSocketAddress)
 							.withValue(localAddressKey, localSocketAddress)
@@ -2219,7 +2319,7 @@ public class FederationServer {
 		};
 	}
 	
-    public ServerInterceptor oauthInterceptor() {
+    public ServerInterceptor oauthInterceptor(boolean tls) {
     	Tls tlsConfig = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer()
 				.getTls();
     	
@@ -2235,6 +2335,11 @@ public class FederationServer {
 				// allow request for token to be unauthenticated
 				if (serverCall.getMethodDescriptor().getFullMethodName()
 						.equals("com.atakmap.FederatedChannel/GetAuthTokenByX509")) {
+					return Contexts.interceptCall(Context.current(), serverCall, metadata, serverCallHandler);
+				}
+				
+				// allow request for public identity to be unauthenticated
+				if (serverCall.getMethodDescriptor().getFullMethodName().equals("com.atakmap.FederatedChannel/Getx509Identity")) {
 					return Contexts.interceptCall(Context.current(), serverCall, metadata, serverCallHandler);
 				}
 
@@ -2257,13 +2362,19 @@ public class FederationServer {
 						status = Status.UNAUTHENTICATED.withDescription(e.getMessage()).withCause(e);
 					}
 					if (claims != null) {
-						SSLSession sslSession = serverCall.getAttributes().get(Grpc.TRANSPORT_ATTR_SSL_SESSION);
-						String sessionId = new BigInteger(sslSession.getId()).toString();
+						
 						SocketAddress remoteSocketAddress = serverCall.getAttributes().get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR);
 						SocketAddress localSocketAddress = serverCall.getAttributes().get(Grpc.TRANSPORT_ATTR_LOCAL_ADDR);
 						
-						// if a fingerprint exists, that means the client authenticated with an x509
-						// cert
+						String sessionId;
+						if (tls) {
+							SSLSession sslSession = serverCall.getAttributes().get(Grpc.TRANSPORT_ATTR_SSL_SESSION);
+							sessionId = new BigInteger(sslSession.getId()).toString();
+						} else {
+							sessionId = serverCall.getAttributes().get(HTTP_SESSION_ID_KEY);
+						}
+						
+						// if a fingerprint exists, that means the client authenticated with an x509 cert
 						if (claims.containsKey("fingerprint")) {
 							String fingerprint = (String) claims.get("fingerprint");
 							String caFingerprint = (String) claims.get("caFingerprint");
@@ -2271,8 +2382,8 @@ public class FederationServer {
 							String issuerDN = (String) claims.get("issuerDN");
 							String name = (String) claims.get("name");
 							
-							Context context = Context.current().withValue(sslSessionKey, sslSession)
-									.withValue(sslSessionIdKey, new BigInteger(sslSession.getId()).toString())
+							Context context = Context.current()
+									.withValue(sslSessionIdKey, sessionId)
 									.withValue(remoteAddressKey, remoteSocketAddress)
 									.withValue(localAddressKey, localSocketAddress)
 									.withValue(principalDNKey, principalDN)
@@ -2318,8 +2429,8 @@ public class FederationServer {
 								serverCall.close(status, new Metadata());
 								return new ServerCall.Listener<ReqT>() {};
 							} else {
-								Context context = Context.current().withValue(sslSessionKey, sslSession)
-										.withValue(sslSessionIdKey, new BigInteger(sslSession.getId()).toString())
+								Context context = Context.current()
+										.withValue(sslSessionIdKey, sessionId)
 										.withValue(remoteAddressKey, remoteSocketAddress)
 										.withValue(localAddressKey, localSocketAddress)
 										.withValue(principalDNKey, tokenName)
@@ -2390,31 +2501,7 @@ public class FederationServer {
 
 	private String getCurrentSessionId() {
 		try {
-			return new String(((SSLSession) sslSessionKey.get(Context.current())).getId(), Charsets.UTF_8);
-		} catch (Exception e) {
-			throw new TakException(e);
-		}
-	}
-
-	private Certificate getCurrentClientCert() {
-		try {
-
-			SSLSession session = sslSessionKey.get(Context.current());
-
-			Certificate[] clientCertArray = requireNonNull(requireNonNull(session, "SSL Session").getPeerCertificates(), "SSL peer certs array");
-
-			if (clientCertArray == null) {
-				throw new IllegalArgumentException("null v2 fed client cert array");
-			}
-
-			if (clientCertArray.length == 0) {
-				throw new IllegalArgumentException("emmpty v2 fed client cert array");
-			}
-
-			Certificate clientCert = requireNonNull(clientCertArray[0], "v2 fed client cert");
-
-			return clientCert;
-
+			return sslSessionIdKey.get(Context.current());
 		} catch (Exception e) {
 			throw new TakException(e);
 		}
@@ -2428,31 +2515,6 @@ public class FederationServer {
 
 		} catch (Exception e) {
 			throw new TakException(e);
-		}
-	}
-
-	private Certificate getCurrentCaCert() {
-		try {
-
-			SSLSession session = sslSessionKey.get(Context.current());
-
-			Certificate[] clientCertArray = requireNonNull(requireNonNull(session, "SSL Session").getPeerCertificates(), "SSL peer certs array");
-
-			if (clientCertArray == null) {
-				throw new IllegalArgumentException("null v2 fed client cert array");
-			}
-
-			if (clientCertArray.length == 0) {
-				throw new IllegalArgumentException("emmpty v2 fed client cert array");
-			}
-
-			Certificate caCert = requireNonNull(clientCertArray[1], "v2 fed ca cert");
-
-			return caCert;
-
-		} catch (Exception e) {
-			logger.warn("Warning: Could not find CA in connecting federate's cert chain. CA level group assignment will be skipped.");
-			return null;
 		}
 	}
 }

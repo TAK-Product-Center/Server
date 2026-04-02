@@ -59,7 +59,7 @@ public class FederationHubMissionDisruptionManager {
 		}
 
 		Collection<String> receivableFederates = 
-				FederationHubDependencyInjectionProxy.getInstance().fedHubPolicyManager().getPolicyGraph()
+				FederationHubDependencyInjectionProxy.getInstance().fedHubPolicyManager().getActivePolicyGraph()
 					.allReceivableFederates(sourceServerId)
 					.stream()
 					.map(f -> f.getFederateIdentity().getFedId())
@@ -99,7 +99,7 @@ public class FederationHubMissionDisruptionManager {
 			Collection<String> receivableFederates = getReceivableFederates(federateServerId);
 			// must get updated policy after we check for receivable federates
 			// because getReceivableFederates(...) will modify the graph
-			FederationPolicyGraph policyGraph = FederationHubDependencyInjectionProxy.getInstance().fedHubPolicyManager().getPolicyGraph();
+			FederationPolicyGraph policyGraph = FederationHubDependencyInjectionProxy.getInstance().fedHubPolicyManager().getActivePolicyGraph();
 						
 			for (String receivableFederate: receivableFederates) {
 				// for every federate this newly connected federate can receive from,
@@ -108,8 +108,6 @@ public class FederationHubMissionDisruptionManager {
 				for (Document update: updates) {
 					ROL.Builder rolBuilder = ROL.newBuilder();
 					Document eventRol = update.get("event_rol", Document.class);
-
-					logger.trace("eventRol document: {}", eventRol);
 
 					rolBuilder.setProgram(eventRol.getString("rol_program"));
 
@@ -181,8 +179,8 @@ public class FederationHubMissionDisruptionManager {
     					
     					ROL rol = rolBuilder.build();
 						if (eventRol.containsKey("resource_object_id")) {
-							logger.trace("adding resource rol: {}", rol);
-							changes.addResourceROL(eventRol.getObjectId("resource_object_id"), rolBuilder);
+							logger.info("adding resource rol: {}", rol);
+							changes.addResourceROL(eventRol.getObjectId("resource_object_id"), rolBuilder.build());
 						}
 						else {
 							logger.trace("adding change rol: {}", rol);
@@ -202,20 +200,22 @@ public class FederationHubMissionDisruptionManager {
 		return changes;
 	}
 	
-	public ROL hydrateResourceROL(ObjectId resourceObjectId, ROL.Builder rol) {
-		try {
-			byte[] resource = federationHubDatabaseService.getResource(resourceObjectId);
-			
-			if (resource == null) return rol.build();
-			
-			BinaryBlob blob = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(resource))).build();
-			rol.addPayload(blob);
+	public ROL hydrateResourceROL(ObjectId resourceObjectId, ROL rol) {
+		ROL.Builder builder = rol.toBuilder();
+
+		try {			
+			ByteString resource = federationHubDatabaseService.getResource(resourceObjectId);
+			if (resource != null) {
+			    builder.addPayload(BinaryBlob.newBuilder().setData(resource).build());
+			}
 		} catch (Exception e) {
 			logger.error("hydrateResourceROL error", e);
 		}	
 		
-		return rol.build();
+		return builder.build();
 	}
+	
+	
 	
 	public ObjectId addResource(byte[] data, Map<String, Object>  parameters) {
 		try {			
@@ -229,7 +229,7 @@ public class FederationHubMissionDisruptionManager {
 	public void storeRol(ROL event, String res, String op, Map<String, Object>  parameters, String federateServerId) {	
 		this.storeRol(event, res, op, parameters, federateServerId, null);
 	}
-	
+
 	public void storeRol(ROL event, String res, String op, Map<String, Object>  parameters, String federateServerId, ObjectId resourceObjectId) {
 
 		try {
@@ -313,10 +313,10 @@ public class FederationHubMissionDisruptionManager {
 	}
 	
 	public static final class OfflineMissionChanges {
-		Map<ObjectId, ROL.Builder> resourceRols = new HashMap<>();
+		Map<ObjectId, ROL> resourceRols = new HashMap<>();
 		List<ROL> rols = new ArrayList<>();
 		
-		public Map<ObjectId, ROL.Builder> getResourceRols() {
+		public Map<ObjectId, ROL> getResourceRols() {
 			return resourceRols;
 		}
 		
@@ -324,7 +324,7 @@ public class FederationHubMissionDisruptionManager {
 			return rols;
 		}
 		
-		public void addResourceROL(ObjectId key, ROL.Builder value) {
+		public void addResourceROL(ObjectId key, ROL value) {
 			resourceRols.put(key, value);
 		}
 		

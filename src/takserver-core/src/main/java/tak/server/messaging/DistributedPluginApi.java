@@ -14,6 +14,7 @@ import com.bbn.marti.service.PluginStore;
 import tak.server.Constants;
 import tak.server.PluginManager;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.plugins.PluginApi;
 import tak.server.plugins.PluginManagerConstants;
 
@@ -61,11 +62,9 @@ public class DistributedPluginApi implements PluginApi, org.apache.ignite.servic
 				return true;
 			}
 		};
-
-		IgniteHolder.getInstance()
-				.getIgnite()
-				.events()
-				.localListen(ignitePredicate, EventType.EVT_NODE_LEFT, EventType.EVT_NODE_FAILED);
+		
+		IgniteHolder.getInstance().getIgnite().events().localListen(ignitePredicate, EventType.EVT_NODE_LEFT,
+				EventType.EVT_NODE_FAILED);
 	}
 
 }

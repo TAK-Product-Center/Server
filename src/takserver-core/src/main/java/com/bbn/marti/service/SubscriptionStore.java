@@ -68,11 +68,6 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 
 	@Autowired
 	protected Ignite ignite;
-	// Used to keep track of where/if federation connections got started
-	private IgniteCache<String, FederationSubscriptionCacheDAO>  federationSubscriptionCache = null;
-	// Used so that when an api process polls for federation outgoing data, we dont just get data from one messaging node.
-	// we get it from all the nodes in the cluster
-	private IgniteCache<String, ConnectionStatus>  federationOutgoingConnectionStatus = null;
 	
 	private ConcurrentHashMap<String, Subscription> uidSubscriptionMap = new ConcurrentHashMap<>();
 	private ConcurrentHashMap<ChannelHandler, Subscription> channelHandlerSubscriptionMap = new ConcurrentHashMap<>();
@@ -124,20 +119,15 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
     	logger.debug("init SubscriptionStore. ignite instance {}", ignite);
     }
     
+    // Used to keep track of where/if federation connections got started
     protected IgniteCache<String, FederationSubscriptionCacheDAO> getFederationSubscriptionCache() {
-		if (federationSubscriptionCache == null) {
-			federationSubscriptionCache = ignite.getOrCreateCache("fedsubcache");
-		}
-		
-		return federationSubscriptionCache;
+		return ignite.getOrCreateCache("fedsubcache");
 	}
 	
-	protected IgniteCache<String, ConnectionStatus> getFederationOutgoingConnectionStatusCache() {
-		if (federationOutgoingConnectionStatus == null) {
-			federationOutgoingConnectionStatus = ignite.getOrCreateCache("federationOutgoingConnectionStatus");
-		}
-				
-		return federationOutgoingConnectionStatus;
+ // Used so that when an api process polls for federation outgoing data, we dont just get data from one messaging node.
+ 	// we get it from all the nodes in the cluster
+	protected IgniteCache<String, ConnectionStatus> getFederationOutgoingConnectionStatusCache() {	
+		return ignite.getOrCreateCache("federationOutgoingConnectionStatus");
 	}
 	
 	private void updateSubscriptionCaches(Subscription subscription) {

@@ -35,6 +35,7 @@ import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import tak.server.Constants;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.qos.MessageDeliveryStrategy;
 
 public class TakProtoWebSocketHandler extends BinaryWebSocketHandler {
@@ -68,39 +69,46 @@ public class TakProtoWebSocketHandler extends BinaryWebSocketHandler {
 		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
 			setupIgniteListeners();
 		}
-		
-		Resources.tcpProcessor.execute(() -> {
-			ignite().message(
-				ignite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME))	
-					.localListen("websocket-write-listener", (nodeId, message) -> {
-						if (message instanceof WebsocketMessageTransporter) {
-							final WebsocketMessageTransporter wmt = (WebsocketMessageTransporter) message;
-							final BinaryMessage binaryMessage = new BinaryMessage(wmt.message);
-							
-							Resources.messageSendExecutor.submit(
-									() -> {
-										((WebsocketMessageTransporter) message).websocketConnectionIds.parallelStream().forEach(id -> {
-											try {
-												WebSocketSession session = websocketMap.get(id);
-												
-												if (session != null && binaryMessage != null) {
-													
-													if (mds().isAllowed(wmt.messageType, wmt.publisherId, id)) {
-														session.sendMessage(binaryMessage);
-														Metrics.counter(Constants.METRIC_MESSAGE_WRITE_COUNT_WEBSOCKET, "takserver", "api").increment();
+
+		IgniteReconnectEventHandler.registerListener(() -> {
+
+			Resources.tcpProcessor.execute(() -> {
+				ignite().message(
+						ignite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME))
+						.localListen("websocket-write-listener", (nodeId, message) -> {
+							if (message instanceof WebsocketMessageTransporter) {
+								final WebsocketMessageTransporter wmt = (WebsocketMessageTransporter) message;
+								final BinaryMessage binaryMessage = new BinaryMessage(wmt.message);
+
+								Resources.messageSendExecutor.submit(() -> {
+									((WebsocketMessageTransporter) message).websocketConnectionIds.parallelStream()
+											.forEach(id -> {
+												try {
+													WebSocketSession session = websocketMap.get(id);
+
+													if (session != null && binaryMessage != null) {
+
+														if (mds().isAllowed(wmt.messageType, wmt.publisherId, id)) {
+															session.sendMessage(binaryMessage);
+															Metrics.counter(
+																	Constants.METRIC_MESSAGE_WRITE_COUNT_WEBSOCKET,
+																	"takserver", "api").increment();
+														}
+													}
+												} catch (Exception e) {
+													if (logger.isDebugEnabled()) {
+														logger.debug(
+																"Error submitting message to websocket via ignite write listener",
+																e);
 													}
 												}
-											} catch (Exception e) {
-												if (logger.isDebugEnabled()) {
-													logger.debug("Error submitting message to websocket via ignite write listener", e);
-												}
-											}
-										});
-									});
-						}
+											});
+								});
+							}
 
-						return true;
-					});
+							return true;
+						});
+			});
 		});
 	}
 
@@ -274,10 +282,8 @@ public class TakProtoWebSocketHandler extends BinaryWebSocketHandler {
 				return true;
 			}
 		};
-
-		IgniteHolder.getInstance()
-				.getIgnite()
-				.events()
-				.localListen(ignitePredicate, EventType.EVT_NODE_LEFT, EventType.EVT_NODE_FAILED);
+		
+		IgniteHolder.getInstance().getIgnite().events().localListen(ignitePredicate, EventType.EVT_NODE_LEFT,
+				EventType.EVT_NODE_FAILED);
 	}
 }

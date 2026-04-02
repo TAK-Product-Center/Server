@@ -37,9 +37,11 @@ task createCIVersionArtifacts() {
 }
 
 task constructDockerZip(type: Zip) { Task task ->
-    archiveName 'takserver-docker-' + project.version + '.zip'
     duplicatesStrategy DuplicatesStrategy.FAIL
-    destinationDir(file("$buildDir/distributions"))
+    
+    archiveFileName.set("takserver-docker-${project.version}.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    
     into('takserver-docker-' + project.version)
 
     with takserverDockerCommonSpec(task).into('tak')
@@ -86,9 +88,11 @@ task updateIntegrationTesterCore(type: Copy) { task ->
 
 task constructIntegrationTesterZip(type: Zip) { task ->
     dependsOn(constructIntegrationTesterDir)
-    archiveName "takserver-integration-tester-${project.version}.zip"
     duplicatesStrategy DuplicatesStrategy.FAIL
-    destinationDir(file("$buildDir/distributions"))
+    
+    archiveFileName.set("takserver-integration-tester-${project.version}.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    
     from("$buildDir/integrationTesterDir")
     into("takserver-integration-tester-${project.version}/tak")
 }
@@ -102,9 +106,11 @@ task fetchRpmsForHardenedDocker(type: Exec) {
 }
 
 task constructIronbankDBZip(type: Zip) { task ->
-    archiveName 'takserver-ironbank-db-' + project.version + '.zip'
     duplicatesStrategy DuplicatesStrategy.FAIL
-    destinationDir(file("$buildDir/distributions"))
+    
+    archiveFileName.set("takserver-ironbank-db-${project.version}.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    
     into('takserver-ironbank-db-' + project.version)
 
     with copySchemaManagerJarSpec(task)
@@ -119,9 +125,11 @@ task constructIronbankDBZip(type: Zip) { task ->
 task constructHardenedDockerZip(type: Zip) { Task task ->
     dependsOn fetchRpmsForHardenedDocker
 
-    archiveName 'takserver-docker-hardened-' + project.version + '.zip'
     duplicatesStrategy DuplicatesStrategy.FAIL
-    destinationDir(file('build/distributions'))
+    
+    archiveFileName.set("takserver-docker-hardened-${project.version}.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    
     into('takserver-docker-hardened-' + project.version)
 
     with takserverDockerCommonSpec(task).into('tak')
@@ -159,9 +167,11 @@ task constructHardenedDockerZip(type: Zip) { Task task ->
 }
 
 task constructFullDockerZip(type: Zip) { Task task ->
-    archiveName 'takserver-docker-full-' + project.version + '.zip'
     duplicatesStrategy DuplicatesStrategy.FAIL
-    destinationDir(file("$buildDir/distributions"))
+    
+    archiveFileName.set("takserver-docker-full-${project.version}.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    
     into('takserver-docker-full-' + project.version)
 
     with takserverDockerCommonSpec(task).into('tak')
@@ -197,9 +207,12 @@ task constructFullDockerZip(type: Zip) { Task task ->
 
 
 task constructHardenedFullDockerZip(type: Zip) { Task task ->
-    archiveName 'takserver-docker-hardened-full-' + project.version + '.zip'
     duplicatesStrategy DuplicatesStrategy.FAIL
-    destinationDir(file("$buildDir/distributions"))
+    
+    archiveFileName.set("takserver-docker-hardened-full-${project.version}.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+
+    
     into('takserver-docker-hardened-full-' + project.version)
 
     dependsOn fetchRpmsForHardenedDocker
@@ -333,7 +346,7 @@ After=network.target
 Type=simple
 WorkingDirectory=/opt/tak/federation-hub/scripts
 
-ExecStart=/bin/bash -c "./federation-hub-policy.sh & ./federation-hub-ui.sh & ./federation-hub-broker.sh"
+ExecStart=/bin/bash -c "./federation-hub-policy.sh & ./federation-hub-plugin-manager.sh & ./federation-hub-ui.sh & ./federation-hub-broker.sh"
 RemainAfterExit=yes
 User=tak
 Group=tak

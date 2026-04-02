@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.remote.ConnectionStatus;
 import com.bbn.marti.remote.ConnectionStatusValue;
-import com.bbn.marti.sync.service.MissionService;
 
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
@@ -31,44 +30,25 @@ import tak.server.ignite.IgniteHolder;
  */
 public class ClusterSubscriptionStore extends SubscriptionStore {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterSubscriptionStore.class);
-
-	private IgniteAtomicSequence missionSequence;
-	private IgniteAtomicSequence missionContentsSequence;
-	
-	private IgniteCache<String, MissionEntry> missionUidCache;
-	
-	private IgniteCache<String, MissionContentsEntry> missionContentsUidCache;
 	
 	public IgniteAtomicSequence missionSequence() {
-		if (missionSequence == null)
-			missionSequence = ignite.atomicSequence("autoMissionSequence", 0, true);
-		
-		return missionSequence;
+		return ignite.atomicSequence("autoMissionSequence", 0, true);
 	}
 	
 	public IgniteAtomicSequence missionContentsSequence() {
-		if (missionContentsSequence == null)
-			missionContentsSequence = ignite.atomicSequence("autoMissionContentSequence", 0, true);
-		
-		return missionContentsSequence;
+		return ignite.atomicSequence("autoMissionContentSequence", 0, true);
 	}
 	
 	public IgniteCache<String, MissionEntry> missionUidCache() {
-		if (missionUidCache == null) {
-			CacheConfiguration<String, MissionEntry> missionCfg = new CacheConfiguration<>("missionUidCache");
-			missionCfg.setIndexedTypes(String.class, MissionEntry.class);
-			missionUidCache = ignite.getOrCreateCache(missionCfg);
-		}
-		return missionUidCache;
+		CacheConfiguration<String, MissionEntry> missionCfg = new CacheConfiguration<>("missionUidCache");
+		missionCfg.setIndexedTypes(String.class, MissionEntry.class);
+		return ignite.getOrCreateCache(missionCfg);
 	}
 
 	public IgniteCache<String, MissionContentsEntry> missionContentsUidCache() {
-		if (missionContentsUidCache == null) {
-			CacheConfiguration<String, MissionContentsEntry> missionContentCfg = new CacheConfiguration<>("missionContentsUidCache");
-			missionContentCfg.setIndexedTypes(String.class, MissionContentsEntry.class);
-			missionContentsUidCache = ignite.getOrCreateCache(missionContentCfg);
-		}
-		return missionContentsUidCache;
+		CacheConfiguration<String, MissionContentsEntry> missionContentCfg = new CacheConfiguration<>("missionContentsUidCache");
+		missionContentCfg.setIndexedTypes(String.class, MissionContentsEntry.class);
+		return ignite.getOrCreateCache(missionContentCfg);
 	}
 	
 	

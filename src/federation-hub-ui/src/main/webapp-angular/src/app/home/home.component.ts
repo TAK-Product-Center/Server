@@ -26,7 +26,7 @@ export class HomeComponent {
   searchTerm: string = '';
 
   constructor(private localStoreageService: LocalStorageService, private workflowService: WorkflowService, private dataService: DataService, private router: Router) {
-    dataService.setActivePolicy(undefined)
+    dataService.setActiveEditingPolicy(undefined)
     workflowService.getWorkflowDescriptors().subscribe({
       next: (v) => this.successFunc(v),
       error: (e) => this.failureFunc(e)
@@ -68,6 +68,7 @@ export class HomeComponent {
   }
 
   public onLoad() {
-    this.router.navigate(['/drawflow'], { queryParams: { policy: this.selectedPolicy.name }}); 
+    this.dataService.setActiveEditingPolicy(this.selectedPolicy)
+    this.router.navigate(['/drawflow']); 
   }
 }

@@ -717,6 +717,7 @@ federationManagerControllers.controller('OutgoingConnectionCreationCtrl', ['$sco
         firstNewOutgoing.fallback = null;
         firstNewOutgoing.maxRetriesFallbackError = false;
         firstNewOutgoing.id = 0;
+        firstNewOutgoing.tls = true;
 
         $scope.newOutgoingConnections.push(firstNewOutgoing);
 
@@ -751,6 +752,7 @@ federationManagerControllers.controller('OutgoingConnectionCreationCtrl', ['$sco
             fallbackConnection.unlimitedRetries = true;
             fallbackConnection.fallback = null;
             fallbackConnection.maxRetriesFallbackError = false;
+            fallbackConnection.tls = true
             $scope.newOutgoingConnections.push(fallbackConnection);
 
             $scope.checkMaxRetries(outgoingConnection);
@@ -1129,6 +1131,7 @@ federationManagerControllers.controller(
                      $scope.fedConfig.v1Tls.forEach(function (item) {
                          $scope.tls[item.tlsVersion] = true;
                      });
+                     
                      handleRecencySeconds($scope.fedConfig);
                  },
                  function (response) {
@@ -1189,6 +1192,15 @@ federationManagerControllers.controller(
          $scope.$on('$viewContentLoaded', function (event) {
              getFedConfig();
          });
+
+         $scope.addTokenServer = function () {
+             $scope.fedConfig.federationTokenAuthentication.push({tls: true, enabled: true, port: 9002})
+         }
+
+         $scope.removeTokenServer = function (index) {
+            $scope.fedConfig.federationTokenAuthentication.splice(index, 1);
+
+         }
 
          $scope.addPort = function () {
              var newPort = new FederationConfigService();
@@ -1323,6 +1335,19 @@ federationManagerControllers.controller(
          };
 
          $scope.saveFederationConfig = function (config) {
+             let ports = []
+             ports.push($scope.fedConfig.serverPortv1)
+             ports.push($scope.fedConfig.serverPortv2)
+
+             $scope.fedConfig.federationTokenAuthentication.forEach(s => ports.push(s.port))
+
+             let dupliatePorts = new Set(ports).size !== ports.length
+
+             if (dupliatePorts) {
+                 alert('Duplicate Ports Detected. Not Savings');
+                 return
+             }
+
              $scope.submitInProgress = true;
 
              saveRecencySeconds(config);

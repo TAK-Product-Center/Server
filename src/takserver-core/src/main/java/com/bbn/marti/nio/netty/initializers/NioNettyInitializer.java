@@ -44,6 +44,7 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProvider;
 import org.springframework.boot.web.server.Ssl;
 import tak.server.cot.CotEventContainer;
+import tak.server.ignite.IgniteHolder;
 
 /*
  */
@@ -73,6 +74,12 @@ public abstract class NioNettyInitializer extends ChannelInitializer<SocketChann
 				
 				@Override
 				protected void initChannel(SocketChannel channel) throws Exception {
+					if (!IgniteHolder.getInstance().isConnected()) {
+						log.info("Rejecting Federation Connection Until Ignite Connects");
+						channel.close();
+						return;
+					}
+					
 					SslHandler sslHandler = sslContext.newHandler(channel.alloc());
 					sslHandler.engine()
 							.setEnabledProtocols(federationServer.getV1Tls()
@@ -100,6 +107,11 @@ public abstract class NioNettyInitializer extends ChannelInitializer<SocketChann
 
 				@Override
 				protected void initChannel(SocketChannel channel) throws Exception {
+					if (!IgniteHolder.getInstance().isConnected()) {
+						log.info("Rejecting Federation Client Connection Until Ignite Connects");
+						channel.close();
+						return;
+					}
 					SslHandler sslHandler = sslContext.newHandler(channel.alloc());
 
 					sslHandler.engine()
@@ -161,6 +173,12 @@ public abstract class NioNettyInitializer extends ChannelInitializer<SocketChann
 			return new NioNettyInitializer() {
 				@Override
 				protected void initChannel(SocketChannel channel) throws Exception {
+					if (!IgniteHolder.getInstance().isConnected()) {
+						log.info("Rejecting TCP Server Connection Until Ignite Connects");
+						channel.close();
+						return;
+					}
+					
 					channel.pipeline()
 							.addLast(new ByteArrayDecoder())
 							.addLast(new ByteArrayEncoder())
@@ -178,6 +196,12 @@ public abstract class NioNettyInitializer extends ChannelInitializer<SocketChann
 			return new NioNettyInitializer() {
 				@Override
 				protected void initChannel(SocketChannel channel) throws Exception {
+					if (!IgniteHolder.getInstance().isConnected()) {
+						log.info("Rejecting STCP Server Connection Until Ignite Connects");
+						channel.close();
+						return;
+					}  
+					
 					channel.pipeline()
 							.addLast(new ByteArrayDecoder())
 							.addLast(new ByteArrayEncoder())
@@ -196,6 +220,12 @@ public abstract class NioNettyInitializer extends ChannelInitializer<SocketChann
 				SslContext sslContext = buildServerSslContext(tls);
 				@Override
 				protected void initChannel(SocketChannel channel) throws Exception {
+					if (!IgniteHolder.getInstance().isConnected()) {
+						log.info("Rejecting TLS Server Connection Until Ignite Connects");
+						channel.close();
+						return;
+					}
+					
 					SslHandler sslHandler = sslContext.newHandler(channel.alloc());
 					sslHandler.engine()
 						.setEnabledProtocols(input.getCoreVersion2TlsVersions().split(","));

@@ -62,7 +62,7 @@ dependencies {
   implementation group: 'io.micrometer', name: 'micrometer-core', version: micrometer_version
 
   // cloudwatch metrics
-  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch2', version: cloudwatch_version
+  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch2', version: micrometer_version
     
   api group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeine_version
   implementation group: 'io.jsonwebtoken', name: 'jjwt', version: jsonwebtoken_version

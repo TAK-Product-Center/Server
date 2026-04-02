@@ -77,4 +77,6 @@ public interface PluginCoreConfigApi {
 	}
 
 	public Security getSecurity() throws Exception;
+
+	public Security getFederationSecurity() throws Exception;
 }

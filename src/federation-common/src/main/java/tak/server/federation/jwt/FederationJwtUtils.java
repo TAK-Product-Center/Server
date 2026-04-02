@@ -186,7 +186,7 @@ public class FederationJwtUtils {
 			Date now = new Date();
 
 			JwtBuilder builder = Jwts.builder().setIssuedAt(now).signWith(SignatureAlgorithm.HS256, secretKeySpec)
-					.claim("federation", "federation claim val").claim("clientFingerprint", clientFingerprint)
+					.claim("clientFingerprint", clientFingerprint)
 					.claim("clientGroups", clientGroups);
 
 			if (expiration > 0)
@@ -205,8 +205,7 @@ public class FederationJwtUtils {
 			Date now = new Date();
 
 			JwtBuilder builder = Jwts.builder().setIssuedAt(now).signWith(SignatureAlgorithm.HS256, secretKeySpec)
-					.claim("name", name)
-					.claim("expiration", expiration);
+					.claim("name", name).claim("expiration", expiration);
 
 			if (expiration > 0)
 				builder.setExpiration(new Date(expiration));
@@ -218,17 +217,15 @@ public class FederationJwtUtils {
 			return null;
 		}
 	}
-	
-	public String createFederationTokenFromClientCert(String fingerprint, String caFingerprint, String principalDN, String issuerDN, long expiration) {
+
+	public String createFederationTokenFromClientCert(String fingerprint, String caFingerprint, String principalDN,
+			String issuerDN, long expiration) {
 		try {
 			Date now = new Date();
 
 			JwtBuilder builder = Jwts.builder().setIssuedAt(now).signWith(SignatureAlgorithm.HS256, secretKeySpec)
-					.claim("fingerprint", fingerprint)
-					.claim("caFingerprint", caFingerprint)
-					.claim("principalDN", principalDN)
-					.claim("issuerDN", issuerDN)
-					.claim("expiration", expiration);
+					.claim("fingerprint", fingerprint).claim("caFingerprint", caFingerprint)
+					.claim("principalDN", principalDN).claim("issuerDN", issuerDN).claim("expiration", expiration);
 
 			if (expiration > 0)
 				builder.setExpiration(new Date(expiration));

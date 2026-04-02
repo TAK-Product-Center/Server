@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.util.ActiveProfiles;
 
 import java.rmi.RemoteException;
@@ -50,20 +51,23 @@ public class CoreConfigFacade implements CoreConfig {
     // Local instance of the cachedConfiguration to avoid Ignite call behind the scenes
     private Configuration cachedConfig = null;
 
-    private CoreConfigFacade() {
-        if (ActiveProfiles.getInstance().isConfigProfileActive()) {
-            coreConfig = DistributedConfiguration.getInstance();
-        } else {
-            // initial setting of coreConfig instance
-            refreshConfiguration();
-            // setup listener for updates to the
-            IgniteHolder.getInstance().getIgnite().message().localListen(
-                Constants.CONFIG_TOPIC_KEY, (nodeId, message) -> {
-                    refreshConfiguration();
-                    return true;
-                });
-        }
-    }
+	private CoreConfigFacade() {
+		if (ActiveProfiles.getInstance().isConfigProfileActive()) {
+			coreConfig = DistributedConfiguration.getInstance();
+		} else {
+			// initial setting of coreConfig instance
+			refreshConfiguration();
+
+			IgniteReconnectEventHandler.registerListener(() -> {
+				// setup listener for updates to the
+				IgniteHolder.getInstance().getIgnite().message().localListen(Constants.CONFIG_TOPIC_KEY,
+						(nodeId, message) -> {
+							refreshConfiguration();
+							return true;
+						});
+			});
+		}
+	}
 
     public static CoreConfigFacade getInstance() {
         if (instance == null) {

@@ -32,6 +32,7 @@ import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import tak.server.Constants;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.ignite.grid.SubscriptionManagerProxyHandler;
 import tak.server.qos.MessageDeliveryStrategy;
 
@@ -44,7 +45,7 @@ public class BinaryPayloadWebSocketHandler extends BinaryWebSocketHandler {
 	private ConcurrentHashMap<String, String> websocketGroupVectorMap = new ConcurrentHashMap<>();
 	private ConcurrentHashMap<String, String> websocketSessionIdMap = new ConcurrentHashMap<>();
 	private MessageDeliveryStrategy mds = null;
-
+	
 	private MessageDeliveryStrategy mds() {
 		if (mds == null ) {
 			mds = (MessageDeliveryStrategy) SpringContextBeanForApi.getSpringContext().getBean("mds");
@@ -66,38 +67,40 @@ public class BinaryPayloadWebSocketHandler extends BinaryWebSocketHandler {
 			setupIgniteListeners();
 		}
 		
-		Resources.tcpProcessor.execute(() -> {
-			ignite().message(
-				ignite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME))	
-					.localListen("websocket-payload-write-listener", (nodeId, message) -> {
-						if (message instanceof WebsocketMessageTransporter) {
-							final WebsocketMessageTransporter wmt = (WebsocketMessageTransporter) message;
-							final BinaryMessage binaryMessage = new BinaryMessage(wmt.message);
-							
-							Resources.messageSendExecutor.submit(
-									() -> {
-										((WebsocketMessageTransporter) message).websocketConnectionIds.parallelStream().forEach(id -> {
-											try {
-												WebSocketSession session = websocketMap.get(id);
-												
-												if (session != null && binaryMessage != null) {
+		IgniteReconnectEventHandler.registerListener(() -> {
+			Resources.tcpProcessor.execute(() -> {
+				ignite().message(
+					ignite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME))	
+						.localListen("websocket-payload-write-listener", (nodeId, message) -> {
+							if (message instanceof WebsocketMessageTransporter) {
+								final WebsocketMessageTransporter wmt = (WebsocketMessageTransporter) message;
+								final BinaryMessage binaryMessage = new BinaryMessage(wmt.message);
+								
+								Resources.messageSendExecutor.submit(
+										() -> {
+											((WebsocketMessageTransporter) message).websocketConnectionIds.parallelStream().forEach(id -> {
+												try {
+													WebSocketSession session = websocketMap.get(id);
 													
-													if (mds().isAllowed(wmt.messageType, wmt.publisherId, id)) {
-														session.sendMessage(binaryMessage);
-														Metrics.counter(Constants.METRIC_MESSAGE_WRITE_COUNT, "takserver", "messaging").increment();
+													if (session != null && binaryMessage != null) {
+														
+														if (mds().isAllowed(wmt.messageType, wmt.publisherId, id)) {
+															session.sendMessage(binaryMessage);
+															Metrics.counter(Constants.METRIC_MESSAGE_WRITE_COUNT, "takserver", "messaging").increment();
+														}
+													}
+												} catch (Exception e) {
+													if (logger.isDebugEnabled()) {
+														logger.debug("Error submitting message to websocket via ignite write listener", e);
 													}
 												}
-											} catch (Exception e) {
-												if (logger.isDebugEnabled()) {
-													logger.debug("Error submitting message to websocket via ignite write listener", e);
-												}
-											}
+											});
 										});
-									});
-						}
+							}
 
-						return true;
-					});
+							return true;
+						});
+			});	
 		});
 	}
 
@@ -235,10 +238,8 @@ public class BinaryPayloadWebSocketHandler extends BinaryWebSocketHandler {
 				return true;
 			}
 		};
-
-		IgniteHolder.getInstance()
-				.getIgnite()
-				.events()
-				.localListen(ignitePredicate, EventType.EVT_NODE_LEFT, EventType.EVT_NODE_FAILED);
+		
+		IgniteHolder.getInstance().getIgnite().events().localListen(ignitePredicate, EventType.EVT_NODE_LEFT,
+				EventType.EVT_NODE_FAILED);
 	}
 }

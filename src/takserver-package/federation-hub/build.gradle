@@ -4,7 +4,7 @@ buildscript {
     }
 }
 
-apply plugin: 'nebula.ospackage'
+apply plugin: 'com.netflix.nebula.ospackage'
 apply from: "../utils/utils.gradle"
 
 // RPM pre-install script.
@@ -14,11 +14,23 @@ mkdir -p /opt/tak/federation-hub
 
 mkdir -p /opt/tak/federation-hub/policies
 
+# try to backup policies
+if [ -d "/opt/tak/federation-hub/policies" ] ; then
+    timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+    backup_root="/opt/tak/federation-hub/backup-policies"
+    backup_dir="$backup_root/$timestamp"
+
+    echo "Backing up /opt/tak/federation-hub/policies to $backup_dir"
+    mkdir -p "$backup_dir"
+    cp -fr /opt/tak/federation-hub/policies/* "$backup_dir"/
+fi
+
 # Stop the federation hub if it is still running.
 set +e
 pkill -9 -f federation-hub-broker.jar
 pkill -9 -f federation-hub-policy.jar
 pkill -9 -f federation-hub-ui.war
+pkill -9 -f federation-hub-plugin-manager.jar
 set -e
 
 if service --status-all | grep -Fq 'federation-hub'; then
@@ -48,11 +60,15 @@ fi
 def postinstall_script_federation_hub = '''\
 chown -R tak:tak /opt/tak
 
-# try to backup configs
+# set defaults
 if [ ! -d "/opt/tak/federation-hub/configs" ] ; then
     mkdir -p /opt/tak/federation-hub/configs
     cp -fR /opt/tak/federation-hub/default-configs/* /opt/tak/federation-hub/configs/
 fi
+
+# copy only files that don't exist yet
+cp -rnv /opt/tak/federation-hub/default-configs/* /opt/tak/federation-hub/configs/
+
 
 chown -fR tak:tak /opt/tak/federation-hub/configs
 
@@ -78,14 +94,17 @@ chown root:root /opt/tak/federation-hub/scripts/federation-hub
 chown root:root /opt/tak/federation-hub/scripts/federation-hub-broker
 chown root:root /opt/tak/federation-hub/scripts/federation-hub-policy
 chown root:root /opt/tak/federation-hub/scripts/federation-hub-ui
+chown root:root /opt/tak/federation-hub/scripts/federation-hub-plugin-manager
 chmod 755 /opt/tak/federation-hub/scripts/federation-hub
 chmod 755 /opt/tak/federation-hub/scripts/federation-hub-broker
 chmod 755 /opt/tak/federation-hub/scripts/federation-hub-policy
 chmod 755 /opt/tak/federation-hub/scripts/federation-hub-ui
+chmod 755 /opt/tak/federation-hub/scripts/federation-hub-plugin-manager
 cp /opt/tak/federation-hub/scripts/federation-hub /etc/init.d
 cp /opt/tak/federation-hub/scripts/federation-hub-broker /etc/init.d
 cp /opt/tak/federation-hub/scripts/federation-hub-policy /etc/init.d
 cp /opt/tak/federation-hub/scripts/federation-hub-ui /etc/init.d
+cp /opt/tak/federation-hub/scripts/federation-hub-plugin-manager /etc/init.d
 
 
 # Set up logging directory.
@@ -137,6 +156,7 @@ case "$1" in
         rm /etc/init.d/federation-hub-broker
         rm /etc/init.d/federation-hub-policy
         rm /etc/init.d/federation-hub-ui
+        rm /etc/init.d/federation-hub-plugin-manager
         rm /etc/init.d/federation-hub
         echo "Removing federation-hub.service file"
         sudo rm -f /etc/systemd/system/federation-hub.service
@@ -208,11 +228,13 @@ task createFedhubDockerPoliciesDir() {
 }
 
 task constructFedhubDockerZip(type: Zip) { Task task ->
-
     dependsOn createFedhubDockerLogDir, createFedhubDockerPoliciesDir
-    archiveName 'takserver-fedhub-docker-' + version + '.zip'
-    duplicatesStrategy 'fail'
-    destinationDir(file("$buildDir/distributions"))
+
+	duplicatesStrategy = DuplicatesStrategy.FAIL
+
+    archiveFileName.set("takserver-fedhub-docker-${version}.zip")
+	destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+
     into('takserver-fedhub-docker-' + version)
 
     with copyFullFedhubSpec(task, true).into('tak')

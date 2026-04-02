@@ -773,7 +773,8 @@ public class RepositoryService extends BaseService {
 	 * @param uid       String (required)
 	 * @param eventType ConnectionEventTypeValue (required)
 	 */
-	public void auditCallsignUIDEventAsync(String callsign, String uid, String username, ConnectionEventTypeValue eventType, String groupVector) {
+	public void auditCallsignUIDEventAsync(String callsign, String uid, String username, String team, String role,
+										   ConnectionEventTypeValue eventType, String groupVector) {
 
 		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 		if (!config.getRepository().isEnable()) {
@@ -798,14 +799,14 @@ public class RepositoryService extends BaseService {
 				if (uid != null && uid.trim().length() > 0 &&
 						callsign != null && callsign.trim().length() > 0 && eventType != null) {
 
-					String ep_sql = new String("insert into client_endpoint (callsign, uid, username) " +
-							"select ?, ?, ? where not exists " +
-							"(select * from client_endpoint ce where ce.callsign = ? and ce.uid = ? and username = ?)");
+					String ep_sql = new String("insert into client_endpoint (callsign, uid, username, team, role) " +
+							"select ?, ?, ?, ?, ? where not exists " +
+							"(select * from client_endpoint ce where ce.callsign = ? and ce.uid = ? and username = ? and team = ? and role = ?)");
 
 					String epe_sql = new String("insert into client_endpoint_event (client_endpoint_id, connection_event_type_id, created_ts, groups) " +
 							"select ce.id, cet.id, current_timestamp, (?)::bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + ") " +
 							"from client_endpoint ce join connection_event_type cet on cet.event_name = ? " +
-							"where ce.callsign = ? and ce.uid = ? and username = ?");
+							"where ce.callsign = ? and ce.uid = ? and username = ? and team = ? and role = ?");
 
 					if (log.isDebugEnabled()) {
 						log.debug("Insert client endpoint callsign: " + callsign + " uid: " + uid);
@@ -817,9 +818,13 @@ public class RepositoryService extends BaseService {
 							ps_ep.setString(1, callsign);
 							ps_ep.setString(2, uid);
 							ps_ep.setString(3, fusername);
-							ps_ep.setString(4, callsign);
-							ps_ep.setString(5, uid);
-							ps_ep.setString(6, fusername);
+							ps_ep.setString(4, team);
+							ps_ep.setString(5, role);
+							ps_ep.setString(6, callsign);
+							ps_ep.setString(7, uid);
+							ps_ep.setString(8, fusername);
+							ps_ep.setString(9, team);
+							ps_ep.setString(10, role);
 							ps_ep.executeUpdate();
 
 							// Insert a client endpoint row
@@ -829,6 +834,8 @@ public class RepositoryService extends BaseService {
 								ps_epe.setString(3, callsign);
 								ps_epe.setString(4, uid);
 								ps_epe.setString(5, fusername);
+								ps_epe.setString(6, team);
+								ps_epe.setString(7, role);
 								ps_epe.executeUpdate();
 							}
 						}

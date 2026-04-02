@@ -4,11 +4,12 @@ import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
 
-import tak.server.federation.hub.ui.graph.FederationPolicyModel;
+import tak.server.federation.hub.ui.graph.FederationUIPluginsPolicyModel;
+import tak.server.federation.hub.ui.graph.FederationUIPolicyModel;
 
 public interface FederationHubBroker {
     void addGroupCa(X509Certificate ca);
-    void updatePolicy(FederationPolicyModel federationPolicyModel);
+    void updatePolicy(FederationUIPolicyModel federationPolicyModel);
     List<HubConnectionInfo> getActiveConnections();
     FederationHubBrokerMetrics getFederationHubBrokerMetrics();
 	FederationHubBrokerGlobalMetrics getFederationHubBrokerGlobalMetrics();

@@ -26,7 +26,6 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.DirectoryWalker;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
-import org.joda.time.DateTime;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.Logger;
@@ -87,7 +86,8 @@ public class ProfileService {
             profileList = profileRepository.getAllProfiles(
                     applyOnEnrollment, applyOnConnect, groupVector);
         } else {
-            Date lastSyncTime = new DateTime().minusSeconds(new Long(syncSecago).intValue()).toDate();
+            Date lastSyncTime = Date.from(Instant.now().minusSeconds(syncSecago));
+
             profileList = profileRepository.getLatestProfiles(
                     applyOnEnrollment, applyOnConnect, lastSyncTime, groupVector);
         }
@@ -162,7 +162,8 @@ public class ProfileService {
             profileList = profileRepository.getAllProfilesForTool(
                     tool, groupVector);
         } else {
-            Date lastSyncTime = new DateTime().minusSeconds(new Long(syncSecago).intValue()).toDate();
+            Date lastSyncTime = Date.from(Instant.now().minusSeconds(syncSecago));
+
             profileList = profileRepository.getLatestProfilesForTool(
                     tool, lastSyncTime, groupVector);
         }
@@ -260,7 +261,8 @@ public class ProfileService {
             profileList = profileRepository.getAllProfilesForTool(
                     tool, groupVector);
         } else {
-            Date lastSyncTime = new DateTime().minusSeconds(new Long(syncSecago).intValue()).toDate();
+            Date lastSyncTime = Date.from(Instant.now().minusSeconds(syncSecago));
+
             profileList = profileRepository.getLatestProfilesForTool(
                     tool, lastSyncTime, groupVector);
         }

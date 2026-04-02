@@ -2,10 +2,11 @@ import java.nio.file.Files
 import java.nio.file.Paths
 
 apply plugin: 'application'
-
-mainClassName = 'com.bbn.marti.UserManager'
-
 apply plugin: 'com.github.johnrengelman.shadow'
+
+application {
+    mainClass = 'com.bbn.marti.UserManager'
+}
 
 jar {
     enabled = false
@@ -13,10 +14,9 @@ jar {
 
 shadowJar {
     dependsOn compileJava
-    baseName = 'UserManager'
-    classifier = 'all'
+    archiveBaseName.set("UserManager")
+    archiveClassifier.set("all")
     setZip64(true)
-    version = version
 }
 
 sourceSets {
@@ -131,10 +131,15 @@ dependencies {
     implementation group: 'org.springframework.security', name: 'spring-security-crypto', version: spring_security_version
     implementation group: 'org.springframework', name: 'spring-core', version: spring_version
 
-    integrationTestImplementation sourceSets.main.output
-    integrationTestImplementation sourceSets.main.compileClasspath
-    integrationTestImplementation project(':takserver-takcl-core')
-    integrationTestImplementation group: 'junit', name: 'junit', version: junit_version
+	integrationTestImplementation sourceSets.main.output
+	integrationTestImplementation project(':takserver-takcl-core')
+	integrationTestImplementation group: 'junit', name: 'junit', version: junit_version
+}
+
+configurations {
+    integrationTestImplementation {
+        extendsFrom implementation
+    }
 }
 
 task copyJar(type: Copy, dependsOn: shadowJar) {

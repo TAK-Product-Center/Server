@@ -1,0 +1,66 @@
+buildscript {
+  dependencies {
+    classpath('org.springframework.boot:spring-boot-gradle-plugin:' + spring_boot_version)
+  }
+}
+
+jar {
+    enabled = false
+}
+
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'org.springframework.boot'
+
+jar {
+    enabled = false
+}
+
+test {
+  testLogging.showStandardStreams = true
+
+  // Display logging output.
+  onOutput { descriptor, event -> logger.lifecycle(event.message) }
+}
+
+sourceSets {
+  main {
+    java {
+      srcDir 'build/src-generated'
+    }
+  }
+}
+
+dependencies {
+  implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
+  implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+
+   implementation(project(':federation-common')) {
+    exclude group: 'log4j', module: 'log4j'
+    exclude group: 'org.apache.logging.log4j'
+    exclude group: 'org.slf4j', module: 'log4j-over-slf4j'
+  }
+
+  implementation group: 'com.h2database', name: 'h2', version: h2_version
+
+  // Apache Ignite (cache and distributed service grid).
+  implementation group: 'org.apache.ignite', name: 'ignite-spring', version: ignite_version
+  implementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
+  implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+
+  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: spring_boot_version
+  implementation group: 'org.springframework.boot', name: 'spring-boot-loader', version: spring_boot_version
+  implementation group: 'org.springframework', name: 'spring-context', version: spring_version
+
+  testImplementation group: 'junit', name: 'junit', version: junit_version
+  testImplementation group: 'org.mockito', name: 'mockito-core', version: mockito_version
+  testImplementation("org.springframework.boot:spring-boot-starter-test:$spring_boot_version") {
+    exclude group: "com.vaadin.external.google", module:"android-json"
+  }
+
+  testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+}
+
+compileJava {
+    options.compilerArgs += ["-Xlint:unchecked", "-Xlint:deprecation", "-Xlint:serial"]
+}

@@ -1,5 +1,6 @@
 package tak.server.federation.hub.ui.graph;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
@@ -14,7 +15,8 @@ import java.util.Map;
 public class EdgeCell extends PolicyObjectCell {
     private String type = "Policy";
 
-    @JsonProperty("roger_federation")
+    @JsonProperty("federation")
+    @JsonAlias("roger_federation")
     @JsonDeserialize(as=EdgeProperties.class)
     private EdgeProperties properties;
 

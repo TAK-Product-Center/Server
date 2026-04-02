@@ -2,8 +2,11 @@ package com.bbn.marti.jwt;
 
 import com.bbn.marti.config.MissionTls;
 import com.bbn.marti.config.Oauth;
+import com.bbn.marti.oauth.OAuthUtils;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtParser;
@@ -17,6 +20,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.Key;
 import java.security.KeyFactory;
@@ -33,6 +37,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class JwtUtils {
 
@@ -44,6 +49,8 @@ public class JwtUtils {
     private boolean keysLoaded = false;
     private boolean keysGenerated = false;
     private static JwtUtils instance = null;
+
+    private volatile Cache<String, List<RSAPublicKey>> publicKeyCache;
 
     private KeyPair loadKeyPair(String keyStoreType, String keyStoreFile, String keyStorePass) {
         InputStream keyStoreStream = null;
@@ -212,27 +219,22 @@ public class JwtUtils {
             }
 
             List<RSAPublicKey> rsaPublicKeys = new ArrayList<>();
+            Cache<String,List<RSAPublicKey>> publicKeyCache = getOrCreatePublicKeyCache();
 
             for (Oauth.AuthServer authServer : oAuth.getAuthServer()) {
-                try {
-                    String issuer = authServer.getIssuer();
-                    byte[] keyBytes = Files.readAllBytes(Paths.get(issuer));
+                if (publicKeyCache.asMap().get(authServer.getName()) == null) {
+                    resolveAndCachePublicKeyDetails(authServer, rsaPublicKeys, publicKeyCache);
+                } else {
+                    rsaPublicKeys.addAll( publicKeyCache.asMap().get(authServer.getName()) );
+                }
+            }
 
-                    if (issuer.toLowerCase().endsWith(".pem")) {
-                        String key = new String(keyBytes);
-                        String[] keys = key.split("-----BEGIN PUBLIC KEY-----");
-                        for (int i = 1; i < keys.length; i++) {
-                            keys[i] = keys[i]
-                                    .replaceAll("\n", "")
-                                    .replaceAll("-----END PUBLIC KEY-----", "");
-                            byte[] decoded = Base64.decodeBase64(keys[i]);
-                            rsaPublicKeys.add(loadPublicKey(decoded));
-                        }
-                    } else {
-                        rsaPublicKeys.add(loadPublicKey(keyBytes));
-                    }
-                } catch (Exception e) {
-                    logger.error("exception loading authServer public key", e);
+            for (Oauth.OpenIdDiscoveryConfiguration serverConfiguration : oAuth.getOpenIdDiscoveryConfiguration()) {
+                if (publicKeyCache.asMap().get(serverConfiguration.getName()) == null) {
+                    Oauth.AuthServer authServer = OAuthUtils.processTrustedAuthServerConfig(serverConfiguration);
+                    resolveAndCachePublicKeyDetails(authServer, rsaPublicKeys, publicKeyCache);
+                } else {
+                    rsaPublicKeys.addAll( publicKeyCache.asMap().get(serverConfiguration.getName()) );
                 }
             }
 
@@ -240,6 +242,54 @@ public class JwtUtils {
         } catch (Exception e) {
             logger.error("exception in getExternalVerifiers!", e);
             return  null;
+        }
+    }
+
+    private void resolveAndCachePublicKeyDetails(Oauth.AuthServer authServer, List<RSAPublicKey> rsaPublicKeys, Cache<String, List<RSAPublicKey>> publicKeyCache) {
+        if (authServer.getKey().isEmpty()) {
+            List<RSAPublicKey> rsaKeys = new ArrayList<>();
+            try {
+                String issuer = authServer.getIssuer();
+                Path filepathToKey = Paths.get(issuer);
+                if (issuer.toLowerCase().endsWith(".pem")) {
+                    byte[] keyBytes = Files.readAllBytes(filepathToKey);
+                    String key = new String(keyBytes);
+                    String[] keys = key.split("-----BEGIN PUBLIC KEY-----");
+                    for (int i = 1; i < keys.length; i++) {
+                        keys[i] = keys[i]
+                                .replaceAll("\n", "")
+                                .replaceAll("-----END PUBLIC KEY-----", "");
+                        byte[] decoded = Base64.decodeBase64(keys[i]);
+                        RSAPublicKey keyValue = loadPublicKey(decoded);
+                        rsaKeys.add(keyValue);
+                        rsaPublicKeys.addAll(rsaKeys);
+                        publicKeyCache.asMap().put(authServer.getName(), rsaKeys);
+                    }
+                } else if (issuer.toLowerCase().endsWith(".der")) {
+                    byte[] keyBytes = Files.readAllBytes(filepathToKey);
+                    RSAPublicKey key = loadPublicKey(keyBytes);
+                    rsaKeys.add(key);
+                    rsaPublicKeys.addAll(rsaKeys);
+                    publicKeyCache.asMap().put(authServer.getName(), rsaKeys);
+                } else {
+                    logger.error("found unsupported issuer: " + issuer);
+                }
+            } catch (Exception e) {
+                logger.error("exception loading authServer public key", e);
+            }
+        } else {
+            List<RSAPublicKey> rsaKeys = new ArrayList<>();
+            for (String key : authServer.getKey() ) {
+                try {
+                    byte[] decoded = Base64.decodeBase64(key);
+                    RSAPublicKey rsa = loadPublicKey(decoded);
+                    rsaKeys.add(rsa);
+                } catch (Exception e) {
+                    logger.error("exception loading authServer public key", e);
+                }
+            }
+            rsaPublicKeys.addAll(rsaKeys);
+            publicKeyCache.asMap().put(authServer.getName(), rsaKeys);
         }
     }
 
@@ -305,4 +355,17 @@ public class JwtUtils {
         return parseClaims(token, jwtParsers, false);
     }
 
+    private Cache<String, List<RSAPublicKey>> getOrCreatePublicKeyCache() {
+        if (publicKeyCache == null) {
+            synchronized (this) {
+                if (publicKeyCache == null) {
+                    publicKeyCache = Caffeine.newBuilder().expireAfterWrite(
+                            CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue()
+                                    .getOAuthPublicKeyCacheSeconds(), TimeUnit.SECONDS).build();
+                }
+            }
+        }
+
+        return publicKeyCache;
+    }
 }

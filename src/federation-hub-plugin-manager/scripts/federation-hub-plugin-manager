@@ -1,0 +1,75 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: federation-hub-plugin-manager init script
+### END INIT INFO
+#
+# /etc/rc.d/init.d/federation-hub-plugin-manager
+#
+# (c)2015-2021 Raytheon BBN. Licensed to US Government with unlimited rights.
+#
+# The Federation Hub is an optional companion to the Team Awareness Kit (TAK) server.
+# It allows for the federation of TAK data across the administrative and trust
+# boundaries of different networks participating in a TAK deployment. It can be run
+# with or without a co-located TAK server.
+#
+# This script starts the federation-hub-plugin-manager service, which provides the
+# plugin-manager logic to determine how federated data is shared to registered plugins.
+
+# chkconfig: 345 20 40
+# description: Federation Hub plugin manager service.
+
+# Source function library
+if [ -f /etc/rc.d/init.d/functions ]; then
+    . /etc/rc.d/init.d/functions
+fi
+
+SERVICE="Federation Hub Plugin Manager"
+FEDERATION_HUB_HOME=/opt/tak/federation-hub
+
+case "$1" in
+     start)
+        echo -n "Starting $SERVICE: "
+          su tak -c "cd ${FEDERATION_HUB_HOME}/scripts && ./federation-hub-plugin-manager.sh > /opt/tak/federation-hub/logs/federation-hub-plugin-manager-console.log 2>&1 &"
+          if [ $? -eq 0 ]; then
+	      echo "OK"
+	      else
+		  pkill -9 -f "federation-hub-plugin-manager"
+		  echo "FAILED"
+		  exit 1
+	      fi
+          touch "/var/lock/subsys/$SERVICE"
+    ;;
+    stop)
+          echo -n "Shutting down $SERVICE: "
+		    pkill -9 -f "federation-hub-plugin-manager"
+	  rm -f "/var/lock/subsys/$SERVICE"
+	  echo "done."
+    ;;
+    status)
+	RETVAL=0
+	PID=`pgrep -f "federation-hub-plugin-manager"`
+        if [ $? -eq 0 ] ; then
+            echo "$SERVICE is running with pid ${PID}"
+        else
+            echo "$SERVICE is not running."
+            RETVAL=1
+        fi
+	exit $RETVAL
+    ;;
+    restart)
+          $0 stop;
+          $0 start;
+    ;;
+    reload)
+          $0 stop;
+          $0 start;
+    ;;
+    *)
+       echo "Usage: $0 {start|stop|status|restart}"
+       exit 1
+    ;;
+esac
+
+exit 0

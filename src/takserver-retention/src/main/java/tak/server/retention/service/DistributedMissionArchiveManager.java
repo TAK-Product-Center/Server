@@ -88,7 +88,7 @@ public class DistributedMissionArchiveManager implements MissionArchiveManager, 
 		
 		String cronExpression = missionArchiveConfig.getCronExpression();
 		
-		if (CronExpression.isValidExpression(cronExpression) && !cronExpression.equals("-")) {
+		if (!CronExpression.isValidExpression(cronExpression) && !cronExpression.equals("-")) {
 			logger.error(" Invalid cron expression " + cronExpression + " schedule not changed");
 		} else {
 			newCronConfig.setMissionCronExpression(cronExpression);

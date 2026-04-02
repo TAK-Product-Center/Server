@@ -22,7 +22,7 @@ public class FederationConfigInfo implements Serializable {
 	private String truststorePass;
 	private String tlsVersion;
 	private String webBaseURL;
-	private FederationTokenAuthentication federationTokenAuthentication;
+	private List<FederationTokenAuthentication> federationTokenAuthentication;
 	private boolean allowMissionFederation;
 	private boolean allowDataFeedFederation;
 	private boolean allowFederatedDelete;
@@ -40,7 +40,7 @@ public class FederationConfigInfo implements Serializable {
 
 	public FederationConfigInfo(boolean isEnabled, List<V1Tls> v1Tls, List<FederationPort> v1Ports, int serverPortv1, int serverPortv2, boolean serverPortEnabled,
 								boolean serverPortEnabledv2, String truststorePath, String truststorePass, String tlsVersion,
-								String webBaseURL, FederationTokenAuthentication federationTokenAuthentication, boolean allowMissionFederation, boolean allowDataFeedFederation, boolean allowFederatedDelete, boolean enableMissionFederationDisruptionTolerance,
+								String webBaseURL, List<FederationTokenAuthentication> federationTokenAuthentication, boolean allowMissionFederation, boolean allowDataFeedFederation, boolean allowFederatedDelete, boolean enableMissionFederationDisruptionTolerance,
 								long missionFederationDisruptionToleranceRecencySeconds, List<Mission> missionInterval, int coreVersion,
 								boolean enableDataPackageAndMissionFileFilter, List<String> fileExtension) {
 
@@ -155,11 +155,11 @@ public class FederationConfigInfo implements Serializable {
 		this.webBaseURL = webBaseURL;
 	}
 
-	public FederationTokenAuthentication getFederationTokenAuthentication() {
+	public List<FederationTokenAuthentication> getFederationTokenAuthentication() {
 		return federationTokenAuthentication;
 	}
 
-	public void setFederationTokenAuthentication(FederationTokenAuthentication federationTokenAuthentication) {
+	public void setFederationTokenAuthentication(List<FederationTokenAuthentication> federationTokenAuthentication) {
 		this.federationTokenAuthentication = federationTokenAuthentication;
 	}
 

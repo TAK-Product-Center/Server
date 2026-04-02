@@ -445,9 +445,9 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 			queryBuilder.append(", ?" + RemoteUtil.getInstance().getGroupType()); // groups
 
-			queryBuilder.append(");");
+			queryBuilder.append(") returning id, submissiontime;");
 
-			try (Connection connection = dataSource.getConnection(); PreparedStatement statement = connection.prepareStatement(queryBuilder.toString(), Statement.RETURN_GENERATED_KEYS)) {
+			try (Connection connection = dataSource.getConnection(); PreparedStatement statement = connection.prepareStatement(queryBuilder.toString())) {
 
 				// bind input stream to database
 				if (logger.isDebugEnabled()) {
@@ -537,20 +537,13 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 				queryHelper.auditLog(queryBuilder.toString());
 
-				int insertResult = statement.executeUpdate();
-
-				if (logger.isDebugEnabled()) {
-					logger.debug("insertResult: " + insertResult);
-				}
-
 				Integer primaryKey = null;
 
-				try (ResultSet generatedKeys = queryHelper.getGeneratedKeys(statement)) {
-					generatedKeys.next();
+				try (ResultSet insertResult = statement.executeQuery()) {
+					insertResult.next();
 
-					primaryKey = new Integer(generatedKeys.getInt(1));
-					Timestamp submissionTime = generatedKeys.getTimestamp(11,
-							new GregorianCalendar());
+					primaryKey = insertResult.getInt(1);
+					Timestamp submissionTime = insertResult.getTimestamp(2);
 
 					metadataResult = Metadata.copy(metadata);
 					metadataResult.set(Field.PrimaryKey, primaryKey.toString());
@@ -583,16 +576,15 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 
 				// Always calculate the SHA-256 hash in the database
 				// This has to be done after the insert, postgres won't allow the hash to be calculated during the insert statement
-				try (PreparedStatement updateHashStatement = connection.prepareStatement(updateHashUidSql, Statement.RETURN_GENERATED_KEYS)) {
+				try (PreparedStatement updateHashStatement = connection.prepareStatement(updateHashUidSql)) {
 
 					if (logger.isDebugEnabled()) {
 						logger.debug("primary key for hash update: " + primaryKey);
 					}
 
 					updateHashStatement.setInt(1, primaryKey);
-					updateHashStatement.execute();
 
-					try (ResultSet updateHashResult = queryHelper.getGeneratedKeys(updateHashStatement)) {
+					try (ResultSet updateHashResult = updateHashStatement.executeQuery()) {
 						updateHashResult.next();
 
 						String hash = updateHashResult.getString(1);

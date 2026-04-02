@@ -21,6 +21,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBElement;
+import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
 import javax.xml.namespace.QName;
 
@@ -95,7 +96,17 @@ public class CertManagerApi extends BaseRestController {
     private CertManagerService certManagerService;
 
     private static final String DEFAULT_PASSWORD = "atakatak";
-    
+
+    private static JAXBContext jaxbContext;
+
+    static {
+        try {
+            jaxbContext = JAXBContext.newInstance(CertificateConfig.class);
+        } catch (JAXBException e) {
+            logger.warn("exception creating CertificateConfig deserialization context", e);
+        }
+    }
+
     @RequestMapping(value = "/tls/makeClientKeyStore", method = RequestMethod.GET)
     ResponseEntity<byte[]> makeKeyStore(@RequestParam(value = "cn", required = false) String cn,
                                         @RequestParam(value = "clientUid", required = false) String clientUid,
@@ -268,9 +279,7 @@ public class CertManagerApi extends BaseRestController {
                 throw new TakException("getCertificateConfig failed!");
             }
 
-            // instantiate a jaxb context to serialize out the configuration
-            JAXBContext jc = JAXBContext.newInstance(CertificateConfig.class);
-            Marshaller marshaller = jc.createMarshaller();
+            Marshaller marshaller = jaxbContext.createMarshaller();
             StringWriter writer = new StringWriter();
 
             // create a root node (not present in the xsd generated classes)
