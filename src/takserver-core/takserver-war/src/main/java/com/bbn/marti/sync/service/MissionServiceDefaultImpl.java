@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,20 +25,25 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.SimpleTimeZone;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.validator.routines.EmailValidator;
 import org.dom4j.DocumentException;
+import org.dom4j.DocumentHelper;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.locationtech.jts.geom.Polygon;
@@ -53,13 +59,13 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.repository.query.Param;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.oxm.Marshaller;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCrypt;
@@ -228,6 +234,18 @@ public class MissionServiceDefaultImpl implements MissionService {
 	private final FileManagerService fileManagerService;
 
 	private final Logger changeLogger = LoggerFactory.getLogger(Constants.CHANGE_LOGGER);
+
+	private class PendingNotification {
+		PendingNotification(CotEventContainer notification, ConcurrentSkipListSet<String> subscribers) {
+			this.notification = notification;
+			this.subscribers = subscribers;
+		}
+
+		CotEventContainer notification;
+		ConcurrentSkipListSet<String> subscribers;
+	}
+
+	private volatile Cache<String, PendingNotification> notificationCache;
 
 	@Autowired
 	private AsyncTaskExecutor asyncExecutor;
@@ -409,29 +427,54 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	@Override
 	public List<CotElement> getCotElementsByTimeAndBbox(
-			Date start, Date end, GeospatialFilter.BoundingBox boundingBox, String groupVector) {
+			Date start, Date end, GeospatialFilter.BoundingBox boundingBox, String groupVector, boolean isFiltered) {
 		try {
+			StringBuilder sb = new StringBuilder();
+			
+			// select all from combined cot_router + cot_router_chat
+			sb.append("select * from (");
+			// select from cot_router
+			String selectCotRouterColumns = "  select uid, ST_X(event_pt), ST_Y(event_pt), point_hae, cot_type,"
+					+ " servertime, point_le, detail, id, how, stale, point_ce, groups, event_pt ";
+			sb.append(selectCotRouterColumns);
+			sb.append("  from cot_router");
 
-			String sql = "select "
-					+ "uid, ST_X(event_pt), ST_Y(event_pt), "
-					+ " point_hae, cot_type, servertime, point_le, detail, id, how, stale "
-					+ ", point_ce "
-					+ "from cot_router where " +
-					"   servertime >= ? and servertime <= ? and " +
-					"   ( cot_type = 'b-t-f' or ( " +
-					"    (cot_type like 'a-f%' or cot_type like 'a-n%' or cot_type like 'a-u%' " +
-					"       or cot_type like 'a-h%' or cot_type like 'b-m-r%' ) ";
+			if (isFiltered) {
+				sb.append(" where ");
+				sb.append("  (cot_type like 'a-f%' or cot_type like 'a-n%' or cot_type like 'a-u%'");
+				sb.append("    or cot_type like 'a-h%' or cot_type like 'b-m-r%')");
+			}
+
+			// combine with above selection to get chat cot events
+			// since all cot events of chat type (b-t-f) are stored in cot_router_chat
+			sb.append("  union all ");
+			// from cot_router_chat, select the same columns from cot_router 
+			sb.append(selectCotRouterColumns);
+			sb.append("  from cot_router_chat");
+
+			// close select from union all
+			sb.append(") as combined_cot_router");
+
+			// for parameter simplicity and readability, filter by time, bbox, and group clause after union
+			sb.append("  where servertime >= ? and servertime <= ?");
 
 			Object[] params = null;
 			if (boundingBox != null) {
-				sql += " and event_pt && ST_MakeEnvelope(?, ?, ?, ?, 4326) ";
+				sb.append(" and event_pt && ST_MakeEnvelope(?, ?, ?, ?, 4326) ");
 				params = new Object[] { start, end, boundingBox.getMinLongitude(), boundingBox.getMinLatitude(),
 						boundingBox.getMaxLongitude(), boundingBox.getMaxLatitude(), groupVector };
 			} else {
 				params = new Object[] { start, end, groupVector };
 			}
+			sb.append(remoteUtil.getGroupAndClause());
 
-			sql += remoteUtil.getGroupAndClause() + ")) order by servertime desc";
+			sb.append(" order by servertime desc");
+
+			String sql = sb.toString();
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("getCotElementsByTimeAndBbox sql query: " + sql);
+			}
 
 			return new JdbcTemplate(dataSource).query(sql, params,
 					new ResultSetExtractor<List<CotElement>>() {
@@ -597,10 +640,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 				});
 	}
 
-	@Override
-	@Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, keyGenerator = "methodNameMultiStringArgCacheKeyGenerator", sync = true)
-	public String getCachedCot(String missionName, Set<String> uids, String groupVector) {
-
+	private String getCachedCotImpl(Set<String> uids, String path, String groupVector) {
 		StringBuilder result = new StringBuilder();
 		result.append(Constants.XML_HEADER);
 		result.append("<events>");
@@ -611,6 +651,18 @@ public class MissionServiceDefaultImpl implements MissionService {
 		Iterator it = cot.iterator();
 		while (it.hasNext()) {
 			CotElement cotElement = (CotElement)it.next();
+
+			if (path != null) {
+				try {
+					if (DocumentHelper.parseText(cotElement.detailtext).selectNodes(
+							"/detail/marti/dest[@path=\"" + path + "\"]").isEmpty()) {
+						continue;
+					}
+				} catch (Exception e) {
+					logger.error("exception filtering cot path", e);
+				}
+			}
+
 			result.append(cotElement.toCotXml());
 			result.append('\n');
 		}
@@ -619,28 +671,17 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 		return result.toString();
 	}
-	
+
 	@Override
 	@Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, keyGenerator = "methodNameMultiStringArgCacheKeyGenerator", sync = true)
-	public String getCachedCot(UUID missionGuid, Set<String> uids, String groupVector) {
+	public String getCachedCot(String missionName, Set<String> uids, String path, String groupVector) {
+		return getCachedCotImpl(uids, path, groupVector);
+	}
 
-		StringBuilder result = new StringBuilder();
-		result.append(Constants.XML_HEADER);
-		result.append("<events>");
-
-		// Get mission uids, then the latest CoT for each
-		List<CotElement> cot = getLatestCotForUids(uids, groupVector);
-		@SuppressWarnings("rawtypes")
-		Iterator it = cot.iterator();
-		while (it.hasNext()) {
-			CotElement cotElement = (CotElement)it.next();
-			result.append(cotElement.toCotXml());
-			result.append('\n');
-		}
-
-		result.append("</events>");
-
-		return result.toString();
+	@Override
+	@Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, keyGenerator = "methodNameMultiStringArgCacheKeyGenerator", sync = true)
+	public String getCachedCot(UUID missionGuid, Set<String> uids, String path, String groupVector) {
+		return getCachedCotImpl(uids, path, groupVector);
 	}
 
 	@Override
@@ -650,18 +691,16 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 			AuditLogUtil.auditLog(sql + "uids: " + uids + " groupVector: " + groupVector);
 
-			Connection connection = dataSource.getConnection();
-			Array uidArray = connection.createArrayOf("varchar", uids.toArray());
-			connection.close();
+			try (Connection connection = dataSource.getConnection()) {
+				Array uidArray = connection.createArrayOf("varchar", uids.toArray());
+				int updated = new JdbcTemplate(dataSource).update(sql,
+						new Object[] {
+								uidArray,
+								groupVector
+						});
 
-			int updated = new JdbcTemplate(dataSource).update(sql,
-					new Object[] {
-							uidArray,
-							groupVector
-					});
-
-			return updated > 0;
-
+				return updated > 0;
+			}
 		} catch (SQLException e) {
 			logger.error("sql exception in deleteAllCotForUids! " + e.getMessage());
 			return false;
@@ -675,7 +714,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 			String parentUid, String afterUid, String creatorUid, String groupVector) {
 
 		if (uid != null) {
-			MissionLayer existing =  missionLayerRepository.findByUidNoMission(uid);
+			MissionLayer existing =  missionLayerRepository.findByUidNoMission(uid, mission.getId());
 			if (existing != null) {
 				setLayerParent(missionName, mission, uid, parentUid, afterUid, creatorUid);
 				return existing;
@@ -685,7 +724,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		MissionLayer missionLayer = new MissionLayer(uid);
 
 		if (!Strings.isNullOrEmpty(parentUid)) {
-			MissionLayer parentLayer = missionLayerRepository.findByUidNoMission(parentUid);
+			MissionLayer parentLayer = missionLayerRepository.findByUidNoMission(parentUid, mission.getId());
 			missionLayer.setParent(parentLayer);
 		}
 
@@ -701,17 +740,14 @@ public class MissionServiceDefaultImpl implements MissionService {
 		subscriptionManager.announceMissionChange(UUID.fromString(mission.getGuid()), missionName, SubscriptionManagerLite.ChangeType.MISSION_LAYER,
 				creatorUid, mission.getTool(), commonUtil.toXml(missionLayer));
 
-
 		return missionLayer;
 	}
 	
-	
-
 	@Override
 	@CacheEvict(cacheResolver = MissionLayerCacheResolver.MISSION_LAYER_CACHE_RESOLVER, allEntries = true)
 	public void setLayerName(String missionName, Mission mission, String layerUid, String name, String creatorUid) {
 
-		MissionLayer layer = missionLayerRepository.findByUidNoMission(layerUid);
+		MissionLayer layer = missionLayerRepository.findByUidNoMission(layerUid, mission.getId());
 		if (layer == null) {
 			throw new NotFoundException();
 		}
@@ -730,7 +766,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 	public synchronized void setLayerPosition(
 			String missionName, Mission mission, String layerUid, String afterUid, String creatorUid) {
 
-		MissionLayer layer = missionLayerRepository.findByUidNoMission(layerUid);
+		MissionLayer layer = missionLayerRepository.findByUidNoMission(layerUid, mission.getId());
 		if (layer == null) {
 			throw new NotFoundException();
 		}
@@ -751,8 +787,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 	public synchronized void setLayerParent(
 			String missionName, Mission mission, String layerUid, String parentUid, String afterUid, String creatorUid) {
 
-		MissionLayer layer = missionLayerRepository.findByUidNoMission(layerUid);
-		MissionLayer parent = parentUid == null ? null : missionLayerRepository.findByUidNoMission(parentUid);
+		MissionLayer layer = missionLayerRepository.findByUidNoMission(layerUid, mission.getId());
+		MissionLayer parent = parentUid == null ? null : missionLayerRepository.findByUidNoMission(parentUid, mission.getId());
 
 		if (layer == null || (parentUid != null && parent == null)) {
 			throw new NotFoundException();
@@ -803,7 +839,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		missionLayerRepository.deleteByUid(layer.getUid());
 
 		for (MissionLayer child : layer.getChildren()) {
-			removeMissionLayerData(child, mission, creatorUid, groupVector);
+			removeMissionLayerData(child, mission, creatorUid, mission.getGroupVector());
 		}
 	}
 
@@ -813,14 +849,14 @@ public class MissionServiceDefaultImpl implements MissionService {
 			String missionName, Mission mission, String layerUid, String creatorUid, String groupVector) {
 
 		try {
-			MissionLayer layer = missionLayerRepository.findByUidNoMission(layerUid);
+			MissionLayer layer = missionLayerRepository.findByUidNoMission(layerUid, mission.getId());
 			if (layer == null) {
 				throw new NotFoundException();
 			}
 
 			missionLayerRepository.fixupAfter(layer.getAfter(), layer.getParentUid(), layerUid);
 
-			removeMissionLayerData(layer,  mission, creatorUid, groupVector);
+			removeMissionLayerData(layer,  mission, creatorUid, mission.getGroupVector());
 
 			subscriptionManager.announceMissionChange(UUID.fromString(mission.getGuid()), missionName, SubscriptionManagerLite.ChangeType.MISSION_LAYER,
 					creatorUid, mission.getTool(), commonUtil.toXml(layer));
@@ -834,7 +870,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 	@Cacheable(cacheResolver = MissionLayerCacheResolver.MISSION_LAYER_CACHE_RESOLVER,
 			key="{#root.methodName, #root.args[0], #root.args[2]}", sync = true)
 	public MissionLayer hydrateMissionLayer(String missionName, Mission mission, String layerUid) {
-		MissionLayer missionLayer = missionLayerRepository.findByUidNoMission(layerUid);
+		MissionLayer missionLayer = missionLayerRepository.findByUidNoMission(layerUid, mission.getId());
 		if (missionLayer == null) {
 			throw new NotFoundException();
 		}
@@ -864,19 +900,25 @@ public class MissionServiceDefaultImpl implements MissionService {
 					if (uidMap.get(item.getUid()) != null) {
 						parent.getUidAdds().add(uidMap.get(item.getUid()));
 					} else {
-						logger.error("unable to hydrate layer content for uid " + item.getUid());
+						if (logger.isDebugEnabled()) {
+							logger.debug("unable to hydrate layer content for uid " + item.getUid());
+						}
 					}
 				} else if (parent.getType() == MissionLayer.Type.CONTENTS) {
 					if (resourceMap.get(item.getUid()) != null) {
 						parent.getResourceAdds().add(resourceMap.get(item.getUid()));
 					} else {
-						logger.error("unable to hydrate layer content for file " + item.getUid());
+						if (logger.isDebugEnabled()) {
+							logger.debug("unable to hydrate layer content for file " + item.getUid());
+						}
 					}
 				} else if (parent.getType() == MissionLayer.Type.MAPLAYER) {
 					if (mapLayerMap.get(item.getUid()) != null) {
 						parent.getMaplayerAdds().add(mapLayerMap.get(item.getUid()));
 					} else {
-						logger.error("unable to hydrate layer content for map layer " + item.getUid());
+						if (logger.isDebugEnabled()) {
+							logger.debug("unable to hydrate layer content for map layer " + item.getUid());
+						}
 					}
 				}
 			}
@@ -956,12 +998,12 @@ public class MissionServiceDefaultImpl implements MissionService {
 			
 			Set<Resource> resources = mission.getContents();
 			Map<Integer, List<String>> keywordMap = getMissionService().getCachedResourcesByGuid(mission.getGuidAsUUID(), resources);  // hydrate resources
-				for (Resource resource : resources) {
-					List<String> keywords = keywordMap.get(resource.getId());
-					resource.setKeywords(keywords);
-					resourceMap.put(resource.getHash(), resource);
-				}
+			for (Resource resource : resources) {
+				List<String> keywords = keywordMap.get(resource.getId());
+				resource.setKeywords(keywords);
+				resourceMap.put(resource.getHash(), resource);
 			}
+		}
 
 		Metrics.timer("method-exec-timer-hydrateMission-hashes", "takserver", "MissionService").record(Duration.ofMillis(System.currentTimeMillis() - start));
 
@@ -1328,13 +1370,13 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	@Override
 	@CacheEvict(value = Constants.INVITE_ONLY_MISSION_CACHE, allEntries = true)
-	public void missionInvite(
+	public boolean missionInvite(
 			UUID missionGuid, String invitee, MissionInvitation.Type type, MissionRole role, String creatorUid, String groupVector) {
 		try {
 
 			// validate existence of mission
 			Mission mission = getMissionService().getMissionByGuidCheckGroups(missionGuid, groupVector);
-			validateMissionByGuid(mission);
+			validateMissionByGuid(mission, missionGuid.toString());
 
 			String token = generateToken(
 					UUID.randomUUID().toString(), mission.getGuidAsUUID(), mission.getName(), MissionTokenUtils.TokenType.INVITATION, -1);
@@ -1342,27 +1384,28 @@ public class MissionServiceDefaultImpl implements MissionService {
 			MissionInvitation missionInvitation = new MissionInvitation(mission.getName(),
 					UUID.fromString(mission.getGuid()), invitee, type.name(), creatorUid, new Date(), token, role, mission.getId());
 
-			missionInvite(mission, missionInvitation);
+			return missionInvite(mission, missionInvitation);
 
 		} catch (Exception e) {
 			logger.error("exception in missionInvite!", e);
+			return false;
 		}
 	}
 
 	@Override
 	@CacheEvict(value = Constants.INVITE_ONLY_MISSION_CACHE, allEntries = true)
-	public void missionInvite(Mission mission, MissionInvitation missionInvitation) {
+	public boolean missionInvite(Mission mission, MissionInvitation missionInvitation) {
 
 		try {
 
 			try {
 				missionInvitationRepository.save(missionInvitation);
 			} catch (DataIntegrityViolationException e) {
-				if (logger.isDebugEnabled()) {
-					logger.debug("attempt to add duplicate invitation : " + missionInvitation.toString());
-				}
+				logger.error("attempt to add duplicate invitation : " + missionInvitation.toString());
+				return false;
 			} catch (Exception e) {
 				logger.error("Exception calling missionInvitationRepository.save", e);
+				return false;
 			}
 
 			String[] contactUids = null;
@@ -1456,8 +1499,11 @@ public class MissionServiceDefaultImpl implements MissionService {
 						missionInvitation.getCreatorUid(), mission.getTool(), missionInvitation.getToken(), roleXml);
 			}
 
+			return true;
+
 		} catch (Exception e) {
 			logger.error("Exception in missionInvite2!", e);
+			return false;
 		}
 	}
 
@@ -1469,7 +1515,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		// validate existence of mission
 		Mission mission = getMissionService().getMissionByGuidCheckGroups(missionGuid, groupVector);
 
-		validateMissionByGuid(mission);
+		validateMissionByGuid(mission, missionGuid.toString());
 
 		// TODO: make sure this updated SQL is correct
 		MapSqlParameterSource namedParameters = new MapSqlParameterSource();
@@ -1506,115 +1552,115 @@ public class MissionServiceDefaultImpl implements MissionService {
 		return missionInvitationRepository.findAllByMissionId(missionId);
 	}
 
-	@Override
-	public Set<MissionInvitation> getAllMissionInvitationsForClient(String clientUid, String groupVector) {
+	public CompletableFuture<Set<MissionInvitation>> getAllMissionInvitationsForClient(String clientUid, String groupVector, String username) {
+	    return subscriptionManagerProxy.getSubscriptionManagerForClientUid(clientUid)
+	        .thenApply(subscriptionManager -> {
+	            Set<MissionInvitation> missionInvitations = new HashSet<>();
 
-		try {
-			Set<MissionInvitation> missionInvitations = new HashSet<>();
+	            // 1. Invitations for clientUid
+	            missionInvitations.addAll(
+	                missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
+	                    clientUid, MissionInvitation.Type.clientUid.name(), groupVector)
+	            );
 
-			// add invitations for the clientUid
-			missionInvitations.addAll(missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
-					clientUid, MissionInvitation.Type.clientUid.name(), groupVector));
+	            // 2. Invitations for callsign (if any)
+	            RemoteSubscription subscription = subscriptionManager.getRemoteSubscriptionByClientUid(clientUid);
+	            if (subscription != null) {
+	                missionInvitations.addAll(
+	                    missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
+	                        subscription.callsign, MissionInvitation.Type.callsign.name(), groupVector)
+	                );
+	            }
 
-			// get the streaming channel subscription for this clientUid
-			RemoteSubscription subscription = subscriptionManagerProxy.getSubscriptionManagerForClientUid(clientUid).getRemoteSubscriptionByClientUid(clientUid);
-			if (subscription != null) {
+	            // 3. Invitations for authenticated username
+	            missionInvitations.addAll(
+	                missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
+	                    username, MissionInvitation.Type.userName.name(), groupVector)
+	            );
 
-				// add any invitations for the associated streaming channel callsign
-				missionInvitations.addAll(missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
-						subscription.callsign, MissionInvitation.Type.callsign.name(), groupVector));
-			}
-
-			// add any invitations for the authenticated username
-			String username = SecurityContextHolder.getContext().getAuthentication().getName();
-			missionInvitations.addAll(missionInvitationRepository.findAllMissionInvitationsByInviteeIgnoreCaseAndType(
-					username, MissionInvitation.Type.userName.name(), groupVector));
-
-			return missionInvitations;
-
-		} catch (Exception e) {
-			logger.error("Exception in getAllMissionInvitationsForClient!", e);
-			return null;
-		}
+	            return missionInvitations;
+	        })
+	        .exceptionally(ex -> {
+	            logger.error("Exception in getAllMissionInvitationsForClient!", ex);
+	            return Collections.emptySet();
+	        });
 	}
 
 	@Override
 	@Transactional
-	public MissionSubscription missionSubscribe(UUID missionGuid, String clientUid, MissionRole missionRole, String groupVector) {
-		Mission mission = getMissionService().getMissionByGuid(missionGuid, groupVector);
+	public CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, String clientUid, MissionRole missionRole, String groupVector) {
+	    Mission mission = getMissionService().getMissionByGuid(missionGuid, groupVector);
 
-		String username = "";
-		try {
-			username = SecurityContextHolder.getContext().getAuthentication().getName();
-		} catch (Exception e) {
-			if (logger.isDebugEnabled()) {
-				logger.debug("exception getting username", e);
-			}
-		}
+	    String username = "";
+	    try {
+	        username = SecurityContextHolder.getContext().getAuthentication().getName();
+	    } catch (Exception e) {
+	        if (logger.isDebugEnabled()) {
+	            logger.debug("exception getting username", e);
+	        }
+	    }
 
-		return missionSubscribe(missionGuid, mission.getId(), clientUid, username, missionRole, groupVector);
+	    return missionSubscribe(missionGuid, mission.getId(), clientUid, username, missionRole, groupVector);
 	}
 
 	@Override
 	@Transactional
-	public MissionSubscription missionSubscribe(UUID missionGuid, String clientUid, String groupVector) {
-		Mission mission = getMissionService().getMissionByGuid(missionGuid, groupVector);
-		return missionSubscribe(missionGuid, clientUid, getDefaultRole(mission), groupVector);
+	public CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, String clientUid, String groupVector) {
+	    Mission mission = getMissionService().getMissionByGuid(missionGuid, groupVector);
+	    MissionRole role = getDefaultRole(mission);
+	    return missionSubscribe(missionGuid, clientUid, role, groupVector);
 	}
 
 	@Override
-	public MissionSubscription missionSubscribe(UUID missionGuid, Long missionId, String clientUid, String username, MissionRole role, String groupVector) {
-		try {
+	public CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, Long missionId, String clientUid, String username, MissionRole role, String groupVector) {
+	    return subscriptionManagerProxy.getSubscriptionManagerForClientUid(clientUid)
+	        .thenApply(subscriptionManager -> {
+	            subscriptionManager.missionSubscribe(missionGuid, clientUid);
 
-			subscriptionManagerProxy.getSubscriptionManagerForClientUid(clientUid).missionSubscribe(missionGuid, clientUid);
+	            Mission m = getMissionByGuid(missionGuid, false);
+	            MissionSubscription missionSubscription = missionSubscriptionRepository
+	                .findByMissionGuidAndClientUidAndUsernameNoMission(missionGuid.toString(), clientUid, username);
 
-			MissionSubscription missionSubscription = null;
-			
-			logger.debug("findByMissionGuidAndClientUidAndUsernameNoMission {} {} {}", missionGuid.toString(), clientUid, username);
-			
-			Mission m = getMissionByGuid(missionGuid, false);
-			
-			missionSubscription = missionSubscriptionRepository.findByMissionGuidAndClientUidAndUsernameNoMission(missionGuid.toString(), clientUid, username);
+	            if (missionSubscription == null) {
+	                String subscriptionUid = UUID.randomUUID().toString();
+	                String token = generateToken(subscriptionUid, missionGuid, m.getName(), MissionTokenUtils.TokenType.SUBSCRIPTION, -1);
 
-			if (missionSubscription == null) {
+	                logger.debug("Creating subscription with uid {}", subscriptionUid);
 
-				String subscriptionUid = UUID.randomUUID().toString();
-				String token = generateToken(
-						subscriptionUid, missionGuid, m.getName(), MissionTokenUtils.TokenType.SUBSCRIPTION,-1);
+	                missionSubscription = new MissionSubscription(subscriptionUid, token, null, clientUid, username, new Date(), role);
 
-				logger.debug("creating subscription with uid {} ", subscriptionUid);
+	                missionSubscriptionRepository.subscribe(
+	                    missionId, clientUid, new Date(), subscriptionUid, token, role.getId(), username);
+	            } else if (missionSubscription.getRole() != null
+	                    && missionSubscription.getRole().compareTo(role) != 0
+	                    && role.hasAllPermissions(missionSubscription.getRole())) {
 
-				missionSubscription = new MissionSubscription(subscriptionUid, token, null, clientUid, username, new Date(), role);
+	                logger.debug("Updating subscription role");
+	                missionSubscription.setRole(role);
 
-				missionSubscriptionRepository.subscribe(missionId, clientUid, new Date(), subscriptionUid, token, role.getId(), username);
+	                getMissionService().setRoleByClientUidOrUsername(missionId, clientUid, null, role.getId());
+	            }
 
-			} else {
-				if (!role.isUsingMissionDefault() && missionSubscription.getRole() != null && missionSubscription.getRole().compareTo(role) != 0) {
-					if (logger.isDebugEnabled()) {
-						logger.debug("updating subscription role");
-					}
-					missionSubscription.setRole(role);
-
-					getMissionService().setRoleByClientUidOrUsername(missionId, clientUid, null, role.getId());
-				}
-			}
-
-			return missionSubscription;
-
-		} catch (DataIntegrityViolationException e) {
-			logger.debug("mission already contained subscription {} {} ", missionGuid, clientUid);
-			return null;
-		} catch (Exception e) {
-			logger.error("Exception in missionSubscribe!", e);
-			return null;
-		}
+	            return missionSubscription;
+	        })
+	        .exceptionally(ex -> {
+	            if (ex.getCause() instanceof DataIntegrityViolationException) {
+	                logger.debug("mission already contained subscription {} {}", missionGuid, clientUid);
+	            } else {
+	                logger.error("Exception in missionSubscribe!", ex);
+	            }
+	            return null;
+	        });
 	}
+
 
 	@Override
 	@Transactional
 	public void missionUnsubscribe(UUID missionGuid, String uid, String username, String groupVector, boolean disconnectOnly) {
 		try {
-			subscriptionManagerProxy.getSubscriptionManagerForClientUid(uid).missionUnsubscribe(missionGuid, uid, username, disconnectOnly);
+			subscriptionManagerProxy.getSubscriptionManagerForClientUid(uid).thenAccept(subMgr -> {
+				subMgr.missionUnsubscribe(missionGuid, uid, username, disconnectOnly);
+			});
 		} catch (Exception e) {
 			throw new TakException(e);
 		}
@@ -1641,8 +1687,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	private AtomicInteger addCount = new AtomicInteger();
 	
-	@Override
-	public Mission addMissionContentAtTime(UUID missionGuid, MissionContent missionContent, String creatorUid, String groupVector, Date date, String xmlContentForNotification) {
+	private Mission addMissionContentImpl(UUID missionGuid, MissionContent missionContent, String creatorUid, String groupVector, Date date, String xmlContentForNotification) {
 		
 		if (missionGuid == null) {
 			throw new IllegalArgumentException("null missionGuid");
@@ -1651,7 +1696,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		logger.debug("addMissionContentAtTime missionContent {} missionGuid: {} creatorUid: {} ", missionContent, missionGuid, creatorUid);
 		
 		Mission mission = getMissionService().getMissionByGuidCheckGroups(missionGuid, groupVector);
-		getMissionService().validateMissionByGuid(mission);
+		getMissionService().validateMissionByGuid(mission, missionGuid.toString());
 
 		logger.debug("mission for add content: {}", mission);
 		
@@ -1695,6 +1740,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 							MissionChange change = new MissionChange(MissionChangeType.ADD_CONTENT, mission, resourceList.get(0).getHash(), null);
 							change.setTimestamp(date);
 							change.setCreatorUid(creatorUid);
+							change.setXmlContentForNotification(xmlContentForNotification);
 							missionChangeRepository.saveAndFlush(change);
 
 							MissionAdd<Resource> resourceAdd = new MissionAdd<>();
@@ -1729,6 +1775,13 @@ public class MissionServiceDefaultImpl implements MissionService {
 									logger.error("exception adding mission layer", e);
 								}
 							}
+
+							// make sure the file is accessible to all mission groups
+							if (coreConfig.getRemoteConfiguration().getNetwork().isMissionUseGroupsForContents()
+							&&	resourceList.get(0).getGroupVector() != mission.getGroupVector()) {
+								missionRepository.updateGroupsForMissionResource(
+										hash, groupVector, mission.getGroupVector());
+							}
 						}
 					}
 				}
@@ -1738,6 +1791,15 @@ public class MissionServiceDefaultImpl implements MissionService {
 					try {
 
 						try {
+							if (coreConfig.getRemoteConfiguration().getNetwork().isMissionStrictUidMissionMembership()) {
+									Collection<UUID> missionGuids = subscriptionManager.getMissionsForContentUid(uid);
+									if (missionGuids != null && !missionGuids.isEmpty()
+											&& !missionGuids.contains(missionGuid)) {
+										logger.error("Illegal attempt to add mission event to a different mission {} {}",
+												uid, missionGuid);
+										break;
+									}
+							}
 
 							if (mission.getUids().size() >= coreConfig.getRemoteConfiguration().getBuffer().getQueue().getMissionUidLimit()) {
 								logger.error("Track limit (" + coreConfig.getRemoteConfiguration().getBuffer().getQueue().getMissionUidLimit() + ") exceeded for mission {} {}", mission.getName(), mission.getGuid());
@@ -1761,6 +1823,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 						MissionChange change = new MissionChange(MissionChangeType.ADD_CONTENT, mission, null, uid);
 						change.setTimestamp(date);
 						change.setCreatorUid(creatorUid);
+						change.setXmlContentForNotification(xmlContentForNotification);
 
 						asyncExecutor.execute(() -> {
 
@@ -1816,7 +1879,31 @@ public class MissionServiceDefaultImpl implements MissionService {
 					changeLogger.trace(" announcing change " +  changeXml);
 				}
 
-				subscriptionManager.announceMissionChange(UUID.fromString(mission.getGuid()), mission.getName(), ChangeType.CONTENT, creatorUid, mission.getTool(), changeXml, xmlContentForNotification);
+				// send notification right away for map items, or if no limit on concurrent mission file downloads
+				if (!Strings.isNullOrEmpty(change.getContentUid()) ||
+					CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue()
+						.getMissionConcurrentDownloadLimit() == null) {
+					subscriptionManager.announceMissionChange(UUID.fromString(mission.getGuid()), mission.getName(),
+							ChangeType.CONTENT, creatorUid, mission.getTool(), changeXml, xmlContentForNotification);
+				} else {
+					// create a pending notification for the current change and active mission subscribers
+					PendingNotification pendingNotification = new PendingNotification(
+							subscriptionManager.createMissionChangeMessage(UUID.fromString(mission.getGuid()),
+									mission.getName(), ChangeType.CONTENT, creatorUid, mission.getTool(),
+									changeXml, xmlContentForNotification),
+							new ConcurrentSkipListSet<>(subscriptionManager.getMissionSubscriptions(
+									UUID.fromString(mission.getGuid()), true)));
+
+					// cache off the pending notification for the  mission, file pair
+					getOrCreateNotificationCache().put(
+							mission.getGuid() + "-" + change.getContentHash(), pendingNotification);
+
+					// send off the max number of allowed notifications
+					getMissionService().checkAndSendPendingNotifications(
+							UUID.fromString(mission.getGuid()), change.getContentHash(),
+							CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue()
+									.getMissionConcurrentDownloadLimit());
+				}
 
 				if (logger.isDebugEnabled()) {
 					logger.debug("mission change announced");
@@ -1839,8 +1926,40 @@ public class MissionServiceDefaultImpl implements MissionService {
 	}
 
 	@Override
+	@Retryable(retryFor = { NotFoundException.class })
+	public void brokerMissionUids(
+			Mission mission, MissionContent missionContent, String creatorUid, String groupVector)
+			throws NotFoundException {
+
+		if (missionContent.getUids().isEmpty()) {
+			return;
+		}
+
+		List<CotElement> cotElements = new CopyOnWriteArrayList<>();
+
+		for (String uid : missionContent.getUids()) {
+			try {
+				cotElements.add(getMissionService().getLatestCotForUid(uid, groupVector));
+			} catch (NotFoundException e) {
+				logger.error("brokerMissionUids failed to find uid {}", uid);
+				throw e;
+			}
+		}
+
+		for (CotElement cotElement : cotElements) {
+			submission.submitMissionCot(cotElement.toCotXml(), mission.getGuidAsUUID(),
+					null, groupManager.groupVectorToGroupSet(groupVector), creatorUid);
+		}
+	}
+
+	@Override
 	public Mission addMissionContent(UUID missionGuid, MissionContent content,  String creatorUid, String groupVector) {
-		return addMissionContentAtTime(missionGuid, content, creatorUid, groupVector, new Date(), null);
+		return addMissionContentImpl(missionGuid, content, creatorUid, groupVector, new Date(), null);
+	}
+
+	@Override
+	public Mission addMissionContentAtTime(UUID missionGuid, MissionContent content, String creatorUid, String groupVector, Date date, String xmlContentForNotification) {
+		return addMissionContentImpl(missionGuid, content, creatorUid, groupVector, date, xmlContentForNotification);
 	}
 
 	public Metadata addToEnterpriseSync(byte[] contents, String name, String mimeType, List<String> keywords,
@@ -1998,15 +2117,17 @@ public class MissionServiceDefaultImpl implements MissionService {
 			throw new NotFoundException("Log entry with id " + id + " not found");
 		}
 
+		Set<String> missionNames = entry.getMissionNames();
+
 		// delete the log entry
 		logEntryRepository.deleteById(id);
 
-		for (String missionName : entry.getMissionNames()) {
+		for (String missionName : missionNames) {
 			getMissionService().invalidateMissionCache(missionName);
 		}
 
 		// send change notifications
-		for (String missionName : entry.getMissionNames()) {
+		for (String missionName : missionNames) {
 			try {
 				Mission mission = getMissionService().getMissionByNameCheckGroups(missionName, groupVector);
 				subscriptionManager.announceMissionChange(UUID.fromString(mission.getGuid()), missionName, SubscriptionManagerLite.ChangeType.LOG, entry.getCreatorUid(), mission.getTool(), null);
@@ -2033,6 +2154,10 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 		entry.setServertime(new Date());
 		entry.setCreated(created);
+
+		if (Strings.isNullOrEmpty(entry.getId())) {
+			entry.setId(UUID.randomUUID().toString());
+		}
 
 		// save the log entry
 		entry = logEntryRepository.save(entry);
@@ -2154,7 +2279,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		logger.debug("addMissionPackage missionGuid {}", missionGuid);
 		
 		Mission mission = getMissionService().getMissionByGuidCheckGroups(missionGuid, groupVector);
-		validateMissionByGuid(mission);
+		validateMissionByGuid(mission, missionGuid.toString());
 
 		logger.debug("mission for add mission package {}", mission);
 		
@@ -2205,9 +2330,14 @@ public class MissionServiceDefaultImpl implements MissionService {
 						if (pendingChange.getType() == MissionChangeType.ADD_CONTENT) {
 							// pass the event to the submission service
 							String path = ndx + "/" + pendingChange.getContentUid() + ".cot";
+							if (files.get(path) == null) {
+								logger.error("unable to find file for offline change at " + path);
+								continue;
+							}
+
 							String cot = new String(files.get(path));
 							cot = trimByteOrderMark(cot);
-							submission.submitMissionPackageCotAtTime(cot, missionGuid, pendingChange.getTimestamp(), groups, creatorUid);
+							submission.submitMissionCot(cot, missionGuid, pendingChange.getTimestamp(), groups, creatorUid);
 						} else {
 							deleteMissionContentAtTime(missionGuid, null, pendingChange.getContentUid(),
 									creatorUid, groupVector, pendingChange.getTimestamp());
@@ -2225,7 +2355,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 							if (contents != null) {
 								// add the file to enterprise sync
 								Metadata metadata = addToEnterpriseSync(contents, resource.getName(), resource.getMimeType(),
-										resource.getKeywords(), groupVector, pendingChange.getTimestamp());
+										resource.getKeywords(), mission.getGroupVector(), pendingChange.getTimestamp());
 								hash = metadata.getHash();
 							}
 
@@ -2233,7 +2363,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 							MissionContent content = new MissionContent();
 							content.getHashes().add(hash);
 							addMissionContentAtTime(
-									missionGuid, content, creatorUid, groupVector, pendingChange.getTimestamp(), null);
+									missionGuid, content, creatorUid, mission.getGroupVector(), pendingChange.getTimestamp(), null);
 						} else {
 							String hash = pendingChange.getTempResource().getHash();
 							deleteMissionContentAtTime(missionGuid, hash, null,
@@ -2244,7 +2374,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 						if (pendingChange.getType() == MissionChangeType.ADD_CONTENT) {
 							setExternalMissionDataAtTime(
-									missionGuid, creatorUid, pendingChange.getTempExternalData(), groupVector, new Date());
+									missionGuid, creatorUid, pendingChange.getTempExternalData(), mission.getGroupVector(), new Date());
 						} else {
 							deleteExternalMissionDataAtTime(missionGuid,
 									pendingChange.getTempExternalData().getId(), pendingChange.getTempExternalData().getNotes(),
@@ -2257,9 +2387,9 @@ public class MissionServiceDefaultImpl implements MissionService {
 							LogEntry pendingLogEntry = pendingChange.getTempLogEntry();
 							// TODO: check if this log needs to include the mission guid also
 							pendingLogEntry.getMissionNames().add(mission.getName());
-							addUpdateLogEntry(pendingLogEntry, pendingChange.getTimestamp(), groupVector);
+							addUpdateLogEntry(pendingLogEntry, pendingChange.getTimestamp(), mission.getGroupVector());
 						} else {
-							deleteLogEntry(pendingChange.getTempLogEntry().getId(), groupVector);
+							deleteLogEntry(pendingChange.getTempLogEntry().getId(), mission.getGroupVector());
 						}
 
 					}
@@ -2281,17 +2411,19 @@ public class MissionServiceDefaultImpl implements MissionService {
 					if (filename.endsWith(".cot")) {
 						String cot = new String(contents);
 						cot = trimByteOrderMark(cot);
-						submission.submitMissionPackageCotAtTime(cot, missionGuid, new Date(), groups, creatorUid);
+						submission.submitMissionCot(cot, missionGuid, null, groups, creatorUid);
 					} else {
+						filename = filename.substring(filename.lastIndexOf("/") + 1);
+
 						Date now = new Date();
 						// add the file to enterprise sync
 						Metadata metadata = addToEnterpriseSync(contents, filename, null,
-								null, groupVector, now);
+								null, mission.getGroupVector(), now);
 
 						// add the new checklist to the checklist mission
 						MissionContent content = new MissionContent();
 						content.getHashes().add(metadata.getHash());
-						addMissionContentAtTime(missionGuid, content, creatorUid, groupVector, now, null);
+						addMissionContentAtTime(missionGuid, content, creatorUid, mission.getGroupVector(), now, null);
 					}
 				}
 			}
@@ -2307,7 +2439,6 @@ public class MissionServiceDefaultImpl implements MissionService {
 	}
 
 	@Override
-	@Transactional
 	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
 	public Mission deleteMissionContentAtTime(UUID missionGuid, String hash, String uid, String creatorUid, String groupVector, Date date) {
 
@@ -2320,7 +2451,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		}
 
 		Mission mission = getMissionService().getMissionByGuidCheckGroups(missionGuid, groupVector);
-		validateMissionByGuid(mission);
+		validateMissionByGuid(mission, missionGuid.toString());
 
 		try {
 
@@ -2380,7 +2511,6 @@ public class MissionServiceDefaultImpl implements MissionService {
 	}
 
 	@Override
-	@Transactional
 	@CacheEvict(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER, allEntries = true)
 	public Mission deleteMissionContent(UUID missionGuid, String hash, String uid, String creatorUid, String groupVector) {
 		return deleteMissionContentAtTime(missionGuid, hash, uid, creatorUid, groupVector, new Date());
@@ -2393,7 +2523,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		try {
 			// This query considers the vector, so you can only delete missions with which you share common group membership.
 			Mission mission = getMissionService().getMissionByGuidCheckGroups(missionGuid, groupVector);
-			validateMissionByGuid(mission);
+			validateMissionByGuid(mission, missionGuid.toString());
 
 			MissionPackage mp = new MissionPackage(mission.getName() + "_" + mission.getGuid() + ".zip");
 			mp.addParameter("uid", UUID.randomUUID().toString());
@@ -2635,7 +2765,7 @@ public class MissionServiceDefaultImpl implements MissionService {
  
 		// This query considers the vector, so you can only delete missions with which you share common group membership.
 		Mission mission = getMissionService().getMissionByGuidCheckGroups(missionGuid, groupVector);
-		validateMissionByGuid(mission);
+		validateMissionByGuid(mission, missionGuid.toString());
 
 		try {
 
@@ -2858,18 +2988,20 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	// checks if the mission was previously deleted
 	@Override
-	public void validateMissionByGuid(Mission mission) {
+	public void validateMissionByGuid(Mission mission, String missionGuid) {
 
-		logger.debug("validateMissionByGuid {} {} ", mission, mission.getGuid(), mission.getName());
+		if (logger.isDebugEnabled()) {
+			logger.debug("validateMissionByGuid {} {} ", mission, missionGuid);
+		}
 		
 		if (mission == null) {
 			// if a mission was deleted, respond with a 410
-			if (isDeletedByGuid(UUID.fromString(mission.getGuid()))) {
-				throw new MissionDeletedException("Mission  '" + mission.getGuid() + "' was deleted");
+			if (isDeletedByGuid(UUID.fromString(missionGuid))) {
+				throw new MissionDeletedException("Mission guid '" + missionGuid + "' was deleted");
 				// if a mission doesn't exist, respond with a 404
 			} else {
 
-				String msg = "Mission '" + mission.getGuid() + "' not found - not deleted";
+				String msg = "Mission guid '" + missionGuid + "' not found - not deleted";
 
 				if (logger.isDebugEnabled()) {
 					logger.debug(msg);
@@ -2990,7 +3122,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 			mission = null;
 		}
 
-		getMissionService().validateMissionByGuid(mission);
+		getMissionService().validateMissionByGuid(mission, missionGuid.toString());
 
 		return mission;
 	}
@@ -3034,7 +3166,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		logger.debug("return mission in getMissionByGuid {} {}", missionGuid, mission);
 
 		// will throw MissionDeletedException if deleted, NotFoundException if not found
-		getMissionService().validateMissionByGuid(mission);
+		getMissionService().validateMissionByGuid(mission, missionGuid.toString());
 
 		return mission;
 	}
@@ -3076,6 +3208,13 @@ public class MissionServiceDefaultImpl implements MissionService {
 	@Override
 	public Mission getMissionByNameCheckGroups(String missionName, String groupVector) {
 		return getMissionByNameCheckGroups(missionName, false, groupVector);
+	}
+
+	@Override
+	@Cacheable(cacheResolver = MissionCacheResolver.MISSION_CACHE_RESOLVER)
+	public UUID getMissionGuidByNameCheckGroups(String missionName, String groupVector) {
+		String missionGuid = missionRepository.getGuidByName(missionName, groupVector);
+		return UUID.fromString(missionGuid);
 	}
 
 	@Override
@@ -3476,7 +3615,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 			}
 
 			Mission mission = getMissionService().getMissionByGuidCheckGroups(missionGuid, groupVector);
-			validateMissionByGuid(mission);
+			validateMissionByGuid(mission, missionGuid.toString());
 
 			// validate time interval
 			Map.Entry<Date, Date> timeInterval = TimeUtils.validateTimeInterval(secago, start, end);
@@ -3828,7 +3967,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 			Mission mission, MissionTokenUtils.TokenType[] validTokenTypes, HttpServletRequest request) {
 		try {
 
-			if (commonUtil.isAdmin()) {
+			if (commonUtil.isAdmin(request)) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("getRoleFromToken granting admin MISSION_OWNER for : " + request.getServletPath());
 				}
@@ -3961,7 +4100,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 			boolean match = false;
 			Pattern pattern = Pattern.compile(
 					missionCreateGroupsRegex, Pattern.CASE_INSENSITIVE);
-			for (Group group : commonUtil.getGroupsFromSessionId(request.getSession().getId())) {
+			for (Group group : commonUtil.getGroupsFromRequest(request)) {
 				if (match = pattern.matcher(group.getName()).find()) {
 					break;
 				}
@@ -3974,7 +4113,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 	}
 
 	@Override
-	public MissionRole getRoleForRequest(Mission mission, HttpServletRequest request) {
+	public MissionRole getRoleForRequest(Mission mission, HttpServletRequest request, boolean isAdmin) {
 		try {
 
 			if (logger.isDebugEnabled()) {
@@ -4001,7 +4140,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 						+ request.getMethod() + " " + request.getServletPath());
 			}
 
-			if (commonUtil.isAdmin()) {
+			if (isAdmin) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("getRoleForRequest granting admin MISSION_OWNER for : " + request.getServletPath());
 				}
@@ -5015,6 +5154,59 @@ public class MissionServiceDefaultImpl implements MissionService {
 	public String getMissionNameByGuid(UUID missionGuid) {
 		return missionRepository.getMissionNameForMissionGuid(missionGuid);
 	}
-	
 
+	private Cache<String, PendingNotification> getOrCreateNotificationCache() {
+		if (notificationCache == null) {
+			synchronized (this) {
+				if (notificationCache == null) {
+					notificationCache = Caffeine.newBuilder().expireAfterWrite(1, TimeUnit.HOURS).build();
+				}
+			}
+		}
+
+		return notificationCache;
+	}
+
+	@Override
+	public void checkAndSendPendingNotifications(String missionName, String hash, int count, String groupVector) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue()
+				.getMissionConcurrentDownloadLimit() == null) {
+			return;
+		}
+
+		Mission mission = getMissionService().getMission(missionName, groupVector);
+		checkAndSendPendingNotifications(UUID.fromString(mission.getGuid()), hash, count);
+	}
+
+	@Override
+	public void checkAndSendPendingNotifications(UUID missionGuid, String hash, int count) {
+		if (CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue()
+				.getMissionConcurrentDownloadLimit() == null) {
+			return;
+		}
+
+		String key = missionGuid.toString() + "-" + hash;
+		PendingNotification pendingNotification = getOrCreateNotificationCache().getIfPresent(key);
+		if (pendingNotification == null) {
+			logger.error("unable to find pendingNotification for " + key);
+			return;
+		}
+
+		int ndx = 0;
+		Iterator<String> it = pendingNotification.subscribers.iterator();
+		while (it.hasNext() && ndx++ < count) {
+			String subscriberUid = it.next();
+
+			if (!subscriptionManager.getMissionSubscriptions(missionGuid, true)
+					.contains(subscriberUid)) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("skipping pending notification for client that is not connected {}", subscriberUid);
+				}
+				continue;
+			}
+
+			subscriptionManager.submitAnnounceMissionChangeCot(subscriberUid, pendingNotification.notification);
+			it.remove();
+		}
+	}
 }

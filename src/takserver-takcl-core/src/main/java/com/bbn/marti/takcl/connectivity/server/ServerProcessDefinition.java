@@ -16,11 +16,11 @@ import java.util.Collections;
 import java.util.List;
 
 public enum ServerProcessDefinition {
-    FederationHubBroker("federation-hub-broker", "federation-hub/federation-hub-broker.jar", "/opt/tak/federation-hub/logs/federation-hub-broker.log", Collections.unmodifiableList(Arrays.asList(
+    FederationHubBroker("federation-hub-broker", "federation-hub/jars/federation-hub-broker.jar", "/opt/tak/federation-hub/logs/federation-hub-broker.log", Collections.unmodifiableList(Arrays.asList(
         "Started FederationHubServer"
     )), Arrays.asList("-Dlogging.config=/opt/tak/federation-hub/configs/logback-broker.xml", "-DFEDERATION_HUB_BROKER_CONFIG=federation-hub/configs/federation-hub-broker.yml")),
 
-    FederationHubPolicy("federation-hub-policy", "federation-hub/federation-hub-policy.jar", "/opt/tak/federation-hub/logs/federation-hub-policy.log", Collections.unmodifiableList(Arrays.asList(
+    FederationHubPolicy("federation-hub-policy", "federation-hub/jars/federation-hub-policy.jar", "/opt/tak/federation-hub/logs/federation-hub-policy.log", Collections.unmodifiableList(Arrays.asList(
         "Started FederationHubPolicyManagerService"
     )), Arrays.asList("-Dlogging.config=/opt/tak/federation-hub/configs/logback-policy.xml", "-DFEDERATION_HUB_POLICY_CONFIG=federation-hub/ui_generated_policy.json")),
 
@@ -131,9 +131,9 @@ public enum ServerProcessDefinition {
             }
 
             if (serverReady) {
-                System.out.println("Server process " + this.identifier + " appears to be ready based on log statements after " + duration + " ms");
+                System.out.println("Server " + serverIdentifier + " process " + this.identifier + " appears to be ready based on log statements after " + duration + " ms");
             } else {
-                System.out.println("Server process " + this.identifier + " init timeout of " + maxWaitTimeMs + " ms reached. The following log statements were not seen:\n\t" +
+                System.out.println("Server " + serverIdentifier + " process " + this.identifier + " init timeout of " + maxWaitTimeMs + " ms reached. The following log statements were not seen:\n\t" +
                     String.join("\"\n\t\"", remainingStatementsToSee) + "\n There is a good chance the tests may fail!");
             }
         } catch (InterruptedException | IOException e) {

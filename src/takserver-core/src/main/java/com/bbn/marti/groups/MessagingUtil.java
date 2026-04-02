@@ -12,7 +12,8 @@ import tak.server.cot.CotEventContainer;
 public interface MessagingUtil {
 
 	void sendLatestReachableSA(User destUser);
-	
+	void sendUpdatedGroupsLatestSA(User destUser);
+
 	List<CotEventContainer> getLatestSAForHandler(ChannelHandler handler);
 
 	void processFederateClose(ConnectionInfo connection, ChannelHandler handler, Subscription subscription);

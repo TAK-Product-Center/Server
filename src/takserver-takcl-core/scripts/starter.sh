@@ -2,6 +2,7 @@
 
 BUILD=false
 DEPLOY=false
+UPDATE=false
 START=false
 USE_COT_DB=false
 KILL_EXISTING_TAKSERVER=false
@@ -20,7 +21,35 @@ API_PID=null
 PM_PID=null
 RETENTION_PID=null
 
-DEFAULT_SERVER_SRC=takserver-package/build/takArtifacts
+DEFAULT_SERVER_SRC=takserver-package/build/integrationTesterDir
+
+
+if [[ $1 == "" ]];then
+	printf "This script is intended to simplify local server deployment.
+
+Used Docker Container Name:
+    TakserverServer0DB
+
+Required Environment Variables:
+	TAKCL_SERVER_POSTGRES_PASSWORD		The Postgres password that will be used
+
+Optional Environment Variables:
+    TAKSERVER_USER_AUTHENTICATION_FILE	Overrides the User Authentication File contents
+
+Usage:
+
+This script takes a single parameter, which can use a mix of the following characters to perform
+the indicated startup tasks:
+
+\t(b)uild\t\tPerforms \`./gradlew clean buildIntegrationTesterDir -x test\`
+\t(u)pdate\t\tPerforms \`./gradlew updateIntegrationTesterDirCore -x test\`
+\t(d)eploy\tDeploys takserver to the provided deployment dir
+\tsetup (c)ot databases\t\t Sets up DBs in docker and sets up the test script to use them
+\t(s)tart\t\tStarts the server
+\t(k)ill\t\tKills the currently running takserver, if one is running
+"
+  exit 1
+fi
 
 SRC=`realpath "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../../`
 
@@ -32,16 +61,16 @@ if [[ "${TAKCL_SERVER_POSTGRES_PASSWORD}" == "" ]];then
 fi
 
 if [[ "${2}" == "" ]];then
-  echo The second parameter should be the ABSOLUTE path of the desired test environment!
+  echo The second parameter should be the path to deploy the server instance to!
   exit 1
 fi
 
-#if [[ -d "${2}" ]];then
-#  echo The target test environment path should not exist!
-#  exit 1
-#fi
+if [[ -d "${2}" ]];then
+  echo The target test environment path should not exist!
+  exit 1
+fi
 
-DEPLOYMENT_DIR=${2}
+DEPLOYMENT_DIR=$(pwd)/${2}
 mkdir -p ${DEPLOYMENT_DIR}
 
 JARGS="-Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/ 
@@ -54,6 +83,7 @@ JARGS="-Dloader.path=WEB-INF/lib-provided,WEB-INF/lib,WEB-INF/classes,file:lib/
     -Djdk.tls.client.protocols=TLSv1.2 
 	  -Dlogging.level.com.bbn=DEBUG
     -Dlogging.level.tak=DEBUG 
+	-Dio.netty.incubator=DEBUG
     -Xmx2000m 
     -XX:+HeapDumpOnOutOfMemoryError"
 
@@ -100,34 +130,12 @@ trap ctrl_c SIGINT
 
 set -e
 
-if [[ $1 == "" ]];then
-	printf "This script is intended to simplify local server deployment.
-
-Used Docker Container Name:
-    TakserverServer0DB
-
-Required Environment Variables:
-	TAKCL_SERVER_POSTGRES_PASSWORD		The Postgres password that will be used
-	
-Optional Environment Variables:
-    TAKSERVER_USER_AUTHENTICATION_FILE	Overrides the User Authentication File contents
-
-Usage:
-
-This script takes a single parameter, which can use a mix of the following characters to perform 
-the indicated startup tasks:
-
-\t(b)uild\t\tPerforms \`./gradlew clean buildRpm buildDocker\`
-\t(d)eploy\tDeploys takserver to the provided deployment dir
-\tsetup (c)ot databases\t\t Sets up DBs in docker and sets up the test script to use them
-\t(s)tart\t\tStarts the server
-\t(k)ill\t\tKills the currently running takserver, if one is running
-"
-  exit 1
-fi
-
 if [[ $1 == *"d"* ]]; then
 	DEPLOY=true
+fi
+
+if [[ $1 == *"u"* ]]; then
+	UPDATE=true
 fi
 
 if [[ $1 == *"s"* ]]; then
@@ -164,8 +172,13 @@ fi
 
 if [ $BUILD == true ];then
 	echo BUILDING...
-	./gradlew --parallel clean buildRpm buildDocker
+	./gradlew --parallel clean buildIntegrationTesterDir -x test
 	echo DONE
+fi
+
+if [ $UPDATE == true ];then
+  echo UPDATING...
+  ./gradlew --parallel updateIntegrationTesterDirCore -x test
 fi
 
 if [ $DEPLOY == true ];then
@@ -195,7 +208,7 @@ if [ $DEPLOY == true ];then
 
 	cp -R ${SERVER_SRC}/* "${DEPLOYMENT_DIR}"/
 
-	cp "${SRC}/takserver-takcl-core/src/rpm/resources/TAKCLConfig.xml" "${DEPLOYMENT_DIR}/utils/"
+	cp "${SRC}/takserver-takcl-core/src/exe/resources/TAKCLConfig.xml" "${DEPLOYMENT_DIR}/utils/"
 	sed -i "s|/opt/tak|${DEPLOYMENT_DIR}|g" "${DEPLOYMENT_DIR}/utils/TAKCLConfig.xml"
 
 
@@ -234,10 +247,13 @@ fi
 if [ $START == true ];then
 	echo STARTING SERVER...
 
+        sed -i "s/\/opt\/tak\/certs\/files\/takserver.jks/certs\/files\/takserver.jks/g" "${DEPLOYMENT_DIR}/CoreConfig.xml"
+        sed -i "s/\/opt\/tak\/certs\/files\/truststore-root.jks/certs\/files\/truststore-root.jks/g" "${DEPLOYMENT_DIR}/CoreConfig.xml"
+
 	if [[ $USE_COT_DB == true ]];then
 		echo Waiting for DB to settle...
 		sleep 20
-		sed -i "s/<connection url=\"jdbc:postgresql:\/\/tak-database:5432\/cot\" username=\"martiuser\" password=\"\" \/>/<connection url=\"jdbc:postgresql:\/\/${DOCKER0_IP}:5432\/cot\" username=\"${POSTGRES_USER}\" password=\"${TAKCL_SERVER_POSTGRES_PASSWORD}\"\/>/g" "${DEPLOYMENT_DIR}/CoreConfig.xml"
+		sed -i "s/<connection url=\"jdbc:postgresql:\/\/tak-database:5432\/cot\" username=\"martiuser\" password=\"atakatak\" \/>/<connection url=\"jdbc:postgresql:\/\/${DOCKER0_IP}:5432\/cot\" username=\"${POSTGRES_USER}\" password=\"${TAKCL_SERVER_POSTGRES_PASSWORD}\"\/>/g" "${DEPLOYMENT_DIR}/CoreConfig.xml"
 		sync
 		java -jar ${DEPLOYMENT_DIR}/db-utils/SchemaManager.jar -url jdbc:postgresql://${DOCKER0_IP}:5432/cot -user ${POSTGRES_USER} -password ${TAKCL_SERVER_POSTGRES_PASSWORD} upgrade
 	fi

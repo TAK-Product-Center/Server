@@ -13,16 +13,23 @@ dependencies {
 
   implementation group: 'javax.annotation', name: 'javax.annotation-api', version: annotation_api_version
 
+  // needs to go before gRPC so that gRPC will be forced to use this version of netty
+  api group: 'io.netty', name: 'netty-handler', version: netty_handler_version
+
   // gRPC
   api (group: 'io.grpc', name: 'grpc-netty', version: grpc_version) {
     exclude group: 'io.perfmark', module: 'perfmark-api'
-}
+  }
   api (group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version) {
-    exclude group: 'io.perfmark', module: 'perfmark-api'
-}
+    exclude group: 'io.perfmark', module: 'perfmark-api' 
+  }
   api (group: 'io.grpc', name: 'grpc-stub', version: grpc_version) {
     exclude group: 'io.perfmark', module: 'perfmark-api'
-}
+  }
+
+  api (group: 'io.grpc', name: 'grpc-core', version: grpc_version) {
+    exclude group: 'io.perfmark', module: 'perfmark-api'
+  }
 
   // Google's OpenSSL variant
   // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
@@ -41,11 +48,11 @@ dependencies {
 // protobuf code generation step
 protobuf {
   protoc {
-    artifact = 'com.google.protobuf:protoc:3.0.0'
+    artifact = 'com.google.protobuf:protoc:3.25.8'
   }
   plugins {
     grpc {
-      artifact = 'io.grpc:protoc-gen-grpc-java:1.0.2'
+      artifact = 'io.grpc:protoc-gen-grpc-java:1.65.1'
     }
   }
   generateProtoTasks {

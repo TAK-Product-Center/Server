@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+import "takmessage.proto";
+
+package atakmap.commoncommo.protobuf.v1;
+
+// Container for MissionAnnouncement and metadata
+message MissionAnnouncement {
+    TakMessage payload = 1;
+
+    string missionName = 2;
+    
+    string missionAnnouncementType = 3;
+    
+    string creatorUid = 4;
+
+    string groupVector = 5;
+    
+    string clientUid = 6;
+    
+    repeated string uids = 7;
+
+    string missionGuid = 8;
+
+}

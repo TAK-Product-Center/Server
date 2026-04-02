@@ -85,10 +85,10 @@ public class UserExpectationValidator {
 				
 		String errorString = "";
 		ActionEngine.ActionClient client = ActionEngine.data.getState(state.getProfile());
-		System.out.println("--- Call validateExpectations with justification: " + justification +", state.getProfile():" + state.getProfile());
+		logger.debug("--- Call validateExpectations with justification: " + justification +", state.getProfile():" + state.getProfile());
 		
-		System.out.println("--- transientUserData.getProfile: " + transientUserData.getProfile());
-		transientUserData.getExpectedSenders().forEach(s ->{System.out.println("\t--- ExpectedSender:"+s.getDynamicName());});
+		logger.debug("--- transientUserData.getProfile: " + transientUserData.getProfile());
+		transientUserData.getExpectedSenders().forEach(s ->{logger.debug("\t--- ExpectedSender:"+s.getDynamicName());});
 
 		if (client.getConnectivityState() != transientUserData.getExpectedConnectivityState()) {
 			if (transientUserData.getExpectedConnectivityState() == TestConnectivityState.Disconnected) {
@@ -123,11 +123,11 @@ public class UserExpectationValidator {
 		Map<String, Integer> shouldntHaveSentMap = new HashMap<>();
 
 		List<AbstractUser> expectedSenders = new ArrayList<>(transientUserData.getExpectedSenders());
-		System.out.println("--- expectedSenders.size():" + expectedSenders.size());
-		expectedSenders.forEach(expectedSender ->{System.out.println("\t--- expectedSender:" + expectedSender);});
+		logger.debug("--- expectedSenders.size():" + expectedSenders.size());
+		expectedSenders.forEach(expectedSender ->{logger.debug("\t--- expectedSender:" + expectedSender);});
 
 		List<String> receivedMessages = ActionEngine.data.getState(state.getProfile()).getRecievedMessages();
-		System.out.println("--- receivedMessages.size():" + receivedMessages.size());
+		logger.debug("--- receivedMessages.size():" + receivedMessages.size());
 
 		// Go through all the received messages
 		for (String msg : receivedMessages) {
@@ -143,11 +143,11 @@ public class UserExpectationValidator {
 			String uid = CotGenerator.parseClientUID(msg);
 			String endpoint = CotGenerator.parseEndpoint(msg);
 			
-			System.out.println("--- \tReceived msg. Parsed uid: " + uid + ", endpoint: "+ endpoint);
+			logger.debug("--- \tReceived msg. Parsed uid: " + uid + ", endpoint: "+ endpoint);
 
 			AbstractUser sendingUser = null;
 			if (StateEngine.data.getUserState(endpoint == null ? uid : endpoint) == null) {
-				System.out.println("--- Could not find the UserState with the uid/endpoint in StateEngine.data. Assume it comes from a plugin");
+				logger.debug("--- Could not find the UserState with the uid/endpoint in StateEngine.data. Assume it comes from a plugin");
 				sendingUser = ImmutableUsers.s0_stcp_anonuser_t_plugin1;
 			}else {
 				// If validation shouldn't be done, ignore the user's messages
@@ -213,14 +213,14 @@ public class UserExpectationValidator {
 			}
 		}
 		
-		System.out.println("--- expectedDidSendMap.size():" + expectedDidSendMap.size());
-		expectedDidSendMap.forEach((k,v) ->{System.out.println("\t--- expectedDidSendMap: key:" + k + ", value: " + v);});
+		logger.debug("--- expectedDidSendMap.size():" + expectedDidSendMap.size());
+		expectedDidSendMap.forEach((k,v) ->{logger.debug("\t--- expectedDidSendMap: key:" + k + ", value: " + v);});
 
-		System.out.println("--- shouldHaveSentMap.size():" + shouldHaveSentMap.size());
-		shouldHaveSentMap.forEach((k,v) ->{System.out.println("\t--- shouldHaveSentMap: key:" + k + ", value: " + v);});
+		logger.debug("--- shouldHaveSentMap.size():" + shouldHaveSentMap.size());
+		shouldHaveSentMap.forEach((k,v) ->{logger.debug("\t--- shouldHaveSentMap: key:" + k + ", value: " + v);});
 		
-		System.out.println("--- shouldntHaveSentMap.size():" + shouldntHaveSentMap.size());
-		shouldntHaveSentMap.forEach((k,v) ->{System.out.println("\t--- shouldntHaveSentMap: key:" + k + ", value: " + v);});
+		logger.debug("--- shouldntHaveSentMap.size():" + shouldntHaveSentMap.size());
+		shouldntHaveSentMap.forEach((k,v) ->{logger.debug("\t--- shouldntHaveSentMap: key:" + k + ", value: " + v);});
 
 		// Process the senders that should have sent but didn't
 		for (String sender : shouldHaveSentMap.keySet()) {
@@ -245,7 +245,7 @@ public class UserExpectationValidator {
 //            }
 //        }
 //
-		System.out.println("--- errorString: " + errorString);
+		logger.debug("--- errorString: " + errorString);
 		if (errorString != null && !errorString.isEmpty()) {
 			if (failIfUnmet) {
 				if (FAILURE_DELAY_TIME != null) {

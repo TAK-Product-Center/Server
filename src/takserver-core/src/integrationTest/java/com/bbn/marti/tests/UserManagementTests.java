@@ -6,12 +6,14 @@ import com.bbn.marti.test.shared.AbstractTestClass;
 import com.bbn.marti.test.shared.data.GroupProfiles;
 import com.bbn.marti.test.shared.data.connections.MutableConnection;
 import com.bbn.marti.test.shared.data.generated.ImmutableConnections;
+import com.bbn.marti.test.shared.data.generated.ImmutableUsers;
 import com.bbn.marti.test.shared.data.servers.ImmutableServerProfiles;
 import com.bbn.marti.test.shared.data.servers.MutableServerProfile;
 import com.bbn.marti.test.shared.data.users.BaseUsers;
 import com.bbn.marti.test.shared.data.users.MutableUser;
 import com.bbn.marti.takcl.connectivity.server.AbstractRunnableServer;
 import com.bbn.marti.test.shared.engines.TestEngine;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -44,6 +46,24 @@ public class UserManagementTests extends AbstractTestClass {
         // Federate things tend to take a little longer to propagate...
         engine.setSleepMultiplier(3.0);
 
+    }
+
+    @Test(timeout = 120000)
+    public void UserManagerJarTest() {
+        try {
+            String sessionIdentifier = initTestMethod();
+            engine.offlineAddUsersAndConnectionsIfNecessary(ImmutableUsers.s0_authstcp_authuser012_012f);
+            engine.offlineEnableLatestSA(true, ImmutableServerProfiles.SERVER_0);
+            engine.startServer(ImmutableServerProfiles.SERVER_0, sessionIdentifier);
+            engine.addUserThroughUserManager(ImmutableUsers.s0_authstcp_authuser012_012f_A);
+            engine.connectClientsAndVerify(true, ImmutableUsers.s0_authstcp_authuser012_012f, ImmutableUsers.s0_authstcp_authuser012_012f_A);
+            engine.attemptSendFromUserAndVerify(ImmutableUsers.s0_authstcp_authuser012_012f);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Assert.fail(e.getMessage());
+        } finally {
+            engine.stopServers(ImmutableServerProfiles.SERVER_0);
+        }
     }
 
     @Test(timeout = 3600000)

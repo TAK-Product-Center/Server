@@ -1,6 +1,7 @@
 package com.bbn.marti.device.profile.api;
 
 
+import java.nio.charset.StandardCharsets;
 import java.rmi.RemoteException;
 import java.util.Arrays;
 import java.util.Date;
@@ -10,6 +11,7 @@ import java.util.Set;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.apache.catalina.util.URLEncoder;
 import org.jetbrains.annotations.NotNull;
 import org.owasp.esapi.errors.IntrusionException;
 import org.owasp.esapi.errors.ValidationException;
@@ -39,6 +41,7 @@ import com.bbn.marti.device.profile.repository.ProfileRepository;
 import com.bbn.marti.device.profile.service.ProfileService;
 import com.bbn.marti.network.BaseRestController;
 import com.bbn.marti.remote.SubmissionInterface;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.remote.groups.Direction;
@@ -165,9 +168,14 @@ public class ProfileAdminAPI extends BaseRestController {
             String uid = shaHash;
             String callsign = "TAK Server";
 
-            String requestUrl = request.getRequestURL().toString();
-            String url = requestUrl.substring(0, requestUrl.indexOf(request.getServletPath()))
-                    + "/Marti/api/device/profile/" + name + "/missionpackage";
+            String takServerHost =
+                    CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getTakServerHost() != null ?
+                    CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getTakServerHost() :
+                    request.getServerName();
+
+            String url = "https://" + takServerHost + ":8443"
+                    + "/Marti/api/device/profile/" + URLEncoder.DEFAULT.encode(name, StandardCharsets.UTF_8)
+                    + "/missionpackage";
 
             // Generate the CoT message
             String cotMessage = CommonUtil.getFileTransferCotMessage(

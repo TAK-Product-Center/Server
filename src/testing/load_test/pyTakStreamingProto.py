@@ -1,3 +1,4 @@
+
 import asyncio
 import logging
 import multiprocessing
@@ -32,12 +33,19 @@ class PyTAKStreamingProto:
                  password=None,
                  uid=None,
                  self_sa_delta=1.0,
+                 track_write_delta=1.0,
+                 num_tracks_per_delta=0,
                  mission_config=None,
                  data_dict=None,
                  ping=False,
                  ping_interval=1000, # in ms
                  arr=None,
-                 debug=False):
+                 debug=False,
+                 track_file=None,
+                 track_start_delay=0):
+
+        self.track_file = track_file
+        self.track_start_delay = track_start_delay
 
         self.certfile = certfile
         self.password = password
@@ -51,6 +59,11 @@ class PyTAKStreamingProto:
         self.ping_interval = ping_interval # in ms
         self.last_ping_write = time.time()*1000 + self.ping_interval # in ms
         self.arr = arr
+
+        self.track_write_delta = track_write_delta
+        self.num_tracks_per_delta = num_tracks_per_delta
+        self.last_track_write = time.time() + self.track_write_delta
+        self.track_uids = [CotProtoMessage().uid for _ in range(self.num_tracks_per_delta)]
 
         if mission_config is not None:
             self.mission_config = mission_config
@@ -78,7 +91,7 @@ class PyTAKStreamingProto:
         with p12_to_pem(self.certfile, self.password) as cert:
             self.ssl_context.load_cert_chain(cert)
 
-        self.location = (random.uniform(-90, 90), random.uniform(-180, 180))
+        self.location = (random.uniform(-75, 75), random.uniform(-170, 170))
         self.data_dict = data_dict if data_dict is not None else dict()
         self.data_dict[self.uid] = {'write': 0, 'read': 0, 'bytes': 0, 'connected': False}
 
@@ -102,6 +115,47 @@ class PyTAKStreamingProto:
         self.read_socket: azmq.Socket = None
         self.read_pool: Pool = None
 
+        self.replay_tracks = []
+        self.replay_index = 0
+        self.replay_start_time = None
+        self.callsign = "Replay"
+        self.replay_uid = CotProtoMessage().uid
+
+        if self.track_file:
+            print("got track file: " + str(self.track_file))
+            self.num_tracks_per_delta = 0 # set num tracks per delta to 0 if replaying from file
+            self.load_track_file(self.track_file, self.track_start_delay)
+
+    def load_track_file(self, path, delay_threshold):
+        with open(path, "r") as f:
+            lines = f.read().strip().splitlines()
+
+        try:
+            # First line now contains both callsign and uid
+            callsign_str, uid_str = lines[0].strip().split(",", 1)
+            self.callsign = callsign_str.strip()
+            self.replay_uid = uid_str.strip()
+        except ValueError:
+            self.logger.error(f"Malformed first line in track file: '{lines[0]}' — expected format 'callsign,uid'")
+            return
+        
+        parsed_tracks = []
+        for idx, line in enumerate(lines[1:]):  # skip the first line with callsign/uid
+            try:
+                delay, lat, lon = map(float, line.strip().split(",")[:3])
+                if delay >= delay_threshold:
+                    parsed_tracks.append((idx, delay, lat, lon))  # preserve original index
+            except ValueError:
+                self.logger.warning(f"Skipping malformed line: {line}")
+
+        # Normalize delay so the first retained point starts at 0.0
+        if parsed_tracks:
+            base_time = self.track_start_delay
+            self.replay_tracks = [(idx, delay - base_time, lat, lon) for (idx, delay, lat, lon) in parsed_tracks]
+        
+        self.replay_start_time = time.time()
+        self.logger.info(f"Loaded {len(self.replay_tracks)} replay points for callsign '{self.callsign}' with UID '{self.replay_uid}'")
+                                                                                
     async def negotiate_protocol(self, reader, writer):
         self.negotiated = False
         self.logger.debug("negotiating protocol")
@@ -189,12 +243,22 @@ class PyTAKStreamingProto:
 
 
     async def send_self_sa(self, writer):
-        self.location = (random.uniform(-90, 90), random.uniform(-180, 180))
+        self.location = (random.uniform(-75, 75), random.uniform(-170, 170))
         self_sa_message = CotProtoMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]))
         self_sa_message.add_callsign_detail(group_name="Red", platform="PyTAKStreamingProto")
         writer.write(self_sa_message.serialize())
         await writer.drain()
         self.last_sa_write = time.time()
+
+    async def send_track(self, writer):
+        for i in range(self.num_tracks_per_delta):
+            track_uid = self.track_uids[i]
+            track_location = (random.uniform(-70, 70), random.uniform(-130, 130))
+            track_message = CotProtoMessage(uid=track_uid, lat=str(track_location[0]), lon=str(track_location[1]))
+            track_message.add_callsign_detail(group_name="Blue", platform="PyTAKStreamingProto")
+            writer.write(track_message.serialize())
+            await writer.drain()
+        self.last_track_write = time.time()
 
     async def send_mission_cot(self, writer):
         for mission in self.data_sync_sess.missions_subscribed:
@@ -244,6 +308,8 @@ class PyTAKStreamingProto:
             now = time.time()
             if now - self.last_sa_write > self.self_sa_delta:
                 return "self_sa"
+            if now - self.last_track_write > self.track_write_delta and self.track_file == None:
+                return "track_write"
             if self.mission_config.get("send_mission_cot", False):
                 if (not self.did_mission_write) and (now > self.next_mission_write):
                     return "mission_cot"
@@ -251,6 +317,10 @@ class PyTAKStreamingProto:
                     self.last_mission_write = now
                     self.next_mission_write = self.last_mission_write + random.uniform(0, self.mission_cot_delta)
                     self.did_mission_write = False
+            if self.replay_index < len(self.replay_tracks):
+                _, replay_time, _, _ = self.replay_tracks[self.replay_index]                  
+                if (now - self.replay_start_time) >= replay_time:
+                    return "replay_track"                                                            
             # if self.data_sync_sess.ready_to_request():
             #     return "data_sync"
             if (now * 1000 - self.last_ping_write) > self.ping_interval: # in ms
@@ -279,25 +349,60 @@ class PyTAKStreamingProto:
             while True:
                 write_action = await self.time_to_write()
 
+                did_write = False
+
                 if write_action == "ping":
+                    #print("sending ping")
                     await self.send_ping(writer)
-                    # print("~~~Streaming proto: Sent a ping message")
+                    #print("~~~Streaming proto: Sent a ping message")
                     if self.arr is not None:
                         self.arr[stats.MESSAGES_PING_COUNT_INDEX] += 1
                         self.arr[stats.MESSAGES_SENT_INDEX] += 1
 
+                    did_write = True
+
                 elif write_action == "self_sa":
+                    #print("sending self sa")
                     await self.send_self_sa(writer)
-                    # print("~~~Streaming proto: Sent send_self_sa")
+                    #print("~~~Streaming proto: Sent send_self_sa")
                     if self.arr is not None:
                         self.arr[stats.MESSAGES_SENT_INDEX] += 1
 
+                    did_write = True
+
+                elif write_action == "track_write" and self.num_tracks_per_delta != 0:
+                    #print("sending track")
+                    await self.send_track(writer)
+                    #print("~~~Streaming proto: Sent send_track")
+                    if self.arr is not None:
+                        self.arr[stats.MESSAGES_SENT_INDEX] += 1
+
+                    did_write = True
+                        
                 elif write_action == "mission_cot":
+                    #print("sending mission cot")
                     await self.send_mission_cot(writer)
-                    # print("~~~Streaming proto: Sent send_mission_cot")
+                    #print("~~~Streaming proto: Sent send_mission_cot")
                     if self.arr is not None:
                         self.arr[stats.MESSAGES_SENT_INDEX] += 1
 
+                    did_write = True
+
+                elif write_action == "replay_track":
+                    print("replaying track")
+                    original_idx, _, lat, lon = self.replay_tracks[self.replay_index]              
+                    msg = CotProtoMessage(uid=self.replay_uid, lat=str(lat), lon=str(lon))
+                    msg.add_callsign_detail(group_name="Replay", platform="PyTAKStreamingProto", callsign=self.callsign)
+                    writer.write(msg.serialize())
+                    await writer.drain()
+                    self.logger.info(f"Replayed track #{original_idx} at lat={lat}, lon={lon}")
+                    self.replay_index += 1
+
+                    if self.arr is not None:
+                        self.arr[stats.MESSAGES_SENT_INDEX] += 1
+
+                    did_write = True
+                        
                 # elif write_action == "data_sync":
                 #     await asyncio.get_event_loop().run_in_executor(self.pool, self.data_sync_sess.make_requests)
 
@@ -305,9 +410,10 @@ class PyTAKStreamingProto:
                 if not data_sync_thread.is_alive():
                     raise RuntimeError("There was a mission api exception")
                 await asyncio.sleep(0.01)
-                connection_data = self.data_dict[self.uid]
-                connection_data['write'] += 1
-                self.data_dict[self.uid] = connection_data
+                if did_write is True:
+                    connection_data = self.data_dict[self.uid]
+                    connection_data['write'] += 1
+                    self.data_dict[self.uid] = connection_data
         except asyncio.CancelledError:
             data_sync_event.set()
             data_sync_thread.join()
@@ -341,9 +447,9 @@ class PyTAKStreamingProto:
                     for i in range(POOL_SIZE):
                         self.read_pool.apply_async(read_thread_zmq, args=(port, data_sync_port))
                     await asyncio.sleep(1)
-
+                    
                 # get list of recent client connect / disconnect events
-                self.data_sync_sess.get_client_endpoints()
+                # self.data_sync_sess.get_client_endpoints()
 
                 read_task = asyncio.ensure_future(self.read_handler(reader))
                 write_task = asyncio.ensure_future(self.write_handler(writer))
@@ -413,20 +519,25 @@ def read_thread_zmq(port: int, data_sync_port):
 
 class PyTAKStreamingProtoProcess(multiprocessing.Process):
     def __init__(self, address=None, uid=None, cert=None, password=None, self_sa_delta=5.0,
+                 track_write_delta=1.0, num_tracks_per_delta=0,
                  mission_config=None, data_dict=None,
-                 ping=False, ping_interval=1000, arr=None):
+                 ping=False, ping_interval=1000, arr=None, track_file=None, track_start_delay=0):
         multiprocessing.Process.__init__(self)
         self.address = address
         self.uid = uid
         self.cert = cert
         self.password = password
         self.self_sa_delta = self_sa_delta
+        self.track_write_delta = track_write_delta
+        self.num_tracks_per_delta = num_tracks_per_delta
         self.mission_config = mission_config
         self.data_dict = data_dict
         self.agent = None
         self.ping = ping
         self.ping_interval = ping_interval
         self.arr = arr # multiprocessing.Array to store metric data for this client
+        self.track_file = track_file
+        self.track_start_delay = track_start_delay
 
     def run(self):
         try:
@@ -435,11 +546,15 @@ class PyTAKStreamingProtoProcess(multiprocessing.Process):
                                              certfile=self.cert,
                                              password=self.password,
                                              self_sa_delta=self.self_sa_delta,
+                                             track_write_delta=self.track_write_delta,
+                                             num_tracks_per_delta=self.num_tracks_per_delta,
                                              mission_config=self.mission_config,
                                              data_dict=self.data_dict,
                                              ping=self.ping,
                                              ping_interval=self.ping_interval,
-                                             arr = self.arr
+                                             arr = self.arr,
+                                             track_file = self.track_file,
+                                             track_start_delay = self.track_start_delay
                                              )
             if self.uid is None:
                 self.uid = self.agent.uid
@@ -452,8 +567,7 @@ class PyTAKStreamingProtoProcess(multiprocessing.Process):
                 self.agent.read_pool.terminate()
                 self.agent.read_pool.join()
             return
-
-
+        
 if __name__ == "__main__":
     logging.basicConfig(level=logging.ERROR,
                         format='%(asctime)s - %(name)s - %(levelname)s:\t %(message)s',

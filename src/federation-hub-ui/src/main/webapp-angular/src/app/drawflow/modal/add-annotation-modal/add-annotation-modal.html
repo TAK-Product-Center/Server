@@ -1,0 +1,20 @@
+<h1 mat-dialog-title class="dialogHeader">{{editorTitle}} Annotation</h1>
+<mat-dialog-content class="mat-typography">
+  <form (ngSubmit)="onSave(federation)" #userForm="ngForm">
+    <div class="form-group">
+      <div class="form-group">
+        <label for="descriptionAnnotation">Annotation Text</label>
+        <input type="text" id="descriptionAnnotation" class="form-control" [(ngModel)]="federation.description"
+          name="description" maxlength="75" />
+      </div>
+      <small class="form-text text-muted">{{ federation.description ? (75 - federation.description.length) : 75 }}
+        characters remaining</small>
+    </div>
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button (click)="onCancel()" mat-button mat-dialog-close
+    class="btn btn-just-outline border-radius margin-right">Cancel</button>
+  <button class="btn btn-primary" (click)="onSave(federation)" [disabled]="userForm.invalid"
+    [mat-dialog-close]="true">Save</button>
+</mat-dialog-actions>

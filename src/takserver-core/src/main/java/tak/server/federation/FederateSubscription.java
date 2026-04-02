@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.sql.SQLException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import javax.naming.NamingException;
@@ -44,7 +45,7 @@ import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
 import org.apache.hc.client5.http.entity.mime.HttpMultipartMode;
 import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 
-
+import tak.server.Constants;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotEventContainer;
 
@@ -67,9 +68,20 @@ public class FederateSubscription extends Subscription {
         if (toSend.hasContextKey(GroupFederationUtil.FEDERATE_ID_KEY)) {
         	if (logger.isDebugEnabled())
         		logger.debug("not federating federated message");
-        	
+
             return;
         }
+        
+		// if a message has federation provenance, do not allow it to be re-federated
+		Set<String> provenances = (Set<String>) toSend.getContextValue(Constants.MESSAGE_PROVENANCE);
+		if (provenances != null) {
+            if (provenances.contains(Constants.FEDERATION_PROVENANCE)) {
+                if (logger.isDebugEnabled())
+                    logger.debug("not re-federating message with federation provenance");
+
+                return;
+            }
+		}
         
         // increment the hit time in the super class
         super.incHit(hitTime);

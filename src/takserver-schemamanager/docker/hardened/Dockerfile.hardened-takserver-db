@@ -1,39 +1,151 @@
 ## Environment variables outside image context. These will be available until the first FROM statement.
 ARG BASE_REGISTRY=registry1.dso.mil
 ARG BASE_DEPLOY_IMAGE=ironbank/opensource/postgres/postgresql
-ARG BASE_DEPLOY_TAG=15.1
+ARG BASE_DEPLOY_TAG=15.15
 
 ####################################################################################################
+#####                          Stage: Build brotli 1.2.0 RPM                                   #####
+####################################################################################################
+FROM registry1.dso.mil/ironbank/redhat/ubi/ubi9:9.7 AS brotli-builder
 
-## Base deploy image
-FROM ${BASE_REGISTRY}/${BASE_DEPLOY_IMAGE}:${BASE_DEPLOY_TAG} as deploy_container
+RUN dnf install -y cmake gcc gcc-c++ make rpm-build rpmdevtools
 
+# Setup rpmbuild structure
+RUN rpmdev-setuptree
+
+# Download source
+# v1.2.0 is the latest as of 10 FEB 2026
+# https://github.com/google/brotli/releases/tag/v1.2.0
+RUN curl -L -o /root/rpmbuild/SOURCES/v1.2.0.tar.gz \
+    https://github.com/google/brotli/archive/refs/tags/v1.2.0.tar.gz
+
+# Create spec file
+RUN cat <<'EOF' > /root/rpmbuild/SPECS/brotli.spec
+%define debug_package %{nil}
+
+Name:           brotli
+Version:        1.2.0
+Release:        1%{?dist}
+Summary:        Lossless compression algorithm
+License:        MIT
+URL:            https://github.com/google/brotli
+Source0:        v%{version}.tar.gz
+
+BuildRequires:  cmake gcc gcc-c++ make
+
+%description
+Brotli is a generic-purpose lossless compression algorithm.
+
+%package -n libbrotli
+Summary:        Brotli shared libraries
+Obsoletes:      libbrotli < %{version}
+Provides:       libbrotli = %{version}-%{release}
+
+%description -n libbrotli
+Shared libraries for Brotli compression.
+
+%prep
+%setup -q -n brotli-%{version}
+
+%build
+mkdir build && cd build
+cmake -DCMAKE_INSTALL_PREFIX=/usr \
+      -DCMAKE_INSTALL_LIBDIR=%{_libdir} \
+      -DBUILD_SHARED_LIBS=ON ..
+make %{?_smp_mflags}
+
+%install
+cd build
+make DESTDIR=%{buildroot} install
+rm -rf %{buildroot}/usr/lib64/pkgconfig
+rm -rf %{buildroot}/usr/include
+rm -rf %{buildroot}/usr/bin
+rm -rf %{buildroot}/usr/share/man
+
+%files -n libbrotli
+%{_libdir}/libbrotli*.so*
+
+%changelog
+* Tue Feb 10 2026 Build <build@local> - 1.2.0-1
+- Update to 1.2.0 for CVE-2025-6176
+EOF
+
+# Build the RPM
+RUN rpmbuild -bb /root/rpmbuild/SPECS/brotli.spec
+
+####################################################################################################
+#####                                 Base deploy image                                        #####
+####################################################################################################
+FROM ${BASE_REGISTRY}/${BASE_DEPLOY_IMAGE}:${BASE_DEPLOY_TAG} AS deploy_container
 USER root
 
-# Upgrade first
-RUN dnf -y upgrade --nodocs \
-    && dnf clean all \
-    && rm -rf /var/cache/dnf
+# Install our patched libbrotli FIRST - satisfies deps when postgis is installed later
+COPY --from=brotli-builder /root/rpmbuild/RPMS/x86_64/libbrotli-1.2.0-1.el9.x86_64.rpm /tmp/
+RUN rpm -ivh /tmp/libbrotli-1.2.0-1.el9.x86_64.rpm && \
+    rm /tmp/libbrotli-1.2.0-1.el9.x86_64.rpm
 
 # Adding RHEL repos and signatures
 COPY tak/security/rpms/repos/* /etc/yum.repos.d/
 COPY tak/security/rpms/signatures /opt/signatures
 
-# Install EPEL 8 repo
-COPY tak/security/*.rpm .
-RUN rpm -Uvh epel-release-latest-8.noarch.rpm
+# Remove PowerTools, it's now CRB
+RUN rm -f /etc/yum.repos.d/Rocky-Linux-PowerTools.repo
 
+# Install EPEL 9 repo
+COPY tak/security/*.rpm .
+RUN rpm -Uvh epel-release-latest-9.noarch.rpm
+
+RUN rpm --import https://download.rockylinux.org/pub/rocky/RPM-GPG-KEY-Rocky-9 && \
+    curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9 \
+        https://download.rockylinux.org/pub/rocky/RPM-GPG-KEY-Rocky-9 && \
+    printf '%s\n' \
+        '[rocky-baseos]' \
+        'name=Rocky Linux $releasever - BaseOS' \
+        'baseurl=https://download.rockylinux.org/pub/rocky/9/BaseOS/$basearch/os/' \
+        'gpgcheck=1' \
+        'enabled=0' \
+        'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9' \
+        > /etc/yum.repos.d/rocky-baseos.repo && \
+    printf '%s\n' \
+        '[rocky-appstream]' \
+        'name=Rocky Linux $releasever - AppStream' \
+        'baseurl=https://download.rockylinux.org/pub/rocky/9/AppStream/$basearch/os/' \
+        'gpgcheck=1' \
+        'enabled=0' \
+        'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9' \
+        > /etc/yum.repos.d/rocky-appstream.repo && \
+    printf '%s\n' \
+        '[rocky-crb]' \
+        'name=Rocky Linux $releasever - CRB' \
+        'baseurl=https://download.rockylinux.org/pub/rocky/9/CRB/$basearch/os/' \
+        'gpgcheck=1' \
+        'enabled=0' \
+        'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9' \
+        > /etc/yum.repos.d/rocky-crb.repo
+
+# Update postgresql GPG
 # Install dependencies
-RUN rpm --import /opt/signatures/* \
-    && dnf -y install https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm \
-    && dnf -qy module disable postgresql \
-    && dnf -y upgrade --nodocs \
-    && dnf -y install --nodocs \
-        java-17-openjdk \
-        postgis33_15 \
-        && sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/pgsql-15/share/postgresql.conf.sample \
-    && dnf clean all \
-    && rm -rf /var/cache/dnf
+RUN rpm --import https://download.postgresql.org/pub/repos/yum/keys/PGDG-RPM-GPG-KEY-RHEL && \
+    rpm --import /opt/signatures/* && \
+    dnf -v -y install https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+
+RUN dnf -v -y updateinfo list cves && \
+    dnf -v -y update --security && \
+    dnf -v -yq module disable postgresql && \
+    dnf -v -y upgrade --nodocs --exclude='openssl*' --exclude='openssl-fips-provider*'
+
+RUN dnf -v -y install --nodocs \
+        --enablerepo=rocky-appstream \
+        --enablerepo=rocky-crb \
+        chkconfig \
+        java-17-openjdk-headless \
+        postgis33_15 && \
+    sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/pgsql-15/share/postgresql.conf.sample
+
+RUN dnf -v -y remove libsoup webkit2gtk3-jsc&& \
+    dnf -v -y autoremove && \
+    dnf -v -y clean all && \
+    rm -rf /var/cache/dnf
 
 RUN usermod -a -G root postgres
 
@@ -50,15 +162,19 @@ ENV POSTGRES_HOST_AUTH_METHOD=trust
 
 #runs in takserver-setup-db.sh but fails because of permissions. running as root to prevent error
 RUN chkconfig --level 345 postgresql-15 on
-
 RUN usermod -a -G root postgres
+
 USER postgres:0
-COPY --chown=postgres:0 tak/ /opt/tak
+
+COPY --chown=postgres:0 --exclude=**/*.jar --exclude=**/*.war tak/ /opt/tak
+COPY --chown=postgres:0 tak/db-utils/SchemaManager.jar /opt/tak/db-utils/SchemaManager.jar
+
+RUN sed -i 's/[[:space:]]*-Djdk\.tls\.client\.protocols=TLSv1\.2//g; s/[[:space:]]\{2,\}/ /g' /opt/tak/setenv.sh
 
 RUN chmod u=rwx /opt/tak \
     && find /opt/tak/ -type d -exec chmod u=rwx {} \; \
-	&& find /opt/tak/ -type f -name "*.*" -exec chmod u=rw {} \; \
-	&& find /opt/tak/ -type f -name "*.sh" -exec chmod u=rx {} \;
+    && find /opt/tak/ -type f -name "*.*" -exec chmod u=rw {} \; \
+    && find /opt/tak/ -type f -name "*.sh" -exec chmod u=rx {} \;
 
 HEALTHCHECK --start-period=120s --interval=30s --timeout=30s --retries=10 CMD /opt/tak/health/takserver-db/health_check.sh || exit 1
 

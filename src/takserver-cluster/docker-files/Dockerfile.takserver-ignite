@@ -1,0 +1,29 @@
+# Use a Java 17 base image
+FROM eclipse-temurin:17-jammy
+
+# Install unzip curl, and nc (used for startup ordering)
+RUN apt-get update && apt-get install -y unzip curl netcat && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /opt
+
+# Download and unpack Ignite 2.17.0
+RUN curl -LO https://archive.apache.org/dist/ignite/2.17.0/apache-ignite-2.17.0-bin.zip \
+    && unzip apache-ignite-2.17.0-bin.zip \
+    && rm apache-ignite-2.17.0-bin.zip \
+    && mv apache-ignite-2.17.0-bin ignite
+
+RUN cp /opt/ignite/libs/optional/ignite-kubernetes/*.jar /opt/ignite/libs/
+
+# Copy over a version of ignite.sh that uses exec to launch the process so the SIGTERM signal is caught
+COPY docker-files/scripts/takserver-ignite/ignite.sh /opt/ignite/bin/ignite.sh
+RUN chmod +x /opt/ignite/bin/ignite.sh
+
+ENV IGNITE_HOME=/opt/ignite
+WORKDIR $IGNITE_HOME
+
+# Expose default Ignite ports
+EXPOSE 10800 47100 47500 49112
+
+# Default command
+ENTRYPOINT ["./bin/ignite.sh"]

@@ -1,0 +1,75 @@
+apply plugin: 'java-library'
+apply plugin: 'maven-publish'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+apply plugin: 'application'
+
+mainClassName = 'netty.NettyRunnerExample'
+
+apply plugin: 'com.github.johnrengelman.shadow'
+
+
+buildscript {
+  repositories {
+    mavenCentral()
+    maven {
+      url 'https://plugins.gradle.org/m2'
+    }
+  }
+  dependencies {
+    classpath 'com.google.protobuf:protobuf-gradle-plugin:' + gradle_protobuf_version
+    classpath 'gradle.plugin.com.github.johnrengelman:shadow:' + gradle_shadow_version
+  }
+}
+
+//apply plugin: 'com.github.johnrengelman.shadow'
+
+repositories {
+  mavenCentral()
+  mavenLocal()
+}
+dependencies {
+
+  implementation group: 'org.eclipse.jetty', name: 'jetty-util', version: '9.4.10.RC0'
+
+
+  implementation group: 'io.netty', name: 'netty-handler', version: netty_handler_version
+
+  // Google's OpenSSL variant
+  // Important Note: be cautious with this dependency version, in combination with the gprc-* above.
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
+  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
+  
+  implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_handler_version, classifier: 'linux-x86_64'
+  
+
+  implementation "io.netty.incubator:netty-incubator-codec-native-quic:$netty_quic_version:linux-x86_64"
+  implementation "io.netty.incubator:netty-incubator-codec-native-quic:$netty_quic_version:osx-x86_64"
+  implementation "io.netty.incubator:netty-incubator-codec-native-quic:$netty_quic_version:windows-x86_64"
+
+  implementation group: 'io.netty', name: 'netty-tcnative-classes', version: netty_tcnative_version
+  
+
+  implementation group: 'com.google.guava', name: 'guava', version: guava_version
+
+
+  implementation 'javax.annotation:javax.annotation-api:' + javax_annotation_api_version
+
+  // for netty performance, put javassist on the classpath
+  implementation group: 'org.javassist', name: 'javassist', version: javassist_version
+}
+
+
+shadowJar {
+    baseName = 'nettytestclient'
+    classifier = 'uber'
+    version = '1.0'
+}
+
+clean {
+  delete 'bin'
+}
+

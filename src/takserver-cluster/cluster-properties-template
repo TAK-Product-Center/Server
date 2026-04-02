@@ -94,9 +94,10 @@ export TAK_MINIKUBE_DELETE_EXISTING_INSTANCE=false
 
 ### ------------------- PRESET VARIABLES - DO NOT EDIT  ------------------- ###
 
-export TAK_HELM_VERSION=v3.12.3
-export TAK_MINIKUBE_VERSION=v1.31.2
-export TAK_KUBERNETES_VERSION=v1.27.0
+export TAK_HELM_VERSION=v3.17.1
+export TAK_MINIKUBE_VERSION=v1.35.0
+# If not using minikube as early as 1.29.x should be supported without problem
+export TAK_KUBERNETES_VERSION=v1.32.2
 
 # Ignore AWS stuff if not necessary so aws installation isn't necessary
 if [[ "${TAK_DEPLOYMENT_TARGET}" == "aws" ]];then

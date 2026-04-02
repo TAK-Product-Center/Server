@@ -1,0 +1,51 @@
+--- build/generated/source/proto/main/java/com/atakmap/Tak/GeoEvent.java	2017-08-04 16:40:57.017593186 -0400
++++ build/generated/source/proto/main/java/com/atakmap/Tak/GeoEvent.java.new	2017-08-04 16:40:28.651960810 -0400
+@@ -868,21 +868,11 @@
+     if (staleTime_ != 0L) {
+       output.writeInt64(3, staleTime_);
+     }
+-    if (lat_ != 0D) {
+       output.writeDouble(4, lat_);
+-    }
+-    if (lon_ != 0D) {
+       output.writeDouble(5, lon_);
+-    }
+-    if (hae_ != 0D) {
+       output.writeDouble(6, hae_);
+-    }
+-    if (ce_ != 0D) {
+       output.writeDouble(7, ce_);
+-    }
+-    if (le_ != 0D) {
+       output.writeDouble(8, le_);
+-    }
+     if (!getUidBytes().isEmpty()) {
+       com.google.protobuf.GeneratedMessageV3.writeString(output, 9, uid_);
+     }
+@@ -950,26 +940,16 @@
+       size += com.google.protobuf.CodedOutputStream
+         .computeInt64Size(3, staleTime_);
+     }
+-    if (lat_ != 0D) {
+       size += com.google.protobuf.CodedOutputStream
+         .computeDoubleSize(4, lat_);
+-    }
+-    if (lon_ != 0D) {
+       size += com.google.protobuf.CodedOutputStream
+         .computeDoubleSize(5, lon_);
+-    }
+-    if (hae_ != 0D) {
+       size += com.google.protobuf.CodedOutputStream
+         .computeDoubleSize(6, hae_);
+-    }
+-    if (ce_ != 0D) {
+       size += com.google.protobuf.CodedOutputStream
+         .computeDoubleSize(7, ce_);
+-    }
+-    if (le_ != 0D) {
+       size += com.google.protobuf.CodedOutputStream
+         .computeDoubleSize(8, le_);
+-    }
+     if (!getUidBytes().isEmpty()) {
+       size += com.google.protobuf.GeneratedMessageV3.computeStringSize(9, uid_);
+     }

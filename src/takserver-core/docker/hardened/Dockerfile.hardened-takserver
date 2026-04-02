@@ -1,6 +1,6 @@
 ## Environment variables outside image context. These will be available until the first FROM statement.
 ARG BASE_REGISTRY=registry1.dso.mil
-ARG BASE_DEPLOY_IMAGE=ironbank/redhat/openjdk/openjdk17
+ARG BASE_DEPLOY_IMAGE=ironbank/redhat/openjdk/openjdk17-ubi9
 ARG BASE_DEPLOY_TAG=1.17
 
 ####################################################################################################
@@ -8,40 +8,96 @@ ARG BASE_DEPLOY_TAG=1.17
 ## Base deploy image
 FROM ${BASE_REGISTRY}/${BASE_DEPLOY_IMAGE}:${BASE_DEPLOY_TAG} as deploy_container
 
+## Base deploy image
+FROM registry1.dso.mil/ironbank/redhat/ubi/ubi9:9.7
+
+
+RUN dnf install -y \
+        java-17-openjdk-headless \
+    && dnf clean all
+
+
 USER root
+
+# Set JAVA_HOME and update PATH
+# TODO this may change
+ENV JAVA_HOME=/etc/java/java-17-openjdk/java-17-openjdk-17.0.18.0.8-1.el9.x86_64/
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Upgrade first
 RUN dnf -y upgrade --nodocs \
     && dnf clean all \
     && rm -rf /var/cache/dnf
 
+# Adding RHEL repos and signatures for NFS-UTILS
+COPY tak/security/rpms/repos/* /etc/yum.repos.d/
+COPY tak/security/rpms/signatures /opt/signatures
+
+# Remove PowerTools, it's now CRB
+RUN rm -f /etc/yum.repos.d/Rocky-Linux-PowerTools.repo
+
 COPY tak/security/*.rpm .
 # Install EPEL 8 repo
-RUN rpm -Uvh epel-release-latest-8.noarch.rpm
+RUN rpm -Uvh epel-release-latest-9.noarch.rpm
+
+# addin
+RUN rpm --import https://download.rockylinux.org/pub/rocky/RPM-GPG-KEY-Rocky-9 && \
+    curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9 \
+        https://download.rockylinux.org/pub/rocky/RPM-GPG-KEY-Rocky-9 && \
+    printf '%s\n' \
+        '[rocky-baseos]' \
+        'name=Rocky Linux $releasever - BaseOS' \
+        'baseurl=https://download.rockylinux.org/pub/rocky/9/BaseOS/$basearch/os/' \
+        'gpgcheck=1' \
+        'enabled=0' \
+        'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9' \
+        > /etc/yum.repos.d/rocky-baseos.repo && \
+    printf '%s\n' \
+        '[rocky-appstream]' \
+        'name=Rocky Linux $releasever - AppStream' \
+        'baseurl=https://download.rockylinux.org/pub/rocky/9/AppStream/$basearch/os/' \
+        'gpgcheck=1' \
+        'enabled=0' \
+        'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9' \
+        > /etc/yum.repos.d/rocky-appstream.repo && \
+    printf '%s\n' \
+        '[rocky-crb]' \
+        'name=Rocky Linux $releasever - CRB' \
+        'baseurl=https://download.rockylinux.org/pub/rocky/9/CRB/$basearch/os/' \
+        'gpgcheck=1' \
+        'enabled=0' \
+        'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9' \
+        > /etc/yum.repos.d/rocky-crb.repo
+
+RUN dnf install -y nfs-utils stunnel
 
 # Install dependencies
-RUN dnf update -y --disableplugin=subscription-manager --nodocs \
-    && dnf install -y --disableplugin=subscription-manager --nodocs \
-           xemacs-nox \
+RUN dnf update -y --disableplugin=subscription-manager --nodocs  --exclude='openssl*' --exclude='openssl-fips-provider*'
+RUN dnf install -y --disableplugin=subscription-manager --nodocs   --exclude='openssl*' --exclude='openssl-fips-provider*' \
+           #xemacs-nox \
            net-tools \
            netcat \
            vim \
+           unzip \
+           nfs-utils stunnel \
     && dnf clean all \
     && rm -rf /var/cache/dnf
 
 #fix fips related issue, takserver needs the non fips providers so simply set them as fips providers so that they are available
-RUN echo "fips.provider.1=SUN" >> $JAVA_HOME/conf/security/java.security
-RUN echo "fips.provider.2=SunRsaSign" >> $JAVA_HOME/conf/security/java.security
-RUN echo "fips.provider.3=SunEC" >> $JAVA_HOME/conf/security/java.securitysudo
-RUN echo "fips.provider.4=SunJSSE" >> $JAVA_HOME/conf/security/java.security
-RUN echo "fips.provider.5=SunJCE" >> $JAVA_HOME/conf/security/java.security
-RUN echo "fips.provider.6=SunJGSS" >> $JAVA_HOME/conf/security/java.security
-RUN echo "fips.provider.7=SunSASL" >> $JAVA_HOME/conf/security/java.security
-RUN echo "fips.provider.8=XMLDSig" >> $JAVA_HOME/conf/security/java.security
-RUN echo "fips.provider.9=SunPCSC" >> $JAVA_HOME/conf/security/java.security
-RUN echo "fips.provider.10=JdkLDAP" >> $JAVA_HOME/conf/security/java.security
-RUN echo "fips.provider.11=JdkSASL" >> $JAVA_HOME/conf/security/java.security
-RUN echo "fips.provider.12=SunPKCS11" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.1=SUN" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.2=SunRsaSign" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.3=SunEC" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.4=SunJSSE" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.5=SunJCE" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.6=SunJGSS" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.7=SunSASL" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.8=XMLDSig" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.9=SunPCSC" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.10=JdkLDAP" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.11=JdkSASL" >> $JAVA_HOME/conf/security/java.security
+# RUN echo "fips.provider.12=SunPKCS11" >> $JAVA_HOME/conf/security/java.security
+
+RUN  rpm -ivh amazon-efs-utils-*.rpm
 
 RUN useradd -g 0 -u 1001 tak \
     && usermod -a -G root tak

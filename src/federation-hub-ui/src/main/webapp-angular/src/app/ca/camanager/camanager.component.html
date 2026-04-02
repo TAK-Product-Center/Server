@@ -1,0 +1,72 @@
+<div class="w-50 mx-auto sub-form" style="text-align: center;">
+    <h3>Upload New CA</h3>
+  <div>
+    To add a CA, upload its X.509 certificate in .pem format.<br />
+    Warning: adding a CA will restart the federation server.
+  </div>
+  <br>
+  <!-- File Input -->
+  <input
+    #fileInput
+    type="file"
+    (change)="onFileChange($event)"
+    class="form-control"
+  />
+
+  <div class="d-flex justify-content-end">
+    <button
+      (click)="uploadFile(fileInput)"
+      class="btn btn-secondary ms-auto"
+      [disabled]="!certificateFile"
+    >
+      Upload
+    </button>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="progress mt-3" *ngIf="uploadProgress > 0 && uploadProgress < 100">
+    <div
+      class="progress-bar"
+      role="progressbar"
+      [style.width.%]="uploadProgress"
+    >
+      {{ uploadProgress }}%
+    </div>
+  </div>
+
+  <!-- Success/Error Message -->
+  <div *ngIf="uploadSuccess === true" class="alert alert-success mt-3">
+    Upload successful!
+  </div>
+  <div *ngIf="uploadSuccess === false" class="alert alert-danger mt-3">
+    Upload failed. Please try again.
+  </div>
+</div>
+<br>
+<div class="sub-form" style="margin-left: 5%; margin-right: 5%; text-align: center;">
+    <h3>Manage Existing CAs</h3>
+    <div class="table-wrapper scroll-container">
+        <table class="table table-bordered table-striped">
+            <thead class="table-light">
+              <tr>
+                <th>UID</th>
+                <th>Issuer</th>
+                <th>Subject</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let ca of knownCas">
+                <td>{{ ca.uid }}</td>
+                <td>{{ ca.issuer }}</td>
+                <td>{{ ca.subject }}</td>
+                <td>
+                  <button class="btn btn-danger btn-sm" (click)="deleteCA(ca)">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+    </div>
+</div>

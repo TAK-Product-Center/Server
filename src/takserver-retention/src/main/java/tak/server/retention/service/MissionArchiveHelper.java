@@ -144,28 +144,30 @@ public class MissionArchiveHelper {
 			Map<String, byte[]> files = new HashMap<>();
 			ZipEntry entry;
 			final int BUFFER = 2048;
-			FileInputStream fis = new FileInputStream(filename);
-			BufferedInputStream bis = new BufferedInputStream(fis);
-			ZipInputStream zis = new ZipInputStream(new BufferedInputStream(bis));
-			while ((entry = zis.getNextEntry()) != null) {
+			
+		
+			try (FileInputStream fis = new FileInputStream(filename);
+					BufferedInputStream bis = new BufferedInputStream(fis);
+					ZipInputStream zis = new ZipInputStream(new BufferedInputStream(bis))) {
 
-				// skip directories
-				if (entry.isDirectory()) {
-					continue;
-				}
+				while ((entry = zis.getNextEntry()) != null) {
+					// skip directories
+					if (entry.isDirectory()) {
+						continue;
+					}
 
-				// load in the file
-				int count;
-				byte data[] = new byte[BUFFER];
-				ByteArrayOutputStream bos = new ByteArrayOutputStream();
-				while ((count = zis.read(data, 0, BUFFER)) != -1) {
-					bos.write(data, 0, count);
+					// load in the file
+					int count;
+					byte data[] = new byte[BUFFER];
+					try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+						while ((count = zis.read(data, 0, BUFFER)) != -1) {
+							bos.write(data, 0, count);
+						}
+						bos.flush();
+						files.put(entry.getName(), bos.toByteArray());
+					}
 				}
-				bos.flush();
-				bos.close();
-				files.put(entry.getName(), bos.toByteArray());
 			}
-			zis.close();
 			
 			MissionPackageManifest manifest = null;
 			try {

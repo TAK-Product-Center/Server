@@ -32,16 +32,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.config.TAKIgniteConfiguration;
-import com.bbn.marti.config.Tls;
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.exception.NotFoundException;
 import com.bbn.marti.remote.exception.TakException;
 
+import jakarta.xml.bind.JAXBException;
 import tak.server.Constants;
 import tak.server.util.ActiveProfiles;
 import tak.server.util.JAXBUtils;
-
-import jakarta.xml.bind.JAXBException;
 
 public class IgniteConfigurationHolder {
 
@@ -191,12 +188,12 @@ public class IgniteConfigurationHolder {
 															boolean isMulticastDiscovery, @Nullable Integer nonMulticastDiscoveryPort,
 													  @Nullable Integer nonMulticastDiscoveryPortCount, Integer communicationPort,
 															Integer communicationPortCount, int maxQueue, long workerTimeoutMilliseconds,
-															long dataRegionInitialSize, long dataRegionMaxSize) {
+															long dataRegionInitialSize, long dataRegionMaxSize, long metricsLogFrequency) {
 		return getTAKIgniteConfiguration(igniteHost, isCluster, isKubernetes, isEmbedded, isMulticastDiscovery,
 				nonMulticastDiscoveryPort, nonMulticastDiscoveryPortCount, communicationPort, communicationPortCount,
 				maxQueue, workerTimeoutMilliseconds, dataRegionInitialSize, dataRegionMaxSize, -1, false,
 				-1.f, false, false, -1,
-				false, -1, -1, -1);
+				false, -1, -1, -1, metricsLogFrequency);
 	}
 
 	// It is preferred to let the class set this from the config file but this allows overriding the values for the legacy
@@ -209,7 +206,7 @@ public class IgniteConfigurationHolder {
 															boolean enablePersistence, float evictionThreshold, boolean ignitePoolSizeUseDefaultsForApi,
 															boolean igniteDefaultSpiConnectionsPerNode, int igniteExplicitSpiConnectionsPerNode,
 															boolean apiServiceIgniteServer, long spiConnectionTimeoutMs,
-															long clientConnectionTimeoutMs, long failureDetectionTimeoutMs) {
+															long clientConnectionTimeoutMs, long failureDetectionTimeoutMs, long metricsLogFrequency) {
 
 		takIgniteConfiguration.setIgniteHost(igniteHost);
 		takIgniteConfiguration.setClusterEnabled(isCluster);
@@ -260,9 +257,8 @@ public class IgniteConfigurationHolder {
 
 		if (takIgniteConfiguration.isClusterEnabled()) {
 			IgniteConfiguration clusterConf = new IgniteConfiguration();
-
+			
 			TcpDiscoverySpi tds = new TcpDiscoverySpi();
-
 			if (takIgniteConfiguration.isClusterKubernetes()) {
 
 				TcpDiscoveryKubernetesIpFinder ipFinder = new TcpDiscoveryKubernetesIpFinder();
@@ -287,18 +283,32 @@ public class IgniteConfigurationHolder {
 				//ipFinder.setMasterUrl("https://kubernetes.ignite.svc.cluster.local:443");
 
 				tds.setIpFinder(ipFinder);
+				clusterConf.setDiscoverySpi(tds);
+			} else {
+				TcpDiscoveryVmIpFinder ipFinder = new TcpDiscoveryVmIpFinder();
+
+				String address = takIgniteConfiguration.getIgniteHost() + ":" + takIgniteConfiguration.getIgniteNonMulticastDiscoveryPort() +
+						".." + (takIgniteConfiguration.getIgniteNonMulticastDiscoveryPort() + takIgniteConfiguration.getIgniteNonMulticastDiscoveryPortCount());
+				ipFinder.setAddresses(Arrays.asList(address));
+				
+				logger.trace("ignite grid discovery address: {}", address);
+
+				tds.setIpFinder(ipFinder);
+
+				tds.setLocalPort(takIgniteConfiguration.getIgniteNonMulticastDiscoveryPort());
+				tds.setLocalPortRange(takIgniteConfiguration.getIgniteNonMulticastDiscoveryPortCount());
 			}
 
 			clusterConf.setDiscoverySpi(tds);
 			clusterConf.setClientMode(true);
 			clusterConf.setUserAttributes(Collections.singletonMap(Constants.TAK_PROFILE_KEY, igniteProfile));
+			clusterConf.setMetricsLogFrequency(takIgniteConfiguration.getMetricsLogFrequency());
 			
 			return clusterConf;
 
 		} else {
 
 			IgniteConfiguration standaloneConf = new IgniteConfiguration();
-
 			String defaultWorkDir = "/opt/tak";
 			try {
 				 defaultWorkDir = U.defaultWorkDirectory();
@@ -440,6 +450,7 @@ public class IgniteConfigurationHolder {
 			IgniteLogger log = new Slf4jLogger();
 
 			standaloneConf.setGridLogger(log);
+			standaloneConf.setMetricsLogFrequency(takIgniteConfiguration.getMetricsLogFrequency());
 
 			return standaloneConf;
 		}

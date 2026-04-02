@@ -98,11 +98,12 @@ public class JAXBUtils {
             FileUtils.copyFile(file, copied);
         }
 
-        OutputStream fos = new FileOutputStream(file);
-        // Write to the file
-        baos.writeTo(fos);
-        fos.flush();
-        fos.close();
+        try (OutputStream fos = new FileOutputStream(file)) {
+        	// Write to the file
+            baos.writeTo(fos);
+            fos.flush();
+        }
+        baos.close();
     }
 
 

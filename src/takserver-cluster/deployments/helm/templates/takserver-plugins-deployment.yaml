@@ -17,6 +17,7 @@ spec:
       containers:
         - name: takserver-plugins 
           image: "{{ .Values.takserver.plugins.image.repository }}:{{ .Values.takserver.plugins.image.tag }}"
+          imagePullPolicy: Always
           env:
             - name: "spring_profiles_active"
               value: "k8cluster"

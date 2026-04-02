@@ -80,7 +80,7 @@ public class SendingClient implements SendingInterface {
 			group = null;
 		}
 		this.log = LoggerFactory.getLogger(SendingClient.class);
-		this.dl = new DurationLogger(user.getConsistentUniqueReadableIdentifier(), log);
+		this.dl = new DurationLogger(user.getConsistentUniqueReadableIdentifier(), "SendingClient");
 	}
 
 	private boolean sendMessage(@NotNull Document doc, boolean omitXmlDeclaration) {
@@ -92,7 +92,7 @@ public class SendingClient implements SendingInterface {
 		switch (user.getConnection().getProtocol()) {
 			case INPUT_TCP:
 			case DATAFEED_TCP:
-				sendTCPMessage(user.getServer().getUrl(), user.getConnection().getPort(), xmlData);
+				sendTCPMessage(user.getServer().getHost(), user.getConnection().getPort(), xmlData);
 //				dl.begin("stateChangeListener.onMessageSent");
 				stateChangeListener.onMessageSent(xmlData);
 //				dl.end("stateChangeListener.onMessageSent");
@@ -101,7 +101,7 @@ public class SendingClient implements SendingInterface {
 			case INPUT_UDP:
 			case DATAFEED_UDP:
 				try {
-					sendUDPMessage(user.getServer().getUrl(), user.getConnection().getPort(), udpPort, xmlData);
+					sendUDPMessage(user.getServer().getHost(), user.getConnection().getPort(), udpPort, xmlData);
 //					dl.begin("stateChangeListener.onMessageSent");
 					stateChangeListener.onMessageSent(xmlData);
 //					dl.end("stateChangeListener.onMessageSent");

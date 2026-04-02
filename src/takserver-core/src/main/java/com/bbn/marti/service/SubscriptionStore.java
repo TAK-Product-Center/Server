@@ -40,6 +40,7 @@ import com.bbn.marti.remote.RemoteContact;
 import com.bbn.marti.remote.RemoteFile;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.RemoteSubscriptionMetrics;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.remote.groups.FederateUser;
 import com.bbn.marti.remote.groups.User;
@@ -159,9 +160,8 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 	public ArrayList<RemoteSubscription> getFilteredPaginatedCachedRemoteSubscriptions(String groupVector, String sort, int direction,
 			int page, int limit) {
 		ArrayList<RemoteSubscription> subs = new ArrayList<>();
-
 		SqlFieldsQuery qry = getAllSubscriptionQuery(groupVector, sort, direction, page, limit);
-		try (QueryCursor<List<?>> cursor = IgniteCacheHolder.getIgniteSubscriptionUidTackerCache().query(qry)) {
+		try (QueryCursor<List<?>> cursor = IgniteCacheHolder.queryIgniteSubscriptionUidTrackerCache(qry)) {
 			for (List<?> row : cursor) {
 				subs.add(new RemoteCachedSubscription(row));
 			}
@@ -172,7 +172,7 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 		
 	private SqlFieldsQuery getAllSubscriptionQuery(String groupVector, String sort, int direction, int page, int limit) {		
 		StringBuilder sb = new StringBuilder();
-		sb.append("select rs.callsign, rs.clientUid, rs.connectionId, rs.currentBandwidth, rs.handlerType, rs.iface, rs.incognito, rs.lastProcTime, rs.mode, rs.notes, rs.role, rs.takv, rs.team, rs.to, rs.uid, rs.username, rs.xpath, rs.numHits, rs.writeQueueDepth, rs.lastProcTime, ig._VAL, og._VAL, rs.originNode from RemoteSubscription as rs inner join \""  + Constants.IGNITE_USER_INBOUND_GROUP_CACHE +  "\".String ig on rs.connectionId = ig._KEY inner join \"" + Constants.IGNITE_USER_OUTBOUND_GROUP_CACHE + "\".String og on ig._KEY = og._KEY ORDER BY ?");
+		sb.append("select rs.callsign, rs.clientUid, rs.connectionId, rs.currentBandwidth, rs.handlerType, rs.iface, rs.incognito, rs.lastProcTime, rs.lastReportTime, rs.mode, rs.notes, rs.role, rs.takv, rs.team, rs.to, rs.uid, rs.username, rs.xpath, rs.numHits, rs.writeQueueDepth, rs.lastProcTime, ig._VAL, og._VAL, rs.originNode from RemoteSubscription as rs inner join \""  + Constants.IGNITE_USER_INBOUND_GROUP_CACHE +  "\".String ig on rs.connectionId = ig._KEY inner join \"" + Constants.IGNITE_USER_OUTBOUND_GROUP_CACHE + "\".String og on ig._KEY = og._KEY ORDER BY ?");
 		sb.append(direction == 1 ? " ASC" : " DESC");
 		sb.append(limit == -1 ? "" : " LIMIT ");
 		sb.append(limit == -1 ? "" : limit);
@@ -545,7 +545,7 @@ public class SubscriptionStore implements FederatedSubscriptionManager {
 
 	@Override
 	public Subscription removeSubscriptionByClientUid(String clientuid) {
-		IgniteCacheHolder.getIgniteSubscriptionClientUidTackerCache().remove(clientuid);
+		IgniteCacheHolder.removeFromIgniteSubscriptionClientUidTrackerCache(clientuid);
 		return clientUidToSubMap.remove(clientuid);
 	}
 

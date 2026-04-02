@@ -31,14 +31,14 @@ import com.bbn.marti.remote.exception.ValidationException;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.TimeUtils;
-import com.bbn.marti.util.spring.RequestHolderBean;
+import com.bbn.marti.util.spring.RequestUtilBean;
 import com.bbn.security.web.MartiValidator;
 import com.bbn.security.web.MartiValidatorConstants;
 import com.google.common.base.Strings;
 
+import jakarta.servlet.http.HttpServletRequest;
 import tak.server.Constants;
 import tak.server.cot.CotElement;
-
 
 /*
  * 
@@ -57,18 +57,17 @@ public class CotApi extends BaseRestController {
     CommonUtil commonUtil;
     
     @Autowired
-    RequestHolderBean requestHolder;
+    RequestUtilBean requestHolder;
+    
+    @Autowired
+    HttpServletRequest request;
 
     @RequestMapping(value = "/cot/xml/{uid:.+}", method = RequestMethod.GET)
     Callable<ResponseEntity<String>> getCotEvent(@PathVariable("uid") @NotNull String uid) throws IntrusionException, org.owasp.esapi.errors.ValidationException {
     	
     	final String sessionId = requestHolder.sessionId();
-		final String groupVector = commonUtil.getGroupVectorBitString(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
     	
-    	if (logger.isDebugEnabled()) {
-    		logger.debug("session id: " + requestHolder.sessionId());
-    	}
-
     	return () -> {
     		//
     		// validate the uid parameter from URL
@@ -82,9 +81,7 @@ public class CotApi extends BaseRestController {
     			return new ResponseEntity<String>("", HttpStatus.INTERNAL_SERVER_ERROR);
     		}
 
-    		if (logger.isDebugEnabled()) {
-    			logger.debug("get latest CoT for uid " + uid);
-    		}
+    		logger.debug("get latest CoT for uid {}", uid);
 
     		//
     		// query the database for the cot element
@@ -122,7 +119,7 @@ public class CotApi extends BaseRestController {
     				throws IntrusionException, org.owasp.esapi.errors.ValidationException {
     	
     	final String sessionId = requestHolder.sessionId();
-		final String groupVector = commonUtil.getGroupVectorBitString(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
     	
     	if (logger.isDebugEnabled()) {
     		logger.debug("session id: " + requestHolder.sessionId());
@@ -182,7 +179,7 @@ public class CotApi extends BaseRestController {
     Callable<ResponseEntity<String>> getCotEvents(@RequestBody @NotNull Set<String> uids) {
     	
     	final String sessionId = requestHolder.sessionId();
-		final String groupVector = commonUtil.getGroupVectorBitString(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
     	
     	if (logger.isDebugEnabled()) {
     		logger.debug("session id: " + requestHolder.sessionId());
@@ -238,10 +235,11 @@ public class CotApi extends BaseRestController {
     		@RequestParam(value = "left", required = false) Double left,
     		@RequestParam(value = "bottom", required = false) Double bottom,
     		@RequestParam(value = "right", required = false) Double right,
-    		@RequestParam(value = "top", required = false) Double top) {
+    		@RequestParam(value = "top", required = false) Double top,
+			@RequestParam(value = "isFiltered", defaultValue = "true") Boolean isFiltered) {
     	
     	final String sessionId = requestHolder.sessionId();
-		final String groupVector = commonUtil.getGroupVectorBitString(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
     	
     	if (logger.isDebugEnabled()) {
     		logger.debug("session id: " + requestHolder.sessionId());
@@ -264,8 +262,11 @@ public class CotApi extends BaseRestController {
     			boundingBox.setMaxLatitude(top);
     		}
 
-    		List<CotElement> cotElements = missionService.getCotElementsByTimeAndBbox(
-    				start, end, boundingBox, groupVector);
+    		List<CotElement> cotElements;
+			
+			// handled in case user explicitly passes null value for isFiltered
+			cotElements = missionService.getCotElementsByTimeAndBbox(
+					start, end, boundingBox, groupVector, isFiltered == null || isFiltered.booleanValue());
 
     		if (cotElements == null || cotElements.size() == 0) {
     			return new ResponseEntity<String>("", HttpStatus.NOT_FOUND);
@@ -291,8 +292,7 @@ public class CotApi extends BaseRestController {
     ResponseEntity<List<String>> getCotEventsByTimeAndBbox(
 		@RequestParam(value = "search", defaultValue = " ", required = false) String search){
     	
-    	final String sessionId = requestHolder.sessionId();
-		final String groupVector = commonUtil.getGroupVectorBitString(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
 		
 		List<String> results = missionService.getAllCotForString(search, groupVector);
 		HttpHeaders headers = new HttpHeaders();

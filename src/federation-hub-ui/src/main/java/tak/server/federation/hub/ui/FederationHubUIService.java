@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 
 import org.owasp.esapi.Validator;
@@ -54,6 +55,7 @@ import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.view.InternalResourceView;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import com.bbn.roger.fig.FederationUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -64,26 +66,24 @@ import jakarta.servlet.http.HttpServletResponse;
 import tak.server.federation.FederateGroup;
 import tak.server.federation.FederationException;
 import tak.server.federation.FederationPolicyGraph;
-import tak.server.federation.hub.FederationHubUtils;
-import tak.server.federation.hub.FedhubJwtUtils;
 import tak.server.federation.hub.broker.FederationHubBroker;
+import tak.server.federation.hub.broker.FederationHubBrokerGlobalMetrics;
 import tak.server.federation.hub.broker.FederationHubBrokerMetrics;
 import tak.server.federation.hub.broker.FederationHubServerConfig;
 import tak.server.federation.hub.broker.HubConnectionInfo;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
 import tak.server.federation.hub.policy.FederationPolicy;
-import tak.server.federation.hub.ui.graph.EdgeFilter;
 import tak.server.federation.hub.ui.graph.FederateCell;
 import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
 import tak.server.federation.hub.ui.graph.FederationPolicyModel;
 import tak.server.federation.hub.ui.graph.FederationTokenGroupCell;
-import tak.server.federation.hub.ui.graph.FilterUtils;
 import tak.server.federation.hub.ui.graph.GroupCell;
-import tak.server.federation.hub.ui.graph.JwtTokenRequestModel;
-import tak.server.federation.hub.ui.graph.JwtTokenResponseModel;
 import tak.server.federation.hub.ui.jwt.AuthRequest;
 import tak.server.federation.hub.ui.jwt.AuthResponse;
 import tak.server.federation.hub.ui.keycloak.AuthCookieUtils;
+import tak.server.federation.jwt.FederationJwtUtils;
+import tak.server.federation.jwt.JwtTokenRequestModel;
+import tak.server.federation.jwt.JwtTokenResponseModel;
 
 @RequestMapping("/")
 @RestController
@@ -112,6 +112,15 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
     
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
+    	try {
+			Map<String, FederationPolicyGraph> policies = fedHubPolicyManager.getAllPolicies();
+			for(Entry<String, FederationPolicyGraph> policy: policies.entrySet()) {
+				this.cachedPolicies.put(policy.getKey(), getPolicyAsPolicyModel(policy.getValue()));
+			}
+		} catch (IOException e) {
+			logger.error("Could not load policies directory");
+		}
+    	
     	// hydrate cache
     	getActivePolicy();
     }
@@ -261,11 +270,11 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
 	@RequestMapping(value = "/fig/generateJwtToken", method = RequestMethod.POST)
 	public ResponseEntity<JwtTokenResponseModel> generateJwtToken(@RequestBody JwtTokenRequestModel tokenRequest) {
 		try {
-			String token = FedhubJwtUtils.getInstance(fedHubConfig).createToken(tokenRequest.getClientFingerprint(),
-					tokenRequest.getClientGroup(), tokenRequest.getExpiration());
+			String token = FederationJwtUtils.getInstance(fedHubConfig).createFedhubToken(tokenRequest.getAttributes(), tokenRequest.getExpiration());
 
 			JwtTokenResponseModel response = new JwtTokenResponseModel();
 			response.setToken(token);
+			response.setExpiration(tokenRequest.getExpiration());
 			
 			return new ResponseEntity<>(response, new HttpHeaders(), HttpStatus.OK);
 		} catch (Exception e) {
@@ -288,6 +297,7 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
     @ResponseBody
     public FederationPolicyModel saveFederation(RequestEntity<FederationPolicyModel> requestEntity) {
         FederationPolicyModel policy = requestEntity.getBody();
+        
         if (policy != null) {
         	this.cachedPolicies.put(policy.getName(), policy);
         }
@@ -326,13 +336,7 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
         }
         return new ResponseEntity<>(new HttpHeaders(), HttpStatus.FORBIDDEN);
     }
-
-    @RequestMapping(value = "/fig/knownFilter", method = RequestMethod.GET)
-    @ResponseBody
-    public Collection<EdgeFilter> getKnownFilters() {
-        return getKnownFiltersFromPolicy();
-    }
-
+    
     @RequestMapping(value = "/fig/graphAsJson/{federationId}", method = RequestMethod.GET)
     @ResponseBody
     public FederationPolicy getGraphAsJson(@PathVariable String federationId) {
@@ -417,6 +421,30 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
         }
         return new ResponseEntity<>(new HttpHeaders(), HttpStatus.FORBIDDEN);
     }
+    
+    @RequestMapping(value = "/fig/getCaGroupNames", method = RequestMethod.GET)
+    public ResponseEntity<List<String>> getCaGroupNames(HttpServletRequest request) {
+        if (isUpdateActiveFederation()) {
+        	List<String> names = new ArrayList<>();
+        	FederationPolicyModel activePolicy = getActivePolicyAsPolicyModel();
+        	activePolicy.getCells().forEach(cell -> {
+    			if (cell instanceof GroupCell) {
+    				GroupCell gCell = (GroupCell) cell;
+    				names.add(gCell.getProperties().getName());
+    			}
+                if (cell instanceof FederationTokenGroupCell) {
+                    FederationTokenGroupCell tCell = (FederationTokenGroupCell) cell;
+                    names.add(tCell.getProperties().getName());
+                }
+        	});
+        	
+        	
+            return new ResponseEntity<>(names,
+                new HttpHeaders(),
+                HttpStatus.OK);
+        }
+        return new ResponseEntity<>(new HttpHeaders(), HttpStatus.FORBIDDEN);
+    }
 
     @RequestMapping(value = "/fig/getKnownGroupsForGraphNode/{graphNodeId}", method = RequestMethod.GET)
     @ResponseBody
@@ -456,6 +484,11 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
     @RequestMapping(value = "/fig/getBrokerMetrics", method = RequestMethod.GET)
     public ResponseEntity<FederationHubBrokerMetrics> getFederationHubBrokerMetrics() {
         return new ResponseEntity<FederationHubBrokerMetrics>(fedHubBroker.getFederationHubBrokerMetrics(), new HttpHeaders(), HttpStatus.OK);
+    }
+
+    @RequestMapping(value = "/fig/getBrokerGlobalMetrics", method = RequestMethod.GET)
+    public ResponseEntity<FederationHubBrokerGlobalMetrics> getFederationHubBrokerGlobalMetrics() {
+        return new ResponseEntity<FederationHubBrokerGlobalMetrics>(fedHubBroker.getFederationHubBrokerGlobalMetrics(), new HttpHeaders(), HttpStatus.OK);
     }
 
     @RequestMapping(value = "/fig/addNewGroupCa", method = RequestMethod.POST)
@@ -541,7 +574,11 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
 		try {		
 			logger.info("Restarting Broker Service");
 
-			killBrokerProcess();
+			int code = killBrokerProcess();
+			
+			if (code != 0) {
+				return new ResponseEntity<>(new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR);
+			}
 			
 		    // start
 		    String startCmd= "./federation-hub-broker.sh &> /opt/tak/federation-hub/logs/federation-hub-broker-console.log &";
@@ -563,19 +600,20 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
 		}
 	}
     
-    private void killBrokerProcess() {
-    	try {
-    		String killCmd = "pkill -9 -f \"federation-hub-broker\"";
-			String[] killCmds = new String[] {"bash", "-c", killCmd};
-			
-			ProcessBuilder killProcessBuilder = new ProcessBuilder(killCmds);
-			killProcessBuilder.directory(new File("/opt/tak/federation-hub/scripts"));
-		    Process killProcess = killProcessBuilder.start();
-		   
-		    killProcess.waitFor();
-    	} catch (Exception e) {
-    		logger.error("error with killBrokerProcess", e);
-		}
+    private int killBrokerProcess() {
+        try {
+            ProcessHandle.allProcesses()
+                .filter(ph -> ph.info().commandLine().isPresent() &&
+                              ph.info().commandLine().get().contains("federation-hub-broker"))
+                .forEach(ph -> {
+                    logger.info("Destroying PID=" + ph.pid());
+                    ph.destroyForcibly(); // SIGKILL equivalent
+                });
+            return 0;
+        } catch (Exception e) {
+            logger.error("error with killBrokerProcess", e);
+            return 2;
+        }
     }
     
     private boolean canAccessBrokerProcessServices() throws Exception {
@@ -607,30 +645,24 @@ public class FederationHubUIService implements ApplicationListener<ContextRefres
         /* TODO do we really need to configure this? */
         return true;
     }
-
-    private Collection<EdgeFilter> getKnownFiltersFromPolicy() {
-        return FilterUtils.getKnownFiltersFromPolicy().values();
+    
+    private FederationPolicyModel getPolicyAsPolicyModel(FederationPolicyGraph policy) {
+        // Production code.
+        Map<String, Object> additionalData = policy.getAdditionalData();
+        
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.convertValue(additionalData.get("uiData"), FederationPolicyModel.class);
     }
 
     private FederationPolicyModel getActivePolicyAsPolicyModel() {
-        // Production code.
-        FederationPolicyGraph activePolicy = fedHubPolicyManager.getPolicyGraph();
-        Map<String, Object> additionalData = activePolicy.getAdditionalData();
-
-
-        // UI Test code.
-        //FederationPolicyGraph testActualPolicy = cachedPolicys.values().iterator().next().getPolicyGraphFromModel();
-        //Map<String, Object> additionalData =  testActualPolicy.getAdditionalData();
-
-        ObjectMapper mapper = new ObjectMapper();
-        return mapper.convertValue(additionalData.get("uiData"), FederationPolicyModel.class);
+        return getPolicyAsPolicyModel(fedHubPolicyManager.getPolicyGraph());
     }
 
     private List<RemoteGroup> federateGroupsToGroupHolders(Collection<FederateGroup> groups) {
     	X509Certificate selfCa = null;
     	try {
         	byte[] selfCaB = fedHubBroker.getSelfCaFile();
-        	selfCa = FederationHubUtils.loadX509CertFromBytes(selfCaB);
+        	selfCa = FederationUtils.loadX509CertFromBytes(selfCaB);
 		} catch (Exception e) {
 			logger.error("error computing self ca", e);
 		}

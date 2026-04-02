@@ -4,7 +4,9 @@ import com.bbn.marti.test.shared.data.connections.AbstractConnection;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
 import com.bbn.marti.test.shared.data.users.AbstractUser;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -192,6 +194,10 @@ public class ServerState implements Comparable<ServerState> {
 			private final AbstractServerProfile federateServer;
 			private final Set<String> outboundGroups = new HashSet<>();
 			private final Set<String> inboundGroups = new HashSet<>();
+			private boolean groupMappingEnabled = false;
+			private int maxHops = -1;
+			private final Map<String, Set<String>> inboundGroupMappings = new HashMap<>();
+			private final Map<String, Long> outboundGroupHopLimits = new HashMap<>();
 
 			FederateState(AbstractServerProfile federatedServer, AbstractServerProfile federateServer) {
 				this.federatedServer = federatedServer;
@@ -210,7 +216,6 @@ public class ServerState implements Comparable<ServerState> {
 				}
 			}
 
-
 			public boolean isInboundGroup(String groupIdentifier) {
 				return inboundGroups.contains(groupIdentifier);
 			}
@@ -222,6 +227,17 @@ public class ServerState implements Comparable<ServerState> {
 					inboundGroups.add(groupIdentifier);
 				}
 			}
+			
+			void addInboundGroupMapping(String remoteGroup, String localGroup) {
+				if (!inboundGroupMappings.containsKey(remoteGroup)) {
+					inboundGroupMappings.put(remoteGroup, new TreeSet<>());
+				}
+				inboundGroupMappings.get(remoteGroup).add(localGroup);
+			}
+			
+			void addOutboundGroupHopLimit(String groupIdentifier, long limit) {
+				outboundGroupHopLimits.put(groupIdentifier, limit);
+			}
 
 			public TreeSet<String> getOutboundGroups() {
 				return new TreeSet<>(outboundGroups);
@@ -229,6 +245,30 @@ public class ServerState implements Comparable<ServerState> {
 
 			public TreeSet<String> getInboundGroups() {
 				return new TreeSet<>(inboundGroups);
+			}
+
+			public Map<String, Set<String>> getInboundGroupMappings() {
+				return inboundGroupMappings;
+			}
+
+			public Map<String, Long> getOutboundGroupHopLimits() {
+				return outboundGroupHopLimits;
+			}
+
+			public boolean isGroupMappingEnabled() {
+				return groupMappingEnabled;
+			}
+
+			public void setGroupMappingEnabled(boolean groupMappingEnabled) {
+				this.groupMappingEnabled = groupMappingEnabled;
+			}
+
+			public int getMaxHops() {
+				return maxHops;
+			}
+
+			public void setMaxHops(int maxHops) {
+				this.maxHops = maxHops;
 			}
 		}
 	}

@@ -11,6 +11,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.math.BigInteger;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.rmi.RemoteException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -27,8 +28,10 @@ import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import org.apache.catalina.util.URLEncoder;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -46,7 +49,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCrypt;
@@ -102,7 +104,7 @@ import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.sync.service.MissionTokenUtils;
 import com.bbn.marti.util.CommonUtil;
 import com.bbn.marti.util.KmlUtils;
-import com.bbn.marti.util.spring.RequestHolderBean;
+import com.bbn.marti.util.spring.RequestUtilBean;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -154,7 +156,7 @@ public class MissionApi extends BaseRestController {
 	private GroupManager groupManager;
 
 	@Autowired
-	private CommonUtil martiUtil;
+	private CommonUtil commonUtil;
 
 	@Autowired
 	private RemoteUtil remoteUtil;
@@ -175,7 +177,7 @@ public class MissionApi extends BaseRestController {
 	private MissionSubscriptionRepository missionSubscriptionRepository;
 
 	@Autowired
-	private RequestHolderBean requestHolderBean;
+	private RequestUtilBean requestHolderBean;
 
 	@Autowired(required = false)
 	private RetentionPolicyConfig retentionPolicyConfig;
@@ -196,7 +198,7 @@ public class MissionApi extends BaseRestController {
 			logger.debug("mission API getAllMissions");
 		}
 
-		final NavigableSet<Group> groups = martiUtil.getGroupsFromRequest(request);
+		final NavigableSet<Group> groups = commonUtil.getGroupsFromRequest(request);
 		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
 		return () -> {
@@ -249,20 +251,8 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date start,
 			@RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date end) {
 
-		final HttpServletRequest request = requestHolderBean.getRequest();
-
-		final String sessionId = requestHolderBean.sessionId();
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("session id: " + requestHolderBean.sessionId());
-		}
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("request: " + request);
-		}
-
-		final String groupVector = martiUtil.getGroupVectorBitString(sessionId);
-		final NavigableSet<Group> userGroups = martiUtil.getUserGroups(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
+		final NavigableSet<Group> userGroups = commonUtil.getUserGroups(request);
 
 		return () -> {
 
@@ -348,14 +338,10 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date start,
 			@RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date end) {
 
-		final HttpServletRequest request = requestHolderBean.getRequest();
-
-		final String sessionId = requestHolderBean.sessionId();
-
 		logger.debug("MissionApi.getMissionByGuid {}", guid);
 
-		final String groupVector = martiUtil.getGroupVectorBitString(sessionId);
-		final NavigableSet<Group> userGroups = martiUtil.getUserGroups(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
+		final NavigableSet<Group> userGroups = commonUtil.getUserGroups(request);
 
 		return () -> {
 
@@ -449,21 +435,9 @@ public class MissionApi extends BaseRestController {
 			throw new IllegalArgumentException("empty 'name' path parameter");
 		}
 
-		final HttpServletRequest request = requestHolderBean.getRequest();
+		final String groupVectorUser = commonUtil.getGroupVectorBitString(request);
 
-		final String sessionId = requestHolderBean.sessionId();
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("session id: " + requestHolderBean.sessionId());
-		}
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("request: " + request);
-		}
-
-		final String groupVectorUser = martiUtil.getGroupVectorBitString(sessionId);
-
-		final MissionRole adminRole = martiUtil.isAdmin() ?
+		final MissionRole adminRole = commonUtil.isAdmin(request) ?
 				missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_OWNER) : null;
 
 		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -492,14 +466,17 @@ public class MissionApi extends BaseRestController {
 			// mission exists, get groups to check if they changed
 			Set<Group> groups = groupManager.findGroups(Arrays.asList(groupNames));
 			String groupVectorMission = remoteUtil.bitVectorToString(remoteUtil.getBitVectorForGroups(groups));
-			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 
 			// if the groups changed
 			if (mission.getGroupVector().compareTo(groupVectorMission) != 0) {
-				boolean userAllowedToChangeGroups = martiUtil.isAdmin() || roleForRequest.getRole() == MissionRole.Role.MISSION_OWNER;
-				// user isn't an admin or mission owner, bad request
-				if (!userAllowedToChangeGroups || !allowGroupChange)
+				boolean userAllowedToChangeGroups = commonUtil.isAdmin(request) || roleForRequest.getRole() == MissionRole.Role.MISSION_OWNER;
+				// to change groups, the user must either be an admin or mission owner, and either request-level or
+				// global allowGroupChange attribute needs to be set
+				if (!(userAllowedToChangeGroups && (allowGroupChange || CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork()
+						.isMissionAllowGroupChange()))) {
 					throw new ForbiddenException("Illegal attempt to change Mission groups!");
+				}
 			}
 		} catch (MissionDeletedException | NotFoundException e) {
 			// no mission found, proceed with doCreateMissionAllowDupe
@@ -524,7 +501,7 @@ public class MissionApi extends BaseRestController {
 				false,
 				requestBody,
 				request,
-				sessionId,
+				request.getSession().getId(),
 				groupVectorUser,
 				adminRole,
 				username);
@@ -560,8 +537,6 @@ public class MissionApi extends BaseRestController {
 			throw new IllegalArgumentException("empty 'name' path parameter");
 		}
 
-		final HttpServletRequest request = requestHolderBean.getRequest();
-
 		final String sessionId = requestHolderBean.sessionId();
 
 		if (logger.isDebugEnabled()) {
@@ -572,9 +547,9 @@ public class MissionApi extends BaseRestController {
 			logger.debug("POST create mission {}", nameParam);
 		}
 
-		final String groupVectorUser = martiUtil.getGroupVectorBitString(sessionId);
+		final String groupVectorUser = commonUtil.getGroupVectorBitString(request);
 
-		final MissionRole adminRole = martiUtil.isAdmin() ?
+		final MissionRole adminRole = commonUtil.isAdmin(request) ?
 				missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_OWNER) : null;
 
 		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -626,7 +601,7 @@ public class MissionApi extends BaseRestController {
 															   final String sessionId,
 															   final String groupVectorUser,
 															   final MissionRole adminRole,
-															   final String username) throws ValidationException, IntrusionException, RemoteException {
+															   final String username) throws Exception {
 
 		logger.debug("session id: {}", requestHolderBean.sessionId());
 		
@@ -884,6 +859,8 @@ public class MissionApi extends BaseRestController {
 						// did the groups change?
 						if (mission.getGroupVector().compareTo(groupVectorMission) != 0) {
 							missionRepository.updateGroups(name, groupVectorUser, groupVectorMission);
+							missionRepository.updateGroupsForMissionUids(name, groupVectorUser, groupVectorMission);
+							missionRepository.updateGroupsForMissionResources(name, groupVectorUser, groupVectorMission);
 							updated = true;
 						}
 					}
@@ -952,7 +929,7 @@ public class MissionApi extends BaseRestController {
 			Mission reqMission,
 			String tool,
 			MissionRole defaultRole,
-			String boundingPolygon) throws RemoteException {
+			String boundingPolygon) throws RemoteException, InterruptedException, ExecutionException {
 
 		// result
 		Mission mission = null;
@@ -977,20 +954,23 @@ public class MissionApi extends BaseRestController {
 
 		MissionRole ownerRole = missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_OWNER);
 		MissionSubscription ownerSubscription = missionService.missionSubscribe(
-				mission.getGuidAsUUID(), mission.getId(), creatorUid, username, ownerRole, groupVectorUser);
+				mission.getGuidAsUUID(), mission.getId(), creatorUid, username, ownerRole, groupVectorUser).get();
 		mission.setToken(ownerSubscription.getToken());
 		mission.setOwnerRole(ownerRole);
 
 		if (missionPackage != null) {
 			List<MissionChange> conflicts = new ArrayList<>();
 			missionService.addMissionPackage(
-					mission.getGuidAsUUID(), missionPackage, creatorUid, martiUtil.getGroupsFromRequest(request), conflicts);
+					mission.getGuidAsUUID(), missionPackage, creatorUid, commonUtil.getGroupsFromRequest(request), conflicts);
 			mission = missionService.getMission(name, groupVectorUser);
 		}
 
 		if (reqMission != null) {
 			createOrUpdateMissionRequestBody(mission, reqMission, creatorUid, false);
 		}
+
+		mission.setGroups(RemoteUtil.getInstance().getGroupNamesForBitVectorString(
+				mission.getGroupVector(), groupManager.getAllGroups()));
 
 		response.setStatus(mission.getId() != 0 ? HttpServletResponse.SC_CREATED
 				: HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -1148,7 +1128,6 @@ public class MissionApi extends BaseRestController {
 			throw new IllegalArgumentException("empty 'copyName' request parameter");
 		}
 
-		final HttpServletRequest request = requestHolderBean.getRequest();
 		final String sessionId = requestHolderBean.sessionId();
 
 		if (logger.isDebugEnabled()) {
@@ -1159,7 +1138,7 @@ public class MissionApi extends BaseRestController {
 			logger.debug("request: " + request);
 		}
 
-		final String groupVector = martiUtil.getGroupVectorBitString(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
 		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
 		return () -> {
@@ -1206,10 +1185,10 @@ public class MissionApi extends BaseRestController {
 
 			MissionRole ownerRole = missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_OWNER);
 			MissionSubscription ownerSubscription = missionService.missionSubscribe(missionCopy.getGuidAsUUID(), missionCopy.getId(),
-					creatorUidParam, username, ownerRole, groupVector);
+					creatorUidParam, username, ownerRole, groupVector).get();
 
 			if (missionCopy.getId() != null) {
-				copyMissionContainers(mission, missionCopy, creatorUidParam, groupVector);
+				copyMissionContainers(mission, missionCopy, creatorUidParam, mission.getGroupVector());
 			}
 
 			missionCopy.setToken(ownerSubscription.getToken());
@@ -1246,7 +1225,7 @@ public class MissionApi extends BaseRestController {
 
 		validateParameters(new Object() {}.getClass().getEnclosingMethod());
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		Mission mission = missionService.getMissionByNameCheckGroups(name, groupVector);
 
@@ -1270,7 +1249,7 @@ public class MissionApi extends BaseRestController {
 				logger.debug("Mission delete: VBM is enabled");
 			}
 
-			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (roleForRequest == null) {
 				throw new IllegalArgumentException("no role for request!");
 			}
@@ -1287,7 +1266,7 @@ public class MissionApi extends BaseRestController {
 		}
 
 		if (deepDelete) {
-			MissionRole role = missionService.getRoleForRequest(mission, request);
+			MissionRole role = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (role == null) {
 				throw new IllegalArgumentException("no role for request!");
 			}
@@ -1300,12 +1279,15 @@ public class MissionApi extends BaseRestController {
 
 		logger.debug("archiving mission");
 
-		byte[] archive = missionService.archiveMission(mission.getGuidAsUUID(), groupVector, request.getServerName());
-		missionService.addMissionArchiveToEsync(mission.getName(), archive, mission.getGroupVector(), true);
+		try {
+			byte[] archive = missionService.archiveMission(mission.getGuidAsUUID(), groupVector, request.getServerName());
+			missionService.addMissionArchiveToEsync(mission.getName(), archive, mission.getGroupVector(), true);
+			logger.debug("added archived mission to esync " + mission.getName());
+		} catch (Exception e) {
+			logger.error("exception saving mission archive prior to deletion", e);
+		}
 
-		logger.debug("added archived mission to esync " + mission.getName());
-
-		mission = missionService.deleteMission(name, creatorUid, groupVector, deepDelete);
+		mission = missionService.deleteMission(name, creatorUid, mission.getGroupVector(), deepDelete);
 
 		logger.debug("mission deleted");
 
@@ -1348,13 +1330,13 @@ public class MissionApi extends BaseRestController {
 
 		validateParameters(new Object() {}.getClass().getEnclosingMethod());
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		Mission mission = missionService.getMissionByGuidCheckGroups(guid, groupVector);
 
 		logger.debug("mission to delete: {} ", mission);
 
-		missionService.validateMissionByGuid(mission);
+		missionService.validateMissionByGuid(mission, guidString);
 
 		CoreConfig config = CoreConfigFacade.getInstance();
 
@@ -1367,7 +1349,7 @@ public class MissionApi extends BaseRestController {
 				logger.debug("Mission delete: VBM is enabled");
 			}
 
-			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (roleForRequest == null) {
 				throw new IllegalArgumentException("no role for request!");
 			}
@@ -1384,7 +1366,7 @@ public class MissionApi extends BaseRestController {
 		}
 
 		if (deepDelete) {
-			MissionRole role = missionService.getRoleForRequest(mission, request);
+			MissionRole role = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (role == null) {
 				throw new IllegalArgumentException("no role for request!");
 			}
@@ -1427,15 +1409,15 @@ public class MissionApi extends BaseRestController {
 
 		validateParameters(new Object() {}.getClass().getEnclosingMethod());
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByNameCheckGroups(name, groupVector);
-		missionService.validateMissionByGuid(mission);
+		missionService.validateMission(mission, name);
 
 		byte[] archive = missionService.archiveMission(mission.getGuidAsUUID(), groupVector, request.getServerName());
 
 		response.addHeader(
 				"Content-Disposition",
-				"attachment; filename=" + name + ".zip");
+				"attachment; filename=\"" + URLEncoder.DEFAULT.encode(name, StandardCharsets.UTF_8) + "\".zip");
 
 		return archive;
 	}
@@ -1453,7 +1435,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		Mission mission = missionService.getMissionByNameCheckGroups(missionName, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(missionName, commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, missionName);
 
 		String[] contactUids = request.getParameterValues("contacts");
@@ -1468,7 +1450,7 @@ public class MissionApi extends BaseRestController {
 		}
 		validateParameters(new Object() {}.getClass().getEnclosingMethod());
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		byte[] archive = missionService.archiveMission(mission.getGuidAsUUID(), groupVector, request.getServerName());
 
@@ -1489,7 +1471,7 @@ public class MissionApi extends BaseRestController {
 				/*String[] contacts*/ contactUids);
 
 		try {
-			submission.submitCot(cotMessage, martiUtil.getGroupsFromRequest(request));
+			submission.submitCot(cotMessage, commonUtil.getGroupsFromRequest(request));
 		} catch (Exception e) {
 			throw new TakException(e);
 		}
@@ -1509,8 +1491,8 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
-		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
-		missionService.validateMissionByGuid(mission);
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, commonUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		String[] contactUids = request.getParameterValues("contacts");
 
@@ -1524,7 +1506,7 @@ public class MissionApi extends BaseRestController {
 		}
 		validateParameters(new Object() {}.getClass().getEnclosingMethod());
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		byte[] archive = missionService.archiveMission(mission.getGuidAsUUID(), groupVector, request.getServerName());
 		
@@ -1547,7 +1529,7 @@ public class MissionApi extends BaseRestController {
 				/*String[] contacts*/ contactUids);
 
 		try {
-			submission.submitCot(cotMessage, martiUtil.getGroupsFromRequest(request));
+			submission.submitCot(cotMessage, commonUtil.getGroupsFromRequest(request));
 		} catch (Exception e) {
 			throw new TakException(e);
 		}
@@ -1570,7 +1552,7 @@ public class MissionApi extends BaseRestController {
 
 		final String sessionId = requestHolderBean.sessionId();
 
-		final String groupVector = martiUtil.getGroupVectorBitString(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		return () -> {
 
@@ -1585,11 +1567,17 @@ public class MissionApi extends BaseRestController {
 			}
 			
 			Mission mission = missionService.getMissionByNameCheckGroups(name, groupVector);
+			missionService.validateMission(mission, name);
 
-			Mission updatedMission = missionService.addMissionContent(mission.getGuidAsUUID(), content, creatorUid, groupVector);
+			if (!content.getUids().isEmpty() && CoreConfigFacade.getInstance().getRemoteConfiguration()
+					.getNetwork().isMissionBrokerUidAddsFromApi()) {
+				missionService.brokerMissionUids(mission, content, creatorUid, groupVector);
+			} else {
+				mission = missionService.addMissionContent(mission.getGuidAsUUID(), content, creatorUid, mission.getGroupVector());
+			}
 
 			Set<Mission> result = new HashSet<>();
-			result.add(updatedMission);
+			result.add(mission);
 
 			return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), result);
 		};
@@ -1609,7 +1597,7 @@ public class MissionApi extends BaseRestController {
 
 		final String sessionId = requestHolderBean.sessionId();
 
-		final String groupVector = martiUtil.getGroupVectorBitString(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		return () -> {
 			
@@ -1623,7 +1611,16 @@ public class MissionApi extends BaseRestController {
 				throw new IllegalArgumentException("at least one hash or uid must be provided in request");
 			}
 
-			Mission mission = missionService.addMissionContent(missionGuid, content, creatorUid, groupVector);
+			// will throw appropriate exeception if mission does not exist or has been deleted
+			Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
+			missionService.validateMissionByGuid(mission, guid);
+
+			if (!content.getUids().isEmpty() && CoreConfigFacade.getInstance().getRemoteConfiguration()
+					.getNetwork().isMissionBrokerUidAddsFromApi()) {
+				missionService.brokerMissionUids(mission, content, creatorUid, groupVector);
+			} else {
+				mission = missionService.addMissionContent(missionGuid, content, creatorUid, mission.getGroupVector());
+			}
 
 			Set<Mission> result = new HashSet<>();
 			result.add(mission);
@@ -1646,13 +1643,13 @@ public class MissionApi extends BaseRestController {
 
 		validateParameters(new Object() {}.getClass().getEnclosingMethod());
 
-		Mission mission = missionService.getMissionByNameCheckGroups(name, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(name, commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, name);
 
 		List<MissionChange> conflicts = new ArrayList<>();
 
 		boolean success = missionService.addMissionPackage(
-				mission.getGuidAsUUID(), missionPackage, creatorUid, martiUtil.getGroupsFromRequest(request), conflicts);
+				mission.getGuidAsUUID(), missionPackage, creatorUid, commonUtil.getGroupsFromRequest(request), conflicts);
 
 		if (!success) {
 			if (conflicts.size() > 0) {
@@ -1686,7 +1683,7 @@ public class MissionApi extends BaseRestController {
 
 		try {
 			// Get group vector for the user associated with this session
-			groupVector = martiUtil.getGroupBitVector(request);
+			groupVector = commonUtil.getGroupBitVector(request);
 		} catch (Exception e) {
 			logger.debug("exception getting group membership for user request", e);
 		}
@@ -1694,7 +1691,7 @@ public class MissionApi extends BaseRestController {
 		Mission mission = missionService.getMissionByNameCheckGroups(name, groupVector);
 
 		// remove the content and track change
-		Mission updatedMission = missionService.deleteMissionContent(mission.getGuidAsUUID(), hash, uid, creatorUid, martiUtil.getGroupVectorBitString(request));
+		Mission updatedMission = missionService.deleteMissionContent(mission.getGuidAsUUID(), hash, uid, creatorUid, mission.getGroupVector());
 
 		// return mission object without resource and uid list (since the query could be expensive)
 		return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), Sets.newHashSet(updatedMission));
@@ -1717,7 +1714,7 @@ public class MissionApi extends BaseRestController {
 
 		try {
 			// Get group vector for the user associated with this session
-			groupVector = martiUtil.getGroupBitVector(request);
+			groupVector = commonUtil.getGroupBitVector(request);
 		} catch (Exception e) {
 			logger.debug("exception getting group membership for user request", e);
 		}
@@ -1727,7 +1724,7 @@ public class MissionApi extends BaseRestController {
 		Mission mission = missionService.getMissionByGuidCheckGroups(guidUuid, groupVector);
 		
 		// remove the content and track change
-		Mission updatedMission = missionService.deleteMissionContent(mission.getGuidAsUUID(), hash, uid, creatorUid, martiUtil.getGroupVectorBitString(request));
+		Mission updatedMission = missionService.deleteMissionContent(mission.getGuidAsUUID(), hash, uid, creatorUid, mission.getGroupVector());
 
 		// return mission object without resource and uid list (since the query could be expensive)
 		return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), Sets.newHashSet(updatedMission));
@@ -1756,7 +1753,7 @@ public class MissionApi extends BaseRestController {
 				logger.debug("getting mission changes for mission " + name);
 			}
 
-			Set<MissionChange> changes = missionService.getMissionChanges(name, martiUtil.getGroupVectorBitString(request),
+			Set<MissionChange> changes = missionService.getMissionChanges(name, commonUtil.getGroupVectorBitString(request),
 					secago, start, end, squashed);
 
 			if (logger.isDebugEnabled()) {
@@ -1791,7 +1788,7 @@ public class MissionApi extends BaseRestController {
 			throw new IllegalArgumentException("empty 'name' path parameter");
 		}
 
-		Mission mission = missionService.getMission(missionService.trimName(name), martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMission(missionService.trimName(name), commonUtil.getGroupVectorBitString(request));
 
 		// remove all keywords
 		mission.getKeywords().clear();
@@ -1830,7 +1827,7 @@ public class MissionApi extends BaseRestController {
 			keywords = new ArrayList<>();
 		}
 
-		Mission mission = missionService.getMission(missionService.trimName(name), martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMission(missionService.trimName(name), commonUtil.getGroupVectorBitString(request));
 
 		// remove all keywords
 		mission.getKeywords().clear();
@@ -1888,7 +1885,7 @@ public class MissionApi extends BaseRestController {
 			throw new IllegalArgumentException("keyword to delete must be provided in URL");
 		}
 
-		Mission mission = missionService.getMission(missionService.trimName(name), martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMission(missionService.trimName(name), commonUtil.getGroupVectorBitString(request));
 
 		if (!mission.getKeywords().remove(keyword)) {
 			throw new IllegalArgumentException("mission '" + name + "' did not contain keyword " + keyword);
@@ -1924,7 +1921,7 @@ public class MissionApi extends BaseRestController {
 			throw new IllegalArgumentException("empty keywords array");
 		}
 
-		Mission mission = missionService.getMission(missionService.trimName(name), martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMission(missionService.trimName(name), commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, name);
 
 		missionRepository.removeAllKeywordsForMissionUid(mission.getId(), uid);
@@ -1964,7 +1961,7 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "creatorUid", defaultValue = "") @ValidatedBy("MartiSafeString") String creatorUid,
 			HttpServletRequest request) {
 
-		Mission mission = missionService.getMission(missionService.trimName(name), martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMission(missionService.trimName(name), commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, name);
 
 		missionRepository.removeAllKeywordsForMissionUid(mission.getId(), uid);
@@ -1995,7 +1992,7 @@ public class MissionApi extends BaseRestController {
 			throw new IllegalArgumentException("empty keywords array");
 		}
 
-		Mission mission = missionService.getMission(missionService.trimName(name), martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMission(missionService.trimName(name), commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, name);
 
 		missionRepository.removeAllKeywordsForMissionResource(mission.getId(), hash);
@@ -2035,7 +2032,7 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "creatorUid", defaultValue = "") @ValidatedBy("MartiSafeString") String creatorUid,
 			HttpServletRequest request) {
 
-		Mission mission = missionService.getMission(missionService.trimName(name), martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMission(missionService.trimName(name), commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, name);
 
 		missionRepository.removeAllKeywordsForMissionResource(mission.getId(), hash);
@@ -2081,7 +2078,7 @@ public class MissionApi extends BaseRestController {
 
 		try {
 			// Get group vector for the user associated with this session
-			groupVector = martiUtil.getGroupBitVector(request);
+			groupVector = commonUtil.getGroupBitVector(request);
 		} catch (Exception e) {
 			logger.debug("exception getting group membership for user request", e);
 		}
@@ -2284,7 +2281,7 @@ public class MissionApi extends BaseRestController {
 		missionName = missionService.trimName(missionName);
 
 		// validate existence of mission
-		Mission mission = missionService.getMissionByNameCheckGroups(missionName, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(missionName, commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, missionName);
 
 		missionService.validatePassword(mission, password);
@@ -2308,7 +2305,7 @@ public class MissionApi extends BaseRestController {
 		missionName = missionService.trimName(missionName);
 
 		// validate existence of mission
-		Mission mission = missionService.getMissionByNameCheckGroups(missionName, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(missionName, commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, missionName);
 
 		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -2336,8 +2333,8 @@ public class MissionApi extends BaseRestController {
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
 		// validate existence of mission
-		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
-		missionService.validateMissionByGuid(mission);
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, commonUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
 		MissionSubscription missionSubscription = missionSubscriptionRepository
@@ -2365,11 +2362,9 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date end,
 			@PathVariable("missionName") String missionNameParam) {
 
-		final HttpServletRequest request = requestHolderBean.getRequest();
-
 		final String sessionId = requestHolderBean.sessionId();
 
-		final String groupVector = martiUtil.getGroupVectorBitString(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
@@ -2427,7 +2422,7 @@ public class MissionApi extends BaseRestController {
 			}
 
 			MissionSubscription missionSubscription = missionService.missionSubscribe(mission.getGuidAsUUID(), mission.getId(),
-					Strings.isNullOrEmpty(topic) ? uid : "topic:" + topic, username, role, groupVector);
+					Strings.isNullOrEmpty(topic) ? uid : "topic:" + topic, username, role, groupVector).get();
 
 			if (mission.getFeeds() != null) {
 				for (MissionFeed missionFeed : mission.getFeeds()) {
@@ -2441,7 +2436,7 @@ public class MissionApi extends BaseRestController {
 						uid, MissionInvitation.Type.clientUid, uid, groupVector);
 
 				// clear out any callsign invitations for the devices current callsign
-				RemoteSubscription subscription = subscriptionManagerProxy.getSubscriptionManagerForClientUid(uid).getRemoteSubscriptionByClientUid(uid);
+				RemoteSubscription subscription = subscriptionManagerProxy.getSubscriptionManagerForClientUid(uid).get().getRemoteSubscriptionByClientUid(uid);
 				if (subscription != null && !Strings.isNullOrEmpty(subscription.callsign)) {
 					missionService.missionUninvite(mission.getGuidAsUUID(), subscription.callsign,
 							MissionInvitation.Type.callsign, uid, groupVector);
@@ -2487,11 +2482,9 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date end,
 			@PathVariable("missionGuid") String missionGuidParam) {
 
-		final HttpServletRequest request = requestHolderBean.getRequest();
-
 		final String sessionId = requestHolderBean.sessionId();
 
-		final String groupVector = martiUtil.getGroupVectorBitString(sessionId);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
 		
@@ -2504,7 +2497,7 @@ public class MissionApi extends BaseRestController {
 				mission = missionService.getMissionByGuid(missionGuid, groupVector);
 			} else {
 				mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
-				missionService.validateMissionByGuid(mission);
+				missionService.validateMissionByGuid(mission, missionGuidParam);
 			}
 
 			MissionRole subRole = missionService.getRoleFromToken(mission,
@@ -2548,7 +2541,7 @@ public class MissionApi extends BaseRestController {
 			}
 
 			MissionSubscription missionSubscription = missionService.missionSubscribe(mission.getGuidAsUUID(), mission.getId(),
-					Strings.isNullOrEmpty(topic) ? uid : "topic:" + topic, username, role, groupVector);
+					Strings.isNullOrEmpty(topic) ? uid : "topic:" + topic, username, role, groupVector).get();
 
 			if (mission.getFeeds() != null) {
 				for (MissionFeed missionFeed : mission.getFeeds()) {
@@ -2562,7 +2555,7 @@ public class MissionApi extends BaseRestController {
 						uid, MissionInvitation.Type.clientUid, uid, groupVector);
 
 				// clear out any callsign invitations for the devices current callsign
-				RemoteSubscription subscription = subscriptionManagerProxy.getSubscriptionManagerForClientUid(uid).getRemoteSubscriptionByClientUid(uid);
+				RemoteSubscription subscription = subscriptionManagerProxy.getSubscriptionManagerForClientUid(uid).get().getRemoteSubscriptionByClientUid(uid);
 				if (subscription != null && !Strings.isNullOrEmpty(subscription.callsign)) {
 					missionService.missionUninvite(mission.getGuidAsUUID(), subscription.callsign,
 							MissionInvitation.Type.callsign, uid, groupVector);
@@ -2604,7 +2597,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		// validate existence of mission
 		Mission mission = missionService.getMissionByNameCheckGroups(missionName, groupVector);
@@ -2638,11 +2631,11 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		// validate existence of mission
 		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
-		missionService.validateMissionByGuid(mission);
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		// validate subscription list
 		for (MissionSubscription subscription : subscriptions) {
@@ -2675,7 +2668,7 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "disconnectOnly", defaultValue = "true") boolean disconnectOnly,
 			@PathVariable("missionName") String missionNameParam) {
 
-		final String groupVector = martiUtil.getGroupVectorBitString(request);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
@@ -2710,7 +2703,7 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "disconnectOnly", defaultValue = "true") boolean disconnectOnly,
 			@PathVariable("missionGuid") String missionGuidParam) {
 
-		final String groupVector = martiUtil.getGroupVectorBitString(request);
+		final String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		final String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
@@ -2720,7 +2713,7 @@ public class MissionApi extends BaseRestController {
 
 			// validate existence of mission
 			Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
-			missionService.validateMissionByGuid(mission);
+			missionService.validateMissionByGuid(mission, missionGuidParam);
 
 			if (Strings.isNullOrEmpty(uid) && Strings.isNullOrEmpty(topic)) {
 				throw new IllegalArgumentException("either 'uid' or 'topic' parameter must be specified");
@@ -2764,7 +2757,7 @@ public class MissionApi extends BaseRestController {
 	public ApiResponse<List<String>> getMissionSubscriptions(
 			@PathVariable("missionName") String missionName, HttpServletRequest request) {
 
-		Mission mission = missionService.getMissionByNameCheckGroups(missionService.trimName(missionName), martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(missionService.trimName(missionName), commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, missionName);
 
 		try {
@@ -2787,8 +2780,8 @@ public class MissionApi extends BaseRestController {
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
-		missionService.validateMissionByGuid(mission);
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, commonUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		try {
 			return new ApiResponse<List<String>>(Constants.API_VERSION, "MissionSubscription", subscriptionManager.getMissionSubscriptions(mission.getGuidAsUUID(), false));
@@ -2806,8 +2799,8 @@ public class MissionApi extends BaseRestController {
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
-		missionService.validateMissionByGuid(mission);
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, commonUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		// ensure tokens are removed from the output
 		List<MissionSubscription> missionSubscriptions = missionService.getMissionSubscriptionsByMissionGuidNoMissionNoToken(missionGuid);
@@ -2826,7 +2819,7 @@ public class MissionApi extends BaseRestController {
 	public ApiResponse<List<MissionSubscription>> getMissionSubscriptionRoles(
 			@PathVariable("missionName") String missionName, HttpServletRequest request) {
 
-		Mission mission = missionService.getMissionByNameCheckGroups(missionService.trimName(missionName), martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(missionService.trimName(missionName), commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, missionName);
 
 		// ensure tokens are removed from the output
@@ -2847,7 +2840,7 @@ public class MissionApi extends BaseRestController {
 		missionName = missionService.trimName(missionName);
 
 		// validate existence of mission
-		Mission mission = missionService.getMissionByNameCheckGroups(missionName, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(missionName, commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, missionName);
 
 		MissionRole role = (MissionRole)request.getAttribute(MissionRole.class.getName());
@@ -2864,8 +2857,8 @@ public class MissionApi extends BaseRestController {
 		UUID missionGuid = parseGuid(missionGuidParam);
 
 		// validate existence of mission
-		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
-		missionService.validateMissionByGuid(mission);
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, commonUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		MissionRole role = (MissionRole)request.getAttribute(MissionRole.class.getName());
 
@@ -2885,8 +2878,8 @@ public class MissionApi extends BaseRestController {
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
 		// validate existence of mission
-		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
-		missionService.validateMissionByGuid(mission);
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, commonUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		if (mission.getDefaultRole() == null) {
 			logger.error("illegal attempt to set role on non role-enabled mission!");
@@ -2906,7 +2899,7 @@ public class MissionApi extends BaseRestController {
 			}
 		}
 
-		result = missionService.setRole(mission, clientUid, username, role, martiUtil.getGroupVectorBitString(request));
+		result = missionService.setRole(mission, clientUid, username, role, commonUtil.getGroupVectorBitString(request));
 
 		response.setStatus(result ? HttpServletResponse.SC_OK : HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 	}
@@ -2923,7 +2916,7 @@ public class MissionApi extends BaseRestController {
 		missionName = missionService.trimName(missionName);
 
 		// validate existence of mission
-		Mission mission = missionService.getMissionByNameCheckGroups(missionName, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(missionName, commonUtil.getGroupVectorBitString(request));
 		
 		logger.debug("mission in setMissionRole {} default role {}", mission, mission.getDefaultRole());
 		
@@ -2947,7 +2940,7 @@ public class MissionApi extends BaseRestController {
 			}
 		}
 
-		result = missionService.setRole(mission, clientUid, username, role, martiUtil.getGroupVectorBitString(request));
+		result = missionService.setRole(mission, clientUid, username, role, commonUtil.getGroupVectorBitString(request));
 
 		response.setStatus(result ? HttpServletResponse.SC_OK : HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 	}
@@ -2958,27 +2951,35 @@ public class MissionApi extends BaseRestController {
 	 */
 	@RequestMapping(value = "/missions/all/invitations", method = RequestMethod.GET)
 	@ResponseStatus(HttpStatus.OK)
-	public ApiResponse<Set<String>> getAllMissionInvitations(
-			@RequestParam(value = "clientUid", defaultValue = "") @ValidatedBy("MartiSafeString") String clientUid) {
+	public Callable<ApiResponse<Set<String>>> getAllMissionInvitations(
+	        @RequestParam(value = "clientUid", defaultValue = "") @ValidatedBy("MartiSafeString") String clientUid) {
 
-		Set<MissionInvitation> missionInvitations = missionService.getAllMissionInvitationsForClient(
-				clientUid, martiUtil.getGroupVectorBitString(request));
+	    final String groupVector = commonUtil.getGroupVectorBitString(request);
+		String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
-		Set<String> missionNames = new HashSet<String>();
-		for (MissionInvitation mi : missionInvitations) {
-			missionNames.add(mi.getMissionName());
-		}
+	    return () -> {
+	        Set<MissionInvitation> missionInvitations = missionService
+	                .getAllMissionInvitationsForClient(clientUid, groupVector, username)
+	                .get();
 
-		return new ApiResponse<Set<String>>(Constants.API_VERSION, "MissionInvitation", missionNames);
+	        Set<String> missionNames = new HashSet<>();
+	        for (MissionInvitation mi : missionInvitations) {
+	            missionNames.add(mi.getMissionName());
+	        }
+
+	        return new ApiResponse<>(Constants.API_VERSION, "MissionInvitation", missionNames);
+	    };
 	}
+
 
 	@RequestMapping(value = "/missions/invitations", method = RequestMethod.GET)
 	@ResponseStatus(HttpStatus.OK)
-	public ApiResponse<Set<MissionInvitation>> getAllMissionInvitationsWithPasswords(
+	public Callable<ApiResponse<Set<MissionInvitation>>> getAllMissionInvitationsWithPasswords(
 			@RequestParam(value = "clientUid", required = true) @ValidatedBy("MartiSafeString") String clientUid) {
-
-		return new ApiResponse<Set<MissionInvitation>>(Constants.API_VERSION, "MissionInvitation",
-				missionService.getAllMissionInvitationsForClient(clientUid, martiUtil.getGroupVectorBitString(request)));
+		String username = SecurityContextHolder.getContext().getAuthentication().getName();
+		return () -> new ApiResponse<Set<MissionInvitation>>(Constants.API_VERSION, "MissionInvitation",
+				missionService.getAllMissionInvitationsForClient(
+						clientUid, commonUtil.getGroupVectorBitString(request), username).get());
 	}
 
 	/*
@@ -2991,7 +2992,7 @@ public class MissionApi extends BaseRestController {
 	public ApiResponse<List<MissionInvitation>> getMissionInvitations(
 			@PathVariable("missionName") String missionName, HttpServletRequest request) {
 
-		Mission mission = missionService.getMissionByNameCheckGroups(missionName, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(missionName, commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, missionName);
 
 		List<MissionInvitation> missionInvitations = missionService.getMissionInvitations(mission.getName());
@@ -3011,8 +3012,8 @@ public class MissionApi extends BaseRestController {
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
-		missionService.validateMissionByGuid(mission);
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, commonUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		List<MissionInvitation> missionInvitations = missionService.getMissionInvitationsByGuid(mission.getGuidAsUUID());
 
@@ -3020,7 +3021,6 @@ public class MissionApi extends BaseRestController {
 	}
 
 	@RequestMapping(value = "/missions/{name:.+}/invite/{type:.+}/{invitee:.+}", method = RequestMethod.PUT)
-	@ResponseStatus(HttpStatus.OK)
 	public void inviteToMission(
 			@PathVariable("name") @NotNull String missionName,
 			@PathVariable("type") @NotNull MissionInvitation.Type type,
@@ -3035,7 +3035,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		Mission mission = missionService.getMissionByNameCheckGroups(missionName, groupVector);
 		missionService.validateMission(mission, missionName);
@@ -3051,7 +3051,7 @@ public class MissionApi extends BaseRestController {
 				logger.debug("Mission Invite 2: VBM is enabled");
 			}
 
-			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (roleForRequest == null) {
 				throw new IllegalArgumentException("no role for request!");
 			}
@@ -3079,11 +3079,12 @@ public class MissionApi extends BaseRestController {
 					+ inviteRole.getRole().name());
 		}
 
-		missionService.missionInvite(mission.getGuidAsUUID(), invitee, type, inviteRole, creatorUid, groupVector);
+		boolean result = missionService.missionInvite(mission.getGuidAsUUID(), invitee, type, inviteRole, creatorUid, groupVector);
+		response.setStatus(result ? HttpServletResponse.SC_OK : HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+
 	}
 	
 	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/invite/{type:.+}/{invitee:.+}", method = RequestMethod.PUT)
-	@ResponseStatus(HttpStatus.OK)
 	public void inviteToMissionByGuid(
 			@PathVariable("missionGuid") @NotNull String missionGuidParam,
 			@PathVariable("type") @NotNull MissionInvitation.Type type,
@@ -3094,10 +3095,10 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
-		missionService.validateMissionByGuid(mission);
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		CoreConfig config = CoreConfigFacade.getInstance();
 
@@ -3110,7 +3111,7 @@ public class MissionApi extends BaseRestController {
 				logger.debug("Mission Invite 2: VBM is enabled");
 			}
 
-			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (roleForRequest == null) {
 				throw new IllegalArgumentException("no role for request!");
 			}
@@ -3138,7 +3139,8 @@ public class MissionApi extends BaseRestController {
 					+ inviteRole.getRole().name());
 		}
 
-		missionService.missionInvite(mission.getGuidAsUUID(), invitee, type, inviteRole, creatorUid, groupVector);
+		boolean result = missionService.missionInvite(mission.getGuidAsUUID(), invitee, type, inviteRole, creatorUid, groupVector);
+		response.setStatus(result ? HttpServletResponse.SC_OK : HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 	}
 
 	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/invite/{type:.+}/{invitee:.+}", method = RequestMethod.DELETE)
@@ -3154,8 +3156,8 @@ public class MissionApi extends BaseRestController {
 		try {
 			UUID missionGuid = parseGuid(missionGuidParam);
 
-			Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
-			missionService.validateMissionByGuid(mission);
+			Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, commonUtil.getGroupVectorBitString(request));
+			missionService.validateMissionByGuid(mission, missionGuidParam);
 
 			CoreConfig config = CoreConfigFacade.getInstance();
 
@@ -3168,7 +3170,7 @@ public class MissionApi extends BaseRestController {
 					logger.debug("Mission Invite 2: VBM is enabled");
 				}
 
-				MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+				MissionRole roleForRequest = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 				if (roleForRequest == null) {
 					throw new IllegalArgumentException("no role for request!");
 				}
@@ -3194,7 +3196,7 @@ public class MissionApi extends BaseRestController {
 			}
 
 			missionService.missionUninvite(
-					mission.getGuidAsUUID(), invitee, type, creatorUid, martiUtil.getGroupVectorBitString(request));
+					mission.getGuidAsUUID(), invitee, type, creatorUid, commonUtil.getGroupVectorBitString(request));
 		} catch (Exception e) {
 			logger.error("exception in uninviteFromMission!", e);
 			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -3218,7 +3220,7 @@ public class MissionApi extends BaseRestController {
 
 			missionName = missionService.trimName(missionName);
 
-			Mission mission = missionService.getMissionByNameCheckGroups(missionName, martiUtil.getGroupVectorBitString(request));
+			Mission mission = missionService.getMissionByNameCheckGroups(missionName, commonUtil.getGroupVectorBitString(request));
 			missionService.validateMission(mission, missionName);
 
 			CoreConfig config = CoreConfigFacade.getInstance();
@@ -3232,7 +3234,7 @@ public class MissionApi extends BaseRestController {
 					logger.debug("Mission Invite 2: VBM is enabled");
 				}
 
-				MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+				MissionRole roleForRequest = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 				if (roleForRequest == null) {
 					throw new IllegalArgumentException("no role for request!");
 				}
@@ -3258,7 +3260,7 @@ public class MissionApi extends BaseRestController {
 			}
 
 			missionService.missionUninvite(
-					mission.getGuidAsUUID(), invitee, type, creatorUid, martiUtil.getGroupVectorBitString(request));
+					mission.getGuidAsUUID(), invitee, type, creatorUid, commonUtil.getGroupVectorBitString(request));
 		} catch (Exception e) {
 			logger.error("exception in uninviteFromMission!", e);
 			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -3278,14 +3280,14 @@ public class MissionApi extends BaseRestController {
 			throw new IllegalArgumentException("log entry id must not be included for POST");
 		}
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		for (String name : entry.getMissionNames()) {
 			String missionName = missionService.trimName(name);
 			Mission mission = missionService.getMissionByNameCheckGroups(missionName, groupVector);
 			missionService.validateMission(mission, missionName);
 
-			MissionRole role = missionService.getRoleForRequest(mission, request);
+			MissionRole role = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (role == null) {
 				logger.error("no role for request : " + request.getServletPath());
 				continue;
@@ -3331,10 +3333,10 @@ public class MissionApi extends BaseRestController {
 
 		for (String name : entry.getMissionNames()) {
 			String missionName = missionService.trimName(name);
-			Mission mission = missionService.getMissionByNameCheckGroups(missionName, martiUtil.getGroupVectorBitString(request));
+			Mission mission = missionService.getMissionByNameCheckGroups(missionName, commonUtil.getGroupVectorBitString(request));
 			missionService.validateMission(mission, missionName);
 
-			MissionRole role = missionService.getRoleForRequest(mission, request);
+			MissionRole role = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (role == null) {
 				logger.error("no role for request : " + request.getServletPath());
 				continue;
@@ -3368,14 +3370,14 @@ public class MissionApi extends BaseRestController {
 			throw new IllegalArgumentException("servertime can't be modified");
 		}
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		for (String name : entry.getMissionNames()) {
 			String missionName = missionService.trimName(name);
 			Mission mission = missionService.getMissionByNameCheckGroups(missionName, groupVector);
 			missionService.validateMission(mission, missionName);
 
-			MissionRole role = missionService.getRoleForRequest(mission, request);
+			MissionRole role = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (role == null) {
 				logger.error("no role for request : " + request.getServletPath());
 				continue;
@@ -3384,14 +3386,15 @@ public class MissionApi extends BaseRestController {
 			if (!role.hasPermission(MissionPermission.Permission.MISSION_WRITE)) {
 				throw new ForbiddenException("Illegal attempt to access mission!");
 			}
-		}
 
-		// Don't allow create through this path (by specifying primary key)
-		if (!logEntryRepository.existsById(entry.getId())) {
-			throw new IllegalArgumentException("Log entry " + entry.getId() + " not found");
-		}
 
-		entry = missionService.addUpdateLogEntry(entry, new Date(), groupVector);
+			// Don't allow create through this path (by specifying primary key)
+			if (!logEntryRepository.existsById(entry.getId())) {
+				throw new IllegalArgumentException("Log entry " + entry.getId() + " not found");
+			}
+
+			entry = missionService.addUpdateLogEntry(entry, new Date(), mission.getGroupVector());
+		}
 
 		return new ApiResponse<>(Constants.API_VERSION, LogEntry.class.getName(), entry);
 	}
@@ -3414,14 +3417,14 @@ public class MissionApi extends BaseRestController {
 			throw new NotFoundException("log entry " + id + " not found");
 		}
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		for (String name : entry.getMissionNames()) {
 			String missionName = missionService.trimName(name);
 			Mission mission = missionService.getMissionByNameCheckGroups(missionName, groupVector);
 			missionService.validateMission(mission, missionName);
 
-			MissionRole role = missionService.getRoleForRequest(mission, request);
+			MissionRole role = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (role == null) {
 				logger.error("no role for request : " + request.getServletPath());
 				continue;
@@ -3430,9 +3433,9 @@ public class MissionApi extends BaseRestController {
 			if (!role.hasPermission(MissionPermission.Permission.MISSION_WRITE)) {
 				throw new ForbiddenException("Illegal attempt to access mission!");
 			}
-		}
 
-		missionService.deleteLogEntry(id, groupVector);
+			missionService.deleteLogEntry(id, mission.getGroupVector());
+		}
 	}
 
 	/*
@@ -3452,7 +3455,7 @@ public class MissionApi extends BaseRestController {
 
 		String name = missionService.trimName(missionName);
 
-		Mission mission = missionService.getMissionByNameCheckGroups(name, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(name, commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, name);
 
 		return new ApiResponse<List<LogEntry>>(Constants.API_VERSION, LogEntry.class.getName(),
@@ -3483,7 +3486,8 @@ public class MissionApi extends BaseRestController {
 	// Get all latest CoT events for a mission
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
 	@RequestMapping(value = "/missions/{name:.+}/cot", method = RequestMethod.GET)
-	ResponseEntity<String> getLatestMissionCotEvents(@PathVariable("name") @NotNull String missionName, HttpServletRequest request) {
+	ResponseEntity<String> getLatestMissionCotEvents(@PathVariable("name") @NotNull String missionName,
+													 @RequestParam(value = "path", required = false) String path, HttpServletRequest request) {
 
 		final String sessionId = requestHolderBean.sessionId();
 
@@ -3497,13 +3501,13 @@ public class MissionApi extends BaseRestController {
 
 		String fmissionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(sessionId);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		// will throw appropriate exeception if mission does not exist or has been deleted
 		Mission mission = missionService.getMissionByNameCheckGroups(fmissionName, groupVector);
 		missionService.validateMission(mission, fmissionName);
 
-		String cot = missionService.getCachedCot(missionName, mission.getUids(), groupVector);
+		String cot = missionService.getCachedCot(missionName, mission.getUids(), path, groupVector);
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(org.springframework.http.MediaType.APPLICATION_XML);
@@ -3514,7 +3518,8 @@ public class MissionApi extends BaseRestController {
 	// Get all latest CoT events for a mission by guid
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
 	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/cot", method = RequestMethod.GET)
-	ResponseEntity<String> getLatestMissionCotEventsByGuid(@PathVariable("missionGuid") @NotNull String missionGuidParam, HttpServletRequest request) {
+	ResponseEntity<String> getLatestMissionCotEventsByGuid(@PathVariable("missionGuid") @NotNull String missionGuidParam,
+														   @RequestParam(value = "path", required = false) String path, HttpServletRequest request) {
 	
 		final String sessionId = requestHolderBean.sessionId();
 
@@ -3524,13 +3529,13 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		String groupVector = martiUtil.getGroupVectorBitString(sessionId);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		// will throw appropriate exeception if mission does not exist or has been deleted
 		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
-		missionService.validateMissionByGuid(mission);
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
-		String cot = missionService.getCachedCot(missionGuid, mission.getUids(), groupVector);
+		String cot = missionService.getCachedCot(missionGuid, mission.getUids(), path, groupVector);
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(org.springframework.http.MediaType.APPLICATION_XML);
@@ -3546,8 +3551,8 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
-		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, martiUtil.getGroupVectorBitString(request));
-		missionService.validateMissionByGuid(mission);
+		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, commonUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		List<RemoteSubscription> results = subscriptionManager.getSubscriptionsWithGroupAccess(mission.getGroupVector(), false);
 
@@ -3566,7 +3571,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		Mission mission = missionService.getMissionByNameCheckGroups(missionName, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(missionName, commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, missionName);
 
 		List<RemoteSubscription> results = subscriptionManager.getSubscriptionsWithGroupAccess(mission.getGroupVector(), false);
@@ -3587,7 +3592,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		Mission mission = missionService.getMissionByNameCheckGroups(missionName, groupVector);
 		missionService.validateMission(mission, missionName);
@@ -3603,7 +3608,7 @@ public class MissionApi extends BaseRestController {
 				logger.debug("Mission Invite: VBM is enabled");
 			}
 
-			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (roleForRequest == null) {
 				throw new IllegalArgumentException("no role for request!");
 			}
@@ -3708,10 +3713,10 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
-		missionService.validateMissionByGuid(mission);
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
 		CoreConfig config = CoreConfigFacade.getInstance();
 
@@ -3724,7 +3729,7 @@ public class MissionApi extends BaseRestController {
 				logger.debug("Mission Invite: VBM is enabled");
 			}
 
-			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request);
+			MissionRole roleForRequest = missionService.getRoleForRequest(mission, request, commonUtil.isAdmin(request));
 			if (roleForRequest == null) {
 				throw new IllegalArgumentException("no role for request!");
 			}
@@ -3832,13 +3837,13 @@ public class MissionApi extends BaseRestController {
 		parentName = missionService.trimName(parentName);
 
 		// TODO: this will get the first mission found with with this name. For guid support, request needs to be by guid.
-		Mission childMission = missionService.getMissionByNameCheckGroups(childName, martiUtil.getGroupVectorBitString(request));
-		Mission parentMission = missionService.getMissionByNameCheckGroups(parentName, martiUtil.getGroupVectorBitString(request));
+		Mission childMission = missionService.getMissionByNameCheckGroups(childName, commonUtil.getGroupVectorBitString(request));
+		Mission parentMission = missionService.getMissionByNameCheckGroups(parentName, commonUtil.getGroupVectorBitString(request));
 
-		missionService.validateMissionByGuid(childMission);
-		missionService.validateMissionByGuid(parentMission);
+		missionService.validateMission(childMission, childName);
+		missionService.validateMission(parentMission, parentName);
 
-		missionService.setParent(childMission.getGuidAsUUID(), parentMission.getGuidAsUUID(), martiUtil.getGroupVectorBitString(request));
+		missionService.setParent(childMission.getGuidAsUUID(), parentMission.getGuidAsUUID(), childMission.getGroupVector());
 	}
 	
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
@@ -3851,13 +3856,13 @@ public class MissionApi extends BaseRestController {
 		UUID childGuid = parseGuid(childGuidParam);
 		UUID parentGuid = parseGuid(parentGuidParam);
 
-		Mission childMission = missionService.getMissionByGuidCheckGroups(childGuid, martiUtil.getGroupVectorBitString(request));
-		Mission parentMission = missionService.getMissionByGuidCheckGroups(parentGuid, martiUtil.getGroupVectorBitString(request));
+		Mission childMission = missionService.getMissionByGuidCheckGroups(childGuid, commonUtil.getGroupVectorBitString(request));
+		Mission parentMission = missionService.getMissionByGuidCheckGroups(parentGuid, commonUtil.getGroupVectorBitString(request));
 
-		missionService.validateMissionByGuid(childMission);
-		missionService.validateMissionByGuid(parentMission);
+		missionService.validateMissionByGuid(childMission, childGuidParam);
+		missionService.validateMissionByGuid(parentMission, parentGuidParam);
 
-		missionService.setParent(childMission.getGuidAsUUID(), parentMission.getGuidAsUUID(), martiUtil.getGroupVectorBitString(request));
+		missionService.setParent(childMission.getGuidAsUUID(), parentMission.getGuidAsUUID(), childMission.getGroupVector());
 	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
@@ -3867,10 +3872,10 @@ public class MissionApi extends BaseRestController {
 
 		childName = missionService.trimName(childName);
 
-		Mission mission = missionService.getMissionByNameCheckGroups(childName, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(childName, commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, childName);
 
-		missionService.clearParent(mission.getGuidAsUUID(), martiUtil.getGroupVectorBitString(request));
+		missionService.clearParent(mission.getGuidAsUUID(), mission.getGroupVector());
 	}
 	
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
@@ -3880,20 +3885,20 @@ public class MissionApi extends BaseRestController {
 
 		UUID childGuid = parseGuid(childGuidParam);
 
-		Mission mission = missionService.getMissionByGuidCheckGroups(childGuid, martiUtil.getGroupVectorBitString(request));
-		missionService.validateMissionByGuid(mission);
+		Mission mission = missionService.getMissionByGuidCheckGroups(childGuid, commonUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission, childGuidParam);
 
-		missionService.clearParent(mission.getGuidAsUUID(), martiUtil.getGroupVectorBitString(request));
+		missionService.clearParent(mission.getGuidAsUUID(), mission.getGroupVector());
 	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
 	@RequestMapping(value = "/missions/{name:.+}/children", method = RequestMethod.GET)
 	ApiResponse<Set<Mission>> getChildren(@PathVariable("name") @NotNull String parentName, HttpServletRequest request) {
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		parentName = missionService.trimName(parentName);
 
-		Mission mission = missionService.getMissionByNameCheckGroups(parentName, martiUtil.getGroupVectorBitString(request));
+		Mission mission = missionService.getMissionByNameCheckGroups(parentName, commonUtil.getGroupVectorBitString(request));
 		missionService.validateMission(mission, parentName);
 
 		Set<Mission> children = missionService.getChildren(mission.getGuidAsUUID(), groupVector);
@@ -3904,12 +3909,12 @@ public class MissionApi extends BaseRestController {
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
 	@RequestMapping(value = "/missions/guid/{guid:.+}/children", method = RequestMethod.GET)
 	ApiResponse<Set<Mission>> getChildrenByGuid(@PathVariable("guid") @NotNull String parentGuidParam, HttpServletRequest request) {
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		UUID parentGuid = parseGuid(parentGuidParam);
 
-		Mission mission = missionService.getMissionByGuidCheckGroups(parentGuid, martiUtil.getGroupVectorBitString(request));
-		missionService.validateMissionByGuid(mission);
+		Mission mission = missionService.getMissionByGuidCheckGroups(parentGuid, commonUtil.getGroupVectorBitString(request));
+		missionService.validateMissionByGuid(mission, parentGuidParam);
 
 		Set<Mission> children = missionService.getChildren(mission.getGuidAsUUID(), groupVector);
 
@@ -3919,7 +3924,7 @@ public class MissionApi extends BaseRestController {
 	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
 	@RequestMapping(value = "/missions/{name:.+}/parent", method = RequestMethod.GET)
 	ApiResponse<Mission> getParent(@PathVariable("name") @NotNull String parentName, HttpServletRequest request) {
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionService.trimName(parentName), groupVector);
 
 		if (mission.getParent() == null) {
@@ -3937,7 +3942,7 @@ public class MissionApi extends BaseRestController {
 			@PathVariable("name") @NotNull String missionName,
 			@RequestParam(value = "download", defaultValue = "false") boolean download,
 			HttpServletRequest request) {
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(new org.springframework.http.MediaType(
@@ -3966,7 +3971,7 @@ public class MissionApi extends BaseRestController {
 			@PathVariable("missionGuid") @NotNull String missionGuidParam,
 			@RequestParam(value = "download", defaultValue = "false") boolean download,
 			HttpServletRequest request) {
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 
@@ -4003,13 +4008,13 @@ public class MissionApi extends BaseRestController {
 			throw new IllegalArgumentException("ExternalMissionData id must be included");
 		}
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		
 		Mission mission = missionService.getMissionByNameCheckGroups(missionName, groupVector);
 		
-		missionService.validateMissionByGuid(mission);
+		missionService.validateMission(mission, missionName);
 
-		externalMissionData = missionService.setExternalMissionData(mission.getGuidAsUUID(), creatorUid, externalMissionData, groupVector);
+		externalMissionData = missionService.setExternalMissionData(mission.getGuidAsUUID(), creatorUid, externalMissionData, mission.getGroupVector());
 
 		// save the new log entry and let the database generate the id
 		return new ApiResponse<>(Constants.API_VERSION, ExternalMissionData.class.getName(), externalMissionData);
@@ -4029,13 +4034,13 @@ public class MissionApi extends BaseRestController {
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 
 		Mission mission = missionService.getMissionByGuidCheckGroups(missionGuid, groupVector);
 
-		missionService.validateMissionByGuid(mission);
+		missionService.validateMissionByGuid(mission, missionGuidParam);
 
-		externalMissionData = missionService.setExternalMissionData(mission.getGuidAsUUID(), creatorUid, externalMissionData, groupVector);
+		externalMissionData = missionService.setExternalMissionData(mission.getGuidAsUUID(), creatorUid, externalMissionData, mission.getGroupVector());
 
 		// save the new log entry and let the database generate the id
 		return new ApiResponse<>(Constants.API_VERSION, ExternalMissionData.class.getName(), externalMissionData);
@@ -4050,11 +4055,11 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "notes") @ValidatedBy("MartiSafeString") String notes,
 			@RequestParam(value = "creatorUid") @ValidatedBy("MartiSafeString") String creatorUid,
 			HttpServletRequest request) {
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		
 		Mission mission = missionService.getMission(missionName, groupVector);
 
-		missionService.deleteExternalMissionData(mission.getGuidAsUUID(), externalMissionDataId, notes, creatorUid, groupVector);
+		missionService.deleteExternalMissionData(mission.getGuidAsUUID(), externalMissionDataId, notes, creatorUid, mission.getGroupVector());
 	}
 	
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
@@ -4066,13 +4071,13 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "notes") @ValidatedBy("MartiSafeString") String notes,
 			@RequestParam(value = "creatorUid") @ValidatedBy("MartiSafeString") String creatorUid,
 			HttpServletRequest request) {
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
-		missionService.deleteExternalMissionData(mission.getGuidAsUUID(), externalMissionDataId, notes, creatorUid, groupVector);
+		missionService.deleteExternalMissionData(mission.getGuidAsUUID(), externalMissionDataId, notes, creatorUid, mission.getGroupVector());
 	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
@@ -4085,11 +4090,11 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "notes") @ValidatedBy("MartiSafeString") String notes,
 			@RequestBody String token,
 			HttpServletRequest request) {
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		
 		Mission mission = missionService.getMission(missionName, groupVector);
 
-		missionService.notifyExternalMissionDataChanged(mission.getGuidAsUUID(), externalMissionDataId, token, notes, creatorUid, groupVector);
+		missionService.notifyExternalMissionDataChanged(mission.getGuidAsUUID(), externalMissionDataId, token, notes, creatorUid, mission.getGroupVector());
 	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_WRITE')")
@@ -4102,13 +4107,13 @@ public class MissionApi extends BaseRestController {
 			@RequestParam(value = "notes") @ValidatedBy("MartiSafeString") String notes,
 			@RequestBody String token,
 			HttpServletRequest request) {
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
-		missionService.notifyExternalMissionDataChanged(mission.getGuidAsUUID(), externalMissionDataId, token, notes, creatorUid, groupVector);
+		missionService.notifyExternalMissionDataChanged(mission.getGuidAsUUID(), externalMissionDataId, token, notes, creatorUid, mission.getGroupVector());
 	}
 
 	@PreAuthorize("hasPermission(#request, 'MISSION_SET_PASSWORD')")
@@ -4122,7 +4127,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		String newPasswordHash = BCrypt.hashpw(password, BCrypt.gensalt());
@@ -4149,7 +4154,7 @@ public class MissionApi extends BaseRestController {
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		String newPasswordHash = BCrypt.hashpw(password, BCrypt.gensalt());
@@ -4174,7 +4179,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		missionRepository.setPasswordHash(missionName, null, groupVector);
@@ -4199,7 +4204,7 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		missionRepository.setPasswordHashByGuid(missionGuid.toString(), null, groupVector);
@@ -4221,8 +4226,10 @@ public class MissionApi extends BaseRestController {
 			HttpServletRequest request) {
 
 		try {
-			String groupVector = martiUtil.getGroupVectorBitString(request);
-			boolean result = missionService.setExpiration(missionName, expiration, groupVector);
+			String groupVector = commonUtil.getGroupVectorBitString(request);
+			Mission mission = missionService.getMission(missionName, groupVector);
+			boolean result = missionService.setExpiration(missionName, expiration, mission.getGroupVector());
+
 			response.setStatus(result ? HttpServletResponse.SC_OK : HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			try {
 				if (logger.isDebugEnabled()) {
@@ -4247,8 +4254,9 @@ public class MissionApi extends BaseRestController {
 		UUID missionGuid = parseGuid(missionGuidParam);
 
 		try {
-			String groupVector = martiUtil.getGroupVectorBitString(request);
-			boolean result = missionService.setExpiration(missionGuid, expiration, groupVector);
+			String groupVector = commonUtil.getGroupVectorBitString(request);
+			Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
+			boolean result = missionService.setExpiration(missionGuid, expiration, mission.getGroupVector());
 			response.setStatus(result ? HttpServletResponse.SC_OK : HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			try {
 				if (logger.isDebugEnabled()) {
@@ -4277,7 +4285,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 		List<String> filterCotTypes = null;
 		if (filterCotTypesSerialized != null) {
@@ -4321,7 +4329,7 @@ public class MissionApi extends BaseRestController {
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-				String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 		List<String> filterCotTypes = null;
 		if (filterCotTypesSerialized != null) {
@@ -4363,7 +4371,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		try {
@@ -4385,7 +4393,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		mapLayer.setMission(mission);
@@ -4406,7 +4414,7 @@ public class MissionApi extends BaseRestController {
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		mapLayer.setMission(mission);
@@ -4426,7 +4434,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		missionService.removeMapLayerFromMission(missionName, creatorUid, mission, uid);
@@ -4442,7 +4450,7 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		missionService.removeMapLayerFromMission(mission.getName(), creatorUid, mission, uid);
@@ -4458,7 +4466,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		mapLayer.setMission(mission);
@@ -4478,7 +4486,7 @@ public class MissionApi extends BaseRestController {
 		
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		mapLayer.setMission(mission);
@@ -4531,7 +4539,7 @@ public class MissionApi extends BaseRestController {
 
 		try {
 			missionName = missionService.trimName(missionName);
-			String groupVector = martiUtil.getGroupVectorBitString(request);
+			String groupVector = commonUtil.getGroupVectorBitString(request);
 			Mission mission = missionService.getMission(missionName, groupVector);
 
 			List<MissionLayer> missionLayers = missionService.hydrateMissionLayers(missionName, mission);
@@ -4556,7 +4564,7 @@ public class MissionApi extends BaseRestController {
 			
 			UUID missionGuid = parseGuid("missionGuidParam");
 			
-			String groupVector = martiUtil.getGroupVectorBitString(request);
+			String groupVector = commonUtil.getGroupVectorBitString(request);
 			Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 			List<MissionLayer> missionLayers = missionService.hydrateMissionLayers(mission.getName(), mission);
@@ -4580,7 +4588,7 @@ public class MissionApi extends BaseRestController {
 
 		try {
 			missionName = missionService.trimName(missionName);
-			String groupVector = martiUtil.getGroupVectorBitString(request);
+			String groupVector = commonUtil.getGroupVectorBitString(request);
 			Mission mission = missionService.getMission(missionName, groupVector);
 
 			MissionLayer missionLayer = missionService.hydrateMissionLayer(missionName, mission, layerUid);
@@ -4608,7 +4616,7 @@ public class MissionApi extends BaseRestController {
 			
 			UUID missionGuid = parseGuid(missionGuidParam);
 			
-			String groupVector = martiUtil.getGroupVectorBitString(request);
+			String groupVector = commonUtil.getGroupVectorBitString(request);
 			Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 			MissionLayer missionLayer = missionService.hydrateMissionLayer(mission.getName(), mission, layerUid);
@@ -4639,11 +4647,11 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		MissionLayer missionLayer = missionService.addMissionLayer(
-				missionName, mission, uid, name, type, parentUid, afterUid, creatorUid, groupVector);
+				missionName, mission, uid, name, type, parentUid, afterUid, creatorUid, mission.getGroupVector());
 
 		return new ApiResponse<MissionLayer>(
 				Constants.API_VERSION, MissionLayer.class.getSimpleName(), missionLayer);
@@ -4663,11 +4671,11 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		MissionLayer missionLayer = missionService.addMissionLayer(
-				mission.getName(), mission, uid, name, type, parentUid, afterUid, creatorUid, groupVector);
+				mission.getName(), mission, uid, name, type, parentUid, afterUid, creatorUid, mission.getGroupVector());
 
 		return new ApiResponse<MissionLayer>(
 				Constants.API_VERSION, MissionLayer.class.getSimpleName(), missionLayer);
@@ -4684,7 +4692,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		missionService.setLayerName(missionName, mission, layerUid, name, creatorUid);
@@ -4701,7 +4709,7 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		missionService.setLayerName(mission.getName(), mission, layerUid, name, creatorUid);
@@ -4718,7 +4726,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		missionService.setLayerPosition(missionName, mission, layerUid, afterUid, creatorUid);
@@ -4735,7 +4743,7 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		missionService.setLayerPosition(mission.getName(), mission, layerUid, afterUid, creatorUid);
@@ -4753,7 +4761,7 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		// move the first layer in the parameter list after the afterUid
@@ -4777,7 +4785,7 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		// move the first layer in the parameter list after the afterUid
@@ -4799,11 +4807,11 @@ public class MissionApi extends BaseRestController {
 
 		missionName = missionService.trimName(missionName);
 
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMission(missionName, groupVector);
 
 		for (String layerUid : layerUids) {
-			missionService.removeMissionLayer(missionName, mission, layerUid, creatorUid, groupVector);
+			missionService.removeMissionLayer(missionName, mission, layerUid, creatorUid, mission.getGroupVector());
 		}
 	}
 	
@@ -4817,11 +4825,11 @@ public class MissionApi extends BaseRestController {
 
 		UUID missionGuid = parseGuid(missionGuidParam);
 		
-		String groupVector = martiUtil.getGroupVectorBitString(request);
+		String groupVector = commonUtil.getGroupVectorBitString(request);
 		Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);
 
 		for (String layerUid : layerUids) {
-			missionService.removeMissionLayer(mission.getName(), mission, layerUid, creatorUid, groupVector);
+			missionService.removeMissionLayer(mission.getName(), mission, layerUid, creatorUid, mission.getGroupVector());
 		}
 	}
 
@@ -4843,7 +4851,7 @@ public class MissionApi extends BaseRestController {
 
 		logger.debug("mission API getPagedMissions");
 
-		NavigableSet<Group> groups = martiUtil.getGroupsFromRequest(request);
+		NavigableSet<Group> groups = commonUtil.getGroupsFromRequest(request);
 
 		List<Mission> missions;
 		int offset = page * limit;

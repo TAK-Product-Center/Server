@@ -29,7 +29,12 @@ import tak.server.cot.CotParser;
  */
 public class SingleCotProtocol extends AbstractBroadcastingProtocol<CotEventContainer> {
 	
-	private ThreadLocal<CotParser> cotParser = new ThreadLocal<>();
+	private static ThreadLocal<CotParser> cotParser =
+			new ThreadLocal<CotParser>() {
+				@Override public CotParser initialValue() {
+					return CotParserCreator.newInstance();
+				}
+			};
 	
     private final static Logger log = Logger.getLogger(SingleCotProtocol.class);
     
@@ -46,11 +51,8 @@ public class SingleCotProtocol extends AbstractBroadcastingProtocol<CotEventCont
 
     @Override
 	public void onDataReceived(ByteBuffer buffer, ChannelHandler handler) {
-    	if (cotParser.get() == null) {
-			cotParser.set(CotParserCreator.newInstance());
-		}
     	
-    	CotEventContainer cot = byteBufToCot(buffer, handler, cotParser.get());
+    	CotEventContainer cot = byteBufToCot(buffer, handler);
 			
     	if (cot != null) {
     		broadcastDataReceived(cot, handler);
@@ -100,7 +102,9 @@ public class SingleCotProtocol extends AbstractBroadcastingProtocol<CotEventCont
         return "server_packet_CoT";
 	}
     
-    public static CotEventContainer byteBufToCot(ByteBuffer buffer, ChannelHandler handler, CotParser cotParser) {
+    // always use threadlocal CotParser to parse
+    public static CotEventContainer byteBufToCot(ByteBuffer buffer, ChannelHandler handler) {
+    	
         int binaryLength = buffer.remaining();
 		String strData = charset.decode(buffer).toString();
 
@@ -112,13 +116,9 @@ public class SingleCotProtocol extends AbstractBroadcastingProtocol<CotEventCont
         
 		Document doc = null;
 		try {			
-			doc = cotParser.parse(strData);
+			doc = cotParser.get().parse(strData);
 		} catch (DocumentException e) {
 			// TODO: notify somebody... may want to filter out messages from a given party if we get too many
-		    if (log.isTraceEnabled()) {
-		        log.trace("received single message packet data: " + strData);
-		    }
-			log.debug("Error attempting to parse single message packet from " + handler.toString());
 		}
 		
 		if (doc != null) {
@@ -135,4 +135,5 @@ public class SingleCotProtocol extends AbstractBroadcastingProtocol<CotEventCont
 
 		return null;
     }
+    
 }

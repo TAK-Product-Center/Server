@@ -90,6 +90,12 @@ do
     fi
 done
 
+CA_NAME=$(openssl x509 -noout -subject -in ca.pem -nameopt multiline | awk -F' = ' '/commonName/ {print $2}')
+if  [ $CA_NAME == $SNAME ]; then
+  echo "The certificate cannot use the same name as the CA. Please choose a unique name for the certificate."
+  exit -1
+fi
+
 SUBJ=$SUBJBASE"CN=$SNAME"
 echo "Making a $1 cert for " $SUBJ
 if [[ "$1" == "ca" ]]; then

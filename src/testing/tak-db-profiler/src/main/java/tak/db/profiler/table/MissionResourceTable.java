@@ -34,6 +34,8 @@ public class MissionResourceTable {
 		ps.setLong(1, currIdStart);
 		ps.setLong(2, increment);
 		
+		logger.info("Executing: " + ps.toString());
+		
 		ResultSet rs = ps.executeQuery();
 		int rowcount = 0;		
 		while(rs.next()) {

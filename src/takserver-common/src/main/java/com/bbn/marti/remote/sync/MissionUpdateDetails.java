@@ -5,6 +5,10 @@ package com.bbn.marti.remote.sync;
  * 
  */
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import java.util.Date;
+
 /*
  *     public Mission createMission(String name, String creatorUid, String groupVector, String description, String chatRoom, String tool) {
 
@@ -20,7 +24,13 @@ public class MissionUpdateDetails {
 	private String missionChatRoom;
 	private String missionTool;
 	private String missionDescription;
-   
+
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private Date date;
+
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private String xmlContentForNotification;
+
 	public MissionContent getContent() {
 		return content;
 	}
@@ -68,6 +78,18 @@ public class MissionUpdateDetails {
 	}
 	public void setMissionDescription(String missionDescription) {
 		this.missionDescription = missionDescription;
+	}
+	public Date getDate() {
+		return date;
+	}
+	public void setDate(Date date) {
+		this.date = date;
+	}
+	public String getXmlContentForNotification() {
+		return xmlContentForNotification;
+	}
+	public void setXmlContentForNotification(String xmlContentForNotification) {
+		this.xmlContentForNotification = xmlContentForNotification;
 	}
 	@Override
 	public String toString() {

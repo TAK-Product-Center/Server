@@ -1,11 +1,12 @@
 package com.bbn.tak.tls.WSTEP;
 
 import com.bbn.marti.remote.exception.TakException;
-
+import com.bbn.marti.remote.util.SecureXmlParser;
 import com.sun.xml.ws.developer.JAXWSProperties;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
@@ -79,7 +80,15 @@ public class WSTEPClient {
 			TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
 					TrustManagerFactory.getDefaultAlgorithm());
 			KeyStore keyStore = KeyStore.getInstance("JKS");
-			keyStore.load(new FileInputStream(truststore), truststorePassword.toCharArray());
+			InputStream fis = null;
+			try {
+				fis = new FileInputStream(truststore);
+				keyStore.load(fis, truststorePassword.toCharArray());
+			} finally {
+				if (fis!= null) {
+					fis.close();
+				}
+			}
 			trustManagerFactory.init(keyStore);
 			SSLContext sslContext = SSLContext.getInstance(tlsContext);
 			sslContext.init(null, trustManagerFactory.getTrustManagers(), new java.security.SecureRandom());
@@ -221,9 +230,9 @@ public class WSTEPClient {
 			//
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			response.writeTo(baos);
-			DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-			DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
-			Document document = documentBuilder.parse(new InputSource(new StringReader(baos.toString())));
+			
+			Document document = SecureXmlParser.makeDocument(baos.toString());
+			
 			document.getDocumentElement().normalize();
 
 			//

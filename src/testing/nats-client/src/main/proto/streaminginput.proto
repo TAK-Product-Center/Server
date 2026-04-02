@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.atakmap.Tak";
+option java_outer_classname = "StreamingInputProto";
+option objc_class_prefix = "TAK";
+
+import "takmessage.proto";
+
+package com.atakmap;
+
+service InputChannel {
+	rpc ClientTakMessageStream (ClientSubscription) returns (stream .atakmap.commoncommo.protobuf.v1.TakMessage) {}
+	rpc ServerTakMessageStream (stream .atakmap.commoncommo.protobuf.v1.TakMessage) returns (ClientSubscription) {}
+	rpc VersionCheck (ClientVersion) returns (ServerVersion) {}
+}
+
+message ClientSubscription {
+	ClientVersion version = 1;
+}
+
+message ClientVersion {
+    int32 version = 1;
+}
+
+message ServerVersion {
+    int32 version = 1;
+    bool compatible = 2;
+}
+

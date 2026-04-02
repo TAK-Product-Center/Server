@@ -150,6 +150,9 @@ public class RepeaterService extends BaseService {
 //		    }
 
 		    LOGGER.debug("New repeatable message request found. ");
+			if (repeaterManager.isRepeating(cotMsg.getUid())) {
+				return false;
+			}
 
 		    // Get a copy of the user
 		    try {

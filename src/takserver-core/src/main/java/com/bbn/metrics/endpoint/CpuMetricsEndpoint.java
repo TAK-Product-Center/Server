@@ -9,6 +9,7 @@ import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import com.bbn.metrics.MetricsCollector;
 import com.bbn.metrics.dto.CpuMetrics;
 import com.bbn.metrics.service.ActuatorMetricsService;
+import com.bbn.metrics.messaging.MessagingMetricsService;
 
 @Endpoint(id = "custom-cpu-metrics")
 public class CpuMetricsEndpoint {
@@ -16,7 +17,9 @@ public class CpuMetricsEndpoint {
 	private MetricsCollector metricsCollector;
 	@Autowired
 	ActuatorMetricsService actuatorMetricsService;
-	
+	@Autowired
+	MessagingMetricsService messagingMetricsService;
+
 	public CpuMetricsEndpoint(MetricsCollector metricsCollector) {
 		this.metricsCollector = metricsCollector;
 	}
@@ -26,7 +29,9 @@ public class CpuMetricsEndpoint {
 		CpuMetrics cpuMetrics = new CpuMetrics();
 		cpuMetrics.setCpuCount(actuatorMetricsService.getCpuCount());
 		cpuMetrics.setCpuUsage(actuatorMetricsService.getCpuUsage());
-	
+		cpuMetrics.setMessagingCpuUsage(messagingMetricsService.getCpuUsage());
+		cpuMetrics.setMessagingCpuCount(messagingMetricsService.getCpuCount());
+
 		return cpuMetrics;
 	}
 }

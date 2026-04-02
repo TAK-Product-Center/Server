@@ -1,15 +1,11 @@
 package com.bbn.marti.oauth;
 
-import jakarta.servlet.http.Cookie;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.resource.BearerTokenError;
 import org.springframework.security.oauth2.server.resource.BearerTokenErrors;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
@@ -39,6 +35,14 @@ public class AccessTokenResolver implements BearerTokenResolver {
             return null;
         }
 
+        try {
+            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth() != null &&
+                    CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth() != null) {
+                allowUriQueryParameter = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth()
+                        .getOauth().isAllowUriQueryParameter();
+            }
+        } catch (Exception e) {}
+
         final String authorizationHeaderToken = resolveFromAuthorizationHeader(request);
         final String parameterToken = isParameterTokenSupportedForRequest(request)
                 ? resolveFromRequestParameters(request) : null;
@@ -55,25 +59,9 @@ public class AccessTokenResolver implements BearerTokenResolver {
         }
 
         // TAK - check for access token cookie
-        String accessTokenCookie = extractCookieToken(request);
+        String accessTokenCookie = AuthCookieUtils.extractAccessTokenFromCookies(request);
         if (accessTokenCookie != null) {
             return accessTokenCookie;
-        }
-
-        return null;
-    }
-
-
-    protected String extractCookieToken(HttpServletRequest request) {
-        Cookie[] cookies = request.getCookies();
-        if (cookies == null) {
-            return null;
-        }
-
-        for (Cookie cookie : cookies) {
-            if (cookie.getName().compareToIgnoreCase(OAuth2TokenType.ACCESS_TOKEN.getValue()) == 0) {
-                return cookie.getValue();
-            }
         }
 
         return null;

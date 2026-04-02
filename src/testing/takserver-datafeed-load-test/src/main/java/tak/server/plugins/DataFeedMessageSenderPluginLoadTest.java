@@ -1,8 +1,10 @@
 package tak.server.plugins;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -36,6 +38,8 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 
 	private int delay = 10; // in milliseconds
 	
+	private int perMessageDelay = 0;
+
 	private ScheduledExecutorService worker;
 	
 	private AtomicInteger count;
@@ -66,6 +70,10 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 			delay = (int)config.getProperty("delay");
 		}
 		
+		if (config.containsProperty("perMessageDelay")) {
+			perMessageDelay = (int)config.getProperty("perMessageDelay");
+		}
+
 		if (config.containsProperty("numberOfThreads")) {
 			numberOfThreads = (int)config.getProperty("numberOfThreads");
 		}
@@ -78,8 +86,7 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 	public void start() {
 		
 		logger.info("Starting plugin " + getClass().getName());
-//		logger.info("### Load test params: numberOfFeeds: {}, numberOfTracksPerFeed: {}, messageRatePerTrackInSecond: {}, numberOfThreads: {}", numberOfFeeds, numberOfTracksPerFeed, messageRatePerTrackInSecond, numberOfThreads);
-		logger.info("### Load test params: numberOfFeeds: {}, numberOfTracksPerFeed: {}, delay: {}, numberOfThreads: {}", numberOfFeeds, numberOfTracksPerFeed, delay, numberOfThreads);
+		logger.info("### Load test params: numberOfFeeds: {}, numberOfTracksPerFeed: {}, delay: {}, perMessageDelay: {},  numberOfThreads: {}", numberOfFeeds, numberOfTracksPerFeed, delay, perMessageDelay, numberOfThreads);
 
 		feedUuids = new ArrayList<String>();
 		count = new AtomicInteger(0);
@@ -88,13 +95,17 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 
 		// create new datafeeds
 		for (int i = 0 ; i < numberOfFeeds; i++) {
-//			String feedUuid = UUID.randomUUID().toString(); 
 			String feedUuid = "feedUUID_loadtest_" + (i+1); // DataFeed UUIDs need to be known so that they can be added to missions in the client side
 			String datafeedName = "loadTestPluginDataFeed_" + (i+1);
 			List<String> tags = new ArrayList<>();
 			tags.add("loadTest");
 			logger.info("Creating new datafeed with uuid: {}", feedUuid);
-			PluginDataFeed myPluginDataFeed = pluginDataFeedApi.create(feedUuid, datafeedName, tags);
+			PluginDataFeed myPluginDataFeed;
+			if (groups == null) {
+				myPluginDataFeed = pluginDataFeedApi.create(feedUuid, datafeedName, tags, false, false);
+			} else {
+				myPluginDataFeed = pluginDataFeedApi.create(feedUuid, datafeedName, tags, false, false, new ArrayList<>(groups));
+			}
 			logger.info("Successfully created datafeed: {}", myPluginDataFeed.toString());
 			
 			feedUuids.add(feedUuid);
@@ -111,7 +122,7 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 		public void run() {
 			
 			String trackUid = "dummyTrackUid"; // this value will be replaced
-			String SA = "<event version=\"2.0\" uid=\""+trackUid+"\" type=\"a-f-G-U-C\" how=\"m-g\" time=\"2020-02-12T13:16:07Z\" start=\"2020-02-12T13:16:05Z\" stale=\"2020-02-12T13:16:50Z\" caveat=\"TestCaveat\" releaseableTo=\"TestReleaseableTo\"><point lat=\"40.255716\" lon=\"-72.045306\" hae=\"-22.22983896651138\" ce=\"4.9\" le=\"9999999.0\"/><detail><__group name=\"Dark Blue\" role=\"Team Member\"/><precisionlocation geopointsrc=\"GPS\" altsrc=\"GPS\"/><status battery=\"32\"/><takv device=\"SAMSUNG SM-G975U1\" platform=\"ATAK-CIV\" os=\"29\" version=\"3.12.0-45691.45691-CIV\"/><track speed=\"0.0\" course=\"344.72362164876733\"/><contact endpoint=\"*:-1:stcp\" phone=\"19999999999\" callsign=\"coolata\"/><uid Droid=\"coolata\"/></detail></event>";
+			String SA = "<event version=\"2.0\" uid=\""+trackUid+"\" type=\"a-f-G\" how=\"m-g\" time=\"2020-02-12T13:16:07Z\" start=\"2020-02-12T13:16:05Z\" stale=\"2020-02-12T13:16:50Z\" caveat=\"TestCaveat\" releaseableTo=\"TestReleaseableTo\"><point lat=\"40.255716\" lon=\"-72.045306\" hae=\"-22.22983896651138\" ce=\"4.9\" le=\"9999999.0\"/><detail><precisionlocation geopointsrc=\"GPS\" altsrc=\"GPS\"/></detail></event>";
 			
 			int currentCount = count.incrementAndGet();
 
@@ -125,6 +136,19 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 						
 						Message.Builder mb = message.toBuilder();
 
+						Random random = new Random();
+						double latitude = -90 + (90 - (-90)) * random.nextDouble();
+						double longitude = -180 + (180 - (-180)) * random.nextDouble();
+
+						mb.getPayloadBuilder().getCotEventBuilder()
+								.setLat(latitude)
+								.setLon(longitude);
+
+						long timeStamp = new Date().getTime();
+						mb.getPayloadBuilder().getCotEventBuilder().setSendTime(timeStamp)
+								.setStartTime(timeStamp)
+								.setStaleTime(timeStamp + (24 * 60 * 1000));
+
 						mb.getPayloadBuilder().getCotEventBuilder().getDetailBuilder().getStatusBuilder().setBattery(currentCount);
 						trackUid = "loadTest_" + "feed_" + feedIndex + "_" + "track_" + trackIndex;
 						mb.getPayloadBuilder().getCotEventBuilder().setUid(trackUid);
@@ -137,6 +161,9 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 						
 						logger.debug("Sent message to datafeed UUID: {}, trackUid: {}, count: {}", feedUuid, trackUid, currentCount);	
 						
+						if (perMessageDelay != 0) {
+							Thread.sleep(perMessageDelay);
+						}
 					}
 				}
 				
@@ -157,8 +184,17 @@ public class DataFeedMessageSenderPluginLoadTest extends MessageSenderBase {
 		try {
 			logger.info("Deleting datafeeds used in load testing");
 			PluginDataFeedApi pluginDataFeedApi = getPluginDataFeedApi();
+
+			List<String> groupsForDelete;
+			if (groups == null) {
+				groupsForDelete = new ArrayList<>();
+				groupsForDelete.add("__ANON__");
+			} else {
+				groupsForDelete = new ArrayList<>(groups);
+			}
+
 			for (String feedUuid : feedUuids) {
-				pluginDataFeedApi.delete(feedUuid, new ArrayList<String>());
+				pluginDataFeedApi.delete(feedUuid, groupsForDelete);
 			}
 			logger.info("Deleted all datafeeds used in load testing");
 

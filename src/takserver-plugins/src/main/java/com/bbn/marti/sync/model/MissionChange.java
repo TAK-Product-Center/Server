@@ -4,6 +4,7 @@ package com.bbn.marti.sync.model;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.UUID;
 
 import jakarta.persistence.Cacheable;
 import jakarta.persistence.CascadeType;
@@ -75,6 +76,7 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
     transient protected Mission mission;
     protected String missionName; // mission name is denormalized here to track all event by mission name, even deletions (because if the mission id foreign key was joined on, the mission name would be lost when the mission record is deleted.
                                   // Mission change records will not be deleted at the application layer
+    protected UUID missionGuid;
 
     protected Date timestamp;
     protected Date servertime;
@@ -82,6 +84,7 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
 
     @Transient private UidDetails uidDetails = null;
     private ExternalMissionData externalMissionData = null;
+    protected String xmlContentForNotification;
 
     private Resource tempResource = null;
     private LogEntry tempLogEntry = null;
@@ -121,6 +124,7 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
         
         if (mission != null) {
             this.missionName = mission.getName();
+            this.missionGuid = UUID.fromString(mission.getGuid());
         }
     }
     
@@ -199,7 +203,16 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
     public void setMissionName(String missionName) {
         this.missionName = missionName;
     }
-    
+
+    @Column(name = "mission_guid")
+    public UUID getMissionGuid() {
+        return missionGuid;
+    }
+
+    public void setMissionGuid(UUID missionGuid) {
+        this.missionGuid = missionGuid;
+    }
+
     @Column(name = "remote_federated_change")
     public boolean getIsFederatedChange() {
         return isFederatedChange;
@@ -522,5 +535,15 @@ public class MissionChange implements Serializable, Comparable<MissionChange> {
 	public void setExternalMissionData(ExternalMissionData externalMissionData) {
 		this.externalMissionData = externalMissionData;
 	}
-	
+
+    @JsonIgnore
+    @XmlTransient
+    @Column(name = "xml_content_for_notification")
+    public String getXmlContentForNotification() {
+        return xmlContentForNotification;
+    }
+
+    public void setXmlContentForNotification(String xmlContentForNotification) {
+        this.xmlContentForNotification = xmlContentForNotification;
+    }
 }

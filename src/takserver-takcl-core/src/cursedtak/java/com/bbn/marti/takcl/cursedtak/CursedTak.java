@@ -1,10 +1,6 @@
 package com.bbn.marti.takcl.cursedtak;
 
-import com.bbn.marti.takcl.AppModules.TAKCLConfigModule;
 import com.bbn.marti.takcl.TAKCLCore;
-import com.bbn.marti.takcl.Util;
-import com.bbn.marti.takcl.config.TAKCLConfiguration;
-import com.bbn.marti.takcl.connectivity.implementations.ConnectibleTakprotoClient;
 import com.bbn.marti.takcl.connectivity.implementations.UnifiedClient;
 import com.bbn.marti.test.shared.data.connections.MutableConnection;
 import com.bbn.marti.test.shared.data.generated.CLINonvalidatingUsers;
@@ -16,14 +12,11 @@ import picocli.CommandLine;
 import sun.misc.Unsafe;
 
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.GeneralSecurityException;
 import java.util.concurrent.Callable;
 
 /**
@@ -135,7 +128,7 @@ public class CursedTak implements Callable<Void> {
 			if (ipAddress == null) {
 				serverProfileInstance = MutableServerProfile.Builder.build(userServer).create();
 			} else {
-				serverProfileInstance = MutableServerProfile.Builder.build(userServer).setUrl(ipAddress).create();
+				serverProfileInstance = MutableServerProfile.Builder.build(userServer).setHost(ipAddress).create();
 			}
 
 			if (port == null) {

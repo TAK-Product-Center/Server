@@ -1,0 +1,28 @@
+.table-wrapper {
+    max-height: 400px;
+    overflow-y: auto;
+    display: block;
+  }
+  
+  .table thead {
+    position: sticky;
+    top: 0;
+    background-color: white; /* Ensure header remains visible */
+    z-index: 10;
+  }
+  
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  th, td {
+    white-space: nowrap; /* Prevent content from wrapping */
+    padding: 8px;
+    border: 1px solid #ddd;
+  }
+  
+  th {
+    background-color: #f8f9fa; /* Light gray background */
+  }
+  

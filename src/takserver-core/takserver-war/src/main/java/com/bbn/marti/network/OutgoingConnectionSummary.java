@@ -96,6 +96,22 @@ public class OutgoingConnectionSummary implements Serializable {
     public void setConnectionToken(String value) {
         this.outgoingConnection.getConnectionToken();
     }
+    
+    public boolean isUseToken() {
+        return outgoingConnection.isUseToken();
+    }
+
+    public void setUseToken(boolean value) {
+        this.outgoingConnection.setUseToken(value);
+    }
+    
+    public String getTokenType() {
+        return outgoingConnection.getTokenType();
+    }
+
+    public void setTokenType(String value) {
+        this.outgoingConnection.setTokenType(value);
+    }
 
     public ConnectionInfoSummary getConnectionInfoSummary() {
 	return connectionInfoSummary;

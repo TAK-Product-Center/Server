@@ -16,13 +16,14 @@ import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
 import com.bbn.cot.filter.VBMSASharingFilter;
 import com.bbn.marti.nio.protocol.connections.StreamingProtoBufProtocol;
 import com.bbn.marti.remote.QueueMetric;
-import com.bbn.marti.remote.groups.ConnectionInfo;
-import com.bbn.marti.util.FixedSizeBlockingQueue;
-import com.bbn.marti.remote.util.SpringContextBeanForApi;
-
 import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.groups.ConnectionInfo;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
+import com.bbn.marti.util.FixedSizeBlockingQueue;
+
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
+import tak.server.federation.FederateSubscription;
 
 public class BrokerService extends BaseService {
 	private static final Logger logger = LoggerFactory.getLogger(BrokerService.class);
@@ -167,11 +168,15 @@ public class BrokerService extends BaseService {
 			// pre-convert to protobuf
 			cot.setProtoBufBytes(StreamingProtoBufProtocol.convertCotToProtoBufBytes(cot));
 			
-			for (String connectionId : hits) {
+			for (String connectionId : hits) {		
 				// if the message was injected by a plugin, the list of hits may contain the original sender.
-				// we can filter them out by tracking the connection id the message originally came from				
-				if (cot.getContextValue(Constants.PLUGIN_PROVENANCE) != null && senderConnectionId != null 
-						&& senderConnectionId.equals(connectionId)) continue;
+				// we can filter them out by tracking the connection id the message originally came from	
+				boolean fromPlugin = false;
+				Set<String> provenances = (Set<String>) cot.getContextValue(Constants.MESSAGE_PROVENANCE);
+				if (provenances != null) {
+					fromPlugin = provenances.contains(Constants.PLUGIN_MANAGER_PROVENANCE);
+				}
+				if (fromPlugin && senderConnectionId != null && senderConnectionId.equals(connectionId)) continue;
 				
 				Subscription subscription = null;
 
@@ -191,12 +196,13 @@ public class BrokerService extends BaseService {
 						if (!CollectionUtils.isEmpty(cot.getBinaryPayloads())) {
 							if (subscription.isLinkedToWebsocket.get()) {
 								websocketHits.add(subscription.linkedWebsocketConnectionId);
+							} else if (subscription instanceof FederateSubscription) {
+								subscription.submit(cot, hitTime);
 							}
 						} else if (subscription.isWebsocket.get()) {
 							websocketHits.add(connectionId);
 							subscription.incHit(hitTime);
 						} else {
-							
 							subscription.submit(cot, hitTime);
 						}
 					}

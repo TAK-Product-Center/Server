@@ -28,7 +28,6 @@ sourceSets {
 }
 dependencies {
 
-
   implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
   implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
 
@@ -49,11 +48,6 @@ dependencies {
   implementation group: 'io.netty', name: 'netty-tcnative', version: netty_tcnative_version
   implementation group: 'io.netty', name: 'netty-tcnative-classes', version: netty_tcnative_version
   implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: netty_version, classifier: 'linux-x86_64'
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-x86_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:linux-aarch_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-x86_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:osx-aarch_64"
-  implementation "io.netty:netty-tcnative-boringssl-static:$netty_tcnative_version:windows-x86_64"
 
   implementation ("org.springframework.boot:spring-boot-starter-actuator:$spring_boot_version") {
     exclude group: 'org.apache.logging.log4j'
@@ -64,6 +58,12 @@ dependencies {
   implementation group: 'org.springframework', name: 'spring-context', version: spring_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-cache', version: spring_boot_version
   implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-mongodb', version: spring_boot_version
+  
+  implementation group: 'io.micrometer', name: 'micrometer-core', version: micrometer_version
+
+  // cloudwatch metrics
+  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch2', version: cloudwatch_version
+    
   api group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeine_version
   implementation group: 'io.jsonwebtoken', name: 'jjwt', version: jsonwebtoken_version
   

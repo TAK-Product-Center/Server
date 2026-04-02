@@ -7,75 +7,12 @@ buildscript {
 apply plugin: 'nebula.ospackage'
 apply from: "../utils/utils.gradle"
 
-// Copy README.
-task copyFedHubReadme(type: Copy) {
-    from getRootProject().file('docs')
-    include 'README_fedhub.md'
-    into "$buildDir/artifacts/docs"
-    rename 'README_fedhub.md', 'README.md'
-}
-
-// Copy Docker README.
-task copyFedHubDockerReadme(type: Copy) {
-    from getRootProject().file('docs')
-    include 'README_fedhub_docker.md'
-    into "$buildDir/artifacts/docs"
-}
-
-// Copy configs.
-task copyFedHubConfigs(type: Copy) {
-    from getRootProject().subprojects.collect { "${it.projectDir}/src/main/resources" }
-    include 'federation-hub-*.yml', 'logback-*.xml'
-    into "$buildDir/artifacts/configs"
-}
-
-// Copy executables.
-task copyFedHubJars(type: Copy) {
-    dependsOn(':federation-hub-broker:build')
-    dependsOn(':federation-hub-policy:build')
-    dependsOn(':federation-hub-ui:bootWar')
-    dependsOn(':federation-hub-ui:bootJar')
-    dependsOn(':federation-hub-ui:shadowJar')
-
-    from getRootProject().subprojects.collect { "${it.buildDir}/libs" }
-    into "$buildDir/artifacts/jars"
-    include 'federation-hub-*-' + version + '.jar', 'federation-hub-ui-' + version + '.war'
-    rename 'federation-hub-broker-*' + version + '.jar', 'federation-hub-broker.jar'
-    rename 'federation-hub-policy-*' + version + '.jar', 'federation-hub-policy.jar'
-    rename 'federation-hub-ui-*' + version + '.war', 'federation-hub-ui.war'
-    rename 'federation-hub-manager-*' + version + '.jar', 'federation-hub-manager.jar'
-}
-
-// Copy scripts.
-task copyFedHubScripts(type: Copy) {
-    from getRootProject().subprojects.collect { "${it.projectDir}/scripts" }
-    include 'federation-hub*'
-    include 'db/'
-    into "$buildDir/artifacts/scripts"
-}
-
-// Copy certificate scripts.
-task copyCertScripts(type: Copy) {
-    from project(':takserver-core').file('scripts/certs')
-    into "$buildDir/artifacts/certs"
-}
-
-task copySELinuxPolicy(type: Copy) {
-    from project(':takserver-core').file('scripts/utils')
-    include 'takserver-policy.te'
-    into "$buildDir/artifacts"
-}
-
-task copySELinuxScript(type: Copy) {
-    from project(':takserver-core').file('scripts')
-    include 'apply-selinux.sh'
-    into "$buildDir/artifacts"
-}
-
 // RPM pre-install script.
 def preinstall_script_federation_hub = '''\
 
 mkdir -p /opt/tak/federation-hub
+
+mkdir -p /opt/tak/federation-hub/policies
 
 # Stop the federation hub if it is still running.
 set +e
@@ -109,7 +46,7 @@ fi
 
 // RPM post-install script.
 def postinstall_script_federation_hub = '''\
-chown tak:tak /opt/tak
+chown -R tak:tak /opt/tak
 
 # try to backup configs
 if [ ! -d "/opt/tak/federation-hub/configs" ] ; then
@@ -156,6 +93,8 @@ mkdir -p /opt/tak/federation-hub/logs
 chown tak:tak /opt/tak/federation-hub/logs
 chmod 755 /opt/tak/federation-hub/logs
 
+chown -R tak:tak /opt/tak
+
 cat <<- "EOF"
 
 TAK SERVER FEDERATION HUB SOFTWARE LICENSE AGREEMENT
@@ -179,7 +118,7 @@ Log-in with the administrative certificate enabled above.
 Follow the instructions in the Installation section of the configuration guide to complete the setup process.
 
 EOF
-'''
+''' + federation_hub_systemd_setup_script
 
 // RPM post-uninstall script.
 def postuninstall_script_federation_hub = '''\
@@ -199,12 +138,15 @@ case "$1" in
         rm /etc/init.d/federation-hub-policy
         rm /etc/init.d/federation-hub-ui
         rm /etc/init.d/federation-hub
+        echo "Removing federation-hub.service file"
+        sudo rm -f /etc/systemd/system/federation-hub.service
         ;;
  1|upgrade)
         # This is an upgrade, do nothing.
         :
         ;;
 esac
+
 '''
 
 ospackage {
@@ -229,36 +171,20 @@ with or without a co-located TAK server.
     postInstall postinstall_script_federation_hub
     postUninstall postuninstall_script_federation_hub
 
-    from ("$buildDir/artifacts") {
+    from("$buildDir/takArtifacts") {
         exclude 'configs/'
-        into '/opt/tak/federation-hub'
-        fileMode = 444
-        dirMode = 755
-    }
-
-    from ("$buildDir/artifacts/configs") {
-        into '/opt/tak/federation-hub/default-configs'
+        into '/opt/tak'
         fileMode = 444
         dirMode = 755
     }
 }
 
 task prePackage(type: Copy) { task ->
-    with copyLicenseSpec()
+    with copyFullFedhubSpec(task, false)
     destinationDir file("$buildDir/takArtifacts")
 }
 
-prePackage.dependsOn copyFedHubReadme
-prePackage.dependsOn copyFedHubDockerReadme
-prePackage.dependsOn copyFedHubConfigs
-prePackage.dependsOn copyFedHubJars
-prePackage.dependsOn copyFedHubScripts
-prePackage.dependsOn copyCertScripts
-prePackage.dependsOn copySELinuxPolicy
-prePackage.dependsOn copySELinuxScript
-
 buildRpm.dependsOn prePackage
-
 buildDeb.dependsOn prePackage
 
 buildRpm {
@@ -266,58 +192,43 @@ buildRpm {
 }
 
 buildDeb {
-  requires('openjdk-17-jdk')
+    requires('openjdk-17-jdk')
 }
 
-def copyFedhubResourcesDef() { return copySpec {
-    from 'build/artifacts'
-}}
-def copyFedhubDockerDef() { return copySpec {
-    from project(':federation-common').file('docker/')
-}}
-def copyFedhubDockerScriptDef() { return copySpec {
-    from project(':federation-common').file('scripts/configureInDocker.sh')
-}}
-def copyCertsSetupDef() { return copySpec {
-    from project(':takserver-core').file('scripts/certs')
-}}
-def copyDocsToTopLevelDef() { return copySpec {
-    from 'build/artifacts/docs'
-}}
-
 task createFedhubDockerLogDir() {
-    doLast{
-        mkdir "build/artifacts/logs"
+    doFirst {
+        mkdir "$buildDir/takDockerDirs/tak/federation-hub/logs"
     }
 }
 
-def copyFedhubResources = copyFedhubResourcesDef()
-def copyFedhubDocker = copyFedhubDockerDef()
-def copyFedhubDockerScript = copyFedhubDockerScriptDef()
-def copyCertsSetup = copyCertsSetupDef()
-def copyDocsToTopLevel = copyDocsToTopLevelDef()
+task createFedhubDockerPoliciesDir() {
+    doFirst {
+        mkdir "$buildDir/takDockerDirs/tak/federation-hub/policies"
+    }
+}
 
 task constructFedhubDockerZip(type: Zip) { Task task ->
-    dependsOn createFedhubDockerLogDir
-    dependsOn buildRpm
-   
+
+    dependsOn createFedhubDockerLogDir, createFedhubDockerPoliciesDir
     archiveName 'takserver-fedhub-docker-' + version + '.zip'
     duplicatesStrategy 'fail'
     destinationDir(file("$buildDir/distributions"))
     into('takserver-fedhub-docker-' + version)
 
+    with copyFullFedhubSpec(task, true).into('tak')
     with copyVersionFileSpec(task).into('tak')
-    with copyFedhubResources.exclude("configs/federation-hub-broker.yml", "configs/federation-hub-broker-docker.yml")
-            .into('tak/federation-hub')
-    with copyFedhubDockerScript.into('tak/federation-hub/scripts')
-    with copyFedhubDocker.into('docker')
-    with copyCertsSetup.into('tak/certs')
-    with copyDocsToTopLevel.into('./')
-    
-    from(project(':federation-hub-broker').file('src/main/resources')) {
-    	include('federation-hub-broker-docker.yml')
-		rename('federation-hub-broker-docker.yml', 'federation-hub-broker.yml')
-		into('tak/federation-hub/configs')
-	}
+    from("$buildDir/takDockerDirs/")
+    from(rootProject.file('docs')) {
+        include 'README_fedhub.md', 'README_fedhub_docker.md'
+        rename 'README_fedhub.md', 'README.md'
+    }
+    from(project(':takserver-core').file('scripts/certs')) {
+        rename('(.*)', 'certs/$1')
+    }
+
+    from(project(':federation-common').file('docker')) {
+        include 'Dockerfile.fedhub', 'Dockerfile.fedhub-db'
+        rename '(.*)', 'docker/$1'
+    }
 
 }

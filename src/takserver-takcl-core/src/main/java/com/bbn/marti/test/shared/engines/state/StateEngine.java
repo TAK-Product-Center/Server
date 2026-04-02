@@ -230,6 +230,20 @@ public class StateEngine implements EngineInterface {
         data.getState(federatedServer).federation.addFederate(federate);
         data.updateState();
     }
+    
+    @Override
+	public void offlineEnableFederatedGroupMapping(AbstractServerProfile federatedServer, AbstractServerProfile federate,
+			boolean enable) {
+    	data.getState(federatedServer).federation.getFederateState(federate).setGroupMappingEnabled(enable);
+        data.updateState();
+    }
+    
+    @Override
+	public void offlineSetFederateMaxHops(AbstractServerProfile federatedServer, AbstractServerProfile federate,
+			int maxHops) {
+    	 data.getState(federatedServer).federation.getFederateState(federate).setMaxHops(maxHops);
+    	 data.updateState();
+	}
 
     @Override
     public void offlineAddOutboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String outboundGroupIdentifier) {
@@ -238,13 +252,33 @@ public class StateEngine implements EngineInterface {
     }
 
     @Override
+	public void offlineAddOutboundFederateGroupHopLimit(AbstractServerProfile federatedServer,
+			AbstractServerProfile federate, String outboundGroupIdentifier, int hopLimit) {
+    	 data.getState(federatedServer).federation.getFederateState(federate).addOutboundGroupHopLimit(outboundGroupIdentifier, hopLimit);
+    	 data.updateState();
+	}
+    
+    @Override
     public void offlineAddInboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String inboundGroupIdentifier) {
         data.getState(federatedServer).federation.getFederateState(federate).addInboundGroup(inboundGroupIdentifier);
         data.updateState();
     }
+    
+    @Override
+	public void offlineAddInboundFederateGroupMapping(AbstractServerProfile federatedServer,
+			AbstractServerProfile federate, String remoteGroupIdentifier, String localGroupIdentifier) {
+    	 data.getState(federatedServer).federation.getFederateState(federate).addInboundGroupMapping(remoteGroupIdentifier, localGroupIdentifier);
+    	 data.updateState();
+	}
 
     @Override
     public void onlineAddUser(@NotNull AbstractUser user) {
+        data.getState(user).setActiveInDeployment();
+        data.updateState();
+    }
+
+    @Override
+    public void addUserThroughUserManager(@NotNull AbstractUser user) {
         data.getState(user).setActiveInDeployment();
         data.updateState();
     }

@@ -2,6 +2,11 @@ package tak.server.federation.hub.policy;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -40,9 +45,11 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
     private final Ignite ignite;
 
     private static String DEFAULT_POLICY_FILE = "/opt/tak/federation-hub/ui_generated_policy.json";
-
+    private static String DEFAULT_POLICY_DIR = "/opt/tak/federation-hub/policies";
+    
     /* JSON file constants. */
     private static final String POLICY_NAME = "name";
+    private static final String VERSION_NAME = "version";
     /* A list of fully-qualified names of objects containing federate lambda filter implementations. */
     private static final String FILTER_OBJECTS = "filter_objects";
     private static final String FEDERATE_NODES = "federate_nodes";
@@ -50,11 +57,11 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
     private static final String GROUPS = "groups";
     private static final String NAME = "name";
     private static final String INTERCONNECTED = "interconnected";
+    private static final String ALLOW_TOKEN_AUTH = "allowTokenAuth";
+    private static final String TOKEN_AUTH_DURATION = "tokenAuthDuration";
     private static final String NODE_UID = "uid";
-    private static final String NODE_ATTRIBUTES = "attributes";
     private static final String EDGE_SOURCE = "source";
     private static final String EDGE_DESTINATION = "destination";
-    private static final String FILTER_EXPRESSION = "filterExpression";
     private static final String ALLOWED_GROUPS = "allowedGroups";
     private static final String DISALLOWED_GROUPS = "disallowedGroups";
     private static final String GROUPS_FILTER_TYPE = "groupsFilterType";
@@ -138,9 +145,7 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
         // This lets new objects supersede old ones.  We don't just update the current federate
         // because that can cause issues with removing outdated nodes later
         currentFederate.getGroupIdentities().addAll(node.getGroupIdentities());
-        currentFederate.getAttributes().putAll(node.getAttributes());
         node.getGroupIdentities().addAll(currentFederate.getGroupIdentities());
-        node.getAttributes().putAll(currentFederate.getAttributes());
         federationPolicyGraph.addNode(node);
     }
 
@@ -151,9 +156,7 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
         // This lets new objects supersede old ones.  We don't just update the current federate
         // because that can cause issues with removing outdated nodes later
         currentGroup.getFederatesInGroup().addAll(node.getFederatesInGroup());
-        currentGroup.getAttributes().putAll(node.getAttributes());
         node.getFederatesInGroup().addAll(currentGroup.getFederatesInGroup());
-        node.getAttributes().putAll(currentGroup.getAttributes());
         federationPolicyGraph.addNode(node);
     }
 
@@ -180,7 +183,7 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
     	federationPolicyGraph.getEdgeSet().addAll(federationPolicyGraph.getEdgeSet());
     }
 
-    private void updateFile(Object updateFile) {
+    private void updateFile(FederationPolicy updateFile) {
         /* TODO allow policy file to be specified via configuration. */
         String policyFilePath = DEFAULT_POLICY_FILE;
         if (policyFilePath.contains(".yml"))
@@ -188,6 +191,7 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
         ObjectMapper mapper = new ObjectMapper();
         try {
             mapper.writerWithDefaultPrettyPrinter().writeValue(new File(policyFilePath), updateFile);
+            mapper.writerWithDefaultPrettyPrinter().writeValue(Paths.get(DEFAULT_POLICY_DIR).resolve(updateFile.getName() + ".json").toFile(), updateFile);
         } catch (IOException e) {
             logger.error("Could not write policy to file", e);
         }
@@ -195,7 +199,7 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
 
     @Override
     public void updatePolicyGraph(FederationPolicyModel federationPolicyModel,
-            Object updateFile) throws FederationException {
+            FederationPolicy updateFile) throws FederationException {
     	federationPolicyGraph.getNodes().clear();
     	federationPolicyGraph.getEdgeSet().clear();
     	
@@ -213,7 +217,7 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
 
     @Override
     public void setPolicyGraph(FederationPolicyModel newPolicyModel,
-            Object updateFile) throws FederationException {
+            FederationPolicy updateFile) throws FederationException {
         FederationPolicyGraph newPolicyGraph = newPolicyModel.getPolicyGraphFromModel();
         this.federationPolicyGraph = newPolicyGraph;
         cachePolicyGraph();
@@ -235,12 +239,13 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
     }
 
     private FederationPolicyGraph getEmptyPolicy() {
-        return new FederationPolicyGraphImpl("Default Policy", new HashSet<>());
+        return new FederationPolicyGraphImpl("Default Policy", "v2");
     }
 
     @SuppressWarnings("unchecked")
     private FederationPolicyGraph createPolicyGraph(Map<String, Object> policyMap) {
         String graphName = (String)policyMap.get(POLICY_NAME);
+        String graphVersion = (String)policyMap.get(VERSION_NAME);
         if (Strings.isNullOrEmpty(graphName)) {
             throw new RuntimeException("There was no policy name in the given policy file");
         }
@@ -253,7 +258,7 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
         if (filterObjectSet == null)
             filterObjectSet = new HashSet<>();
 
-        return new FederationPolicyGraphImpl(graphName, filterObjectSet);
+        return new FederationPolicyGraphImpl(graphName, graphVersion);
     }
 
     @SuppressWarnings("unchecked")
@@ -266,16 +271,10 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
                 String nodeUID = (String)nodeMap.get(NODE_UID);
 
                 if (newPolicyGraph.getFederate(new FederateIdentity(nodeUID)) != null) {
-                    throw new RuntimeException("A federate node was repeated in the policy file");
+                    throw new RuntimeException("A federate node was repeated in the policy file for uid " + nodeUID);
                 }
 
                 Federate federate = new Federate(new FederateIdentity(nodeUID));
-
-                if (nodeMap.containsKey(NODE_ATTRIBUTES)) {
-                    Map<String, Object> nodeAttributes =
-                        (Map<String, Object>)nodeMap.get(NODE_ATTRIBUTES);
-                    federate.getAttributes().putAll(nodeAttributes);
-                }
 
                 if (nodeMap.containsKey(GROUPS)) {
                     for (String groupId : ((List<String>)nodeMap.get(GROUPS))) {
@@ -298,22 +297,22 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
                 String groupId = (String)groupMap.get(NODE_UID);
 
                 if (newPolicyGraph.getGroup(new FederateIdentity(groupId)) != null) {
-                    throw new RuntimeException("A federate node was repeated in the policy file");
+                    throw new RuntimeException("A federate group was repeated in the policy file for uid " + groupId);
                 }
 
                 FederateGroup newGroup = new FederateGroup(new FederateIdentity(groupId));
 
-                if (groupMap.containsKey(NODE_ATTRIBUTES)) {
-                    Map<String, Object> nodeAttributes = (Map<String, Object>)groupMap.get(NODE_ATTRIBUTES);
-                    newGroup.getAttributes().putAll(nodeAttributes);
-                }
-
-                if (groupMap.containsKey(FILTER_EXPRESSION)) {
-                    String filterExpression = (String)groupMap.get(FILTER_EXPRESSION);
-                    newGroup.setFilterExpression(filterExpression);
-                } else if (groupMap.containsKey(INTERCONNECTED)) {
+                if (groupMap.containsKey(INTERCONNECTED)) {
                     boolean interconnected = (Boolean)groupMap.get(INTERCONNECTED);
                     newGroup.setInterconnected(interconnected);
+                }
+                if (groupMap.containsKey(ALLOW_TOKEN_AUTH)) {
+                    boolean allowTokenAuth = (Boolean)groupMap.get(ALLOW_TOKEN_AUTH);
+                    newGroup.setAllowTokenAuth(allowTokenAuth);
+                }
+                if (groupMap.containsKey(TOKEN_AUTH_DURATION)) {
+                    long tokenAuthDuration = (Long)groupMap.get(TOKEN_AUTH_DURATION);
+                    newGroup.setTokenAuthDuration(tokenAuthDuration);
                 }
                 newPolicyGraph.addGroup(newGroup);
             }
@@ -338,14 +337,9 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
                 FederationNode destinationNode = newPolicyGraph.getNode(destination);
                 if (sourceNode != null && destinationNode != null) {
 
-                    String edgeFilterExpression = "";
                     Set<String> allowedGroups = new HashSet<>();
                     Set<String> disallowedGroups = new HashSet<>();
                     FederateEdge.GroupFilterType groupFilterType = GroupFilterType.ALL;
-
-                    if (edgeMap.containsKey(FILTER_EXPRESSION)) {
-                        edgeFilterExpression = (String)edgeMap.get(FILTER_EXPRESSION);
-                    }
                     
                     if (edgeMap.containsKey(ALLOWED_GROUPS)) {
                         List<String> allowedGroupsList = (List<String>) edgeMap.get(ALLOWED_GROUPS);
@@ -363,7 +357,7 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
                     }
 
                     FederateEdge federateEdge = new FederateEdge(sourceNode.getFederateIdentity(),
-                        destinationNode.getFederateIdentity(), edgeFilterExpression, allowedGroups, disallowedGroups, groupFilterType);
+                        destinationNode.getFederateIdentity(), allowedGroups, disallowedGroups, groupFilterType);
 
                     try {
                         newPolicyGraph.addEdge(federateEdge);
@@ -384,8 +378,30 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
             newPolicyGraph.setAddtionalData((Map)policyMap.get(ADDITIONAL_DATA));
         }
     }
+    
+    @Override
+    public Map<String, FederationPolicyGraph> getAllPolicies() throws IOException {
+        Map<String, FederationPolicyGraph> policies = new HashMap<>();
 
-    private boolean initializePolicyGraphFromFile(String policyFile) {
+        Path dirPath = Paths.get(DEFAULT_POLICY_DIR);
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dirPath, "*.json")) {
+            for (Path entry : stream) {
+            	String filename = entry.getFileName().toString();
+            	
+            	if (Strings.isNullOrEmpty(filename)) break;
+            	
+            	FederationPolicyGraph policy = initializePolicyGraphFromFile(dirPath.resolve(filename).toString());
+            	
+            	if (policy == null) break;
+            	
+            	policies.put(policy.getName(), policy);
+            }
+        }
+
+        return policies;
+    }
+
+    public FederationPolicyGraph initializePolicyGraphFromFile(String policyFile) {
         ObjectMapper mapper;
         if (policyFile.endsWith(".yml")) {
             mapper = new ObjectMapper(new YAMLFactory());
@@ -398,8 +414,9 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
 
             if (getClass().getResource(policyFile) != null) {
                 // It's a resource.
-                map = mapper.readValue(getClass().getResourceAsStream(policyFile),
-                    new TypeReference<HashMap<String, Object>>(){});
+            	try (InputStream is = getClass().getResourceAsStream(policyFile)) {
+            		map = mapper.readValue(is, new TypeReference<HashMap<String, Object>>(){});
+            	}
             } else {
                 // It's a file.
                 map = mapper.readValue(new File(policyFile),
@@ -412,20 +429,11 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
             setPolicyGraphEdges(map, newPolicyGraph);
             setAdditionalData(map, newPolicyGraph);
             
-            try {
-                Map<String, Object> additionalData = newPolicyGraph.getAdditionalData();
-                FederationPolicyModel policyModel =  new ObjectMapper().convertValue(additionalData.get("uiData"), FederationPolicyModel.class);
-        		cells = policyModel.getCells();
-            } catch (Exception e) {
-            	logger.error("err",e);
-            }
-            this.federationPolicyGraph = newPolicyGraph;
-            cachePolicyGraph();
+            return newPolicyGraph;
         } catch (IOException | RuntimeException e) {
             logger.error("Could not load policy graph from file: " + e);
-            return false;
+            return null;
         }
-        return true;
     }
     
 	@Override
@@ -442,11 +450,34 @@ public class FederationHubPolicyManagerImpl implements FederationHubPolicyManage
         /* TODO allow policy file to be specified via configuration. */
         String policyFilename = DEFAULT_POLICY_FILE;
         File policyFile = new File(policyFilename);
-        if (!policyFile.exists() || !initializePolicyGraphFromFile(policyFilename)) {
+        if (!policyFile.exists()) {
         	this.federationPolicyGraph = getEmptyPolicy();
-        	cachePolicyGraph();
+        } else {
+        	FederationPolicyGraph policy = initializePolicyGraphFromFile(policyFilename);
+        	if (policy == null) {
+        		this.federationPolicyGraph = getEmptyPolicy();
+        	} else {
+        		try {
+        			if (Strings.isNullOrEmpty(policy.getVersion())) {
+        		        ObjectMapper mapper = new ObjectMapper();
+    		            mapper.writerWithDefaultPrettyPrinter().writeValue(new File(DEFAULT_POLICY_FILE + ".bak"), policy);
+        			}
+                } catch (Exception e) {
+                	logger.error("err backing up policy file", e);
+                }
+                try {
+                    Map<String, Object> additionalData = policy.getAdditionalData();
+                    FederationPolicyModel policyModel =  new ObjectMapper().convertValue(additionalData.get("uiData"), FederationPolicyModel.class);
+            		cells = policyModel.getCells();
+                } catch (Exception e) {
+                	logger.error("err",e);
+                }
+                this.federationPolicyGraph = policy;
+        	}
         }
-
+        
+        cachePolicyGraph();
+        
         groupCas = new HashSet<>();
         dynamicallyAddedFederates = new HashSet<>();
     }

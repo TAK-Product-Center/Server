@@ -12,14 +12,7 @@ if [ -d /certs-configmap ];then
 	cp -Lr /certs-configmap/* /certs/files/
 fi
 
-# get total RAM
-TOTAL=`awk '/MemTotal/ {print $2}' /proc/meminfo`
+if [ -z "$MAX_HEAP_PERCENT" ]; then
+  export MAX_HEAP_PERCENT=90
+fi
 
-# convert from KiB to MB"
-TOTAL=$(($TOTAL * 1024 * 30 / 1000 / 1000 / 100))
-
-export CONFIG_MAX_HEAP=7500
-export API_MAX_HEAP=7500
-export MESSAGING_MAX_HEAP=7500
-export PLUGIN_MANAGER_MAX_HEAP=7500
-export RETENTION_MAX_HEAP=7500

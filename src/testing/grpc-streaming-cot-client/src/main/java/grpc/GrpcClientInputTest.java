@@ -2,9 +2,9 @@ package grpc;
 
 import static io.grpc.MethodDescriptor.generateFullMethodName;
 
-import java.util.Date;
 import java.io.FileInputStream;
 import java.security.KeyStore;
+import java.util.Date;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -20,17 +20,12 @@ import com.atakmap.Tak.InputChannelGrpc;
 import com.atakmap.Tak.InputChannelGrpc.InputChannelStub;
 import com.google.common.base.Strings;
 
-import atakmap.commoncommo.protobuf.v1.Takmessage;
 import atakmap.commoncommo.protobuf.v1.ContactOuterClass.Contact;
 import atakmap.commoncommo.protobuf.v1.Cotevent.CotEvent;
 import atakmap.commoncommo.protobuf.v1.DetailOuterClass.Detail;
 import atakmap.commoncommo.protobuf.v1.GroupOuterClass.Group;
-import atakmap.commoncommo.protobuf.v1.Precisionlocation.PrecisionLocation;
-import atakmap.commoncommo.protobuf.v1.StatusOuterClass.Status;
+import atakmap.commoncommo.protobuf.v1.Takmessage;
 import atakmap.commoncommo.protobuf.v1.Takmessage.TakMessage;
-import atakmap.commoncommo.protobuf.v1.Takmessage.TakMessage.Builder;
-import atakmap.commoncommo.protobuf.v1.TakvOuterClass.Takv;
-import atakmap.commoncommo.protobuf.v1.TrackOuterClass.Track;
 import io.grpc.ClientCall;
 import io.grpc.ManagedChannel;
 import io.grpc.Metadata;

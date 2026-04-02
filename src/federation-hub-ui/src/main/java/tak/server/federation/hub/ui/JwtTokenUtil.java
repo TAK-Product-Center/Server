@@ -108,7 +108,9 @@ public class JwtTokenUtil {
 		
 		if (privateKey == null) {
 			KeyStore keyStore = KeyStore.getInstance(fedHubConfig.getKeystoreType());
-			keyStore.load(new FileInputStream(fedHubConfig.getKeystoreFile()), fedHubConfig.getKeystorePassword().toCharArray());
+			try (InputStream is = new FileInputStream(fedHubConfig.getKeystoreFile())) {
+				keyStore.load(is, fedHubConfig.getKeystorePassword().toCharArray());
+			}
 
 			Enumeration<String> aliases = keyStore.aliases();
 			while (aliases.hasMoreElements() && privateKey == null) {

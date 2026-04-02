@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
-
 import javax.naming.NamingException;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
@@ -21,16 +20,18 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
 
-import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.google.common.base.Strings;
+
 import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import com.bbn.marti.ValidatorUtils;
-import com.bbn.marti.remote.CoreConfig;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.sync.Metadata.Field;
-import com.google.common.base.Strings;
+import com.bbn.marti.ValidatorUtils;
+
 
 /**
  * Servlet that accepts POST requests (only) to upload mission packages to the
@@ -47,8 +48,10 @@ public class MissionPackageUploadServlet extends UploadServlet {
 	private static Set<String> optionalParameters = new HashSet<String>();
 	private static Set<String> requiredParameters = new HashSet<String>();
 
-
 	private static final org.slf4j.Logger logger = LoggerFactory.getLogger(MissionPackageUploadServlet.class);
+
+	@Autowired
+	private GroupManager groupManager;
 
 	static {
 		// static initializer for all required parameters
@@ -61,6 +64,7 @@ public class MissionPackageUploadServlet extends UploadServlet {
 		optionalParameters.add(PostParameter.KEYWORD.getParameterString());
 		optionalParameters.add(PostParameter.TOOL.getParameterString());
 		optionalParameters.add(PostParameter.CREATORUID.getParameterString());
+		optionalParameters.add(PostParameter.GROUPS.getParameterString());
 	}
 	/**
 	 * Required parameter enum for posting a mission package.
@@ -74,7 +78,8 @@ public class MissionPackageUploadServlet extends UploadServlet {
 		MIMETYPE 	("mimetype", Metadata.Field.MIMEType, false, "application/x-zip-compressed"),
 		KEYWORD    	("keyword",  Metadata.Field.Keywords, false, MISSION_PACKAGE_KEYWORD),
 		TOOL        ("tool",  Metadata.Field.Tool, false, "public"),
-		CREATORUID  ("creatorUid", Metadata.Field.CreatorUid, true, "");
+		CREATORUID  ("creatorUid", Metadata.Field.CreatorUid, true, ""),
+		GROUPS  	("groups", Field.Groups, false, "");
 
 		private final String param; // string value of the param
 		private final Metadata.Field field; // metadata field that this param is entered into
@@ -199,8 +204,15 @@ public class MissionPackageUploadServlet extends UploadServlet {
 				}
 			}
 
-			// map post parameters to metadata field entries 
+			// map post parameters to metadata field entries
 			Map<String,String[]> paramsMap = request.getParameterMap();
+
+			if (paramsMap.get(Field.Groups.name()) != null) {
+				String[] fileGroupNames = paramsMap.get(Field.Groups.name());
+				String fileGroupVector = groupManager.validateAccess(fileGroupNames, groupVector);
+				groupVector = fileGroupVector;
+			}
+
 			Metadata requestMetadata = new Metadata();
 			for (PostParameter param : PostParameter.values()) {
 				String[] args = paramsMap.get(param.getParameterString());

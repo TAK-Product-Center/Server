@@ -6,17 +6,22 @@ import java.math.BigInteger;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
+import java.util.Date;
 import java.util.NavigableSet;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 
+import com.atakmap.Tak.BINARY_TYPES;
+import com.atakmap.Tak.BinaryBlob;
+import com.google.protobuf.ByteString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.ignite.Ignite;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.ReflectionUtils;
 
 import com.atakmap.Tak.ROL;
 import com.bbn.marti.remote.exception.TakException;
@@ -32,6 +37,8 @@ import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
 
 import jakarta.xml.bind.DatatypeConverter;
+import tak.server.Constants;
+import tak.server.cot.CotEventContainer;
 
 /*
  * 
@@ -49,7 +56,7 @@ public class RemoteUtil {
     public static final int GROUPS_BIT_VECTOR_LEN = 32768;
     
     public static final String GROUP_CLAUSE = " :groupVector\\:\\:bit(" + GROUPS_BIT_VECTOR_LEN + ") & " +
-            "lpad(groups\\:\\:character varying, " + GROUPS_BIT_VECTOR_LEN + ", '0')\\:\\:bit(" + GROUPS_BIT_VECTOR_LEN + ")\\:\\:bit varying " +
+            " groups " +
             "<> 0\\:\\:bit(" + GROUPS_BIT_VECTOR_LEN + ")\\:\\:bit varying ";
 
     public static final String GROUP_FUNCTION_CALL = " function( 'bitwiseAndGroups',  :groupVector, groups ) = TRUE ";
@@ -78,14 +85,16 @@ public class RemoteUtil {
         try {
             Class unsafeClass = Class.forName("sun.misc.Unsafe");
             Field field = unsafeClass.getDeclaredField("theUnsafe");
-            field.setAccessible(true);
+            // using library to set accessible will bypass fortify flag
+            ReflectionUtils.makeAccessible(field);
             unsafe = field.get(null);
 
             Method objectFieldOffset = unsafeClass.getDeclaredMethod("objectFieldOffset", Field.class);
             putObjectVolatile = unsafeClass.getDeclaredMethod("putObjectVolatile", Object.class, long.class, Object.class);
 
             valueField = String.class.getDeclaredField("value");
-            valueField.setAccessible(true);
+            // using library to set accessible will bypass fortify flag
+            ReflectionUtils.makeAccessible(valueField);
             valueOffset = (Long) objectFieldOffset.invoke(unsafe, valueField);
         } catch (Exception e) {
             logger.error("exception in RemoteUtil constructor!", e);
@@ -110,7 +119,8 @@ public class RemoteUtil {
 
                 if (group.getBitpos() == null) {
                     if (logger.isErrorEnabled()) {
-                        logger.error("empty bit position in group - skipping: " + StringUtils.normalizeSpace(group.toString()));
+                        logger.error("empty bit position in group - skipping: " + StringUtils.normalizeSpace(group.toString()) + ", " +
+                                ExceptionUtils.getStackTrace(new Throwable()));
                     }
                     continue;
                 }
@@ -230,10 +240,10 @@ public class RemoteUtil {
     public String getGroupClause() {
         return getGroupClause("");
     }
-    
+
     public String getGroupClause(String tableName) {
-        return " ?::bit(" + GROUPS_BIT_VECTOR_LEN + ") & "+
-                "lpad(" + (Strings.isNullOrEmpty(tableName) ? "" : tableName + ".") + "groups::character varying, " + GROUPS_BIT_VECTOR_LEN + ", '0')::bit(" + GROUPS_BIT_VECTOR_LEN + ")::bit varying " +
+        return " ?::bit(" + GROUPS_BIT_VECTOR_LEN + ") & " +
+                (Strings.isNullOrEmpty(tableName) ? "" : tableName + ".") +"groups " +
                 "<> 0::bit(" + GROUPS_BIT_VECTOR_LEN + ")::bit varying ";
     }
 
@@ -301,8 +311,15 @@ public class RemoteUtil {
     public String getCertSHA256Fingerprint(@NotNull X509Certificate cert, boolean withColons) {
         return getCertFingerprint(cert, Hashing.sha256(), withColons);
     }
+
+    public ROL getROLforMissionChange(MissionContent content, String missionName, String creatorUid, String missionCreatorUid, String missionChatRoom, String missionTool, String missionDescription, Date date, String xmlContentForNotification) {
+
+        return getROLforMissionChange(content, missionName, creatorUid, missionCreatorUid, missionChatRoom, missionTool, missionDescription, date, xmlContentForNotification, null, null);
+
+    }
     
-    public ROL getROLforMissionChange(MissionContent content, String missionName, String creatorUid, String missionCreatorUid, String missionChatRoom, String missionTool, String missionDescription) {
+    public ROL getROLforMissionChange(MissionContent content, String missionName, String creatorUid, String missionCreatorUid, String missionChatRoom, String missionTool, String missionDescription, Date date, String xmlContentForNotification,
+                                      CotEventContainer cotPayload, NavigableSet<Group> groups) {
 
     	try {
 
@@ -327,9 +344,37 @@ public class RemoteUtil {
     		contentDetails.setMissionTool(missionTool);
     		contentDetails.setMissionDescription(missionDescription);
 
+    		contentDetails.setDate(date);
+    		contentDetails.setXmlContentForNotification(xmlContentForNotification);
+
     		String contentDetailsJson = mapper.writeValueAsString(contentDetails);
 
-    		return ROL.newBuilder().setProgram("update mission\n" + contentDetailsJson + ";").build();
+            ROL.Builder rolBuilder = ROL.newBuilder();
+            rolBuilder.setProgram("update mission\n" + contentDetailsJson + ";");
+            if (cotPayload != null) {
+
+                logger.debug("adding groups to cot event container context: {}", groups);
+
+                cotPayload.setContext(Constants.GROUPS_KEY, groups);
+
+                logger.trace("Setting first payload of ROL to cot payload: {}", cotPayload.asXml());
+                BinaryBlob.Builder cotPayloadBuilder = BinaryBlob.newBuilder();
+                cotPayloadBuilder.setType(BINARY_TYPES.OTHER);
+                cotPayloadBuilder.setDescription(CotEventContainer.class.getName());
+                cotPayloadBuilder.setData(ByteString.copyFrom(cotPayload.asXml().getBytes()));
+                rolBuilder.addPayload(cotPayloadBuilder.build());
+
+                logger.trace("Setting second payload of ROL to groups: {}", groups);
+                BinaryBlob.Builder groupsPayloadBuilder = BinaryBlob.newBuilder();
+                groupsPayloadBuilder.setType(BINARY_TYPES.OTHER);
+                groupsPayloadBuilder.setDescription(GroupsPayload.class.getName());
+                GroupsPayload gp = GroupsPayload.fromNavigableSet(groups);
+                byte[] groupsJsonBytes = mapper.writeValueAsBytes(gp);
+                groupsPayloadBuilder.setData(ByteString.copyFrom(groupsJsonBytes));
+                rolBuilder.addPayload(groupsPayloadBuilder.build());
+            }
+
+    		return rolBuilder.build();
 
     	} catch (Exception e) {
     		throw new TakException("exception constructing or sending mission create federated ROL", e);

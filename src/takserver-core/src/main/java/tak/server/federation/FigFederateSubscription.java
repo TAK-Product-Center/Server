@@ -2,12 +2,11 @@ package tak.server.federation;
 
 import static io.grpc.MethodDescriptor.generateFullMethodName;
 
-import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.NavigableSet;
 import java.util.Set;
-
-import com.google.common.collect.ComparisonChain;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.grpc.ClientCall;
 import io.grpc.Metadata;
@@ -17,7 +16,9 @@ import io.micrometer.core.instrument.Metrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.atakmap.Tak.FederateGroupHopLimits;
 import com.atakmap.Tak.FederateGroups;
+import com.atakmap.Tak.FederateProvenance;
 import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.Subscription;
 import com.bbn.marti.config.DataFeed;
@@ -45,60 +46,64 @@ import tak.server.cot.CotEventContainer;
  */
 public class FigFederateSubscription extends FederateSubscription {
 
-    private static final Logger logger = LoggerFactory.getLogger(FigFederateSubscription.class);
+	private static final Logger logger = LoggerFactory.getLogger(FigFederateSubscription.class);
 
-    private static final long serialVersionUID = 3972200398818680453L;
+	private static final long serialVersionUID = 3972200398818680453L;
 
-    private Reachability<User> reachability;
+	private Reachability<User> reachability;
 
-    private final TakFigClient figClient;
+	private final TakFigClient figClient;
 
-    private boolean isAutoMapped = false;
-    
-    private GuardedStreamHolder<FederatedEvent> clientCallHolder;
-    private GuardedStreamHolder<FederateGroups> groupsCallHolder;
-        
-    public Reachability<User> getReachability() {
-        return reachability;
-    }
+	private AtomicBoolean initSenders = new AtomicBoolean(false);
+	
+	private boolean isAutoMapped = false;
 
-    public void setReachability(Reachability<User> reachability) {
-        this.reachability = reachability;
-    }
-    
-    @SuppressWarnings("deprecation")
+	private GuardedStreamHolder<FederatedEvent> clientCallHolder;
+	private GuardedStreamHolder<FederateGroups> groupsCallHolder;
+
+	public Reachability<User> getReachability() {
+		return reachability;
+	}
+
+	public void setReachability(Reachability<User> reachability) {
+		this.reachability = reachability;
+	}
+
+	@SuppressWarnings("deprecation")
 	public FigFederateSubscription(TakFigClient figClient) {
-        super();
-        this.figClient = figClient;
-        
-        if (figClient != null) {
-        	setupGroupStream();
-        } 
-    }
+		super();
+		this.figClient = figClient;
 
-    public void setLastProcTime(long curTime) {
-        this.hasUpdate.set(true);
-        this.lastProcTime.set(curTime);
-    }
+		initSenders();
+	}
+	
+	public void initSenders() {
+		if (figClient != null && figClient.getAsyncFederatedChannel() != null && !initSenders.get()) {
+			initSenders.getAndSet(true);
+			setupGroupStream();
+		}
+	}
 
-    private void setupGroupStream() {
-    	ClientCall<FederateGroups, Subscription> groupsCall = figClient.getChannel()
+	public void setLastProcTime(long curTime) {
+		this.hasUpdate.set(true);
+		this.lastProcTime.set(curTime);
+	}
+
+	private void setupGroupStream() {
+		ClientCall<FederateGroups, Subscription> groupsCall = figClient.getChannel()
 				.newCall(io.grpc.MethodDescriptor.create(MethodDescriptor.MethodType.CLIENT_STREAMING,
 						generateFullMethodName("com.atakmap.FederatedChannel", "ClientFederateGroupsStream"),
 						io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.FederateGroups.getDefaultInstance()),
 						io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance())),
 						figClient.getAsyncFederatedChannel().getCallOptions());
 
-		groupsCallHolder = new GuardedStreamHolder<FederateGroups>(groupsCall, figClient.getClientName(),
-				new Comparator<FederateGroups>() {
-					@Override
-					public int compare(FederateGroups a, FederateGroups b) {
-						return ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result();
-					}
-				}, false);
-		
+		FederateProvenance provenance = FederateProvenance.newBuilder().setFederationServerId(
+				CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId()).build();
+
+		groupsCallHolder = new GuardedStreamHolder<FederateGroups>(groupsCall, figClient.getClientName(), provenance);
+
 		groupsCallHolder.setMaxFederateHops(getFederate().getMaxHops());
-    	
+
 		// use listener to respect flow control, and send messages to the server when it
 		// is ready
 		groupsCall.start(new ClientCall.Listener<Subscription>() {
@@ -110,175 +115,196 @@ public class FigFederateSubscription extends FederateSubscription {
 			}
 
 			@Override
-			public void onReady() {}
-			
+			public void onReady() {
+			}
+
 		}, new Metadata());
 
 		// Notify gRPC to receive one response. Without this line, onMessage() would
 		// never be called.
 		groupsCall.request(1);
-    }
-    
-    public void setupEventStream() { 
-    	ClientCall<FederatedEvent, Subscription> clientCall = figClient.getChannel().newCall(io.grpc.MethodDescriptor.create(
-    			io.grpc.MethodDescriptor.MethodType.CLIENT_STREAMING,
-    			generateFullMethodName("com.atakmap.FederatedChannel", "ServerEventStream"),
-    			io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.FederatedEvent.getDefaultInstance()),
-    			io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance())), figClient.getAsyncFederatedChannel().getCallOptions());
+	}
 
-		clientCallHolder = new GuardedStreamHolder<FederatedEvent>(clientCall, figClient.getClientName(),
-				new Comparator<FederatedEvent>() {
-					@Override
-					public int compare(FederatedEvent a, FederatedEvent b) {
-						return ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result();
-					}
-				}, false);
-		
+	public void setupEventStream() {
+		ClientCall<FederatedEvent, Subscription> clientCall = figClient.getChannel()
+				.newCall(io.grpc.MethodDescriptor.create(io.grpc.MethodDescriptor.MethodType.CLIENT_STREAMING,
+						generateFullMethodName("com.atakmap.FederatedChannel", "ServerEventStream"),
+						io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.FederatedEvent.getDefaultInstance()),
+						io.grpc.protobuf.ProtoUtils.marshaller(com.atakmap.Tak.Subscription.getDefaultInstance())),
+						figClient.getAsyncFederatedChannel().getCallOptions());
+
+		FederateProvenance provenance = FederateProvenance.newBuilder().setFederationServerId(
+				CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId()).build();
+
+		clientCallHolder = new GuardedStreamHolder<FederatedEvent>(clientCall, figClient.getClientName(), provenance);
+
 		clientCallHolder.setMaxFederateHops(getFederate().getMaxHops());
-    	
-    	// use listener to respect flow control, and send messages to the server when it is ready 
-    	clientCall.start(new ClientCall.Listener<Subscription>() {
 
-    		@Override
-    		public void onMessage(Subscription response) {
-    			// Notify gRPC to receive one additional response.
-    			clientCall.request(1);
-    		}
+		// use listener to respect flow control, and send messages to the server when it
+		// is ready
+		clientCall.start(new ClientCall.Listener<Subscription>() {
 
 			@Override
-    		public void onReady() {
+			public void onMessage(Subscription response) {
+				// Notify gRPC to receive one additional response.
+				clientCall.request(1);
+			}
 
-    			if (logger.isDebugEnabled()) {
-    				logger.debug("ServerEventStreamclientCall ready.");
-    			}
-    			
-    			try {
-    				// send a current snapshot of the contact list (current subscriptions) to this federate
-        			GroupFederationUtil.getInstance().sendLatestContactsToFederate(FigFederateSubscription.this);
-    			} catch (Exception e) {
-    				if (logger.isDebugEnabled()) {
-    					logger.debug("exception sending latest contacts as v2 federate client", e);
-    				}
-    			}
-    			
-    			try {
-    				if (config.getBuffer().getLatestSA().isEnable()) {
-    					if (logger.isDebugEnabled()) {
-    						logger.debug("Sending latest SA as v2 federate client");
-    					}
+			@Override
+			public void onReady() {
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("ServerEventStreamclientCall ready.");
+				}
+
+				try {
+					// send a current snapshot of the contact list (current subscriptions) to this
+					// federate
+					GroupFederationUtil.getInstance().sendLatestContactsToFederate(FigFederateSubscription.this);
+				} catch (Exception e) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("exception sending latest contacts as v2 federate client", e);
+					}
+				}
+
+				try {
+					if (config.getBuffer().getLatestSA().isEnable()) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("Sending latest SA as v2 federate client");
+						}
 						MessagingUtilImpl.getInstance().sendLatestReachableSA(getUser());
-    				}
-    			} catch (Exception e) {
-    				if (logger.isDebugEnabled()) {
-    					logger.debug("exception sending latest SA as v2 federate client", e);
-    				}
-    			}
-       		}
-    	}, new Metadata());
-    	
-    	// Notify gRPC to receive one response. Without this line, onMessage() would never be called.
-        clientCall.request(1);	
-    }
+					}
+				} catch (Exception e) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("exception sending latest SA as v2 federate client", e);
+					}
+				}
+			}
+		}, new Metadata());
 
-    private synchronized void sendMessageProtected(FederatedEvent e) {
-    	clientCallHolder.send(e);
-        
-        try {
-        	
-        	if (e.hasEvent() && e.getEvent() != null) {
-        		Metrics.counter(Constants.METRIC_FED_DATA_MESSAGE_WRITE_COUNT, "takserver", "messaging").increment();
-        	}
-        	
-        	if (e.hasContact() && e.getContact() != null) {
-        		Metrics.counter(Constants.METRIC_FED_CONTACT_MESSAGE_WRITE_COUNT, "takserver", "messaging").increment();
-        	}
-        	
-        } catch (Exception ex) {
-        	if (logger.isDebugEnabled()) {
-        		logger.debug("error recording fed message write metric", ex);
-        	}
-        }
+		// Notify gRPC to receive one response. Without this line, onMessage() would
+		// never be called.
+		clientCall.request(1);
+	}
 
-    }
+	private synchronized void sendMessageProtected(FederatedEvent e) {
+		clientCallHolder.send(e);
 
-    @Override
-    public void submitLocalContact(FederatedEvent e, long hitTime) {
-        if (localContactUid.contains(e.getContact().getUid())) {
-        	if (logger.isDebugEnabled()) {
-        		logger.debug("skipping sending contact: " + e.getContact().getCallsign() + ":" + e.getContact().getOperation());
-        	}
-            return;
-        } else {
-            localContactUid.add(e.getContact().getUid());
-            super.incHit(hitTime);
-            sendMessageProtected(e); // send the contact message to the FIG
-        }
-    }
+		try {
 
-    @Override
-    public void submit(final CotEventContainer toSend, long hitTime) {
-    	
-    	if (logger.isDebugEnabled()) {
-    		logger.debug("FigFederateSubscription submit " + toSend);
-    	}
-    	
+			if (e.hasEvent() && e.getEvent() != null) {
+				Metrics.counter(Constants.METRIC_FED_DATA_MESSAGE_WRITE_COUNT, "takserver", "messaging").increment();
+			}
+
+			if (e.hasContact() && e.getContact() != null) {
+				Metrics.counter(Constants.METRIC_FED_CONTACT_MESSAGE_WRITE_COUNT, "takserver", "messaging").increment();
+			}
+
+		} catch (Exception ex) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("error recording fed message write metric", ex);
+			}
+		}
+
+	}
+
+	@Override
+	public void submitLocalContact(FederatedEvent e, long hitTime) {
+		if (localContactUid.contains(e.getContact().getUid())) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("skipping sending contact: " + e.getContact().getCallsign() + ":"
+						+ e.getContact().getOperation());
+			}
+			return;
+		} else {
+			localContactUid.add(e.getContact().getUid());
+			super.incHit(hitTime);
+			sendMessageProtected(e); // send the contact message to the FIG
+		}
+	}
+
+	@Override
+	public void submit(final CotEventContainer toSend, long hitTime) {
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("FigFederateSubscription submit " + toSend);
+		}
+
 		// for benchmarking only - disable message dissemination to clients
 		if (!config.getDissemination().isEnabled()) {
 			return;
 		}
-    	
+
 		totalSubmitted.incrementAndGet();
-    	
-        ((AbstractBroadcastingChannelHandler) getHandler()).getConnectionInfo().getProcessedCount().getAndIncrement();
-        if (toSend.getContextValue(Constants.NOFEDV2_KEY) != null) {
-        	if (logger.isDebugEnabled()) {
-        		logger.debug("Explicitly not sending forwarding FIG message back to FIG");
-        	}
-            return;
-        }
-        
-        if (toSend.hasContextKey(GroupFederationUtil.FEDERATE_ID_KEY)) {
-        	if (logger.isDebugEnabled()) {
-        		logger.debug("not federating federated message");
-        	}
-            return;
-        }
-        
-        if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null && !CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
+
+		((AbstractBroadcastingChannelHandler) getHandler()).getConnectionInfo().getProcessedCount().getAndIncrement();
+		if (toSend.getContextValue(Constants.NOFEDV2_KEY) != null) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Explicitly not sending forwarding FIG message back to FIG");
+			}
+			return;
+		}
+
+		if (toSend.hasContextKey(GroupFederationUtil.FEDERATE_ID_KEY)) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("not federating federated message");
+			}
+
+			return;
+		}
+
+		// if a message came over federation and was intercepted, do not allow it to be
+		// re-federated
+		Set<String> provenances = (Set<String>) toSend.getContextValue(Constants.MESSAGE_PROVENANCE);
+		if (provenances != null) {
+			if (provenances.contains(Constants.PLUGIN_MANAGER_PROVENANCE)
+					&& provenances.contains(Constants.FEDERATION_PROVENANCE)) {
+				if (logger.isDebugEnabled())
+					logger.debug("not re-federating intercepted message");
+
+				return;
+			}
+		}
+
+		if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null && !CoreConfigFacade.getInstance()
+				.getRemoteConfiguration().getFederation().isAllowDataFeedFederation()) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("data feed federation disabled");
 			}
 			return;
 		}
-        
-        if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null) {
-        	DataFeed datafeed = (DataFeed)toSend.getContext(Constants.DATA_FEED_KEY);
-        	if (!datafeed.isFederated()) {
+
+		if (toSend.getContextValue(Constants.DATA_FEED_KEY) != null) {
+			DataFeed datafeed = (DataFeed) toSend.getContext(Constants.DATA_FEED_KEY);
+			if (!datafeed.isFederated()) {
 				logger.info("~~~ In submit A: Not sending to federation");
-            	return;
-        	}else {
+				return;
+			} else {
 				logger.info("~~~ In submit A: Will send to federation");
-        	}
-        }
+			}
+		}
 
-        // increment the hit count in the super class
-        super.incHit(hitTime);
+		// increment the hit count in the super class
+		super.incHit(hitTime);
 
-        /*
-        // send the message
-        ImportanceSpec qosSpec = this.lqm.getImportance(toSend.getDocument());
-        this.sender.addToOutputQueue(toSend, qosSpec.importance, qosSpec.replaceByPubUID);
-         */
+		/*
+		 * // send the message ImportanceSpec qosSpec =
+		 * this.lqm.getImportance(toSend.getDocument());
+		 * this.sender.addToOutputQueue(toSend, qosSpec.importance,
+		 * qosSpec.replaceByPubUID);
+		 */
 
 		Set<String> outGroups = null;
 		if (figClient.getFederate().isFederatedGroupMapping()) {
 			// Filter the incoming remote groups based on the federate's outbound groups
 			NavigableSet<Group> groups = (NavigableSet<Group>) toSend.getContext(Constants.GROUPS_KEY);
 			if (groups != null) {
-				NavigableSet<Group> inGroups = GroupFederationUtil.getInstance().filterGroupDirection(Direction.IN, groups);
+				NavigableSet<Group> inGroups = GroupFederationUtil.getInstance().filterGroupDirection(Direction.IN,
+						groups);
 				Federate federate = getFigClient().getFederate();
 				if (federate != null) {
-					outGroups = GroupFederationUtil.getInstance().filterFedOutboundGroups(federate.getOutboundGroup(), inGroups, federate.getId());
+					outGroups = GroupFederationUtil.getInstance().filterFedOutboundGroups(federate.getOutboundGroup(),
+							inGroups, federate.getId());
 				} else {
 					if (logger.isDebugEnabled()) {
 						logger.debug("unable to add federate groups to Fed Event, federate is null ");
@@ -287,114 +313,135 @@ public class FigFederateSubscription extends FederateSubscription {
 			}
 		}
 
-        if (toSend.getType().equals("b-f-t-r")) {
-            if (toSend.getContextValue(Constants.NOFEDV2_KEY) != null) {
-            	if (logger.isDebugEnabled()) {
-            		logger.debug("Explicitly ignoring FIG mission package announcement");
-            	}
-            } else {
-            	if (logger.isDebugEnabled()) {
-            		logger.debug("mission package announce for FIG: " + toSend);
-            	}
-                figClient.sendPackageAnnounce(toSend, outGroups);
-            }
-        } else if (toSend.getType().compareTo("t-x-d-d") == 0) {
-            removeLocalContact(toSend.getUid());
+		if (toSend.getType().equals("b-f-t-r")) {
+			if (toSend.getContextValue(Constants.NOFEDV2_KEY) != null) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("Explicitly ignoring FIG mission package announcement");
+				}
+			} else {
+				if (logger.isDebugEnabled()) {
+					logger.debug("mission package announce for FIG: " + toSend);
+				}
+				figClient.sendPackageAnnounce(toSend, outGroups);
+			}
+		} else if (toSend.getType().compareTo("t-x-d-d") == 0) {
+			removeLocalContact(toSend.getUid());
 
 			FederatedEvent federatedEvent = ProtoBufHelper.getInstance().delContact2protoBuf(toSend);
 
 			if (outGroups != null) {
 				FederatedEvent.Builder builder = federatedEvent.toBuilder();
+
+				FederateGroupHopLimits groupHopsLimits = GroupFederationUtil.getInstance()
+						.getFederateGroupHopsLimitsForFederate(getFederate(), outGroups);
+
 				builder.addAllFederateGroups(outGroups);
+				builder.setFederateGroupHopLimits(groupHopsLimits);
+				
 				federatedEvent = builder.build();
 			}
 
-            sendMessageProtected(federatedEvent); // convert CoT message to FederatedEvent, and send to the FIG server, respecting flow control
-        } else if (toSend.getType().toLowerCase(Locale.ENGLISH).startsWith("t-x-m")) {
-        	
-        	if (logger.isDebugEnabled()) {
-        		logger.debug("not federating mission change " + toSend.asXml());
-        	}
-        	
-		} else {
-            try {
-            	FederatedEvent.Builder builder = FederatedEvent.newBuilder();
+			sendMessageProtected(federatedEvent); // convert CoT message to FederatedEvent, and send to the FIG server,
+													// respecting flow control
+		} else if (toSend.getType().toLowerCase(Locale.ENGLISH).startsWith("t-x-m")) {
 
-            	if (outGroups != null) {
-            		builder.addAllFederateGroups(outGroups);
+			if (logger.isDebugEnabled()) {
+				logger.debug("not federating mission change " + toSend.asXml());
+			}
+
+		} else {
+			try {
+				FederatedEvent.Builder builder = FederatedEvent.newBuilder();
+
+				if (outGroups != null) {
+					FederateGroupHopLimits groupHopsLimits = GroupFederationUtil.getInstance()
+							.getFederateGroupHopsLimitsForFederate(getFederate(), outGroups);
+
+					logger.info("Attaching hop group limits1:");
+					groupHopsLimits.getLimitsList().forEach(ghl -> logger.info("" + ghl));
+					
+					builder.addAllFederateGroups(outGroups);
+					builder.setFederateGroupHopLimits(groupHopsLimits);
 				}
 
-                FederatedEvent fEvent = builder.setEvent(ProtoBufHelper.getInstance().cot2protoBuf(toSend)).build();
+				FederatedEvent fEvent = builder.setEvent(ProtoBufHelper.getInstance().cot2protoBuf(toSend)).build();
 
-                if (logger.isDebugEnabled()) {
-                	logger.debug("sending FederatedEvent: " + fEvent);
-                }
+				if (logger.isDebugEnabled()) {
+					logger.debug("sending FederatedEvent: " + fEvent);
+				}
 
-                if (clientCallHolder == null) {
-                	if (logger.isDebugEnabled()) {
-                		logger.debug("null clientCall");
-                	}
-                } else {
-                	sendMessageProtected(fEvent);
-                }
+				if (clientCallHolder == null) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("null clientCall");
+					}
+				} else {
+					sendMessageProtected(fEvent);
+				}
 
-            } catch (NumberFormatException e) {
-                // ignore people putting NaN as their elevation
-            } catch (IllegalArgumentException e) {
-            	if (logger.isDebugEnabled()) {
-            		logger.debug("invalid message", e);
-            	}
-            } catch (Exception e) {
-            	if (logger.isDebugEnabled()) {
-            		logger.debug("exception sending FederatedEvent", e);
-            	}
-            }
-        }
-        
-        try {
-        	ClusterManager.countMessageSent();
+			} catch (NumberFormatException e) {
+				// ignore people putting NaN as their elevation
+			} catch (IllegalArgumentException e) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("invalid message", e);
+				}
+			} catch (Exception e) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("exception sending FederatedEvent", e);
+				}
+			}
+		}
+
+		try {
+			ClusterManager.countMessageSent();
 		} catch (Exception e) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("exception tracking clustered message sent count", e);
 			}
 		}
-    }
-    
-    public void submitFederateGroups(Set<String> federateGroups) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Submitting federate groups: " + federateGroups);
-        }
-        groupsCallHolder.send(FederateGroups.newBuilder().addAllFederateGroups(federateGroups).build());
-    }
+	}
 
-    public void closeGroupStream(Throwable t) {
-    	try {
-    		groupsCallHolder.cancel("Close group stream", t);
-    	} catch (Exception e) {}
-    }
+	public void submitFederateGroups(Set<String> federateGroups) {
+		if (logger.isDebugEnabled()) {
+			logger.debug("Submitting federate groups: " + federateGroups);
+		}
+		FederateGroupHopLimits groupHopsLimits = GroupFederationUtil.getInstance()
+				.getFederateGroupHopsLimitsForFederate(getFederate(), federateGroups);
 
-    public void closeClientCall(Throwable t) {
-        try {
-            clientCallHolder.cancel("Close client call", t);
-        } catch (Exception e) {}
-    }
+		groupsCallHolder.send(FederateGroups.newBuilder().addAllFederateGroups(federateGroups)
+				.setFederateGroupHopLimits(groupHopsLimits).build());
+	}
 
-    public TakFigClient getFigClient() {
-        return figClient;
-    }
-    
-    public boolean getIsAutoMapped() {
+	public void closeGroupStream(Throwable t) {
+		try {
+			groupsCallHolder.cancel("Close group stream", t);
+		} catch (Exception e) {
+		}
+	}
+
+	public void closeClientCall(Throwable t) {
+		try {
+			clientCallHolder.cancel("Close client call", t);
+		} catch (Exception e) {
+		}
+	}
+
+	public TakFigClient getFigClient() {
+		return figClient;
+	}
+
+	public boolean getIsAutoMapped() {
 		return isAutoMapped;
 	}
 
 	public void setIsAutoMapped(boolean isAutoMapped) {
-		if (isAutoMapped) logger.info("federate subscription " + this.callsign + " set to auto mapping");
+		if (isAutoMapped)
+			logger.info("federate subscription " + this.callsign + " set to auto mapping");
 		this.isAutoMapped = isAutoMapped;
 	}
 
 	public Federate getFederate() {
-        return figClient.getFederate();
-    }
+		return figClient.getFederate();
+	}
 
 	public GuardedStreamHolder<FederatedEvent> getClientCallHolder() {
 		return clientCallHolder;

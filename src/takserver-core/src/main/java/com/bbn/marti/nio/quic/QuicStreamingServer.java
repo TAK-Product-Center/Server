@@ -25,7 +25,6 @@ import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.handler.codec.bytes.ByteArrayDecoder;
 import io.netty.handler.codec.bytes.ByteArrayEncoder;
 import io.netty.incubator.codec.quic.QuicChannel;
-import io.netty.incubator.codec.quic.QuicConnectionEvent;
 import io.netty.incubator.codec.quic.QuicServerCodecBuilder;
 import io.netty.incubator.codec.quic.QuicSslContext;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
@@ -70,40 +69,11 @@ public class QuicStreamingServer {
 		                .initialMaxStreamsBidirectional(1)
 		                .initialMaxStreamsUnidirectional(0)
 		                .initialMaxStreamDataUnidirectional(0)
-		                .tokenHandler(new QuicTokenHandler() {
-							@Override
-							public boolean writeToken(ByteBuf out, ByteBuf dcid, InetSocketAddress address) {
-								// TODO Auto-generated method stub
-								return false;
-							}
-
-							@Override
-							public int validateToken(ByteBuf token, InetSocketAddress address) {
-								// TODO Auto-generated method stub
-								return 0;
-							}
-
-							@Override
-							public int maxTokenLength() {
-								// TODO Auto-generated method stub
-								return 0;
-							}
-		                })
 						.handler(new ChannelInboundHandlerAdapter() {
-							@Override
-							public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-								super.userEventTriggered(ctx, evt);
-								// save the client address
-								if (evt instanceof QuicConnectionEvent) {
-									QuicConnectionEvent event = (QuicConnectionEvent) evt;
-									clientAddressMap.put(ctx.channel().id().asLongText(), (InetSocketAddress) event.newAddress());
-								}
-							}
-
 							@Override
 							public void channelActive(ChannelHandlerContext ctx) {
 								QuicChannel channel = (QuicChannel) ctx.channel();
-								// Create streams etc.. (right now the client creates the takstream)
+								clientAddressMap.put(ctx.channel().id().asLongText(), (InetSocketAddress) channel.remoteSocketAddress());
 							}
 
 							// use one channel to accept all connections

@@ -7,11 +7,10 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Strings;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,6 +32,9 @@ import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.LdapGroup;
 import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.util.CommonUtil;
+
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -70,7 +72,7 @@ public class GroupsApi extends BaseRestController {
     @Autowired
     SubscriptionManagerLite subscriptionManager;
 
-    private Map<String, String> descriptionMap = new ConcurrentHashMap<>();
+    private volatile Cache<String, LdapGroup> descriptionCache;
 
     public GroupManager getGroupManager() {
         return groupManager;
@@ -204,7 +206,21 @@ public class GroupsApi extends BaseRestController {
         
         return result;
     }
-    
+
+    private Cache<String, LdapGroup> getOrCreateDescriptionCache() {
+        if (descriptionCache == null) {
+            synchronized (this) {
+                if (descriptionCache == null) {
+                    descriptionCache = Caffeine.newBuilder().expireAfterWrite(
+                            CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue()
+                                    .getGroupDescriptionCacheSeconds(), TimeUnit.SECONDS).build();
+                }
+            }
+        }
+
+        return descriptionCache;
+    }
+
     /*
      * get all groups
      * 
@@ -216,7 +232,7 @@ public class GroupsApi extends BaseRestController {
     ) throws RemoteException {
 
         Collection<Group> groups = null;
-        if (martiUtil.isAdmin()) {
+        if (martiUtil.isAdmin(request)) {
             // admins can see all groups that have been loaded
             groups = groupManager.getAllGroups();
         } else {
@@ -251,8 +267,9 @@ public class GroupsApi extends BaseRestController {
             try {
                 if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getDefault().equalsIgnoreCase("ldap")) {
                     for (Group group : groups) {
-                        String description = descriptionMap.get(group.getName());
-                        if (description == null) {
+                        LdapGroup ldapGroup = getOrCreateDescriptionCache().getIfPresent(group.getName());
+
+                        if (ldapGroup == null) {
                             List<LdapGroup> ldapGroups = groupManager.searchGroups(group.getName(), true);
                             if (ldapGroups.size() == 0) {
                                 logger.debug("unable to find description for group! " + group.getName());
@@ -261,16 +278,16 @@ public class GroupsApi extends BaseRestController {
                                 logger.error("found more than one result for group! " + group.getName());
                             }
 
-                            LdapGroup ldapGroup = ldapGroups.get(0);
-                            description = ldapGroup.getDescription();
-                            if (description == null) {
-                                description = "";
-                            }
-                            descriptionMap.put(group.getName(), description);
+                            ldapGroup = ldapGroups.get(0);
+                            getOrCreateDescriptionCache().put(group.getName(), ldapGroup);
                         }
 
-                        if (!Strings.isNullOrEmpty(description)) {
-                            group.setDescription(description);
+                        if (!Strings.isNullOrEmpty(ldapGroup.getDescription())) {
+                            group.setDescription(ldapGroup.getDescription());
+                        }
+
+                        if (!Strings.isNullOrEmpty(ldapGroup.getDn())) {
+                            group.setDistinguishedName(ldapGroup.getDn());
                         }
                     }
                 }
@@ -296,6 +313,28 @@ public class GroupsApi extends BaseRestController {
                 }
             }
 
+        }
+
+        return new ResponseEntity<ApiResponse<Collection<Group>>>(new ApiResponse<Collection<Group>>(
+                Constants.API_VERSION, Group.class.getName(), groups), HttpStatus.OK);
+    }
+
+
+
+    /*
+     * get all groups for a given user
+     *
+     */
+    @RequestMapping(value = "/groups/user", method = RequestMethod.GET)
+    public ResponseEntity<ApiResponse<Collection<Group>>> getAllGroupsForUser(
+            @RequestParam(value = "username") String username
+    ) throws RemoteException {        
+        Collection<Group> groups = null;
+        try {
+            logger.info("Get all groups for username " + username);
+            groups = activeGroupCacheHelper.getActiveGroupsForUser(username);
+        } catch (Exception e) {
+            logger.error(e.getLocalizedMessage());
         }
 
         return new ResponseEntity<ApiResponse<Collection<Group>>>(new ApiResponse<Collection<Group>>(

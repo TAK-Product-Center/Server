@@ -73,13 +73,11 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 
     private synchronized void saveTruststoreFile(SSLConfig sslConfig,
             FederationHubServerConfig fedHubConfig) {
-        try {
+        try (FileOutputStream fos = new FileOutputStream(fedHubConfig.getTruststoreFile())) {
 
             if (Strings.isNullOrEmpty(fedHubConfig.getTruststorePassword())) {
                 throw new IllegalArgumentException("empty or null truststore password ");
             }
-            FileOutputStream fos = new FileOutputStream(
-                fedHubConfig.getTruststoreFile());
             sslConfig.getTrust().store(fos,
                 fedHubConfig.getTruststorePassword().toCharArray());
             fos.close();
@@ -233,6 +231,13 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 
 		return FederationHubDependencyInjectionProxy.getInstance()
 				.federationHubBrokerMetrics();
+	}
+
+	@Override
+	public FederationHubBrokerGlobalMetrics getFederationHubBrokerGlobalMetrics() {
+
+		return FederationHubDependencyInjectionProxy.getInstance()
+				.federationHubBrokerGlobalMetrics();
 	}
 
 	@Override

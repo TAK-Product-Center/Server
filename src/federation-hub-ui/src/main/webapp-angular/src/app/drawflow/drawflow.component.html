@@ -1,0 +1,42 @@
+<app-toolbar></app-toolbar>
+<div class="wrapper">
+  <div class="col" style="margin-left: 5px;">
+    <div class="bg-primary" style="width: 100%; color: white; border-radius: 2px;">
+      <svg style="margin-bottom: 10px;" height="20px" width="20px" viewBox="0 0 320 512"><path d="M182.6 470.6c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-9.2-9.2-11.9-22.9-6.9-34.9s16.6-19.8 29.6-19.8l256 0c12.9 0 24.6 7.8 29.6 19.8s2.2 25.7-6.9 34.9l-128 128z"/></svg>    
+      <span>Nodes</span>
+    </div>
+    <div *ngFor="let node of graphNodes">
+      <div class="drag-drawflow" draggable="true" (dragstart)="drag($event)" [attr.data-node]="node.id" style="text-align: left;">
+        <img [attr.width]="node.image_width" [attr.height]="node.image_height" [style.marginRight.px]="node.marginRight" [style.marginLeft.px]="node.marginLeft" src="{{node.image}}">
+        <span>{{node.title}}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-right">
+    <div class="menu">
+      <ul>
+        <li class="selected">Policy</li>
+      </ul>
+    </div>
+    <div id="drawflow" (drop)="drop($event)" (dragover)="allowDrop($event)">
+      <div class="btn-clear" (click)="onClear()">Clear</div>
+      <div class="btn-lock">
+        <i id="lock" class="fas fa-lock" onclick="editor.editor_mode='fixed'; changeMode('lock');"></i>
+        <i id="unlock" class="fas fa-lock-open" onclick="editor.editor_mode='edit'; changeMode('unlock');"
+          style="display:none;"></i>
+      </div>
+      <div class="bar-zoom">
+        <i class="fas fa-search-minus" (click)="onZoomOut()"></i>
+        <i class="fas fa-search" (click)="onZoomReset()"></i>
+        <i class="fas fa-search-plus" (click)="onZoomIn()"></i>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- <div id="dynamic-component-container" style="display: none;"></div> -->
+<ng-container #dynamic_loader></ng-container>
+
+<!-- <ng-template #viewUserTemplate>
+  <app-modal [user]="user" [exitModal]="exitModal" />
+</ng-template> -->

@@ -1,0 +1,29 @@
+<!--&lt;!&ndash; Top Navbar (Dark Style) &ndash;&gt;-->
+<!--<nav class="navbar navbar-dark" style="background-color: #2c2f3e; border-bottom: 1px solid #1c1e27; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);">-->
+<!--  <div class="container-fluid d-flex justify-content-between align-items-center px-3">-->
+<!--    &lt;!&ndash; Left side: TAK logo &ndash;&gt;-->
+<!--    <div class="d-flex align-items-center gap-2">-->
+<!--      <img src="assets/tak-logo.ico" alt="TAK Logo" style="height: 50px; width: 50px;">-->
+<!--      <a style="" class="navbar-brand brand-title nohover" href="#">TAK Server</a>-->
+<!--      <a style="padding: 10px 15px;"-->
+<!--         class="navbar-brand"-->
+<!--         [class.chosen]="activeLink === 'metrics'"-->
+<!--         routerLink="/metrics">Metrics</a>-->
+<!--    </div>-->
+
+<!--    &lt;!&ndash; Right side: Hamburger menu &ndash;&gt;-->
+<!--    <div class="dropdown">-->
+<!--      <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">-->
+<!--        <i class="bi bi-list"></i>-->
+<!--      </button>-->
+<!--      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton">-->
+<!--        <li><a class="dropdown-item" href="#settings">Settings</a></li>-->
+<!--      </ul>-->
+<!--    </div>-->
+<!--  </div>-->
+<!--</nav>-->
+
+<!-- Main Content -->
+<div class="content-wrapper" style="padding: 1rem; background-color: #1e1f2a; color: white; height: calc(100vh - 120px); overflow-y: auto;">
+  <router-outlet></router-outlet>
+</div>

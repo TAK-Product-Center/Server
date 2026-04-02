@@ -43,6 +43,8 @@ import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
+import com.bbn.marti.util.CommonUtil;
+import com.bbn.marti.xml.bindings.Role;
 import com.bbn.marti.xml.bindings.UserAuthenticationFile;
 import com.bbn.tak.tls.TakCert;
 import com.bbn.tak.tls.repository.TakCertRepository;
@@ -67,6 +69,8 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
 
     TakCertRepository takCertRepository;
 
+    CommonUtil commonUtil;
+
     Ldap ldapConf = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getLdap();
 
     private final X509UsernameExtractor usernameExtractor = new X509UsernameExtractor(
@@ -78,17 +82,19 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
             instance = new X509Authenticator(
                     SpringContextBeanForApi.getSpringContext().getBean(GroupManager.class),
                     SpringContextBeanForApi.getSpringContext().getBean(ActiveGroupCacheHelper.class),
-                    SpringContextBeanForApi.getSpringContext().getBean(TakCertRepository.class));
+                    SpringContextBeanForApi.getSpringContext().getBean(TakCertRepository.class),
+                    SpringContextBeanForApi.getSpringContext().getBean(CommonUtil.class));
         }
         
         return instance;
     }
     
-    public X509Authenticator(GroupManager groupManager, ActiveGroupCacheHelper activeGroupCacheHelper, TakCertRepository takCertRepository) {
-        
-   	    this.groupManager = groupManager;
+    public X509Authenticator(GroupManager groupManager, ActiveGroupCacheHelper activeGroupCacheHelper, TakCertRepository takCertRepository, CommonUtil commonUtil) {
+
+        this.groupManager = groupManager;
    	    this.activeGroupCacheHelper = activeGroupCacheHelper;
    	    this.takCertRepository = takCertRepository;
+        this.commonUtil = commonUtil;
 
         groupManager.registerAuthenticator("X509", this);
     }
@@ -148,7 +154,7 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                 }
 
                 if (input == null) {
-                    AuthenticatorUtil.setUserRolesBasedOnRequestPort(user, logger);
+                    AuthenticatorUtil.setUserRolesBasedOnRequestPort(user, logger, true);
                 }
 
                 return user;
@@ -217,7 +223,20 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                             logger.debug("groups: " + fileUser.getGroupList());
                         }
 
-                        Set<Group> groups = FileAuthenticator.getGroups(fileUser);
+                        Set<Group> groups = null;
+
+                        if (fileUser.getRole() == Role.ROLE_ADMIN &&
+                                CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth()
+                                        .isX509AssignAdminAllGroups()) {
+                            Set<Group> allGroups = commonUtil.getAllInOutGroups();
+                            if (allGroups != null && !allGroups.isEmpty()) {
+                                groups = allGroups;
+                            }
+                        }
+
+                        if (groups == null) {
+                            groups = FileAuthenticator.getGroups(fileUser);
+                        }
 
                         if (useGroupCache) {
                             Set<Group> hydrated = new ConcurrentSkipListSet<>();
@@ -367,7 +386,7 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                 }
             	
                 if (input == null) {
-                	AuthenticatorUtil.setUserRolesBasedOnRequestPort(user, logger);
+                	AuthenticatorUtil.setUserRolesBasedOnRequestPort(user, logger, true);
                 }
 
                 break;

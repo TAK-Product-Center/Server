@@ -1,6 +1,7 @@
 package com.bbn.marti.takcl.connectivity.server;
 
 import com.bbn.marti.takcl.AppModules.TAKCLConfigModule;
+import com.bbn.marti.takcl.SSLHelper;
 import com.bbn.marti.takcl.TAKCLCore;
 import com.bbn.marti.takcl.TestExceptions;
 import com.bbn.marti.test.shared.data.servers.AbstractServerProfile;
@@ -12,6 +13,7 @@ import org.apache.ignite.Ignition;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -146,7 +148,7 @@ public class RunnableServerManager {
             if (Files.exists(Paths.get(serverRootDir))) {
                 FileUtils.cleanDirectory(new File(serverRootDir));
             }
-
+                        
             Path targetPath = Paths.get(serverRootDir);
 
             FileUtils.copyDirectory(modelPath.toFile(), targetPath.toFile());
@@ -167,10 +169,19 @@ public class RunnableServerManager {
             File certTargetDir = new File(serverRootDir + "/certs/files");
             FileUtils.forceMkdir(certTargetDir);
             Files.copy(conf.getCoreConfigExamplePath(), Paths.get(serverRootDir, "CoreConfig.xml"));
-            Files.copy(Paths.get(TAKCLConfigModule.getInstance().getCertificateFilepath(newServerIdentifier.getConsistentUniqueReadableIdentifier(), "jks")), Paths.get(serverRootDir, "certs/files/takserver.jks"));
-            Files.copy(Paths.get(TAKCLConfigModule.getInstance().getTruststoreJKSFilepath()), Paths.get(serverRootDir, "certs/files/truststore-root.jks"));
-            Files.copy(Paths.get(TAKCLConfigModule.getInstance().getTruststoreJKSFilepath()), Paths.get(serverRootDir, "certs/files/fed-truststore.jks"));
-
+            
+            if (SSLHelper.useUniqueCertsPerServer()) {
+            	Path predefinedCertRoot = TAKCLCore.testCertSourceDir;
+            	Path rootCertDir = predefinedCertRoot != null ? predefinedCertRoot
+						: Paths.get(TAKCLConfigModule.getInstance().getTemporaryDirectory());
+            	
+        		FileUtils.copyDirectory(rootCertDir.resolve(newServerIdentifier.getConsistentUniqueReadableIdentifier()).toFile(), Paths.get(serverRootDir, "certs/files").toFile());
+            } else {
+                FileUtils.copyDirectory(TAKCLConfigModule.getInstance().getCertificateDir().toFile(), Paths.get(serverRootDir, "certs/files").toFile());
+            }
+            
+            Files.copy(Paths.get(serverRootDir, "certs/files", newServerIdentifier.getConsistentUniqueReadableIdentifier() + ".jks"), Paths.get(serverRootDir, "certs/files/takserver.jks"));
+            
         } catch (FileAlreadyExistsException e) {
             System.err.println("A file expected to not exist already exists! Did you forget to remove an existing TEST_RESULTS directory prior to test execution?");
             throw new RuntimeException(e);

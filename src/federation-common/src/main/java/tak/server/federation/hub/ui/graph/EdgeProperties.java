@@ -63,30 +63,6 @@ public class EdgeProperties {
         this.name = name;
     }
 
-    public List<FilterNode> getFilters() {
-        return filters;
-    }
-
-    public void setFilters(List<FilterNode> filters) {
-        this.filters = filters;
-    }
-
-    /**
-     * Returns the filter expression generated from the filter node tree of this edge.  If there are multiple top level
-     * nodes, they will be OR'ed.
-     */
-    @JsonIgnore
-    public String getFilterExpression() {
-        if (filters.size() < 1) {
-            return null;
-        } else if (filters.size() > 1) {
-            return FilterUtils.filterNodeToString(filters.get(0));
-        }
-
-        return FilterUtils.oredFiltersToString(filters);
-    }
-
-
     /**
      * Catch all for Json properties that are not specifically defined above.
      * Adding this catch-all allows storage and recall of any Json fields from the client.

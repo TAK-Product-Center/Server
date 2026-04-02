@@ -25,6 +25,8 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.retry.annotation.EnableRetry;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -85,22 +87,26 @@ import com.bbn.marti.sync.service.DistributedDataFeedCotService;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.bbn.marti.util.spring.RequestHolderBean;
+import com.bbn.marti.util.spring.RequestUtilBean;
 import com.bbn.metrics.DistributedMetricsCollector;
 import com.bbn.metrics.MetricsCollector;
 import com.bbn.metrics.service.ActuatorMetricsService;
 import com.bbn.metrics.service.DatabaseMetricsService;
 import com.bbn.metrics.service.NetworkMetricsService;
 import com.bbn.metrics.service.QueueMetricsService;
+import com.bbn.metrics.messaging.MessagingMetricsService;
+import com.bbn.metrics.messaging.MessagingMetricsServiceImpl;
+import com.bbn.metrics.messaging.MessagingMetricsDependencyInjectionProxy;
+import com.bbn.metrics.messaging.MessagingMetricsCollector;
+import com.bbn.tak.tls.repository.TakCertRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.awspring.cloud.autoconfigure.context.properties.AwsS3ResourceLoaderProperties;
-import io.awspring.cloud.autoconfigure.metrics.CloudWatchExportAutoConfiguration;
 import jakarta.servlet.ServletContext;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
 import tak.server.cache.DataFeedCotCacheHelper;
 import tak.server.cache.DatafeedCacheHelper;
+import tak.server.cache.MissionCacheHelper;
 import tak.server.cache.classification.ClassificationCacheHelper;
 import tak.server.cluster.DistributedInjectionService;
 import tak.server.cluster.DistributedInputManager;
@@ -110,6 +116,7 @@ import tak.server.federation.DistributedFederationManager;
 import tak.server.federation.FederationServer;
 import tak.server.federation.MissionDisruptionManager;
 import tak.server.federation.TakFigClient;
+import tak.server.grid.PluginManagerProxyFactory;
 import tak.server.messaging.DistributedCotMessenger;
 import tak.server.messaging.DistributedPluginApi;
 import tak.server.messaging.DistributedPluginDataFeedApi;
@@ -132,8 +139,9 @@ import tak.server.qos.QoSManager;
  */
 @Configuration
 @EnableAutoConfiguration
+@EnableRetry
 @Profile({Constants.MESSAGING_PROFILE_NAME, Constants.MONOLITH_PROFILE_NAME})
-@SpringBootApplication(exclude = {MongoAutoConfiguration.class, MongoDataAutoConfiguration.class, ErrorMvcAutoConfiguration.class, MetricsAutoConfiguration.class, MetricsEndpointAutoConfiguration.class, CloudWatchExportAutoConfiguration.class, AwsS3ResourceLoaderProperties.class})
+@SpringBootApplication(exclude = {MongoAutoConfiguration.class, MongoDataAutoConfiguration.class, ErrorMvcAutoConfiguration.class, MetricsAutoConfiguration.class, MetricsEndpointAutoConfiguration.class})
 public class MessagingConfiguration {
 
 	@Autowired
@@ -143,9 +151,9 @@ public class MessagingConfiguration {
 	public SubmissionService submissionService(DistributedFederationManager dfm, NioNettyBuilder nb, MessagingUtilImpl mui, NioServer ns, GroupManager gm,
 											   ScrubInvalidValues siv, MessageConversionUtil mcu, GroupFederationUtil gfu, InjectionManager im, RepositoryService rs, Ignite ig, SubscriptionManager sm,
 											   SubscriptionStore ss, FlowTagFilter flowTag, ContactManager contactManager, ServerInfo serverInfo,
-											   MessageConverter messageConverter, ActiveGroupCacheHelper activeGroupCacheHelper, RemoteUtil remoteUtil, DataFeedRepository dfr) {
+											   MessageConverter messageConverter, ActiveGroupCacheHelper activeGroupCacheHelper, RemoteUtil remoteUtil, DataFeedRepository dfr, TakCertRepository tcr, MissionCacheHelper missionCacheHelper) {
 
-		return new SubmissionService(dfm, nb, mui, ns, gm, siv, mcu, gfu, im, rs, ig, sm, ss, flowTag, contactManager, serverInfo, messageConverter, activeGroupCacheHelper, remoteUtil, dfr);
+		return new SubmissionService(dfm, nb, mui, ns, gm, siv, mcu, gfu, im, rs, ig, sm, ss, flowTag, contactManager, serverInfo, messageConverter, activeGroupCacheHelper, remoteUtil, dfr, tcr, missionCacheHelper);
 	}
 
 	@Bean
@@ -485,8 +493,8 @@ public class MessagingConfiguration {
 	
 	@Bean
 	@Scope(scopeName = "thread", proxyMode = ScopedProxyMode.TARGET_CLASS)
-	public RequestHolderBean requestHolderBean() { 
-		return new RequestHolderBean();
+	public RequestUtilBean requestHolderBean() {
+		return new RequestUtilBean();
 	}
 
 	@Bean
@@ -513,7 +521,11 @@ public class MessagingConfiguration {
 		
 		return qosManager;
 	}
-	
+
+	@Bean
+	public PluginManagerProxyFactory pluginManagerProxyFactory() {
+		return new PluginManagerProxyFactory();
+	}
 
 	@Bean
 	public DataFeedFederationAspect DataFeedFederationAspect(FederationManager federationManager, MissionActionROLConverter malrc) {
@@ -582,5 +594,24 @@ public class MessagingConfiguration {
 	@Bean
 	public DataFeedCotCacheHelper dataFeedCotCacheHelper() {
 		return new DataFeedCotCacheHelper();
+	}
+
+	@Bean
+	@Profile(Constants.MESSAGING_PROFILE_NAME)
+	public MessagingMetricsService messagingMetricsService(Ignite ignite) {
+		MessagingMetricsServiceImpl service = new MessagingMetricsServiceImpl();
+		ignite.services(ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite)).
+				deployNodeSingleton(Constants.MESSAGING_METRICS_SERVICE_NAME, service);
+		return service;
+	}
+
+	@Bean
+	public MessagingMetricsDependencyInjectionProxy messagingMetricsDependencyInjectionProxy() {
+		return new MessagingMetricsDependencyInjectionProxy();
+	}
+
+	@Bean
+	public MessagingMetricsCollector messagingMetricsCollector(ActuatorMetricsService actuatorMetricsService) {
+		return new MessagingMetricsCollector(actuatorMetricsService);
 	}
 }

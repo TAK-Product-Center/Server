@@ -9,8 +9,6 @@ public class GroupHolder {
     private String name;
     private String uid;
     private boolean interconnected;
-    private Map<String, Object> attributes;
-    private String filterExpression;
 
     public GroupHolder(String uid) {
         this.uid = uid;
@@ -38,21 +36,5 @@ public class GroupHolder {
 
     public void setInterconnected(boolean interconnected) {
         this.interconnected = interconnected;
-    }
-
-    public Map<String, Object> getAttributes() {
-        return attributes;
-    }
-
-    public void setAttributes(Map<String, Object> attributes) {
-        this.attributes = attributes;
-    }
-
-    public String getFilterExpression() {
-        return filterExpression;
-    }
-
-    public void setFilterExpression(String filterExpression) {
-        this.filterExpression = filterExpression;
     }
 }

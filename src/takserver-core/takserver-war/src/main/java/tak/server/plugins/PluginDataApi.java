@@ -23,7 +23,7 @@ import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.network.BaseRestController;
 import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.sync.api.MissionApi.ValidatedBy;
-import com.bbn.marti.util.spring.RequestHolderBean;
+import com.bbn.marti.util.spring.RequestUtilBean;
 import com.google.common.base.Charsets;
 
 import tak.server.Constants;
@@ -45,7 +45,7 @@ public class PluginDataApi extends BaseRestController {
 	private PluginManager pluginManager;
 	
 	@Autowired
-	private RequestHolderBean requestHolderBean;
+	private RequestUtilBean requestHolderBean;
 
 	/*
 	 * Submit generic to a plugin for processing. Data must be UTF-8 text. 

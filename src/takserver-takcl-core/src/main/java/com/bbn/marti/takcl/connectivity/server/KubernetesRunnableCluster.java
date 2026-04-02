@@ -40,7 +40,7 @@ public class KubernetesRunnableCluster extends AbstractRunnableServer {
             if (definition == ServerProcessDefinition.MessagingService) {
                 try {
                     List<V1Pod> pods = kh.getPods(definition);
-                    serverIdentifier.setUrl(pods.get(0).getStatus().getPodIP());
+                    serverIdentifier.setHost(pods.get(0).getStatus().getPodIP());
                 } catch (ApiException e) {
                     logger.error(e.getResponseBody());
                     throw new RuntimeException(e);

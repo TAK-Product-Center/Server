@@ -3,6 +3,7 @@ package tak.server.cache;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,10 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.Cache.ValueWrapper;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.support.SimpleValueWrapper;
 import org.springframework.context.annotation.Lazy;
 
 import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.exception.TakException;
 import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.repository.MissionRepository;
 import com.bbn.marti.sync.service.MissionService;
@@ -29,7 +30,7 @@ public class MissionCacheHelper {
     
     @Autowired
     @Qualifier("caffineCacheManager")
-    private CacheManager caffineCacheManager;
+    private CacheManager caffeineCacheManager;
 
 	@Autowired
 	@Lazy // lazy is necessary due to circular dependency. Could be fixed by wrapping this around whole mission data layer, or combining them.
@@ -43,7 +44,9 @@ public class MissionCacheHelper {
 	
 	@Autowired
 	AllCopMissionCacheResolver allCopMissionCacheResolver;
-	
+
+	private Object semaphoreLock = new Object();
+
 	private static final Logger logger = LoggerFactory.getLogger(MissionCacheHelper.class);
 	
 	public Mission getMission(String missionName, boolean hydrateDetails, boolean skipCache) {
@@ -51,6 +54,8 @@ public class MissionCacheHelper {
 		if (Strings.isNullOrEmpty(missionName)) {
 			throw new IllegalArgumentException("can't get cache for empty mission name");
 		}
+
+		missionName = missionName.toLowerCase();
 
 		if (skipCache) {
 			return doMissionQuery(missionName, hydrateDetails);
@@ -62,36 +67,43 @@ public class MissionCacheHelper {
 
 		ValueWrapper wrapper = getCacheManager().getCache(missionName).get(key);
 		mission = unwrapMission(wrapper);
-		
+
 		if (mission != null) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("cache hit for " + key);
 			}
 			return mission;
 		}
-		
+
 		if (logger.isDebugEnabled()) {
 			logger.debug("cache miss for " + key);
 		}
-		
+
+		// only lock on write
 		Semaphore lock = null;
 		try {
 			// only lock on cache miss. block to acquire semaphore.
 			lock = getMissionLock(key);
-			lock.acquire();
+			boolean acquired = lock.tryAcquire(CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getMissionCacheLockTimeoutMilliseconds(), TimeUnit.MILLISECONDS);
 
-			// double-checked cache get
-			wrapper = getCacheManager().getCache(missionName).get(key);	
-			mission = unwrapMission(wrapper);
+			if (!acquired) {
+				logger.warn("Timeout exceeded acquiring lock to fetch mission by name for key {}", key); // lock could not be acquired in time, skip cache and go directly to database 
+			}
 
-			if (mission != null) {
-				// cache hit - double-checked lock
-				return mission;
+			if (acquired) {
+				// double-checked cache get
+				wrapper = getCacheManager().getCache(missionName).get(key);	
+				mission = unwrapMission(wrapper);
+
+				if (mission != null) {
+					// cache hit - double-checked lock
+					return mission;
+				}
 			}
 
 			mission = doMissionQuery(missionName, hydrateDetails);
 
-			if (mission != null) {
+			if (acquired && mission != null) {
 
 				if (logger.isDebugEnabled()) {
 					logger.debug("Unproxy ExternalMissionData and MapLayer");
@@ -142,27 +154,35 @@ public class MissionCacheHelper {
 		if (logger.isDebugEnabled()) {
 			logger.debug("cache miss for " + key);
 		}
-		
+
 		Semaphore lock = null;
+
 		try {
 			// only lock on cache miss. block to acquire semaphore.
 			lock = getMissionLock(key);
-			lock.acquire();
 
-			// double-checked cache get
-			wrapper = getCacheManager().getCache(guid.toString()).get(key);	
-			mission = unwrapMission(wrapper);
+			boolean acquired = lock.tryAcquire(CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer().getQueue().getMissionCacheLockTimeoutMilliseconds(), TimeUnit.MILLISECONDS);
 
-			if (mission != null) {
-				// cache hit - double-checked lock
-				return mission;
+			if (!acquired) {
+				logger.warn("Timeout exceeded fetching mission by guid with key {}", key); // lock could not be acquired, proceed to do db query 
+			} else {
+
+				// double-checked cache get
+				wrapper = getCacheManager().getCache(guid.toString()).get(key);	
+				mission = unwrapMission(wrapper);
+
+				if (mission != null) {
+					// cache hit - double-checked lock
+					return mission;
+				}
 			}
 
 			mission = doMissionQueryGuid(guid, hydrateDetails);
-			
+
 			logger.debug("Mission from doMissionQueryGuid {} {}", guid, mission);
 
-			if (mission != null) {
+			// only do cache put if the lock was acquired
+			if (acquired && mission != null) {
 
 				if (logger.isDebugEnabled()) {
 					logger.debug("Unproxy ExternalMissionData and MapLayer");
@@ -176,7 +196,7 @@ public class MissionCacheHelper {
 			logger.error("interrupted", e);
 		} finally {
 			try {
-				// release lock and remove it from lock map
+				// release lock and remove it from lock map. Can call release even if not acquired.
 				lock.release();
 			} finally {
 				deleteLock(key);
@@ -258,24 +278,30 @@ public class MissionCacheHelper {
     	if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
     		return cacheManager;
     	} else {
-    		return caffineCacheManager;
+    		return caffeineCacheManager;
     	}
     }
 	
     private final ConcurrentHashMap<String, Semaphore> missionAvailableMap = new ConcurrentHashMap<>();
 	
     private Semaphore getMissionLock(String key) {
-		Semaphore lock = missionAvailableMap.get(key);
 
-		if (lock != null) {
+		synchronized(semaphoreLock) {
+
+			Semaphore lock = missionAvailableMap.get(key);
+
+			if (lock != null) {
+				return lock;
+			}
+
+			lock = new Semaphore(1, true);
+
+			missionAvailableMap.putIfAbsent(key, lock);
+
 			return lock;
+
 		}
 
-		lock = new Semaphore(1, true);
-
-		missionAvailableMap.putIfAbsent(key, lock);
-
-		return lock;
 	}
 
 	private void deleteLock(String key) {

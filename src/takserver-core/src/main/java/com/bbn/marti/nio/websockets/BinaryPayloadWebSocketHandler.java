@@ -1,5 +1,6 @@
 package com.bbn.marti.nio.websockets;
 
+import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -114,33 +115,48 @@ public class BinaryPayloadWebSocketHandler extends BinaryWebSocketHandler {
 		
 		websocketMap.put(hashCode(session), concurrentSession);
 
+		Resources.tcpProcessor.execute(() -> {
+			try {
+
+				String sessionId = ((WsSession) ((StandardWebSocketSession) session).getNativeSession()).getHttpSessionId();
+				websocketSessionIdMap.put(hashCode(session), sessionId);
+				
+				// this is blocking but has a time limit and is only called once per connection
+				SubscriptionManagerLite subMgr = smp().getSubscriptionManagerForClientUid(clientUid).get();
+				
+				if (subMgr == null) {
+					session.close();
+					return;
+				}
+
+				String handlingNode = subMgr.linkWebsocketToExistingSub(hashCode(session), clientUid,
+						session.getPrincipal().getName());
+				
+				if (handlingNode == null) {
+					session.close();
+					return;
+				}
+				
+				websocketMessagingMap.put(hashCode(session), handlingNode);
+
+			} catch (Exception e) {
+				if (logger.isTraceEnabled()) {
+					logger.trace("afterConnectionEstablished ERROR " + e);
+				}
+				forceClose(session);
+			}
+		});
+	}
+	
+	private void forceClose(WebSocketSession session) {
 		try {
-
-			String sessionId = ((WsSession) ((StandardWebSocketSession) session).getNativeSession()).getHttpSessionId();
-			websocketSessionIdMap.put(hashCode(session), sessionId);
-						
-			SubscriptionManagerLite subMgr = smp().getSubscriptionManagerForClientUid(clientUid);
-			
-			if (subMgr == null) {
-				session.close();
-				return;
+			session.close();
+		} catch (IOException e) {
+			try {
+				removeWebSocketSubscription(session);
+			} catch (Exception e1) {
+				logger.error("Error force closing websocket", e);
 			}
-
-			String handlingNode = subMgr.linkWebsocketToExistingSub(hashCode(session), clientUid,
-					session.getPrincipal().getName());
-			
-			if (handlingNode == null) {
-				session.close();
-				return;
-			}
-			
-			websocketMessagingMap.put(hashCode(session), handlingNode);
-
-		} catch (Exception e) {
-			if (logger.isTraceEnabled()) {
-				logger.trace("afterConnectionEstablished ERROR " + e);
-			}
-			throw e;
 		}
 	}
 

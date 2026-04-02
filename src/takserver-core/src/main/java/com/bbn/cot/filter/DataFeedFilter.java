@@ -202,15 +202,23 @@ public class DataFeedFilter {
 	}
 	
 	public void filterFederatedDataFeed(CotEventContainer cot) {
-		String dataFeedUuid = (String) cot.getContextValue(Constants.DATA_FEED_UUID_KEY);
-		DataFeedDTO dataFeed = dataFeedService.getDataFeedByUid(dataFeedUuid);
-
-		// submit data feed message for in memory caching			
-		DistributedDataFeedCotService.getInstance().cacheDataFeedEvent(dataFeed.toInput(), cot);
 
 		// if vbm is enabled and we're mission federating, only broker messages to clients subscribed to a mission that is linked to this data feed
 		// otherwise, this message will continue through federation brokering
 		if (isVbm() && isMissionDataFeedFederation()) {
+
+			String dataFeedUuid = (String) cot.getContextValue(Constants.DATA_FEED_UUID_KEY);
+			DataFeedDTO dataFeed = dataFeedService.getDataFeedByUid(dataFeedUuid);
+			if (dataFeed == null) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("getDataFeedByUid lookup failed for : " + dataFeedUuid);
+				}
+				return;
+			}
+
+			// submit data feed message for in memory caching
+			DistributedDataFeedCotService.getInstance().cacheDataFeedEvent(dataFeed.toInput(), cot);
+
 			if (dataFeed != null && dataFeed.getFederated()) {
 				// update fed feed counter
 				InputMetric metric = SubmissionService.getInstance().getInputMetric(dataFeed.getName());
@@ -414,7 +422,7 @@ public class DataFeedFilter {
 		return boundingBox;
 	}
 
-	private Cache<String, BoundingBox> cache;
+	private volatile Cache<String, BoundingBox> cache;
 	private Cache<String, BoundingBox> cache() {
 		if (cache == null) {
 			synchronized (this) {

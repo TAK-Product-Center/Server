@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -16,6 +15,25 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 import javax.naming.NamingException;
+
+import org.owasp.esapi.errors.IntrusionException;
+import org.owasp.esapi.errors.ValidationException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.bbn.marti.ValidatorUtils;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.exception.ForbiddenException;
+import com.bbn.marti.remote.groups.GroupManager;
+import com.bbn.marti.sync.Metadata.Field;
+import com.bbn.marti.sync.model.Mission;
+import com.bbn.marti.sync.model.MissionRole;
+import com.bbn.marti.sync.model.MissionSubscription;
+import com.bbn.marti.sync.service.MissionService;
+
+import com.google.common.base.Strings;
+
+import io.micrometer.core.instrument.Metrics;
 import jakarta.servlet.AsyncContext;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
@@ -23,18 +41,6 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
-
-import com.bbn.marti.remote.config.CoreConfigFacade;
-import org.owasp.esapi.errors.IntrusionException;
-import org.owasp.esapi.errors.ValidationException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.context.SecurityContextHolder;
-
-import com.bbn.marti.ValidatorUtils;
-import com.bbn.marti.sync.Metadata.Field;
-import com.google.common.base.Strings;
-
-import io.micrometer.core.instrument.Metrics;
 import tak.server.PluginManager;
 
 /**
@@ -48,10 +54,18 @@ public class UploadServlet extends EnterpriseSyncServlet {
 	private static final int DEFAULT_PARAMETER_LENGTH = 1024;
 	private static Set<String> optionalParameters;
 
+	final String fbadRequestPrefix = "";
+
 	private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UploadServlet.class);
 
 	@Autowired(required = false)
 	protected PluginManager pluginManager;
+
+	@Autowired
+	private GroupManager groupManager;
+
+	@Autowired
+	private MissionService missionService;
 
 	private int uploadSizeLimitMB;
 
@@ -111,13 +125,45 @@ public class UploadServlet extends EnterpriseSyncServlet {
 	 * @see <code>Metadata.Field</code>
 	 */
 	@Override
-	public void doPost(HttpServletRequest req, HttpServletResponse response) throws ServletException, IOException {
+	public void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
-		AsyncContext async = req.startAsync();
+		final boolean isAdmin = commonUtil.isAdmin((HttpServletRequest) request);
+		final String fgroupVector = commonUtil.getGroupBitVector((HttpServletRequest) request);
+		// Get the user ID from the request
+		String tusername = SecurityContextHolder.getContext().getAuthentication().getName();
+
+		final String context = "Upload request parameters";
+
+		try {
+			if (validator != null) {
+				tusername = validator.getValidInput(context, tusername,
+						Metadata.Field.SubmissionUser.validationType.name(),
+						Metadata.Field.SubmissionUser.maximumLength, true);
+			}
+		} catch (ValidationException validex) {
+			if (logger.isWarnEnabled()) {
+				logger.warn("ValidationException: {}", fbadRequestPrefix + validex.getLogMessage(), validex);
+			}
+			response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+					"Illegal parameters or characters detected. Accents and most punctuation characters are not allowed for security.");
+			return;
+		}
 		
+		String username = tusername;
+
+		logger.debug("is admin: {}", isAdmin);
+
+		Metrics.counter("DownloadMissionContent", "missions", "content").increment();
+
+		AsyncContext async = request.startAsync();
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("POST resource");
+		}
+
 		// Set the timeout for async context for file upload (ms)
 		async.setTimeout(CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getEnterpriseSyncSizeUploadTimeoutMillis());
-		
+
 		if (logger.isDebugEnabled()) {
 			logger.debug("POST upload");
 		}
@@ -127,19 +173,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 
 				try {
 
-					HttpServletRequest request = (HttpServletRequest) async.getRequest();
-
-					String groupVector = null;
-
-					try {
-						// Get group vector for the user associated with this session
-						groupVector = commonUtil.getGroupBitVector(request);
-						if (logger.isDebugEnabled()) {
-							logger.debug("groups bit vector: " + groupVector);
-						}
-					} catch (Exception e) {
-						logger.error("exception getting group membership for current user ", e);
-					}
+					String groupVector = fgroupVector;
 
 					if (Strings.isNullOrEmpty(groupVector)) {
 						throw new IllegalStateException("empty group vector");
@@ -150,13 +184,13 @@ public class UploadServlet extends EnterpriseSyncServlet {
 					}
 
 					String remoteHost = "unknown host";
-					String context = "Upload request parameters";
 					Metadata uploadedMetadata = null;
-					String badRequestPrefix = "";
+
+					String badRequestPrefix = fbadRequestPrefix;
 
 					// Process the HTTP request
 					try {
-						String requestHost = request.getRemoteHost();
+						String requestHost = ((HttpServletRequest) async.getRequest()).getRemoteHost();
 						if (requestHost != null && validator != null) {
 							remoteHost = validator.getValidInput("HttpServletRequest.getRemoteHost()", requestHost,
 									"MartiSafeString", DEFAULT_PARAMETER_LENGTH, false);
@@ -165,16 +199,16 @@ public class UploadServlet extends EnterpriseSyncServlet {
 
 						if (validator != null) {
 
-							ValidatorUtils.assertValidHTTPRequestParameterSet(context, request.getParameterMap().keySet(),
+							ValidatorUtils.assertValidHTTPRequestParameterSet(context, ((HttpServletRequest) async.getRequest()).getParameterMap().keySet(),
 									new HashSet<String>(),
 									optionalParameters, validator);
 						}
 
-						Map<String, String[]> httpParameters = request.getParameterMap();
+						Map<String, String[]> httpParameters = ((HttpServletRequest) async.getRequest()).getParameterMap();
 						Map<Metadata.Field, String[]> metadataParameters = new HashMap<Metadata.Field, String[]>();
 						for (String key : httpParameters.keySet()) {
 							Metadata.Field field = Metadata.Field.fromString(key);
-							if (field == null ) {
+							if (field == null) {
 								if (validator != null) {
 									response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Unrecognized parameter " +
 											validator.getValidInput(context, key, "MartiSafeString", DEFAULT_PARAMETER_LENGTH,
@@ -207,6 +241,30 @@ public class UploadServlet extends EnterpriseSyncServlet {
 								metadataParameters.put(field, values);
 							}
 						}
+
+						if (metadataParameters.get(Field.Groups) != null) {
+							String[] fileGroupNames = metadataParameters.get(Field.Groups);
+							String fileGroupVector = groupManager.validateAccess(fileGroupNames, groupVector);
+							groupVector = fileGroupVector;
+						}
+
+						if (metadataParameters.get(Field.MissionName) != null && CoreConfigFacade.getInstance()
+								.getRemoteConfiguration().getNetwork().isMissionUseGroupsForContents()) {
+							try {
+								String creatoruUid = metadataParameters.get(Field.CreatorUid)[0];
+								String missionName = metadataParameters.get(Field.MissionName)[0];
+								MissionSubscription subscription = missionService.
+										getMissionSubscriptionByMissionNameAndClientUidNoMission(missionName, creatoruUid);
+								if (subscription != null && subscription.getRole() != null &&
+										subscription.getRole().getRole() != MissionRole.Role.MISSION_READONLY_SUBSCRIBER) {
+									Mission mission = missionService.getMissionNoContent(missionName, groupVector);
+									groupVector = mission.getGroupVector();
+								}
+							} catch (Exception e) {
+								logger.error("exception attempting to use mission group vector for mission file", e);
+							}
+						}
+
 						Metadata toStore = Metadata.fromMap(metadataParameters);
 						commonUtil.validateMetadata(toStore);
 
@@ -215,7 +273,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 							logger.debug("Content length is " + request.getContentLength());
 						}
 
-						if (request.getContentLength() > uploadSizeLimitMB * 1000000) {
+						if (((HttpServletRequest) async.getRequest()).getContentLength() > uploadSizeLimitMB * 1000000) {
 							String message = "Uploaded file exceeds server's size limit of " + uploadSizeLimitMB + " MB! (limit is set in CoreConfig.xml network.enterpriseSyncSizeLimitMB";
 
 							if (logger.isWarnEnabled()) {
@@ -223,7 +281,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 							}
 							response.sendError(HttpServletResponse.SC_BAD_REQUEST, message);
 							return;
-						} else if (request.getContentLength() < 1) {
+						} else if (((HttpServletRequest) async.getRequest()).getContentLength() < 1) {
 							String message = "HTTP request body has no content.";
 
 							if (logger.isWarnEnabled()) {
@@ -235,12 +293,12 @@ public class UploadServlet extends EnterpriseSyncServlet {
 
 						// assign random to resource if not specified in request
 						if (toStore.getUid() == null || toStore.getUid().isEmpty()) {
-							toStore.set(Metadata.Field.UID, new String[] {UUID.randomUUID().toString()});
+							toStore.set(Metadata.Field.UID, new String[]{UUID.randomUUID().toString()});
 						}
 
-						String mimeType = request.getHeader("Content-Type");
+						String mimeType = ((HttpServletRequest) async.getRequest()).getHeader("Content-Type");
 
-						InputStream inputStream = request.getInputStream();
+						InputStream inputStream = ((HttpServletRequest) async.getRequest()).getInputStream();
 
 						if (mimeType == null || !mimeType.contains("multipart/form-data")) {
 
@@ -252,19 +310,19 @@ public class UploadServlet extends EnterpriseSyncServlet {
 								logger.debug("reading payload from request");
 							}
 
-							inputStream = request.getInputStream();
+							inputStream = ((HttpServletRequest) async.getRequest()).getInputStream();
 
 						} else {
-							Collection<Part> parts = request.getParts();
+							Collection<Part> parts = ((HttpServletRequest) async.getRequest()).getParts();
 
 							if (logger.isDebugEnabled()) {
 								logger.debug("Uploading multi-part content with " + parts.size() + " parts.");
 							}
 							// ATAK sends a part called "assetfile"
-							Part part = request.getPart("assetfile");
+							Part part = ((HttpServletRequest) async.getRequest()).getPart("assetfile");
 							if (part == null) {
 								// Firefox and Chrome browsers send a part called "resource"
-								part = request.getPart("resource");
+								part = ((HttpServletRequest) async.getRequest()).getPart("resource");
 							}
 
 							if (part != null) {
@@ -277,7 +335,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 							} else {
 								for (Part myPart : parts) {
 									if (logger.isDebugEnabled()) {
-										logger.debug(myPart.getName() + ": " + myPart.getContentType() );
+										logger.debug(myPart.getName() + ": " + myPart.getContentType());
 									}
 								}
 
@@ -309,9 +367,9 @@ public class UploadServlet extends EnterpriseSyncServlet {
 											Metadata.Field.DownloadPath.maximumLength, true);
 								}
 
-								toStore.set(Metadata.Field.DownloadPath, new String[] {filename});
+								toStore.set(Metadata.Field.DownloadPath, new String[]{filename});
 								if (toStore.getFirstSafely(Field.Name).isEmpty()) {
-									toStore.set(Metadata.Field.Name, new String[] {filename});
+									toStore.set(Metadata.Field.Name, new String[]{filename});
 								}
 							}
 							mimeType = part.getHeader("content-type");
@@ -322,15 +380,9 @@ public class UploadServlet extends EnterpriseSyncServlet {
 						if (mimeType != null) {
 							toStore.set(Metadata.Field.MIMEType, mimeType);
 						}
-						// Get the user ID from the request
-						String userName = SecurityContextHolder.getContext().getAuthentication().getName();
-						if (validator != null) {
-							userName = validator.getValidInput(context, userName,
-									Metadata.Field.SubmissionUser.validationType.name(),
-									Metadata.Field.SubmissionUser.maximumLength, true);
-						}
-						if (userName != null) {
-							toStore.set(Metadata.Field.SubmissionUser, userName);
+
+						if (username != null) {
+							toStore.set(Metadata.Field.SubmissionUser, username);
 						}
 
 						uploadedMetadata = enterpriseSyncService.insertResourceStream(toStore, inputStream, groupVector); // do not validate file length, as that's already checked above 
@@ -349,7 +401,7 @@ public class UploadServlet extends EnterpriseSyncServlet {
 							logger.error("exception calling pluginManager.onFileUpload", e);
 						}
 
-					} catch (NamingException|SQLException ex) {
+					} catch (NamingException | SQLException ex) {
 						String msg = "Enterprise Sync database failed to process write operation.";
 						response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, msg);
 
@@ -417,12 +469,17 @@ public class UploadServlet extends EnterpriseSyncServlet {
 					}
 
 					response.setStatus(HttpServletResponse.SC_OK);
+				} catch (ForbiddenException e) {
+					logger.error("Illegal attempt to set groupVector for File!", e);
+					throw e;
 				} catch (Exception e) {
 					logger.error("error processing file POST", e);
 				} finally {
 					async.complete();
 				}
 			});
+		} catch (ForbiddenException e) {
+			throw e;
 		} catch (Exception e) {
 			logger.error("error uploading file", e);
 		}

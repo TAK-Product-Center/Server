@@ -10,6 +10,7 @@ import java.io.Serializable;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
+import java.nio.charset.StandardCharsets;
 import java.rmi.RemoteException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
@@ -18,7 +19,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -41,10 +41,67 @@ import javax.naming.NamingException;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 
-import com.bbn.marti.config.Configuration;
+import com.atakmap.Tak.*;
+import com.atakmap.Tak.Subscription;
+import com.bbn.cot.CotParserCreator;
+import com.bbn.marti.config.*;
+import com.bbn.marti.remote.util.*;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import org.antlr.v4.runtime.ANTLRInputStream;
+import org.antlr.v4.runtime.BailErrorStrategy;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.dom4j.Document;
+import org.dom4j.DocumentException;
+import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.atakmap.Tak.FederatedChannelGrpc.FederatedChannelBlockingStub;
+import com.atakmap.Tak.FederatedChannelGrpc.FederatedChannelStub;
+import com.atakmap.Tak.ROL.Builder;
+import com.atakmap.Tak.ServerHealth.ServingStatus;
+import com.bbn.cot.filter.DataFeedFilter;
+import com.bbn.marti.config.Federation.Federate;
+import com.bbn.marti.config.Federation.FederationOutgoing;
+import com.bbn.marti.groups.CommonGroupDirectedReachability;
+import com.bbn.marti.groups.GroupFederationUtil;
+import com.bbn.marti.groups.MessagingUtilImpl;
+import com.bbn.marti.groups.PeriodicUpdateCancellationException;
+import com.bbn.marti.nio.channel.ChannelHandler;
+import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
+import com.bbn.marti.nio.server.Server;
+import com.bbn.marti.remote.ConnectionStatus;
+import com.bbn.marti.remote.ConnectionStatusValue;
+import com.bbn.marti.remote.SubmissionInterface;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.exception.DuplicateFederateException;
+import com.bbn.marti.remote.exception.TakException;
+import com.bbn.marti.remote.groups.ConnectionInfo;
+import com.bbn.marti.remote.groups.Direction;
+import com.bbn.marti.remote.groups.FederateUser;
+import com.bbn.marti.remote.groups.Group;
+import com.bbn.marti.remote.groups.GroupManager;
+import com.bbn.marti.remote.groups.Reachability;
+import com.bbn.marti.remote.groups.User;
+import com.bbn.marti.service.FederatedSubscriptionManager;
+import com.bbn.marti.service.RepositoryService;
+import com.bbn.marti.service.Resources;
+import com.bbn.marti.service.SSLConfig;
+import com.bbn.marti.service.SubscriptionManager;
+import com.bbn.marti.service.SubscriptionStore;
+import com.bbn.marti.sync.federation.FederationROLHandler;
+import com.bbn.marti.util.MessageConversionUtil;
+import com.bbn.marti.util.MessagingDependencyInjectionProxy;
+import com.bbn.marti.util.VersionBean;
+import com.bbn.marti.util.concurrent.future.AsyncCallback;
+import com.bbn.marti.util.concurrent.future.AsyncFuture;
+import com.bbn.roger.fig.FederationUtils;
+import com.bbn.roger.fig.FigProtocolNegotiator;
+import com.bbn.roger.fig.Propagator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
-import com.google.common.collect.ComparisonChain;
 import com.google.protobuf.ByteString;
 
 import io.grpc.ClientCall;
@@ -61,75 +118,6 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
-
-import org.antlr.v4.runtime.ANTLRInputStream;
-import org.antlr.v4.runtime.BailErrorStrategy;
-import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.tree.ParseTree;
-import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import com.atakmap.Tak.BinaryBlob;
-import com.atakmap.Tak.CRUD;
-import com.atakmap.Tak.ClientHealth;
-import com.atakmap.Tak.ContactListEntry;
-import com.atakmap.Tak.FederateGroups;
-import com.atakmap.Tak.FederatedChannelGrpc;
-import com.atakmap.Tak.FederatedChannelGrpc.FederatedChannelBlockingStub;
-import com.atakmap.Tak.FederatedChannelGrpc.FederatedChannelStub;
-import com.atakmap.Tak.FederatedEvent;
-import com.atakmap.Tak.Identity;
-import com.atakmap.Tak.ROL;
-import com.atakmap.Tak.ROL.Builder;
-import com.atakmap.Tak.ServerHealth;
-import com.atakmap.Tak.ServerHealth.ServingStatus;
-import com.atakmap.Tak.Subscription;
-import com.atakmap.Tak.TakServerVersion;
-import com.bbn.cot.filter.DataFeedFilter;
-import com.bbn.marti.config.Federation;
-import com.bbn.marti.config.Federation.Federate;
-import com.bbn.marti.config.Federation.FederationOutgoing;
-import com.bbn.marti.config.Input;
-import com.bbn.marti.config.Tls;
-import com.bbn.marti.groups.CommonGroupDirectedReachability;
-import com.bbn.marti.groups.GroupFederationUtil;
-import com.bbn.marti.groups.MessagingUtilImpl;
-import com.bbn.marti.groups.PeriodicUpdateCancellationException;
-import com.bbn.marti.nio.channel.ChannelHandler;
-import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
-import com.bbn.marti.nio.server.Server;
-import com.bbn.marti.remote.ConnectionStatus;
-import com.bbn.marti.remote.ConnectionStatusValue;
-import com.bbn.marti.remote.SubmissionInterface;
-import com.bbn.marti.remote.exception.DuplicateFederateException;
-import com.bbn.marti.remote.exception.TakException;
-import com.bbn.marti.remote.groups.ConnectionInfo;
-import com.bbn.marti.remote.groups.Direction;
-import com.bbn.marti.remote.groups.FederateUser;
-import com.bbn.marti.remote.groups.Group;
-import com.bbn.marti.remote.groups.GroupManager;
-import com.bbn.marti.remote.groups.Reachability;
-import com.bbn.marti.remote.groups.User;
-import com.bbn.marti.remote.util.RemoteUtil;
-import com.bbn.marti.service.FederatedSubscriptionManager;
-import com.bbn.marti.service.RepositoryService;
-import com.bbn.marti.service.Resources;
-import com.bbn.marti.service.SSLConfig;
-import com.bbn.marti.service.SubscriptionManager;
-import com.bbn.marti.service.SubscriptionStore;
-import com.bbn.marti.sync.federation.FederationROLHandler;
-import com.bbn.marti.util.MessageConversionUtil;
-import com.bbn.marti.util.MessagingDependencyInjectionProxy;
-import com.bbn.marti.util.VersionBean;
-import com.bbn.marti.util.concurrent.future.AsyncCallback;
-import com.bbn.marti.util.concurrent.future.AsyncFuture;
-import com.bbn.marti.remote.util.SpringContextBeanForApi;
-import com.bbn.roger.fig.FederationUtils;
-import com.bbn.roger.fig.FigProtocolNegotiator;
-import com.bbn.roger.fig.Propagator;
-
 import mil.af.rl.rol.FederationProcessor;
 import mil.af.rl.rol.Resource;
 import mil.af.rl.rol.ResourceOperationParameterEvaluator;
@@ -137,10 +125,9 @@ import mil.af.rl.rol.RolLexer;
 import mil.af.rl.rol.RolParser;
 import mil.af.rl.rol.value.Parameters;
 import mil.af.rl.rol.value.ResourceDetails;
-
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
+import tak.server.cot.CotParser;
 import tak.server.federation.rol.MissionRolVisitor;
 import tak.server.messaging.Messenger;
 
@@ -191,10 +178,13 @@ public class TakFigClient implements Serializable {
 	@SuppressWarnings("unused")
 	private FederatedChannelBlockingStub blockingFederatedChannel;
 	private FederatedChannelStub asyncFederatedChannel;
+	private FederatedChannelStub asyncNoAuthChannel;
 
 	public FederatedChannelStub getAsyncFederatedChannel() {
 		return asyncFederatedChannel;
 	}
+	
+	private FederateProvenance provenance;
 
 	private String fedName = "";
 
@@ -205,6 +195,8 @@ public class TakFigClient implements Serializable {
 	private String clientUid = "";
 	
 	private String connectionToken = "";
+	private boolean useToken = false;
+	private String tokenType = "";
 
 	private FigFederateSubscription federateSubscription = null;
 
@@ -263,6 +255,8 @@ public class TakFigClient implements Serializable {
 
 	private ClientCall<ROL, Subscription> rolCall;
 
+	private static final ObjectMapper groupsMapper = new ObjectMapper()
+			.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
 	public GuardedStreamHolder<ROL> getRolCall() {
 		return rolHolder;
@@ -275,6 +269,12 @@ public class TakFigClient implements Serializable {
 		this.outgoingName = outgoing.getDisplayName();
 		this.status = status;
 		this.connectionToken = outgoing.getConnectionToken();
+		this.useToken = outgoing.isUseToken();
+		this.tokenType = outgoing.getTokenType();
+		
+		provenance = FederateProvenance.newBuilder()
+    			.setFederationServerId(CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getServerId())
+    			.build();
 		
 		Tls figTls = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getTls();
 
@@ -342,7 +342,7 @@ public class TakFigClient implements Serializable {
 			
 			SslContextBuilder sslContextBuilder;
 			// don't use a key manager if we are using token auth
-			if (!Strings.isNullOrEmpty(connectionToken)) {
+			if (useToken) {
 				sslContextBuilder = GrpcSslContexts.configure(SslContextBuilder.forClient(), SslProvider.OPENSSL)  // this ensures that we are using OpenSSL, not JRE SSL
 						.trustManager(trustMgrFactory);
 			} else {
@@ -367,15 +367,6 @@ public class TakFigClient implements Serializable {
 
 		} catch (Exception e) {
 			logger.error("exception setting up TLS config", e);
-		}
-
-		blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel);
-				
-		if (!Strings.isNullOrEmpty(connectionToken)) {
-			TokenAuthCredential credential = new TokenAuthCredential(connectionToken);
-			asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
-		} else {
-			asyncFederatedChannel = FederatedChannelGrpc.newStub(channel);
 		}
 
 		connectionInfo = new ConnectionInfo();
@@ -511,10 +502,60 @@ public class TakFigClient implements Serializable {
 				return "FIG channel handler " + connectionInfo;
 			}
 		};
+		
+		if (useToken) {
+			if ("automatic".equals(tokenType.toLowerCase())) {
+				asyncNoAuthChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(null);
+                
+				Tls tls = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer()
+						.getTls();
+				
+                X509Certificate clientCert = null;
+                BinaryBlob certPayload = null;
+                try {
+					clientCert = FederationUtils.loadX509CertFromJKSFile(tls.getKeystoreFile(),tls.getKeystorePass());
+	                certPayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(clientCert.getEncoded()))).build();
+				} catch (Exception e) {
+					processDisconnect(new FederationException("Could not load keystore for use in token exchange"));
+				}
+                
+                asyncNoAuthChannel.getAuthTokenByX509(certPayload, new StreamObserver<com.atakmap.Tak.FederateTokenResponse>() {
+					@Override
+					public void onNext(FederateTokenResponse value) {
+						TokenAuthCredential credential = new TokenAuthCredential(value.getToken());
+						blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel).withCallCredentials(credential);
+						asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
+						
+						federateSubscription.initSenders();
+						
+						init();
+						SubscriptionStore.getInstanceFederatedSubscriptionManager().updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
+					}
 
-		// connect to server, and start receiving messages.
-		init();
-		SubscriptionStore.getInstanceFederatedSubscriptionManager().updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
+					@Override
+					public void onError(Throwable t) {
+						processDisconnect(t);
+					}
+
+					@Override
+					public void onCompleted() {}
+                	
+                });
+			} else {
+				TokenAuthCredential credential = new TokenAuthCredential(connectionToken);
+				blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel).withCallCredentials(credential);
+				asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
+				
+				init();
+				SubscriptionStore.getInstanceFederatedSubscriptionManager().updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
+			}
+		} else {
+			blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel);
+			asyncFederatedChannel = FederatedChannelGrpc.newStub(channel);
+
+			init();
+			SubscriptionStore.getInstanceFederatedSubscriptionManager().updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
+		}
 	}
 
 	private NavigableSet<Group> getGroupsForActiveSubscription() throws RemoteException {
@@ -603,6 +644,8 @@ public class TakFigClient implements Serializable {
 								return;
 							}
 						}
+						
+						fedManager.addFederationProvenance(cot);
 
 						cot.setContext(GroupFederationUtil.FEDERATE_ID_KEY, clientUid);
 			            cot.setContext(Constants.SOURCE_HASH_KEY, figDummyChannelHandler.identityHash());
@@ -707,11 +750,13 @@ public class TakFigClient implements Serializable {
 						ContactListEntry contact = fedEvent.getContact();
 						if (contact.getOperation() == CRUD.DELETE) {
 							CotEventContainer e = ProtoBufHelper.getInstance().protoBuf2delContact(contact);
+							fedManager.addFederationProvenance(e);
 							Collection<com.bbn.marti.service.Subscription> reachable = groupFederationUtil.getReachableSubscriptions(federateSubscription);
 							if (reachable.contains(federateSubscription)) {
 								logger.warn("reachable contained self!");
 								reachable.remove(federateSubscription);
 							}
+							
 							e.setContext(Constants.NOFEDV2_KEY, true);
 							e.setContext(GroupFederationUtil.FEDERATE_ID_KEY, clientUid);
 							e.setContextValue(Constants.SUBSCRIBER_HITS_KEY, subscriptionStore.subscriptionCollectionToConnectionIdSet(reachable));
@@ -815,8 +860,49 @@ public class TakFigClient implements Serializable {
 											return;
 										}
 
-										if (rolLogger.isDebugEnabled()) {
-											rolLogger.debug("received ROL from server: " + rol.getProgram());
+										rolLogger.debug("received ROL from server (payload count: {}): {}", rol.getPayloadCount(), rol.getProgram());
+										if (rol.getPayloadCount() > 0) {
+
+											CotEventContainer cot = null;
+											NavigableSet<Group> groups = null;
+
+											for (int i = 0; i < rol.getPayloadCount(); i++) {
+												logger.debug("Got payload {} size ({})", i, rol.getPayload(i).getSerializedSize());
+
+												BinaryBlob payload = rol.getPayload(i);
+												if (payload.getType().equals(BINARY_TYPES.OTHER) && payload.getDescription().equals(CotEventContainer.class.getName())) {
+
+													String cotString = new String(payload.getData().toByteArray(), StandardCharsets.UTF_8);
+													CotParser cotParser = CotParserCreator.newInstance();
+													Document doc = null;
+													try {
+														doc = cotParser.parse(cotString);
+													} catch (DocumentException e) {
+														logger.error("Error parsing rol cot payload", e);
+													}
+
+													if (doc != null) {
+														cot = new CotEventContainer(doc);
+													}
+
+												} else if (payload.getType().equals(BINARY_TYPES.OTHER) && payload.getDescription().equals(GroupsPayload.class.getName())) {
+													byte[] data = payload.getData().toByteArray();
+													GroupsPayload gp = null;
+													try {
+														gp = groupsMapper.readValue(data, GroupsPayload.class);
+														groups = gp.toNavigableSet();
+													} catch (IOException e) {
+														logger.error("Error parsing rol groups payload", e);
+													}
+												}
+											}
+
+											if (cot != null && groups != null) {
+												logger.trace("Got cot event container from ROL: {}", cot);
+												logger.trace("Got groups set from ROL: {}", groups);
+												cot.setContext(Constants.GROUPS_KEY, groups);
+												cotMessenger.send(cot);
+											}
 										}
 
 										// interpret and execute the ROL program
@@ -920,8 +1006,12 @@ public class TakFigClient implements Serializable {
 												try {
 													ROL modifiedFeedMessage = feedMessage;
 													if (federate.isFederatedGroupMapping() && fOutGroups != null && fOutGroups.size() > 0) {
+														FederateGroupHopLimits groupHopsLimits = groupFederationUtil
+																.getFederateGroupHopsLimitsForFederate(federate, fOutGroups);
+														
 														ROL.Builder changeBuilder = modifiedFeedMessage.toBuilder();
 														changeBuilder.addAllFederateGroups(fOutGroups);
+														changeBuilder.setFederateGroupHopLimits(groupHopsLimits);														
 														modifiedFeedMessage = changeBuilder.build();
 													}
 													rolHolder.send(modifiedFeedMessage);
@@ -964,8 +1054,12 @@ public class TakFigClient implements Serializable {
 										missionChanges.forEach((change) -> {
 
 											if (federate.isFederatedGroupMapping() && fOutGroups != null && fOutGroups.size() > 0) {
+												FederateGroupHopLimits groupHopsLimits = groupFederationUtil
+														.getFederateGroupHopsLimitsForFederate(federate, fOutGroups);
+												
 												ROL.Builder changeBuilder = change.toBuilder();
 												changeBuilder.addAllFederateGroups(fOutGroups);
+												changeBuilder.setFederateGroupHopLimits(groupHopsLimits);								
 												change = changeBuilder.build();
 											}
 
@@ -1016,17 +1110,6 @@ public class TakFigClient implements Serializable {
 			}, CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getHealthCheckIntervalSeconds(),
 					CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getHealthCheckIntervalSeconds(), TimeUnit.SECONDS);
 
-			// send health check messages according to the configuration
-			Resources.repeaterPool.scheduleWithFixedDelay(new Runnable() {
-				@Override
-				public void run() {
-
-					if (!running.get()) {
-						throw new PeriodicUpdateCancellationException("cancelling updates - not running");
-					}
-				}
-			}, CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getHealthCheckIntervalSeconds(),
-					CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getHealthCheckIntervalSeconds(), TimeUnit.SECONDS);
 		} else {
 			logger.warn("FIG health check disabled in config (health check interval seconds < 1)");
 		}
@@ -1056,14 +1139,8 @@ public class TakFigClient implements Serializable {
 
 		// Notify gRPC to receive one response. Without this line, onMessage() would never be called.
 		rolCall.request(1);
-
-		rolHolder = new GuardedStreamHolder<ROL>(rolCall, getClientName(),
-				new Comparator<ROL>() {
-					@Override
-					public int compare(ROL a, ROL b) {
-						return ComparisonChain.start().compare(a.hashCode(), b.hashCode()).result();
-					}
-				}, false);
+		
+		rolHolder = new GuardedStreamHolder<ROL>(rolCall, getClientName(), provenance);
 
 		rolHolder.setMaxFederateHops(getFederate().getMaxHops());
 
@@ -1144,7 +1221,7 @@ public class TakFigClient implements Serializable {
 
 							String caFingerprint = Optional.ofNullable(caCert).map(ca->RemoteUtil.getInstance().getCertSHA256Fingerprint(ca)).orElse("");
 
-							boolean matchingCA = GroupFederationUtil.getInstance().isRemoteCASelfCA(caCert);
+							boolean matchingCA = GroupFederationUtil.getInstance().isRemoteCASelfCA(caFingerprint);
 
 							if (federate == null) {
 
@@ -1237,7 +1314,7 @@ public class TakFigClient implements Serializable {
 							FederateUser user = new FederateUser(fingerprint, connectionInfo.getConnectionId(), fedName, connectionInfo.getAddress(), cert, new X509Certificate[0], federate);
 
 							groupManager.addUser(user);
-
+							
 							// setup federate groups. For a new federate config object, these lists will be empty.
 							for (String groupName : federate.getInboundGroup()) {
 								groupManager.addUserToGroup(user, new Group(groupName, Direction.IN));
@@ -1359,7 +1436,13 @@ public class TakFigClient implements Serializable {
 
 			if (groups != null) {
 				ROL.Builder builder = rol.toBuilder();
+				
+				FederateGroupHopLimits groupHopsLimits = groupFederationUtil
+						.getFederateGroupHopsLimitsForFederate(fedManager().getFederate(federateId), groups);
+				
 				builder.addAllFederateGroups(groups);
+				builder.setFederateGroupHopLimits(groupHopsLimits);
+				
 				rol = builder.build();
 			}
 
@@ -1385,8 +1468,6 @@ public class TakFigClient implements Serializable {
 				if (logger.isDebugEnabled()) {
 					logger.debug("Received remote federate groups = " + value);
 				}
-
-				logger.debug("Received remote federate groups = " + value);
 
 				// once the group stream is established, we are ready to setup event streaming
 				if (value.getStreamUpdate() != null && value.getStreamUpdate().getStatus() == ServingStatus.SERVING) {
@@ -1615,10 +1696,6 @@ public class TakFigClient implements Serializable {
 			fedManager = SpringContextBeanForApi.getSpringContext().getBean(DistributedFederationManager.class);
 		}
 		return fedManager;
-	}
-
-	private synchronized void rolSendSync(ROL rol) {
-		rolHolder.send(rol);
 	}
 
 	public int getFederateMaxHops() {

@@ -1,0 +1,100 @@
+<h1 mat-dialog-title class="dialogHeader">{{editorTitle}} CA Group</h1>
+<!-- 
+<mat-dialog-content class="mat-typography">
+  <button class="btn btn-primary" type="button" (click)="modifyCa()">Remove CA's</button>
+  <button *ngIf="editExisting" class="btn btn-primary" type="button" (click)="showActiveConnections()">Show Active Connections</button>
+</mat-dialog-content> -->
+
+<mat-dialog-content class="mat-typography">
+    <div class="d-flex justify-content-end mb-3">
+        <button [disabled]="userForm.invalid || existingName()" (click)="generateToken()" class="btn btn-primary" style="margin-right: 3px;">Generate Token</button>
+        <button class="btn btn-primary">Show Active Connections</button>
+    </div>
+  <form (ngSubmit)="onSave(federation)" #userForm="ngForm">
+    <div class="form-group">
+      <label for="id">Token Group Name</label>
+      <input
+        [disabled]="editExisting || federation.tokens.length > 0"
+        type="text"
+        id="stringId"
+        class="form-control"
+        [(ngModel)]="federation.stringId"
+        name="stringId"
+        required
+      />
+      <div *ngIf="existingName()" class="text-danger">
+        This name already exists!
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="description">Description</label>
+      <input
+        type="text"
+        id="description"
+        class="form-control"
+        [(ngModel)]="federation.description"
+        name="description"
+        maxlength="75"
+      />
+      <small class="form-text text-muted">{{ federation.description ? (75 - federation.description.length) : 75 }} characters remaining</small>
+    </div>
+
+    <div class="form-group">
+      <label for="expiration">Valid For (ms)</label>
+      <input
+        type="number"
+        id="expiration"
+        class="form-control"
+        [(ngModel)]="federation.expiration"
+        name="expiration"
+        min="-1" 
+        required
+      />
+      <span>
+        <button (click)="federation.expiration = -1">No Exp</button>
+        <button (click)="federation.expiration = 3600000">1 Hour</button>
+        <button (click)="federation.expiration = 86400000">1 Day</button>
+        <button (click)="federation.expiration = 604800000">1 Week</button>
+        <button (click)="federation.expiration = 18144000000">1 Month</button>
+        <button (click)="federation.expiration = 31536000000">1 Year</button>
+    </span>
+    </div>
+
+    <div class="form-group">
+      <label>Interconnected</label>
+      <div>
+        <input
+          type="checkbox"
+          name="interconnected"
+          [(ngModel)]="federation.interconnected"
+        />
+      </div>
+    </div>
+    <!-- <button type="submit" class="btn btn-primary" [disabled]="userForm.invalid">Submit</button> -->
+  </form>
+  <div class="card p-4 mt-4">
+    <h4>Generated Tokens</h4>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Copy Token</th>
+          <th>Expiration</th>
+          <th>Delete</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let token of federation.tokens">
+          <td><button (click)="copyToken(token.token)" class="btn btn-light btn-sm">{{previewToken(token.token)}}</button></td>
+          <td>{{getDisplayDate(token.expiration)}}</td>
+          <td><button (click)="deleteToken(token)" class="btn btn-danger btn-sm">Delete</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button (click)="onCancel()" mat-button mat-dialog-close class="btn btn-just-outline border-radius margin-right">Cancel</button>
+  <button class="btn btn-primary" (click)="onSave(federation)" [disabled]="userForm.invalid || existingName()" [mat-dialog-close]="true">Save</button>
+</mat-dialog-actions>
+

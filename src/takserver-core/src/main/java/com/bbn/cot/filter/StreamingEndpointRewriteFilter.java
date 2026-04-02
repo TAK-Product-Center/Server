@@ -2,6 +2,7 @@
 
 package com.bbn.cot.filter;
 
+import java.util.Date;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 import javax.naming.ldap.LdapName;
 
@@ -26,6 +28,10 @@ import com.atakmap.Tak.ROL;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.nio.channel.ChannelHandler;
 import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.exception.ForbiddenException;
+import com.bbn.marti.remote.groups.Direction;
+import com.bbn.marti.remote.groups.FederateUser;
+import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.sync.MissionContent;
@@ -62,8 +68,10 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 	public static String MISSION_ATTR_GUID = "mission-guid";
 	public static String PATH_ATTR = "path";
 	public static String AFTER_ATTR = "after";
+	public static String GROUP_ATTR = "group";
 
-  	public static String DEST_XPATH = String.format("/event/detail/marti/dest[@%s or @%s or @%s or @%s or @%s or @%s or @%s]", CALLSIGN_ATTR, PUBLISH_ATTR, UID_ATTR, MISSION_ATTR, PATH_ATTR, AFTER_ATTR, MISSION_ATTR_GUID);
+  	public static String DEST_XPATH = String.format("/event/detail/marti/dest[@%s or @%s or @%s or @%s or @%s or @%s or @%s or @%s]",
+			CALLSIGN_ATTR, PUBLISH_ATTR, UID_ATTR, MISSION_ATTR, PATH_ATTR, AFTER_ATTR, MISSION_ATTR_GUID, GROUP_ATTR);
 
   	private static final Logger logger = LoggerFactory.getLogger(StreamingEndpointRewriteFilter.class);
 
@@ -78,6 +86,9 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 
   	@Autowired
    	private DistributedFederationManager federationManager;
+
+	@Autowired
+	private GroupManager groupManager;
 
    	@Autowired
    	ApplicationContext context;
@@ -106,6 +117,7 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 				List<String> publishList = new LinkedList<String>();
 				List<String> callsignList = new LinkedList<String>();
 				Set<String> uids = new HashSet<>();
+				ConcurrentSkipListSet<Group> destGroups = new ConcurrentSkipListSet<>();
 				
 				// Mission name supporting data structures
 				Set<String> missionNames = new HashSet<>();
@@ -203,7 +215,22 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
                     			}
                     		}
                     	}
-                    }
+                    } else if (detached.attribute(GROUP_ATTR) != null) {
+						String destGroupName = detached.attributeValue(GROUP_ATTR);
+						Group destGroup = groupManager.hydrateGroup(new Group(destGroupName, Direction.IN));
+
+						NavigableSet<Group> currentGroups = (NavigableSet<Group>)cot.getContext(Constants.GROUPS_KEY);
+						if (!currentGroups.contains(destGroup)) {
+							throw new ForbiddenException(
+									"illegal attempt to set group " + destGroupName + " for uid" + cot.getUid());
+						}
+
+						destGroups.add(destGroup);
+					}
+				}
+
+				if (destGroups.size() > 0) {
+					cot.setContext(Constants.GROUPS_KEY, destGroups);
 				}
 
 				if (publishList.size() > 0) {
@@ -274,45 +301,51 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 
 				MissionSubscription missionSubscription = null;
 				User user = (User) cot.getContextValue(Constants.USER_KEY);
-				if (user != null) {
-					missionSubscription = missionService
-							.getMissionSubcriptionByMissionNameAndClientUidAndUsernameNoMission(
-									missionName, clientUid, user.getName());
 
-					if (missionSubscription == null
-							&& user.getCert() != null && user.getCert().getSubjectX500Principal() != null) {
-						// lookup the mission subscription based on CN, needed when input auth=ldap or auth=file
-						String cn = new LdapName(user.getCert().getSubjectX500Principal().getName())
-								.getRdns().stream().filter(i -> i.getType().equalsIgnoreCase("CN"))
-								.findFirst().get().getValue().toString();
+				// skip permissions checks for federate users
+				boolean federateUser = user != null && user instanceof FederateUser;
+				if (!federateUser) {
+
+					if (user != null) {
 						missionSubscription = missionService
 								.getMissionSubcriptionByMissionNameAndClientUidAndUsernameNoMission(
-										missionName, clientUid, cn);
+										missionName, clientUid, user.getName());
+
+						if (missionSubscription == null
+								&& user.getCert() != null && user.getCert().getSubjectX500Principal() != null) {
+							// lookup the mission subscription based on CN, needed when input auth=ldap or auth=file
+							String cn = new LdapName(user.getCert().getSubjectX500Principal().getName())
+									.getRdns().stream().filter(i -> i.getType().equalsIgnoreCase("CN"))
+									.findFirst().get().getValue().toString();
+							missionSubscription = missionService
+									.getMissionSubcriptionByMissionNameAndClientUidAndUsernameNoMission(
+											missionName, clientUid, cn);
+						}
+
+					} else {
+						missionSubscription = missionService.getMissionSubscriptionByMissionNameAndClientUidNoMission(
+								missionName, clientUid);
 					}
 
-				} else {
-					missionSubscription = missionService.getMissionSubscriptionByMissionNameAndClientUidNoMission(
-							missionName, clientUid);
-				}
+					if (missionSubscription == null) {
+						logger.error("unable to find mission subscription for client " + missionName + ", " + clientUid);
+						continue;
+					} else {
+						if (changeLogger.isDebugEnabled()) {
+							changeLogger.debug("mission sub for explcit mission sender to " + missionName + ": " + missionSubscription);
+						}
+					}
 
-				if (missionSubscription == null) {
-					logger.error("unable to find mission subscription for client " + missionName + ", " + clientUid);
-					continue;
-				} else {
-					if (changeLogger.isDebugEnabled()) {
-						changeLogger.debug("mission sub for explcit mission sender to " + missionName + ": " + missionSubscription);
+					if (missionSubscription.getRole() != null && !missionSubscription.getRole().
+							hasPermission(MissionPermission.Permission.MISSION_WRITE)) {
+						logger.error("Illegal attempt to adding streaming content to mission!");
+						continue;
 					}
 				}
 
-				if (missionSubscription.getRole() != null && !missionSubscription.getRole().
-						hasPermission(MissionPermission.Permission.MISSION_WRITE)) {
-					logger.error("Illegal attempt to adding streaming content to mission!");
-					continue;
-				}
+				UUID missionUuid = missionService.getMissionGuidByNameCheckGroups(missionName, groupVector);
 
-				Mission m = missionService.getMissionByNameCheckGroups(missionName, groupVector); // fetch the mission so that we have the guid available. Could be replaced with a call to get the guid only (more efficient).
-
-				for (String missionClientUid : subscriptionManager.getMissionSubscriptions(m.getGuidAsUUID(), true)) {
+				for (String missionClientUid : subscriptionManager.getMissionSubscriptions(missionUuid, true)) {
 					// don't send the event back to the submitter
 					if (clientUid != null && clientUid.compareTo(missionClientUid) == 0) {
 						continue;
@@ -323,6 +356,12 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 
 				if (changeLogger.isDebugEnabled()) {
 					changeLogger.debug("mission client uid for mission sub count: " + uids.size());
+				}
+
+				// For inbound federated mission events we dont need to call addMissionContent since that's taken
+				// care of by ROL processor, and we don't want to re-federate the message, so just return
+				if (federateUser) {
+					return;
 				}
 
 				// final copy of variable to use in inner class
@@ -356,7 +395,14 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 							missionContent = pathContent;
 						}
 
-						missionService.addMissionContent(m.getGuidAsUUID(), missionContent, finClientUid, finGroupVector);
+
+						Date timestamp = new Date();
+//						if (cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY) != null) {
+//							timestamp = (Date)cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY);
+//						}
+
+						missionService.addMissionContentAtTime(missionUuid, missionContent, finClientUid,
+								finGroupVector, timestamp, null);
 
 						//TODO - add case here for mission guid. Where to get it
 					} catch (Exception e) {
@@ -421,13 +467,14 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 								}
 							}
 
-							ROL rol = RemoteUtil.getInstance().getROLforMissionChange(content, missionName, fclientUid, mission.getCreatorUid(), mission.getChatRoom(), mission.getTool(), mission.getDescription());
+							ROL rol = RemoteUtil.getInstance().getROLforMissionChange(content, missionName, fclientUid, mission.getCreatorUid(), mission.getChatRoom(), mission.getTool(), mission.getDescription(), null, null, copyCot, groups);
 
 							if (logger.isDebugEnabled()) {
 								logger.debug("rol to federate for mission change " + rol + " to groups " + groups);
 							}
 
 							federationManager.submitMissionFederateROL(rol, groups, missionName);
+
 						} else {
 							logger.warn("unable to federate mission uid add - cot message specified no groups");
 						}
@@ -463,38 +510,44 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 
 				MissionSubscription missionSubscription = null;
 				User user = (User) cot.getContextValue(Constants.USER_KEY);
-				if (user != null) {
-					
-					missionSubscription = missionService
-							.getMissionSubcriptionByMissionGuidAndClientUidAndUsernameNoMission(missionGuid.toString(), clientUid, user.getName());
 
-					if (missionSubscription == null
-							&& user.getCert() != null && user.getCert().getSubjectX500Principal() != null) {
-						// lookup the mission subscription based on CN, needed when input auth=ldap or auth=file
-						String cn = new LdapName(user.getCert().getSubjectX500Principal().getName())
-								.getRdns().stream().filter(i -> i.getType().equalsIgnoreCase("CN"))
-								.findFirst().get().getValue().toString();
+				// skip permissions checks for federate users
+				boolean federateUser = user != null && user instanceof FederateUser;
+				if (!federateUser) {
+
+					if (user != null) {
+
 						missionSubscription = missionService
-								.getMissionSubcriptionByMissionGuidAndClientUidAndUsernameNoMission(
-										missionGuid.toString(), clientUid, cn);
+								.getMissionSubcriptionByMissionGuidAndClientUidAndUsernameNoMission(missionGuid.toString(), clientUid, user.getName());
+
+						if (missionSubscription == null
+								&& user.getCert() != null && user.getCert().getSubjectX500Principal() != null) {
+							// lookup the mission subscription based on CN, needed when input auth=ldap or auth=file
+							String cn = new LdapName(user.getCert().getSubjectX500Principal().getName())
+									.getRdns().stream().filter(i -> i.getType().equalsIgnoreCase("CN"))
+									.findFirst().get().getValue().toString();
+							missionSubscription = missionService
+									.getMissionSubcriptionByMissionGuidAndClientUidAndUsernameNoMission(
+											missionGuid.toString(), clientUid, cn);
+						}
+
+					} else {
+						missionSubscription = missionService.getMissionSubscriptionByMissionGuidAndClientUidNoMission(
+								missionGuid.toString(), clientUid);
 					}
 
-				} else {
-					missionSubscription = missionService.getMissionSubscriptionByMissionGuidAndClientUidNoMission(
-							missionGuid.toString(), clientUid);
-				}
+					if (missionSubscription == null) {
+						logger.error("unable to find mission subscription for mission with guid {} for client {} ", missionGuid, clientUid);
+						continue;
+					} else {
+						changeLogger.debug("mission sub for explcit mission sender to mission guid {} for subscription {}.", missionGuid.toString(), missionSubscription);
+					}
 
-				if (missionSubscription == null) {
-					logger.error("unable to find mission subscription for mission with guid {} for client {} ", missionGuid, clientUid);
-					continue;
-				} else {
-					changeLogger.debug("mission sub for explcit mission sender to mission guid {} for subscription {}.", missionGuid.toString(), missionSubscription);
-				}
-
-				if (missionSubscription.getRole() != null && !missionSubscription.getRole().
-						hasPermission(MissionPermission.Permission.MISSION_WRITE)) {
-					logger.error("Illegal attempt to adding streaming content to mission!");
-					continue;
+					if (missionSubscription.getRole() != null && !missionSubscription.getRole().
+							hasPermission(MissionPermission.Permission.MISSION_WRITE)) {
+						logger.error("Illegal attempt to adding streaming content to mission!");
+						continue;
+					}
 				}
 
 				for (String missionClientUid : subscriptionManager.getMissionSubscriptions(missionGuid, true)) {
@@ -508,6 +561,12 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 
 				if (changeLogger.isDebugEnabled()) {
 					changeLogger.debug("mission client uid for mission sub count: " + uids.size());
+				}
+
+				// For inbound federated mission events we dont need to call addMissionContent since that's taken
+				// care of by ROL processor, and we don't want to re-federate the message, so just return
+				if (federateUser) {
+					return;
 				}
 
 				// final copy of variable to use in inner class
@@ -541,7 +600,13 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 							missionContent = pathContent;
 						}
 
-						missionService.addMissionContent(missionGuid, missionContent, finClientUid, finGroupVector);
+						Date timestamp = new Date();
+//						if (cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY) != null) {
+//							timestamp = (Date)cot.getContextValue(Constants.OFFLINE_CHANGE_TIME_KEY);
+//						}
+
+						missionService.addMissionContentAtTime(missionGuid, missionContent, finClientUid,
+								finGroupVector, timestamp, null);
 
 					} catch (Exception e) {
 						logger.error("exception adding content uid to mission " + e.getMessage(), e);
@@ -610,13 +675,14 @@ public class StreamingEndpointRewriteFilter implements CotFilter {
 							if (!Strings.isNullOrEmpty(missionName)) {
 
 								// TODO: when implementing support for federating missions by guid, update this codepath to include the mission guid along with the mission name
-								ROL rol = RemoteUtil.getInstance().getROLforMissionChange(content, missionName, fclientUid, mission.getCreatorUid(), mission.getChatRoom(), mission.getTool(), mission.getDescription());
+								ROL rol = RemoteUtil.getInstance().getROLforMissionChange(content, missionName, fclientUid, mission.getCreatorUid(), mission.getChatRoom(), mission.getTool(), mission.getDescription(), null, null);
 
 								if (logger.isDebugEnabled()) {
 									logger.debug("rol to federate for mission change " + rol + " to groups " + groups);
 								}
 
 								federationManager.submitMissionFederateROL(rol, groups, missionName);
+
 							} else {
 								logger.warn("no mission name found for mission guid {}. Nothing to federate", missionGuid);
 							}

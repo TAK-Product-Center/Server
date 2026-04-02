@@ -1,7 +1,9 @@
 package tak.server.federation.hub.policy;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import tak.server.federation.Federate;
 import tak.server.federation.FederateGroup;
@@ -15,8 +17,9 @@ public interface FederationHubPolicyManager {
     Collection<FederateGroup> getCaGroups();
     FederationPolicyGraph addCaFederate(Federate federate, List<String> federateCaNames);
     FederationPolicyGraph getPolicyGraph();
-    void setPolicyGraph(FederationPolicyModel newPolicyModel, Object updateFile) throws FederationException;
+    void setPolicyGraph(FederationPolicyModel newPolicyModel, FederationPolicy updateFile) throws FederationException;
 	Collection<PolicyObjectCell> getPolicyCells();
-	void updatePolicyGraph(FederationPolicyModel federationPolicyModel, Object updateFile) throws FederationException;
+	void updatePolicyGraph(FederationPolicyModel federationPolicyModel, FederationPolicy updateFile) throws FederationException;
 	void removeCaGroup(FederateGroup federateGroup);
+	Map<String, FederationPolicyGraph> getAllPolicies() throws IOException;
 }

@@ -5,10 +5,14 @@ import java.security.KeyManagementException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Base64;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -29,11 +33,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.OkHttp3ClientHttpRequestFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
+import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -46,6 +52,7 @@ import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.view.InternalResourceView;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import com.bbn.marti.jwt.JwtUtils;
 import com.bbn.marti.config.Oauth;
 import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.util.spring.MartiSocketUserDetailsImpl;
@@ -63,7 +70,7 @@ public class OAuthApi {
 
     @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
     @RequestMapping(value = "/login/auth", method = RequestMethod.GET)
-    public void handleAuthRequest(HttpServletResponse response) {
+    public void handleAuthRequest(HttpServletRequest request, HttpServletResponse response) {
         try {
             // get the auth server config
             Oauth.AuthServer authServer = getAuthServerConfig();
@@ -79,7 +86,7 @@ public class OAuthApi {
 
             // attach the state to a cookie that we will validate in the redirect
             response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
-                    "state", state, -1, false).toString());
+                    "state", state, -1, false, request.isSecure()).toString());
 
             // build the auth url
             UriComponentsBuilder uriComponentBuilder =
@@ -104,7 +111,7 @@ public class OAuthApi {
         }
     }
 
-    private void processAuthServerRequest(
+    private String processAuthServerRequest(
             MultiValueMap<String, String> requestBody,
             HttpServletRequest request, HttpServletResponse response)
             throws NoSuchAlgorithmException, KeyManagementException, ParseException {
@@ -170,8 +177,11 @@ public class OAuthApi {
 
         // store the access token in a cookie
         String access_token = (String)tokenJson.get(authServer.getAccessTokenName());
-        response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
-                OAuth2TokenType.ACCESS_TOKEN.getValue(), access_token, -1, true).toString());
+
+        for (ResponseCookie cookie : AuthCookieUtils.createCookiesWithMaxSize(
+                OAuth2TokenType.ACCESS_TOKEN.getValue(), access_token, -1, true, request.isSecure())) {
+            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        }
 
         // store the refresh token in the session, if we have one
         if (tokenJson.containsKey(authServer.getRefreshTokenName())) {
@@ -181,6 +191,8 @@ public class OAuthApi {
 
         response.setHeader("Cache-Control", "must-revalidate, max-age=0, no-cache, no-store");
         response.setDateHeader("Expires", 0);
+
+        return access_token;
     }
 
     @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
@@ -213,7 +225,7 @@ public class OAuthApi {
 
             // clean up the state cookie
             response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
-                    "state", stateCookie, 0, false).toString());
+                    "state", stateCookie, 0, false, request.isSecure()).toString());
 
             // get the auth server config
             Oauth.AuthServer authServer = getAuthServerConfig();
@@ -229,9 +241,25 @@ public class OAuthApi {
             requestBody.add("client_secret", authServer.getSecret());
             requestBody.add("redirect_uri", authServer.getRedirectUri());
 
-            processAuthServerRequest(requestBody, request, response);
+            String access_token = processAuthServerRequest(requestBody, request, response);
 
-            return new ModelAndView(new InternalResourceView("/Marti/login/redirect.html"));
+            String redirect = "/Marti/login/redirect.html";
+
+            Oauth oauthConf = getOuathConfig();
+            if (oauthConf != null && oauthConf.getWebtakScope() != null) {
+
+                Claims claims = JwtUtils.getInstance().parseClaims(
+                        access_token, SignatureAlgorithm.RS256, false);
+                if (claims == null) {
+                    throw new InvalidBearerTokenException("Unable to parse claims from token : " + access_token);
+                }
+
+                if (!AuthCookieUtils.userHasWebtakAccess(oauthConf, claims)) {
+                    redirect = "/Marti/login/webtak-role-error.html";
+                }
+            }
+
+            return new ModelAndView(new InternalResourceView(redirect));
 
         } catch (Exception e) {
             logger.error("exception in handleRedirect", e);
@@ -289,6 +317,22 @@ public class OAuthApi {
                 new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), name), status);
     }
 
+    class OpoenIdConfigufation {
+        public String authorization_endpoint;
+        public String token_endpoint;
+    }
+
+    @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
+    @RequestMapping(value = "/login/.well-known/openid-configuration", method = RequestMethod.GET)
+    public OpoenIdConfigufation getOpenIdConfiguration() {
+        OpoenIdConfigufation opoenIdConfigufation = new OpoenIdConfigufation();
+        if (getAuthServerConfig() != null) {
+            opoenIdConfigufation.authorization_endpoint = getAuthServerConfig().getAuthEndpoint();
+            opoenIdConfigufation.token_endpoint = getAuthServerConfig().getTokenEndpoint();
+        }
+        return opoenIdConfigufation;
+    }
+
     @RequestMapping(value = "/logout", method = { RequestMethod.GET, RequestMethod.POST })
     public void logout(HttpServletRequest request, HttpServletResponse response) {
         AuthCookieUtils.logout(request, response);
@@ -306,13 +350,20 @@ public class OAuthApi {
         return new ApiResponse<String>(Constants.API_VERSION, String.class.getSimpleName(), token);
     }
 
-    private Oauth.AuthServer getAuthServerConfig() {
+    private Oauth getOuathConfig() {
         if (CoreConfigFacade.getInstance() != null &&
                 CoreConfigFacade.getInstance().getRemoteConfiguration() != null &&
                 CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth() != null &&
-                CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth() != null &&
-                CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getAuthServer() != null &&
-                !CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getAuthServer().isEmpty()) {
+                CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth() != null) {
+            return CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth();
+        }
+        return null;
+    }
+
+    private Oauth.AuthServer getAuthServerConfig() {
+        if (getOuathConfig() != null &&
+                getOuathConfig().getAuthServer() != null &&
+                !getOuathConfig().getAuthServer().isEmpty()) {
             return CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getAuthServer().get(0);
         }
         return null;

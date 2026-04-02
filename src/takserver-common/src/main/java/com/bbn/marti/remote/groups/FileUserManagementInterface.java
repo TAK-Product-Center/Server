@@ -41,6 +41,8 @@ public interface FileUserManagementInterface {
 
     FileAuthenticatorControl removeUserFromGroup(@NotNull String userIdentifier, @NotNull String groupName);
 
+    FileAuthenticatorControl removeUserFromGroup(@NotNull String userIdentifier, @NotNull String groupName, @NotNull Direction direction);
+
     boolean isUserInGroup(@NotNull String userIdentifier, @NotNull String groupName);
 
     void saveChanges(FileAuthenticatorControl control) throws JAXBException, IOException;

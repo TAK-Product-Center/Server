@@ -27,7 +27,10 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
 
     @Query(value = missionAttributes + " from mission where guid = uuid(:guid)", nativeQuery = true)
     Mission getByGuid(@Param("guid") UUID missionGuid);
-    
+
+    @Query(value = "select guid from mission where name = :name and " + RemoteUtil.GROUP_CLAUSE, nativeQuery = true)
+    String getGuidByName(@Param("name") String name, @Param("groupVector") String groupVector);
+
     // Only fetch the mission name for the guid (rather than the whole mission)
     @Query(value = "select name from mission where guid = uuid(:guid)", nativeQuery = true)
     String getMissionNameForMissionGuid(@Param("guid") UUID missionGuid);
@@ -232,6 +235,23 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
 
     @Query(value = "update mission set groups = cast(:groupVectorMission as bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + ")) where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long updateGroups(@Param("name") String name, @Param("groupVector") String groupVector, @Param("groupVectorMission") String groupVectorMission);
+
+    @Modifying
+    @Transactional
+    @Query(value = "update cot_router set groups = cast(:groupVectorMission as bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + ")) " +
+            "where uid in ( select uid from mission_uid mu, mission m where m.id = mu.mission_id and lower(m.name) = lower(:name) ) and" + RemoteUtil.GROUP_CLAUSE, nativeQuery = true)
+    void updateGroupsForMissionUids(@Param("name") String name, @Param("groupVector") String groupVector, @Param("groupVectorMission") String groupVectorMission);
+
+    @Modifying
+    @Transactional
+    @Query(value = "update resource set groups = cast(:groupVectorMission as bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + ")) " +
+            "where hash in ( select resource_hash from mission_resource mr, mission m where m.id = mr.mission_id and lower(m.name) = lower(:name) ) and" + RemoteUtil.GROUP_CLAUSE, nativeQuery = true)
+    void updateGroupsForMissionResources(@Param("name") String name, @Param("groupVector") String groupVector, @Param("groupVectorMission") String groupVectorMission);
+
+    @Modifying
+    @Transactional
+    @Query(value = "update resource set groups = cast(:groupVectorMission as bit(" + RemoteUtil.GROUPS_BIT_VECTOR_LEN + ")) " + " where hash = :hash and" + RemoteUtil.GROUP_CLAUSE, nativeQuery = true)
+    void updateGroupsForMissionResource(@Param("hash") String hash, @Param("groupVector") String groupVector, @Param("groupVectorMission") String groupVectorMission);
 
     @Query(value = "update mission set tool = :tool where lower(name) = lower(:name) and" + RemoteUtil.GROUP_CLAUSE + " returning id", nativeQuery = true)
     Long updateTool(@Param("name") String name, @Param("groupVector") String groupVector, @Param("tool") String tool);

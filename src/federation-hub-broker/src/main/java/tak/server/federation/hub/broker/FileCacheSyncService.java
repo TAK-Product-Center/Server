@@ -4,6 +4,7 @@ import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,11 +81,9 @@ public class FileCacheSyncService implements SyncService {
 
         Path path = FileSystems.getDefault().getPath(details.getLocalPath());
 
-        try {
-            byte[] bytes = ByteStreams.toByteArray(new BufferedInputStream(Files.newInputStream(path)));
-
+        try (InputStream is = new BufferedInputStream(Files.newInputStream(path))) {
+            byte[] bytes = ByteStreams.toByteArray(is);
             result.setInputStream(new ByteArrayInputStream(bytes));
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -110,8 +109,8 @@ public class FileCacheSyncService implements SyncService {
 
         Path path = FileSystems.getDefault().getPath(details.getLocalPath());
 
-        try {
-            byte[] bytes = ByteStreams.toByteArray(new BufferedInputStream(Files.newInputStream(path)));
+        try (InputStream is = new BufferedInputStream(Files.newInputStream(path))) {
+            byte[] bytes = ByteStreams.toByteArray(is);
             result.setBytes(bytes);
         } catch (IOException e) {
             throw new RuntimeException(e);

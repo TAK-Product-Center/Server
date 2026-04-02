@@ -26,6 +26,8 @@ import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.sync.model.Mission;
+import com.bbn.marti.sync.model.MissionRole;
+import com.bbn.marti.sync.repository.MissionRoleRepository;
 import com.bbn.marti.sync.service.MissionService;
 import com.bbn.security.web.MartiValidator;
 import com.bbn.security.web.MartiValidatorConstants;
@@ -53,6 +55,9 @@ public class LocateApi {
 
     @Autowired
     private MissionService missionService;
+
+    @Autowired
+    private MissionRoleRepository missionRoleRepository;
 
     @Autowired
     private Validator validator = new MartiValidator();
@@ -126,24 +131,24 @@ public class LocateApi {
             groups.add(locateGroup);
             String groupVector = RemoteUtil.getInstance().bitVectorToString(
                     RemoteUtil.getInstance().getBitVectorForGroups(groups));
-            
-            Mission mission = missionService.getMissionByNameCheckGroups(name, groupVector);
-            
-            missionService.validateMissionByGuid(mission);
 
             if (locateConfig.isAddToMission()) {
                 String missionName = locateConfig.getMission().toLowerCase();
 
                 if (missionService.getMission(missionName, false) == null) {
                     // create the mission and make sure that the we're subscribed
-                    missionService.createMission(missionName, creatorUid, groupVector, null,
-                            null, null, null, null, null, "public", null, null, null, null, false);
+                    MissionRole defaultRole = missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_SUBSCRIBER);
+                    missionService.createMission(missionName, creatorUid, groupVector, "",
+                            "", "", "", "", "", "public", null, defaultRole, null, null, false);
                 }
+
+                Mission mission = missionService.getMissionByNameCheckGroups(missionName, groupVector);
+                missionService.validateMission(mission, missionName);
 
                 missionService.missionSubscribe(mission.getGuidAsUUID(), creatorUid, groupVector);
 
                 // submit the marker to the mission
-                submission.submitMissionPackageCotAtTime(cot, mission.getGuidAsUUID(), new Date(), groups, creatorUid);
+                submission.submitMissionCot(cot, mission.getGuidAsUUID(), null, groups, creatorUid);
             }
 
             if (locateConfig.isBroadcast()) {

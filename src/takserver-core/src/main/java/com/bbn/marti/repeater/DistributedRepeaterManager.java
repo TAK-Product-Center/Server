@@ -65,6 +65,9 @@ public class DistributedRepeaterManager implements RepeaterManager, org.apache.i
 		super();
 	}
 
+	public boolean isRepeating(String uid) {
+		return repeaterStore().getRepeatedMessages().get(uid) != null;
+	}
 
 	@SuppressWarnings("unchecked")
 	public void addMessage(CotEventContainer msg, String repeatableType) {

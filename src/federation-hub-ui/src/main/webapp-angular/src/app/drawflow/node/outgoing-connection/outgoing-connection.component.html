@@ -1,0 +1,10 @@
+<div>
+    <div class="title-box"><img [attr.width]="properties.image_width" [attr.height]="properties.image_height" src="{{ properties.image }}"> Outgoing Connection </div>
+    <div class="box">
+        <div><b>Outgoing Name: </b>{{ federation.stringId }}</div>
+        <div><b>Host: </b>{{ federation.host }}</div>
+        <div><b>Port: </b>{{ federation.port }}</div>
+        <div><b>Enabled: </b>{{ federation.outgoingEnabled ? federation.outgoingEnabled : false }}</div>
+        <div class="description">{{ federation.description }}</div>
+    </div>
+</div>

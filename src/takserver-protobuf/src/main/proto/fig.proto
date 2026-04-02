@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "binarypayload.proto";
+
 option java_multiple_files = true;
 option java_package = "com.atakmap.Tak";
 option java_outer_classname = "FigProto";
@@ -23,6 +25,8 @@ service FederatedChannel {
 	rpc ServerFederateGroupsStream (Subscription) returns (stream FederateGroups) {}
 	// the client federate sends its groups to the Federate Server, clientStreamingCall
 	rpc ClientFederateGroupsStream (stream FederateGroups) returns (Subscription) {}
+	
+	rpc GetAuthTokenByX509 (BinaryBlob) returns (FederateTokenResponse) {}
 }
 
 enum CRUD { INVALID = 0; CREATE = 1; READ = 2; UPDATE = 3; DELETE = 4; }
@@ -34,6 +38,7 @@ message FederatedEvent {
 	repeated string federateGroups = 3;
 	repeated FederateProvenance federateProvenance = 4;
 	FederateHops federateHops = 5;
+	FederateGroupHopLimits federateGroupHopLimits = 6;
 }
 
 message GeoEvent {
@@ -63,6 +68,12 @@ message GeoEvent {
 	repeated string ptpCallsigns = 24;
 	string feedUid = 25;
 	repeated string missionNames = 26;
+	string access = 27;
+	string caveat = 28;
+	string releaseableTo = 29;
+
+	// optional sequence of binary payloads
+	repeated gov.tak.cop.proto.v1.BinaryPayload bloads = 30;
 }
 
 message BinaryBlob {
@@ -73,6 +84,7 @@ message BinaryBlob {
 	string description = 5;
 	repeated FederateProvenance federateProvenance = 6;
 	FederateHops federateHops = 7;
+	FederateGroupHopLimits federateGroupHopLimits = 8;
 }
 	
 message ContactListEntry {
@@ -131,6 +143,7 @@ message ROL {
 	repeated string federateGroups = 3;
 	repeated FederateProvenance federateProvenance = 4;
 	FederateHops federateHops = 5;
+	FederateGroupHopLimits federateGroupHopLimits = 6;
 }
 
 message FederateGroups {
@@ -139,6 +152,7 @@ message FederateGroups {
 	repeated FederateProvenance federateProvenance = 3;
 	FederateHops federateHops = 4;
 	repeated FederateGroups nestedGroups = 5;
+	FederateGroupHopLimits federateGroupHopLimits = 6;
 }
 
 message TakServerVersion {
@@ -159,4 +173,17 @@ message FederateHops {
 	int64 currentHops = 2;
 }
 
+message FederateGroupHopLimit {
+	string groupName = 1;
+	int64 maxHops = 2;
+	int64 currentHops = 3;
+}
 
+message FederateGroupHopLimits {
+	repeated FederateGroupHopLimit limits = 1;
+	bool useFederateGroupHopLimits = 2;
+}
+
+message FederateTokenResponse {
+	string token = 1;
+}

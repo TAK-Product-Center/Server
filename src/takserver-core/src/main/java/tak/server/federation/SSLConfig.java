@@ -31,30 +31,38 @@ public class SSLConfig {
 
     private TrustManagerFactory trustMgrFactory;
     private KeyManagerFactory keyMgrFactory;
-    private SslContext sslContext; // context used to source the tabula rasa engine
+    private SslContext sslContextClientAuth;
+    private SslContext sslContextNoAuth;
     private KeyStore trust;
     private KeyStore self;
     private FigServerConfig config;
 
-    public SslContext initSslContext(FigServerConfig config) {
+    public void initSslContext(FigServerConfig config) {
         this.config = config;
 
         try {
             // initialize keystore
             self = KeyStore.getInstance(config.getKeystoreType());
-            self.load(getFileOrResource(config.getKeystoreFile()), config.getKeystorePassword().toCharArray());
+            try (InputStream is = getFileOrResource(config.getKeystoreFile())) {
+                self.load(is, config.getKeystorePassword().toCharArray());
+            }
             keyMgrFactory = KeyManagerFactory.getInstance(config.getKeymanagerType());
             keyMgrFactory.init(self, config.getKeystorePassword().toCharArray());
 
             // initialize truststore
             trustMgrFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trust = KeyStore.getInstance(config.getTruststoreType());
-            trust.load(getFileOrResource(config.getTruststoreFile()), config.getTruststorePassword().toCharArray());
+            try (InputStream trustStoreStream = getFileOrResource(config.getTruststoreFile())) {
+                trust.load(trustStoreStream, config.getTruststorePassword().toCharArray());
+            }
             trustMgrFactory.init(trust);
-
             SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(SslContextBuilder.forServer(keyMgrFactory), SslProvider.OPENSSL) // this ensures that we are using OpenSSL, not JRE SSL
             		.trustManager(trustMgrFactory)
                     .clientAuth(ClientAuth.REQUIRE); // client auth always required
+            
+            SslContextBuilder sslContextNoAuthBuilder = GrpcSslContexts.configure(SslContextBuilder.forServer(keyMgrFactory), SslProvider.OPENSSL) // this ensures that we are using OpenSSL, not JRE SSL
+            		.trustManager(trustMgrFactory)
+                    .clientAuth(ClientAuth.NONE); // client not required when using tokens
 
             String context = "TLSv1.2,TLSv1.3";
 
@@ -67,9 +75,8 @@ public class SSLConfig {
                 }
             }
 
-            sslContext = sslContextBuilder.protocols(Arrays.asList(context.split(","))).build();
-
-            return sslContext;
+            sslContextClientAuth = sslContextBuilder.protocols(Arrays.asList(context.split(","))).build();
+            sslContextNoAuth = sslContextNoAuthBuilder.protocols(Arrays.asList(context.split(","))).build();
 
         } catch (Exception e) {
             throw new TakException(e);
@@ -100,9 +107,12 @@ public class SSLConfig {
             String truststoreFile = config.getTruststoreFile();
             String truststorePassword = config.getTruststorePassword();
 
-            trust = KeyStore.getInstance(truststoreType);
-            trust.load(new FileInputStream(truststoreFile), truststorePassword.toCharArray());
-            trustManagerFactory.init(trust);
+			trust = KeyStore.getInstance(truststoreType);
+			try (InputStream trustStoreStream = new FileInputStream(truststoreFile)) {
+				trust.load(trustStoreStream, truststorePassword.toCharArray());
+			}
+			trustManagerFactory.init(trust);
+            
             return trust;
         } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {
             throw new TakException(e);
@@ -126,9 +136,12 @@ public class SSLConfig {
     }
 
     public SslContext getSslContext() {
-        return sslContext;
+        return sslContextClientAuth;
     }
-
+    
+    public SslContext getSslContextNoAuth() {
+        return sslContextNoAuth;
+    }
 
     public KeyStore getTrust() {
         return trust;

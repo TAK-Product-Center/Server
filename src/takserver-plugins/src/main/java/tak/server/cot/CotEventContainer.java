@@ -84,7 +84,7 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 
 	private int battery = -1;
 	
-	private String type = null;
+	private volatile String type = null;
 	
 	private volatile String endpoint = null;
 	
@@ -532,6 +532,9 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 
 		return element;
 	}
-	
-	
+
+	public boolean isSituationalAwarenessMessage() {
+		return !Strings.isNullOrEmpty(getCallsign()) &&
+				!Strings.isNullOrEmpty(getEndpoint()) && !Strings.isNullOrEmpty(getUid());
+	}
 }

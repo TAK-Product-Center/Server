@@ -79,8 +79,8 @@ public class MetricSubscription extends RemoteSubscription {
 				TcpChannelHandler handler = (TcpChannelHandler) subscription.getHandler();
 				this.totalTcpBytesRead = handler.totalTcpBytesRead;
 				this.totalTcpBytesWritten = handler.totalTcpBytesWritten;
-				this. totalTcpNumberOfWrites = handler.totalTcpNumberOfReads;
-				this.totalTcpNumberOfReads = handler.totalTcpNumberOfWrites;
+				this.totalTcpNumberOfWrites = handler.totalTcpNumberOfWrites;
+				this.totalTcpNumberOfReads = handler.totalTcpNumberOfReads;
 			}
 		}
 	}

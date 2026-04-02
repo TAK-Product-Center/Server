@@ -308,7 +308,7 @@ public class NioNettyTlsServerHandler extends NioNettyHandlerBase {
 
 		try {
 			
-			StreamingCotProtocol.add(builder, Charsets.UTF_8.decode(msg), cotParser(), channelHandler).forEach(c -> {
+			StreamingCotProtocol.add(builder, Charsets.UTF_8.decode(msg), channelHandler).forEach(c -> {
 				if (isNotDOSLimited(c) && isNotReadLimited(c)) {
 					if (isDataFeedInput()) {
 						DataFeedFilter.getInstance().filter(c, (DataFeed) input);

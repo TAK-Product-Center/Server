@@ -20,7 +20,7 @@ public class UserState implements Comparable<UserState> {
 	private final AtomicBoolean isDeployed;
 	private TestConnectivityState connectivityState;
 	private String latestSA;
-	private boolean isAdmin;
+	private final boolean isAdmin;
 
 	UserState(AbstractUser profile) {
 		this.profile = profile;
@@ -28,6 +28,7 @@ public class UserState implements Comparable<UserState> {
 		this.server = profile.getServer();
 		this.isDeployed = new AtomicBoolean(false);
 		this.connectivityState = ActionEngine.data.getState(profile).getConnectivityState();
+        this.isAdmin = profile.isAdmin();
 	}
 
 	public TestConnectivityState getConnectivityState() {
@@ -48,11 +49,7 @@ public class UserState implements Comparable<UserState> {
 
 
 	public boolean isAdmin() {
-		return isAdmin;
-	}
-
-	public void overrideAdminStatus(boolean isAdmin) {
-		this.isAdmin = isAdmin;
+        return this.isAdmin;
 	}
 
 	void setActiveInDeployment() {

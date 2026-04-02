@@ -1,7 +1,8 @@
 package com.bbn.security.web;
 
 public class MartiValidatorConstants {
-	
+
+	public static final int VERY_LONG_STRING_CHARS = 65535;
 	public static final int LONG_STRING_CHARS = 2047;
 	public static final int DEFAULT_STRING_CHARS = 255;
 	public static final int SHORT_STRING_CHARS = 128;

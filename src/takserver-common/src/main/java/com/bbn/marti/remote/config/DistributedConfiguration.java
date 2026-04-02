@@ -40,6 +40,7 @@ import com.bbn.marti.config.Federation.FederationServer;
 import com.bbn.marti.config.Ferry;
 import com.bbn.marti.config.Filter;
 import com.bbn.marti.config.Geocache;
+import com.bbn.marti.config.Injectionfilter;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.config.Network;
 import com.bbn.marti.config.Qos;
@@ -300,7 +301,8 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
 					JAXBUtils.saveJAXifiedObject(LocalConfiguration.CONFIG_FILE, getRemoteConfiguration(), false);
 				}
 			} catch (FileNotFoundException fnfe) {
-				// do nothing. Happens in unit test.
+                logger.error(fnfe.getMessage());
+                // do nothing. Happens in unit test.
 			} catch (JAXBException | IOException e) {
 				throw new RuntimeException(e);
 			}
@@ -391,12 +393,13 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
         saveChangesAndUpdateCache();
     }
 
-    public synchronized void removeStaticSubscriptionAndSave(@NotNull String subscriptionIdentifier) {
+    public synchronized boolean removeStaticSubscriptionAndSave(@NotNull String subscriptionIdentifier) {
         Subscription.Static subscription = getStaticSubscriptionByName(subscriptionIdentifier);
         if (subscription != null) {
             getRemoteConfiguration().getSubscription().getStatic().remove(subscription);
             saveChangesAndUpdateCache();
         }
+        return subscription != null;
     }
 
     @NotNull
@@ -511,6 +514,12 @@ public class DistributedConfiguration implements CoreConfig, org.apache.ignite.s
 	    getRemoteConfiguration().getFilter().setQos(qos);
         saveChangesAndUpdateCache();
 	}
+
+    @Override
+    public void setAndSaveInjector(Injectionfilter injectionfilter) {
+        getRemoteConfiguration().getFilter().setInjectionfilter(injectionfilter);
+        saveChangesAndUpdateCache();
+    }
 
 	@Override
 	public void setAndSaveLDAP(Ldap ldap) {

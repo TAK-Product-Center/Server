@@ -49,6 +49,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.xml.sax.SAXException;
@@ -61,25 +62,20 @@ import com.bbn.cot.filter.FlowTagFilter;
 import com.bbn.cot.filter.GeospatialEventFilter;
 import com.bbn.cot.filter.ScrubInvalidValues;
 import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
+import com.bbn.cot.filter.StrictUidMissionMemebershipFilter;
 import com.bbn.marti.config.Auth;
 import com.bbn.marti.config.Auth.Ldap;
 import com.bbn.marti.config.AuthType;
-import com.bbn.marti.config.Buffer.LatestSA;
 import com.bbn.marti.config.CAType;
-import com.bbn.marti.config.CertificateConfig;
 import com.bbn.marti.config.CertificateSigning;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.DataFeed;
 import com.bbn.marti.config.Dropfilter;
-import com.bbn.marti.config.Federation.FederationServer;
 import com.bbn.marti.config.Filter;
 import com.bbn.marti.config.GeospatialFilter;
 import com.bbn.marti.config.Input;
 import com.bbn.marti.config.MicrosoftCAConfig;
-import com.bbn.marti.config.NameEntries;
-import com.bbn.marti.config.NameEntry;
 import com.bbn.marti.config.Network.Connector;
-import com.bbn.marti.config.Repository;
 import com.bbn.marti.config.TAKServerCAConfig;
 import com.bbn.marti.config.Tls;
 import com.bbn.marti.groups.GroupFederationUtil;
@@ -104,6 +100,7 @@ import com.bbn.marti.nio.protocol.connections.StreamingCotProtocol;
 import com.bbn.marti.nio.server.NioServer;
 import com.bbn.marti.nio.util.CodecSource;
 import com.bbn.marti.remote.AuthenticationConfigInfo;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.ConnectionEventTypeValue;
 import com.bbn.marti.remote.ContactManager;
 import com.bbn.marti.remote.InputMetric;
@@ -124,18 +121,22 @@ import com.bbn.marti.remote.groups.NetworkInputAddResult;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.remote.util.RemoteUtil;
+import com.bbn.marti.sync.model.Mission;
 import com.bbn.marti.sync.repository.DataFeedRepository;
+import com.bbn.marti.sync.service.MissionService;
 import com.bbn.marti.util.FixedSizeBlockingQueue;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.util.Tuple;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
+import com.bbn.tak.tls.TakCert;
+import com.bbn.tak.tls.repository.TakCertRepository;
 
 import tak.server.CommonConstants;
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.Constants;
 import tak.server.cache.ActiveGroupCacheHelper;
 import tak.server.cache.DatafeedCacheHelper;
+import tak.server.cache.MissionCacheHelper;
 import tak.server.cluster.ClusterManager;
 import tak.server.cot.CotElement;
 import tak.server.cot.CotEventContainer;
@@ -171,10 +172,14 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     // default latest SA and delete messages to off, unless explicitly enabled.
     private boolean enableLatestSa = false;
 
+	private boolean validateClientUid = false;
+
     // makes all points added to missions visible to __ANON__
     private boolean postMissionEventsAsPublic = false;
 
 	private boolean alwaysArchiveMissionCot = false;
+
+	private boolean useMissionGroupsForContents = false;
 
     private final DistributedFederationManager federationManager;
 
@@ -207,7 +212,20 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     private static String MASK_WORD_FOR_DISPLAY = "********";
 
     private DataFeedRepository dataFeedRepository;
+
+	private TakCertRepository takCertRepository;
     
+	private MissionCacheHelper missionCacheHelper;
+
+	private boolean strictUidMissionMembership = true;
+
+	private StrictUidMissionMemebershipFilter strictUidMissionMemebershipFilter;
+
+	@Autowired
+	@Lazy
+	// lazy is necessary due to circular dependency.
+	private MissionService missionService;
+
 	@Autowired
 	private DatafeedCacheHelper pluginDatafeedCacheHelper;
     
@@ -247,11 +265,12 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             }));
 
     public SubmissionService(DistributedFederationManager dfm, NioNettyBuilder nb, MessagingUtilImpl mui, NioServer ns,
-                             GroupManager gm, ScrubInvalidValues siv, MessageConversionUtil mcu,
-                             GroupFederationUtil gfu, InjectionManager im, RepositoryService rs,
-                             Ignite i, SubscriptionManager sm, SubscriptionStore store, FlowTagFilter flowTag,
+							 GroupManager gm, ScrubInvalidValues siv, MessageConversionUtil mcu,
+							 GroupFederationUtil gfu, InjectionManager im, RepositoryService rs,
+							 Ignite i, SubscriptionManager sm, SubscriptionStore store, FlowTagFilter flowTag,
 							 ContactManager contactManager, ServerInfo serverInfo, MessageConverter messageConverter,
-							 ActiveGroupCacheHelper agch, RemoteUtil remoteUtil, DataFeedRepository dfr) {
+							 ActiveGroupCacheHelper agch, RemoteUtil remoteUtil, DataFeedRepository dfr, TakCertRepository tcr,
+							 MissionCacheHelper missionCacheHelper) {
     	this.federationManager = dfm;
         this.nettyBuilder = nb;
         this.messagingUtil = mui;
@@ -271,6 +290,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         this.messageConverter = messageConverter;
         this.remoteUtil = remoteUtil;
         this.dataFeedRepository = dfr;
+        this.takCertRepository = tcr;
+        this.missionCacheHelper = missionCacheHelper;
 
 		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
         Auth.Ldap ldapConfig = config.getAuth().getLdap();
@@ -295,6 +316,9 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     FixedSizeBlockingQueue<CotEventContainer> inputQueue = new FixedSizeBlockingQueue<CotEventContainer>();
     LinkedList<StreamingCotProtocol> protocolQueue = new LinkedList<StreamingCotProtocol>();
     AtomicInteger streamingUidGen = new AtomicInteger(1);
+    HashMap<PluginBasedSubscription, Date> pluginSubMap = new HashMap();
+    Boolean pluginContactEnabled;
+    int pluginContactCleanupFrequency;
 
     @EventListener({ContextRefreshedEvent.class})
     public void init() throws IOException, DocumentException {
@@ -308,10 +332,28 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
         enableLatestSa = config.getBuffer().getLatestSA().isEnable();
 
+		validateClientUid = config.getBuffer().getLatestSA().isValidateClientUid();
+
         postMissionEventsAsPublic = config.getAuth() != null && config.getAuth().getLdap() != null &&
                 config.getAuth().getLdap().isPostMissionEventsAsPublic();
 
         alwaysArchiveMissionCot = config.getNetwork().isAlwaysArchiveMissionCot();
+
+		useMissionGroupsForContents = config.getNetwork().isMissionUseGroupsForContents();
+
+		strictUidMissionMembership = config.getNetwork().isMissionStrictUidMissionMembership();
+
+		if (strictUidMissionMembership) {
+			strictUidMissionMemebershipFilter = new StrictUidMissionMemebershipFilter(subMgr, missionService);
+		}
+
+        pluginContactEnabled = config.getPlugins().isAllowPluginContacts();
+        
+        pluginContactCleanupFrequency = config.getPlugins().getPluginContactCleanupFrequencySeconds();
+        
+        if (pluginContactEnabled) {
+        	Resources.pluginContactCleanupPool.scheduleWithFixedDelay(() -> {checkPluginContactCleanup();}, 0, pluginContactCleanupFrequency, TimeUnit.SECONDS);
+        }
 
         List<Input> inputs = config.getNetwork().getInput();
 
@@ -661,6 +703,22 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 											}
 										}
 									}
+									
+									// If Plugins are allowed to generate contacts, create a plugin subscription and add to endpoints
+									if (pluginContactEnabled) {
+										if (logger.isDebugEnabled()) {
+											logger.debug("Adding pluginCotEvent as pluginSub: {}", pluginCotEvent );
+											logger.debug("Endpoint: {}", pluginCotEvent.getEndpoint() );
+											logger.debug("UID: {}", pluginCotEvent.getUid() );
+										}
+										
+										PluginBasedSubscription pluginSub = new PluginBasedSubscription(pluginCotEvent);
+										subMgr.addRawSubscription(pluginSub);
+										repositoryService.auditCallsignUIDEventAsync(
+												pluginCotEvent.getCallsign(), pluginCotEvent.getUid(), "", ConnectionEventTypeValue.CONNECTED, RemoteUtil.getInstance().getBitStringAllGroups());
+										pluginSubMap.put(pluginSub, new Date());
+									}
+									
 								} else if (pluginCotEvent.getType().equals("t-x-d-d")) {
 									Element link = (Element)pluginCotEvent.getDocument().selectSingleNode(LINK_XPATH);
 									if (link != null && link.attribute("uid") != null) {
@@ -834,6 +892,29 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 			logger.error("Could not push dummy message into pipeline", e);
 		}
     }
+    
+    public void checkPluginContactCleanup() {
+    	if(pluginContactEnabled) {
+	    	if (logger.isDebugEnabled()) {
+				logger.debug("Checking if plugin SAs have expired");
+			}
+	    	for (Map.Entry<PluginBasedSubscription, Date> entry : pluginSubMap.entrySet()) {
+	    		PluginBasedSubscription sub = entry.getKey();
+	            Date date = entry.getValue();
+	            Date currentTime = new Date();
+	            if(currentTime.getTime() - date.getTime() > 10 * 60 * 1000) {
+	            	if (logger.isDebugEnabled()) {
+	        			logger.debug("UID: " + sub.uid + "is expired");
+	        		}
+					repositoryService.auditCallsignUIDEventAsync(
+							sub.callsign, sub.uid, "", ConnectionEventTypeValue.DISCONNECTED, RemoteUtil.getInstance().getBitStringAllGroups());
+					subMgr.deleteSubscription(sub.uid);
+					pluginSubMap.remove(sub);
+	            }
+	        }
+    	}
+    }
+    
 
     public static class InputListenerAuxillaryRouter {
 
@@ -846,7 +927,12 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             if (!input.isArchive()) {
                 listeners.add(onNoArchiveDataReceivedCallback);
             }
-        }
+
+            if (input.isFederateOnly()) {
+				listeners.add(onFederateOnlyDataReceivedCallback);
+			}
+
+		}
 
         private InputListenerAuxillaryRouter() {
         }
@@ -878,6 +964,20 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                 return "archive_data_manager";
             }
         };
+
+		public static final ProtocolListenerInstantiator<CotEventContainer> onFederateOnlyDataReceivedCallback = new AbstractAutoProtocolListener<CotEventContainer>() {
+			private static final long serialVersionUID = -2338348114005512169L;
+
+			@Override
+			public void onDataReceived(CotEventContainer data, final ChannelHandler handler, final Protocol<CotEventContainer> protocol) {
+				data.setContextValue(Constants.FEDERATE_ONLY_KEY, Boolean.TRUE);
+			}
+
+			@Override
+			public String toString() {
+				return "federate_broker_data_manager";
+			}
+		};
     }
 
     public final ProtocolListenerInstantiator<CotEventContainer> subscriptionLifecycleCallback = new AbstractAutoProtocolListener<CotEventContainer>() {
@@ -1045,13 +1145,61 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             logger.debug("exception sending delete message", e);
         }
 
-        Resources.tcpCloseThreadPool.execute(() -> {
+        Resources.removeSubscriptionPool.execute(() -> {
             try {
                 subMgr.removeSubscription(handler);
             } catch (Exception e) {
                 logger.warn("Remote exception removing subscription: " + handler, e);
             }
         });
+	}
+
+	private boolean clientUidMatchesCert(CotEventContainer cot, Subscription subscription) {
+		try {
+			// only look at SA messages
+			if (!cot.isSituationalAwarenessMessage()) {
+				return true;
+			}
+
+			// validate the subscription
+			if (subscription == null || subscription.getUser() == null) {
+				logger.error("invalid subscription, unable to validate clientUid");
+				return false;
+			}
+
+			// ignore subscriptions without a certificate
+			if (subscription.getUser().getCert() == null) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("found user without certificate, unable to validate clientUid");
+				}
+				return true;
+			}
+
+			// see if we have a matching certificate in the database
+			TakCert cert = takCertRepository.findOneByHash(
+					RemoteUtil.getInstance().getCertSHA256Fingerprint(
+							subscription.getUser().getCert()));
+			if (cert == null) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("unable to find enrollment for user {}", subscription.getUser().getName());
+				}
+				return true;
+			}
+
+			// make sure the client uid from the SA messages matches the cert
+			if (!cert.getClientUid().equals(cot.getUid())) {
+				subMgr.deleteSubscriptionssByCertificate(cert.getX509Certificate());
+				logger.error("illegal attempt to submit SA message with clientUid {}" +
+						" that doesn't match enrollment {} ", cot.getUid(), cert.getClientUid());
+				return false;
+			}
+
+			return true;
+
+		} catch (Exception e) {
+			logger.error("exception validating clientUid", e);
+			return false;
+		}
 	}
 
     public final ProtocolListenerInstantiator<CotEventContainer> staticSubscriptionRemovingCallback = (new AbstractAutoProtocolListener<CotEventContainer>() {
@@ -1147,8 +1295,10 @@ public class SubmissionService extends BaseService implements MessagingConfigura
             final Subscription sub = subscriptionStore.getByHandler(handler);
 
             User user = null;
-
             if (sub != null) {
+            	sub.lastReportTime = new AtomicLong(new Date().getTime());
+            	sub.hasUpdate.set(true);
+
                 //
                 // if we're incognito and the current message isn't a control message and isn't
                 // directly addressing another user, don't do any further processing
@@ -1231,20 +1381,24 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                 return;
             }
 
-            boolean isMpAck = data.getType() != null && data.getType().compareTo("b-f-t-a") == 0;
-
             if (logger.isDebugEnabled()) {
             	//Prevent NPE when sub is null
             	String clientId = (sub==null)? "null" : sub.clientUid;
-            	logger.debug("isMpAck: " + isMpAck + " current sub: " + sub + " sub.clientUid: " + clientId + " message uid: " + data.getUid());
+            	logger.debug(" current sub: " + sub + " sub.clientUid: " + clientId + " message uid: " + data.getUid());
             }
 
-            if (!isMpAck && sub != null) {
+			if (sub != null && data.isSituationalAwarenessMessage()) {
 
             	if (logger.isDebugEnabled()) {
             		logger.debug("tracking for latestSA and local contact - subscription type: " + Subscription.getClassName());
             	}
+
                 try {
+					// optional check to validate that the client is reporting the same uid used during enrollment
+					if (validateClientUid && !clientUidMatchesCert(data, sub)) {
+						return;
+					}
+
                 	if (sub.clientUid.compareTo(data.getUid()) == 0) {
                 		groupFederationUtil.trackLatestSA(sub, data, true);
                 	}
@@ -1281,9 +1435,29 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
                         if (groups != null) {
 
-                        	if (postMissionEventsAsPublic || alwaysArchiveMissionCot) {
-								if (data.getDocument().selectNodes(
-										"/event/detail/marti/dest[@mission]").size() > 0) {
+                        	if (postMissionEventsAsPublic || alwaysArchiveMissionCot || useMissionGroupsForContents) {
+
+								if (!data.getDocument().selectNodes(
+										"/event/detail/marti/dest[@mission]").isEmpty()) {
+
+									if (useMissionGroupsForContents) {
+										String missionName = ((Element) data.getDocument().selectNodes(
+												"/event/detail/marti/dest[@mission]").get(0)).attributeValue("mission");
+										String userGroupVector = getGroupVectorFromHandler(handler);
+										Mission mission = missionCacheHelper.getMission(missionName, false, false);
+										if (remoteUtil.isGroupVectorAllowed(userGroupVector, mission.getGroupVector())) {
+											if (mission.getGroupVector() != userGroupVector) {
+												Collection<Group> allOutGroups = groupManager.getAllGroups();
+												Collection<Group> allInGroups = allOutGroups.stream()
+														.map(group -> groupManager.hydrateGroup(
+																new Group(group.getName(), Direction.IN)))
+														.collect(Collectors.toSet());
+												groups = new ConcurrentSkipListSet<>();
+												groups.addAll(RemoteUtil.getInstance().getGroupsForBitVectorString(
+														mission.getGroupVector(), allInGroups));
+											}
+										}
+									}
 
 									if (postMissionEventsAsPublic) {
 										//make a copy of the group set so we don't modify the actual user
@@ -1304,15 +1478,20 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                                 logger.trace("groups at send time for message " + data + ": " + groups);
                             }
                         }
-
                     } catch (Exception e) {
                     	if (logger.isDebugEnabled()) {
                     		logger.debug("exception getting group information " + e.getMessage(), e);
                     	}
                     }
 
-                    // perform message injection if configured, and there is a match on this message. In any case, process the message.
-                    injectionManager.process(sub, data);
+                    Resources.injectorMessageReceiveProcessor.submit(() -> {
+                    	try {	
+                    		// perform message injection if configured, and there is a match on this message. In any case, process the message.
+                    		injectionManager.process(sub, data);
+                    	} catch (Exception e) {
+                    		logger.error("internal message send error", e);
+                    	}
+                    });
                 }
             });
         }
@@ -1431,6 +1610,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 						Subscription sub = subscriptionStore.getByHandler(handler);
 						String groupVector = getGroupVectorFromHandler(handler);
+
+						// optional check to validate that the client is reporting the same uid used during enrollment
+						if (validateClientUid && !clientUidMatchesCert(data, sub)) {
+							return;
+						}
 
 						if (enableLatestSa) {
 							// also track this message as the latest SA message
@@ -1697,109 +1881,113 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     @Override
     protected void processNextEvent() {
 
-        CotEventContainer c = null;
-		try {
-            c = inputQueue.take();
+    	try {
+    		final CotEventContainer c = inputQueue.take();
 
-            if (logger.isTraceEnabled()) {
-            	logger.trace("SubmissionService processNextEvent " + c);
-            }
+    		if (c == null) {
+    			return;
+    		}
 
-            if (c == null) {
-                return;
-            }
+    		if (logger.isTraceEnabled()) {
+    			logger.trace("Found a CotEventContainer in the inputQueue");
+    		}
 
-			if (logger.isTraceEnabled()) {
-				logger.trace("Found a CotEventContainer in the inputQueue");
+
+    		if (c.getLat() == null || c.getLat().length() == 0) {
+    			return;
+    		}
+
+    		if (geospatialEventFilter != null && geospatialEventFilter.filter(c) == null) {
+    			return;
+    		}
+
+			if (strictUidMissionMemebershipFilter != null && strictUidMissionMemebershipFilter.filter(c) == null) {
+				return;
 			}
 
-        } catch (InterruptedException e1) {
-            logger.warn("Exception taking object from queue " + inputQueue, e1);
-        }
+    		if (logger.isTraceEnabled()) {
+    			logger.trace("passed geospatial");
+    		}
 
-        if (c.getLat() == null || c.getLat().length() == 0) {
-            return;
-        }
+    		for (DropEventFilter f : dropFilters) {
+    			if (f.filter(c) == null) {
+    				return;
+    			}
+    		}
 
-        if (geospatialEventFilter != null && geospatialEventFilter.filter(c) == null) {
-            return;
-        }
+    		if (logger.isTraceEnabled()) {
+    			logger.trace("passed dropfilters");
+    		}
 
-        if (logger.isTraceEnabled()) {
-        	logger.trace("passed geospatial");
-        }
+    		if (isControlMessage(c.getType())) {
+    			try {
+    				if (logger.isTraceEnabled()) {
+    					logger.trace("Processing Control Message.");
+    				}
+    				processControlMessage(c);
+    			} catch (IOException e) {
+    				logger.debug("exception processing control message", e);
+    			}
+    			// consume control messages
+    			// (i.e., do NOT send them to subscribers)
+    			return;
+    		}
 
-        for (DropEventFilter f : dropFilters) {
-            if (f.filter(c) == null) {
-                return;
-            }
-        }
+    		if (logger.isTraceEnabled()) {
+    			logger.trace("passed control message check");
+    		}
 
-        if (logger.isTraceEnabled()) {
-        	logger.trace("passed dropfilters");
-        }
+    		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
 
-        if (isControlMessage(c.getType())) {
-            try {
-				if (logger.isTraceEnabled()) {
-					logger.trace("Processing Control Message.");
-				}
-                processControlMessage(c);
-            } catch (IOException e) {
-                logger.debug("exception processing control message", e);
-            }
-            // consume control messages
-            // (i.e., do NOT send them to subscribers)
-            return;
-        }
+    		if (config.getFilter().getFlowtag().isEnable() && c.matchXPath("/event/detail/_flow-tags_[@" + flowTagFilter.flowTag() + "]")) {
+    			//we've already processed this message, throw it away
+    			logger.error("Duplicate message - already processed by this takserver");
 
-        if (logger.isTraceEnabled()) {
-        	logger.trace("passed control message check");
-        }
+    			return;
+    		}
 
-		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+    		// add a flow tag (to show that Marti has processed the message)
+    		if (logger.isTraceEnabled()) {
+    			logger.trace("Adding flow tag (to show that the message has been processed.");
+    		}
 
-        if (config.getFilter().getFlowtag().isEnable() && c.matchXPath("/event/detail/_flow-tags_[@" + flowTagFilter.flowTag() + "]")) {
-            //we've already processed this message, throw it away
-        	logger.error("Duplicate message - already processed by this takserver");
+    		Resources.flowTagProcessor.submit(() -> {
+    			try {
+    				flowTagFilter.filter(c);
 
-            return;
-        }
+    				Resources.contactProcessor.submit(() -> {
 
-        // add a flow tag (to show that Marti has processed the message)
-		if (logger.isTraceEnabled()) {
-			logger.trace("Adding flow tag (to show that the message has been processed.");
-		}
-        flowTagFilter.filter(c);
+    					try {
+    						processContactMessage(c);
 
-		if (logger.isTraceEnabled()) {
-			logger.trace("Processing a Contact Message.");
-		}
-        processContactMessage(c);
+    						c.setServerTime(DateUtil.toCotTime(new Date().getTime()));
 
-        if (logger.isTraceEnabled()) {
-        	logger.trace("passed flowtag and contact");
-        }
+    						boolean allServicesHaveRoom = true;
+    						for (BaseService s : consumers) {
+    							if (!s.hasRoomInQueueFor(c)) {
+    								allServicesHaveRoom = false;
+    							}
+    						}
 
-        c.setServerTime(DateUtil.toCotTime(new Date().getTime()));
+    						if (allServicesHaveRoom ||
+    								(config.getSubmission().isDropMesssagesIfAnyServiceIsFull() == false)) {
+    							for (BaseService s : consumers) {
+    								s.addToInputQueue(c.copy());
+    							}
+    						}
+    					} catch (Exception e) {
+    						logger.error("error processing contact message tag", e);
+    					}
+    				});
+    			} catch (Exception e) {
+    				logger.error("error processing flow tag", e);
+    			}
+    		});		
 
-        boolean allServicesHaveRoom = true;
-        for (BaseService s : consumers) {
-            if (!s.hasRoomInQueueFor(c)) {
-                allServicesHaveRoom = false;
-            }
-        }
+    	} catch (Exception e) {
+    		logger.warn("Exception processing message from queue " + inputQueue, e);
+    	}
 
-        if (allServicesHaveRoom ||
-        		(config.getSubmission().isDropMesssagesIfAnyServiceIsFull() == false)) {
-
-			if (logger.isTraceEnabled()) {
-				logger.trace("Adding a copy of the CotEventContainer to the other services via the InputQueue.");
-			}
-        	for (BaseService s : consumers) {
-        		s.addToInputQueue(c.copy());
-        	}
-        }
     }
     
     public boolean isControlMessage(String ct) {

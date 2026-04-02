@@ -40,6 +40,7 @@ export JDK_JAVA_OPTIONS="${JDK_JAVA_OPTIONS}
 --add-opens=java.base/sun.security.ssl=ALL-UNNAMED
 --add-opens=java.base/sun.security.validator=ALL-UNNAMED
 --add-opens=java.base/sun.security.x500=ALL-UNNAMED
+--add-opens=jdk.crypto.cryptoki/sun.security.pkcs11=ALL-UNNAMED
 --add-opens=java.base/sun.security.pkcs12=ALL-UNNAMED
 --add-opens=java.base/sun.security.provider=ALL-UNNAMED
 --add-opens=java.base/javax.security.auth.x500=ALL-UNNAMED"

@@ -10,8 +10,6 @@ import com.bbn.marti.util.Assertion;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 
-import org.jetbrains.annotations.Nullable;
-
 /**
 * A channel handler for representing the receipt of a single datagram -- the source address/port are recorded internally. 
 *

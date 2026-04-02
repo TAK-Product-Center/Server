@@ -11,6 +11,7 @@ public interface FederationHubBroker {
     void updatePolicy(FederationPolicyModel federationPolicyModel);
     List<HubConnectionInfo> getActiveConnections();
     FederationHubBrokerMetrics getFederationHubBrokerMetrics();
+	FederationHubBrokerGlobalMetrics getFederationHubBrokerGlobalMetrics();
     List<String> getGroupsForNode(String federateId);
 	void deleteGroupCa(String groupId);
 	void disconnectFederate(String connectionId);

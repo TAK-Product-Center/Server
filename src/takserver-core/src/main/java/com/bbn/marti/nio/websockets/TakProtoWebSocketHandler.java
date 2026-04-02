@@ -87,7 +87,7 @@ public class TakProtoWebSocketHandler extends BinaryWebSocketHandler {
 													
 													if (mds().isAllowed(wmt.messageType, wmt.publisherId, id)) {
 														session.sendMessage(binaryMessage);
-														Metrics.counter(Constants.METRIC_MESSAGE_WRITE_COUNT, "takserver", "messaging").increment();
+														Metrics.counter(Constants.METRIC_MESSAGE_WRITE_COUNT_WEBSOCKET, "takserver", "api").increment();
 													}
 												}
 											} catch (Exception e) {

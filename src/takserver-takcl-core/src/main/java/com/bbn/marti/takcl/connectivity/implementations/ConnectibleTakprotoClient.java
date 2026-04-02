@@ -50,6 +50,8 @@ import static com.bbn.marti.takcl.TAKCLProfilingLogging.LogActivity;
  */
 public class ConnectibleTakprotoClient implements ConnectingInterface {
 
+    private static final Logger logger = LoggerFactory.getLogger(ConnectibleTakprotoClient.class);
+
 	private final ClientResponseListener stateChangeListener;
 	private final AbstractUser user;
 
@@ -85,7 +87,7 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 		this.user = user;
 		this.stateChangeListener = listener;
 		this._connectivityState = TestConnectivityState.Disconnected;
-		this.dl = new DurationLogger(user.getConsistentUniqueReadableIdentifier(), log);
+		this.dl = new DurationLogger(user.getConsistentUniqueReadableIdentifier(), "ConnectibleTakprotoClient");
 	}
 
 
@@ -386,7 +388,7 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 
 
 		protected static TakWebsocketClient buildAndConnectWebsocketClient(AbstractUser user, Consumer<String> responseListener, DurationLogger dl) throws GeneralSecurityException, IOException, URISyntaxException {
-			String baseUrl = "https://" + user.getServer().getUrl() + ":" + user.getServer().getCertHttpsPort();
+			String baseUrl = "https://" + user.getServer().getHost() + ":" + user.getServer().getCertHttpsPort();
 			SSLHelper.TakClientSslContext tcsc = new SSLHelper.TakClientSslContext(user);
 			SessionIdFetcher sif = new SessionIdFetcher(tcsc, baseUrl);
 			String cookie = sif.getSessionId();
@@ -430,7 +432,7 @@ public class ConnectibleTakprotoClient implements ConnectingInterface {
 
 		@Override
 		public void onOpen(ServerHandshake handshakedata) {
-			System.out.println("Socket Opened");
+			logger.trace("Socket Opened");
 		}
 
 		@Override

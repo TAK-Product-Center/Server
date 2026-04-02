@@ -38,6 +38,8 @@ public class ResourceTable {
 		ps.setLong(1, currIdStart);
 		ps.setLong(2, increment);
 		
+		logger.info("Executing: " + ps.toString());
+		
 		ResultSet rs = ps.executeQuery();
 		int rowcount = 0;	
 		
@@ -56,15 +58,15 @@ public class ResourceTable {
 			String groups = rs.getString("groups");
 			groups = new StringBuilder(groups).reverse().toString();
 			
+			int groupCounter = 0;
 			List<String> foundGroups = new ArrayList<String>();
-			for (int i = 0; i < groups.toCharArray().length; i++) {
-				// skip null groups					
-				if (groups.charAt(i) == '0')
-					continue;
-				
-				String groupName = groupsTable.getGroupsMap().get(i);
-				if (groupName != null)
-					foundGroups.add(groupName);
+			for(Character c : groups.toCharArray()) {
+			    if(c.equals('1')) {
+			    	String groupName = groupsTable.getGroupsMap().get(groupCounter);
+					if (groupName != null)
+						foundGroups.add(groupName);
+			    }
+			    groupCounter++;
 			}
 			resource.setGroups(foundGroups);
 			

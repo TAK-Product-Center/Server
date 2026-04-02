@@ -1,0 +1,111 @@
+<style type="text/css">
+  input.ng-invalid.ng-touched {
+    background-color: #FA787E;
+  }
+
+  input.ng-valid.ng-touched {
+    background-color: white;
+  }
+
+  .rowHeader {
+  	text-align:right;
+  	padding-right:5px;
+  	width:200px;
+  	vertical-align:top;
+  }
+
+  .rowValue {
+  	width:400px;
+  	text-align:right;
+  	vertical-align:top;
+  }
+
+  .rowValue select {
+  	width:100%;
+  }
+
+  .rowValue input {
+  	width:400px;
+  }
+
+  .error {
+  	color:red;
+  	vertical-align:top;
+  }
+
+  .formTable {
+  	border-collapse: separate;
+  	border-spacing:10px
+  }
+
+  .inlineHelp {
+  	font:13px arial, sans-serif;
+  	font-style:italic;
+  	text-align:right;
+  	color:green;
+  }
+
+  .nav, .pagination, .carousel, .panel-title a { cursor: pointer; color:blue;}
+</style>
+
+<div>
+	<div class="content">
+
+    <h3>Federate Certificate Authority Token Authentication Config</h3>
+
+    <p>You are configuring token authentication for federate certificate authority: <b>{{ca.issuerDN}} - {{caId}}</b></p>
+
+		<div data-ng-show="serviceReportedMessages">
+			<ul>
+				<li class="error" data-ng-repeat="message in messages">{{message}}</li>
+			</ul>
+		</div>
+	    <form name="federateCATokenAuthForm" novalidate>
+
+		    <div style="border: 1px solid gray; padding:5px;">
+			  	<table class="formTable">
+			  		<tr>
+			  			<td class="rowHeader"><label style="font-weight:normal;" for="allowTokenAuth">Allow Token Authentication</label></td>
+			  			<td>
+			  				<div style="display: flex; justify-content: flex-start; align-items: center;">
+						    	<input type="checkbox" data-ng-model="ca.allowTokenAuth" name="allowTokenAuth">
+						  	</div>
+						  	<br/><span class="inlineHelp">When enabled, will allow incoming federate connections to present thier client certificates over TLS (instead of traditional mTLS) to authenticate and receive a token. This will allow federation connections to work in network environments where mutual authentication is not an option (Ex. if your network is running break and inspect on all tls connections).</span>
+						  	<br><br><span class="inlineHelp">Note: For this to work you will also need to enable token authentication and set an additional port in the federation config settings</span>
+			  			</td>
+			  		</tr>
+			  		<tr>
+			  			<td class="rowHeader"><label style="font-weight:normal;" for="tokenAuthDuration">Token Duration</label></td>
+			  			<td class="rowValue">
+			  				<input type="number" data-ng-model="ca.tokenAuthDuration" min="-1"/>
+			  				<br/>
+			  				<span class="inlineHelp">How often the federate will have to reconnect and be issued a new token</span>
+			  				<br><br>
+			  				<span class="inlineHelp">Note: a value of -1 means the token will not expire. Any value greater than 0 may cause disruptions in service until the remote end attemps to reconnect</span>
+			  			</td>
+			  			<td style="text-align:right; vertical-align: top;" colspan="2">
+			  				<div style="margin-left: 5%">
+						      <select ng-model="ca.tokenAuthDuration">
+						        <option ng-value="-1">No Exp</option>
+						        <option ng-value="3600000">1 Hour</option>
+						        <option ng-value="86400000">1 Day</option>
+						        <option ng-value="604800000">1 Week</option>
+						        <option ng-value="18144000000">1 Month</option>
+						        <option ng-value="31536000000">1 Year</option>
+						      </select>
+						  </div>
+			  			</td>
+			  		</tr>
+			  		<tr>
+			  			<td style="text-align:right;"colspan="2">
+			  				<button data-ng-enabled="ca.tokenAuthDuration" type="button" class="btn btn-default" data-ng-click="saveConfig()">Save Config</button>
+			  			</td>
+			  			<td></td>
+			  		</tr>
+				</table>
+	    	</div>
+	    	<br>
+	    	<input type="button"  onclick="window.history.back()" value="Back To Federate Certificate Authorities" />&nbsp;
+		</form>
+	</div>
+</div>

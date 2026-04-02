@@ -6,13 +6,10 @@ import static com.bbn.tak.tls.Constants.CERTBITS;
 import static com.bbn.tak.tls.Constants.KEY_TYPE;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertificateException;
@@ -68,13 +65,12 @@ public class CertManager {
         return new CertKey(serverBase, privKey);
     }
 
-    public CertKey makeClientCert(String name, long validity, String signatureAlg) throws InvalidKeyException,
+    public CertKey makeClientCert(String name, long validitySeconds, String signatureAlg) throws InvalidKeyException,
             IOException, NoSuchAlgorithmException, CertificateException, SignatureException, NoSuchProviderException {
         CertAndKeyGen certGen = new CertAndKeyGen(KEY_TYPE, signatureAlg, null);
         certGen.generate(CERTBITS);
         PrivateKey privKey = certGen.getPrivateKey();
-        // need to turn validity from days into seconds
-        X509Certificate clientBase = certGen.getSelfCertificate(new X500Name(name), validity * 60 * 60 *24);
+        X509Certificate clientBase = certGen.getSelfCertificate(new X500Name(name), validitySeconds);
         return new CertKey(clientBase, privKey);
     }
 

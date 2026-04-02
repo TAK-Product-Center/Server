@@ -146,6 +146,24 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		verificationEngine.offlineAddFederate(federatedServer, federate);
 		stateEngine.offlineAddFederate(federatedServer, federate);
 	}
+	
+	@Override
+	public void offlineEnableFederatedGroupMapping(AbstractServerProfile federatedServer, AbstractServerProfile federate,
+			boolean enable) {
+		TestLogger.executeEngineCommand("offlineEnableFederatedGroupMapping");
+		actionEngine.offlineEnableFederatedGroupMapping(federatedServer, federate, enable);
+		verificationEngine.offlineEnableFederatedGroupMapping(federatedServer, federate, enable);
+		stateEngine.offlineEnableFederatedGroupMapping(federatedServer, federate, enable);
+	}
+	
+	@Override
+	public void offlineSetFederateMaxHops(AbstractServerProfile federatedServer, AbstractServerProfile federate,
+			int maxHops) {
+		TestLogger.executeEngineCommand("offlineSetFederateMaxHops");
+		actionEngine.offlineSetFederateMaxHops(federatedServer, federate, maxHops);
+		verificationEngine.offlineSetFederateMaxHops(federatedServer, federate, maxHops);
+		stateEngine.offlineSetFederateMaxHops(federatedServer, federate, maxHops);
+	}
 
 	@Override
 	public void offlineAddOutboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String outboundGroupIdentifier) {
@@ -154,6 +172,15 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		verificationEngine.offlineAddOutboundFederateGroup(federatedServer, federate, outboundGroupIdentifier);
 		stateEngine.offlineAddOutboundFederateGroup(federatedServer, federate, outboundGroupIdentifier);
 	}
+	
+	@Override
+	public void offlineAddOutboundFederateGroupHopLimit(AbstractServerProfile federatedServer,
+			AbstractServerProfile federate, String outboundGroupIdentifier, int hopLimit) {
+		TestLogger.executeEngineCommand("offlineAddOutboundFederateGroupHopLimit");
+		actionEngine.offlineAddOutboundFederateGroupHopLimit(federatedServer, federate, outboundGroupIdentifier, hopLimit);
+		verificationEngine.offlineAddOutboundFederateGroupHopLimit(federatedServer, federate, outboundGroupIdentifier, hopLimit);
+		stateEngine.offlineAddOutboundFederateGroupHopLimit(federatedServer, federate, outboundGroupIdentifier, hopLimit);
+	}
 
 	@Override
 	public void offlineAddInboundFederateGroup(@NotNull AbstractServerProfile federatedServer, @NotNull AbstractServerProfile federate, @NotNull String inboundGroupIdentifier) {
@@ -161,6 +188,15 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		actionEngine.offlineAddInboundFederateGroup(federatedServer, federate, inboundGroupIdentifier);
 		verificationEngine.offlineAddInboundFederateGroup(federatedServer, federate, inboundGroupIdentifier);
 		stateEngine.offlineAddInboundFederateGroup(federatedServer, federate, inboundGroupIdentifier);
+	}
+	
+	@Override
+	public void offlineAddInboundFederateGroupMapping(AbstractServerProfile federatedServer,
+			AbstractServerProfile federate, String remoteGroupIdentifier, String localGroupIdentifier) {
+		TestLogger.executeEngineCommand("offlineAddInboundFederateGroupMapping");
+		actionEngine.offlineAddInboundFederateGroupMapping(federatedServer, federate, remoteGroupIdentifier, localGroupIdentifier);
+		verificationEngine.offlineAddInboundFederateGroupMapping(federatedServer, federate, remoteGroupIdentifier, localGroupIdentifier);
+		stateEngine.offlineAddInboundFederateGroupMapping(federatedServer, federate, remoteGroupIdentifier, localGroupIdentifier);
 	}
 
 	@Override
@@ -248,6 +284,14 @@ public class TestEngine implements EngineInterface, Callable<String> {
 		verificationEngine.onlineAddUser(user);
 		stateEngine.onlineAddUser(user);
 	}
+
+    @Override
+    public void addUserThroughUserManager(@NotNull AbstractUser user) {
+        TestLogger.executeEngineCommand("addUserThroughUserManager");
+        actionEngine.addUserThroughUserManager(user);
+        verificationEngine.addUserThroughUserManager(user);
+        stateEngine.addUserThroughUserManager(user);
+    }
 
 	@Override
 	public void onlineRemoveUsers(@NotNull AbstractServerProfile server, @NotNull MutableUser... users) {

@@ -1,421 +1,137 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+plugins {
+    id "com.github.johnrengelman.shadow" version "${gradle_shadow_version}"
+    id("org.openapi.generator") version "7.0.1"
+}
 
 sourceSets {
     main {
         java {
-            srcDirs = ['src/main/java']
+            srcDirs = [
+                    'src/main/java',
+                    // Generated OpenAPI clients
+                    "build/generated/src/main/java"
+            ]
+        }
+        resources {
+            srcDirs = ['src/main/resources']
         }
     }
     exe {
         java {
-            srcDirs = ['src/exe/java']
-			destinationDirectory.set(file('build/classes/java/main'))
-		}
-    }
-    core {
-    	java {
-	        srcDirs = ['src/core/java']
-			destinationDirectory.set(file('build/classes/java/main'))
+            srcDirs = [
+                    'src/exe/java',
+                    // Include the test files from takserver-core to run the tests
+                    project(':takserver-core').sourceSets.integrationTest.allSource
+            ]
         }
-    }
-    rpm {
         resources {
-            srcDirs = ['src/rpm/resources']
-
+            srcDirs = ['src/exe/resources']
         }
     }
     cursedtak {
         java {
             srcDirs = ['src/cursedtak/java']
-			destinationDirectory.set(file('build/classes/java/main'))
         }
         resources {
             srcDirs = ['src/cursedtak/resources']
         }
     }
-	test {
-        java {
-            srcDirs = ['src/test/java']
-        }
-    }
 }
 
 javadoc {
-	exclude "com/bbn/marti/takcl/connectivity/server/**"
-	source = sourceSets.main.allJava
+    exclude "com/bbn/marti/takcl/connectivity/server/**"
+    source = sourceSets.main.allJava
 }
 
-compileExeJava.dependsOn(':takserver-core:copyVerFile')
-compileCursedtakJava.dependsOn compileJava
-compileCursedtakJava.dependsOn compileExeJava
-compileTestJava.dependsOn compileCursedtakJava
-jar.dependsOn compileCursedtakJava
+compileJava.dependsOn(':takserver-core:copyVerFile')
 
-task cursedJar(type: ShadowJar) {
-    classifier = 'exe'
-    from sourceSets.cursedtak.output
-	project.configurations.cursedtakImplementation.canBeResolved = true
-	configurations = [project.configurations.cursedtakImplementation]
-	setZip64(true)
-	exclude "META-INF/*.SF"
-	exclude 'META-INF/*.DSA'
-	exclude 'META-INF/*.RSA'
-    manifest {
-        attributes 'Main-Class': 'com.bbn.marti.takcl.cursedtak.CursedTak'
-    }
-    baseName = "takcl-dev-cursedtak"
+//task cursedJar(type: ShadowJar) {
+//    classifier = 'exe'
+//    from sourceSets.cursedtak.output, sourceSets.cursedtak.compileClasspath
+//	project.configurations.cursedtakImplementation.canBeResolved = true
+////	configurations = [project.configurations.cursedtakImplementation]
+//	setZip64(true)
+////	exclude "META-INF/*.SF"
+////	exclude 'META-INF/*.DSA'
+////	exclude 'META-INF/*.RSA'
+//    manifest {
+//        attributes 'Main-Class': 'com.bbn.marti.takcl.cursedtak.CursedTak'
+//    }
+//    baseName = "takcl-dev-cursedtak"
+//
+//	dependsOn(compileCursedtakJava)
+//}
 
-	dependsOn(compileCursedtakJava)
-}
-
-task publicJar(type: ShadowJar) {
-    classifier = 'exe'
-    from sourceSets.exe.output, sourceSets.rpm.output
-	project.configurations.exeImplementation.canBeResolved = true
-    configurations = [project.configurations.exeImplementation]
-	setZip64(true)
-	exclude "META-INF/*.SF"
-	exclude 'META-INF/*.DSA'
-	exclude 'META-INF/*.RSA'
+shadowJar {
+    classifier 'exe'
+    baseName 'takcl'
+    zip64 true
     manifest {
         attributes 'Main-Class': 'com.bbn.marti.takcl.TAKCL'
     }
-    baseName = "takcl"
-
-	dependsOn(compileCursedtakJava)
-	dependsOn(':takserver-core:copyVerFile')
-}
-
-task developerJar(type: ShadowJar) {
-    classifier = 'exe'
-    from sourceSets.exe.output
-	project.configurations.exeImplementation.canBeResolved = true
-    configurations = [project.configurations.exeImplementation]
-	setZip64(true)
-	exclude "META-INF/*.SF"
-	exclude 'META-INF/*.DSA'
-	exclude 'META-INF/*.RSA'
-    manifest {
-        attributes 'Main-Class': 'com.bbn.marti.takcl.TAKCL',
-                "Developer-Mode": "true"
-    }
-    baseName = "takcl-dev"
-
-	dependsOn(compileCursedtakJava)
-	dependsOn(':takserver-core:copyVerFile')
-}
-
-task coreJar(type: ShadowJar) {
-    classifier = 'exe'
-    from sourceSets.core.output
-	project.configurations.coreImplementation.canBeResolved = true
-    configurations = [project.configurations.coreImplementation]
-	setZip64(true)
-	exclude "META-INF/*.SF"
-	exclude 'META-INF/*.DSA'
-	exclude 'META-INF/*.RSA'
-	baseName = 'takcl-dev-tmp'
-
-	dependsOn(compileCursedtakJava)
-}
-
-configurations {
-//    all*.exclude group: 'com.bbn.roger'
-//    all*.exclude group: 'com.google.guava'
-//    all*.exclude group: 'com.sun.xml.ws'
-//	all*.exclude group: 'org.springframework'
-//	all*.exclude group: 'org.apache.httpcomponents'
+    from sourceSets.exe.output, sourceSets.exe.compileClasspath
 }
 
 dependencies {
+    implementation project(':takserver-common')
+    implementation project(':federation-common')
+    implementation project(':takserver-usermanager')
 
-    implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: log4j_api_version
-	implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j', version: log4j_api_version
-	implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-
-    coreImplementation (project(':takserver-common')) {
-	    exclude group: 'ch.qos.logback', module: 'logback-classic'
-	    exclude group: 'org.slf4j'
-	    exclude group: 'log4j', module: 'log4j'
-  	}
-
-    coreImplementation (project(':takserver-fig-core')) {
-	    exclude group: 'ch.qos.logback', module: 'logback-classic'
-	    exclude group: 'org.slf4j'
-	    exclude group: 'log4j', module: 'log4j'
-  	}
-
-  	coreImplementation (project(':federation-common')) {
-	    exclude group: 'ch.qos.logback', module: 'logback-classic'
-	    exclude group: 'org.slf4j'
-	    exclude group: 'log4j', module: 'log4j'
-  	}
-
-    coreImplementation group: 'commons-io', name: 'commons-io', version: commons_io_version
-    coreImplementation ("org.apache.ignite:ignite-core:$ignite_version") {
-	    exclude group: 'ch.qos.logback', module: 'logback-classic'
-	    exclude group: 'org.slf4j'
-	    exclude group: 'log4j', module: 'log4j'
-  	}
-
-    coreImplementation ("org.apache.ignite:ignite-slf4j:$ignite_version") {
-	    exclude group: 'ch.qos.logback', module: 'logback-classic'
-	    exclude group: 'org.slf4j'
-	    exclude group: 'log4j', module: 'log4j'
-  	}
-
-	implementation group: 'org.postgresql', name: 'postgresql', version: postgres_version
-	exeImplementation group: 'org.postgresql', name: 'postgresql', version: postgres_version
-
-    coreImplementation group: 'org.apache.ignite', name: 'ignite-kubernetes', version: ignite_version
-	coreImplementation group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
-    coreImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
-	coreImplementation group: 'xerces', name: 'xercesImpl', version: xerces_version
-	// required to fix version conflict for h2 between ignite and spring boot
-	coreImplementation group: 'com.h2database', name: 'h2', version: h2_version
-
-
-	implementation sourceSets.core.output
-	implementation (project(':takserver-common')) {
-	    exclude group: 'ch.qos.logback', module: 'logback-classic'
-	    exclude group: 'org.slf4j'
-	    exclude group: 'log4j', module: 'log4j'
-  	}
-
-	implementation (project(':takserver-fig-core')) {
-	    exclude group: 'ch.qos.logback', module: 'logback-classic'
-	    exclude group: 'org.slf4j'
-	    exclude group: 'log4j', module: 'log4j'
-  	}
-
-	implementation (project(':federation-common')) {
-	    exclude group: 'ch.qos.logback', module: 'logback-classic'
-	    exclude group: 'org.slf4j'
-	    exclude group: 'log4j', module: 'log4j'
-  	}
-
-	implementation group: 'commons-io', name: 'commons-io', version: commons_io_version
-
-	// required to fix version conflict for h2 between ignite and spring boot
-	implementation group: 'com.h2database', name: 'h2', version: h2_version
-	implementation group: 'xerces', name: 'xercesImpl', version: xerces_version
-
-
-	implementation ("org.apache.ignite:ignite-core:$ignite_version") {
-	    exclude group: 'ch.qos.logback', module: 'logback-classic'
-	    exclude group: 'org.slf4j'
-	    exclude group: 'log4j', module: 'log4j'
-  	}
-
-	implementation ("org.apache.ignite:ignite-slf4j:$ignite_version") {
-	    exclude group: 'ch.qos.logback', module: 'logback-classic'
-	    exclude group: 'org.slf4j'
-	    exclude group: 'log4j', module: 'log4j'
-  	}
-
+    api group: 'com.google.code.gson', name: 'gson', version: gson_version
 
     implementation group: 'com.squareup.retrofit2', name: 'retrofit', version: '2.9.0'
     implementation group: 'com.squareup.retrofit2', name: 'converter-gson', version: '2.9.0'
     implementation group: 'com.squareup.retrofit2', name: 'converter-scalars', version: '2.9.0'
-	// Keep the logging-interceptor in sync with the retrofit dependencies!
-	implementation group: 'com.squareup.okhttp3', name: 'logging-interceptor', version: '3.14.9'
-	implementation group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.5.0'
+    // Keep the logging-interceptor in sync with the retrofit dependencies!
+    implementation group: 'com.squareup.okhttp3', name: 'logging-interceptor', version: '3.14.9'
+    implementation group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.5.0'
     implementation group: 'io.grpc', name: 'grpc-protobuf', version: grpc_version
-
     implementation group: 'org.springframework.security', name: 'spring-security-core', version: spring_security_version
     implementation group: 'commons-io', name: 'commons-io', version: commons_io_version
-    //implementation group: 'org.apache.httpcomponents', name: 'httpclient', version: httpcomponents_version
     implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: httpcomponents_version
     implementation group: 'org.dom4j', name: 'dom4j', version: dom4j_version
     implementation group: 'junit', name: 'junit', version: junit_version
-    api group: 'com.google.code.gson', name: 'gson', version: gson_version
     implementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
     implementation group: 'io.kubernetes', name: 'client-java', version: '16.0.0'
+    implementation group: 'org.postgresql', name: 'postgresql', version: postgres_version
+    implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: jakarta_xml_bind_api_version
+
+    // OpenAPI Client dependencies
+    dependencies {
+        implementation "com.squareup.retrofit2:retrofit:2.9.0"
+        implementation "com.squareup.retrofit2:converter-scalars:2.9.0"
+        implementation "com.squareup.retrofit2:converter-gson:2.9.0"
+        implementation "io.swagger:swagger-annotations:1.5.22"
+        implementation "com.google.code.findbugs:jsr305:3.0.2"
+        implementation("org.apache.oltu.oauth2:org.apache.oltu.oauth2.client:1.0.1") {
+            exclude group: 'org.apache.oltu.oauth2', module: 'org.apache.oltu.oauth2.common'
+        }
+        implementation "io.gsonfire:gson-fire:1.8.0"
+        implementation "jakarta.annotation:jakarta.annotation-api:1.3.5"
+    }
 
     exeImplementation sourceSets.main.output
-    exeImplementation configurations.implementation
-    exeImplementation configurations.runtimeOnly
-	exeImplementation group: 'xerces', name: 'xercesImpl', version: xerces_version
-
-    exeImplementation project(':takserver-core').sourceSets.integrationTest.output
-    exeImplementation project(':takserver-fig-core')
-
-	// required to fix version conflict for h2 between ignite and spring boot
-	exeImplementation group: 'com.h2database', name: 'h2', version: h2_version
-
-	exeImplementation 'org.apache.ant:ant-junit:1.10.8'
-	exeImplementation 'args4j:args4j:2.33'
-	exeImplementation 'org.kohsuke:asm3:3.3.0'
-
+    exeImplementation sourceSets.main.compileClasspath
+    exeImplementation 'org.apache.ant:ant-junit:1.10.8'
+    exeImplementation 'args4j:args4j:2.33'
+    exeImplementation 'org.kohsuke:asm3:3.3.0'
 
     cursedtakImplementation sourceSets.main.output
-    cursedtakImplementation configurations.implementation
-    cursedtakImplementation configurations.runtimeOnly
-
+    cursedtakImplementation sourceSets.main.compileClasspath
     cursedtakImplementation 'info.picocli:picocli:3.8.2'
-    cursedtakImplementation project(':takserver-fig-core')
-
-	// required to fix version conflict for h2 between ignite and spring boot
-	cursedtakImplementation group: 'com.h2database', name: 'h2', version: h2_version
-
     cursedtakImplementation 'com.googlecode.lanterna:lanterna:3.0.1'
-	cursedtakImplementation group: 'xerces', name: 'xercesImpl', version: xerces_version
-	
-	implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: jakarta_xml_bind_api_version
 }
 
-
-task devDeployCore(type: GradleBuild) {
-	group = 'TAKServer'
-	description = 'Rebuilds and copies takserver.war, takserver-pm.jar, takserver-retention.jar, and takcl.jar into their appropriate location in takserver-package/build/takArtifacts'
-	buildName = 'devDeployCore'
-	dependsOn(
-			':federation-common:clean',
-			':takserver-common:clean',
-			':takserver-core:clean',
-			':takserver-fig-core:clean',
-			':takserver-plugins:clean',
-	)
-	doFirst {
-		tasks = [
-				':takserver-core:bootWar',
-				':takserver-takcl-core:publicJar'
-		]
+openApiGenerate {
+    generatorName.set("java")
+    library.set("retrofit2")
+    inputSpec.set(projectDir.toPath().resolve('src/main/openapi/takserver-openapi-spec.json').toString())
+    apiPackage.set("tak.server.api.client")
+    invokerPackage.set('tak.server.api.client.invoker')
+    ignoreFileOverride.set(projectDir.toPath().resolve(".openapi-generator-ignore").toString())
+    outputDir.set(project.buildDir.toPath().resolve("generated").toString())
+    modelPackage.set("tak.server.api.client.models")
+    configOptions.set([delegatePattern: "true", reactive: "true", useSpringBoot3: "true"])
 }
-	doLast {
-		copy {
-			into("${rootDir}/takserver-package/build/takArtifacts")
-			from "${rootDir}/takserver-core/build/libs/takserver-core-${version}.war"
-			rename("takserver-core-${version}.war", "takserver.war")
-		}
-	}
-}
-
-
-
-task devDeployTakcl(type: GradleBuild) {
-	group = 'TAKServer'
-	description = 'Rebuilds and copies takserver.war, takserver-pm.jar, takserver-retention.jar, and takcl.jar into their appropriate location in takserver-package/build/takArtifacts'
-	buildName = 'devDeployTakcl'
-	dependsOn(
-			':takserver-takcl-core:clean',
-	)
-	doFirst {
-		tasks = [
-				':takserver-takcl-core:publicJar'
-		]
-	}
-	doLast {
-		copy {
-			into("${rootDir}/takserver-package/build/takArtifacts")
-			from "${buildDir}/libs/takcl-${version}-exe.jar"
-			rename("takcl-${version}-exe.jar", "utils/takcl.jar")
-		}
-	}
-}
-
-
-task devDeployAux(type: GradleBuild) {
-	group = 'TAKServer'
-	description = 'Rebuilds and copies takserver.war, takserver-pm.jar, takserver-retention.jar, and takcl.jar into their appropriate location in takserver-package/build/takArtifacts'
-	buildName = 'devDeployAux'
-	dependsOn(
-			':federation-common:clean',
-			':takserver-common:clean',
-			':takserver-fig-core:clean',
-			':takserver-plugin-manager:clean',
-			':takserver-plugins:clean',
-			':takserver-retention:clean',
-			':takserver-usermanager:clean',
-			':takserver-schemamanager:clean'
-	)
-	doFirst {
-		tasks = [
-				':takserver-plugin-manager:bootJar',
-				':takserver-retention:bootJar',
-				':takserver-usermanager:shadowJar',
-				':takserver-schemamanager:shadowJar'
-		]
-	}
-	doLast {
-		copy {
-			into("${rootDir}/takserver-package/build/takArtifacts/db-utils")
-			from "${rootDir}/takserver-schemamanager/build/libs/schemamanager-${version}-uber.jar"
-			rename("schemamanager-${version}-uber.jar", "SchemaManager.jar")
-		}
-		copy {
-			into("${rootDir}/takserver-package/build/takArtifacts/utils")
-			from "${rootDir}/takserver-usermanager/build/libs/UserManager-${version}-all.jar"
-			rename("UserManager-${version}-all.jar", "UserManager.jar")
-		}
-		copy {
-			into("${rootDir}/takserver-package/build/takArtifacts")
-			from "${rootDir}/takserver-retention/build/libs/takserver-retention-${version}.jar"
-			rename("takserver-retention-${version}.jar", "takserver-retention.jar")
-		}
-		copy {
-			into("${rootDir}/takserver-package/build/takArtifacts")
-			from "${rootDir}/takserver-plugin-manager/build/libs/takserver-plugin-manager-${version}.jar"
-			rename("takserver-plugin-manager-${version}.jar", "takserver-pm.jar")
-		}
-	}
-}
-
-task devDeployFedHub(type: GradleBuild) {
-       group = 'TAKServer'
-       description = 'Rebuilds and copies federation hub into their appropriate location in takserver-package/build/takArtifacts'
-       buildName = 'devDeployFedHub'
-       dependsOn(
-                       ':federation-hub-broker:clean',
-                       ':federation-hub-ui:clean',
-                       ':federation-hub-policy:clean',
-       )
-       doFirst {
-               tasks = [
-                               ':federation-hub-policy:bootJar',
-                               ':federation-hub-broker:bootJar',
-                               ':federation-hub-ui:bootWar',
-                               ':federation-hub-ui:shadowJar'
-               ]
-       }
-       doLast {
-               copy {
-                       into("${rootDir}/takserver-package/build/takArtifacts/federation-hub/configs")
-                       from "${rootDir}/federation-hub-broker/src/main/resources/federation-hub-broker.yml"
-               }
-               copy {
-                       into("${rootDir}/takserver-package/build/takArtifacts/federation-hub/configs")
-                       from "${rootDir}/federation-hub-ui/src/main/resources/federation-hub-ui.yml"
-               }
-
-               copy {
-                       into("${rootDir}/takserver-package/build/takArtifacts/federation-hub/configs")
-                       from "${rootDir}/federation-hub-broker/src/main/resources/logback-broker.xml"
-               }
-               copy {
-                       into("${rootDir}/takserver-package/build/takArtifacts/federation-hub/configs")
-                       from "${rootDir}/federation-hub-policy/src/main/resources/logback-policy.xml"
-               }
-
-               copy {
-                       into("${rootDir}/takserver-package/build/takArtifacts")
-                       from "${rootDir}/federation-hub-policy/build/libs/federation-hub-policy-${version}.jar"
-                       rename("federation-hub-policy-${version}.jar", "federation-hub/federation-hub-policy.jar")
-               }
-               copy {
-                       into("${rootDir}/takserver-package/build/takArtifacts")
-                       from "${rootDir}/federation-hub-broker/build/libs/federation-hub-broker-${version}.jar"
-                       rename("federation-hub-broker-${version}.jar", "federation-hub/federation-hub-broker.jar")
-               }
-               copy {
-                       into("${rootDir}/takserver-package/build/takArtifacts")
-                       from "${rootDir}/federation-hub-ui/build/libs/federation-hub-ui-${version}.war"
-                       rename("federation-hub-ui-${version}.war", "federation-hub/federation-hub-ui.war")
-               }
-               copy {
-                       into("${rootDir}/takserver-package/build/takArtifacts")
-                       from "${rootDir}/federation-hub-ui/build/libs/federation-hub-manager-${version}.jar"
-                       rename("federation-hub-manager-${version}.jar", "federation-hub/federation-hub-manager.jar")
-               }
-       }
-}
+//configOptions = [delegatePattern: "true", title: "${label}", reactive: "${isReactive}", useSpringBoot3: "true"]
+tasks.getByName("compileJava").dependsOn("openApiGenerate")

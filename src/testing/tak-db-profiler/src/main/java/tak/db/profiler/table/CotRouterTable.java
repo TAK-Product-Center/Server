@@ -22,7 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CotRouterTable {
 	private static final Logger logger = LoggerFactory.getLogger(CotRouterTable.class);
-
+	
 	private Collection<Cot> cotMessages = new ArrayList<>();
 
 	@JsonIgnore
@@ -43,9 +43,12 @@ public class CotRouterTable {
 		PreparedStatement ps = dataSource.getConnection().prepareStatement("select cot_type, groups from cot_router where id > ? limit ?;");
 		ps.setLong(1, currIdStart);
 		ps.setLong(2, increment);
+				
+		logger.info("Executing: " + ps.toString());
 		
 		ResultSet rs = ps.executeQuery();
-		int rowcount = 0;		
+		int rowcount = 0;
+		
 		while(rs.next()) {
 			rowcount++;
 			
@@ -53,17 +56,17 @@ public class CotRouterTable {
 			String groups = rs.getString("groups");
 			groups = new StringBuilder(groups).reverse().toString();
 			
+			int groupCounter = 0;
 			Set<String> foundGroups = new HashSet<String>();
-			for (int i = 0; i < groups.toCharArray().length; i++) {
-				// skip null groups					
-				if (groups.charAt(i) == '0')
-					continue;
-				
-				String groupName = groupsTable.getGroupsMap().get(i);
-				if (groupName != null)
-					foundGroups.add(groupName);
+			for(Character c : groups.toCharArray()) {
+			    if(c.equals('1')) {
+			    	String groupName = groupsTable.getGroupsMap().get(groupCounter);
+					if (groupName != null)
+						foundGroups.add(groupName);
+			    }
+			    groupCounter++;
 			}
-			
+						
 			Cot cot = new Cot();
 			cot.setCotType(cotType);
 			cot.setGroups(foundGroups);

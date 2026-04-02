@@ -163,6 +163,7 @@ public class CertManagerService {
                 caChain = subMgr.getSigningCertChain();
                 CertManager.CertKey signingCert = new CertManager.CertKey(caChain[0], subMgr.getSigningKey());
                 long validityDays = subMgr.getSigningValidity();
+                Integer validityHours = takServerCAConfig.getValidityHours();
                 long validityNotBeforeOffsetMinutes = takServerCAConfig.getValidityNotBeforeOffsetMinutes();
 
                 String responderUrl = null;
@@ -172,15 +173,17 @@ public class CertManagerService {
                 }
 
                 long now = new Date().getTime();
-                long validMs = validityDays * 1000 * 60 * 60 * 24;
+                long validMs = validityHours != null ?
+                        validityHours * 1000 * 60 * 60 :
+                        validityDays * 1000 * 60 * 60 * 24;
                 long validityNotBeforeOffsetMS = validityNotBeforeOffsetMinutes * 60 * 1000;
                 Date notBefore = new Date(now - validityNotBeforeOffsetMS);
                 Date notAfter = new Date(now + validMs);
 
                 // is the user authenticating to the enrollment endpoint via OAuth?
-                if (token != null) {
+                if (token != null && takServerCAConfig.isUseTokenExpiration()) {
                     // set the certificate expiration to match the token expiration
-                    Claims claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256);
+                    Claims claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256, false);
                     Integer exp = (Integer)claims.get("exp");
                     if (exp != null) {
                         notAfter = new Date(exp.longValue() * 1000);

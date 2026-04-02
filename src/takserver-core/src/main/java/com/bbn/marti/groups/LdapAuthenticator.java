@@ -35,6 +35,8 @@ import com.google.common.collect.Sets;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ldap.filter.AndFilter;
+import org.springframework.ldap.filter.EqualsFilter;
 
 import com.bbn.marti.config.Auth;
 import com.bbn.marti.config.LdapStyle;
@@ -377,13 +379,13 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
 
     // traverses up the group hierarchy and returns the list of nested group names
     public List<String> findNestedGroups(
-            List<String> nestedGroups, DirContext context, String filter, String groupName,
+            List<String> nestedGroups, DirContext context, AndFilter filter, String groupName,
             SearchControls constraints, List<String> parents, Set<String> processed) {
 
         try {
             processed.add(groupName);
 
-            NamingEnumeration results = context.search(conf.getGroupBaseRDN(), filter, constraints);
+            NamingEnumeration results = context.search(conf.getGroupBaseRDN(), filter.toString(), constraints);
             if (results == null || !results.hasMore()) {
                 if (parents.isEmpty()) {
                     return nestedGroups;
@@ -401,7 +403,11 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             Iterator<String> it = parents.iterator();
             while (it.hasNext()) {
                 String groupDn = it.next();
-                String nextfilter = "(&(member=" + groupDn + ")(objectClass=groupOfNames))";
+                
+                AndFilter nextfilter = new AndFilter();
+                nextfilter.and(new EqualsFilter("member", groupDn));
+                nextfilter.and(new EqualsFilter("objectClass", "groupOfNames"));
+                
                 parents.remove(groupDn);
                 if (!processed.contains(groupDn)) {
                     findNestedGroups(nestedGroups, context, nextfilter, groupDn, constraints, parents, processed);
@@ -425,7 +431,10 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         SearchControls constraints = new SearchControls();
         constraints.setSearchScope(SearchControls.SUBTREE_SCOPE);
 
-        String filter = "(&(member=" + userBindDn + ")(objectClass=groupOfNames))";
+        AndFilter filter = new AndFilter();
+        filter.and(new EqualsFilter("member", userBindDn));
+        filter.and(new EqualsFilter("objectClass", "groupOfNames"));
+        
         nestedGroups = findNestedGroups(nestedGroups, ctx, filter, userBindDn, constraints, parents, processed);
 
         for (String groupName : nestedGroups) {
@@ -514,13 +523,15 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         		logger.debug("getting user info using AD approach");
         	}
             // For AD, use the sAMAccountName
-            searchFilter = "(sAMAccountName=" + userId + ")";
+        	EqualsFilter filter = new EqualsFilter("sAMAccountName", userId);
+            searchFilter = filter.toString();
         } else {
         	if (logger.isDebugEnabled()) {
         		logger.debug("getting user info using AD chain approach");
         	}
             String distinguishedName = getDistinguishedName(ctx, userId);
-            searchFilter = "(member:1.2.840.113556.1.4.1941:=" + distinguishedName + ")";
+            EqualsFilter filter = new EqualsFilter("member:1.2.840.113556.1.4.1941:", distinguishedName);
+            searchFilter = filter.toString();
         }
         
         if (logger.isDebugEnabled()) {
@@ -541,7 +552,10 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             SearchControls userControls = new SearchControls();
             userControls.setReturningAttributes(userAttrList);
             userControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-            results = ctx.search("", "(sAMAccountName=" + userId + ")", userControls);
+            
+            EqualsFilter accountFilter = new EqualsFilter("sAMAccountName", userId);
+            
+            results = ctx.search("", accountFilter.toString(), userControls);
             getGroupAttrs(results, attributeMap);
             results.close();
 
@@ -562,7 +576,10 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             SearchControls domainControls = new SearchControls();
             domainControls.setReturningAttributes(domainAttrList);
             domainControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-            results = ctx.search("", "(objectClass=domain)", domainControls);
+            
+            EqualsFilter classFilter = new EqualsFilter("objectClass", "domain");
+            
+            results = ctx.search("", classFilter.toString(), domainControls);
             getGroupAttrs(results, attributeMap);
             results.close();
 
@@ -638,7 +655,10 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             controls.setReturningAttributes(distinguishedNameAttr);
 
             controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-            results = ctx.search("", "(sAMAccountName=" + userId + ")", controls);
+            
+            EqualsFilter filter = new EqualsFilter("sAMAccountName", userId);
+            
+            results = ctx.search("", filter.toString(), controls);
 
             getGroupAttrs(results, groupAttrs);
             distinguishedName = groupAttrs.get("distinguishedName0");
@@ -647,12 +667,10 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             if (results != null) { try { results.close(); } catch(NamingException ne) {} }
         }
 
-        distinguishedName = distinguishedName.replace("\\", "\\\\");
-
         return distinguishedName;
     }
 
-    private String getUsernameByEmail(String email) throws NamingException {
+    public String getUsernameByEmail(String email) throws NamingException {
 
         DirContext ctx = null;
         NamingEnumeration<?> results = null;
@@ -678,10 +696,11 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             controls.setReturningAttributes(logonNameAttr);
 
             controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-            String filter = "(mail=" + email + ")";
+            
+            EqualsFilter filter = new EqualsFilter("mail", email);
 
             String userBaseRDN = conf.getUserBaseRDN() != null ? conf.getUserBaseRDN() : "";
-            results = ctx.search(userBaseRDN, filter, controls);
+            results = ctx.search(userBaseRDN, filter.toString(), controls);
 
             Map<String, String> groupAttrs = new ConcurrentHashMap<>();
             getGroupAttrs(results, groupAttrs);

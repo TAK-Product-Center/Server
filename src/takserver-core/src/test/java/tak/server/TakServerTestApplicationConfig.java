@@ -153,7 +153,7 @@ public class TakServerTestApplicationConfig {
 				"127.0.0.1", false, false, true,
 				false, 47500, 100,
 				47100,100, 0, 600000,
-				524288000,	524288000);
+				524288000,	524288000, 60000);
 		IgniteConfiguration igniteConfiguration = IgniteConfigurationHolder.getInstance().getIgniteConfiguration(Constants.CONFIG_PROFILE_NAME, takIgniteConfiguration);
 		String logPath = System.getProperty(JARG_KEY_IGNITE_TEST_LOG_FILE, null);
 

@@ -10,7 +10,7 @@ delete from cot_link cl using cot_router cr left outer join mission_uid mu on mu
 delete from cot_router using cot_router cr left outer join mission_uid mu on mu.uid=cr.uid where cot_router.id = cr.id and cr.id <= (select maxid from tmp_crid limit 1) and mu.uid is null;
 
 -- uncomment this line to also delete enterprise sync / mission package data
---delete from resource where submissiontime < now() - interval '1 month';
+--delete from resource where submissiontime < now() - interval '1 month' and 'missionpackage'=ANY(keywords);
 
 drop table tmp_crid;
 commit;

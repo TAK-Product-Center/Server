@@ -1,5 +1,6 @@
 package tak.server.util;
 
+import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -31,8 +32,9 @@ public class PasswordUtils {
         String totalChars = RandomStringUtils.randomAlphanumeric(3);
         
         String specialChars = "";
+        SecureRandom r = new SecureRandom();
         for (int count = 0; count < 3; count ++) {
-        	int random_int = (int)Math.floor(Math.random()*(SPECIAL_CHARS_GENERATION.length()));
+        	int random_int = (int)Math.floor(r.nextFloat()*(SPECIAL_CHARS_GENERATION.length()));
         	specialChars += SPECIAL_CHARS_GENERATION.charAt(random_int);
         }
         		

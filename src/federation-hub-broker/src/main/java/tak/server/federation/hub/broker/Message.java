@@ -2,6 +2,7 @@ package tak.server.federation.hub.broker;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
@@ -18,15 +19,17 @@ public class Message {
 
     private static final Logger logger = LoggerFactory.getLogger(Message.class);
 
+    private long receivedTime = Instant.now().toEpochMilli();
+    
     /* Map of metadata attribute names to their values. */
     private Map<String, Object> metadata = new ConcurrentHashMap<>();
 
     /* The contents of the message. */
     private Payload<?> payload;
 
-    private AddressableEntity<?> source;
+    private AddressableEntity source;
 
-    private Set<AddressableEntity<?>> dests;
+    private Set<AddressableEntity> dests;
 
     private UUID messageID;
 
@@ -63,11 +66,11 @@ public class Message {
     }
 
     /* The following are getters for the instance variables. */
-    public AddressableEntity<?> getSource() {
+    public AddressableEntity getSource() {
         return this.source;
     }
 
-    public void setSource(AddressableEntity<?> source) {
+    public void setSource(AddressableEntity source) {
         this.source = source;
     }
 
@@ -76,12 +79,12 @@ public class Message {
      * make will be reflected in the list. In other words, this
      * list is NOT read-only.
      */
-    public Set<AddressableEntity<?>> getDestinations() {
+    public Set<AddressableEntity> getDestinations() {
         if (this.dests != null) {
             return dests;
         }
 
-        this.dests = new SetWrapper<AddressableEntity<?>>(
+        this.dests = new SetWrapper<AddressableEntity>(
             AddressableEntity.class.getName(), new HashSet<>());
         return this.dests;
     }
@@ -106,6 +109,10 @@ public class Message {
     public UUID getMessageID() {
         return messageID;
     }
+    
+    public long getReceivedTime() {
+		return receivedTime;
+	}
 
     public boolean equals(Object obj) {
         if (this == obj) {
@@ -125,7 +132,7 @@ public class Message {
     }
 
     private String getSourceStr() {
-        AddressableEntity<?> source = this.getSource();
+        AddressableEntity source = this.getSource();
         return (source == null) ? "From: null" : "From: " + source.toString();
     }
 

@@ -6,6 +6,25 @@ public class MemoryMetrics {
 	
 	private AtomicDouble heapCommitted;
 	private AtomicDouble heapUsed;
+
+	private double messagingHeapCommitted;
+	private double messagingHeapUsed;
+
+	public double getMessagingHeapCommitted() {
+		return messagingHeapCommitted;
+	}
+
+	public void setMessagingHeapCommitted(double messagingHeapCommitted) {
+		this.messagingHeapCommitted = messagingHeapCommitted;
+	}
+
+	public double getMessagingHeapUsed() {
+		return messagingHeapUsed;
+	}
+
+	public void setMessagingHeapUsed(double messagingHeapUsed) {
+		this.messagingHeapUsed = messagingHeapUsed;
+	}
 	
 	public AtomicDouble getHeapCommitted() {
 		return heapCommitted;

@@ -82,9 +82,7 @@ chmod 500 /opt/tak/db-utils/clear-old-data.sql
 chown postgres:postgres /opt/tak/db-utils/clear-old-data.sh
 chown postgres:postgres /opt/tak/db-utils/clear-old-data.sql
 
-cp /opt/tak/certs-tmp/cert-metadata.sh /opt/tak/certs/. 2>/dev/null || :
-cp /opt/tak/certs-tmp/config.cfg /opt/tak/certs/. 2>/dev/null || :
-rm -rf /opt/tak/certs-tmp
+''' + _installer_sections.restore_config + '''
 
 # rename old tomcat if it exists
 if [ -f "/opt/tak/apache-tomcat" ]; then
@@ -108,11 +106,6 @@ if [ -f "/opt/tak/CoreConfig_temp_backup.example.xml" ]; then
   echo 'Reinstate the previous CoreConfig.example.xml from CoreConfig_temp_backup.example.xml...'
   mv /opt/tak/CoreConfig_temp_backup.example.xml /opt/tak/CoreConfig.example.xml
   chown tak:tak /opt/tak/CoreConfig.example.xml
-fi
-
-if [ -f /opt/tak/db-utils/clear-old-data.sql.bak ] ; then
-    mv /opt/tak/db-utils/clear-old-data.sql /opt/tak/db-utils/clear-old-data.sql.dist.$tak_full_version
-    mv /opt/tak/db-utils/clear-old-data.sql.bak /opt/tak/db-utils/clear-old-data.sql
 fi
 
 sudo /opt/tak/db-utils/takserver-setup-db.sh

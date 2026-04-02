@@ -37,6 +37,10 @@ app.config(['$routeProvider',
 	    templateUrl: 'partials/federateCAGroups.html',
 	    controller: 'FederateCAGroupsCtrl'
 	}).
+	when('/editFederateCATokenAuth/:id', {
+	    templateUrl: 'partials/federateCATokenAuth.html',
+	    controller: 'FederateCATokenAuthCtrl'
+	}).
 	otherwise({
 		redirectTo: '/'
 	});
