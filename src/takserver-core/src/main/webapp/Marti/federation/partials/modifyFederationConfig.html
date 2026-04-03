@@ -117,18 +117,27 @@
                     <td><input type="checkbox" data-ng-model="fedConfig.allowFederatedDelete" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
                   </tr>
                   <tr>
+                    <td>
+                      <div>Federation Token Authentication:</div>
+                      <table>
+                        <tr data-ng-repeat="tokenServer in fedConfig.federationTokenAuthentication">
+                          <td>Port: <input type="number" required min="1" max="65535" data-ng-model="tokenServer.port" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled" data-ng-change="validateTokenServerPort()"></td>
+
+                          <td>TLS: <input type="checkbox" data-ng-model="tokenServer.tls" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
+
+                          <td>Enabled: <input type="checkbox" data-ng-model="tokenServer.enabled" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
+                          
+                          <td data-ng-if="!($last && $first)"><button data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled" type="button" data-ng-click="removeTokenServer($index)">-</button></td>
+                          
+                          <td data-ng-if="$last"><button data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled" type="button" data-ng-click="addTokenServer()">+</button></td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
                     <td>Enable Mission Federation Disruption Tolerance:</td>
                     <td><input type="checkbox" data-ng-model="fedConfig.enableMissionFederationDisruptionTolerance" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
                   </tr>
-                  <tr>
-                    <td>Enable Federation Token Authentication:</td>
-                    <td><input type="checkbox" data-ng-model="fedConfig.federationTokenAuthentication.enabled" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled"></td>
-                  </tr>
-                  <tr>
-                    <td>Enable Federation Token Port:</td>
-                    <td><input type="number" required  min="1" max="65535" data-ng-model="fedConfig.federationTokenAuthentication.port" data-ng-disabled="!fedConfig.serverPortEnabledv2 || !fedConfig.enabled || !fedConfig.federationTokenAuthentication.enabled"></td>
-                  </tr>
-
                 </table>
               </td>
             </tr>

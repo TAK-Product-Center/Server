@@ -7,6 +7,8 @@ import java.util.Map;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 
+import com.google.protobuf.ByteString;
+
 public interface FederationHubDatabaseService {
 	
 	void storeRol(Document rol);
@@ -18,7 +20,7 @@ public interface FederationHubDatabaseService {
 	void trackFederateConnect(String id);
 
 	ObjectId addResource(byte[] data, Map<String, Object> parameters);
-	byte[] getResource(ObjectId resourceObjectId);
+	ByteString getResource(ObjectId resourceObjectId);
 
 	List<Document> getOfflineUpdates(String id, Date lastUpdate);
 }

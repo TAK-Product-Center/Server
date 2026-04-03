@@ -41,12 +41,6 @@ import javax.naming.NamingException;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 
-import com.atakmap.Tak.*;
-import com.atakmap.Tak.Subscription;
-import com.bbn.cot.CotParserCreator;
-import com.bbn.marti.config.*;
-import com.bbn.marti.remote.util.*;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -58,13 +52,34 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.atakmap.Tak.BINARY_TYPES;
+import com.atakmap.Tak.BinaryBlob;
+import com.atakmap.Tak.CRUD;
+import com.atakmap.Tak.ClientHealth;
+import com.atakmap.Tak.ContactListEntry;
+import com.atakmap.Tak.FederateGroupHopLimits;
+import com.atakmap.Tak.FederateGroups;
+import com.atakmap.Tak.FederateProvenance;
+import com.atakmap.Tak.FederateTokenResponse;
+import com.atakmap.Tak.FederatedChannelGrpc;
 import com.atakmap.Tak.FederatedChannelGrpc.FederatedChannelBlockingStub;
 import com.atakmap.Tak.FederatedChannelGrpc.FederatedChannelStub;
+import com.atakmap.Tak.FederatedEvent;
+import com.atakmap.Tak.Identity;
+import com.atakmap.Tak.ROL;
 import com.atakmap.Tak.ROL.Builder;
+import com.atakmap.Tak.ServerHealth;
 import com.atakmap.Tak.ServerHealth.ServingStatus;
+import com.atakmap.Tak.Subscription;
+import com.atakmap.Tak.TakServerVersion;
+import com.bbn.cot.CotParserCreator;
 import com.bbn.cot.filter.DataFeedFilter;
+import com.bbn.marti.config.Configuration;
+import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
 import com.bbn.marti.config.Federation.FederationOutgoing;
+import com.bbn.marti.config.Input;
+import com.bbn.marti.config.Tls;
 import com.bbn.marti.groups.CommonGroupDirectedReachability;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.groups.MessagingUtilImpl;
@@ -85,6 +100,9 @@ import com.bbn.marti.remote.groups.Group;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
+import com.bbn.marti.remote.util.GroupsPayload;
+import com.bbn.marti.remote.util.RemoteUtil;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.service.FederatedSubscriptionManager;
 import com.bbn.marti.service.RepositoryService;
 import com.bbn.marti.service.Resources;
@@ -100,6 +118,7 @@ import com.bbn.marti.util.concurrent.future.AsyncFuture;
 import com.bbn.roger.fig.FederationUtils;
 import com.bbn.roger.fig.FigProtocolNegotiator;
 import com.bbn.roger.fig.Propagator;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
@@ -361,25 +380,31 @@ public class TakFigClient implements Serializable {
 					context = figTls.getContext();
 				}
 			}
-
-			channel = openFigConnection(outgoing.getAddress(), outgoing.getPort(),
-					sslContextBuilder.protocols(Arrays.asList(context.split(","))).build());
+			
+			if (outgoing.isTls()) {
+				channel = openFigConnection(outgoing.getAddress(), outgoing.getPort(),
+						sslContextBuilder.protocols(Arrays.asList(context.split(","))).build());
+			} else {
+				channel = openFigConnection(outgoing.getAddress(), outgoing.getPort(), null);
+			}
 
 		} catch (Exception e) {
 			logger.error("exception setting up TLS config", e);
 		}
 
+		final TrustManagerFactory finalTrustMgrFactory = trustMgrFactory;
+		
 		connectionInfo = new ConnectionInfo();
 
 		connectionInfo.setAddress(outgoing.getAddress());
 		connectionInfo.setConnectionId(clientUid);
 		connectionInfo.setPort(outgoing.getPort());
-		connectionInfo.setTls(true);
+		connectionInfo.setTls(outgoing.isTls());
 		connectionInfo.setClient(true);
 		connectionInfo.setHandler(this);
 
 		final ConnectionInfo ciFinal = connectionInfo;
-
+		
 		status.setConnection(connectionInfo);
 		// Empty ChannelHandler placeholder - to represent this FIG client in places that are expecting an AbstractBroadcastingChannelHandler
 		figDummyChannelHandler = new AbstractBroadcastingChannelHandler() {
@@ -503,56 +528,109 @@ public class TakFigClient implements Serializable {
 			}
 		};
 		
-		if (useToken) {
-			if ("automatic".equals(tokenType.toLowerCase())) {
-				asyncNoAuthChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(null);
-                
-				Tls tls = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer()
-						.getTls();
-				
-                X509Certificate clientCert = null;
-                BinaryBlob certPayload = null;
-                try {
-					clientCert = FederationUtils.loadX509CertFromJKSFile(tls.getKeystoreFile(),tls.getKeystorePass());
-	                certPayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(clientCert.getEncoded()))).build();
-				} catch (Exception e) {
-					processDisconnect(new FederationException("Could not load keystore for use in token exchange"));
-				}
-                
-                asyncNoAuthChannel.getAuthTokenByX509(certPayload, new StreamObserver<com.atakmap.Tak.FederateTokenResponse>() {
-					@Override
-					public void onNext(FederateTokenResponse value) {
-						TokenAuthCredential credential = new TokenAuthCredential(value.getToken());
-						blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel).withCallCredentials(credential);
-						asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
-						
-						federateSubscription.initSenders();
-						
-						init();
-						SubscriptionStore.getInstanceFederatedSubscriptionManager().updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
-					}
-
-					@Override
-					public void onError(Throwable t) {
-						processDisconnect(t);
-					}
-
-					@Override
-					public void onCompleted() {}
-                	
-                });
+		asyncNoAuthChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(null);
+		
+		if (outgoing.isTls()) {
+			if (useToken) {
+				setupChannelCallsWithToken(outgoing, status);
 			} else {
-				TokenAuthCredential credential = new TokenAuthCredential(connectionToken);
-				blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel).withCallCredentials(credential);
-				asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
-				
+				blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel);
+				asyncFederatedChannel = FederatedChannelGrpc.newStub(channel);
+
 				init();
 				SubscriptionStore.getInstanceFederatedSubscriptionManager().updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
 			}
 		} else {
-			blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel);
-			asyncFederatedChannel = FederatedChannelGrpc.newStub(channel);
+			// when we are not using tls, we will not receive a server cert. because federation is built
+			// on using certs as the connection identifier, we ask the server for it's identify and verify it
+			// before proceeding
+			asyncNoAuthChannel.getx509Identity(null, new StreamObserver<com.atakmap.Tak.BinaryBlob>() {
+				@Override
+				public void onNext(BinaryBlob blob) {
+					try {
+						X509Certificate clientCertFromServer = FederationUtils.loadX509CertFromBytes(blob.getData().toByteArray());
+						List<X509Certificate> caCertsFromServer = FederationUtils.verifyTrustedClientCert(finalTrustMgrFactory,
+								clientCertFromServer);
+						if (caCertsFromServer == null || caCertsFromServer.isEmpty()) {
+							processDisconnect(new FederationException("Client does not trust server"));
+							return;
+						}
+						
+						// create the cert chain with the client cert at position 0 followed by CAs
+						X509Certificate[] chain = new X509Certificate[1 + caCertsFromServer.size()];
+						chain[0] = clientCertFromServer;
+						for (int i = 0; i < caCertsFromServer.size(); i++) {
+						    chain[i + 1] = caCertsFromServer.get(i);
+						}
+						
+						configureFederateFromCertChain(outgoing, chain);
+						
+						setupChannelCallsWithToken(outgoing, status);
+					} catch (Exception e) {
+						logger.error("Error processing x509Identity", e);
+						processDisconnect(new FederationException("Error processing x509Identity"));
+						return;
+					}				
+				}
 
+				@Override
+				public void onError(Throwable t) {
+					logger.error("error from getx509Identity", t);
+					processDisconnect(t);
+				}
+
+				@Override
+				public void onCompleted() {}
+			});
+		}
+	}
+
+	private void setupChannelCallsWithToken(FederationOutgoing outgoing, ConnectionStatus status) {
+		if ("automatic".equals(tokenType.toLowerCase())) {                
+			Tls tls = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer()
+					.getTls();
+			
+		    X509Certificate clientCert = null;
+		    BinaryBlob certPayload = null;
+		    try {
+				clientCert = FederationUtils.loadX509CertFromJKSFile(tls.getKeystoreFile(),tls.getKeystorePass());
+		        certPayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(clientCert.getEncoded()))).build();
+			} catch (Exception e) {
+				processDisconnect(new FederationException("Could not load keystore for use in token exchange"));
+			}
+		    
+		    asyncNoAuthChannel.getAuthTokenByX509(certPayload, new StreamObserver<com.atakmap.Tak.FederateTokenResponse>() {
+				@Override
+				public void onNext(FederateTokenResponse value) {
+					if (value == null || Strings.isNullOrEmpty(value.getToken())) {
+						processDisconnect(new FederationException("getAuthTokenByX509 failed to issue a token"));
+						return;
+					}
+					
+					TokenAuthCredential credential = new TokenAuthCredential(value.getToken());
+					blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel).withCallCredentials(credential);
+					asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
+					
+					federateSubscription.initSenders();
+					
+					init();
+					SubscriptionStore.getInstanceFederatedSubscriptionManager().updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
+				}
+
+				@Override
+				public void onError(Throwable t) {
+					processDisconnect(t);
+				}
+
+				@Override
+				public void onCompleted() {}
+		    	
+		    });
+		} else {
+			TokenAuthCredential credential = new TokenAuthCredential(connectionToken);
+			blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel).withCallCredentials(credential);
+			asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
+			
 			init();
 			SubscriptionStore.getInstanceFederatedSubscriptionManager().updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
 		}
@@ -1157,213 +1235,238 @@ public class TakFigClient implements Serializable {
 	/*
 	 * Open a connection to the server, and set up the callback that will look for the right federate, and set up the subscription, once the connection is complete and we have the server's client cert.
 	 */
-	private ManagedChannel openFigConnection(final String host, final int port, SslContext sslContext) throws IOException {
+	private ManagedChannel openFigConnection(final String host, final int port, SslContext sslContext)
+			throws IOException {
 		FederationOutgoing outgoing = fedManager().getOutgoingConnection(outgoingName);
-		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
-		return NettyChannelBuilder.forAddress(host, port)
-				.negotiationType(NegotiationType.TLS)
-				.sslContext(sslContext)
-				.maxInboundMessageSize(outgoing.getMaxFrameSize())
-				.executor(Resources.federationGrpcExecutor)
-				.eventLoopGroup(Resources.federationGrpcWorkerEventLoopGroup)
-				.channelType(NioSocketChannel.class)
-				.protocolNegotiator(new FigProtocolNegotiator(new Propagator<X509Certificate[]>() {
-					@Override
-					public X509Certificate[] propogate(X509Certificate[] certChain) {
 
-						X509Certificate figServerClientCert = certChain[0];
-						X509Certificate caCert = certChain[1];
-
-						if (logger.isDebugEnabled()) {
-							logger.debug("Received server client cert: " + figServerClientCert);
-							logger.debug("Received server ca cert: " + caCert);
+		if (sslContext == null) {
+			return NettyChannelBuilder.forAddress(host, port).negotiationType(NegotiationType.PLAINTEXT)
+					.maxInboundMessageSize(outgoing.getMaxFrameSize()).executor(Resources.federationGrpcExecutor)
+					.eventLoopGroup(Resources.federationGrpcWorkerEventLoopGroup).channelType(NioSocketChannel.class)
+					.build();
+		} else {
+			return NettyChannelBuilder.forAddress(host, port).negotiationType(NegotiationType.TLS)
+					.sslContext(sslContext).maxInboundMessageSize(outgoing.getMaxFrameSize())
+					.executor(Resources.federationGrpcExecutor)
+					.eventLoopGroup(Resources.federationGrpcWorkerEventLoopGroup).channelType(NioSocketChannel.class)
+					.protocolNegotiator(new FigProtocolNegotiator(new Propagator<X509Certificate[]>() {
+						@Override
+						public X509Certificate[] propogate(X509Certificate[] certChain) {
+							return configureFederateFromCertChain(outgoing, certChain);
 						}
-						connectionInfo.setCert(figServerClientCert);
-						try {
-							if (logger.isDebugEnabled()) {
-								logger.debug("Federate connection client cert: " + connectionInfo.getCert() + " connectionInfo " + connectionInfo);
-							}
-							X509Certificate cert = figServerClientCert;//connectionInfo.getCert();
-							String principalDN = cert.getSubjectX500Principal().getName();
-							String issuerDN = cert.getIssuerX500Principal().getName();
-							String fingerprint = RemoteUtil.getInstance().getCertSHA256Fingerprint(cert); // Get the cert fingerprint
-							// this will throw an exception if the principal or issuer dn can't be obtained
-							String certName = MessageConversionUtil.getCN(principalDN) + ":" + MessageConversionUtil.getCN(issuerDN);
-
-							AtomicBoolean duplicateActiveConnection = new AtomicBoolean(false);
-							SubscriptionStore.getInstanceFederatedSubscriptionManager()
-								.getFederateSubscriptions()
-								.forEach(federateSubscription ->{
-									if (federateSubscription.getUser() instanceof FederateUser) {
-										FederateUser fedUser = (FederateUser) federateSubscription.getUser();
-										// there is an active connection from the same cert, mark this connection as duplicate
-										if (fedUser.getFederateConfig().getId().equals(fingerprint)) {
-											duplicateActiveConnection.set(true);
-										}
-									}
-								});
-
-							if (duplicateActiveConnection.get()) {
-								channel.shutdown();
-								DistributedFederationManager.getInstance().disableOutgoing(outgoing);
-								processDisconnect(new TakException("duplicate federation connection"));
-								return null;
-							}
-
-							// Look for a configured federate with this fingerprint.
-							List<ConnectionStatus> dupeFederates = new ArrayList<>();
-
-							String dupeMsg = "";
-
-							// serialize federate config get/set operations
-							Federate federate = fedManager().getFederate(fingerprint);
-							federateId = fingerprint;
-
-							String caFingerprint = Optional.ofNullable(caCert).map(ca->RemoteUtil.getInstance().getCertSHA256Fingerprint(ca)).orElse("");
-
-							boolean matchingCA = GroupFederationUtil.getInstance().isRemoteCASelfCA(caFingerprint);
-
-							if (federate == null) {
-
-								if (logger.isDebugEnabled()) {
-									logger.debug("CoreConfig federate not found for fingerprint / id: " + fingerprint);
-								}
-
-								// put an empty federate with the name and id in the in-memory CoreConfig. Don't save the CoreConfig.xml yet, let that be up to the front-end.
-								federate = new Federate();
-								federate.setId(fingerprint);
-								federate.setName(certName);
-
-								for (Federation.FederateCA ca : config.getFederation().getFederateCA()) {
-			                        if (ca.getFingerprint().compareTo(caFingerprint) == 0) {
-			                            for (String groupname : ca.getInboundGroup()) {
-			                                federate.getInboundGroup().add(groupname);
-			                            }
-			                            for (String groupname : ca.getOutboundGroup()) {
-			                                federate.getOutboundGroup().add(groupname);
-			                            }
-										// set the new federate max hops based on pre-configured CA settings
-			                            federate.setMaxHops(ca.getMaxHops());
-			                            break;
-			                        }
-			                    }
-
-								fedManager().addFederateToConfig(federate);
-
-								if (logger.isDebugEnabled()) {
-									logger.debug("federate added to config for id / fingerprint " + fingerprint);
-								}
-							} else {
-
-								if (logger.isDebugEnabled()) {
-									logger.debug("matched existing federate by fingerprint: " + fingerprint + " " + federate.getName());
-								}
-
-								// if we matched a federate, there may be an existing connection for it.
-
-								for (ConnectionStatus status : fedManager().getActiveConnectionInfo()) {
-									if (status.getFederate() != null && status.getFederate().equals(federate)) {
-										dupeFederates.add(status);
-
-										dupeMsg = "Disallowing duplicate federate connection for federate " + federate.getName() + " " + federate.getId() + " " + new SecureRandom().nextInt();
-									}
-								}
-							}
-
-							federateMaxHops = federate.getMaxHops();
-
-							try {
-
-								// match this federate with an outgoing connection.
-
-								List<FederationOutgoing> outgoings = fedManager().getOutgoingConnections(host, port);
-
-								if (outgoings.isEmpty()) {
-									throw new TakException("no matching outgoing connection found");
-								}
-
-								if (!dupeFederates.isEmpty()) {
-									if (!config.getFederation().isAllowDuplicate()) {
-										for (FederationOutgoing outgoing : outgoings) {
-											fedManager().disableOutgoing(outgoing);
-										}
-
-										TakFigClient.this.shutdown();
-
-										throw new DuplicateFederateException(dupeMsg + " " + outgoings.size() + " duplicate outgoing connections found");
-									} else {
-										logger.warn("allowing duplicate federate connection " + federate.getName() + " " + federate.getId());
-									}
-								}
-
-								status.setConnection(connectionInfo);
-
-								// put a reference to the matched federate in the connection status
-								status.setFederate(federate);
-								status.setConnectionStatusValue(ConnectionStatusValue.CONNECTED);
-								status.setLastError(""); //reset the last error msg
-								SubscriptionStore.getInstanceFederatedSubscriptionManager().updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
-								// TODO: Could put logic here for "zombie" federates
-
-							} catch (DuplicateFederateException e) {
-								throw e; // only let this type of exception propagate
-							} catch (Exception e) {
-								logger.warn("exception setting outgoing connection status " + e.getMessage() , e);
-							}
-
-							FederateUser user = new FederateUser(fingerprint, connectionInfo.getConnectionId(), fedName, connectionInfo.getAddress(), cert, new X509Certificate[0], federate);
-
-							groupManager.addUser(user);
-							
-							// setup federate groups. For a new federate config object, these lists will be empty.
-							for (String groupName : federate.getInboundGroup()) {
-								groupManager.addUserToGroup(user, new Group(groupName, Direction.IN));
-							}
-
-							for (String groupName : federate.getOutboundGroup()) {
-								groupManager.addUserToGroup(user, new Group(groupName, Direction.OUT));
-							}
-
-							for (String groupName : fedManager.getInboundGroupMap(federateId).values()) {
-								groupManager.hydrateGroup(new Group(groupName, Direction.IN));
-							}
-
-							try {
-
-								// always use the default reachability
-								Reachability<User> reachability = new CommonGroupDirectedReachability(groupManager);
-
-								// Create the subscription for the FIG federate, including a reference back to this TakFigClient, so that messages can be delivered
-								federateSubscription = DistributedFederationManager.getInstance().addFigFederateSubscription("FIGFed_" + fedName + "_" + connectionInfo.getConnectionId(), null, null, null, null, user.getFederateConfig().isShareAlerts(), connectionInfo, TakFigClient.this);
-
-								logger.info("created v2 federate subscription " + fedName);
-
-								// set user on subscription, so that message brokering will be able to find the user
-								federateSubscription.setUser(user);
-								federateSubscription.callsign = fedName;
-								federateSubscription.setReachability(reachability);
-								federateSubscription.setHandler(figDummyChannelHandler);
-								federateSubscription.setIsAutoMapped((matchingCA && federate.isFederatedGroupMapping() && federate.isAutomaticGroupMapping()));
-								// track this subscription generally
-								subscriptionManager.addRawSubscription(federateSubscription);
-								DistributedFederationManager.getInstance().updateFederationSubscriptionCache(connectionInfo, user.getFederateConfig());
-
-							} catch (Exception e) {
-								logger.info("exception setting up v2 federate groups " + e.getMessage(), e);
-							}
-						} catch (DuplicateFederateException e) {
-							// let this propagate
-							throw e;
-						} catch (Exception e) {
-							logger.warn("exception creating federate user: " + e.getMessage(), e);
-						}
-
-						return certChain;
-					}
-
-				}).figTlsProtocolNegotiator(sslContext, FederationUtils.authorityFromHostAndPort(host, port)))
-				.build();
+					}).figTlsProtocolNegotiator(sslContext, FederationUtils.authorityFromHostAndPort(host, port)))
+					.build();
 		}
+	}
+	
+	private X509Certificate[] configureFederateFromCertChain(FederationOutgoing outgoing, X509Certificate[] certChain) {
+		X509Certificate figServerClientCert = certChain[0];
+		X509Certificate caCert = certChain[1];
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("Received server client cert: " + figServerClientCert);
+			logger.debug("Received server ca cert: " + caCert);
+		}
+		connectionInfo.setCert(figServerClientCert);
+		try {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Federate connection client cert: " + connectionInfo.getCert() + " connectionInfo "
+						+ connectionInfo);
+			}
+			X509Certificate cert = figServerClientCert;// connectionInfo.getCert();
+			String principalDN = cert.getSubjectX500Principal().getName();
+			String issuerDN = cert.getIssuerX500Principal().getName();
+			String fingerprint = RemoteUtil.getInstance().getCertSHA256Fingerprint(cert); // Get the
+																							// cert
+																							// fingerprint
+			// this will throw an exception if the principal or issuer dn can't be obtained
+			String certName = MessageConversionUtil.getCN(principalDN) + ":" + MessageConversionUtil.getCN(issuerDN);
+
+			AtomicBoolean duplicateActiveConnection = new AtomicBoolean(false);
+			SubscriptionStore.getInstanceFederatedSubscriptionManager().getFederateSubscriptions()
+					.forEach(federateSubscription -> {
+						if (federateSubscription.getUser() instanceof FederateUser) {
+							FederateUser fedUser = (FederateUser) federateSubscription.getUser();
+							// there is an active connection from the same cert, mark this
+							// connection as duplicate
+							if (fedUser.getFederateConfig().getId().equals(fingerprint)) {
+								duplicateActiveConnection.set(true);
+							}
+						}
+					});
+
+			if (duplicateActiveConnection.get()) {
+				channel.shutdown();
+				DistributedFederationManager.getInstance().disableOutgoing(outgoing);
+				processDisconnect(new TakException("duplicate federation connection"));
+				return null;
+			}
+
+			// Look for a configured federate with this fingerprint.
+			List<ConnectionStatus> dupeFederates = new ArrayList<>();
+
+			String dupeMsg = "";
+
+			// serialize federate config get/set operations
+			Federate federate = fedManager().getFederate(fingerprint);
+			federateId = fingerprint;
+
+			String caFingerprint = Optional.ofNullable(caCert)
+					.map(ca -> RemoteUtil.getInstance().getCertSHA256Fingerprint(ca)).orElse("");
+
+			boolean matchingCA = GroupFederationUtil.getInstance().isRemoteCASelfCA(caFingerprint);
+			
+			Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+			if (federate == null) {
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("CoreConfig federate not found for fingerprint / id: " + fingerprint);
+				}
+
+				// put an empty federate with the name and id in the in-memory CoreConfig. Don't
+				// save the CoreConfig.xml yet, let that be up to the front-end.
+				federate = new Federate();
+				federate.setId(fingerprint);
+				federate.setName(certName);
+
+				for (Federation.FederateCA ca : config.getFederation().getFederateCA()) {
+					if (ca.getFingerprint().compareTo(caFingerprint) == 0) {
+						for (String groupname : ca.getInboundGroup()) {
+							federate.getInboundGroup().add(groupname);
+						}
+						for (String groupname : ca.getOutboundGroup()) {
+							federate.getOutboundGroup().add(groupname);
+						}
+						// set the new federate max hops based on pre-configured CA settings
+						federate.setMaxHops(ca.getMaxHops());
+						break;
+					}
+				}
+
+				fedManager().addFederateToConfig(federate);
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("federate added to config for id / fingerprint " + fingerprint);
+				}
+			} else {
+
+				if (logger.isDebugEnabled()) {
+					logger.debug("matched existing federate by fingerprint: " + fingerprint + " " + federate.getName());
+				}
+
+				// if we matched a federate, there may be an existing connection for it.
+
+				for (ConnectionStatus status : fedManager().getActiveConnectionInfo()) {
+					if (status.getFederate() != null && status.getFederate().equals(federate)) {
+						dupeFederates.add(status);
+
+						dupeMsg = "Disallowing duplicate federate connection for federate " + federate.getName() + " "
+								+ federate.getId() + " " + new SecureRandom().nextInt();
+					}
+				}
+			}
+
+			federateMaxHops = federate.getMaxHops();
+
+			try {
+
+				// match this federate with an outgoing connection.
+
+				List<FederationOutgoing> outgoings = fedManager().getOutgoingConnections(outgoing.getAddress(), outgoing.getPort());
+
+				if (outgoings.isEmpty()) {
+					throw new TakException("no matching outgoing connection found");
+				}
+
+				if (!dupeFederates.isEmpty()) {
+					if (!config.getFederation().isAllowDuplicate()) {
+						for (FederationOutgoing out : outgoings) {
+							fedManager().disableOutgoing(out);
+						}
+
+						TakFigClient.this.shutdown();
+
+						throw new DuplicateFederateException(
+								dupeMsg + " " + outgoings.size() + " duplicate outgoing connections found");
+					} else {
+						logger.warn("allowing duplicate federate connection " + federate.getName() + " "
+								+ federate.getId());
+					}
+				}
+
+				status.setConnection(connectionInfo);
+
+				// put a reference to the matched federate in the connection status
+				status.setFederate(federate);
+				status.setConnectionStatusValue(ConnectionStatusValue.CONNECTED);
+				status.setLastError(""); // reset the last error msg
+				SubscriptionStore.getInstanceFederatedSubscriptionManager()
+						.updateFederateOutgoingStatusCache(outgoing.getDisplayName(), status);
+				// TODO: Could put logic here for "zombie" federates
+
+			} catch (DuplicateFederateException e) {
+				throw e; // only let this type of exception propagate
+			} catch (Exception e) {
+				logger.warn("exception setting outgoing connection status " + e.getMessage(), e);
+			}
+
+			FederateUser user = new FederateUser(fingerprint, connectionInfo.getConnectionId(), fedName,
+					connectionInfo.getAddress(), cert, new X509Certificate[0], federate);
+
+			groupManager.addUser(user);
+
+			// setup federate groups. For a new federate config object, these lists will be
+			// empty.
+			for (String groupName : federate.getInboundGroup()) {
+				groupManager.addUserToGroup(user, new Group(groupName, Direction.IN));
+			}
+
+			for (String groupName : federate.getOutboundGroup()) {
+				groupManager.addUserToGroup(user, new Group(groupName, Direction.OUT));
+			}
+
+			for (String groupName : fedManager.getInboundGroupMap(federateId).values()) {
+				groupManager.hydrateGroup(new Group(groupName, Direction.IN));
+			}
+
+			try {
+
+				// always use the default reachability
+				Reachability<User> reachability = new CommonGroupDirectedReachability(groupManager);
+
+				// Create the subscription for the FIG federate, including a reference back to
+				// this TakFigClient, so that messages can be delivered
+				federateSubscription = DistributedFederationManager.getInstance().addFigFederateSubscription(
+						"FIGFed_" + fedName + "_" + connectionInfo.getConnectionId(), null, null, null, null,
+						user.getFederateConfig().isShareAlerts(), connectionInfo, TakFigClient.this);
+
+				logger.info("created v2 federate subscription " + fedName);
+
+				// set user on subscription, so that message brokering will be able to find the
+				// user
+				federateSubscription.setUser(user);
+				federateSubscription.callsign = fedName;
+				federateSubscription.setReachability(reachability);
+				federateSubscription.setHandler(figDummyChannelHandler);
+				federateSubscription.setIsAutoMapped(
+						(matchingCA && federate.isFederatedGroupMapping() && federate.isAutomaticGroupMapping()));
+				// track this subscription generally
+				subscriptionManager.addRawSubscription(federateSubscription);
+				DistributedFederationManager.getInstance().updateFederationSubscriptionCache(connectionInfo,
+						user.getFederateConfig());
+
+			} catch (Exception e) {
+				logger.info("exception setting up v2 federate groups " + e.getMessage(), e);
+			}
+		} catch (DuplicateFederateException e) {
+			// let this propagate
+			throw e;
+		} catch (Exception e) {
+			logger.warn("exception creating federate user: " + e.getMessage(), e);
+		}
+
+		return certChain;
+	}
 
 	public String getClientUid() {
 		return clientUid;

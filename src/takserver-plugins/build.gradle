@@ -52,7 +52,7 @@ dependencies {
        exclude group: 'xpp3'
   }
 
-  runtimeClasspath ("org.dom4j:dom4j:$dom4j_version") {
+  runtimeOnly ("org.dom4j:dom4j:$dom4j_version") {
        exclude group: 'pull-parser'
        exclude group: 'xpp3'
   }
@@ -65,9 +65,9 @@ dependencies {
 }
 
 shadowJar {
-    baseName = 'takserver-plugins'
-    classifier = 'all'
-    version = version
+    archiveBaseName.set("takserver-plugins")
+    archiveClassifier.set("all")
+    archiveVersion.set(version)
 }
 
 sourceSets {

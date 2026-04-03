@@ -23,7 +23,7 @@
     align-items: center;
     position: absolute;
     background: cyan;
-    width: 160px;
+    min-width: 160px;
     min-height: 40px;
     border-radius:4px;
     border: 2px solid black;
@@ -80,6 +80,9 @@
     position: absolute;
     pointer-events: none;
     aspect-ratio: 1 / 1;
+  }
+  .connection {
+    z-index: 1 !important;
   }
   .drawflow .connection .main-path {
     fill: none;
@@ -139,3 +142,20 @@
     right: -15px;
     top: -15px;
   }
+
+  .drawflow-node.hover-drop {
+    /* Example styling for a hovered group */
+    border: 2px dashed #4CAF50; /* A dashed green border */
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.5); /* A subtle green glow */
+    background-color: rgba(76, 175, 80, 0.1); /* A light green background tint */
+  }
+
+.connection.dim {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.connection.hidden {
+  display: none;
+  pointer-events: none;
+}

@@ -116,8 +116,8 @@ export class DashboardComponent {
   bytesWrittenChartYAxisLabelHeap = 'Bytes Written Per Second';
   bytesReadChartYAxisLabelHeap = 'Bytes Read Per Second';
 
-  private globalMetricsApiUrl = '/fig/getBrokerGlobalMetrics';
-  private metricsApiUrl = '/fig/getBrokerMetrics';
+  private globalMetricsApiUrl = '/api/getBrokerGlobalMetrics';
+  private metricsApiUrl = '/api/getBrokerMetrics';
 
   private updateInterval: any;
   private updateIntervalMs = 5000; // update interval in milliseconds

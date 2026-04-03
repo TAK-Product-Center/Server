@@ -475,6 +475,7 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		Connector connector = new Connector("org.apache.coyote.http11.Http11NioProtocol");
 
 		Http11NioProtocol protocol = (Http11NioProtocol) connector.getProtocolHandler();
+		protocol.setMaxHttpHeaderSize(coreConnector.getMaxHttpHeaderSize());
 
 		try {
 

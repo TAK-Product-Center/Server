@@ -1,0 +1,14 @@
+.drawflow-node.group {
+  width: 400px;
+  height: 300px;
+  background-color: #f0f0f0;
+  border: 2px dashed #ccc;
+  z-index: 0;
+}
+
+.drawflow-node.group .group-header {
+  background-color: #ddd;
+  padding: 5px;
+  cursor: move;
+  text-align: center;
+}

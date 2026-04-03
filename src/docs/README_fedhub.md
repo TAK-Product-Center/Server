@@ -68,6 +68,7 @@ sudo dnf update -y
 Install Java 17
 ```
 sudo dnf install java-17-openjdk-devel -y
+sudo alternatives --config java
 ```
 
 To install from the .rpm, run:
@@ -183,7 +184,9 @@ The Federation Hub consists of three processes: a policy manager, an administrat
 To authorize clients to act as administrators and enable access to the admin UI, use `federation-hub-manager.jar`:
 
 ```
+sudo su tak
 java -jar /opt/tak/federation-hub/jars/federation-hub-manager.jar path/to/cert.pem
+exit
 ```
 
 By default, authorized users are written to `/opt/tak/federation-hub/authorized_users.yml`. Optionally, you can specify the location of the output file where the authorized users are written to:

@@ -40,12 +40,14 @@ export class AddOutgoingConnectionModalComponent {
     if (this.federation.stringId) {
         this.editorTitle = "Modify";
         this.editExisting = true;
+    } else {
+        this.federation.tls = true
     }
 
     if (!this.federation.tokenType) {
-      this.federation.tokenType = 'manual';
-      this.federation.useToken = false;
-    }
+        this.federation.tokenType = 'manual';
+        this.federation.useToken = false;
+    }    
   }
 
   onSave(federation : any) {

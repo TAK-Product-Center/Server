@@ -20,6 +20,8 @@ import com.bbn.marti.remote.SubscriptionManagerLite;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.util.RemoteUtil;
+import com.bbn.marti.repeater.IgniteRepeaterStore;
+import com.bbn.marti.repeater.InMemoryRepeaterStore;
 import com.bbn.marti.repeater.RepeaterStore;
 import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.SubscriptionManager;
@@ -206,7 +208,11 @@ public class MessagingDependencyInjectionProxy implements ApplicationContextAwar
 		if (repeaterStore == null) {
 			synchronized (this) {
 				if (repeaterStore == null) {
-					repeaterStore = springContext.getBean(RepeaterStore.class);
+					if (!coreConfig().getRemoteConfiguration().getCluster().isEnabled()) {
+						repeaterStore = springContext.getBean(InMemoryRepeaterStore.class);
+					} else {
+						repeaterStore = springContext.getBean(IgniteRepeaterStore.class);
+					}
 				}
 			}
 		}

@@ -277,7 +277,7 @@ public class CotImageBean implements Serializable {
 				dateFormat.format(results.getTimestamp("start")));
 		eventE.addAttribute("stale",
 				dateFormat.format(results.getTimestamp("stale")));
-		String[] optionalAttrs = { "qos", "opex", "access", "caveat", "releaseableto" };
+		String[] optionalAttrs = { "qos", "opex", "access", "caveat", "releasableTo" };
 		for (String attrName : optionalAttrs) {
 			if (results.getString(attrName) != null) {
 				eventE.addAttribute(attrName, results.getString(attrName));

@@ -44,8 +44,9 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import tak.server.federation.hub.FederationHubConstants;
 import tak.server.federation.hub.FederationHubUtils;
 import tak.server.federation.hub.broker.FederationHubBrokerProxyFactory;
+import tak.server.federation.hub.plugin.PluginRegistrySyncService;
+import tak.server.federation.hub.plugin.manager.FederationHubPluginManagerProxyFactory;
 import tak.server.federation.hub.policy.FederationHubPolicyManagerProxyFactory;
-import tak.server.federation.hub.ui.keycloak.KeycloakTokenParser;
 import tak.server.federation.hub.ui.manage.AuthorizationFileWatcher;
 
 @SpringBootApplication(exclude = {MongoAutoConfiguration.class, MongoDataAutoConfiguration.class})
@@ -110,7 +111,12 @@ public class FederationHubUIServer {
         return new FederationHubPolicyManagerProxyFactory();
     }
 
-	private void makeConnector(FederationHubUIConfig fedHubConfig, Server server, int port, boolean clientAuth) {
+    @Bean
+    public FederationHubPluginManagerProxyFactory fedHubPluginManagerProxyFactory() {
+        return new FederationHubPluginManagerProxyFactory();
+    }
+    
+	private void makeHttpsConnector(FederationHubUIConfig fedHubConfig, Server server, int port, boolean clientAuth) {
 		HttpConfiguration httpConfig = new HttpConfiguration();
 		httpConfig.setSecureScheme("https");
 		httpConfig.setSecurePort(port);
@@ -144,6 +150,21 @@ public class FederationHubUIServer {
 		sslConnector.setPort(port);
 		server.addConnector(sslConnector);
 	}
+	
+	private void makeHttpConnector(Server server, int port) {
+		HttpConfiguration httpConfig = new HttpConfiguration();
+		httpConfig.setOutputBufferSize(32768);
+		httpConfig.setRequestHeaderSize(8192);
+		httpConfig.setResponseHeaderSize(8192);
+		httpConfig.setSendServerVersion(true);
+		httpConfig.setSendDateHeader(false);
+
+		ServerConnector httpConnector = new ServerConnector(server, new HttpConnectionFactory(httpConfig));
+
+		httpConnector.setPort(port);
+		server.addConnector(httpConnector);
+	}
+
 
     @Bean
     public ConfigurableServletWebServerFactory jettyServletFactory(FederationHubUIConfig fedHubConfig) {
@@ -161,20 +182,25 @@ public class FederationHubUIServer {
 					server.getConnectors()[0].stop();
 				} catch (Exception e) {}
 
-				makeConnector(fedHubConfig, server, fedHubConfig.getPort(), true);
+				makeHttpsConnector(fedHubConfig, server, fedHubConfig.getPort(), true);
 
-				if (fedHubConfig.isAllowOauth() && Strings.isNotEmpty(fedHubConfig.getKeycloakAccessTokenName()) &&
+				if (fedHubConfig.isAllowOauth() &&
 						Strings.isNotEmpty(fedHubConfig.getKeycloakAdminClaimValue()) &&
-						Strings.isNotEmpty(fedHubConfig.getKeycloakAuthEndpoint()) &&
+						Strings.isNotEmpty(fedHubConfig.getKeycloakConfigurationEndpoint()) &&
 						Strings.isNotEmpty(fedHubConfig.getKeycloakClaimName()) &&
 						Strings.isNotEmpty(fedHubConfig.getKeycloakClientId()) &&
-						Strings.isNotEmpty(fedHubConfig.getKeycloakDerLocation()) &&
-						Strings.isNotEmpty(fedHubConfig.getKeycloakRefreshTokenName()) &&
+						Strings.isNotEmpty(fedHubConfig.getKeycloakTlsCertFile()) &&
 						Strings.isNotEmpty(fedHubConfig.getKeycloakrRedirectUri()) &&
 						Strings.isNotEmpty(fedHubConfig.getKeycloakSecret()) &&
-						Strings.isNotEmpty(fedHubConfig.getKeycloakServerName()) &&
-						Strings.isNotEmpty(fedHubConfig.getKeycloakTokenEndpoint()))
-					makeConnector(fedHubConfig, server, fedHubConfig.getOauthPort(), false);
+						Strings.isNotEmpty(fedHubConfig.getKeycloakServerName())) {
+					
+					if (fedHubConfig.isOauthPortTls()) {
+						makeHttpsConnector(fedHubConfig, server, fedHubConfig.getOauthPort(), false);
+					} else {
+						makeHttpConnector(server, fedHubConfig.getOauthPort());
+					}
+					
+				}
 			}
 
     	});
@@ -198,6 +224,16 @@ public class FederationHubUIServer {
         	 return new ObjectMapper(new YAMLFactory()).readValue(is, FederationHubUIConfig.class);
         }
     }
+    
+    @Bean 
+    public JwtTokenUtil jwtTokenUtil(FederationHubUIConfig fedHubConfig) throws Exception {
+    	return new JwtTokenUtil(fedHubConfig);
+    }
+    
+    @Bean
+	public PluginRegistrySyncService pluginRegistrySyncService(Ignite ignite) {
+		return new PluginRegistrySyncService(ignite);
+	}
 
     @Bean
     public FederationHubUIConfig getFedHubConfig()
@@ -221,10 +257,5 @@ public class FederationHubUIServer {
         }
         Runtime.getRuntime().addShutdownHook(new Thread(authFileWatcher::stop));
         return authFileWatcher;
-    }
-
-    @Bean
-    public KeycloakTokenParser keycloakTokenParser(FederationHubUIConfig getFedHubConfig) {
-    	return new KeycloakTokenParser(getFedHubConfig);
     }
 }

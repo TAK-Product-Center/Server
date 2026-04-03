@@ -4,41 +4,6 @@ ARG BASE_DEPLOY_IMAGE=ironbank/redhat/openjdk/openjdk17-ubi9
 ARG BASE_DEPLOY_TAG=1.17
 
 ####################################################################################################
-#####                          Stage: Build amazon-efs-utils RPM                               #####
-####################################################################################################
-FROM ${BASE_REGISTRY}/ironbank/redhat/ubi/ubi9:9.7 AS amazon-efs-utils-builder
-
-# Install EPEL 9 repo
-COPY tak/security/*.rpm .
-RUN rpm -Uvh epel-release-latest-9.noarch.rpm
-
-RUN dnf install -y \
-        git \
-        rpm-build \
-        make \
-        cmake \
-        gcc \
-        gcc-c++ \
-        perl \
-        python3 \
-        python3-pip \
-        openssl \
-        openssl-devel \
-        cargo \
-        rust \
-        golang \
-    && dnf clean all
-
-# Clone the latest amazon-efs-utils source
-WORKDIR /build
-RUN git clone --depth 1 https://github.com/aws/efs-utils.git
-
-WORKDIR /build/efs-utils
-
-# Build the RPM (output lands in $HOME/rpmbuild/RPMS/)
-RUN make rpm
-
-####################################################################################################
 
 ## Base deploy image
 FROM ${BASE_REGISTRY}/${BASE_DEPLOY_IMAGE}:${BASE_DEPLOY_TAG} as deploy_container
@@ -131,10 +96,6 @@ RUN dnf install -y --disableplugin=subscription-manager --nodocs   --exclude='op
 # RUN echo "fips.provider.10=JdkLDAP" >> $JAVA_HOME/conf/security/java.security
 # RUN echo "fips.provider.11=JdkSASL" >> $JAVA_HOME/conf/security/java.security
 # RUN echo "fips.provider.12=SunPKCS11" >> $JAVA_HOME/conf/security/java.security
-
-# Copy the RPM artifact from the builder stage
-COPY --from=amazon-efs-utils-builder /build/efs-utils/build/rpmbuild/RPMS/x86_64/amazon-efs-utils*.rpm .
-RUN rpm -ivh amazon-efs-utils-*.rpm
 
 RUN useradd -g 0 -u 1001 tak \
     && usermod -a -G root tak

@@ -1,0 +1,37 @@
+
+dependencies {
+	implementation(project(':federation-common')) { }
+
+	implementation group: 'org.apache.ignite', name: 'ignite-slf4j', version: ignite_version
+
+}
+
+task buildSDK(type: Jar) {
+	dependsOn(":takserver-protobuf:compileJava")
+    dependsOn(":takserver-protobuf:processResources")
+    
+    archiveBaseName.set('federation-hub-plugins-sdk')
+    destinationDirectory.set(layout.buildDirectory.dir('libs'))
+    
+    def commonOutput = project(':federation-common').sourceSets.main.output
+
+    from {
+        commonOutput.classesDirs.collect { dir ->
+            fileTree(dir).matching {
+                include 'tak/server/federation/**'
+            }
+        }
+    }
+    
+    def protoOutput = project(':takserver-protobuf').sourceSets.main.output
+
+	from {
+	    protoOutput.classesDirs.collect { dir ->
+	        fileTree(dir) // no include filter → everything under classesDirs
+	    }
+	}
+	
+	from(protoOutput.resourcesDir) // include resources as well
+
+    from sourceSets.main.output
+}

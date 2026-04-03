@@ -77,7 +77,6 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
     // attributes to apply to the user object, which will return only attributes indicating group membership.
     private final String[] groupUserAttrs = {"memberOf", "ntUserWorkstations"};
     private final String[] distinguishedNameAttr = {"distinguishedName"};
-    private final String[] sAMAccountNameAttr = {"sAMAccountName"};
 
     private final boolean debug = false;
 
@@ -523,13 +522,13 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         		logger.debug("getting user info using AD approach");
         	}
             // For AD, use the sAMAccountName
-        	EqualsFilter filter = new EqualsFilter("sAMAccountName", userId);
+        	EqualsFilter filter = new EqualsFilter(conf.getNameAttrAD(), userId);
             searchFilter = filter.toString();
         } else {
         	if (logger.isDebugEnabled()) {
         		logger.debug("getting user info using AD chain approach");
         	}
-            String distinguishedName = getDistinguishedName(ctx, userId);
+            String distinguishedName = getDistinguishedName(ctx, userId, conf.getNameAttrAD());
             EqualsFilter filter = new EqualsFilter("member:1.2.840.113556.1.4.1941:", distinguishedName);
             searchFilter = filter.toString();
         }
@@ -541,7 +540,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         return getGroupInfoBySearch(ctx, searchFilter, conf.isMatchGroupInChain());
     }
 
-    public Date getPasswordExpiration(DirContext ctx, String userId) {
+    public Date getPasswordExpiration(DirContext ctx, String userId, String nameAttrAD) {
 
         NamingEnumeration<?> results = null;
         Map<String, String> attributeMap = new ConcurrentHashMap<>();
@@ -553,7 +552,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
             userControls.setReturningAttributes(userAttrList);
             userControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
             
-            EqualsFilter accountFilter = new EqualsFilter("sAMAccountName", userId);
+            EqualsFilter accountFilter = new EqualsFilter(nameAttrAD, userId);
             
             results = ctx.search("", accountFilter.toString(), userControls);
             getGroupAttrs(results, attributeMap);
@@ -643,7 +642,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
     	return result != null ? result : new ConcurrentHashMap<>();
     }
 
-    private String getDistinguishedName(DirContext ctx, String userId) throws NamingException {
+    private String getDistinguishedName(DirContext ctx, String userId, String nameAttrAD) throws NamingException {
 
         NamingEnumeration<?> results = null;
         Map<String, String> groupAttrs = new ConcurrentHashMap<>();
@@ -656,7 +655,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
 
             controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
             
-            EqualsFilter filter = new EqualsFilter("sAMAccountName", userId);
+            EqualsFilter filter = new EqualsFilter(nameAttrAD, userId);
             
             results = ctx.search("", filter.toString(), controls);
 
@@ -684,7 +683,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
 
             switch(getConf().getStyle()) {
                 case AD : {
-                    logonNameAttr = sAMAccountNameAttr;
+                    logonNameAttr = new String[] { conf.getNameAttrAD() };
                     break;
                 }
                 case DS : {

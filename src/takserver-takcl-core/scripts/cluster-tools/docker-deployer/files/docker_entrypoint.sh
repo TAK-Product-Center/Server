@@ -12,8 +12,8 @@ source cluster-properties
 
 export CLUSTER_HOME_DIR=/cluster
 
-if [[ "${TAK_CERT_SOURCE_DIR}" != "" ]];then
-	cp -R "${TAK_CERT_SOURCE_DIR}" /tak-cert-source-dir
+if [[ -d '/certs-src' ]];then
+	cp -R /certs-src /tak-cert-source-dir
 	export TAK_CERT_SOURCE_DIR=/tak-cert-source-dir
 fi
 

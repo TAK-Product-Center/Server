@@ -1,0 +1,52 @@
+<nav *ngIf="authChecked" class="navbar navbar-expand-lg navbar-light" style="background-color: #f1f1f1;border-bottom: 1px solid #dfdcdc; 
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);">
+  <div class="container-fluid">
+      <!-- Left Side: App Name -->
+      <div class="d-flex align-items-center gap-2">
+        <a style="font-weight:bold" class="" routerLink="/">
+          <img style="height:50px;width:50px" src="/tak-logo.png">
+        </a>
+        <a style="" class="navbar-brand brand-title nohover" routerLink="/">Federation Hub</a>
+        <a style="padding: 10px 15px;" 
+        class="navbar-brand"
+        [class.chosen]="activeLink === 'policy-manager'"
+        [routerLink]="determinePolicyUrl()">Policy Manager</a>
+        <a style="padding: 10px 15px;" 
+        class="navbar-brand" 
+        [class.chosen]="activeLink === 'metrics'"
+        routerLink="/metrics">Metrics Dashboard</a>
+        <a style="padding: 10px 15px;" 
+        class="navbar-brand" 
+        [class.chosen]="activeLink === 'ca-manager'"
+        routerLink="/ca-manager">CA Manager</a>
+        <a style="padding: 10px 15px;"
+          class="navbar-brand"
+          [class.chosen]="activeLink === 'plugins'"
+          [class.disabled]="!isPolicyActive()"
+          [routerLink]="isPolicyActive() ? '/plugins' : null"
+          matTooltip="Load a policy first"
+          [matTooltipDisabled]="isPolicyActive()"
+          matTooltipPosition="right">
+          Plugins
+        </a>
+
+      </div>
+      <!-- Right Side: Hamburger Menu Dropdown -->
+      <div class="d-flex">
+          <div class="dropdown">
+              <!-- Hamburger Menu Icon -->
+              <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                  <i class="bi bi-list"></i> <!-- Hamburger Icon -->
+              </button>
+              <!-- Dropdown Menu -->
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton">
+                  <li><a class="dropdown-item" routerLink="settings">Settings</a></li>
+              </ul>
+          </div>
+      </div>
+  </div>
+</nav>
+
+<div class="content-wrapper" style="padding: 1rem; overflow: auto; height: calc(100vh - 70px);">
+  <router-outlet></router-outlet>
+</div>

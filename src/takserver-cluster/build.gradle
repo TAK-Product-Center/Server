@@ -4,9 +4,12 @@ buildscript {
       classpath 'net.sf.proguard:proguard-gradle:' + gradle_proguard_version
   }
 }
-apply plugin: 'nebula.ospackage'
+apply plugin: 'com.netflix.nebula.ospackage'
 
 task pullPluginManager(type: Copy, dependsOn: ':takserver-plugin-manager:bootJar') {
+	// skip if another task already added it
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
     from project(':takserver-plugin-manager').file('build/libs/')
     into "$buildDir/takserver-core"
     include 'takserver-plugin-manager-*.jar'
@@ -56,6 +59,8 @@ task moveCoreConfig(type: Copy) {
     dependsOn pullPluginManager
     dependsOn copyClusterProperties
     dependsOn copyClusterConfig
+    dependsOn igniteExtensions
+    
     from project(':takserver-cluster').file('build/takserver-core/CoreConfig.xml')
     from project(':takserver-cluster').file('build/takserver-core/TAKIgniteConfig.xml')
     into "$buildDir"
@@ -119,8 +124,9 @@ task zipCluster(type: Zip) {
     from('.') {
         include 'README.md'
     }
-    archiveName 'takserver-cluster-' + version + '.zip'
-    destinationDir(file('.'))
+    
+    archiveFileName.set("takserver-cluster-${version}.zip")
+    destinationDirectory.set(layout.projectDirectory)
 }
 
 
@@ -158,8 +164,9 @@ task zipClusterHelm(type: Zip) {
     from('.') {
         include 'README.md'
     }
-    archiveName 'takserver-cluster-helm' + version + '.zip'
-    destinationDir(file('.'))
+    
+    archiveFileName.set("takserver-cluster-helm${version}.zip")
+    destinationDirectory.set(layout.projectDirectory)
 }
 
 task moveZipHelm(type: Copy) {

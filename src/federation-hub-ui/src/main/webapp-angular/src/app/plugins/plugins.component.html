@@ -1,0 +1,84 @@
+<div class="container mt-4">
+  <div class="text-center mb-5">
+    <h2 class="fw-bold">
+      <i class="bi bi-puzzle-fill text-primary me-2"></i> Registered Plugins
+    </h2>
+  </div>      
+
+  <div class="d-flex flex-wrap justify-content-center align-items-center gap-3 mb-4">
+    <div class="form-check form-switch">
+      <input class="form-check-input" type="checkbox" id="activeOnly" [(ngModel)]="showOnlyActive" (change)="applyFilters()">
+      <label class="form-check-label" for="activeOnly">Show Active Only</label>
+    </div>
+
+    <div>
+      <label class="me-2">Sort by:</label>
+      <select class="form-select form-select-sm d-inline-block w-auto" [(ngModel)]="sortBy" (change)="applyFilters()">
+        <option value="name">Name</option>
+        <option value="disabled">Status</option>
+        <option value="uptime">Uptime</option>
+      </select>
+    </div>
+
+    <button class="btn btn-outline-secondary btn-sm" (click)="toggleSortDirection()">
+      <i class="bi" [ngClass]="{
+        'bi-sort-alpha-down': sortDirection === 'asc',
+        'bi-sort-alpha-up': sortDirection === 'desc'
+      }"></i>
+    </button>
+
+    <button class="btn btn-outline-primary btn-sm" (click)="loadPlugins()">
+      <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="text-center my-4">
+    <div class="spinner-border" role="disabled"></div>
+  </div>
+
+  <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" *ngIf="!loading">
+    <div class="col" *ngFor="let plugin of filteredPlugins">
+      <div class="card h-100">
+        <div class="card-body d-flex flex-column align-items-center position-relative">
+          <!-- Plugin version in top-right -->
+          <small class="text-muted position-absolute top-0 end-0 m-2">{{ plugin.version }}</small>
+
+          <!-- Plugin name centered -->
+          <h5 class="card-title text-center mt-2 mb-3">
+            {{ plugin.name }}
+          </h5>
+
+          <p class="card-text text-center" style="max-width: 100%; word-wrap: break-word;">
+            {{ plugin.description }}
+          </p>
+
+          <!-- Centered toggle with fancy label -->
+          <div class="d-flex justify-content-center align-items-center mt-auto">
+            <div class="form-check form-switch mb-0 d-flex align-items-center gap-2">
+              <input class="form-check-input" type="checkbox" 
+                    [checked]="!plugin.disabled"
+                    (change)="togglePlugin(plugin)" id="toggle-{{plugin.name}}">
+              <label class="form-check-label mb-0" for="toggle-{{plugin.name}}">
+                {{ plugin.disabled ? 'Disabled' : 'Active' }}
+              </label>
+            </div>
+          </div>
+
+          <!-- Edit button centered with fixed width -->
+          <div class="mt-3 d-flex justify-content-center">
+            <button class="btn btn-info btn-sm" style="min-width: 120px;" (click)="openEditModal(plugin)">
+              <i class="bi bi-pencil me-1"></i> Edit
+            </button>
+          </div>
+        </div>
+
+        <div class="card-footer text-muted d-flex flex-column align-items-center">
+          <div>Type: {{ plugin.type}}</div>
+          <div>Uptime: {{ formatUptime(plugin.uptime) || '—' }}</div>
+          <div>Author: {{ plugin.author }}</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

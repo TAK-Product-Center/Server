@@ -16,14 +16,31 @@ export class WorkflowService {
    *
    * @return {Array}
    */
+  public getActiveEnforcedPolicy(): Observable<any> {
+    var url = this.configService.getServerBaseUrlStr() + 'getActivePolicy';
+    return this.http.get(url)
+  };
+
   public getWorkflowDescriptors(): Observable<any> {
     var url = this.configService.getServerBaseUrlStr() + 'federations';
     return this.http.get(url)
   };
 
-  public saveGraph(graphJson: any): Observable<any> {
+  public saveFederationPolicy(graphJson: any): Observable<any> {
     graphJson.version = 'v2'
-    var url = this.configService.getServerBaseUrlStr() +'saveFederation'
+    var url = this.configService.getServerBaseUrlStr() +'saveFederationPolicy'
+    return this.http.post(url, graphJson)
+  }
+
+   public saveFederationGraphPolicy(graphJson: any): Observable<any> {
+    graphJson.version = 'v2'
+    var url = this.configService.getServerBaseUrlStr() +'saveFederationGraphPolicy'
+    return this.http.post(url, graphJson)
+  }
+
+   public saveFederationPluginsPolicy(graphJson: any): Observable<any> {
+    graphJson.version = 'v2'
+    var url = this.configService.getServerBaseUrlStr() +'saveFederationPluginsPolicy'
     return this.http.post(url, graphJson)
   }
 
@@ -32,8 +49,8 @@ export class WorkflowService {
     return this.http.get(url)
   }
 
-  public updateFederationManagerAndFile(id: any): Observable<any> {
-    var url = this.configService.getServerBaseUrlStr() +'updateFederationManagerAndFile/' + id
+  public activateFederationPolicy(id: any): Observable<any> {
+    var url = this.configService.getServerBaseUrlStr() +'activateFederationPolicy/' + id
     return this.http.get(url)
   }
 
@@ -90,16 +107,18 @@ export class WorkflowService {
       })
     });
   }
+
+  public getRegisteredPlugins(): Observable<any> {
+    var url =  this.configService.getServerBaseUrlStr() + 'getRegisteredPlugins/';
+    return this.http.get(url);
+  };
 }
 
 export type workflow = {
   name: string,
   version: string,
   type: string,
-  creatorName: string,
   description: string,
-  roleProductSet: string,
-  diagramType:  string,
-  federationId: string,
-  federationName: string
+  graphData: any
+  pluginsData: any
 };

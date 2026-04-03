@@ -362,7 +362,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
     	OutputStream responseOutputStream = null;
     	ZipOutputStream zip = null;
 
-    	logger.trace("processor count: " + Runtime.getRuntime().availableProcessors());
+    	logger.debug("processor count: " + Runtime.getRuntime().availableProcessors());
 
     	Set<String> uids = new HashSet<>();
 
@@ -796,18 +796,17 @@ public class MissionKMLServlet extends LatestKMLServlet {
         while (qr == null && results.next()) {
             qr = kmlService.deserializeFromResultSet(results);
 
-            logger.debug("parsed cotelement: " + qr);
+            logger.trace("parsed cotelement: " + qr);
 
             try {
                 if (qr != null) {
                     queue.add(qr);
-                }
+				}
             } catch (Throwable t) {
                 logger.warn("exception enqueuing cot element", t);
             }
 
         } 
-
 
         return qr;
     }
@@ -841,7 +840,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
         public void run() {
             // wait for element to be available, and poll producerComplete
 
-            logger.trace("getting KML dao");
+            logger.debug("getting KML dao");
 
             if (dao == null) {
 	            try {
@@ -864,7 +863,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
                         dao.parse(cot);
                         outputSet.add(cot);
                     } else {
-                        logger.trace("skipping null CotElement");
+                        logger.debug("skipping null CotElement");
                     }
 
                 } catch (Exception e) {
@@ -927,7 +926,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
     }
     
     public long parseResultsForCotElements(Set<CotElement> cotResultSet, ResultSet results) throws SQLException, InterruptedException {
-		// use at least two threads in the thread pool, more per processsor to leverage multicore
+		// use at least two threads in the thread pool, more per processor to leverage multicore
 		int numThreads = Runtime.getRuntime().availableProcessors() + 1;
 
 		// create an executor service
@@ -948,11 +947,8 @@ public class MissionKMLServlet extends LatestKMLServlet {
 		long cotFetchAndDeserializeStart = System.currentTimeMillis();
 
 		// deserialize all cot results
-		CotElement cursor = seekValid(results, queue);
-		if (cursor != null) {
-			// didn't reach the end of the row -- get baseline uid out
-			while(results.next() && (cursor = seekValid(results, queue)) != null);
-		}
+		while(seekValid(results, queue) != null);
+
 		long cotFetchAndDeserializeDuration = System.currentTimeMillis() - cotFetchAndDeserializeStart;
 		while(queue.size() != 0) {
 			logger.debug("Still processing...");
@@ -967,7 +963,7 @@ public class MissionKMLServlet extends LatestKMLServlet {
 
 		// block waiting for thread completion
 		while(!executor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
-			logger.trace("awaiting thread pool termination");
+			logger.debug("awaiting thread pool termination");
 		}
 
 		logger.debug("cot set size: " + cotResultSet.size());

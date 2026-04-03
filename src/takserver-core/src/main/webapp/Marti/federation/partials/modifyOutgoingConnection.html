@@ -215,6 +215,15 @@
                   </label>
                 </div>
                 <input data-ng-disabled="modifiedOutgoing.tokenType !== 'manual'" type="text" data-ng-model="modifiedOutgoing.connectionToken" name="connectionToken"/>
+
+                <br><br>
+                <div class="form-group">
+                  <label style="text-align:center;">
+                    Use TLS
+                    <input type="checkbox" data-ng-model="modifiedOutgoing.tls" name="tls"/>
+                    <span class="inlineHelp">(Disabling TLS will disable traffic encryption)</span>
+                  </label>
+                </div>
               </td>
             </tr>
           </table>

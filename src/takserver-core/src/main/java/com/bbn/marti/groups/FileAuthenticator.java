@@ -70,8 +70,6 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
 
     private final HashMap<String, UserAuthenticationFile.User> userFileMap = new HashMap<>();
     
-    private IgniteCache<String, UserAuthenticationFile.User> userFileCache;
-
     private static final Logger logger = LoggerFactory.getLogger(FileAuthenticator.class);
 
     private static FileAuthenticator fileAuthenticator;
@@ -83,17 +81,20 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
     	if (logger.isDebugEnabled()) {
     		logger.debug("FileAuthenticator construct");
     	}
-    	
-    	if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
-    		CacheConfiguration<String, UserAuthenticationFile.User> cfg = new CacheConfiguration<>();
-			cfg.setName(Constants.USER_AUTH_CACHE_NAME);
-			cfg.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);
-			userFileCache = IgniteHolder.getInstance().getIgnite().getOrCreateCache(cfg);
-    	}
 
         if (ActiveProfiles.getInstance().isMessagingProfileActive()) {
             initFile();
         }
+    }
+    
+    public IgniteCache<String, UserAuthenticationFile.User> userFileCache() {
+    	if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCluster().isEnabled()) {
+    		CacheConfiguration<String, UserAuthenticationFile.User> cfg = new CacheConfiguration<>();
+			cfg.setName(Constants.USER_AUTH_CACHE_NAME);
+			cfg.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);
+			return IgniteHolder.getInstance().getIgnite().getOrCreateCache(cfg);
+    	}
+    	return null;
     }
 
     public static synchronized FileAuthenticator getInstance() {
@@ -144,8 +145,8 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
         fileAuthenticator = this;
         
         // pull in anything sitting on the cache     
-        if (userFileCache != null) {
-        	 userFileCache.forEach(entry -> {
+        if (userFileCache() != null) {
+        	 userFileCache().forEach(entry -> {
              	try {
              		addOrUpdateUser(entry.getValue(), true, null);
              	} catch (Exception e) {
@@ -602,11 +603,11 @@ public class FileAuthenticator extends AbstractAuthenticator implements Serializ
     	    	
     	if (control != null && control.getFileUser() != null) {
         	try {
-        		if (userFileCache != null) {
+        		if (userFileCache() != null) {
         			if (control.getControlType() == FileAuthenticatorControl.ControlType.USER_DELETE) {
-            			userFileCache.remove(control.getFileUser().getIdentifier());
+            			userFileCache().remove(control.getFileUser().getIdentifier());
             		} else {
-            			userFileCache.put(control.getFileUser().getIdentifier(), control.getFileUser());
+            			userFileCache().put(control.getFileUser().getIdentifier(), control.getFileUser());
             		}
         		}
 

@@ -3,8 +3,8 @@
 package com.bbn.marti.groups;
 
 import java.math.BigInteger;
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Hashtable;
 import java.util.List;
@@ -38,6 +38,7 @@ import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.LdapSecurityType;
 import com.bbn.marti.config.LdapStyle;
 import com.bbn.marti.remote.LdapGroup;
+import com.bbn.marti.remote.LdapUser;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.exception.ForbiddenException;
 import com.bbn.marti.remote.exception.NotFoundException;
@@ -53,7 +54,6 @@ import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.groups.Reachability;
 import com.bbn.marti.remote.groups.User;
 import com.bbn.marti.remote.groups.UserClassification;
-import com.bbn.marti.remote.LdapUser;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
@@ -80,26 +80,17 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
     private GroupDao groupDao() {
 		return MessagingDependencyInjectionProxy.getInstance().groupDao();
 	}
-    
-    private GroupStore groupStore;
-    
+        
     private Logger logger = LoggerFactory.getLogger(DistributedPersistentGroupManager.class);
     
     private final Reachability<User> reachability = new CommonGroupDirectedReachability(this);
     
     private GroupStore groupStore() {
-    	return groupStore;
+    	return MessagingDependencyInjectionProxy.getInstance().groupStore();
     }
     
     private Configuration config() {
     	return MessagingDependencyInjectionProxy.getInstance().simpleCoreConfig().getRemoteConfiguration();
-    }
-    
-    public DistributedPersistentGroupManager(GroupStore groupStore) {
-    	this.groupStore = groupStore;
-    	if (logger.isDebugEnabled()) {
-    		logger.debug("Construct " + getClass().getSimpleName());
-    	}
     }
 
     private String getDnAttributeName() {
@@ -752,7 +743,7 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
             entry.put(cn);
 
             // set the sAMAccountName
-            Attribute sAMAccountName = new BasicAttribute("sAMAccountName", userName);
+            Attribute sAMAccountName = new BasicAttribute(ldapConfig.getNameAttrAD(), userName);
             entry.put(sAMAccountName);
 
             // set the email
@@ -999,7 +990,7 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
 
             context = connectLdap();
 
-            String logonNameAttr = "sAMAccountName";
+            String logonNameAttr = ldapConfig.getNameAttrAD();
             if (ldapConfig.getStyle() == LdapStyle.DS) {
                 logonNameAttr = ldapConfig.getNameAttr();
             }

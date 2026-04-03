@@ -12,28 +12,24 @@ import { ToastrModule, ToastrService } from 'ngx-toastr';
   styleUrl: './toolbar.component.css'
 })
 export class ToolbarComponent {
-  title = 'Policy'
+  editingTitle = 'N/A'
+  enforingTitle = 'N/A'
   readonly dialog = inject(MatDialog);
 
   constructor(private toastr: ToastrService, private dataService: DataService, private workflowService: WorkflowService) {}
 
   ngOnInit() {
-    let policy = this.dataService.getActivePolicy()
-    if (!policy) {
-      let policyId = this.dataService.getPolicyIdFromRoute();
-      if (policyId) {
-        this.workflowService.loadGraph(policyId).subscribe({
-          next: (res) => {
-            if (res && res.name) {
-              this.title = res.name
-            }
-          },
-          error: (e) => console.log(e)
-       })
-      }
-    } else {
-      this.title = policy.name
-    }
+    this.editingTitle = this.dataService.getActiveEditingPolicy()?.name
+
+    this.workflowService.getActiveEnforcedPolicy().subscribe({
+        next: (res) => {
+          if (res && res.name) {
+            this.enforingTitle = res.name
+          }
+        },
+        error: (e) => console.log(e)
+      })
+
   }
 
   undo(event: MouseEvent) {
@@ -47,8 +43,9 @@ export class ToolbarComponent {
     event.preventDefault();
 
     let policy: any = {}
-    policy.cells = this.dataService.getEditor().exportCells()
+    policy['graphData']['nodes'] = this.dataService.getEditor().exportCells()
     policy.settings = this.dataService.getEditor().exportSettings()
+    policy.plugins = this.dataService.getPluginsPolicy()
 
     // Convert the object to a JSON string
     const jsonString = JSON.stringify(policy, null, 2); // `null, 2` for pretty-printing
@@ -100,10 +97,16 @@ export class ToolbarComponent {
             let graph : any = {
               drawflow: { Home: { data: {} } }
             };
-            debugger;
+
             for (let cell of cells) {
-              if (cell.graphType === 'GroupCell' || cell.graphType === 'PolicyTextAnnotation' || cell.graphType === 'FederationTokenGroupCell' || cell.graphType === 'FederationOutgoingCell') {
-                graph['drawflow']['Home']['data'][cell.id] = cell
+              if (cell.graphType === 'GroupCell' || cell.graphType === 'GroupingNode' || cell.graphType === 'PolicyTextAnnotation' || cell.graphType === 'FederationTokenGroupCell' || cell.graphType === 'FederationOutgoingCell') {
+                const nodeToImport = { ...cell };
+                if(cell.graphType === 'PolicyTextAnnotation'){
+                  nodeToImport.inputs = 0; 
+                  nodeToImport.outputs = 0;
+                  nodeToImport.connections = [];
+                }
+                graph['drawflow']['Home']['data'][nodeToImport.id] = nodeToImport
               }
             }
             
@@ -139,25 +142,30 @@ export class ToolbarComponent {
     event.preventDefault();
   }
 
-  setAndSavePolicy(event: MouseEvent) {
+  saveAndActivatePolicy(event: MouseEvent) {
     event.preventDefault();
 
-    let policy = this.dataService.getActivePolicy()
-    policy.cells = this.dataService.getEditor().exportCells()
+    let policy = this.dataService.getActiveEditingPolicy()
+
+    console.log(policy)
+
+    policy['graphData']['nodes'] = this.dataService.getEditor().exportCells()
     policy.settings = this.dataService.getEditor().exportSettings()
 
-    this.workflowService.saveGraph(policy).subscribe({
+    this.workflowService.saveFederationGraphPolicy(policy).subscribe({
       next: (v) => {
-        this.workflowService.updateFederationManagerAndFile(policy.name).subscribe({
+        this.dataService.setActiveEditingPolicy(v)
+        this.workflowService.activateFederationPolicy(policy.name).subscribe({
           next: (v) => {
-            this.toastr.info("Successfully Set and Saved Policy", 'Success', {
+            this.enforingTitle = this.editingTitle;
+            this.toastr.info("Successfully Saved and Activated Policy", 'Success', {
               timeOut: 3000,
               positionClass: 'toast-top-center'
             });
           },
           error: (e) => { 
             console.log('e',e)
-            this.toastr.error("Unable to set policy", 'Error', {
+            this.toastr.error("Unable to Activate policy", 'Error', {
               timeOut: 3000,
               positionClass: 'toast-top-center'
             });
@@ -166,7 +174,7 @@ export class ToolbarComponent {
       },
       error: (e) => { 
         console.log('e',e)
-        this.toastr.error("Unable to set policy", 'Error', {
+        this.toastr.error("Unable to Save policy", 'Error', {
           timeOut: 3000,
           positionClass: 'toast-top-center'
         });
@@ -174,23 +182,24 @@ export class ToolbarComponent {
     })
   }
 
-  setPolicy(event: MouseEvent) {
+  savePolicy(event: MouseEvent) {
     event.preventDefault();
 
-    let policy = this.dataService.getActivePolicy()
-    policy.cells = this.dataService.getEditor().exportCells()
+    let policy = this.dataService.getActiveEditingPolicy()
+    policy['graphData']['nodes'] = this.dataService.getEditor().exportCells()
     policy.settings = this.dataService.getEditor().exportSettings()
-
-    this.workflowService.saveGraph(policy).subscribe({
+    
+    this.workflowService.saveFederationGraphPolicy(policy).subscribe({
       next: (v) => {
-        this.toastr.info("Successfully Set Policy", 'Success', {
+        this.dataService.setActiveEditingPolicy(v)
+        this.toastr.info("Successfully Saved Policy", 'Success', {
           timeOut: 3000,
           positionClass: 'toast-top-center'
         });
       },
       error: (e) => { 
         console.log('e',e)
-        this.toastr.error("Unable to set policy", 'Error', {
+        this.toastr.error("Unable to Save policy", 'Error', {
           timeOut: 3000,
           positionClass: 'toast-top-center'
         });

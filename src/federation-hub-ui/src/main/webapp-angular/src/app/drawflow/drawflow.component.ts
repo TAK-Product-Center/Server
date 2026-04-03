@@ -16,6 +16,7 @@ import {
 } from '@angular/core';
 import Drawflowz from '../../assets/drawflow';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { MatDialog } from '@angular/material/dialog';
@@ -30,11 +31,14 @@ import { OutgoingConnectionComponent } from './node/outgoing-connection/outgoing
 
 import { HttpClient } from '@angular/common/http';
 import { Annotation } from './node/annotation/annotation';
+import { Grouping } from './node/grouping/grouping';
 import { AddAnnotationModal } from './modal/add-annotation-modal/add-annotation-modal';
+import { AddGroupingModal } from './modal/add-grouping-modal/add-grouping-modal';
 @Component({
   selector: 'app-drawflow',
   imports: [
     CommonModule,
+    FormsModule,
     ToolbarComponent,
     AddCAGroupModalComponent,
     AddOutgoingConnectionModalComponent,
@@ -98,6 +102,25 @@ export class DrawflowComponent implements OnInit {
       image_width: '35px',
       marginRight: '0',
       marginLeft: '0',
+      inputs: 0,
+      outputs: 0,
+    },
+    {
+      id: 'GroupingNode',
+      title: 'Group',
+      image:
+        'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48IS0tIUZvbnQgQXdlc29tZSBGcmVlIDYuNy4yIGJ5IEBmb250YXdlc29tZSAtIGh0dHBzOi8vZm9udGF3ZXNvbWUuY29tIExpY2Vuc2UgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbS9saWNlbnNlL2ZyZWUgQ29weXJpZ2h0IDIwMjUgRm9udGljb25zLCBJbmMuLS0+PHBhdGggZD0iTTY0IDBDMjguNyAwIDAgMjguNyAwIDY0TDAgMzUyYzAgMzUuMyAyOC43IDY0IDY0IDY0bDk2IDAgMCA4MGMwIDYuMSAzLjQgMTEuNiA4LjggMTQuM3MxMS45IDIuMSAxNi44LTEuNUwzMDkuMyA0MTYgNDQ4IDQxNmMzNS4zIDAgNjQtMjguNyA2NC02NGwwLTI4OGMwLTM1LjMtMjguNy02NC02NC02NEw2NCAweiIvPjwvc3ZnPg==',
+      image_height: '25px',
+      image_width: '35px',
+      marginRight: '0',
+      marginLeft: '0',
+      inputs: 0,
+      outputs: 0,
+      data: {
+        childOffsets: {},
+        elements: [] 
+      },
+      class: 'GROUP'
     },
   ];
 
@@ -111,9 +134,16 @@ export class DrawflowComponent implements OnInit {
   editDivHtml: HTMLElement | undefined;
   editButtonShown: boolean = false;
 
-  drawnNodes: any[] = [];
+  availableNodes: any[] = [];
+  selectedNodeFilter: any = 'Show All Edges';
+  fullyHideEdges: boolean = false;
+  hideEdgeText: boolean = false;
+  
   selectedNodeId: string = '';
   selectedNode: any = {};
+  dragElementHover: any = null;
+  isDraggingInsideGroup: boolean = false;
+  private currentDraggedNodeId: string | null = null; 
 
   lastMousePositionEv: any;
 
@@ -124,7 +154,7 @@ export class DrawflowComponent implements OnInit {
   private updateInterval: any;
   private updateIntervalMs = 5000; // update interval in milliseconds
   private useDummyData = false;
-  private metricsApiUrl = '/fig/getBrokerMetrics';
+  private metricsApiUrl = '/api/getBrokerMetrics';
   private UUIDDecoder = new Map<string, string>();
   private nodeStatsDictionary = new Map<string, number>();
   private testStatsDictionary = new Map<string, number>();
@@ -133,6 +163,7 @@ export class DrawflowComponent implements OnInit {
     private workflowService: WorkflowService, private route: ActivatedRoute, private http: HttpClient) { }
 
   ngOnInit() {
+    this.loadSettings()
     // Fetch metrics immediately and then every 5 seconds
     this.fetchMetrics();
     this.updateInterval = setInterval(() => this.fetchMetrics(), this.updateIntervalMs);
@@ -178,18 +209,18 @@ export class DrawflowComponent implements OnInit {
 
     } else {
       this.http.get<any>(this.metricsApiUrl).subscribe(
-        (data) => {          
-          for(var channel of data.channelInfos){
+        (data) => {
+          for (var channel of data.channelInfos) {
             var channelKey = `${channel.sourceCert}|${channel.targetCert}`;
             var lastStat = (this.nodeStatsDictionary.get(channelKey) ?? 0);
             var decodedUUID = this.UUIDDecoder.get(channel.sourceCert);
-            if(decodedUUID){
+            if (decodedUUID) {
               var nodeClassIn = `node_out_node-${decodedUUID}`;
               var t = document.querySelector(`.${nodeClassIn}`);
               if (t) {
                 var connection = t.querySelector('.main-path');
                 if (connection) {
-                  if(channel.messagesWritten > lastStat){
+                  if (channel.messagesWritten > lastStat) {
                     connection.classList.add("data-flowing");
                     this.nodeStatsDictionary.set(channelKey, channel.messagesWritten);
                   }
@@ -223,7 +254,6 @@ export class DrawflowComponent implements OnInit {
   }
 
   private getCentroid(coords: any) {
-    // Step 1: Calculate the centroid (average of all x and y coordinates)
     let sumX = -1000;
     let sumY = -1000;
     let n = coords.length;
@@ -253,194 +283,202 @@ export class DrawflowComponent implements OnInit {
       this.editor.force_first_input = false;
       this.editor.line_path = 1;
       this.editor.editor_mode = 'edit';
+      this.editor.hide_edge_text = this.hideEdgeText
 
       this.dataService.setEditor(this.editor);
       this.editor.start();
 
-      this.route.queryParamMap.subscribe((params) => {
-        const policyId = params.get('policy');
-        if (!policyId) {
-          this.router.navigate(['/home']);
-          return;
-        }
+      let policyId = this.dataService.getActiveEditingPolicy()?.name;
+      if (!policyId) {
+         this.router.navigate(['/home']);
+         return
+      }
 
-        this.workflowService.loadGraph(policyId).subscribe({
-          next: (res) => {
-            if (!res || !res.name) {
-              console.log('No polcy found for this name!');
-              this.router.navigate(['/home']);
-              return;
-            }
+      this.workflowService.loadGraph(policyId).subscribe({
+        next: (res) => {
+          if (!res || !res.name) {
+            console.log('No polcy found for this name!');
+            this.router.navigate(['/home']);
+            return;
+          }
 
-            let graph: any = {
-              drawflow: { Home: { data: {} } },
-            };
+          let graph: any = {
+            drawflow: { Home: { data: {} } },
+          };
 
-            console.log('Fetch Graph: ', res)
+          console.log('Fetch Graph: ', res)
 
-            let version = res.version;
-
-            if (version?.toLowerCase() === 'v2') {
-              console.log('V2 version found in policy.')
-              if (res.cells) {
-                for (let cell of res.cells) {
-                  if (
-                    cell.graphType === 'GroupCell' ||
-                    cell.graphType === 'FederationTokenGroupCell' ||
-                    cell.graphType === 'FederationOutgoingCell'
-                  ) {
-                    graph['drawflow']['Home']['data'][cell.id] = cell;
-                  }
+          let version = res.version;
+          // if no version found, we need to convert the old format to the new one
+          if (!res.version) {
+            console.log('No version found. Attempting to upgrade policy to current format.')
+            if (res.graphData && res.graphData.nodes) {
+              // lets try to make sure the graph starts at 0,0 by translating it
+              let originalCoords = [];
+              for (let cell of res.graphData.nodes) {
+                if (
+                  cell.graphType === 'GroupCell' ||
+                  cell.graphType === 'FederationTokenGroupCell' ||
+                  cell.graphType === 'FederationOutgoingCell'
+                ) {
+                  originalCoords.push([cell.position.x, cell.position.y]);
                 }
-                console.log('Importing graph for rendering:', graph)
-                this.editor.import(graph);
-                this.editor.applySettings(res.settings)
               }
-            }
-            // if old version or no version found, we need to convert the old format to the new one
-            else {
-              console.log('No version found. Attempting to upgrade policy to current format.')
-              if (res.cells) {
-                // lets try to make sure the graph starts at 0,0 by translating it
-                let originalCoords = [];
-                for (let cell of res.cells) {
-                  if (
-                    cell.graphType === 'GroupCell' ||
-                    cell.graphType === 'FederationTokenGroupCell' ||
-                    cell.graphType === 'FederationOutgoingCell'
-                  ) {
-                    originalCoords.push([cell.position.x, cell.position.y]);
-                  }
-                }
-                let centroid = this.getCentroid(originalCoords);
+              let centroid = this.getCentroid(originalCoords);
 
-                // for each graph node, convert the old format to the new one
-                for (let cell of res.cells) {
-                  if (
-                    cell.graphType === 'GroupCell' ||
-                    cell.graphType === 'FederationTokenGroupCell' ||
-                    cell.graphType === 'FederationOutgoingCell'
-                  ) {
-                    let v1ToV2Cell = {
-                      id: cell.id,
-                      name: cell.graphType,
-                      data: {},
-                      class: cell.graphType,
-                      typenode: false,
-                      connections: [],
-                      html: '',
-                      pos_x: cell.position.x - centroid[0],
-                      pos_y: cell.position.y - centroid[1],
-                      federation: cell.roger_federation,
-                    };
-                    v1ToV2Cell.federation.node_id = cell.id;
+              // for each graph node, convert the old format to the new one
+              for (let cell of res.graphData.nodes) {
+                if (
+                  cell.graphType === 'GroupCell' ||
+                  cell.graphType === 'FederationTokenGroupCell' ||
+                  cell.graphType === 'FederationOutgoingCell'
+                ) {
+                  let v1ToV2Cell = {
+                    id: cell.id,
+                    name: cell.graphType,
+                    data: {},
+                    class: cell.graphType,
+                    typenode: false,
+                    connections: [],
+                    html: '',
+                    pos_x: cell.position.x - centroid[0],
+                    pos_y: cell.position.y - centroid[1],
+                    federation: cell.federation,
+                  };
+                  v1ToV2Cell.federation.node_id = cell.id;
 
-                    switch (cell.graphType) {
-                      case 'PolicyTextAnnotation': {
-                        var nodeProperties = this.graphNodes.filter(
-                          (n) => n.id === 'PolicyTextAnnotation'
-                        )[0];
-                        var PolicyTextAnnotation = this.renderComponent(
-                          Annotation, // Use your new component
-                          v1ToV2Cell.federation, // Pass relevant data (e.g., text)
-                          nodeProperties
-                        );
-                        v1ToV2Cell.html = PolicyTextAnnotation;
-                        break;
-                      }
-                      case 'GroupCell': {
-                        var nodeProperties = this.graphNodes.filter(
-                          (n) => n.id === 'GroupCell'
-                        )[0];
-                        var GroupCell = this.renderComponent(
-                          CaGroupComponent,
-                          v1ToV2Cell.federation,
-                          nodeProperties
-                        );
-                        v1ToV2Cell.html = GroupCell;
-                        break;
-                      }
-                      case 'FederationTokenGroupCell': {
-                        var nodeProperties = this.graphNodes.filter(
-                          (n) => n.id === 'FederationTokenGroupCell'
-                        )[0];
-                        var FederationTokenGroupCell = this.renderComponent(
-                          TokenGroupComponent,
-                          v1ToV2Cell.federation,
-                          nodeProperties
-                        );
-                        v1ToV2Cell.html = FederationTokenGroupCell;
-                        break;
-                      }
-                      case 'FederationOutgoingCell': {
-                        var nodeProperties = this.graphNodes.filter(
-                          (n) => n.id === 'FederationOutgoingCell'
-                        )[0];
-                        var FederationOutgoingCell = this.renderComponent(
-                          OutgoingConnectionComponent,
-                          v1ToV2Cell.federation,
-                          nodeProperties
-                        );
-                        v1ToV2Cell.html = FederationOutgoingCell;
-                        break;
-                      }
-                      default: {
-                        break;
-                      }
+                  switch (cell.graphType) {
+                    case 'PolicyTextAnnotation': {
+                      var nodeProperties = this.graphNodes.filter(
+                        (n) => n.id === 'PolicyTextAnnotation'
+                      )[0];
+                      var PolicyTextAnnotation = this.renderComponent(
+                        Annotation, 
+                        v1ToV2Cell.federation, 
+                        nodeProperties
+                      );
+                      v1ToV2Cell.html = PolicyTextAnnotation;
+                      break;
                     }
-
-                    graph['drawflow']['Home']['data'][cell.id] = v1ToV2Cell;
-                  }
-                }
-                // for each graph edge, convert the old format to the new one
-                for (let cell of res.cells) {
-                  if (cell.graphType === 'EdgeCell') {
-                    let sourceX =
-                      graph['drawflow']['Home']['data'][cell.source.id].pos_x;
-                    let targetX =
-                      graph['drawflow']['Home']['data'][cell.target.id].pos_y;
-
-                    let type;
-                    if (sourceX > targetX) {
-                      type = 'input-output';
-                    } else {
-                      type = 'output-input';
+                    case 'GroupingNode': {
+                      var nodeProperties = this.graphNodes.filter(
+                        (n) => n.id === 'GroupingNode'
+                      )[0];
+                      var GroupingNode = this.renderComponent(
+                        Grouping, 
+                        v1ToV2Cell.federation, 
+                        nodeProperties
+                      );
+                      v1ToV2Cell.html = GroupingNode;
+                      break;
                     }
-
-                    let connection = {
-                      id: cell.id,
-                      type,
-                      destination: cell.target.id,
-                      source: cell.source.id,
-                      federation: cell.roger_federation,
-                    };
-
-                    graph['drawflow']['Home']['data'][
-                      cell.source.id
-                    ].connections.push(connection);
+                    case 'GroupCell': {
+                      var nodeProperties = this.graphNodes.filter(
+                        (n) => n.id === 'GroupCell'
+                      )[0];
+                      var GroupCell = this.renderComponent(
+                        CaGroupComponent,
+                        v1ToV2Cell.federation,
+                        nodeProperties
+                      );
+                      v1ToV2Cell.html = GroupCell;
+                      break;
+                    }
+                    case 'FederationTokenGroupCell': {
+                      var nodeProperties = this.graphNodes.filter(
+                        (n) => n.id === 'FederationTokenGroupCell'
+                      )[0];
+                      var FederationTokenGroupCell = this.renderComponent(
+                        TokenGroupComponent,
+                        v1ToV2Cell.federation,
+                        nodeProperties
+                      );
+                      v1ToV2Cell.html = FederationTokenGroupCell;
+                      break;
+                    }
+                    case 'FederationOutgoingCell': {
+                      var nodeProperties = this.graphNodes.filter(
+                        (n) => n.id === 'FederationOutgoingCell'
+                      )[0];
+                      var FederationOutgoingCell = this.renderComponent(
+                        OutgoingConnectionComponent,
+                        v1ToV2Cell.federation,
+                        nodeProperties
+                      );
+                      v1ToV2Cell.html = FederationOutgoingCell;
+                      break;
+                    }
+                    default: {
+                      break;
+                    }
                   }
+                  graph['drawflow']['Home']['data'][cell.id] = v1ToV2Cell;
                 }
-                console.log('Importing updated graph for rendering:', graph)
-                this.editor.import(graph);
               }
+              // for each graph edge, convert the old format to the new one
+              for (let cell of res.graphData.nodes) {
+                if (cell.graphType === 'EdgeCell') {
+                  let sourceX =
+                    graph['drawflow']['Home']['data'][cell.source.id].pos_x;
+                  let targetX =
+                    graph['drawflow']['Home']['data'][cell.target.id].pos_y;
+
+                  let type;
+                  if (sourceX > targetX) {
+                    type = 'input-output';
+                  } else {
+                    type = 'output-input';
+                  }
+
+                  let connection = {
+                    id: cell.id,
+                    type,
+                    destination: cell.target.id,
+                    source: cell.source.id,
+                    federation: cell.federation,
+                  };
+
+                  graph['drawflow']['Home']['data'][
+                    cell.source.id
+                  ].connections.push(connection);
+                }
+              }
+              console.log('Importing updated graph for rendering:', graph)
+              this.editor.import(graph);
             }
-
-            this.dataService.setActivePolicy(res);
-
-            setTimeout(() => {
-              for (var key in this.editor.drawflow.drawflow.Home.data) {
-                this.editor.updateConnectionNodes('node-'+key);
+          } else if (version.toLowerCase() === 'v2') {
+            console.log('V2 version found in policy.')
+            if (res.graphData && res.graphData.nodes) {
+              for (let cell of res.graphData.nodes) {
+                if (
+                  cell.graphType === 'GroupCell' ||
+                  cell.graphType === 'FederationTokenGroupCell' ||
+                  cell.graphType === 'FederationOutgoingCell'
+                ) {
+                  graph['drawflow']['Home']['data'][cell.id] = cell;
+                }
               }
-            }, 100)
-          },
-          error: (e) => console.log(e),
-        });
+              console.log('Importing graph for rendering:', graph)
+              this.editor.import(graph);
+              this.editor.applySettings(res.graphData.settings)
+            }
+          }
+
+          this.dataService.setActiveEditingPolicy(res);
+
+          Object.values(this.editor.drawflow.drawflow.Home.data).forEach((n:any) => {
+            if (n.name === 'GroupCell' || n.name === 'FederationOutgoingCell' || n.name === 'FederationTokenGroupCell') {
+              this.availableNodes.push(n)
+            }
+          })
+
+        },
+        error: (e) => console.log(e),
       });
     }
   }
 
   private addEditorEvents() {
-    // Events!
 
     this.editor.on('node-dblclick', (id: any) => {
       let editNode = this.editor.drawflow.drawflow.Home.data[`${id}`];
@@ -481,6 +519,17 @@ export class DrawflowComponent implements OnInit {
         'Editor Event :>> Node selected :>> this.selectedNode :>> ',
         this.selectedNode.data
       );
+
+      this.currentDraggedNodeId = id; 
+
+      const parentGroup = this.findParentGroup(id);
+      if (parentGroup) {
+        this.isDraggingInsideGroup = true;
+        console.log(`Node ${id} selected for dragging, it is inside group ${parentGroup.id}. Setting isDraggingInsideGroup to true.`);
+      } else {
+        this.isDraggingInsideGroup = false;
+        console.log(`Node ${id} selected for dragging, it is NOT inside a group. Setting isDraggingInsideGroup to false.`);
+      }
     });
 
     this.editor.on('click', (e: any) => {
@@ -499,7 +548,7 @@ export class DrawflowComponent implements OnInit {
         }
         this.selectedNode =
           this.editor.drawflow.drawflow.Home.data[
-            `${this.selectedNodeId.slice(5)}`
+          `${this.selectedNodeId.slice(5)}`
           ];
       }
 
@@ -524,6 +573,177 @@ export class DrawflowComponent implements OnInit {
     this.editor.on('connectionRemoved', (connection: any) => {
       console.log('Editor Event :>> Connection removed ', connection);
     });
+
+    this.editor.on("nodeMoved", (id: string) => {
+      const dragNodeId = id;
+      const movedNode = this.editor.getNodeFromId(dragNodeId);
+
+      let wasDroppedIntoNewGroup = false;
+
+      // --- Handle dropping INTO a group (if a group was hovered) ---
+      if (this.dragElementHover !== null) {
+          const dropNodeId = this.dragElementHover.id.slice(5);
+          const dropNodeInfo = this.editor.getNodeFromId(dropNodeId);
+
+          if (dragNodeId !== dropNodeId && dropNodeInfo && dropNodeInfo.name === 'GroupingNode') {
+              console.log(`Node ${dragNodeId} dropped over potential group ${dropNodeId}.`);
+
+              this.removeNodeFromGroups(dragNodeId);
+
+              if (dropNodeInfo.data.elements.indexOf(dragNodeId) === -1) {
+                  dropNodeInfo.data.elements.push(dragNodeId);
+                  const relativeX = movedNode.pos_x - dropNodeInfo.pos_x;
+                  const relativeY = movedNode.pos_y - dropNodeInfo.pos_y;
+
+                  if (!dropNodeInfo.data.childOffsets) {
+                      dropNodeInfo.data.childOffsets = {};
+                  }
+                  dropNodeInfo.data.childOffsets[dragNodeId] = { x: relativeX, y: relativeY };
+
+                  this.editor.updateNodeDataFromId(dropNodeId, dropNodeInfo.data);
+                  console.log(`Node ${dragNodeId} added to group ${dropNodeId}. Relative pos: (${relativeX}, ${relativeY})`);
+                  wasDroppedIntoNewGroup = true;
+              } else {
+                  console.log(`Node ${dragNodeId} was already in group ${dropNodeId}. Updating relative position.`);
+                  const relativeX = movedNode.pos_x - dropNodeInfo.pos_x;
+                  const relativeY = movedNode.pos_y - dropNodeInfo.pos_y;
+                  dropNodeInfo.data.childOffsets[dragNodeId] = { x: relativeX, y: relativeY };
+                  this.editor.updateNodeDataFromId(dropNodeId, dropNodeInfo.data);
+                  wasDroppedIntoNewGroup = true;
+              }
+          }
+          this.dragElementHover.classList.remove("hover-drop");
+          this.dragElementHover = null;
+      }
+
+      // --- Handle dragging OUT of a group OR moving a node within its existing group ---
+      if (!wasDroppedIntoNewGroup) {
+          const currentParentGroup = this.findParentGroup(dragNodeId);
+          console.log('nodeMoved: Part 2 - currentParentGroup for', dragNodeId, ':', currentParentGroup);
+
+          if (currentParentGroup) {
+              const groupElement = document.getElementById(`node-${currentParentGroup.id}`);
+              const childElement = document.getElementById(`node-${dragNodeId}`);
+
+              if (groupElement && childElement) {
+                  const groupDrawflow = this.editor.getNodeFromId(currentParentGroup.id);
+
+                  const groupWidth = groupElement.offsetWidth / this.editor.zoom;
+                  const groupHeight = groupElement.offsetHeight / this.editor.zoom;
+                  const childWidth = childElement.offsetWidth / this.editor.zoom;
+                  const childHeight = childElement.offsetHeight / this.editor.zoom;
+
+                  const currentAbsoluteChildPosX = movedNode.pos_x;
+                  const currentAbsoluteChildPosY = movedNode.pos_y;
+
+                  const tolerance = 20; 
+                  
+                  const groupLeft = groupDrawflow.pos_x;
+                  const groupRight = groupDrawflow.pos_x + groupWidth;
+                  const groupTop = groupDrawflow.pos_y;
+                  const groupBottom = groupDrawflow.pos_y + groupHeight;
+
+                  const childLeft = currentAbsoluteChildPosX;
+                  const childRight = currentAbsoluteChildPosX + childWidth;
+                  const childTop = currentAbsoluteChildPosY;
+                  const childBottom = currentAbsoluteChildPosY + childHeight;
+
+                  const isOutside =
+                      childLeft < (groupLeft - tolerance) ||
+                      childRight > (groupRight + tolerance) ||
+                      childTop < (groupTop - tolerance) ||
+                      childBottom > (groupBottom + tolerance);
+
+                  console.log(`nodeMoved: Child ${dragNodeId} isOutside: ${isOutside}, isDraggingInsideGroup (from selected): ${this.isDraggingInsideGroup}`);
+
+                  if (isOutside && this.isDraggingInsideGroup) {
+                      this.removeNodeFromGroups(dragNodeId);
+                      console.log(`Node ${dragNodeId} dragged out of group ${currentParentGroup.id}`);
+                  } else if (!isOutside && this.isDraggingInsideGroup) {
+                      const newRelativeX = currentAbsoluteChildPosX - groupDrawflow.pos_x;
+                      const newRelativeY = currentAbsoluteChildPosY - groupDrawflow.pos_y;
+
+                      if (groupDrawflow.data && groupDrawflow.data.childOffsets) {
+                          groupDrawflow.data.childOffsets[dragNodeId] = { x: newRelativeX, y: newRelativeY };
+                          this.editor.updateNodeDataFromId(currentParentGroup.id, groupDrawflow.data);
+                          console.log(`Node ${dragNodeId} rearranged within group ${currentParentGroup.id}. New relative pos: (${newRelativeX}, ${newRelativeY})`);
+                          this.repositionNodeInGroup(dragNodeId, currentParentGroup.id);
+                      }
+                  } else if (isOutside && !this.isDraggingInsideGroup) {
+                      console.log(`Node ${dragNodeId} not in group initially, ended up outside.`);
+                  }
+              }
+          } else {
+              console.log(`Node ${dragNodeId} has no parent group after move (or was never in one).`);
+          }
+      }
+      
+      // --- Handle group node movement for its children and visibility ---
+      const groupNodeThatWasMoved = this.editor.getNodeFromId(id);
+      if (groupNodeThatWasMoved && groupNodeThatWasMoved.name === "GroupingNode" && groupNodeThatWasMoved.data && groupNodeThatWasMoved.data.elements) {
+          console.log(`Group node ${id} was moved. Repositioning its children and showing them.`);
+          groupNodeThatWasMoved.data.elements.forEach((childId: string) => {
+              const childNode = this.editor.getNodeFromId(childId);
+              if (childNode) {
+                  const childElement = document.getElementById(`node-${childId}`);
+                  if (childElement) {
+                      const relativeOffset = groupNodeThatWasMoved.data.childOffsets?.[childId] || { x: 0, y: 0 };
+                      const newAbsoluteChildPosX = groupNodeThatWasMoved.pos_x + relativeOffset.x;
+                      const newAbsoluteChildPosY = groupNodeThatWasMoved.pos_y + relativeOffset.y;
+
+                      childElement.style.left = `${newAbsoluteChildPosX}px`;
+                      childElement.style.top = `${newAbsoluteChildPosY}px`;
+
+                      this.editor.drawflow.drawflow.Home.data[childId].pos_x = newAbsoluteChildPosX;
+                      this.editor.drawflow.drawflow.Home.data[childId].pos_y = newAbsoluteChildPosY;
+                      childElement.classList.remove("nodeHidden"); 
+                      this.editor.updateConnectionNodes(`node-${childId}`);
+                  }
+              }
+          });
+      }
+
+      this.currentDraggedNodeId = null; 
+      this.isDraggingInsideGroup = false; 
+    });
+
+    this.editor.on("mouseMove", ({ x, y }: { x: number; y: number }) => {
+      if (this.editor.node_selected && this.editor.drag && !this.editor.node_selected.classList.contains("GroupingNode")) {
+        const elementsAtPoint = document.elementsFromPoint(x, y);
+
+        const groupElement = elementsAtPoint.find(ele =>
+          ele.classList.contains("drawflow-node") &&
+          this.editor.getNodeFromId(ele.id.slice(5))?.name === 'GroupingNode'
+        );
+
+        if (groupElement && groupElement !== this.dragElementHover) {
+          if (this.dragElementHover) {
+            this.dragElementHover.classList.remove("hover-drop");
+          }
+          this.dragElementHover = groupElement;
+          groupElement.classList.add("hover-drop"); 
+        } else if (!groupElement && this.dragElementHover) {
+          this.dragElementHover.classList.remove("hover-drop");
+          this.dragElementHover = null;
+        }
+      }
+      else if (this.editor.node_selected && this.editor.drag && this.editor.node_selected.classList.contains("GroupingNode")) {
+        console.log("grouping moved");
+        const groupNodeThatWasMoved = this.editor.getNodeFromId(this.editor.node_selected.id.replace("node-", ""));
+        groupNodeThatWasMoved.data.elements.forEach((childId: string) => {
+          const childNode = this.editor.getNodeFromId(childId);
+          if (childNode) {
+            const childElement = document.getElementById(`node-${childId}`);
+            if (childElement) {
+              childElement.classList.add('nodeHidden');
+              this.editor.updateConnectionNodes(`node-${childId}`);
+            }
+          }
+        });
+      }
+    });
+
+
   }
 
   private dragEvent() {
@@ -537,7 +757,7 @@ export class DrawflowComponent implements OnInit {
         false
       );
       element.addEventListener('touchstart', this.drag.bind(this), false);
-      element.addEventListener('dblclick', (event) => {});
+      element.addEventListener('dblclick', (event) => { });
     });
   }
 
@@ -589,18 +809,18 @@ export class DrawflowComponent implements OnInit {
 
     pos_x =
       pos_x *
-        (this.editor.precanvas.clientWidth /
-          (this.editor.precanvas.clientWidth * this.editor.zoom)) -
+      (this.editor.precanvas.clientWidth /
+        (this.editor.precanvas.clientWidth * this.editor.zoom)) -
       this.editor.precanvas.getBoundingClientRect().x *
-        (this.editor.precanvas.clientWidth /
-          (this.editor.precanvas.clientWidth * this.editor.zoom));
+      (this.editor.precanvas.clientWidth /
+        (this.editor.precanvas.clientWidth * this.editor.zoom));
     pos_y =
       pos_y *
-        (this.editor.precanvas.clientHeight /
-          (this.editor.precanvas.clientHeight * this.editor.zoom)) -
+      (this.editor.precanvas.clientHeight /
+        (this.editor.precanvas.clientHeight * this.editor.zoom)) -
       this.editor.precanvas.getBoundingClientRect().y *
-        (this.editor.precanvas.clientHeight /
-          (this.editor.precanvas.clientHeight * this.editor.zoom));
+      (this.editor.precanvas.clientHeight /
+        (this.editor.precanvas.clientHeight * this.editor.zoom));
 
     pos_x = pos_x - 100;
 
@@ -625,13 +845,33 @@ export class DrawflowComponent implements OnInit {
           GroupCell
         );
         break;
+      case 'GroupingNode':
+        var nodeProperties = this.graphNodes.filter(
+          (n) => n.id === 'GroupingNode'
+        )[0];
+        var GroupingNode = this.renderComponent(
+          Grouping,
+          { description: 'Default Text...', stringId: '1' },
+          nodeProperties
+        );
+        this.editor.addNode(
+          'GroupingNode',
+          0,
+          0,
+          pos_x,
+          pos_y,
+          'GroupingNode',
+          { 'elements': [] },
+          GroupingNode
+        );
+        break;
       case 'PolicyTextAnnotation':
         var nodeProperties = this.graphNodes.filter(
           (n) => n.id === 'PolicyTextAnnotation'
         )[0];
         var PolicyAnnotation = this.renderComponent(
           Annotation,
-          {description: 'Default Text...', stringId: '1'},
+          { description: 'Default Text...', stringId: '1' },
           nodeProperties
         );
         this.editor.addNode(
@@ -713,6 +953,7 @@ export class DrawflowComponent implements OnInit {
     this.editor.zoom_reset();
   }
 
+
   private hideEditButton() {
     this.editButtonShown = false;
     this.editDivHtml = document.getElementById('editNode')!;
@@ -723,6 +964,47 @@ export class DrawflowComponent implements OnInit {
 
   private openModalForNode(node: any) {
     switch (node.name) {
+      case 'GroupingNode': {
+        this.dialog.open(AddGroupingModal, {
+          disableClose: true,
+          autoFocus: false,
+          restoreFocus: false,
+          height: '800px',
+          width: '1200px',
+          data: {
+            onCancel: (editExisting: boolean) => {
+              if (!editExisting) this.editor.removeNodeId(`node-${node.id}`);
+            },
+            onSave: (federation: any) => {
+              var t = document.querySelector(
+                ".drawflow-node[id='node-" +
+                node.id +
+                "'] .drawflow_content_node"
+              );
+              if (t) {
+                var nodeProperties = this.graphNodes.filter(
+                  (n) => n.id === node.name
+                )[0];
+                var GroupCell = this.renderComponent(
+                  Grouping,
+                  federation,
+                  nodeProperties
+                );
+                t.innerHTML = GroupCell;
+                this.editor.drawflow.drawflow.Home.data[`${node.id}`].html =
+                  GroupCell;
+                this.editor.drawflow.drawflow.Home.data[
+                  `${node.id}`
+                ].federation = federation;
+              }
+            },
+            federation: node.federation
+              ? node.federation
+              : { node_id: node.id },
+          },
+        });
+        break;
+      }
       case 'PolicyTextAnnotation': {
         this.dialog.open(AddAnnotationModal, {
           disableClose: true,
@@ -737,8 +1019,8 @@ export class DrawflowComponent implements OnInit {
             onSave: (federation: any) => {
               var t = document.querySelector(
                 ".drawflow-node[id='node-" +
-                  node.id +
-                  "'] .drawflow_content_node"
+                node.id +
+                "'] .drawflow_content_node"
               );
               if (t) {
                 var nodeProperties = this.graphNodes.filter(
@@ -778,8 +1060,8 @@ export class DrawflowComponent implements OnInit {
             onSave: (federation: any) => {
               var t = document.querySelector(
                 ".drawflow-node[id='node-" +
-                  node.id +
-                  "'] .drawflow_content_node"
+                node.id +
+                "'] .drawflow_content_node"
               );
               if (t) {
                 var nodeProperties = this.graphNodes.filter(
@@ -819,8 +1101,8 @@ export class DrawflowComponent implements OnInit {
             onSave: (federation: any) => {
               var t = document.querySelector(
                 ".drawflow-node[id='node-" +
-                  node.id +
-                  "'] .drawflow_content_node"
+                node.id +
+                "'] .drawflow_content_node"
               );
               if (t) {
                 var nodeProperties = this.graphNodes.filter(
@@ -860,8 +1142,8 @@ export class DrawflowComponent implements OnInit {
             onSave: (federation: any) => {
               var t = document.querySelector(
                 ".drawflow-node[id='node-" +
-                  node.id +
-                  "'] .drawflow_content_node"
+                node.id +
+                "'] .drawflow_content_node"
               );
               if (t) {
                 var nodeProperties = this.graphNodes.filter(
@@ -924,19 +1206,14 @@ export class DrawflowComponent implements OnInit {
   }
 
   private renderComponent(component: any, federation: any, properties: any) {
-    // // Create the component dynamically
     const componentRef: any = this.customPlaceholder.createComponent(component);
-    // Pass data to the component via the @Input() property
     componentRef.instance.federation = federation;
     componentRef.instance.properties = properties;
 
-    // // Manually trigger change detection to make sure the component is rendered
     this.cdr.detectChanges();
 
-    // // Access the component's DOM element and get the outer HTML
     const htmlContent = String(componentRef.location.nativeElement.innerHTML);
 
-    // destroy the component after rendering (if not needed anymore)
     componentRef.destroy();
 
     return htmlContent;
@@ -964,36 +1241,120 @@ export class DrawflowComponent implements OnInit {
 
   private setNodeStatus(activeConnectionSetGroupIdentities: any, activeConnectionSetConnectionIds: any) {
     Object.values(this.editor.drawflow.drawflow.Home.data).forEach((node: any) => {
-        let type = node.graphType ?? node.name;
-        if (type === 'FederationOutgoingCell') {
-          let el = $('#node-' + node.id + ' .title-box');
-          if (node.federation && activeConnectionSetConnectionIds.has(node.federation.name)) {
-            if (el && el[0] && el[0] instanceof HTMLElement) {
-              el[0].style.backgroundColor = '#52CC7A';
-            }
-          } else {
-            if (el && el[0] && el[0] instanceof HTMLElement) {
-              // if outgoing is enabled but there is no active connection,
-              // display the node as red to indicate connection issue
-              if (node.federation.outgoingEnabled)
-                el[0].style.backgroundColor = 'red';
-              else
-                el[0].style.backgroundColor = 'var(--background-box-title)';
-            }
+       let type = node.graphType ?? node.name;
+      if (type === 'FederationOutgoingCell') {
+        let el = $('#node-' + node.id + ' .title-box');
+        if (node.federation && activeConnectionSetConnectionIds.has(node.federation.name)) {
+          if (el && el[0] && el[0] instanceof HTMLElement) {
+            el[0].style.backgroundColor = '#52CC7A';
           }
         } else {
-          let el = $('#node-' + node.id + ' .title-box');
-          if (node.federation && activeConnectionSetGroupIdentities.has(node.federation.name)) {
-            if (el && el[0] && el[0] instanceof HTMLElement) {
-              el[0].style.backgroundColor = '#52CC7A';
-            }
-          } else {
-            if (el && el[0] && el[0] instanceof HTMLElement) {
+          if (el && el[0] && el[0] instanceof HTMLElement) {
+            // if outgoing is enabled but there is no active connection,
+            // display the node as red to indicate connection issue
+            if (node.federation.outgoingEnabled)
+              el[0].style.backgroundColor = 'red';
+            else
               el[0].style.backgroundColor = 'var(--background-box-title)';
-            }
+          }
+        }
+      } else {
+        let el = $('#node-' + node.id + ' .title-box');
+        if (node.federation && activeConnectionSetGroupIdentities.has(node.federation.name)) {
+          if (el && el[0] && el[0] instanceof HTMLElement) {
+            el[0].style.backgroundColor = '#52CC7A';
+          }
+        } else {
+          if (el && el[0] && el[0] instanceof HTMLElement) {
+            el[0].style.backgroundColor = 'var(--background-box-title)';
           }
         }
       }
+    }
     );
+  }
+
+  private removeNodeFromGroups(nodeId: string) {
+    Object.values(this.editor.drawflow.drawflow.Home.data).forEach((node: any) => {
+      if (node.name === "GroupingNode" && node.data && node.data.elements) {
+        const findIndex = node.data.elements.indexOf(nodeId);
+        if (findIndex !== -1) {
+          node.data.elements.splice(findIndex, 1);
+
+          if (node.data.childOffsets && node.data.childOffsets[nodeId]) {
+            delete node.data.childOffsets[nodeId];
+          }
+          this.editor.updateNodeDataFromId(node.id, node.data);
+          console.log(`Node ${nodeId} removed from group ${node.id}`);
+        }
+      }
+    });
+  }
+
+  private repositionNodeInGroup(childNodeId: string, parentGroupId: string) {
+    const childNode = this.editor.getNodeFromId(childNodeId);
+    const parentGroup = this.editor.getNodeFromId(parentGroupId);
+
+    if (childNode && parentGroup) {
+      const absoluteChildPosX = childNode.pos_x;
+      const absoluteChildPosY = childNode.pos_y;
+      const absoluteParentPosX = parentGroup.pos_x;
+      const absoluteParentPosY = parentGroup.pos_y;
+
+      const newRelativePosX = absoluteChildPosX - absoluteParentPosX;
+      const newRelativePosY = absoluteChildPosY - absoluteParentPosY;
+
+      this.editor.drawflow.drawflow.Home.data[childNodeId].pos_x = newRelativePosX;
+      this.editor.drawflow.drawflow.Home.data[childNodeId].pos_y = newRelativePosY;
+
+      const childElement = document.getElementById(`node-${childNodeId}`);
+      if (childElement) {
+        const finalAbsoluteVisualPosX = parentGroup.pos_x + newRelativePosX;
+        const finalAbsoluteVisualPosY = parentGroup.pos_y + newRelativePosY;
+
+        childElement.style.left = `${finalAbsoluteVisualPosX}px`;
+        childElement.style.top = `${finalAbsoluteVisualPosY}px`;
+
+        this.editor.drawflow.drawflow.Home.data[childNodeId].pos_x = finalAbsoluteVisualPosX;
+        this.editor.drawflow.drawflow.Home.data[childNodeId].pos_y = finalAbsoluteVisualPosY;
+      }
+
+      this.editor.updateConnectionNodes(`node-${childNodeId}`);
+      console.log(`Node ${childNodeId} repositioned into group ${parentGroupId}. Relative pos: (${newRelativePosX}, ${newRelativePosY})`);
+    }
+  }
+
+  private findParentGroup(childId: string): any | null {
+    for (const nodeId in this.editor.drawflow.drawflow.Home.data) {
+      const node = this.editor.drawflow.drawflow.Home.data[nodeId];
+      if (node.name === "GroupingNode" && node.data && node.data.elements && node.data.elements.includes(childId)) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  public onSelectedNodeFilter() {
+    if (this.selectedNodeFilter.id) {
+      this.editor.highlightConnections(this.selectedNodeFilter.id, this.fullyHideEdges);
+    } else {
+      this.editor.clearConnectionHighlights();
+    }
+  }
+
+  public onHideEdgeText() {
+    this.editor.toggleConnectionText(this.hideEdgeText)
+    this.saveSettings()
+  }
+
+  saveSettings() {
+    localStorage.setItem('hideEdgeText', JSON.stringify(this.hideEdgeText));
+  }
+  loadSettings() {
+    const savedHideEdgeText = localStorage.getItem('hideEdgeText');
+
+    if (savedHideEdgeText !== null) {
+      this.hideEdgeText = JSON.parse(savedHideEdgeText);
+    }
   }
 }

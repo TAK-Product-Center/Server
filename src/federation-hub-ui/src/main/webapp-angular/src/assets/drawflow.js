@@ -34,6 +34,8 @@ export default class Drawflow {
     this.draggable_inputs = true;
     this.useuuid = true;
     this.parent = parent;
+    this.edge_font_size = '14';
+    this.hide_edge_text = false;
 
     this.noderegister = {};
     this.render = render;
@@ -58,6 +60,8 @@ export default class Drawflow {
     this.container.tabIndex = 0;
     this.precanvas = document.createElement('div');
     this.precanvas.classList.add("drawflow");
+    this.precanvas.style.transformOrigin = '0 0';
+
     this.container.appendChild(this.precanvas);
 
     /* Mouse and Touch Actions */
@@ -190,6 +194,7 @@ export default class Drawflow {
         if(this.node_selected != null) {
           this.node_selected.classList.remove("selected");
           if(this.node_selected != this.ele_selected) {
+            // this.clearConnectionHighlights();
             this.dispatch('nodeUnselected', true);
           }
         }
@@ -202,6 +207,7 @@ export default class Drawflow {
         }
         this.node_selected = this.ele_selected;
         this.node_selected.classList.add("selected");
+        // this.highlightConnections(this.node_selected.id);
         if(!this.draggable_inputs) {
           if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT' && e.target.hasAttribute('contenteditable') !== true) {
             this.drag = true;
@@ -223,6 +229,7 @@ export default class Drawflow {
         if(this.node_selected != null) {
           this.node_selected.classList.remove("selected");
           this.node_selected = null;
+          // this.clearConnectionHighlights();
           this.dispatch('nodeUnselected', true);
         }
         if(this.connection_selected != null) {
@@ -235,6 +242,7 @@ export default class Drawflow {
         if(this.node_selected != null) {
           this.node_selected.classList.remove("selected");
           this.node_selected = null;
+          // this.clearConnectionHighlights();
           this.dispatch('nodeUnselected', true);
         }
         if(this.connection_selected != null) {
@@ -247,6 +255,7 @@ export default class Drawflow {
         if(this.node_selected != null) {
           this.node_selected.classList.remove("selected");
           this.node_selected = null;
+          // this.clearConnectionHighlights();
           this.dispatch('nodeUnselected', true);
         }
         if(this.connection_selected != null) {
@@ -259,6 +268,7 @@ export default class Drawflow {
         if(this.node_selected != null) {
           this.node_selected.classList.remove("selected");
           this.node_selected = null;
+          // this.clearConnectionHighlights();
           this.dispatch('nodeUnselected', true);
         }
         if(this.connection_selected != null) {
@@ -293,6 +303,7 @@ export default class Drawflow {
         if(this.node_selected != null) {
           this.node_selected.classList.remove("selected");
           this.node_selected = null;
+          // this.clearConnectionHighlights();
           this.dispatch('nodeUnselected', true);
         }
         if(this.connection_selected != null) {
@@ -541,18 +552,20 @@ export default class Drawflow {
     }
   }
 
+  // Wheel handler: compute client coords and zoom at that client point
   zoom_enter(event, delta) {
     if (event.ctrlKey) {
-      event.preventDefault()
-      if(event.deltaY > 0) {
-        // Zoom Out
-        this.zoom_out();
-      } else {
-        // Zoom In
-        this.zoom_in();
-      }
+      event.preventDefault();
+
+      // client coordinates (viewport)
+      const clientX = event.clientX;
+      const clientY = event.clientY;
+
+      const deltaZoom = event.deltaY > 0 ? -this.zoom_value : this.zoom_value;
+      this.zoom_at(clientX, clientY, deltaZoom);
     }
   }
+
   zoom_refresh(){
     this.dispatch('zoom', this.zoom);
     this.canvas_x = (this.canvas_x / this.zoom_last_value) * this.zoom;
@@ -560,25 +573,100 @@ export default class Drawflow {
     this.zoom_last_value = this.zoom;
     this.precanvas.style.transform = "translate("+this.canvas_x+"px, "+this.canvas_y+"px) scale("+this.zoom+")";
   }
+
+  // Keep zoom_refresh simple and consistent with the new model
+  zoom_refresh(){
+    this.dispatch('zoom', this.zoom);
+    this.zoom_last_value = this.zoom;
+    this.precanvas.style.transform = `translate(${this.canvas_x}px, ${this.canvas_y}px) scale(${this.zoom})`;
+  }
+
+
+  // Core: zoom around an arbitrary client (viewport) point so that the world point
+  // under the pointer remains stationary on-screen.
+  zoom_at(clientX, clientY, deltaZoom) {
+    const newZoom = Math.min(this.zoom_max, Math.max(this.zoom_min, this.zoom + deltaZoom));
+    if (newZoom === this.zoom) return;
+
+    // get the precanvas rect *after* current transform (client-space)
+    const rect = this.precanvas.getBoundingClientRect();
+
+    // compute world coordinates of the client point BEFORE zoom
+    const worldX = (clientX - rect.left) / this.zoom;
+    const worldY = (clientY - rect.top)  / this.zoom;
+
+    // shift canvas_x/y so that worldX/worldY remain at the same clientX/clientY after zoom
+    this.canvas_x = this.canvas_x - worldX * (newZoom - this.zoom);
+    this.canvas_y = this.canvas_y - worldY * (newZoom - this.zoom);
+
+    // apply zoom
+    this.zoom = newZoom;
+    this.zoom_last_value = newZoom;
+
+    this.precanvas.style.transform = `translate(${this.canvas_x}px, ${this.canvas_y}px) scale(${this.zoom})`;
+    this.dispatch('zoom', this.zoom);
+  }
+
+  // Buttons should zoom at the CENTER of the precanvas (client coordinates)
   zoom_in(v) {
     const step = (typeof v !== "undefined") ? v : this.zoom_value;
-    if(this.zoom < this.zoom_max) {
-        this.zoom+=step;
-        this.zoom_refresh();
+    if (this.zoom < this.zoom_max) {
+      const rect = this.precanvas.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top  + rect.height / 2;
+      this.zoom_at(centerX, centerY, step);
     }
   }
   zoom_out(v) {
-    const step = (typeof v !== "undefined") ? v : this.zoom_value;
-    if(this.zoom > this.zoom_min) {
-      this.zoom-=step;
-        this.zoom_refresh();
+    const step = (typeof v !== "undefined") ? v : step;
+    if (this.zoom > this.zoom_min) {
+      const rect = this.precanvas.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top  + rect.height / 2;
+      this.zoom_at(centerX, centerY, -this.zoom_value);
     }
   }
+
   zoom_reset(){
     if(this.zoom != 1) {
       this.zoom = 1;
       this.zoom_refresh();
     }
+  }
+
+  highlightConnections(nodeId, fullyHideEdges) {
+    this.clearConnectionHighlights()
+    // hide all connections first
+    this.container.querySelectorAll('.connection').forEach(conn => {
+      if (fullyHideEdges)
+        conn.classList.add('hidden');
+      else
+        conn.classList.add('dim');
+    });
+
+    // show only connections where this node is source or target
+    const id = nodeId.startsWith("node-") ? nodeId.slice(5) : nodeId;
+
+    this.container.querySelectorAll(`.connection.node_in_node-${id}, .connection.node_out_node-${id}`).forEach(conn => {
+      conn.classList.remove('hidden');
+      conn.classList.remove('dim');
+    });
+  }
+
+  clearConnectionHighlights() {
+    this.container.querySelectorAll('.connection').forEach(conn => {
+      conn.classList.remove('hidden');
+      conn.classList.remove('dim');
+    });
+  }
+
+  toggleConnectionText(hide = false) {
+    this.hide_edge_text = hide
+    // Find all connection text elements
+    const texts = this.precanvas.querySelectorAll('.connection text');
+    texts.forEach(textEl => {
+      textEl.setAttribute('font-size', this.hide_edge_text ? '0' : this.edge_font_size);
+    });
   }
 
 /**
@@ -735,7 +823,6 @@ createCurvature(start_pos_x, start_pos_y, end_pos_x, end_pos_y, type, use_arrow)
   return curve;
 }
 
-
   drawConnection(ele) {
     let svg = this.createConnectionSVG('','')
     this.connection_ele = svg;
@@ -763,7 +850,7 @@ createCurvature(start_pos_x, start_pos_y, end_pos_x, end_pos_y, type, use_arrow)
     connection.appendChild(path);
           
     const text = document.createElementNS(svgNS, 'text');
-    text.setAttribute('font-size', '14');
+    text.setAttribute('font-size', this.hide_edge_text ? '0' : this.edge_font_size);
     text.setAttribute('fill', 'black');
     text.setAttribute('dy', '-3'); // Move text above the line
 
@@ -977,6 +1064,105 @@ createCurvature(start_pos_x, start_pos_y, end_pos_x, end_pos_y, type, use_arrow)
     return { startPos, endPos, lineType };
   }
 
+  calculateEdgeDirectionCentered(sourceNode, destNode) {
+    let precanvasWidthZoom = this.precanvas.clientWidth / (this.precanvas.clientWidth * this.zoom);
+    precanvasWidthZoom = precanvasWidthZoom || 0;
+    let precanvasHeightZoom = this.precanvas.clientHeight / (this.precanvas.clientHeight * this.zoom);
+    precanvasHeightZoom = precanvasHeightZoom || 0;
+
+    let precanvasRect = this.precanvas.getBoundingClientRect();
+    let sourceRect = sourceNode.getBoundingClientRect()
+    let destRect = destNode.getBoundingClientRect()
+
+    const topCenterSource = {
+      x: (sourceRect.x - precanvasRect.x) * precanvasWidthZoom + sourceNode.offsetWidth/2,
+      y: (sourceRect.y - precanvasRect.y) * precanvasHeightZoom
+    };
+  
+    const bottomCenterSource = {
+      x: (sourceRect.x - precanvasRect.x) * precanvasWidthZoom + sourceNode.offsetWidth/2,
+      y: sourceNode.offsetHeight + (sourceRect.y - precanvasRect.y) * precanvasHeightZoom
+    };
+  
+    const leftCenterSource = {
+      x: (sourceRect.x - precanvasRect.x) * precanvasWidthZoom,
+      y: sourceNode.offsetHeight/2 + (sourceRect.y - precanvasRect.y) * precanvasHeightZoom
+    };
+  
+    const rightCenterSource = {
+      x: (sourceRect.x - precanvasRect.x) * precanvasWidthZoom + sourceNode.offsetWidth,
+      y: sourceNode.offsetHeight/2 + (sourceRect.y - precanvasRect.y) * precanvasHeightZoom
+    };
+
+    const centerSource = {
+      x: (sourceRect.x - precanvasRect.x) * precanvasWidthZoom + sourceNode.offsetWidth/2,
+      y: sourceNode.offsetHeight/2 + (sourceRect.y - precanvasRect.y) * precanvasHeightZoom
+    };
+
+    const topCenterDest = {
+      x: (destRect.x - precanvasRect.x) * precanvasWidthZoom + destNode.offsetWidth/2,
+      y: (destRect.y - precanvasRect.y) * precanvasHeightZoom
+    };
+  
+    const bottomCenterDest = {
+      x: (destRect.x - precanvasRect.x) * precanvasWidthZoom + destNode.offsetWidth/2,
+      y: destNode.offsetHeight + (destRect.y - precanvasRect.y) * precanvasHeightZoom
+    };
+  
+    const leftCenterDest = {
+      x: (destRect.x - precanvasRect.x) * precanvasWidthZoom,
+      y: destNode.offsetHeight/2 + (destRect.y - precanvasRect.y) * precanvasHeightZoom
+    };
+  
+    const rightCenterDest = {
+      x: (destRect.x - precanvasRect.x) * precanvasWidthZoom + destNode.offsetWidth,
+      y: destNode.offsetHeight/2 + (destRect.y - precanvasRect.y) * precanvasHeightZoom
+    };
+
+    const centerDest = {
+      x: (destRect.x - precanvasRect.x) * precanvasWidthZoom + destNode.offsetWidth/2,
+      y: destNode.offsetHeight/2 + (destRect.y - precanvasRect.y) * precanvasHeightZoom
+    };
+
+
+    var endPos = {};
+    var startPos = {}
+    var lineType = 'right'
+    // source is center horizontally
+    if (rightCenterSource.x + 50 > leftCenterDest.x && leftCenterSource.x < rightCenterDest.x + 50) {
+       // source is center vertically
+      if (topCenterSource.y < bottomCenterDest.y && bottomCenterSource.y > topCenterDest.y) {
+        endPos = centerDest 
+        startPos = centerSource
+        lineType = 'center'
+      } 
+      // source is below destination
+      else if(bottomCenterSource.y > topCenterDest.y) {
+        endPos = bottomCenterDest
+        startPos = topCenterSource
+        lineType = 'up'
+      } 
+      // source is above destination
+      else {
+        endPos = topCenterDest
+        startPos = bottomCenterSource
+        lineType = 'down'
+      }
+    } 
+    // source is left of destination
+    else if(leftCenterSource.x < rightCenterDest.x) {
+      endPos = leftCenterDest
+      startPos = rightCenterSource
+      lineType = 'right'
+    }  
+    // source is right of destination
+    else {
+      endPos = rightCenterDest
+      startPos = leftCenterSource
+      lineType = 'left'
+    }
+    return {startPos, endPos, lineType}
+  }
 
   updateConnectionNodesText(svg, direction) {
     let text = svg.querySelectorAll('text')[0]
@@ -985,7 +1171,7 @@ createCurvature(start_pos_x, start_pos_y, end_pos_x, end_pos_y, type, use_arrow)
 
     const pathLength = path.getTotalLength();
 
-    let hideText = false;
+    let hideText = this.hide_edge_text;
 
     let rightLineOffset = 45
     let leftLineOffset = 60
@@ -1322,9 +1508,19 @@ createCurvature(start_pos_x, start_pos_y, end_pos_x, end_pos_y, type, use_arrow)
         });
       }
     }
-    node.appendChild(inputs);
+    if(dataNode.inputs === 0){
+      //skip
+    }
+    else {
+      node.appendChild(inputs);
+    }
     node.appendChild(content);
-    node.appendChild(outputs);
+    if(dataNode.outputs === 0){
+      //skip
+    }
+    else{ 
+      node.appendChild(outputs);
+    }
     node.style.top = dataNode.pos_y + "px";
     node.style.left = dataNode.pos_x + "px";
     parent.appendChild(node);
@@ -1709,7 +1905,6 @@ createCurvature(start_pos_x, start_pos_y, end_pos_x, end_pos_y, type, use_arrow)
     for (let node of Object.values(this.drawflow.drawflow.Home.data)) {
       let nodeCopy = JSON.parse(JSON.stringify(node))
       nodeCopy.graphType = node.name;
-      nodeCopy.roger_federation = nodeCopy.federation
       cells.push(nodeCopy);
 
       for (let conn of nodeCopy.connections) {
@@ -1717,7 +1912,6 @@ createCurvature(start_pos_x, start_pos_y, end_pos_x, end_pos_y, type, use_arrow)
         connCopy.graphType = 'EdgeCell';
         connCopy.source = {id: conn.source}
         connCopy.target = {id: conn.destination}
-        connCopy.roger_federation = connCopy.federation;
         cells.push(connCopy);
       }
     }

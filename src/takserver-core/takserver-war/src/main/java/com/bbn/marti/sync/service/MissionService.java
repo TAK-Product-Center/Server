@@ -102,7 +102,7 @@ public interface MissionService {
 
     void missionUninvite(UUID missionGuid, String invitee, MissionInvitation.Type type, String creatorUid, String groupVector);
 
-    CompletableFuture<Set<MissionInvitation>> getAllMissionInvitationsForClient(String clientUid, String groupVector, String username);
+    Set<MissionInvitation> getAllMissionInvitationsForClient(String clientUid, String groupVector, String username);
 
     List<MissionInvitation> getMissionInvitations(String missionName);
     
@@ -110,11 +110,11 @@ public interface MissionService {
 
     List<Mission> getInviteOnlyMissions(String userName, String tool, NavigableSet<Group> groups);
 
-    CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, String clientUid, String groupVector);
+    MissionSubscription missionSubscribe(UUID missionGuid, String clientUid, String groupVector);
 
-    CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, String clientUid, MissionRole missionRole, String groupVector);
+    MissionSubscription missionSubscribe(UUID missionGuid, String clientUid, MissionRole missionRole, String groupVector);
 
-    CompletableFuture<MissionSubscription> missionSubscribe(UUID missionGuid, Long missionId, String clientUid, String username, MissionRole role, String groupVector);
+    MissionSubscription missionSubscribe(UUID missionGuid, Long missionId, String clientUid, String username, MissionRole role, String groupVector);
 
     void missionUnsubscribe(UUID missionGuid, String uid, String username, String groupVector, boolean disconnectOnly);
 
@@ -351,4 +351,5 @@ public interface MissionService {
 
     void checkAndSendPendingNotifications(UUID missionGuid, String hash, int count);
 
+    CotElement fixupMissionChat(CotElement cotElement, String host);
 }

@@ -1,19 +1,20 @@
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
-import { provideRouter, withHashLocation } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
+import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { routes } from './app.routes';
 import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
-import { ToastrModule, provideToastr } from 'ngx-toastr';
+import { provideToastr } from 'ngx-toastr';
 import { provideAnimations } from '@angular/platform-browser/animations';
-import { HashLocationStrategy, LocationStrategy } from '@angular/common';
+import { AuthInterceptor } from './auth-interceptors';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideZoneChangeDetection({ eventCoalescing: true }), 
-    provideHttpClient(),
+    { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },
+    provideZoneChangeDetection({ eventCoalescing: true }),    
+    provideHttpClient(withInterceptorsFromDi()),
     provideToastr(),
     provideAnimations(),
-    provideRouter(routes, withHashLocation()), 
-    { provide: LocationStrategy, useClass: HashLocationStrategy },
-    provideClientHydration(withEventReplay())]
+    provideRouter(routes),
+    provideClientHydration(withEventReplay())
+  ]
 };

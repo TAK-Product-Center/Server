@@ -163,7 +163,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                     throw new TakException("empty username extracted from token");
                 }
 
-                logger.debug("username extracted from OAuth token", username);
+                logger.debug("username extracted from OAuth token {}", username);
 
                 // make a new user object with the identifier from the file
                 user = new AuthenticatedUser(username, auser.getConnectionId(), auser.getAddress(), auser.getCert(), username, "", "", auser.getConnectionType()); // no password or uid
@@ -276,11 +276,24 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
 
                                 boolean readOnly = false;
                                 if (!groupInfo.isEmpty()) {
-                                    if (useGroupCache) {
 
-                                        // extract the set of group names from the ldap search results
-                                        Set<String> setGroupNames = LdapAuthenticator.getInstance().
-                                                getGroupNamesFromSearchResults(groupInfo);
+                                    // extract the set of group names from the ldap search results
+                                    Set<String> setGroupNames = LdapAuthenticator.getInstance().
+                                            getGroupNamesFromSearchResults(groupInfo);
+
+                                    if (!Strings.isNullOrEmpty(ldapConf.getAdminGroup())) {
+                                        if (setGroupNames.contains(ldapConf.getAdminGroup())) {
+                                            if (logger.isDebugEnabled()) {
+                                                logger.debug("adding ROLE_ADMIN for user " + username);
+                                            }
+                                            user.getAuthorities().add("ROLE_ADMIN");
+                                        } else if (logger.isDebugEnabled()) {
+                                            logger.debug("user is not a member of the admin group {}",
+                                                    ldapConf.getAdminGroup());
+                                        }
+                                   }
+
+                                    if (useGroupCache) {
 
                                         // get a set of Group objects for the current ldap results
                                         Set<Group> ldapGroups = new ConcurrentSkipListSet<>();
@@ -313,11 +326,10 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                             }
                         }
                     } catch (Exception e) {
-                        logger.debug("exception searching for ldap groups for user " + user, e);
+                        logger.error("exception searching for ldap groups for user", e);
                     }
                 }
             }
-
 
             if (!useGroupCache) {
                 if (oauthConf != null && oauthConf.isOauthAddAnonymous()) {
@@ -336,7 +348,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
                         doAnonAssignment(user);
                     }
                 } catch (Exception e) {
-                    logger.debug("exception assigning anonymous groups for user " + user, e);
+                    logger.error("exception assigning anonymous groups for user", e);
                 }
             }
 

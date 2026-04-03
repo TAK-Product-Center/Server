@@ -119,6 +119,7 @@ import tak.server.cot.CotEventContainer;
 import tak.server.federation.FederateSubscription;
 import tak.server.federation.FigFederateSubscription;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.ignite.cache.IgniteCacheHolder;
 import tak.server.messaging.MessageConverter;
 
@@ -232,12 +233,31 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
         // load static subscriptions
         loadStaticSubscriptions();
 
-        schedulePeriodicReportTimeoutCheck();
+		// In cluster, don't run this update job as it may cause issues with ignite.
+		if (CoreConfigFacade.getInstance().getCachedConfiguration().getCluster() == null
+				|| !CoreConfigFacade.getInstance().getCachedConfiguration().getCluster().isEnabled()) {
+			schedulePeriodicSubscriptionCacheUpdates();
+		}
+
+		schedulePeriodicReportTimeoutCheck();
 
 		clientCountRef.set(Metrics.gauge(Constants.METRIC_CLIENT_COUNT, clientCountRef.get()));
 
 		applyClassificationFilter = CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm() != null &&
 				CoreConfigFacade.getInstance().getRemoteConfiguration().getVbm().isEnabled();
+	}
+
+	private void schedulePeriodicSubscriptionCacheUpdates() {
+		Resources.metricsReportingPool.scheduleWithFixedDelay(() -> {
+			subscriptionStore()
+					.getAllSubscriptions()
+					.stream()
+					.filter(sub -> sub.hasUpdate.getAndSet(false))
+					.forEach(sub -> {
+						RemoteSubscription rs = new RemoteSubscription(sub);
+						IgniteCacheHolder.cacheRemoteSubscription(rs);
+					});
+		}, 5, 5, TimeUnit.SECONDS);
 	}
 
 	private void schedulePeriodicReportTimeoutCheck() {
@@ -298,7 +318,6 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 				return true;
 			}
 		};
-
 		IgniteHolder.getInstance().getIgnite().events().localListen(ignitePredicate, EventType.EVT_NODE_LEFT, EventType.EVT_NODE_FAILED);
 	}
 	
@@ -1293,6 +1312,13 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 			logger.info("No subscription found for removal: " + uid);
 		}
 		return result;
+	}
+	
+	@Override
+	public void deleteAllSubscriptions() {
+		Resources.tcpProcessor.execute(() -> {
+			subscriptionStore().getAllSubscriptions().forEach(sub -> doDeleteSubscription(sub, sub.uid));
+		});
 	}
 
 	@Override

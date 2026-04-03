@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.codec.binary.Base64;
-import org.dom4j.Attribute;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.DocumentHelper;
@@ -27,6 +26,7 @@ import com.atakmap.Tak.GeoEvent;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.util.DateUtil;
 import com.bbn.marti.service.DistributedSubscriptionManager;
+import com.bbn.marti.util.CommonUtil;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 
@@ -263,7 +263,7 @@ public class ProtoBufHelper {
 		}
 
 		if (!Strings.isNullOrEmpty(geo.getReleaseableTo())) {
-			rootE.addAttribute("releaseableTo", geo.getReleaseableTo());
+			rootE.addAttribute("releasableTo", geo.getReleaseableTo());
 		}
 
 		rootE.addElement("point")
@@ -343,7 +343,8 @@ public class ProtoBufHelper {
 				Element marti = detailE.addElement("marti");
 				for(int i = 0; i < geo.getMissionNamesCount(); ++i) {
 					marti.addElement("dest").addAttribute("mission", geo.getMissionNames(i));
-					fixupMissionChat(rval, geo.getMissionNames(i));
+					CommonUtil.fixupMissionChat(rval, geo.getMissionNames(i),
+							CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getTakServerHost());					;
 				}
 			}
 		}
@@ -359,37 +360,7 @@ public class ProtoBufHelper {
 		return rval;
 	}
 
-	private void fixupMissionChatAttr(Attribute attribute, String missionName, String takServerHost) {
-		if (attribute == null || missionName == null || takServerHost == null) {
-			logger.error("fixupMissionChatAttr unable to fixup federated mission chat");
-			return;
-		}
-
-		String newValue = takServerHost + "-8443-ssl-" + missionName;
-		attribute.setValue(newValue);
-	}
-
-	private void fixupMissionChat(CotEventContainer cot, String missionName) {
-		try {
-			// fixup mission chat messages received over federation to reference local takServerHost
-			Element chatElement = (Element) cot.getDocument().selectSingleNode("/event/detail/__chat");
-			if (chatElement != null) {
-				String takServerHost = CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().
-						getTakServerHost();
-				fixupMissionChatAttr(chatElement.attribute("id"), missionName, takServerHost);
-				Element chatGrp = chatElement.element("chatgrp");
-				if (chatGrp != null) {
-					fixupMissionChatAttr(chatGrp.attribute("uid1"), missionName, takServerHost);
-					fixupMissionChatAttr(chatGrp.attribute("id"), missionName, takServerHost);
-				}
-			}
-		} catch (Exception e) {
-			logger.error("exception fixing up federated mission chat", e);
-		}
-	}
-
 	public CotEventContainer protoBuf2delContact(ContactListEntry contact) {
 		return DistributedSubscriptionManager.getInstance().makeDeleteMessage(contact.getUid(), contact.getCallsign());
 	}
-
 }

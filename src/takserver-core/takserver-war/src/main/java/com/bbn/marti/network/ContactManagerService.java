@@ -133,7 +133,7 @@ public class ContactManagerService {
 
 		if (recent) {
 			// only show the most recent uid for a given callsign
-			query = "select ce.callsign, ce.uid, ce.username, cee.created_ts, cet.event_name, cee.groups " +
+			query = "select ce.callsign, ce.uid, ce.username, ce.team, ce.role, cee.created_ts, cet.event_name, cee.groups " +
 					"from " +
 					"	(select ce2.callsign, max(cee2.id) client_endpoint_event_id " +
 					"		from client_endpoint ce2 join client_endpoint_event cee2 on ce2.id = cee2.client_endpoint_id" + (secAgo > 0 ? " where cee2.created_ts >= (current_timestamp - (? || ' seconds')::interval) " : "") +
@@ -142,11 +142,12 @@ public class ContactManagerService {
 					" join client_endpoint ce on cee.client_endpoint_id = ce.id " +
 					" join connection_event_type cet on cee.connection_event_type_id = cet.id ";
 		} else {
-			query = "select ce.callsign, ce.uid, ce.username, cee.created_ts, cet.event_name, cee.groups " +
+			query = "select ce.callsign, ce.uid, ce.username, ce.team, ce.role, cee.created_ts, cet.event_name, cee.groups " +
 					"from " +
-					"	(select ce2.callsign, ce2.uid, ce2.username, max(cee2.created_ts) last_event_time " +
+					"	(select ce2.callsign, ce2.uid, ce2.username, ce2.team, ce2.role, max(cee2.created_ts) last_event_time " +
 					"	from client_endpoint ce2 join client_endpoint_event cee2 on ce2.id = cee2.client_endpoint_id" + (secAgo > 0 ? " where cee2.created_ts >= (current_timestamp - (? || ' seconds')::interval) " : "") +
-					"	group by ce2.callsign, ce2.uid, ce2.username ) t1 join client_endpoint ce on t1.callsign = ce.callsign and t1.uid = ce.uid and t1.username = ce.username " +
+					"	group by ce2.callsign, ce2.uid, ce2.username, ce2.team, ce2.role ) t1 join client_endpoint ce on t1.callsign = ce.callsign and t1.uid = ce.uid and t1.username = ce.username "  +
+					" and (t1.team = ce.team or (t1.team is null and ce.team is null)) and (t1.role = ce.role or (t1.role is null and ce.role is null))  " +
 					"join client_endpoint_event cee on ce.id = cee.client_endpoint_id and cee.created_ts = t1.last_event_time " +
 					"join connection_event_type cet on cee.connection_event_type_id = cet.id ";
 		}
@@ -156,7 +157,7 @@ public class ContactManagerService {
 		}
 
 		//Sorting is managed by the database and applies to all filter combinations
-		query += " order by callsign, uid, username ";
+		query += " order by callsign, uid, username, team, role ";
 
 		if (logger.isDebugEnabled()) {
 			logger.debug("executing client endpoints query");
@@ -196,11 +197,15 @@ public class ContactManagerService {
 					validator.isValidInput("Client Endpoint callsign", callsign, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 					String username = resultSet.getString("username");
 					validator.isValidInput("Client Endpoint username", username, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+					String team = resultSet.getString("team");
+					validator.isValidInput("Client Endpoint team", team, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
+					String role = resultSet.getString("role");
+					validator.isValidInput("Client Endpoint role", role, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, true);
 					java.sql.Timestamp ts = resultSet.getTimestamp("created_ts");
 					String lastEventName = resultSet.getString("event_name");
 					validator.isValidInput("Client Endpoint event name", lastEventName, MartiValidatorConstants.Regex.MartiSafeString.name(), MartiValidatorConstants.DEFAULT_STRING_CHARS, false);
 					String groups = resultSet.getString("groups");
-					list.add(new ClientEndpoint(callsign, uid, username, new Date(ts.getTime()), lastEventName, groups));
+					list.add(new ClientEndpoint(callsign, uid, username, team, role, new Date(ts.getTime()), lastEventName, groups));
 				} catch (Throwable t) {
 					logger.debug("Exception processing row in ClientEndpointResultSetExtractor: ", t);
 				}

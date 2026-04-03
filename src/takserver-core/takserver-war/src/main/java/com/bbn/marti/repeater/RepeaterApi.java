@@ -20,6 +20,8 @@ import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.network.BaseRestController;
 import com.bbn.marti.remote.Repeatable;
 import com.bbn.marti.remote.RepeaterManager;
+import tak.server.Constants;
+import tak.server.ignite.MessagingIgniteBroker;
 
 @RestController
 @RequestMapping("/Marti/api/repeater")
@@ -41,8 +43,9 @@ public class RepeaterApi extends BaseRestController {
 		List<Repeatable> repeatables = new ArrayList<Repeatable>();
 		
 		HttpStatus responseCode = HttpStatus.OK;
-		try {			
-			repeatables = new ArrayList<Repeatable>(repeaterManager.getRepeatableMessages());
+		try {
+			repeatables = new ArrayList<>(MessagingIgniteBroker.brokerServiceCalls(service -> ((com.bbn.marti.remote.RepeaterManager) repeaterManager)
+					.getRepeatableMessages(), Constants.DISTRIBUTED_REPEATER_MANAGER, RepeaterManager.class));
 		} catch (Exception e) {
 			logger.error("Exception occurred trying to retrieve list of active repeating elements", e);
 			responseCode = HttpStatus.INTERNAL_SERVER_ERROR;
@@ -84,7 +87,7 @@ public class RepeaterApi extends BaseRestController {
 		HttpStatus responseCode = HttpStatus.OK;
 		boolean messageRemoved = false;
 		try {
-			messageRemoved = repeaterManager.removeMessage(uid, true);
+			messageRemoved = repeaterManager.removeRepeatedMessage(uid, true);
 		} catch (Exception e) {
 			messageRemoved = false;
 			logger.error("Exception occurred trying to remove a repeating message", e);

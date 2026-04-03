@@ -368,9 +368,15 @@ public class LocalConfiguration {
 			tls.setTruststoreFile(DEFAULT_TRUSTSTORE);
 			tls.setTruststorePass(existingTls.getTruststorePass());
 			tls.setKeymanager(existingTls.getKeymanager());
-			fedServer.setTls(tls);
-			FederationTokenAuthentication federationTokenAuthentication = new FederationTokenAuthentication();
-			fedServer.setFederationTokenAuthentication(federationTokenAuthentication);
+			
+			FederationTokenAuthentication federationTokenAuthentication = new FederationTokenAuthentication();	
+			federationTokenAuthentication.setEnabled(false);
+			federationTokenAuthentication.setTls(true);	
+			federationTokenAuthentication.setPort(9002);
+			
+			fedServer.getFederationTokenAuthentication().add(federationTokenAuthentication);
+			
+			fedServer.setTls(tls);			
 			Federation federation = new Federation();
 			federation.setFederationServer(fedServer);
 			configuration.setFederation(federation);
@@ -386,10 +392,15 @@ public class LocalConfiguration {
 				configuration.getFederation().setFileFilter(fileFilter);
 				changed = true;
 			}
+			
 			if (configuration.getFederation().getFederationServer() != null) {
-				if (configuration.getFederation().getFederationServer().getFederationTokenAuthentication() == null) {
+				if (configuration.getFederation().getFederationServer().getFederationTokenAuthentication() == null
+						|| configuration.getFederation().getFederationServer().getFederationTokenAuthentication().isEmpty()) {
 					FederationTokenAuthentication federationTokenAuthentication = new FederationTokenAuthentication();
-					configuration.getFederation().getFederationServer().setFederationTokenAuthentication(federationTokenAuthentication);
+					federationTokenAuthentication.setEnabled(false);
+					federationTokenAuthentication.setTls(true);	
+					federationTokenAuthentication.setPort(9002);
+					configuration.getFederation().getFederationServer().getFederationTokenAuthentication().add(federationTokenAuthentication);
 					changed = true;
 				}
 			}

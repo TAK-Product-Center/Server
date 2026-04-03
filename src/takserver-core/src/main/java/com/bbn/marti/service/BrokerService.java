@@ -68,13 +68,14 @@ public class BrokerService extends BaseService {
 				executorService.execute(() -> {
 
 					try {
-						streamendpointFilter.filter(c);
+						for (CotEventContainer cot : streamendpointFilter.filter(c)) {
 
-						Collection<Subscription> hits = subMgr.getMatches(c);
-						
-						c.setContextValue(Constants.SUBSCRIBER_HITS_KEY, subscriptionStore.subscriptionCollectionToConnectionIdSet(hits));
+							Collection<Subscription> hits = subMgr.getMatches(cot);
 
-						inputQueue.add(c);
+							cot.setContextValue(Constants.SUBSCRIBER_HITS_KEY, subscriptionStore.subscriptionCollectionToConnectionIdSet(hits));
+
+							inputQueue.add(cot);
+						}
 
 					} catch (Exception e) {
 						logger.error("exception filtering message and adding to queue", e);

@@ -40,9 +40,10 @@ dependencies {
 
 shadowJar {
     mainClassName = 'com.bbn.tak.schema.SchemaManager'
-    baseName = 'schemamanager'
-    classifier = 'uber'
-    version = version
+    
+    archiveBaseName.set("schemamanager")
+    archiveClassifier.set("uber")
+    archiveVersion.set(version)
 }
 
 jar {

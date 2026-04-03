@@ -228,6 +228,7 @@
               <!--  client dashboard -->
               <sec:intercept-url pattern="/Marti/clients/**" method="GET" access="ROLE_NON_ADMIN_UI" />
               <sec:intercept-url pattern="/Marti/api/subscriptions/all/**" method="GET" access="ROLE_ANONYMOUS" />
+			  <sec:intercept-url pattern="/Marti/api/subscription/**" method="GET" access="ROLE_ANONYMOUS" />
               
               <sec:intercept-url pattern="/Marti/vcu/**" method="POST" access="ROLE_ANONYMOUS" />
               <sec:intercept-url pattern="/Marti/vcm/**" method="GET" access="ROLE_ANONYMOUS" />
@@ -376,6 +377,7 @@
 
 	<bean id="LocateAuthorizationProvider" class="com.bbn.locate.LocateAuthorizationProvider"/>
 	<bean id="UserManagementAuthorizationProvider" class="com.bbn.user.registration.UserManagementAuthorizationProvider"/>
+    <bean id="WebContentAuthorizationProvider" class="com.bbn.marti.security.filters.WebContentAuthorizationProvider"/>
 
 	<bean id="NullRequestCacheAwareFilter" class="org.springframework.security.web.savedrequest.NullRequestCache"/>
 
@@ -386,6 +388,13 @@
 		<property name="filter" ref="SwaggerAuthorizationFilter"/>
 		<property name="urlPatterns" value="/swagger-resources/**, /swagger-ui/index.html, /swagger-ui.html, /v3/api-docs"/>
 	</bean>
+
+    <bean id="webContentFilter" class="com.bbn.marti.security.filters.WebContentFilter"/>
+    <bean id="webContentFilterBean" class="org.springframework.boot.web.servlet.FilterRegistrationBean">
+        <property name="filter" ref="webContentFilter"/>
+		<property name="urlPatterns" value="#{@WebContentAuthorizationProvider.contentFilters}"/>
+		<property name="enabled" value="#{@WebContentAuthorizationProvider.contentFilters.length() > 0}"/>
+    </bean>
 
 	<bean id="martiPreAuthenticationFilter" class="com.bbn.marti.util.spring.TakPreAuthenticatedProcessingFilter">
 		<property name="authenticationManager" ref="martiAuthenticationManager" />

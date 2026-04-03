@@ -12,7 +12,6 @@ apply plugin: 'org.openapi.generator'
 compileJava {
     options.compilerArgs += ["-XDignore.symbol.file", "-Xdoclint:none", "-Xlint:none", "-nowarn"]
     options.fork = true
-    options.forkOptions.executable = 'javac'
 }
 
 javadoc {
@@ -20,11 +19,6 @@ javadoc {
 }
 
 dependencies {
-
-  // override beanutils version in esapi
-  implementation group: 'commons-beanutils', name: 'commons-beanutils', version: beanutils_version
-
-  implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: httpcomponents_version
 
   implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: httpcomponents_version
   implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5-fluent', version: httpcomponents_version
@@ -47,7 +41,7 @@ dependencies {
 //  api group: 'io.awspring.cloud', name: 'spring-cloud-starter-aws', version: spring_cloud_starter_version // TODO replace with current
   implementation group: 'io.awspring.cloud', name: 'spring-cloud-aws-dependencies', version: spring_cloud_aws_version
 
-  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch', version: micrometer_version
+  implementation group: 'io.micrometer', name: 'micrometer-registry-cloudwatch2', version: micrometer_version
   implementation group: 'io.micrometer', name: 'micrometer-core', version: micrometer_version
 
   implementation group: 'commons-codec', name: 'commons-codec', version: commons_codec_version
@@ -62,6 +56,8 @@ dependencies {
   implementation group: 'commons-validator', name: 'commons-validator', version: commons_validator_version
   implementation group: 'org.apache.commons', name: 'commons-pool2', version: commons_pool_version
   api group: 'org.owasp.esapi', name: 'esapi', version: esapi_version
+  
+  
   //implementation group: 'org.hibernate', name: 'hibernate-core', version: hibernate_version
   //implementation group: 'org.hibernate', name: 'hibernate-entitymanager', version: hibernate_version
   //implementation group: 'org.hibernate', name: 'hibernate-spatial', version: hibernate_version

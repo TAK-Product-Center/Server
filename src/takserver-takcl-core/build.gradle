@@ -63,13 +63,25 @@ compileJava.dependsOn(':takserver-core:copyVerFile')
 //}
 
 shadowJar {
-    classifier 'exe'
-    baseName 'takcl'
+    archiveBaseName.set("takcl")
+    archiveClassifier.set("exe")
+    
     zip64 true
     manifest {
         attributes 'Main-Class': 'com.bbn.marti.takcl.TAKCL'
     }
     from sourceSets.exe.output, sourceSets.exe.compileClasspath
+}
+
+configurations {
+    exeImplementation {
+        extendsFrom configurations.implementation
+        extendsFrom configurations.compileOnly
+    }
+    cursedtakImplementation {
+        extendsFrom configurations.implementation
+        extendsFrom configurations.compileOnly
+    }
 }
 
 dependencies {
@@ -111,15 +123,24 @@ dependencies {
     }
 
     exeImplementation sourceSets.main.output
-    exeImplementation sourceSets.main.compileClasspath
     exeImplementation 'org.apache.ant:ant-junit:1.10.8'
     exeImplementation 'args4j:args4j:2.33'
     exeImplementation 'org.kohsuke:asm3:3.3.0'
 
     cursedtakImplementation sourceSets.main.output
-    cursedtakImplementation sourceSets.main.compileClasspath
     cursedtakImplementation 'info.picocli:picocli:3.8.2'
     cursedtakImplementation 'com.googlecode.lanterna:lanterna:3.0.1'
+}
+
+sourceSets {
+    exe {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+    cursedtak {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
 }
 
 openApiGenerate {

@@ -130,6 +130,10 @@ public abstract class AbstractKmlIconStrategy {
        String name;
        @Attribute(required=false)
        String role;
+       @Attribute(required=false)
+       String exrole;
+       @Attribute(required=false)
+       String abbr;
     }
 
     /*

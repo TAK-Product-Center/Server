@@ -1,9 +1,5 @@
 package tak.server.ignite.cache;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
 import com.bbn.marti.config.Cluster;
 import com.bbn.marti.remote.RemoteSubscription;
 import com.bbn.marti.remote.config.CoreConfigFacade;
@@ -15,22 +11,16 @@ import org.apache.ignite.cache.query.SqlFieldsQuery;
 import org.apache.ignite.configuration.CacheConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import tak.server.Constants;
 import tak.server.ignite.IgniteHolder;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.*;
 
 public final class IgniteCacheHolder {
-
-	private static IgniteCache<String, RemoteSubscription>  igniteSubscriptionUidTrackerCache = null;
-	private static IgniteCache<String, RemoteSubscription>  igniteSubscriptionClientUidTrackerCache = null;
-
-	private static IgniteCache<String, String>  igniteLatestSAConnectionUidCache = null;
-
-	private static IgniteCache<String, String>  iginteUserOutboundGroupCache = null;
-	private static IgniteCache<String, String>  iginteUserInboundGroupCache = null;
 
 	public static final int GROUPS_BIT_VECTOR_LEN = 32768;
 
@@ -125,13 +115,10 @@ public final class IgniteCacheHolder {
 	}
 
 	private static IgniteCache<String, RemoteSubscription> getIgniteSubscriptionUidTrackerCache() {
-		if (igniteSubscriptionUidTrackerCache == null) {
-			initGroupCaches();
-			CacheConfiguration<String, RemoteSubscription> cacheCfg = new CacheConfiguration<>(Constants.IGNITE_SUBSCRIPTION_UID_TRACKER_CACHE);
-			cacheCfg.setIndexedTypes(String.class, RemoteSubscription.class);
-			igniteSubscriptionUidTrackerCache = IgniteHolder.getInstance().getIgnite().getOrCreateCache(cacheCfg);
-		}
-		return igniteSubscriptionUidTrackerCache;
+		initGroupCaches();
+		CacheConfiguration<String, RemoteSubscription> cacheCfg = new CacheConfiguration<>(Constants.IGNITE_SUBSCRIPTION_UID_TRACKER_CACHE);
+		cacheCfg.setIndexedTypes(String.class, RemoteSubscription.class);
+		return IgniteHolder.getInstance().getIgnite().getOrCreateCache(cacheCfg);
 	}
 
 	public static FieldsQueryCursor<List<?>> queryIgniteSubscriptionUidTrackerCache(SqlFieldsQuery qry) {
@@ -139,13 +126,10 @@ public final class IgniteCacheHolder {
 	}
 
 	private static IgniteCache<String, RemoteSubscription> getIgniteSubscriptionClientUidTrackerCache() {
-		if (igniteSubscriptionClientUidTrackerCache == null) {
-			initGroupCaches();
-			CacheConfiguration<String, RemoteSubscription> cacheCfg = new CacheConfiguration<>(Constants.IGNITE_SUBSCRIPTION_CLIENTUID_TRACKER_CACHE);
-			cacheCfg.setIndexedTypes(String.class, RemoteSubscription.class);
-			igniteSubscriptionClientUidTrackerCache = IgniteHolder.getInstance().getIgnite().getOrCreateCache(cacheCfg);
-		}
-		return igniteSubscriptionClientUidTrackerCache;
+		initGroupCaches();
+		CacheConfiguration<String, RemoteSubscription> cacheCfg = new CacheConfiguration<>(Constants.IGNITE_SUBSCRIPTION_CLIENTUID_TRACKER_CACHE);
+		cacheCfg.setIndexedTypes(String.class, RemoteSubscription.class);
+		return IgniteHolder.getInstance().getIgnite().getOrCreateCache(cacheCfg);
 	}
 
 	public static RemoteSubscription getSubscriptionFromIgniteSubscriptionClientUidTrackerCache(String uid) {
@@ -157,51 +141,46 @@ public final class IgniteCacheHolder {
 	}
 
 	public static IgniteCache<String, String> getIgniteLatestSAConnectionUidCache() {
-		if (igniteLatestSAConnectionUidCache == null) {
-			initGroupCaches();
-			CacheConfiguration<String, String> cacheCfg = new CacheConfiguration<>(Constants.INGITE_LATEST_SA_CONNECTION_UID_CACHE);
-			cacheCfg.setIndexedTypes(String.class, String.class);
-			cacheCfg.setSqlFunctionClasses(IgniteCacheSqlHelperFunctions.class);
-			igniteLatestSAConnectionUidCache = IgniteHolder.getInstance().getIgnite().getOrCreateCache(cacheCfg);
-		}
+		initGroupCaches();
 
-		return igniteLatestSAConnectionUidCache;
+		// for some reason caches with setSqlFunctionClasses cannot be fetched using getOrCreateCache because if it already exists
+		// ignite thinks you are trying to make a dynamic cache configuration change. to avoid this add an extra check
+		IgniteCache<String, String> cache = IgniteHolder.getInstance().getIgnite().cache(Constants.INGITE_LATEST_SA_CONNECTION_UID_CACHE);
+		if (cache != null) return cache;
+
+		CacheConfiguration<String, String> cacheCfg = new CacheConfiguration<>(Constants.INGITE_LATEST_SA_CONNECTION_UID_CACHE);
+		cacheCfg.setIndexedTypes(String.class, String.class);
+		cacheCfg.setSqlFunctionClasses(IgniteCacheSqlHelperFunctions.class);
+
+		return IgniteHolder.getInstance().getIgnite().getOrCreateCache(cacheCfg);
 	}
 
 	public static IgniteCache<String, String> getIgniteUserOutboundGroupCache() {
-		if (iginteUserOutboundGroupCache == null) {
-			CacheConfiguration<String, String> cacheCfg = new CacheConfiguration<>(Constants.IGNITE_USER_OUTBOUND_GROUP_CACHE);
-			cacheCfg.setIndexedTypes(String.class, String.class);
-			iginteUserOutboundGroupCache = IgniteHolder.getInstance().getIgnite().getOrCreateCache(cacheCfg);
-		}
-
-		return iginteUserOutboundGroupCache;
+		CacheConfiguration<String, String> cacheCfg = new CacheConfiguration<>(Constants.IGNITE_USER_OUTBOUND_GROUP_CACHE);
+		cacheCfg.setIndexedTypes(String.class, String.class);
+		return IgniteHolder.getInstance().getIgnite().getOrCreateCache(cacheCfg);
 	}
 
 	public static IgniteCache<String, String> getIgniteUserInboundGroupCache() {
-		if (iginteUserInboundGroupCache == null) {
-			CacheConfiguration<String, String> cacheCfg = new CacheConfiguration<>(Constants.IGNITE_USER_INBOUND_GROUP_CACHE);
-			cacheCfg.setIndexedTypes(String.class, String.class);
-			iginteUserInboundGroupCache = IgniteHolder.getInstance().getIgnite().getOrCreateCache(cacheCfg);
-		}
-
-		return iginteUserInboundGroupCache;
+		CacheConfiguration<String, String> cacheCfg = new CacheConfiguration<>(Constants.IGNITE_USER_INBOUND_GROUP_CACHE);
+		cacheCfg.setIndexedTypes(String.class, String.class);
+		return IgniteHolder.getInstance().getIgnite().getOrCreateCache(cacheCfg);
 	}
-	
-	public static Collection<String> getAllLatestSAsForGroupVector(String groupVector) {	
+
+	public static Collection<String> getAllLatestSAsForGroupVector(String groupVector) {
 		Collection<String> sas = new ArrayList<>();
 
 		String latestSAQuery = "SELECT LSA._VAL " +
-	             "FROM \"" + Constants.INGITE_LATEST_SA_CONNECTION_UID_CACHE +"\".String LSA, \"" +
-	             Constants.IGNITE_USER_OUTBOUND_GROUP_CACHE + "\".String OG " +
-	             "WHERE LSA._KEY = OG._KEY " +
-	             "  AND groupsOverlap(?,OG._VAL);";
-		
+			"FROM \"" + Constants.INGITE_LATEST_SA_CONNECTION_UID_CACHE + "\".String LSA, \"" +
+			Constants.IGNITE_USER_OUTBOUND_GROUP_CACHE + "\".String OG " +
+			"WHERE LSA._KEY = OG._KEY " +
+			"  AND groupsOverlap(?,OG._VAL);";
+
 		logger.debug("cluster latest SA query: {}", latestSAQuery);
 
 		SqlFieldsQuery qry = new SqlFieldsQuery(latestSAQuery);
 		qry.setArgs(groupVector);
-		
+
 		SqlFieldsQuery saQry = qry;
 		try (QueryCursor<List<?>> cursor = getIgniteLatestSAConnectionUidCache().query(saQry)) {
 			for (List<?> row : cursor) {

@@ -24,20 +24,30 @@ import tak.server.federation.FederationException;
 import tak.server.federation.FederationFilter;
 import tak.server.federation.FederationNode;
 import tak.server.federation.FederationPolicyGraph;
+import tak.server.federation.hub.ui.graph.FederationUIPolicyModel;
 
 /**
  * Created on 4/4/2017.
  */
 public class FederationPolicyGraphImpl implements FederationPolicyGraph, Serializable {
 	private static final long serialVersionUID = -7327365173619071592L;
-	private String name;
-	private String version;
+	
+	private FederationUIPolicyModel model;
+	
     private ConcurrentHashMap<FederateIdentity, FederationNode> nodeMap;
 //    private ConcurrentHashMap<FederateIdentity, FederateGroup> groupMap;
     private Set<FederateEdge> edgeSet;
-    private Map<String, Object> additionalData;
 
     private static final Logger logger = LoggerFactory.getLogger(FederationPolicyGraphImpl.class);
+    
+    public FederationPolicyGraphImpl(FederationUIPolicyModel model) {
+        logger.trace("Creating federation graph object: " + model.getName());
+
+    	this.model = model;
+
+        nodeMap = new ConcurrentHashMap<>();
+        edgeSet = ConcurrentHashMap.newKeySet();
+    }
     
     public final class FederationPolicyReachabilityHolder {
     	public Set<Federate> federates = new HashSet<>();
@@ -75,15 +85,15 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
 
     @Override
     public String getName() {
-        return name;
+        return model.getName();
     }
     
     @Override
     public String getVersion() {
-        return version;
+        return model.getVersion();
     }
-
-    @Override
+    
+	@Override
     public boolean isReachable(String s, String s1) throws FederationException {
         if (Strings.isNullOrEmpty(s) || Strings.isNullOrEmpty(s1)) {
             throw new FederationException("Given source or destination uid was null or empty");
@@ -124,18 +134,6 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
             throw new FederationException("The passed sourceID " + sourceUid + " was not found in the policy graph.");
         }
         return allReceivableFederates(federationNode);
-    }
-
-    public FederationPolicyGraphImpl(String name, String version) {
-
-        logger.trace("Creating federation graph object: " + name);
-
-        this.name = name;
-        this.version = version;
-
-        nodeMap = new ConcurrentHashMap<>();
-        edgeSet = ConcurrentHashMap.newKeySet();
-        additionalData = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -445,17 +443,7 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
         return edgeSet;
     }
 
-    @Override
-    public Map<String, Object> getAdditionalData() {
-        return additionalData;
-    }
-
-    @Override
-    public void setAddtionalData(Map<String, Object> map) {
-        this.additionalData = map;
-    }
-
-    @Override
+	@Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
@@ -477,7 +465,7 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
     public String toString() {
         StringBuilder builder = new StringBuilder();
         builder.append("FederationPolicyGraphImpl [name=");
-        builder.append(name);
+        builder.append(model.getName());
         builder.append(", nodeMap=");
         builder.append(nodeMap);
         builder.append(", edgeSet=");
@@ -485,4 +473,9 @@ public class FederationPolicyGraphImpl implements FederationPolicyGraph, Seriali
         builder.append("]");
         return builder.toString();
     }
+
+	@Override
+	public FederationUIPolicyModel getModel() {
+		return model;
+	}
 }

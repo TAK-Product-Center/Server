@@ -39,10 +39,12 @@ import tak.server.federation.FederationNode;
 import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.hub.FederationHubDependencyInjectionProxy;
 import tak.server.federation.hub.broker.events.ForceDisconnectEvent;
+import tak.server.federation.hub.broker.events.UpdatePluginsPolicy;
 import tak.server.federation.hub.broker.events.UpdatePolicy;
 import tak.server.federation.hub.policy.FederationHubPolicyManager;
 import tak.server.federation.hub.ui.graph.FederationOutgoingCell;
-import tak.server.federation.hub.ui.graph.FederationPolicyModel;
+import tak.server.federation.hub.ui.graph.FederationUIPluginsPolicyModel;
+import tak.server.federation.hub.ui.graph.FederationUIPolicyModel;
 import tak.server.federation.hub.ui.graph.PolicyObjectCell;
 
 public class FederationHubBrokerImpl implements FederationHubBroker, Service {
@@ -203,8 +205,8 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
     }
 
 	@Override
-	public void updatePolicy(FederationPolicyModel federationPolicyModel) {
-		Collection<PolicyObjectCell> cells = federationPolicyModel.getCells();
+	public void updatePolicy(FederationUIPolicyModel federationPolicyModel) {
+		Collection<PolicyObjectCell> cells = federationPolicyModel.getGraphData().getNodes();
 
 		if (cells != null) {
 			List<FederationOutgoingCell> outgoings = new ArrayList<>();
@@ -244,7 +246,7 @@ public class FederationHubBrokerImpl implements FederationHubBroker, Service {
 	public List<String> getGroupsForNode(String federateId) {
 		FederationPolicyGraph policyGraph = FederationHubDependencyInjectionProxy.getInstance()
 				.fedHubPolicyManager()
-				.getPolicyGraph();
+				.getActivePolicyGraph();
 
 		FederationNode sourceNode = policyGraph.getNode(federateId);
 

@@ -954,7 +954,7 @@ public class MissionApi extends BaseRestController {
 
 		MissionRole ownerRole = missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_OWNER);
 		MissionSubscription ownerSubscription = missionService.missionSubscribe(
-				mission.getGuidAsUUID(), mission.getId(), creatorUid, username, ownerRole, groupVectorUser).get();
+				mission.getGuidAsUUID(), mission.getId(), creatorUid, username, ownerRole, groupVectorUser);
 		mission.setToken(ownerSubscription.getToken());
 		mission.setOwnerRole(ownerRole);
 
@@ -1185,7 +1185,7 @@ public class MissionApi extends BaseRestController {
 
 			MissionRole ownerRole = missionRoleRepository.findFirstByRole(MissionRole.Role.MISSION_OWNER);
 			MissionSubscription ownerSubscription = missionService.missionSubscribe(missionCopy.getGuidAsUUID(), missionCopy.getId(),
-					creatorUidParam, username, ownerRole, groupVector).get();
+					creatorUidParam, username, ownerRole, groupVector);
 
 			if (missionCopy.getId() != null) {
 				copyMissionContainers(mission, missionCopy, creatorUidParam, mission.getGroupVector());
@@ -1732,7 +1732,7 @@ public class MissionApi extends BaseRestController {
 
 
 	/*
-	 * get the content change set for a missions given a time period
+	 * get the content change set for a mission given a time period
 	 *
 	 * parameters are seconds ago or {start, end} timespan
 	 *
@@ -1768,6 +1768,44 @@ public class MissionApi extends BaseRestController {
 		}
 	}
 
+	/*
+	 * get the content change set for a mission guid given a time period
+	 *
+	 * parameters are seconds ago or {start, end} timespan
+	 *
+	 */
+	@PreAuthorize("hasPermission(#request, 'MISSION_READ')")
+	@RequestMapping(value = "/missions/guid/{missionGuid:.+}/changes", method = RequestMethod.GET)
+	ApiResponse<Set<MissionChange>> getMissionChangesByGuid(
+			@PathVariable("missionGuid") @NotNull String missionGuidParam,
+			@RequestParam(value = "secago", required = false) Long secago,
+			@RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date start,
+			@RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date end,
+			@RequestParam(value = "squashed", required = false, defaultValue = "true") boolean squashed,
+			HttpServletRequest request) {
+
+		try {
+
+			UUID missionGuid = parseGuid(missionGuidParam);
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("getting mission changes for mission " + missionGuid);
+			}
+
+			Set<MissionChange> changes = missionService.getMissionChangesByGuid(missionGuid, commonUtil.getGroupVectorBitString(request),
+					secago, start, end, squashed);
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("got mission changes: " + changes);
+			}
+
+			return new ApiResponse<Set<MissionChange>>(Constants.API_VERSION, MissionChange.class.getSimpleName(),
+					new ConcurrentSkipListSet<>(changes));
+		} catch (Exception e) {
+			logger.error("exception in getMissionChangesByGuid", e);
+			return null;
+		}
+	}
 
 	/*
 	 * mission keywords
@@ -2422,7 +2460,7 @@ public class MissionApi extends BaseRestController {
 			}
 
 			MissionSubscription missionSubscription = missionService.missionSubscribe(mission.getGuidAsUUID(), mission.getId(),
-					Strings.isNullOrEmpty(topic) ? uid : "topic:" + topic, username, role, groupVector).get();
+					Strings.isNullOrEmpty(topic) ? uid : "topic:" + topic, username, role, groupVector);
 
 			if (mission.getFeeds() != null) {
 				for (MissionFeed missionFeed : mission.getFeeds()) {
@@ -2541,7 +2579,7 @@ public class MissionApi extends BaseRestController {
 			}
 
 			MissionSubscription missionSubscription = missionService.missionSubscribe(mission.getGuidAsUUID(), mission.getId(),
-					Strings.isNullOrEmpty(topic) ? uid : "topic:" + topic, username, role, groupVector).get();
+					Strings.isNullOrEmpty(topic) ? uid : "topic:" + topic, username, role, groupVector);
 
 			if (mission.getFeeds() != null) {
 				for (MissionFeed missionFeed : mission.getFeeds()) {
@@ -2562,7 +2600,7 @@ public class MissionApi extends BaseRestController {
 				}
 			}
 			catch (Exception e) {
-				throw new TakException(e);
+				logger.error("exception uninviting user from mission", e);
 			}
 
 			// return changes and logs with API 3+
@@ -2958,14 +2996,21 @@ public class MissionApi extends BaseRestController {
 		String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
 	    return () -> {
-	        Set<MissionInvitation> missionInvitations = missionService
-	                .getAllMissionInvitationsForClient(clientUid, groupVector, username)
-	                .get();
+	        Set<MissionInvitation> missionInvitations = null;
+
+			try {
+				missionInvitations = missionService
+						.getAllMissionInvitationsForClient(clientUid, groupVector, username);
+			} catch (Exception e) {
+				logger.error("exception getting mission invitations", e);
+			}
 
 	        Set<String> missionNames = new HashSet<>();
-	        for (MissionInvitation mi : missionInvitations) {
-	            missionNames.add(mi.getMissionName());
-	        }
+			if (missionInvitations != null) {
+				for (MissionInvitation mi : missionInvitations) {
+					missionNames.add(mi.getMissionName());
+				}
+			}
 
 	        return new ApiResponse<>(Constants.API_VERSION, "MissionInvitation", missionNames);
 	    };
@@ -2977,9 +3022,20 @@ public class MissionApi extends BaseRestController {
 	public Callable<ApiResponse<Set<MissionInvitation>>> getAllMissionInvitationsWithPasswords(
 			@RequestParam(value = "clientUid", required = true) @ValidatedBy("MartiSafeString") String clientUid) {
 		String username = SecurityContextHolder.getContext().getAuthentication().getName();
-		return () -> new ApiResponse<Set<MissionInvitation>>(Constants.API_VERSION, "MissionInvitation",
-				missionService.getAllMissionInvitationsForClient(
-						clientUid, commonUtil.getGroupVectorBitString(request), username).get());
+
+		return () -> {
+			Set<MissionInvitation> missionInvitations = new HashSet<>();
+
+			try {
+				missionInvitations = missionService.getAllMissionInvitationsForClient(
+						clientUid, commonUtil.getGroupVectorBitString(request), username);
+			} catch (Exception e) {
+				logger.error("exception getting mission invitations", e);
+			}
+
+			return new ApiResponse<Set<MissionInvitation>>(
+					Constants.API_VERSION, "MissionInvitation", missionInvitations);
+		};
 	}
 
 	/*
@@ -3639,6 +3695,7 @@ public class MissionApi extends BaseRestController {
 				}
 
 				missionInvitation.setMissionName(missionName);
+				missionInvitation.setMissionId(mission.getId());
 				missionInvitation.setCreatorUid(creatorUid);
 				missionInvitation.setCreateTime(new Date());
 
@@ -3760,6 +3817,7 @@ public class MissionApi extends BaseRestController {
 				}
 
 				missionInvitation.setMissionName(mission.getName());
+				missionInvitation.setMissionId(mission.getId());
 				missionInvitation.setMissionGuid(mission.getGuidAsUUID());
 				missionInvitation.setCreatorUid(creatorUid);
 				missionInvitation.setCreateTime(new Date());
@@ -4562,7 +4620,7 @@ public class MissionApi extends BaseRestController {
 
 		try {
 			
-			UUID missionGuid = parseGuid("missionGuidParam");
+			UUID missionGuid = parseGuid(missionGuidParam);
 			
 			String groupVector = commonUtil.getGroupVectorBitString(request);
 			Mission mission = missionService.getMissionByGuid(missionGuid, groupVector);

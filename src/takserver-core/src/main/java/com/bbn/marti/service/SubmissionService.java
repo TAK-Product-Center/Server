@@ -61,6 +61,7 @@ import com.bbn.cot.filter.DropEventFilter;
 import com.bbn.cot.filter.FlowTagFilter;
 import com.bbn.cot.filter.GeospatialEventFilter;
 import com.bbn.cot.filter.ScrubInvalidValues;
+import com.bbn.cot.filter.DisableBroadcastMapItemFilter;
 import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
 import com.bbn.cot.filter.StrictUidMissionMemebershipFilter;
 import com.bbn.marti.config.Auth;
@@ -146,6 +147,7 @@ import tak.server.feeds.DataFeedDTO;
 import tak.server.feeds.DataFeed.DataFeedType;
 import tak.server.feeds.DataFeedStatsHelper;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.messaging.MessageConverter;
 
 public class SubmissionService extends BaseService implements MessagingConfigurator {
@@ -221,6 +223,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 	private StrictUidMissionMemebershipFilter strictUidMissionMemebershipFilter;
 
+	private DisableBroadcastMapItemFilter disableBroadcastMapItemFilter;
+
 	@Autowired
 	@Lazy
 	// lazy is necessary due to circular dependency.
@@ -293,20 +297,20 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         this.takCertRepository = tcr;
         this.missionCacheHelper = missionCacheHelper;
 
-		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
-        Auth.Ldap ldapConfig = config.getAuth().getLdap();
-        if (ldapConfig != null) {
-        	if (logger.isDebugEnabled()) {
-        		logger.debug("setting up LDAP authenticator");
-        	}
-
-            // "inject" group manager dependency in the singleton instance of LdapAuthenticator
-            LdapAuthenticator.getInstance(ldapConfig, gm);
-
-			config.getAuth().setX509AddAnonymous(ldapConfig.isX509AddAnonymous());
-			config.getAuth().setX509Groups(ldapConfig.isX509Groups());
-			CoreConfigFacade.getInstance().saveChanges();
-        }
+//		Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+//        Auth.Ldap ldapConfig = config.getAuth().getLdap();
+//        if (ldapConfig != null) {
+//        	if (logger.isDebugEnabled()) {
+//        		logger.debug("setting up LDAP authenticator");
+//        	}
+//
+//            // "inject" group manager dependency in the singleton instance of LdapAuthenticator
+//            LdapAuthenticator.getInstance(ldapConfig, gm);
+//
+//			config.getAuth().setX509AddAnonymous(ldapConfig.isX509AddAnonymous());
+//			config.getAuth().setX509Groups(ldapConfig.isX509Groups());
+//			CoreConfigFacade.getInstance().saveChanges();
+//        }
     }
 
     SubscriptionManager subMgr;
@@ -324,6 +328,23 @@ public class SubmissionService extends BaseService implements MessagingConfigura
     public void init() throws IOException, DocumentException {
 
         Configuration config = CoreConfigFacade.getInstance().getRemoteConfiguration();
+
+
+
+		Auth.Ldap ldapConfig = config.getAuth().getLdap();
+		if (ldapConfig != null) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("setting up LDAP authenticator");
+			}
+
+			// "inject" group manager dependency in the singleton instance of LdapAuthenticator
+			LdapAuthenticator.getInstance(ldapConfig, groupManager);
+
+			config.getAuth().setX509AddAnonymous(ldapConfig.isX509AddAnonymous());
+			config.getAuth().setX509Groups(ldapConfig.isX509Groups());
+			CoreConfigFacade.getInstance().saveChanges();
+		}
+
 
         // setup the global geospatial input filter
         if (config.getFilter().getGeospatialFilter() != null) {
@@ -345,6 +366,10 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
 		if (strictUidMissionMembership) {
 			strictUidMissionMemebershipFilter = new StrictUidMissionMemebershipFilter(subMgr, missionService);
+		}
+
+		if (config.getNetwork().isDisableBroadcastMapItems()) {
+			disableBroadcastMapItemFilter = new DisableBroadcastMapItemFilter();
 		}
 
         pluginContactEnabled = config.getPlugins().isAllowPluginContacts();
@@ -533,350 +558,393 @@ public class SubmissionService extends BaseService implements MessagingConfigura
         if (dlogger.isDebugEnabled()) {
 			dlogger.debug("listening for messages on ignite topic " + serverInfo.getSubmissionTopic());
 		}
-
-        // listen for messages on this node's submission topic
-        ignite.message().localListen(serverInfo.getSubmissionTopic(), (nodeId, message) -> {
-			if (logger.isDebugEnabled()) {
-				logger.debug("In SubmissionTopic listener within Submission Service.");
-			}
-        	if (!(message instanceof byte[])) {
-
-        		if (dlogger.isDebugEnabled()) {
-        			dlogger.debug("ignoring unsupported message type " + message.getClass().getName());
-        		}
-
-        		return true;
-        	}
-
-        	byte[] protoMessage = (byte[]) message;
-
-        	try {
+		IgniteReconnectEventHandler.registerListener(() -> {
+			// listen for messages on this node's submission topic
+			ignite.message().localListen(serverInfo.getSubmissionTopic(), (nodeId, message) -> {
 				if (logger.isDebugEnabled()) {
-					logger.debug("Converting Proto Message to CotEventContainer.");
+					logger.debug("In SubmissionTopic listener within Submission Service.");
 				}
-        		CotEventContainer cot = messageConverter.dataMessageToCot(protoMessage);
+				if (!(message instanceof byte[])) {
 
-        		if (dlogger.isTraceEnabled()) {
+					if (dlogger.isDebugEnabled()) {
+						dlogger.debug("ignoring unsupported message type " + message.getClass().getName());
+					}
 
-        			@SuppressWarnings("unchecked")
-        			NavigableSet<Group> groups = (NavigableSet<Group>) cot.getContextValue(Constants.GROUPS_KEY);
-
-        			dlogger.trace("Received CoT from ignite node " + nodeId + ": " + cot + " groups: " + groups);
-        		}
-
-        		if (dupeLogger.isTraceEnabled()) {
-        			@SuppressWarnings("unchecked")
-        			NavigableSet<Group> groups = (NavigableSet<Group>) cot.getContextValue(Constants.GROUPS_KEY);
-
-        			dupeLogger.trace("Received CoT from ignite node " + nodeId + ": " + cot + " groups: " + groups + " message context map: " + cot.getContext());
-        		}
-
-        		String connectionId = null;
-
-        		// use connectionId to get the handler
-        		try {
-
-        			connectionId = (String) cot.getContext(Constants.CONNECTION_ID_KEY);
-
-        			if (dlogger.isDebugEnabled()) {
-        				dlogger.debug("connectionId in message from ignite: " + connectionId);
-        			}
-
-        			ConnectionInfo ci = new ConnectionInfo();
-
-        			ci.setConnectionId(connectionId);
-
-        			if (dlogger.isTraceEnabled()) {
-        				dlogger.trace("connectionSubMap: " + subscriptionStore.getViewOfConnectionSubMap());
-        			}
-
-        			Subscription sub = subscriptionStore.getSubscriptionByConnectionInfo(ci);
-
-        			if (dlogger.isDebugEnabled()) {
-        				dlogger.debug("sub from connectionId " + ci + " " + sub);
-        			}
-
-        			if (sub != null) {
-        				ChannelHandler handler = sub.getHandler();
-
-        				if (dlogger.isDebugEnabled()) {
-        					dlogger.debug("handler: " + handler);
-        				}
-
-        				cot.setContext(Constants.SOURCE_TRANSPORT_KEY, handler);
-        			} else {
-        				if (dlogger.isDebugEnabled()) {
-        					dlogger.debug("null handler - can't set transport key in message received from ignite");
-        				}
-        			}
-
-        		} catch (Exception e) {
-        			if (dlogger.isDebugEnabled()) {
-        				dlogger.debug("exception getting handler for connection id", e);
-        			}
-        		}
-
-				if (logger.isDebugEnabled()) {
-					logger.debug("Adding CotEventContainer to InputQueue.");
+					return true;
 				}
-        		addToInputQueue(cot);
 
-        	} catch (RemoteException | DocumentException e) {
-        		if (logger.isDebugEnabled()) {
-        			logger.debug("exception deserializing data message", e);
-        		}
-        	}
+				byte[] protoMessage = (byte[]) message;
 
-        	// return true to continue listening
-        	return true;
-        });
+				try {
+					if (logger.isDebugEnabled()) {
+						logger.debug("Converting Proto Message to CotEventContainer.");
+					}
+					CotEventContainer cot = messageConverter.dataMessageToCot(protoMessage);
 
-        // use ignite for plugin messaging when outside the cluster
-        if (config.getPlugins().isUsePluginMessageQueue() && !config.getCluster().isEnabled()) {
+					if (dlogger.isTraceEnabled()) {
 
-        	// listen for messages from plugins
-        	ignite.message().localListen(CommonConstants.PLUGIN_PUBLISH_TOPIC, (nodeId, message) -> {
-				if (logger.isDebugEnabled()) {
-					logger.debug("In Plugin Publish Topic listener.");
-				}
-        		try {
-        			
-        			if (logger.isTraceEnabled()) {
-        				logger.trace("received message from plugin publish topic " + CommonConstants.PLUGIN_PUBLISH_TOPIC + " " + message);
-        			}
-        			if (!(message instanceof byte[])) {
+						@SuppressWarnings("unchecked")
+						NavigableSet<Group> groups = (NavigableSet<Group>) cot.getContextValue(Constants.GROUPS_KEY);
 
-        				if (dlogger.isDebugEnabled()) {
-        					dlogger.debug("ignoring unsupported message type " + message.getClass().getName());
-        				}
+						dlogger.trace("Received CoT from ignite node " + nodeId + ": " + cot + " groups: " + groups);
+					}
 
-        				// return true to continue listening
-        				return true;
-        			}
+					if (dupeLogger.isTraceEnabled()) {
+						@SuppressWarnings("unchecked")
+						NavigableSet<Group> groups = (NavigableSet<Group>) cot.getContextValue(Constants.GROUPS_KEY);
 
-        			try {
-						if (logger.isTraceEnabled()) {
-							logger.trace("Parse bytes into a Message.");
+						dupeLogger.trace("Received CoT from ignite node " + nodeId + ": " + cot + " groups: " + groups
+								+ " message context map: " + cot.getContext());
+					}
+
+					String connectionId = null;
+
+					// use connectionId to get the handler
+					try {
+
+						connectionId = (String) cot.getContext(Constants.CONNECTION_ID_KEY);
+
+						if (dlogger.isDebugEnabled()) {
+							dlogger.debug("connectionId in message from ignite: " + connectionId);
 						}
-        				Message m = Message.parseFrom((byte[]) message);
-        				if (m != null) {
-        					boolean isInterceptorMessage = false;
-           					List<String> provenance = m.getProvenanceList();
-            				if (provenance != null && provenance.contains(Constants.PLUGIN_INTERCEPTOR_PROVENANCE)) {
-            					isInterceptorMessage = true;
-            				}
 
-							if (logger.isDebugEnabled()) {
-								logger.debug("Check if Interceptor Message.");
+						ConnectionInfo ci = new ConnectionInfo();
+
+						ci.setConnectionId(connectionId);
+
+						if (dlogger.isTraceEnabled()) {
+							dlogger.trace("connectionSubMap: " + subscriptionStore.getViewOfConnectionSubMap());
+						}
+
+						Subscription sub = subscriptionStore.getSubscriptionByConnectionInfo(ci);
+
+						if (dlogger.isDebugEnabled()) {
+							dlogger.debug("sub from connectionId " + ci + " " + sub);
+						}
+
+						if (sub != null) {
+							ChannelHandler handler = sub.getHandler();
+
+							if (dlogger.isDebugEnabled()) {
+								dlogger.debug("handler: " + handler);
 							}
-        					if (isInterceptorMessage) {
-            					// do not republish the message if it is marked as intercepted, submit it directly
-        						SubmissionService.this.addToInputQueue(messageConverter.dataMessageToCot(m, false));
-            				} else {
-            					if (logger.isDebugEnabled()) {
-            						logger.debug("processing through plugin pipeline");
-            					}
 
-            					// Check if the message is a datafeed
-            					boolean isDataFeedMessage = false;
+							cot.setContext(Constants.SOURCE_TRANSPORT_KEY, handler);
+						} else {
+							if (dlogger.isDebugEnabled()) {
+								dlogger.debug("null handler - can't set transport key in message received from ignite");
+							}
+						}
+
+					} catch (Exception e) {
+						if (dlogger.isDebugEnabled()) {
+							dlogger.debug("exception getting handler for connection id", e);
+						}
+					}
+
+					if (logger.isDebugEnabled()) {
+						logger.debug("Adding CotEventContainer to InputQueue.");
+					}
+					addToInputQueue(cot);
+
+				} catch (RemoteException | DocumentException e) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("exception deserializing data message", e);
+					}
+				}
+
+				// return true to continue listening
+				return true;
+			});
+		});
+
+		// use ignite for plugin messaging when outside the cluster
+		if (config.getPlugins().isUsePluginMessageQueue() && !config.getCluster().isEnabled()) {
+			IgniteReconnectEventHandler.registerListener(() -> {
+				// listen for messages from plugins
+				ignite.message().localListen(CommonConstants.PLUGIN_PUBLISH_TOPIC, (nodeId, message) -> {
+					if (logger.isDebugEnabled()) {
+						logger.debug("In Plugin Publish Topic listener.");
+					}
+					try {
+
+						if (logger.isTraceEnabled()) {
+							logger.trace("received message from plugin publish topic "
+									+ CommonConstants.PLUGIN_PUBLISH_TOPIC + " " + message);
+						}
+						if (!(message instanceof byte[])) {
+
+							if (dlogger.isDebugEnabled()) {
+								dlogger.debug("ignoring unsupported message type " + message.getClass().getName());
+							}
+
+							// return true to continue listening
+							return true;
+						}
+
+						try {
+							if (logger.isTraceEnabled()) {
+								logger.trace("Parse bytes into a Message.");
+							}
+							Message m = Message.parseFrom((byte[]) message);
+							if (m != null) {
+								boolean isInterceptorMessage = false;
+								List<String> provenance = m.getProvenanceList();
+								if (provenance != null
+										&& provenance.contains(Constants.PLUGIN_INTERCEPTOR_PROVENANCE)) {
+									isInterceptorMessage = true;
+								}
+
 								if (logger.isDebugEnabled()) {
-									logger.debug("Check if DataFeed Message.");
+									logger.debug("Check if Interceptor Message.");
 								}
-            					if (m.getFeedUuid() != null && !m.getFeedUuid().isEmpty()) {
-            						isDataFeedMessage = true;
-            					}
-
-								if (logger.isDebugEnabled()) {
-									logger.debug("Convert Message to Plugin CotEventContainer.");
-								}
-            					CotEventContainer pluginCotEvent = messageConverter.dataMessageToCot(m, false);
-
-								if (!Strings.isNullOrEmpty(pluginCotEvent.getCallsign())
-										&& !Strings.isNullOrEmpty(pluginCotEvent.getEndpoint()) && !Strings.isNullOrEmpty(pluginCotEvent.getUid())) {
-									if (config.getFederation() != null) {
-										try {
-											NavigableSet<Group> groups = (NavigableSet<Group>) pluginCotEvent.getContextValue(Constants.GROUPS_KEY);
-											federationManager.addPluginContact(pluginCotEvent, groups);
-										} catch (Exception e) {
-											if (logger.isDebugEnabled()) {
-												logger.debug("exception adding federated plugin contact", e);
-											}
-										}
-									}
-									
-									// If Plugins are allowed to generate contacts, create a plugin subscription and add to endpoints
-									if (pluginContactEnabled) {
-										if (logger.isDebugEnabled()) {
-											logger.debug("Adding pluginCotEvent as pluginSub: {}", pluginCotEvent );
-											logger.debug("Endpoint: {}", pluginCotEvent.getEndpoint() );
-											logger.debug("UID: {}", pluginCotEvent.getUid() );
-										}
-										
-										PluginBasedSubscription pluginSub = new PluginBasedSubscription(pluginCotEvent);
-										subMgr.addRawSubscription(pluginSub);
-										repositoryService.auditCallsignUIDEventAsync(
-												pluginCotEvent.getCallsign(), pluginCotEvent.getUid(), "", ConnectionEventTypeValue.CONNECTED, RemoteUtil.getInstance().getBitStringAllGroups());
-										pluginSubMap.put(pluginSub, new Date());
-									}
-									
-								} else if (pluginCotEvent.getType().equals("t-x-d-d")) {
-									Element link = (Element)pluginCotEvent.getDocument().selectSingleNode(LINK_XPATH);
-									if (link != null && link.attribute("uid") != null) {
-										federationManager.removeLocalContact(link.attributeValue("uid"));
-									}
-								}
-
-            					if (isDataFeedMessage) {
-
-									if (logger.isDebugEnabled()) {
-										logger.debug("Check if the DataFeed is in cache.");
-									}
-            						List<tak.server.plugins.PluginDataFeed> cacheResult = pluginDatafeedCacheHelper.getPluginDatafeed(m.getFeedUuid());
-            						
-            						if (cacheResult == null) { // Does not have in cache
-
-										if (logger.isDebugEnabled()) {
-											logger.debug("Not in cache. Check if DataFeed is in the Repository.");
-										}
-            							List<DataFeedDTO> dataFeedInfo = dataFeedRepository.getDataFeedByUUID(m.getFeedUuid());
-                    					if (dataFeedInfo.size() == 0) {
-                    						
-                    						// update cache with empty result
-                        					pluginDatafeedCacheHelper.cachePluginDatafeed(m.getFeedUuid(), new ArrayList<>());
-
-                        					if (logger.isWarnEnabled()) {
-                        						logger.warn("Datafeed with UUID {} does not exist. Ignore the message.", m.getFeedUuid());
-                        					}
-                        					
-                    					} else {
-                    						List<String> tags = dataFeedRepository.getDataFeedTagsById(dataFeedInfo.get(0).getId());
-
-                    						Set<String> groupNames = RemoteUtil.getInstance().getGroupNamesForBitVectorString(
-                    								dataFeedInfo.get(0).getGroupVector(), groupManager.getAllGroups());
-
-                    						// update cache
-											if (logger.isDebugEnabled()) {
-												logger.debug("Create PluginDataFeed and add to Cache.");
-											}
-                    						List<tak.server.plugins.PluginDataFeed> pluginDatafeeds = new ArrayList<>();
-                    						tak.server.plugins.PluginDataFeed pluginDataFeed = new tak.server.plugins.PluginDataFeed(
-                    								m.getFeedUuid(), dataFeedInfo.get(0).getName(), tags, dataFeedInfo.get(0).getArchive(),
-													dataFeedInfo.get(0).isSync(),  new ArrayList<String>(groupNames), dataFeedInfo.get(0).getFederated());
-                    						
-                    						pluginDatafeeds.add(pluginDataFeed);
-                        					pluginDatafeedCacheHelper.cachePluginDatafeed(m.getFeedUuid(), pluginDatafeeds);
-                    						
-                    						com.bbn.marti.config.DataFeed dataFeed = new com.bbn.marti.config.DataFeed();
-                        					dataFeed.setUuid(m.getFeedUuid());
-                        					dataFeed.setName(dataFeedInfo.get(0).getName());
-                        					dataFeed.getTag().addAll(tags); 
-                        					dataFeed.setArchive(dataFeedInfo.get(0).getArchive());
-                        					dataFeed.setSync(dataFeedInfo.get(0).isSync());
-											dataFeed.getFiltergroup().addAll(groupNames);
-                    						dataFeed.setFederated(dataFeedInfo.get(0).getFederated());
-
-											if (logger.isDebugEnabled()) {
-                            					logger.debug("Retrieve Datafeed info from dataFeedRepository: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, federated: {}, filtergroup: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync(), dataFeed.isFederated(), dataFeed.getFiltergroup());
-                        					}
-                        					
-                        					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
-
-											if (logger.isDebugEnabled()) {
-												logger.debug("Forward the Plugin CotEventContainer along to other services.");
-											}
-											MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
-											if (logger.isDebugEnabled()) {
-												logger.debug("Update InputMetric for DataFeed.");
-											}
-											InputMetric inputMetric = getInputMetric(dataFeed.getName());
-											if (inputMetric != null) {
-												inputMetric.getMessagesReceived().incrementAndGet();
-												inputMetric.getBytesRecieved().addAndGet(((byte[]) message).length);
-											}
-                    					}
-            							
-            						} else { // exist in cache
-										if (logger.isDebugEnabled()) {
-											logger.debug("Found DataFeed in Cache.");
-										}
-            							if (cacheResult.size() == 0) { // datafeed with this uuid does not exist
-            								
-            								if (logger.isWarnEnabled()) {
-            									logger.warn("-Datafeed with UUID {} does not exist. Ignore the message.", m.getFeedUuid());
-            								}
-                        					
-            							} else {
-											if (logger.isDebugEnabled()) {
-												logger.debug("Create new DataFeed from Message.");
-											}
-            								com.bbn.marti.config.DataFeed dataFeed = new com.bbn.marti.config.DataFeed();
-                        					dataFeed.setUuid(m.getFeedUuid());
-                        					dataFeed.setName(cacheResult.get(0).getName());
-                        					dataFeed.getTag().addAll(cacheResult.get(0).getTags());
-                        					dataFeed.setArchive(cacheResult.get(0).isArchive());
-                        					dataFeed.setSync(cacheResult.get(0).isSync());
-											dataFeed.getFiltergroup().addAll(cacheResult.get(0).getFilterGroups());
-                        					dataFeed.setFederated(cacheResult.get(0).isFederated());
-
-											if (logger.isDebugEnabled()) {
-												logger.debug("Retrieve Datafeed info from cache: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, federated: {}, filtergroup: {}", dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(), dataFeed.isArchive(), dataFeed.isSync(), dataFeed.isFederated(), dataFeed.getFiltergroup());
-                        					}
-                        				
-                        					DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
-
-											if (logger.isDebugEnabled()) {
-												logger.debug("Forward the Plugin CotEventContainer along to other services.");
-											}
-											MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
-
-											if (logger.isDebugEnabled()) {
-												logger.debug("Update InputMetric for DataFeed.");
-											}
-											InputMetric inputMetric = getInputMetric(dataFeed.getName());
-											if (inputMetric != null) {
-												inputMetric.getMessagesReceived().incrementAndGet();
-												inputMetric.getBytesRecieved().addAndGet(((byte[])message).length);
-											}
-            							}
-            						}
-									// whether its in cache or not, we need to update the data feed stats for a data feed message
-									if (logger.isDebugEnabled()) {
-										logger.debug("Add the Data Feed message to the DataFeed Stats.");
-									}
-									double lat = Double.valueOf(pluginCotEvent.getLat()).doubleValue();
-									double lon = Double.valueOf(pluginCotEvent.getLon()).doubleValue();
-									if (!DataFeedStatsHelper.getInstance().addStatsForDataFeedMessage(
-											m.getFeedUuid(), pluginCotEvent.getType(), lat,	lon,
-											pluginCotEvent.getCreationTime(), ((byte[])message).length)) {
-										logger.error("Unable to add new DataFeedStats for Message.");
-									}
-
+								if (isInterceptorMessage) {
+									// do not republish the message if it is marked as intercepted, submit it
+									// directly
+									SubmissionService.this.addToInputQueue(messageConverter.dataMessageToCot(m, false));
 								} else {
 									if (logger.isDebugEnabled()) {
-										logger.debug("Forward the Plugin CotEventContainer along to other services.");
+										logger.debug("processing through plugin pipeline");
 									}
-                					MessagingDependencyInjectionProxy.getInstance().cotMessenger().send(pluginCotEvent);
-            					}
-            					
-            				}
-        				}
-        			
-        			} catch (Exception e) {
 
-        				if (logger.isDebugEnabled()) {
-        					logger.debug("exception deserializing plugin message", e);
-        				}
-        			} 
-        		} catch (Exception e) {
-        			if (logger.isDebugEnabled()) {
-        				logger.debug("exception processing pluging message received from ignite topic " + CommonConstants.PLUGIN_PUBLISH_TOPIC, e);
-        			}
-        		}
+									// Check if the message is a datafeed
+									boolean isDataFeedMessage = false;
+									if (logger.isDebugEnabled()) {
+										logger.debug("Check if DataFeed Message.");
+									}
+									if (m.getFeedUuid() != null && !m.getFeedUuid().isEmpty()) {
+										isDataFeedMessage = true;
+									}
 
-        		// return true to continue listening
-        		return true;
-        	});
-        }
+									if (logger.isDebugEnabled()) {
+										logger.debug("Convert Message to Plugin CotEventContainer.");
+									}
+									CotEventContainer pluginCotEvent = messageConverter.dataMessageToCot(m, false);
+
+									if (!Strings.isNullOrEmpty(pluginCotEvent.getCallsign())
+											&& !Strings.isNullOrEmpty(pluginCotEvent.getEndpoint())
+											&& !Strings.isNullOrEmpty(pluginCotEvent.getUid())) {
+										if (config.getFederation() != null) {
+											try {
+												NavigableSet<Group> groups = (NavigableSet<Group>) pluginCotEvent
+														.getContextValue(Constants.GROUPS_KEY);
+												federationManager.addPluginContact(pluginCotEvent, groups);
+											} catch (Exception e) {
+												if (logger.isDebugEnabled()) {
+													logger.debug("exception adding federated plugin contact", e);
+												}
+											}
+										}
+
+										// If Plugins are allowed to generate contacts, create a plugin subscription and
+										// add to endpoints
+										if (pluginContactEnabled) {
+											if (logger.isDebugEnabled()) {
+												logger.debug("Adding pluginCotEvent as pluginSub: {}", pluginCotEvent);
+												logger.debug("Endpoint: {}", pluginCotEvent.getEndpoint());
+												logger.debug("UID: {}", pluginCotEvent.getUid());
+											}
+
+											PluginBasedSubscription pluginSub = new PluginBasedSubscription(
+													pluginCotEvent);
+											subMgr.addRawSubscription(pluginSub);
+											repositoryService.auditCallsignUIDEventAsync(pluginCotEvent.getCallsign(),
+													pluginCotEvent.getUid(), "",
+													pluginCotEvent.getTeam(), pluginCotEvent.getRole(),
+													ConnectionEventTypeValue.CONNECTED,
+													RemoteUtil.getInstance().getBitStringAllGroups());
+											pluginSubMap.put(pluginSub, new Date());
+										}
+
+									} else if (pluginCotEvent.getType().equals("t-x-d-d")) {
+										Element link = (Element) pluginCotEvent.getDocument()
+												.selectSingleNode(LINK_XPATH);
+										if (link != null && link.attribute("uid") != null) {
+											federationManager.removeLocalContact(link.attributeValue("uid"));
+										}
+									}
+
+									if (isDataFeedMessage) {
+
+										if (logger.isDebugEnabled()) {
+											logger.debug("Check if the DataFeed is in cache.");
+										}
+										List<tak.server.plugins.PluginDataFeed> cacheResult = pluginDatafeedCacheHelper
+												.getPluginDatafeed(m.getFeedUuid());
+
+										if (cacheResult == null) { // Does not have in cache
+
+											if (logger.isDebugEnabled()) {
+												logger.debug("Not in cache. Check if DataFeed is in the Repository.");
+											}
+											List<DataFeedDTO> dataFeedInfo = dataFeedRepository
+													.getDataFeedByUUID(m.getFeedUuid());
+											if (dataFeedInfo.size() == 0) {
+
+												// update cache with empty result
+												pluginDatafeedCacheHelper.cachePluginDatafeed(m.getFeedUuid(),
+														new ArrayList<>());
+
+												if (logger.isWarnEnabled()) {
+													logger.warn(
+															"Datafeed with UUID {} does not exist. Ignore the message.",
+															m.getFeedUuid());
+												}
+
+											} else {
+												List<String> tags = dataFeedRepository
+														.getDataFeedTagsById(dataFeedInfo.get(0).getId());
+
+												Set<String> groupNames = RemoteUtil.getInstance()
+														.getGroupNamesForBitVectorString(
+																dataFeedInfo.get(0).getGroupVector(),
+																groupManager.getAllGroups());
+
+												// update cache
+												if (logger.isDebugEnabled()) {
+													logger.debug("Create PluginDataFeed and add to Cache.");
+												}
+												List<tak.server.plugins.PluginDataFeed> pluginDatafeeds = new ArrayList<>();
+												tak.server.plugins.PluginDataFeed pluginDataFeed = new tak.server.plugins.PluginDataFeed(
+														m.getFeedUuid(), dataFeedInfo.get(0).getName(), tags,
+														dataFeedInfo.get(0).getArchive(), dataFeedInfo.get(0).isSync(),
+														new ArrayList<String>(groupNames),
+														dataFeedInfo.get(0).getFederated());
+
+												pluginDatafeeds.add(pluginDataFeed);
+												pluginDatafeedCacheHelper.cachePluginDatafeed(m.getFeedUuid(),
+														pluginDatafeeds);
+
+												com.bbn.marti.config.DataFeed dataFeed = new com.bbn.marti.config.DataFeed();
+												dataFeed.setUuid(m.getFeedUuid());
+												dataFeed.setName(dataFeedInfo.get(0).getName());
+												dataFeed.getTag().addAll(tags);
+												dataFeed.setArchive(dataFeedInfo.get(0).getArchive());
+												dataFeed.setSync(dataFeedInfo.get(0).isSync());
+												dataFeed.getFiltergroup().addAll(groupNames);
+												dataFeed.setFederated(dataFeedInfo.get(0).getFederated());
+
+												if (logger.isDebugEnabled()) {
+													logger.debug(
+															"Retrieve Datafeed info from dataFeedRepository: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, federated: {}, filtergroup: {}",
+															dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(),
+															dataFeed.isArchive(), dataFeed.isSync(),
+															dataFeed.isFederated(), dataFeed.getFiltergroup());
+												}
+
+												DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
+
+												if (logger.isDebugEnabled()) {
+													logger.debug(
+															"Forward the Plugin CotEventContainer along to other services.");
+												}
+												MessagingDependencyInjectionProxy.getInstance().cotMessenger()
+														.send(pluginCotEvent);
+												if (logger.isDebugEnabled()) {
+													logger.debug("Update InputMetric for DataFeed.");
+												}
+												InputMetric inputMetric = getInputMetric(dataFeed.getName());
+												if (inputMetric != null) {
+													inputMetric.getMessagesReceived().incrementAndGet();
+													inputMetric.getBytesRecieved().addAndGet(((byte[]) message).length);
+												}
+											}
+
+										} else { // exist in cache
+											if (logger.isDebugEnabled()) {
+												logger.debug("Found DataFeed in Cache.");
+											}
+											if (cacheResult.size() == 0) { // datafeed with this uuid does not exist
+
+												if (logger.isWarnEnabled()) {
+													logger.warn(
+															"-Datafeed with UUID {} does not exist. Ignore the message.",
+															m.getFeedUuid());
+												}
+
+											} else {
+												if (logger.isDebugEnabled()) {
+													logger.debug("Create new DataFeed from Message.");
+												}
+												com.bbn.marti.config.DataFeed dataFeed = new com.bbn.marti.config.DataFeed();
+												dataFeed.setUuid(m.getFeedUuid());
+												dataFeed.setName(cacheResult.get(0).getName());
+												dataFeed.getTag().addAll(cacheResult.get(0).getTags());
+												dataFeed.setArchive(cacheResult.get(0).isArchive());
+												dataFeed.setSync(cacheResult.get(0).isSync());
+												dataFeed.getFiltergroup().addAll(cacheResult.get(0).getFilterGroups());
+												dataFeed.setFederated(cacheResult.get(0).isFederated());
+
+												if (logger.isDebugEnabled()) {
+													logger.debug(
+															"Retrieve Datafeed info from cache: uuid: {}, name: {}, tags: {}, archive: {}, sync: {}, federated: {}, filtergroup: {}",
+															dataFeed.getUuid(), dataFeed.getName(), dataFeed.getTag(),
+															dataFeed.isArchive(), dataFeed.isSync(),
+															dataFeed.isFederated(), dataFeed.getFiltergroup());
+												}
+
+												DataFeedFilter.getInstance().filter(pluginCotEvent, dataFeed);
+
+												if (logger.isDebugEnabled()) {
+													logger.debug(
+															"Forward the Plugin CotEventContainer along to other services.");
+												}
+												MessagingDependencyInjectionProxy.getInstance().cotMessenger()
+														.send(pluginCotEvent);
+
+												if (logger.isDebugEnabled()) {
+													logger.debug("Update InputMetric for DataFeed.");
+												}
+												InputMetric inputMetric = getInputMetric(dataFeed.getName());
+												if (inputMetric != null) {
+													inputMetric.getMessagesReceived().incrementAndGet();
+													inputMetric.getBytesRecieved().addAndGet(((byte[]) message).length);
+												}
+											}
+										}
+										// whether its in cache or not, we need to update the data feed stats for a data
+										// feed message
+										if (logger.isDebugEnabled()) {
+											logger.debug("Add the Data Feed message to the DataFeed Stats.");
+										}
+										double lat = Double.valueOf(pluginCotEvent.getLat()).doubleValue();
+										double lon = Double.valueOf(pluginCotEvent.getLon()).doubleValue();
+										if (!DataFeedStatsHelper.getInstance().addStatsForDataFeedMessage(
+												m.getFeedUuid(), pluginCotEvent.getType(), lat, lon,
+												pluginCotEvent.getCreationTime(), ((byte[]) message).length)) {
+											logger.error("Unable to add new DataFeedStats for Message.");
+										}
+
+									} else {
+										if (logger.isDebugEnabled()) {
+											logger.debug(
+													"Forward the Plugin CotEventContainer along to other services.");
+										}
+										MessagingDependencyInjectionProxy.getInstance().cotMessenger()
+												.send(pluginCotEvent);
+									}
+
+								}
+							}
+
+						} catch (Exception e) {
+
+							if (logger.isDebugEnabled()) {
+								logger.debug("exception deserializing plugin message", e);
+							}
+						}
+					} catch (Exception e) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("exception processing pluging message received from ignite topic "
+									+ CommonConstants.PLUGIN_PUBLISH_TOPIC, e);
+						}
+					}
+
+					// return true to continue listening
+					return true;
+				});
+			});
+		}
 
         // Push a dummy SA message into the system to make sure pipeline resources get initialized
         // before any actual clients try to connect. This dummy message will help alleviate first time
@@ -907,7 +975,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 	        			logger.debug("UID: " + sub.uid + "is expired");
 	        		}
 					repositoryService.auditCallsignUIDEventAsync(
-							sub.callsign, sub.uid, "", ConnectionEventTypeValue.DISCONNECTED, RemoteUtil.getInstance().getBitStringAllGroups());
+							sub.callsign, sub.uid, "", sub.team, sub.role,
+							ConnectionEventTypeValue.DISCONNECTED, RemoteUtil.getInstance().getBitStringAllGroups());
 					subMgr.deleteSubscription(sub.uid);
 					pluginSubMap.remove(sub);
 	            }
@@ -1133,7 +1202,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
                     String username = subscription.getUser() != null ? subscription.getUser().getName() : "";
 
                     //Audit disconnected event for callsign/uid pair
-                    repositoryService.auditCallsignUIDEventAsync(subscription.callsign, subscription.clientUid, username, ConnectionEventTypeValue.DISCONNECTED,
+                    repositoryService.auditCallsignUIDEventAsync(subscription.callsign, subscription.clientUid,
+							username, subscription.team, subscription.role, ConnectionEventTypeValue.DISCONNECTED,
                             getGroupVectorFromHandler(handler));
                 }
             }
@@ -1636,7 +1706,8 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 						try {
                             String username = sub.getUser() != null ? sub.getUser().getName() : "";
 							repositoryService.auditCallsignUIDEventAsync(
-                                callsign, data.getUid(), username, ConnectionEventTypeValue.CONNECTED, groupVector);
+                                callsign, data.getUid(), username, data.getTeam(), data.getRole(),
+									ConnectionEventTypeValue.CONNECTED, groupVector);
 						} catch (Exception e) {
 							if (logger.isDebugEnabled()) {
 								logger.debug("error recording connection event", e);
@@ -1905,7 +1976,11 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 				return;
 			}
 
-    		if (logger.isTraceEnabled()) {
+			if (disableBroadcastMapItemFilter != null && disableBroadcastMapItemFilter.filter(c) == null) {
+				return;
+			}
+
+			if (logger.isTraceEnabled()) {
     			logger.trace("passed geospatial");
     		}
 

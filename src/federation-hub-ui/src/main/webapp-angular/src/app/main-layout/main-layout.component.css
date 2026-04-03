@@ -1,0 +1,9 @@
+.navbar {
+    padding: 0.5rem 1rem;
+}
+  
+a.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  /* keep hover/focus so tooltip works */
+}

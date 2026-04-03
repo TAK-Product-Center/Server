@@ -183,6 +183,24 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 		}
 	}
 
+	public String getTeam() {
+		Attribute teamAttr = (Attribute) doc.selectSingleNode("/event/detail/__group/@name");
+		if (teamAttr != null) {
+			return teamAttr.getValue();
+		} else {
+			return null;
+		}
+	}
+
+	public String getRole() {
+		Attribute teamAttr = (Attribute) doc.selectSingleNode("/event/detail/__group/@role");
+		if (teamAttr != null) {
+			return teamAttr.getValue();
+		} else {
+			return null;
+		}
+	}
+
 	public Double getCe() {
 		return NumericUtil.parseDoubleOrDefault(getPointAttribute("ce"), 999999);
 	}
@@ -246,7 +264,7 @@ public class CotEventContainer extends XmlContainer implements Serializable {
 		return getRootAttribute("caveat");
 	}
 	public String getReleaseableTo() {
-		return getRootAttribute("releaseableTo");
+		return getRootAttribute("releasableTo");
 	}
 
 	private String getRootAttribute(String attribute) {

@@ -6,6 +6,10 @@ import static java.util.Objects.requireNonNull;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -65,6 +69,7 @@ import io.netty.handler.ssl.SslProvider;
 import tak.server.federation.Federate;
 import tak.server.federation.FederateEdge;
 import tak.server.federation.FederateIdentity;
+import tak.server.federation.FederationException;
 import tak.server.federation.FederationPolicyGraph;
 import tak.server.federation.FedhubGuardedStreamHolder;
 import tak.server.federation.TokenAuthCredential;
@@ -94,8 +99,8 @@ public class HubFigClient implements Serializable {
 	private String connectionToken;
 	private boolean useToken = false;
 	private String tokenType = "";
+	private boolean tls = true;
 	
-	private X509Certificate[] sessionCerts;
 	private String clientFingerprint;
 	private List<String> clientGroups;
 	private String fedName;
@@ -145,7 +150,7 @@ public class HubFigClient implements Serializable {
 		this.connectionToken = federationOutgoingCell.getProperties().getToken();
 		this.useToken = federationOutgoingCell.getProperties().isUseToken();
 		this.tokenType = federationOutgoingCell.getProperties().getTokenType();
-
+		this.tls = federationOutgoingCell.getProperties().isTls();
 		
 		this.info = new HubConnectionInfo();
 
@@ -186,53 +191,120 @@ public class HubFigClient implements Serializable {
 					.trustManager(sslConfig.getTrustMgrFactory());
 		}
 
-		channel = openFigConnection(host, port, sslContextBuilder.build());
-		
-		if (useToken && !Strings.isNullOrEmpty(tokenType)) {
-			if ("automatic".equals(tokenType.toLowerCase())) {
-				asyncNoAuthChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(null);
-                
-                X509Certificate clientCert = null;
-                BinaryBlob certPayload = null;
-                clientCert = FederationUtils.loadX509CertFromJKSFile(fedHubConfigManager.getConfig().getKeystoreFile(), fedHubConfigManager.getConfig().getKeystorePassword());
-                certPayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(clientCert.getEncoded()))).build();
+		if (tls) {
+			channel = openFigConnection(host, port, sslContextBuilder.build());
+			
+			asyncNoAuthChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(null);
 
-                asyncNoAuthChannel.getAuthTokenByX509(certPayload, new StreamObserver<com.atakmap.Tak.FederateTokenResponse>() {
-					@Override
-					public void onNext(FederateTokenResponse value) {
-						TokenAuthCredential credential = new TokenAuthCredential(value.getToken());
-						blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel).withCallCredentials(credential);
-						asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
-						
-						initReceivers();
-
-						if (initSenders.getAndSet(true)) {
-							setupGroupStreamSender();
-							setupRolStreamSender();
-						}
-					}
-
-					@Override
-					public void onError(Throwable t) {
-						processDisconnect(t);
-						if (shouldRetry.get()) {
-							FederationHubBrokerService.getInstance().scheduleRetry(fedName);
-						}
-					}
-
-					@Override
-					public void onCompleted() {}
-                	
-                });
+			if (useToken && !Strings.isNullOrEmpty(tokenType)) {
+				setupChannelCallsWithToken();
 			} else {
-				TokenAuthCredential credential = new TokenAuthCredential(connectionToken);
-				blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel).withCallCredentials(credential);
-				asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
+				blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel);
+				asyncFederatedChannel = FederatedChannelGrpc.newStub(channel);
 				initReceivers();
 			}
 		} else {
-			blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel);
-			asyncFederatedChannel = FederatedChannelGrpc.newStub(channel);
+			channel = openFigConnection(host, port, null);
+			
+			asyncNoAuthChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(null);
+			
+			// when we are not using tls, we will not receive a server cert. because federation is built
+			// on using certs as the connection identifier, we ask the server for it's identify and verify it
+			// before proceeding
+			asyncNoAuthChannel.getx509Identity(null, new StreamObserver<com.atakmap.Tak.BinaryBlob>() {
+				@Override
+				public void onNext(BinaryBlob blob) {
+					try {
+						X509Certificate clientCertFromServer = FederationUtils.loadX509CertFromBytes(blob.getData().toByteArray());
+						List<X509Certificate> caCertsFromServer = FederationUtils.verifyTrustedClientCert(sslConfig.getTrustMgrFactory(),
+								clientCertFromServer);
+						if (caCertsFromServer == null || caCertsFromServer.isEmpty()) {
+							processDisconnect(new FederationException("Client does not trust server"));
+							return;
+						}
+						
+						// create the cert chain with the client cert at position 0 followed by CAs
+						X509Certificate[] chain = new X509Certificate[1 + caCertsFromServer.size()];
+						chain[0] = clientCertFromServer;
+						for (int i = 0; i < caCertsFromServer.size(); i++) {
+						    chain[i + 1] = caCertsFromServer.get(i);
+						}
+						
+						configureFederateFromCertChain(chain);
+						
+						setupChannelCallsWithToken();
+					} catch (Exception e) {
+						logger.error("Error processing x509Identity", e);
+						processDisconnect(new FederationException("Error processing x509Identity"));
+						return;
+					}				
+				}
+
+				@Override
+				public void onError(Throwable t) {
+					logger.error("error from getx509Identity", t);
+					processDisconnect(t);
+				}
+
+				@Override
+				public void onCompleted() {}
+			});
+		}
+	}
+
+	private void setupChannelCallsWithToken() throws KeyStoreException, NoSuchAlgorithmException, CertificateException,
+			IOException, CertificateEncodingException {
+		if ("automatic".equals(tokenType.toLowerCase())) {
+
+			X509Certificate clientCert = null;
+			BinaryBlob certPayload = null;
+			
+			clientCert = FederationUtils.loadX509CertFromJKSFile(fedHubConfigManager.getConfig().getKeystoreFile(),
+					fedHubConfigManager.getConfig().getKeystorePassword());
+			
+			certPayload = BinaryBlob.newBuilder().setData(ByteString.readFrom(new ByteArrayInputStream(clientCert.getEncoded()))).build();
+
+			asyncNoAuthChannel.getAuthTokenByX509(certPayload,
+					new StreamObserver<com.atakmap.Tak.FederateTokenResponse>() {
+						@Override
+						public void onNext(FederateTokenResponse value) {
+							if (value == null || Strings.isNullOrEmpty(value.getToken())) {
+								processDisconnect(new FederationException("getAuthTokenByX509 failed to issue a token"));
+								return;
+							}
+							
+							TokenAuthCredential credential = new TokenAuthCredential(value.getToken());
+							blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel)
+									.withCallCredentials(credential);
+							asyncFederatedChannel = FederatedChannelGrpc.newStub(channel)
+									.withCallCredentials(credential);
+
+							initReceivers();
+							
+							if (!initSenders.get()) {
+								initSenders.set(true);
+								setupGroupStreamSender();
+								setupRolStreamSender();
+							}
+						}
+
+						@Override
+						public void onError(Throwable t) {
+							processDisconnect(t);
+							if (shouldRetry.get()) {
+								FederationHubBrokerService.getInstance().scheduleRetry(fedName);
+							}
+						}
+
+						@Override
+						public void onCompleted() {
+						}
+
+					});
+		} else {
+			TokenAuthCredential credential = new TokenAuthCredential(connectionToken);
+			blockingFederatedChannel = FederatedChannelGrpc.newBlockingStub(channel).withCallCredentials(credential);
+			asyncFederatedChannel = FederatedChannelGrpc.newStub(channel).withCallCredentials(credential);
 			initReceivers();
 		}
 	}
@@ -369,67 +441,82 @@ public class HubFigClient implements Serializable {
 
 	private ManagedChannel openFigConnection(final String host, final int port, SslContext sslContext)
 			throws IOException {
-		return NettyChannelBuilder.forAddress(host, port).negotiationType(NegotiationType.TLS).sslContext(sslContext)
-				.withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, waterMark)
-				.maxInboundMessageSize(fedHubConfigManager.getConfig().getMaxMessageSizeBytes())
-				.channelType(Epoll.isAvailable() ? EpollSocketChannel.class : NioSocketChannel.class)
-				.executor(FederationHubResources.federationGrpcExecutor)
-				.eventLoopGroup(FederationHubResources.federationGrpcWorkerEventLoopGroup)
-				.protocolNegotiator(new FigProtocolNegotiator(new Propagator<X509Certificate[]>() {
-					@Override
-					public X509Certificate[] propogate(X509Certificate[] certs) {
-						try {
-							sessionCerts = certs;
-							X509Certificate clientCert = certs[0];
-							X509Certificate caCert = certs[1];
 
-							clientFingerprint = FederationUtils
-									.getBytesSHA256(((X509Certificate) clientCert).getEncoded());
-							clientGroups = FederationHubUtils.getCaGroupIdsFromCerts(certs);
+		if (sslContext == null) {
+			return NettyChannelBuilder.forAddress(host, port).negotiationType(NegotiationType.PLAINTEXT)
+					.withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, waterMark)
+					.maxInboundMessageSize(fedHubConfigManager.getConfig().getMaxMessageSizeBytes())
+					.channelType(Epoll.isAvailable() ? EpollSocketChannel.class : NioSocketChannel.class)
+					.executor(FederationHubResources.federationGrpcExecutor)
+					.eventLoopGroup(FederationHubResources.federationGrpcWorkerEventLoopGroup).build();
+		} else {
 
-							logger.info("Received remote fingerprint {} for {}", clientFingerprint, fedName);
-
-							if (fedHubConfigManager.getConfig().isUseCaGroups()) {
-								try {
-									hubClientFederate = new Federate(new FederateIdentity(fedName));
-
-									for (String clientGroup : clientGroups) {
-										hubClientFederate.addGroupIdentity(new FederateIdentity(clientGroup));
-										hubClientGroups.add(clientGroup);
-									}
-
-									FederationHubDependencyInjectionProxy.getInstance().fedHubPolicyManager()
-											.addCaFederate(hubClientFederate, hubClientGroups);
-								} catch (Exception e) {
-									logger.error("error updating federate node", e);
-									processDisconnect(e);
-									return null;
-								}
-							}
-
-							FederationPolicyGraph fpg = FederationHubBrokerService.getInstance()
-									.getFederationPolicyGraph();
-							requireNonNull(fpg, "federation policy graph object");
-
-							Federate clientNode = FederationHubBrokerService.getInstance().getFederationPolicyGraph()
-									.getFederate(new FederateIdentity(fedName));
-
-							requireNonNull(clientNode, "federation policy node for newly connected client");
-
-							if (asyncFederatedChannel != null && !initSenders.get()) {
-								initSenders.set(true);
-								setupGroupStreamSender();
-								setupRolStreamSender();
-							}
-						} catch (Exception e) {
-							logger.error("Error parsing cert", e);
-							processDisconnect(e);
-							return null;
+			return NettyChannelBuilder.forAddress(host, port).negotiationType(NegotiationType.TLS)
+					.sslContext(sslContext).withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, waterMark)
+					.maxInboundMessageSize(fedHubConfigManager.getConfig().getMaxMessageSizeBytes())
+					.channelType(Epoll.isAvailable() ? EpollSocketChannel.class : NioSocketChannel.class)
+					.executor(FederationHubResources.federationGrpcExecutor)
+					.eventLoopGroup(FederationHubResources.federationGrpcWorkerEventLoopGroup)
+					.protocolNegotiator(new FigProtocolNegotiator(new Propagator<X509Certificate[]>() {
+						@Override
+						public X509Certificate[] propogate(X509Certificate[] certs) {
+							return configureFederateFromCertChain(certs);
 						}
+					}).figTlsProtocolNegotiator(sslContext, FederationUtils.authorityFromHostAndPort(host, port)))
+					.build();
+		}
+	}
+	
+	private X509Certificate[] configureFederateFromCertChain(X509Certificate[] certs) {
+		try {
+			X509Certificate clientCert = certs[0];
+			X509Certificate caCert = certs[1];
 
-						return certs;
+			clientFingerprint = FederationUtils
+					.getBytesSHA256(((X509Certificate) clientCert).getEncoded());
+			clientGroups = FederationHubUtils.getCaGroupIdsFromCerts(certs);
+
+			logger.info("Received remote fingerprint {} for {}", clientFingerprint, fedName);
+
+			if (fedHubConfigManager.getConfig().isUseCaGroups()) {
+				try {
+					hubClientFederate = new Federate(new FederateIdentity(fedName));
+
+					for (String clientGroup : clientGroups) {
+						hubClientFederate.addGroupIdentity(new FederateIdentity(clientGroup));
+						hubClientGroups.add(clientGroup);
 					}
-				}).figTlsProtocolNegotiator(sslContext, FederationUtils.authorityFromHostAndPort(host, port))).build();
+
+					FederationHubDependencyInjectionProxy.getInstance().fedHubPolicyManager()
+							.addCaFederate(hubClientFederate, hubClientGroups);
+				} catch (Exception e) {
+					logger.error("error updating federate node", e);
+					processDisconnect(e);
+					return null;
+				}
+			}
+
+			FederationPolicyGraph fpg = FederationHubBrokerService.getInstance()
+					.getFederationPolicyGraph();
+			requireNonNull(fpg, "federation policy graph object");
+
+			Federate clientNode = FederationHubBrokerService.getInstance().getFederationPolicyGraph()
+					.getFederate(new FederateIdentity(fedName));
+
+			requireNonNull(clientNode, "federation policy node for newly connected client");
+
+			if (asyncFederatedChannel != null && !initSenders.get()) {
+				initSenders.set(true);
+				setupGroupStreamSender();
+				setupRolStreamSender();
+			}
+		} catch (Exception e) {
+			logger.error("Error parsing cert", e);
+			processDisconnect(e);
+			return null;
+		}
+
+		return certs;
 	}
 
 	private void setupGroupStreamSender() {
@@ -654,7 +741,7 @@ public class HubFigClient implements Serializable {
 		AtomicLong delayMs = new AtomicLong(5000l);
 
 		if (changes != null) {
-			for (final Entry<ObjectId, ROL.Builder> entry : changes.getResourceRols().entrySet()) {
+			for (final Entry<ObjectId, ROL> entry : changes.getResourceRols().entrySet()) {
 				FederationHubResources.mfdtScheduler.schedule(() -> {
 					ROL rol = federationHubMissionDisruptionManager.hydrateResourceROL(entry.getKey(),
 							entry.getValue());

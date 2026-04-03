@@ -1,5 +1,4 @@
 import { Injectable } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
 
 @Injectable({
   providedIn: 'root'
@@ -7,13 +6,7 @@ import { ActivatedRoute } from '@angular/router';
 export class DataService {
   editor!: any;
   policy: any;
-  policyIdFromRoute: any;
-
-  constructor(private route: ActivatedRoute) {
-    this.route.queryParamMap.subscribe((params: any) => {
-      this.policyIdFromRoute = params.get('policy');
-    });
-   }
+  pluginsPolicy: any = {};
 
   setEditor(e : any) {
     this.editor = e;
@@ -21,6 +14,14 @@ export class DataService {
 
   getEditor() {
     return this.editor;
+  }
+
+  setPluginsPolicy(policy: any) {
+    this.pluginsPolicy = policy
+  }
+
+  getPluginsPolicy() {
+    return this.pluginsPolicy
   }
 
   getFederationDataForNodes() {
@@ -33,15 +34,12 @@ export class DataService {
     return vals.filter((n: any) => n.name === 'GroupCell').map((n: { federation: any; }) => n.federation).filter((f: any) => f != undefined);
   }
 
-  setActivePolicy(policy: any) {
+  setActiveEditingPolicy(policy: any) {
+    console.log('setActiveEditingPolicy', policy)
     this.policy = policy;
   }
 
-  getActivePolicy() {
+  getActiveEditingPolicy() {
     return this.policy;
-  }
-
-  getPolicyIdFromRoute() {
-    return this.policyIdFromRoute
   }
 }

@@ -26,6 +26,7 @@ import io.netty.channel.ChannelHandlerContext;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.proto.StreamingProtoBufHelper;
 
 
@@ -36,6 +37,8 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
     private final UUID websocketApiNode;
     private final Oauth oauthConfig;
     private IgniteBiPredicate<UUID, ?> igniteReadListenerPredicate;
+    
+    private Runnable listener;
     
     private static Input websocketInput = new Input();
    
@@ -82,6 +85,9 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
     
     @Override
     public void channelUnregistered(ChannelHandlerContext ctx) {
+    	if (listener != null)
+    		IgniteReconnectEventHandler.unregisterListener(listener);
+
     	IgniteHolder.getInstance()
     		.getIgnite()
     		.message()
@@ -182,10 +188,14 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
             return true;
         };
         
-        IgniteHolder.getInstance()
-        	.getIgnite()
-        	.message(IgniteHolder.getInstance().getIgnite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.API_PROFILE_NAME))
-        	.localListen("websocket-read-listener-" + connectionId, igniteReadListenerPredicate);
+		listener = () -> {
+			IgniteHolder.getInstance().getIgnite()
+					.message(IgniteHolder.getInstance().getIgnite().cluster().forAttribute(Constants.TAK_PROFILE_KEY,
+							Constants.API_PROFILE_NAME))
+					.localListen("websocket-read-listener-" + connectionId, igniteReadListenerPredicate);
+		};
+		
+		IgniteReconnectEventHandler.registerListener(listener);
     }
     
     @Override

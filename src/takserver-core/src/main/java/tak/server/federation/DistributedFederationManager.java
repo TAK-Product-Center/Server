@@ -122,6 +122,7 @@ import io.micrometer.core.instrument.Metrics;
 import tak.server.Constants;
 import tak.server.cot.CotEventContainer;
 import tak.server.ignite.IgniteHolder;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.messaging.Messenger;
 
 /*
@@ -371,16 +372,10 @@ public class DistributedFederationManager implements FederationManager, Service 
 		return sslCache;
 	}
 
-	private IgniteCache<String, String>  federationListenerCache = null;
-
 	private IgniteCache<String, String> getFederationListenerCache() {
-		if (federationListenerCache == null) {
-			CacheConfiguration<String, String> cacheConfiguration = new CacheConfiguration<>();
-			cacheConfiguration.setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.MINUTES, 1)));
-			federationListenerCache = IgniteHolder.getInstance().getIgnite().getOrCreateCache("federationListenerCache");
-		}
-
-		return federationListenerCache;
+		CacheConfiguration<String, String> cacheConfiguration = new CacheConfiguration<>();
+		cacheConfiguration.setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.MINUTES, 1)));
+		return IgniteHolder.getInstance().getIgnite().getOrCreateCache("federationListenerCache");
 	}
 
 	private void setupIgniteListeners() {
@@ -429,8 +424,9 @@ public class DistributedFederationManager implements FederationManager, Service 
 				return true;
 			}
 		};
-
-		IgniteHolder.getInstance().getIgnite().events().localListen(ignitePredicate, EventType.EVT_NODE_LEFT, EventType.EVT_NODE_FAILED);
+		
+		IgniteHolder.getInstance().getIgnite().events().localListen(ignitePredicate, EventType.EVT_NODE_LEFT,
+				EventType.EVT_NODE_FAILED);
 	}
 
 	private synchronized boolean initiateOutgoing(@NotNull FederationOutgoing outgoing, @NotNull ConnectionStatus status) {
@@ -1508,6 +1504,7 @@ public class DistributedFederationManager implements FederationManager, Service 
 				f.setConnectionToken(update.getConnectionToken());
 				f.setUseToken(update.isUseToken());
 				f.setTokenType(update.getTokenType());
+				f.setTls(update.isTls());
 				
 				CoreConfigFacade.getInstance().setAndSaveFederation(federationConfig);
 

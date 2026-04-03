@@ -166,6 +166,7 @@ import tak.server.filemanager.FileManagerServiceDefaultImpl;
 import tak.server.grid.MissionArchiveManagerProxyFactory;
 import tak.server.grid.PluginManagerProxyFactory;
 import tak.server.grid.RetentionPolicyConfigProxyFactory;
+import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.plugins.PluginCoreConfigApi;
 import tak.server.plugins.PluginDataApi;
 import tak.server.plugins.PluginFileApi;
@@ -197,9 +198,12 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Bean
 	public FederationHttpConnectorManager distributedFederationHttpConnectorManager(Ignite ignite) {
 		DistributedFederationHttpConnectorManager distributedFederationHttpConnectorManager =  new DistributedFederationHttpConnectorManager();
-		ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite))
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite))
 			.deployNodeSingleton(Constants.DISTRIBUTED_FEDERATION_HTTP_CONNECTOR_SERVICE, distributedFederationHttpConnectorManager);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getApiLocalClusterDeploymentGroup(ignite))
 				.serviceProxy(Constants.DISTRIBUTED_FEDERATION_HTTP_CONNECTOR_SERVICE, FederationHttpConnectorManager.class, false);
 	}
@@ -861,8 +865,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Bean
 	public RetentionQueryService retentionQueryService(Ignite ignite, GroupManager groupManager) {
 		DistributedRetentionQueryManager distributedRetentionQueryManager =  new DistributedRetentionQueryManager(ignite, groupManager);
-		ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_RETENTION_QUERY_MANAGER,
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_RETENTION_QUERY_MANAGER,
 				distributedRetentionQueryManager);
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
 
 		return ignite.services(ClusterGroupDefinition.getApiLocalClusterDeploymentGroup(ignite))
 				.serviceProxy(Constants.DISTRIBUTED_RETENTION_QUERY_MANAGER, RetentionQueryService.class, false);
@@ -936,8 +943,10 @@ public class ApiConfiguration implements WebMvcConfigurer {
 		
 		DistributedPluginMissionApi distributedPluginMissionApi =  new DistributedPluginMissionApi();
 		
-		ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_MISSION_API, distributedPluginMissionApi);
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_MISSION_API, distributedPluginMissionApi);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getApiLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_MISSION_API, PluginMissionApi.class, false);
 
 	}
@@ -945,7 +954,11 @@ public class ApiConfiguration implements WebMvcConfigurer {
 	@Bean
 	public PluginCoreConfigApi pluginCoreConfigApi(Ignite ignite) {
 		DistributedPluginCoreConfigApi distributedPluginCoreConfigApi = new DistributedPluginCoreConfigApi();
-		ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_CORECONFIG_API, distributedPluginCoreConfigApi);
+		
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_CORECONFIG_API, distributedPluginCoreConfigApi);
+		
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getApiLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_CORECONFIG_API, PluginCoreConfigApi.class, false);
 	}
 	
@@ -958,8 +971,10 @@ public class ApiConfiguration implements WebMvcConfigurer {
 		
 		DistributedPluginFileApi distributedPluginFileApi =  new DistributedPluginFileApi();
 		
-		ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_FILE_API, distributedPluginFileApi);
+		Runnable serviceDeployment = () -> ignite.services(ClusterGroupDefinition.getApiClusterDeploymentGroup(ignite)).deployNodeSingleton(Constants.DISTRIBUTED_PLUGIN_FILE_API, distributedPluginFileApi);
 
+		IgniteReconnectEventHandler.registerService(serviceDeployment);
+		
 		return ignite.services(ClusterGroupDefinition.getApiLocalClusterDeploymentGroup(ignite)).serviceProxy(Constants.DISTRIBUTED_PLUGIN_FILE_API, PluginFileApi.class, false);
 
 	}

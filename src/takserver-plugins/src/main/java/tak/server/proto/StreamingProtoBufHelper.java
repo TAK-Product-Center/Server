@@ -131,7 +131,7 @@ public class StreamingProtoBufHelper {
                 cotEventBuilder.setCaveat(caveat.getText());
             }
 
-            Attribute releaseableTo = root.attribute("releaseableTo");
+            Attribute releaseableTo = root.attribute("releasableTo");
             if (releaseableTo != null) {
                 cotEventBuilder.setReleaseableTo(releaseableTo.getText());
             }
@@ -461,7 +461,7 @@ public class StreamingProtoBufHelper {
 
             String releaseableTo = cotEvent.getReleaseableTo();
             if (releaseableTo != null && releaseableTo.length() > 0) {
-                eventElement.addAttribute("releaseableTo", releaseableTo);
+                eventElement.addAttribute("releasableTo", releaseableTo);
             }
 
             String opex = cotEvent.getOpex();

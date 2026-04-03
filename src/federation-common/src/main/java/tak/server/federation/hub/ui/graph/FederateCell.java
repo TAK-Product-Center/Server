@@ -1,5 +1,6 @@
 package tak.server.federation.hub.ui.graph;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -11,7 +12,8 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 public class FederateCell extends PolicyObjectCell {
     private String type = "Federate";
 
-    @JsonProperty("roger_federation")
+    @JsonProperty("federation")
+    @JsonAlias("roger_federation")
     @JsonDeserialize(as=FederateProperties.class)
     private FederateProperties properties;
 

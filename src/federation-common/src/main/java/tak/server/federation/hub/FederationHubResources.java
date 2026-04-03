@@ -71,6 +71,8 @@ public class FederationHubResources {
 	// Bounded Executor pool for federation grpc server and channel builders
 	public static final ExecutorService federationGrpcExecutor = !IS_LOW_CORE ? newGrpcThreadPoolExecutor("grpc-federation-hub-executor", POOL_SIZE_INITIAL, NUM_AVAIL_CORES) : lowCoreGrpcExecutorService;
 
+	public static final ExecutorService pluginsExecutor = !IS_LOW_CORE ? newGrpcThreadPoolExecutor("plugins-federation-hub-executor", POOL_SIZE_INITIAL, NUM_AVAIL_CORES) : lowCoreGrpcExecutorService;
+
 	// Bounded worker pool for federation grpc server and channel builders
 	public static final EventLoopGroup federationGrpcWorkerEventLoopGroup = !IS_LOW_CORE ? newGrpcEventLoopGroup("grpc-federation-hub-worker", NUM_AVAIL_CORES) : lowCoreGrpcEventLoopGroup;
 

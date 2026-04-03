@@ -116,8 +116,8 @@ public class ApiOnlyConfiguration implements AsyncConfigurer, WebMvcConfigurer {
 
 	@Bean
 	@Primary
-	public GroupManager groupManager(GroupStore groupStore) {
-		return new DistributedPersistentGroupManager(groupStore);
+	public GroupManager groupManager() {
+		return new DistributedPersistentGroupManager();
 	}
 
 	@Bean(CommonConstants.MESSENGER_GROUPMANAGER_NAME)

@@ -27,6 +27,8 @@ service FederatedChannel {
 	rpc ClientFederateGroupsStream (stream FederateGroups) returns (Subscription) {}
 	
 	rpc GetAuthTokenByX509 (BinaryBlob) returns (FederateTokenResponse) {}
+
+	rpc Getx509Identity (Empty) returns (BinaryBlob) {}
 }
 
 enum CRUD { INVALID = 0; CREATE = 1; READ = 2; UPDATE = 3; DELETE = 4; }

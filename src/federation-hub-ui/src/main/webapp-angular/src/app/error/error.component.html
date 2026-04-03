@@ -1,0 +1,18 @@
+<div style="text-align:center; margin-top: 2rem;">
+  <p>{{ message }}</p>
+
+  <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 1rem;">
+      <a 
+        class="btn btn-primary"
+        style="padding: 0.5rem 1rem; font-size: 1rem;"
+        routerLink="/">
+        Back to Home
+      </a>
+      <a 
+        class="btn btn-secondary"
+        style="padding: 0.5rem 1rem; font-size: 1rem;"
+        (click)="reAuth()">
+        Login
+      </a>
+  </div>
+</div>

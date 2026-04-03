@@ -246,6 +246,12 @@ export default class Drawflowz {
      */
     module: string;
 
+    /**
+     * Should Edge Connections render description text
+     *  @default false
+     */
+    hide_edge_text: boolean;
+
     start(): void;
 
     load(): any;
@@ -259,6 +265,12 @@ export default class Drawflowz {
     applySettings(settings: any): void;
 
     getUuid(): string;
+
+    highlightConnections(id: string, fullyHideEdges: boolean): void;
+    
+    clearConnectionHighlights(): void;
+
+    toggleConnectionText(hide: boolean): void;
 
     /**
      * @param name Name of module

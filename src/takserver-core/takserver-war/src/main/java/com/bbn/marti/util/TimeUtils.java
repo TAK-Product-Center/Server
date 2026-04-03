@@ -2,8 +2,9 @@ package com.bbn.marti.util;
 
 import com.google.common.collect.Maps;
 import org.jetbrains.annotations.Nullable;
-import org.joda.time.DateTime;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.Map;
 
@@ -16,7 +17,8 @@ public class TimeUtils {
     public static Map.Entry<Date, Date> validateTimeInterval(@Nullable Long secago, @Nullable Date start, @Nullable Date end) {
         // override start with secago if it is provided
         if (secago != null && secago > 0) {
-            start = new DateTime().minusSeconds(secago.intValue()).toDate();
+            Instant startInstant = Instant.now().minus(secago, ChronoUnit.SECONDS);
+            start = Date.from(startInstant);
         }
 
         if (start == null) {

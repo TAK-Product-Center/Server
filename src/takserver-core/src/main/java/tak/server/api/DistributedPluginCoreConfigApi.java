@@ -52,4 +52,17 @@ public class DistributedPluginCoreConfigApi implements PluginCoreConfigApi, org.
 		}
 		return security;
 	}
+
+	private Security federationSecurity;
+
+	@Override
+	public synchronized Security getFederationSecurity() throws Exception {
+		if (federationSecurity == null) {
+			com.bbn.marti.config.Tls tls = CoreConfigFacade.getInstance().getRemoteConfiguration().getFederation().getFederationServer().getTls();
+			federationSecurity = new Security(new Tls(tls.getKeystore(), tls.getKeystoreFile(), tls.getKeystorePass(),
+					tls.getTruststore(), tls.getTruststoreFile(), tls.getTruststorePass(),
+					tls.getContext(), tls.getKeymanager()));
+		}
+		return federationSecurity;
+	}
 }

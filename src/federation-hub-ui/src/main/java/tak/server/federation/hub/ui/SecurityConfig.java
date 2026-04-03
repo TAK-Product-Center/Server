@@ -3,8 +3,6 @@ package tak.server.federation.hub.ui;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.List;
 
 import javax.naming.InvalidNameException;
 
@@ -13,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -27,11 +27,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
-import org.springframework.security.web.util.matcher.AndRequestMatcher;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -43,12 +39,9 @@ import tak.server.federation.hub.ui.manage.AuthorizationFileWatcher;
 @EnableWebSecurity
 public class SecurityConfig {
 	private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
-
-//	@Autowired
-//	private UserService userService;
-
+	
 	@Autowired
-	private JwtTokenFilter jwtTokenFilter;
+	private JwtTokenUtil jwtUtil;
 
 	@Autowired
 	private AuthorizationFileWatcher authFileWatcher;
@@ -56,16 +49,8 @@ public class SecurityConfig {
 	@Autowired
 	private FederationHubUIConfig fedHubConfig;
 
-//	@Override
-//	protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-//		auth.userDetailsService(username -> {
-//			return userService.loadUserByUsername(username);
-//		});
-//	}
-	
 	@Bean
 	public AuthenticationManager authenticationManager(UserService userService) {
-		
 		 DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
 		 authenticationProvider.setUserDetailsService(userService);
 		 return new ProviderManager(authenticationProvider);
@@ -80,24 +65,56 @@ public class SecurityConfig {
 	};
 
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-		
-		http.csrf().disable();
-		
-		http.x509().authenticationUserDetailsService(new X509AuthenticatedUserDetailsService());
-		
-		http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.ALWAYS);
+	@Order(1)
+	public SecurityFilterChain mtlsChain(HttpSecurity http) throws Exception {
+	    http.securityMatcher(request -> request.getLocalPort() == fedHubConfig.getPort());
 
-		http.authorizeHttpRequests().requestMatchers(getMatchers("/error","/oauth/**", "/login**", "/login/**", "/node_modules/**", "/favicon.ico")).permitAll()
-			.anyRequest().authenticated();
+	    http.csrf().disable();
+	    http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.ALWAYS);
 
-		http.exceptionHandling().authenticationEntryPoint((request, response, ex) -> {
-			response.sendError(HttpServletResponse.SC_UNAUTHORIZED, ex.getMessage());
-		});
+	    http.x509().authenticationUserDetailsService(new X509AuthenticatedUserDetailsService());
 
-		http.addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class);
-		
-		return http.build();
+	    http.authorizeHttpRequests(auth -> auth
+	    		.requestMatchers(HttpMethod.GET, "/api/oauth/login/auth").denyAll()
+	    	    .requestMatchers(HttpMethod.GET, "/api/oauth/login/redirect").denyAll()
+	    	    .requestMatchers(HttpMethod.GET, "/login").denyAll()
+	        .anyRequest().authenticated()
+	    );
+
+	    http.exceptionHandling().authenticationEntryPoint((req, res, ex) ->
+	        res.sendError(HttpServletResponse.SC_UNAUTHORIZED, ex == null ? "Unauthorized" : ex.getMessage()));
+
+	    return http.build();
+	}
+
+	@Bean
+	@Order(2)
+	public SecurityFilterChain oauthChain(HttpSecurity http) throws Exception {
+
+	    http.securityMatcher(oauthPortMatch);
+
+	    http.csrf().disable();
+	    http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+
+	    http.authorizeHttpRequests(auth -> auth
+	    	    .requestMatchers(HttpMethod.GET, "/api/oauth/login/auth").permitAll()
+	    	    .requestMatchers(HttpMethod.GET, "/api/oauth/login/redirect").permitAll()
+	    	    .requestMatchers("/api/**").authenticated()
+	    	    .anyRequest().permitAll()
+	    	);
+
+	    http.addFilterBefore(new JwtTokenFilter(fedHubConfig, jwtUtil), UsernamePasswordAuthenticationFilter.class);
+
+	    http.exceptionHandling()
+	        .authenticationEntryPoint((req, res, ex) -> {
+	            if (req.getRequestURI().startsWith(req.getContextPath() + "/api")) {
+	                res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
+	            } else {
+	                res.sendRedirect("/login");
+	            }
+	        });
+
+	    return http.build();
 	}
 	
 	private class X509AuthenticatedUserDetailsService implements AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken> {
@@ -118,15 +135,5 @@ public class SecurityConfig {
 
 			throw new UsernameNotFoundException("Authorized user for certificate " + dn + " not found");
 		}
-	}
-	
-	private RequestMatcher[] getMatchers(String... paths) {
-		List<RequestMatcher> matchers = new ArrayList<>();
-		for (String path: paths) {
-			RequestMatcher pathMatch = new AntPathRequestMatcher(path);
-			RequestMatcher oauthAndPortMatch = new AndRequestMatcher(oauthPortMatch, pathMatch);
-			matchers.add(oauthAndPortMatch);
-		}
-		return matchers.toArray(new RequestMatcher[0]);
 	}
 }
