@@ -1,0 +1,27 @@
+# Gradle
+.gradle/
+**/.gradle/
+
+# Build output
+**/bin/
+**/build/
+**/out/
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+*.env
+*.env.*
+
+# Project-specific
+src/takserver-package/CI_ENV_VARS
+
+# Logs
+*.log
