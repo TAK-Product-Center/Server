@@ -1,11 +1,14 @@
+from utils import extract_mission_change, extract_fileshare
+
 import random
 import string
 import time
 
-
 from datetime import datetime, timedelta
-from lxml import etree
+import xml.etree.ElementTree as ET
+import xml.dom.minidom
 
+from utils import extract_mission_change, extract_fileshare
 
 def id_gen(size=10):
     chars = string.ascii_letters + string.digits
@@ -37,29 +40,34 @@ class CotMessage:
             self.deserialize(msg)
             return
 
+
         if uid == None:
             uid = "PyTAK-" + id_gen()
 
         self.uid = uid
 
-        self.event = etree.Element("event",
-                                   how=how,
-                                   stale=cot_time_string(datetime.utcnow()+timedelta(minutes=1)),
-                                   start=cot_time_string(),
-                                   time=cot_time_string(),
-                                   type=type,
-                                   uid=self.uid,
-                                   version=version)
+        self.event = ET.Element(
+            "event",
+            {
+                "how": how,
+                "stale": cot_time_string(datetime.utcnow() + timedelta(minutes=1)),
+                "start": cot_time_string(),
+                "time": cot_time_string(),
+                "type": type,
+                "uid": self.uid,
+                "version": version,
+            }
+        )
 
-        self.point = etree.SubElement(self.event, "point")
-
-        self.point.attrib.update({"ce": "500",
-                                  "hae": "262.0",
-                                  "lat": lat,
-                                  "le": "500",
-                                  "lon": lon})
-
-        self.detail = etree.SubElement(self.event, "detail")
+        self.point = ET.SubElement(self.event, "point")
+        self.point.attrib.update({
+            "ce": "500",
+            "hae": "262.0",
+            "lat": lat,
+            "le": "500",
+            "lon": lon
+        })
+        self.detail = ET.SubElement(self.event, "detail")
 
 
     def add_callsign_detail(self,
@@ -99,7 +107,7 @@ class CotMessage:
                 return False # we are trying to edit a tag that doesn't exist
 
         else:
-            sub_detail = etree.SubElement(self.detail, detail_name)
+            sub_detail = ET.SubElement(self.detail, detail_name)
 
         sub_detail.attrib.update(detail_attributes)
 
@@ -114,9 +122,9 @@ class CotMessage:
                 detail = c
 
         else:
-            detail = etree.SubElement(self.detail, detail_name)
+            detail = ET.SubElement(self.detail, detail_name)
 
-        sub_detail = etree.SubElement(detail, sub_detail_name)
+        sub_detail = ET.SubElement(detail, sub_detail_name)
 
         sub_detail.attrib.update(sub_detail_attributes)
         if sub_detail_text is not None:
@@ -138,36 +146,22 @@ class CotMessage:
         return False
 
     def mission_change(self):
-        for c in self.detail:
-            if c.tag == "mission":
-                change_type = c.attrib.get("type")
-                mission_name = c.attrib.get("name")
-                file_hashes = list()
-
-                for node in c.findall('.//MissionChanges/MissionChange/contentResource/hash'):
-                    file_hashes.append(node.text)
-
-                if file_hashes:
-                    return "download_mission_files", file_hashes
-
-                if change_type in {"CREATE", "INVITE", "DELETE"}:
-                    return change_type, mission_name
-
-        return False, False
+        return extract_mission_change(self.detail, is_proto=False)
 
     def fileshare(self):
-        for c in self.detail:
-            if c.tag == "fileshare":
-                file_hash = c.attrib.get("sha256")
-                filename = c.attrib.get("filename")
-                return file_hash, filename
+        return extract_fileshare(self.detail, is_proto=False)
 
 
     def to_string(self, pretty_print=False):
-        return etree.tostring(self.event, pretty_print=pretty_print)
+        rough_string = ET.tostring(self.event, encoding='utf-8')
+        reparsed = xml.dom.minidom.parseString(rough_string)
+        if pretty_print == True:
+            return reparsed.toprettyxml(indent="  ")
+        else:
+            return reparsed.toxml()
 
     def deserialize(self, msg):
-        self.event = etree.fromstring(msg)
+        self.event = ET.fromstring(msg)
         self.uid = self.event.attrib.get("uid")
         for elem in self.event:
             if elem.tag == 'detail':
@@ -202,11 +196,9 @@ class CotMessage:
         self.add_sub_detail("TakControl", "TakRequest", sub_detail_attributes={"version": version})
 
     def __str__(self):
-        return etree.tostring(self.event)
+        return ET.tostring(self.event, encoding='utf-8').decode()
 
 if __name__ == "__main__":
     event = CotMessage()
 
     event.add_callsign_detail()
-
-    print(event.to_string(pretty_print=True))

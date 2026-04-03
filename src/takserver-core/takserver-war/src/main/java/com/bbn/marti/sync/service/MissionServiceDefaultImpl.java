@@ -994,7 +994,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 		}
 
 		// Remove hibernate proxies from the mission before manipulating the context during hydration (below).
-		UnproxyHelper.unproxyMission(mission);
+		mission = UnproxyHelper.unproxyMission(mission);
 
 		List<MissionAdd<String>> uidAdds = new LinkedList<>();
 		List<MissionAdd<Resource>> resourceAdds = new LinkedList<>();
@@ -1976,8 +1976,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	@Override
 	public Mission addMissionContent(UUID missionGuid, MissionContent content,  String creatorUid, String groupVector) {
-		return addMissionContentImpl(missionGuid, content, creatorUid, groupVector, new Date(), null);
-	}
+			return addMissionContentImpl(missionGuid, content, creatorUid, groupVector, new Date(), null);
+		}
 
 	@Override
 	public Mission addMissionContentAtTime(UUID missionGuid, MissionContent content, String creatorUid, String groupVector, Date date, String xmlContentForNotification) {
@@ -2924,6 +2924,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 			mission = missionRepository.getOne(id);
 
 			createChange.setMission(mission);
+			createChange.setMissionGuid(guid);
 			createChange.setMissionName(trimName(name));
 
 			// record the create mission action in the changelog
@@ -3481,6 +3482,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 		String groupVector = RemoteUtil.getInstance().bitVectorToString(RemoteUtil.getInstance().getBitVectorForGroups(groups));
 
+		List<Mission> results = new ArrayList<>();
+
 		List<Mission> missions = missionRepository.getInviteOnlyMissions(userName, tool, groupVector);
 
 		for (Mission mission : missions) {
@@ -3490,10 +3493,10 @@ public class MissionServiceDefaultImpl implements MissionService {
 			mission.setGroups(RemoteUtil.getInstance().getGroupNamesForBitVectorString(
 					mission.getGroupVector(), groups));
 			
-			UnproxyHelper.unproxyMission(mission);
+			results.add(UnproxyHelper.unproxyMission(mission));
 		}
 
-		return missions;
+		return results;
 	}
 
 	@Override
@@ -3514,6 +3517,8 @@ public class MissionServiceDefaultImpl implements MissionService {
 			missions = missionRepository.getAllCopMissions(groupVector, path, tool);
 		}
 
+		List<Mission> results = new ArrayList<>();
+
 		for (Mission mission : missions) {
 			if (mission.isPasswordProtected()) {
 				mission.clear();
@@ -3522,10 +3527,10 @@ public class MissionServiceDefaultImpl implements MissionService {
 			mission.setGroups(RemoteUtil.getInstance().getGroupNamesForBitVectorString(
 					mission.getGroupVector(), groups));
 			
-			UnproxyHelper.unproxyMission(mission);
+			results.add(UnproxyHelper.unproxyMission(mission));
 		}
 
-		return missions;
+		return results;
 	}
 	public Long getMissionCount(String tool) {
 
@@ -4743,15 +4748,17 @@ public class MissionServiceDefaultImpl implements MissionService {
 	@Override
 	@Cacheable(cacheResolver = AllMissionCacheResolver.ALL_MISSION_CACHE_RESOLVER, key="{#root.methodName, #root.args[0]}", sync = true)
 	public List<Mission> getMissionsForDataFeed(String feed_uid) {
+
+		List<Mission> results = new ArrayList<>();
+
 		List<Mission> missions = missionRepository.getMissionsForDataFeed(feed_uid);
-		
+
 		for (Mission mission : missions) {
-			UnproxyHelper.unproxyMission(mission);
+			results.add(UnproxyHelper.unproxyMission(mission));
 		}
 		
-		return missions;
+		return results;
 	}
-
 
 	@Override
 	@Cacheable(cacheResolver = AllMissionCacheResolver.ALL_MISSION_CACHE_RESOLVER, key="{#root.methodName, #root.args[0]}", sync = true)

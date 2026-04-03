@@ -36,7 +36,6 @@ export class AddEdgeModalComponent {
         disallowedGroups: []
       }
     }
-
     this.workflowService.getKnownGroupsForNode(this.edge.source).subscribe({
         next: (res: any) => {
           this.knownOutboundGroups = res

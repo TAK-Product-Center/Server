@@ -18,6 +18,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 
 import com.bbn.marti.config.Oauth;
+import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.security.web.MartiValidator;
 import com.bbn.security.web.MartiValidatorConstants;
 
@@ -52,6 +53,17 @@ public class AuthCookieUtils {
                 .httpOnly(true)
                 .path(path)
                 .maxAge(maxAge);
+
+        if (CoreConfigFacade.getInstance().getRemoteConfiguration().getCookie() != null &&
+                CoreConfigFacade.getInstance().getRemoteConfiguration().getCookie().isCustomDomainEnabled()) {
+            String customDomain = CoreConfigFacade.getInstance().getRemoteConfiguration().getCookie().getCustomDomain();
+            if (!customDomain.isEmpty()) {
+                logger.info("Using custom domain {} for access_token cookie", customDomain);
+                responseCookieBuilder = responseCookieBuilder.domain(customDomain);
+            } else {
+                logger.warn("Custom domain set to empty string, using default domain instead.");
+            }
+        }
 
         responseCookieBuilder = responseCookieBuilder.sameSite(sameSite.name());
 

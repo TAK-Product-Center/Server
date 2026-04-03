@@ -1505,38 +1505,47 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 
                         if (groups != null) {
 
-                        	if (postMissionEventsAsPublic || alwaysArchiveMissionCot || useMissionGroupsForContents) {
+							List<Node> martiNodes = data.getDocument().selectNodes("/event/detail/marti");
+							if (martiNodes != null && !martiNodes.isEmpty()) {
+								Node marti =  martiNodes.get(0);
 
-								if (!data.getDocument().selectNodes(
-										"/event/detail/marti/dest[@mission]").isEmpty()) {
+								String archive = ((Element) marti).attributeValue("archive");
+								if (archive != null) {
+									data.setContext(Constants.ARCHIVE_EVENT_KEY, Boolean.valueOf(archive));
+								}
 
-									if (useMissionGroupsForContents) {
-										String missionName = ((Element) data.getDocument().selectNodes(
-												"/event/detail/marti/dest[@mission]").get(0)).attributeValue("mission");
-										String userGroupVector = getGroupVectorFromHandler(handler);
-										Mission mission = missionCacheHelper.getMission(missionName, false, false);
-										if (remoteUtil.isGroupVectorAllowed(userGroupVector, mission.getGroupVector())) {
-											if (mission.getGroupVector() != userGroupVector) {
-												Collection<Group> allOutGroups = groupManager.getAllGroups();
-												Collection<Group> allInGroups = allOutGroups.stream()
-														.map(group -> groupManager.hydrateGroup(
-																new Group(group.getName(), Direction.IN)))
-														.collect(Collectors.toSet());
-												groups = new ConcurrentSkipListSet<>();
-												groups.addAll(RemoteUtil.getInstance().getGroupsForBitVectorString(
-														mission.getGroupVector(), allInGroups));
+								if (postMissionEventsAsPublic || alwaysArchiveMissionCot || useMissionGroupsForContents) {
+
+									List<Node> missionNodes = marti.selectNodes("dest[@mission]");
+									if (missionNodes != null && !missionNodes.isEmpty()) {
+
+										if (useMissionGroupsForContents) {
+											String missionName = ((Element) missionNodes.get(0)).attributeValue("mission");
+											String userGroupVector = getGroupVectorFromHandler(handler);
+											Mission mission = missionCacheHelper.getMission(missionName, false, false);
+											if (remoteUtil.isGroupVectorAllowed(userGroupVector, mission.getGroupVector())) {
+												if (mission.getGroupVector() != userGroupVector) {
+													Collection<Group> allOutGroups = groupManager.getAllGroups();
+													Collection<Group> allInGroups = allOutGroups.stream()
+															.map(group -> groupManager.hydrateGroup(
+																	new Group(group.getName(), Direction.IN)))
+															.collect(Collectors.toSet());
+													groups = new ConcurrentSkipListSet<>();
+													groups.addAll(RemoteUtil.getInstance().getGroupsForBitVectorString(
+															mission.getGroupVector(), allInGroups));
+												}
 											}
 										}
-									}
 
-									if (postMissionEventsAsPublic) {
-										//make a copy of the group set so we don't modify the actual user
-										groups = new ConcurrentSkipListSet<>(groups);
-										groups.add(groupManager.getGroup("__ANON__", Direction.IN));
-									}
+										if (postMissionEventsAsPublic) {
+											//make a copy of the group set so we don't modify the actual user
+											groups = new ConcurrentSkipListSet<>(groups);
+											groups.add(groupManager.getGroup("__ANON__", Direction.IN));
+										}
 
-									if (alwaysArchiveMissionCot) {
-										data.setContext(Constants.ARCHIVE_EVENT_KEY, Boolean.TRUE);
+										if (alwaysArchiveMissionCot) {
+											data.setContext(Constants.ARCHIVE_EVENT_KEY, Boolean.TRUE);
+										}
 									}
 								}
 							}
@@ -2197,19 +2206,29 @@ public class SubmissionService extends BaseService implements MessagingConfigura
 		try {
 			GeospatialEventFilter filter = null;
 
-			List<Node> bboxNodes = msg.getDocument().selectNodes(
-					"/event/detail/subscription/geospatialFilter/boundingBox");
-			if (bboxNodes != null && !bboxNodes.isEmpty()) {
-				GeospatialFilter geospatialFilter = new GeospatialFilter();
-				for (Node bboxNode : bboxNodes) {
-					GeospatialFilter.BoundingBox boundingBox = new GeospatialFilter.BoundingBox();
-					boundingBox.setMinLongitude(Double.valueOf(bboxNode.valueOf("@minLongitude")));
-					boundingBox.setMinLatitude(Double.valueOf(bboxNode.valueOf("@minLatitude")));
-					boundingBox.setMaxLongitude(Double.valueOf(bboxNode.valueOf("@maxLongitude")));
-					boundingBox.setMaxLatitude(Double.valueOf(bboxNode.valueOf("@maxLatitude")));
-					geospatialFilter.getBoundingBox().add(boundingBox);
+			Node geospatialFilterNode = msg.getDocument().selectSingleNode(
+					"/event/detail/subscription/geospatialFilter");
+			if (geospatialFilterNode != null) {
+
+				List<Node> bboxNodes = geospatialFilterNode.selectNodes("boundingBox");
+				if (bboxNodes != null && !bboxNodes.isEmpty()) {
+					GeospatialFilter geospatialFilter = new GeospatialFilter();
+
+					String filterTAKClients = ((Element) geospatialFilterNode).attributeValue("filterTAKClients");
+					if (filterTAKClients != null) {
+						geospatialFilter.setFilterTAKClients(Boolean.parseBoolean(filterTAKClients));
+					}
+
+					for (Node bboxNode : bboxNodes) {
+						GeospatialFilter.BoundingBox boundingBox = new GeospatialFilter.BoundingBox();
+						boundingBox.setMinLongitude(Double.valueOf(bboxNode.valueOf("@minLongitude")));
+						boundingBox.setMinLatitude(Double.valueOf(bboxNode.valueOf("@minLatitude")));
+						boundingBox.setMaxLongitude(Double.valueOf(bboxNode.valueOf("@maxLongitude")));
+						boundingBox.setMaxLatitude(Double.valueOf(bboxNode.valueOf("@maxLatitude")));
+						geospatialFilter.getBoundingBox().add(boundingBox);
+					}
+					filter = new GeospatialEventFilter(geospatialFilter);
 				}
-				filter = new GeospatialEventFilter(geospatialFilter);
 			}
 
 			ChannelHandler handler = msg.getContext(Constants.SOURCE_TRANSPORT_KEY, ChannelHandler.class);

@@ -15,7 +15,7 @@ import com.bbn.marti.sync.model.Resource;
 
 public class UnproxyHelper {
 	
-	public static void unproxyMission(Mission mission) {
+	public static Mission unproxyMission(Mission mission) {
 		
 		Set<ExternalMissionData> unproxiedExtDataSet = getUnproxySet(mission.getExternalData());
 		mission.setExternalData(unproxiedExtDataSet);
@@ -44,6 +44,8 @@ public class UnproxyHelper {
 		if (mission.getDefaultRole() != null) {
 			mission.setDefaultRole((MissionRole) Hibernate.unproxy(mission.getDefaultRole()));
 		}
+
+		return (Mission) Hibernate.unproxy(mission);
 	}
 
 	@SuppressWarnings("unchecked")

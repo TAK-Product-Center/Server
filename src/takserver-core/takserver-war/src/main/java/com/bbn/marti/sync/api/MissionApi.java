@@ -861,9 +861,13 @@ public class MissionApi extends BaseRestController {
 							missionRepository.updateGroups(name, groupVectorUser, groupVectorMission);
 							missionRepository.updateGroupsForMissionUids(name, groupVectorUser, groupVectorMission);
 							missionRepository.updateGroupsForMissionResources(name, groupVectorUser, groupVectorMission);
+							mission.setGroupVector(groupVectorMission);
 							updated = true;
 						}
 					}
+
+					mission.setGroups(RemoteUtil.getInstance().getGroupNamesForBitVectorString(
+							mission.getGroupVector(), groupManager.getAllGroups()));
 
 					if (updated || updatedMissionRequestBody) {
 						missionService.invalidateMissionCache(name);
@@ -1576,8 +1580,13 @@ public class MissionApi extends BaseRestController {
 				mission = missionService.addMissionContent(mission.getGuidAsUUID(), content, creatorUid, mission.getGroupVector());
 			}
 
+			Mission copy = new Mission(mission);
+			if (copy.getGroups() != null) {
+				copy.getGroups().clear();
+			}
+
 			Set<Mission> result = new HashSet<>();
-			result.add(mission);
+			result.add(copy);
 
 			return new ApiResponse<Set<Mission>>(Constants.API_VERSION, Mission.class.getSimpleName(), result);
 		};

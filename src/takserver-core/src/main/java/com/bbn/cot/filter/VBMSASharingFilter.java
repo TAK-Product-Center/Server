@@ -52,7 +52,7 @@ public class VBMSASharingFilter {
 				}
 			}
 			if (config.getVbm().isDisableSASharing()) {
-				if (!isChatMessage(cot)) {
+				if (isSituationalAwarenessMessage(cot)) {
 					return null;
 				}
 			}
@@ -64,4 +64,10 @@ public class VBMSASharingFilter {
 	private boolean isChatMessage(CotEventContainer cot) {
 		return "b-t-f".equals(cot.getType());
 	}
+
+	public boolean isSituationalAwarenessMessage(CotEventContainer cot) {
+		return !Strings.isNullOrEmpty(cot.getCallsign()) && !Strings.isNullOrEmpty(cot.getEndpoint()) && !Strings.isNullOrEmpty(cot.getUid());
+	}
+
+
 }

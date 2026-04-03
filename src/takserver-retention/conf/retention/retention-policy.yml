@@ -5,3 +5,7 @@ dataRetentionMap:
   missionpackages: null
   missions: null
   geochat: null
+
+retentionSettings:
+  files:
+    exemptKeywords: []

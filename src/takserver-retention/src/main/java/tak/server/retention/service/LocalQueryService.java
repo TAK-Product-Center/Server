@@ -72,10 +72,15 @@ public class LocalQueryService {
         return count;
     }
 
-    public int deleteFilesByTtl(@NotNull Integer ttl) {
+    public int deleteFilesByTtl(@NotNull Integer ttl, List<String> exemptKeywords) {
 
-        String deleteQuery = "delete from resource using resource r left outer join mission_resource mr on mr.resource_id=r.id " +
-                "where resource.id = r.id and mr.resource_id is null and resource.submissiontime" + DELETE_BY_TTL;
+        StringBuilder deleteQuery = new StringBuilder("delete from resource using resource r left outer join mission_resource mr on mr.resource_id=r.id " +
+                "where resource.id = r.id and mr.resource_id is null and resource.submissiontime" + DELETE_BY_TTL);
+        
+        if (exemptKeywords != null && !exemptKeywords.isEmpty()) {
+        	deleteQuery.append(" AND (resource.keywords IS NULL OR NOT (resource.keywords && :exemptKeywords::varchar[]))");
+        }
+        
         int count = 0;
 
         if (ttl == null) {
@@ -83,7 +88,12 @@ public class LocalQueryService {
             return count;
         }
         MapSqlParameterSource namedParameters = new MapSqlParameterSource("ttl", ttl);
-        count = namedParameterJdbcTemplate.update(deleteQuery, namedParameters);
+
+        if (exemptKeywords != null && !exemptKeywords.isEmpty()) {
+            namedParameters.addValue("exemptKeywords", exemptKeywords.toArray(new String[0]));
+        }
+
+        count = namedParameterJdbcTemplate.update(deleteQuery.toString(), namedParameters);
 
         if (count > 0) {
             logger.info("  delete files by time to live, Number of rows deleted  " + count);

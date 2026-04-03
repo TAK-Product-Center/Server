@@ -1123,7 +1123,12 @@ public class SubscriptionApi extends BaseRestController {
             return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-    
+
+	@RequestMapping(value = "/groups/update", method = RequestMethod.POST)
+	public void bulkGroupsUpdated(@RequestBody @NotNull Set<String> usernames) {
+		usernames.forEach(this::groupsUpdated);
+	}
+
     @RequestMapping(value = "/groups/update/{username:.+}", method = RequestMethod.GET)
     public ResponseEntity groupsUpdated(@PathVariable(value = "username") String username) {
         try {

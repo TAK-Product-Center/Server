@@ -25,6 +25,9 @@ from utils import p12_to_pem
 
 import stats
 
+from mission_handlers import read_mission_thread_zmq
+
+
 class PyTAKStreamingProto:
 
     def __init__(self,
@@ -63,7 +66,7 @@ class PyTAKStreamingProto:
         self.track_write_delta = track_write_delta
         self.num_tracks_per_delta = num_tracks_per_delta
         self.last_track_write = time.time() + self.track_write_delta
-        self.track_uids = [CotProtoMessage().uid for _ in range(self.num_tracks_per_delta)]
+        self.track_uids = [CotProtoMessage().uid for _ in range(int(self.num_tracks_per_delta))]
 
         if mission_config is not None:
             self.mission_config = mission_config
@@ -122,7 +125,6 @@ class PyTAKStreamingProto:
         self.replay_uid = CotProtoMessage().uid
 
         if self.track_file:
-            print("got track file: " + str(self.track_file))
             self.num_tracks_per_delta = 0 # set num tracks per delta to 0 if replaying from file
             self.load_track_file(self.track_file, self.track_start_delay)
 
@@ -173,12 +175,11 @@ class PyTAKStreamingProto:
                 raise e
 
             self.logger.debug(data)
-
             msg = CotMessage(msg=data)
             if msg.server_protocol_version_support() == '1':
                 response = CotMessage(uid=msg.uid)
                 response.protocol_response_message(version='1')
-                writer.write(response.to_string())
+                writer.write(response.to_string().encode('utf-8'))
                 await writer.drain()
                 sent_request = True
 
@@ -244,14 +245,16 @@ class PyTAKStreamingProto:
 
     async def send_self_sa(self, writer):
         self.location = (random.uniform(-75, 75), random.uniform(-170, 170))
+        
         self_sa_message = CotProtoMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]))
         self_sa_message.add_callsign_detail(group_name="Red", platform="PyTAKStreamingProto")
+        
         writer.write(self_sa_message.serialize())
         await writer.drain()
         self.last_sa_write = time.time()
 
     async def send_track(self, writer):
-        for i in range(self.num_tracks_per_delta):
+        for i in range(int(self.num_tracks_per_delta)):
             track_uid = self.track_uids[i]
             track_location = (random.uniform(-70, 70), random.uniform(-130, 130))
             track_message = CotProtoMessage(uid=track_uid, lat=str(track_location[0]), lon=str(track_location[1]))
@@ -299,7 +302,7 @@ class PyTAKStreamingProto:
     async def send_ping(self, writer):
         ping_message = CotProtoMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]), type="t-x-c-t")
         writer.write(ping_message.serialize())
-        # print(f"sending Ping: {ping_message.serialize()}")
+        # print(f"sending Ping: {ping_message.to_string().encode('utf-8')}")
         await writer.drain()
         self.last_ping_write = time.time()*1000 # in ms
 
@@ -344,8 +347,7 @@ class PyTAKStreamingProto:
             data_sync_event = threading.Event()
             data_sync_thread = threading.Thread(target=self.data_sync_write_target, args=(data_sync_event,))
             data_sync_thread.start()
-            self.last_sa_write = time.time() - self.self_sa_delta
-            self.last_ping_write = time.time()*1000 - self.ping_interval
+
             while True:
                 write_action = await self.time_to_write()
 
@@ -441,11 +443,11 @@ class PyTAKStreamingProto:
                     self.read_socket = context.socket(zmq.PUSH)
                     port = self.read_socket.bind_to_random_port('tcp://*')
                     data_sync_port = self.data_sync_sess.port
-                    POOL_SIZE = 3
+                    POOL_SIZE = 1
                     self.read_pool = Pool(POOL_SIZE)
 
                     for i in range(POOL_SIZE):
-                        self.read_pool.apply_async(read_thread_zmq, args=(port, data_sync_port))
+                        self.read_pool.apply_async(read_mission_thread_zmq, args=(port, data_sync_port, True))
                     await asyncio.sleep(1)
                     
                 # get list of recent client connect / disconnect events
@@ -483,39 +485,7 @@ class PyTAKStreamingProto:
                 connection_data['connected'] = False
                 self.data_dict[self.uid] = connection_data
                 self.logger.error("retry # %d" % times_connected)
-                await asyncio.sleep(1)
-
-def read_thread_zmq(port: int, data_sync_port):
-    context = zmq.Context()
-    socket = context.socket(zmq.PULL)
-    data_sync_sock = context.socket(zmq.PUSH)
-    addr = 'tcp://localhost:' + str(port)
-    data_sync_addr = 'tcp://localhost:' + str(data_sync_port)
-    socket.connect(addr)
-    data_sync_sock.connect(data_sync_addr)
-
-    try:
-        while True:
-            data = socket.recv()
-            proto_message = CotProtoMessage(msg=data)
-
-            if proto_message.is_sa():
-                continue
-
-            change_type, change_data = proto_message.mission_change()
-            if change_type:
-                send_data = {'req_type': change_type, 'req_data': change_data}
-                data_sync_sock.send_json(send_data, flags=zmq.NOBLOCK)
-
-            fileshare_data = proto_message.fileshare()
-            if fileshare_data:
-                send_data = {'req_type': 'download_file', 'req_data': fileshare_data}
-                data_sync_sock.send_json(send_data, flags=zmq.NOBLOCK)
-
-    except Exception as e:
-        print("read_thread error: " + str(type(e)) + " -> " + str(e.args))
-        raise e
-
+                await asyncio.sleep(5)
 
 class PyTAKStreamingProtoProcess(multiprocessing.Process):
     def __init__(self, address=None, uid=None, cert=None, password=None, self_sa_delta=5.0,

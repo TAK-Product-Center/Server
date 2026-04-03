@@ -34,6 +34,7 @@ public class GeospatialEventFilter implements CotFilter {
 
     public GeospatialEventFilter(GeospatialFilter filter) {
         this.filter = filter;
+        this.noFilterCheckTAKClient = !filter.isFilterTAKClients();
     }
 
     public GeospatialEventFilter(GeospatialFilter filter, boolean noFilterCheckTypes, boolean noFilterCheckTAKClient,

@@ -104,14 +104,6 @@ public class OAuthUtils {
                 throw new IllegalStateException("missing scopes_supported in response");
             }
 
-            if (!response.containsKey("claims_supported")) {
-                throw new IllegalStateException("missing claims_supported in response");
-            }
-
-            if (!response.containsKey("grant_types_supported")) {
-                throw new IllegalStateException("missing grant_types_supported in response");
-            }
-
             AuthServer convertedConfig = new AuthServer();
 
             convertedConfig.setName(config.getName());

@@ -143,7 +143,7 @@ public class Mission implements Serializable, Comparable<Mission> {
         setName(name);
     }
 
-    public Mission(Mission other, Date lastEdited) {
+    public Mission(Mission other) {
         id = other.id;
         name = other.name;
         description = other.description;
@@ -159,6 +159,7 @@ public class Mission implements Serializable, Comparable<Mission> {
         keywords = other.keywords;
         creatorUid = other.creatorUid;
         createTime = other.createTime;
+        lastEdited = other.lastEdited;
         uidAdds = other.uidAdds;
         resourceAdds = other.resourceAdds;
         groupVector = other.groupVector;
@@ -179,8 +180,7 @@ public class Mission implements Serializable, Comparable<Mission> {
         missionChanges = other.missionChanges;
         logs = other.logs;
         expiration = other.expiration;
-
-        this.lastEdited = lastEdited;
+        guid = other.guid;
     }
 
     @Id

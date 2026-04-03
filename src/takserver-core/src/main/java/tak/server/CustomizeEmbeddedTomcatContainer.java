@@ -40,6 +40,18 @@ public class CustomizeEmbeddedTomcatContainer implements WebServerFactoryCustomi
 
 			factory.addContextValves(accessLogValve);
 		}
+		
+		factory.addConnectorCustomizers(connector -> {
+		    // Max worker threads processing requests & websocket IO (Tomcat default: 200)
+		    connector.setProperty("maxThreads", "200");
+
+		    // Max simultaneous socket connections Tomcat will allow (Tomcat default: 8192)
+		    connector.setProperty("maxConnections", String.valueOf(CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork().getTomcatMaxConnections()));
+
+		    // Backlog queue when all threads are busy (Tomcat default: 100)
+		    connector.setProperty("acceptCount", "100");
+		});
+
 	}
 
 	public static class TomcatSlf4jAccessValve extends AbstractAccessLogValve {

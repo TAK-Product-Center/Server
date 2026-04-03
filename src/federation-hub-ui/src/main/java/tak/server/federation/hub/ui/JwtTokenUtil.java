@@ -166,9 +166,22 @@ public class JwtTokenUtil {
 
     public Claims parseClaims(String token, SignatureAlgorithm signatureAlgorithm) throws ExpiredJwtException {
         try {
+        	if (logger.isTraceEnabled()) {
+        		logger.trace("parseClaims for token: " + token);
+        	}
+        	
             Jwt jwt = jwtDecoder.decode(token);
 
             Map<String, Object> springClaims = jwt.getClaims();
+            
+            if (logger.isTraceEnabled()) {
+            	logger.trace("--------- Token Claims ----------");
+            	springClaims.entrySet().forEach(e -> {
+            		logger.trace(e.getKey() + " " + e.getValue());
+            	});
+            	logger.trace("\n");
+            }
+            
             Claims jjwtClaims = new DefaultClaims(springClaims);
 
             return jjwtClaims;
@@ -177,11 +190,11 @@ public class JwtTokenUtil {
         	if (isExpiredJwt(e)) {
         		throw new io.jsonwebtoken.ExpiredJwtException(null, null, e.getLocalizedMessage());
         	} else {
-        		 logger.info("exception checking expiration status", e);
+        		 logger.error("exception checking expiration status", e);
         		 return null;
         	}
         } catch (Exception e) {
-            logger.info("exception in parseClaims", e);
+            logger.error("exception in parseClaims", e);
             return  null;
         }
 
@@ -216,6 +229,10 @@ public class JwtTokenUtil {
         JSONObject tokenJson = (JSONObject) new JSONParser().parse(tokenResponse.getBody());
         if (!tokenJson.containsKey("access_token")) {
             throw new IllegalStateException("missing access_token in response");
+        }
+        
+        if (logger.isTraceEnabled()) {
+        	logger.trace("Keycloak Token Request " + tokenJson);
         }
 
         // store the tokens in the cookie

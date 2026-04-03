@@ -4,7 +4,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 
@@ -15,13 +14,11 @@ import com.bbn.marti.nio.channel.connections.UdpDataChannelHandler;
 import com.bbn.marti.nio.listener.ProtocolListener;
 import com.bbn.marti.nio.protocol.Protocol;
 import com.bbn.marti.nio.protocol.base.AbstractBroadcastingProtocol;
-import com.bbn.marti.nio.protocol.connections.SingleCotProtocol;
 import com.bbn.marti.nio.protocol.connections.SingleProtobufOrCotProtocol;
 import com.bbn.marti.remote.InputMetric;
 import com.bbn.marti.remote.groups.ConnectionInfo;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SubmissionService;
-import com.bbn.marti.service.TransportCotEvent;
 import com.bbn.marti.util.MessageConversionUtil;
 import com.bbn.marti.util.concurrent.future.AsyncFuture;
 
@@ -39,15 +36,9 @@ public class NioNettyUdpHandler extends MessageToMessageDecoder<DatagramPacket> 
 	protected Protocol<CotEventContainer> protocol;
 	protected Input input;
 	protected ConcurrentLinkedQueue<ProtocolListener<CotEventContainer>> protocolListeners;
-	protected AtomicBoolean protoSupported = new AtomicBoolean(false);
-	
+
 	public NioNettyUdpHandler(Input input) {
 		this.input = input;
-		
-		TransportCotEvent transport = TransportCotEvent.findByID(input.getProtocol());
-		if (transport == TransportCotEvent.COTPROTOMUDP) {
-			this.protoSupported.set(true);
-        }
 	}
 	
 	@Override
@@ -83,9 +74,8 @@ public class NioNettyUdpHandler extends MessageToMessageDecoder<DatagramPacket> 
 
 			Resources.udpReadParseProcessor.submit(() -> {
 				try {
-					final CotEventContainer cot = protoSupported.get() ?
-							SingleProtobufOrCotProtocol.byteBufToCot(buffer, handler) :
-							SingleCotProtocol.byteBufToCot(buffer, handler);
+					final CotEventContainer cot =
+							SingleProtobufOrCotProtocol.byteBufToCot(buffer, handler);
 					if (cot != null) {
 						if (anp != null) {
 							Resources.udpReadDataReceivedProcessor.submit(() -> {

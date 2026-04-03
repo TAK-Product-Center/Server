@@ -72,7 +72,7 @@ public class MissionCacheHelper {
 			if (logger.isDebugEnabled()) {
 				logger.debug("cache hit for " + key);
 			}
-			return mission;
+			return new Mission(mission);
 		}
 
 		if (logger.isDebugEnabled()) {
@@ -97,18 +97,18 @@ public class MissionCacheHelper {
 
 				if (mission != null) {
 					// cache hit - double-checked lock
-					return mission;
+					return new Mission(mission);
 				}
 			}
 
 			mission = doMissionQuery(missionName, hydrateDetails);
 
-			if (acquired && mission != null) {
+			if (acquired && mission != null && mission.getName() != null) {
 
 				if (logger.isDebugEnabled()) {
 					logger.debug("Unproxy ExternalMissionData and MapLayer");
 				}
-				UnproxyHelper.unproxyMission(mission);
+				mission = UnproxyHelper.unproxyMission(mission);
 
 				// cache the mission with the appropriate key
 				getCacheManager().getCache(missionName).put(key, mission);
@@ -124,7 +124,7 @@ public class MissionCacheHelper {
 			}
 		}
 		
-		return mission;
+		return mission != null ? new Mission(mission) : null;
 	}
 	
 	public Mission getMissionByGuid(UUID guid, boolean hydrateDetails, boolean skipCache) {
@@ -141,14 +141,14 @@ public class MissionCacheHelper {
 		
 		Mission mission = null;
 
-		ValueWrapper wrapper = getCacheManager().getCache(guid.toString()).get(key);	
+		ValueWrapper wrapper = getCacheManager().getCache("mg-" + guid.toString()).get(key);
 		mission = unwrapMission(wrapper);
 		
 		if (mission != null) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("cache hit for " + key);
 			}
-			return mission;
+			return new Mission(mission);
 		}
 		
 		if (logger.isDebugEnabled()) {
@@ -168,12 +168,12 @@ public class MissionCacheHelper {
 			} else {
 
 				// double-checked cache get
-				wrapper = getCacheManager().getCache(guid.toString()).get(key);	
+				wrapper = getCacheManager().getCache("mg-" + guid.toString()).get(key);
 				mission = unwrapMission(wrapper);
 
 				if (mission != null) {
 					// cache hit - double-checked lock
-					return mission;
+					return new Mission(mission);
 				}
 			}
 
@@ -182,12 +182,12 @@ public class MissionCacheHelper {
 			logger.debug("Mission from doMissionQueryGuid {} {}", guid, mission);
 
 			// only do cache put if the lock was acquired
-			if (acquired && mission != null) {
+			if (acquired && mission != null && mission.getGuid() != null) {
 
 				if (logger.isDebugEnabled()) {
 					logger.debug("Unproxy ExternalMissionData and MapLayer");
 				}
-				UnproxyHelper.unproxyMission(mission);
+				mission = UnproxyHelper.unproxyMission(mission);
 
 				// cache the mission with the appropriate key
 				getCacheManager().getCache("mg-" + guid.toString()).put(key, mission);
@@ -203,7 +203,7 @@ public class MissionCacheHelper {
 			}
 		}
 
-		return mission;
+		return mission != null ? new Mission(mission) : null;
 	}
 	
 	private Mission unwrapMission(ValueWrapper missionWrapper) {

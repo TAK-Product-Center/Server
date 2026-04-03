@@ -49,7 +49,7 @@ public enum TransportCotEvent {
 	UDP   ("udp",
         UdpServerBinder.udpBinderFactory, UdpClientChannelHandler.udpClientFactory,
         Resources.udpProcessor, Resources.udpProcessor, // UDP doesnt' have a pipeline executor
-        SingleCotProtocol.singleCotInstantiator, SingleCotProtocol.singleCotInstantiator),
+		SingleProtobufOrCotProtocol.singleProtobufOrCotInstantiator, SingleProtobufOrCotProtocol.singleProtobufOrCotInstantiator),
 
 	MUDP  ("cotmcast",
         MulticastServerBinder.mudpBinderFactory, UdpClientChannelHandler.udpClientFactory,

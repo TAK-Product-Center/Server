@@ -85,6 +85,10 @@ public class FederationHubUIOAuthApi {
                 	uriComponentBuilder.queryParam("prompt", "login")
                            .queryParam("max_age", "0");
                 }
+                
+            if (logger.isTraceEnabled()) {
+            	logger.trace("request for /login/auth - redirecting to " + uriComponentBuilder.toUriString());
+            }
 
             // send the redirect
             response.sendRedirect(uriComponentBuilder.toUriString());

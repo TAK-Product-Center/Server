@@ -191,7 +191,9 @@ def test_streaming_proto(host, port, cert, password,
                          send_metrics_interval=60,
                          cloudwatch_namespace="pyTAK-test",
                          track_file=None,
-                         track_start_delay=0):
+                         track_start_delay=0,
+                         track_write_delta=1.0,
+                         num_tracks_per_delta=0):
     
     if sequential_uids:
         uids = ["PyTAK-%04d" % i for i in range(clients)]
@@ -690,12 +692,12 @@ if __name__ == "__main__":
         ping = args.ping or False
         ping_interval = args.ping_interval or 1000
         send_metrics = args.send_metrics or False
-        track_write_delta = args.track_interval
+        track_write_delta = args.track_interval or 1.0
         num_tracks_per_delta = getattr(args, "num_tracks_per_delta", 0) or 0
         send_metrics_interval = args.send_metrics_interval or 60
         cloudwatch_namespace = args.cloudwatch_namespace
         track_file = args.track_file
-        track_start_delay = args.track_start_delay
+        track_start_delay = args.track_start_delay or 0
         websocket_path = 'takproto/1'
         config = {}
 
@@ -740,21 +742,21 @@ if __name__ == "__main__":
         logger.info("testing host: {}:{}".format(host, tls))
 
         test_streaming_proto(host, tls, cert, password,
-                             clients=pytak_clients,
-                             self_sa_delta=self_sa_delta,
-                             offset=offset,
-                             sequential_uids=args.sequential_uids,
-                             mission_config=config.get("Missions"),
-                             mission_port=https,
-                             mission_api_config=mission_api_config,
-                             ping=ping,
-                             ping_interval=ping_interval,
-                             send_metrics=send_metrics,
-                             send_metrics_interval=send_metrics_interval,
-                             cloudwatch_namespace=cloudwatch_namespace,
-                             track_file=track_file,
-                             track_start_delay=track_start_delay
-                            )
+                     clients=pytak_clients,
+                     self_sa_delta=self_sa_delta,
+                     offset=offset,
+                     sequential_uids=args.sequential_uids,
+                     mission_config=config.get("Missions"),
+                     mission_port=https,
+                     mission_api_config=mission_api_config,
+                     ping=ping,
+                     ping_interval=ping_interval,
+                     send_metrics=send_metrics,
+                     send_metrics_interval=send_metrics_interval,
+                     cloudwatch_namespace=cloudwatch_namespace,
+                     track_file=args.track_file,
+                     track_start_delay=args.track_start_delay,
+                     track_write_delta=track_write_delta)
 
     if args.test_websocket_proto:
         logger.info("")

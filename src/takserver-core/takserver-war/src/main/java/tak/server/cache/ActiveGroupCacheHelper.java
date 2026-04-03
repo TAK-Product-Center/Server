@@ -57,6 +57,12 @@ public class ActiveGroupCacheHelper {
 
     public void setActiveGroupsForUser(String username, List<Group> groups) {
 
+        // make sure we don't add neighbors to the cache
+        List<Group> setGroups = new ArrayList<>();
+        for (Group group : groups) {
+            setGroups.add(group.getCopy());
+        }
+
         username = username.toLowerCase();
 
         IgniteCache<Object, Object> activeGroupsCache = getActiveGroupsCache();
@@ -65,10 +71,10 @@ public class ActiveGroupCacheHelper {
         }
 
         // add the active groups to the cache
-        activeGroupsCache.put(username, groups);
+        activeGroupsCache.put(username, setGroups);
 
         // save the active groups to the database
-        saveActiveGroupsForUser(username, groups);
+        saveActiveGroupsForUser(username, setGroups);
     }
 
     public List<Group> getActiveGroupsForUser(String username) {

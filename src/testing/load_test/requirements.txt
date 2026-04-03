@@ -1,10 +1,7 @@
-lxml==4.9.2
-protobuf==3.11.3
-pyOpenSSL==23.1.1
-PyYAML==5.1
-requests==2.26
-urllib3==1.26
-websockets
-pyzmq==25.0.2
-boto3==1.18
-
+pyyaml>=6.0,<7.0
+requests>=2.25.0,<3.0.0
+pyzmq
+pyOpenSSL>=23.1.1
+websockets>=16.0
+protobuf>=3.20,<4.0
+boto3>=1.34,<2.0

@@ -1,11 +1,12 @@
 from datetime import datetime
 from protobuf_msg.takmessage_pb2 import TakMessage
-from lxml import etree
+import xml.etree.ElementTree as ET
 
 from create_cot import id_gen
 
-MAGIC_BYTE = b'\xbf'
+from utils import extract_mission_change, extract_fileshare
 
+MAGIC_BYTE = b'\xbf'
 
 class CotProtoMessage:
 
@@ -73,23 +74,34 @@ class CotProtoMessage:
         return True
 
     def add_sub_detail(self, detail_name, sub_detail_name, sub_detail_attributes, sub_detail_text=None):
-        details = etree.fromstring("<detail>" + self.message.cotEvent.detail.xmlDetail + "</detail>")
+        # Wrap xmlDetail with a root tag
+        details = ET.fromstring(f"<detail>{self.message.cotEvent.detail.xmlDetail}</detail>")
+
+        # Try to find existing <detail_name> tag
+        detail = None
         for c in details:
             if detail_name == c.tag:
                 detail = c
-        else:
-            detail = etree.SubElement(details, detail_name)
+                break
 
-        sub_detail = etree.SubElement(detail, sub_detail_name)
+        # If not found, create a new element
+        if detail is None:
+            detail = ET.SubElement(details, detail_name)
 
+        # Add sub-detail
+        sub_detail = ET.SubElement(detail, sub_detail_name)
         sub_detail.attrib.update(sub_detail_attributes)
+
         if sub_detail_text is not None:
             sub_detail.text = sub_detail_text
 
-        xml_details = list()
-        for elem in details.getchildren():
-            xml_details.append(etree.tostring(elem).decode('utf-8'))
+        # Rebuild the inner XML string (children of <detail>)
+        xml_details = [
+            ET.tostring(elem, encoding="unicode") for elem in details
+        ]
+
         self.message.cotEvent.detail.xmlDetail = "".join(xml_details)
+
 
 
     def deserialize_message(self, msg):
@@ -117,35 +129,10 @@ class CotProtoMessage:
         return False   
 
     def mission_change(self):
-        xml_details = etree.fromstring("<detail>"+self.message.cotEvent.detail.xmlDetail+"</detail>")
-        for xml_detail in xml_details.getchildren():
-            if xml_detail.tag == "_flow-tags_":
-                continue
-            if xml_detail.tag == "mission":
-                change_type = xml_detail.attrib.get("type")
-                name = xml_detail.attrib.get("name")
-                file_hashes = list()
-
-                for node in xml_details.findall('.//mission/MissionChanges/MissionChange/contentResource/hash'):
-                    file_hashes.append(node.text)
-
-                if file_hashes:
-                    return "download_mission_files", file_hashes
-
-                if change_type in {"INVITE", "CREATE", "DELETE"}:
-                    return change_type, name
-
-        return False, False
+        return extract_mission_change(self.message.cotEvent.detail, is_proto=True)
 
     def fileshare(self):
-        xml_details = etree.fromstring("<details>"+self.message.cotEvent.detail.xmlDetail+"</details>")
-        for xml_detail in xml_details:
-            if xml_detail.tag == "fileshare":
-                file_hash = xml_detail.attrib.get("sha256")
-                filename = xml_detail.attrib.get("filename")
-                return file_hash, filename
-
-        return False
+        return extract_fileshare(self.message.cotEvent.detail, is_proto=True)
 
 def get_size_and_truncate(msg):
     size = 0
