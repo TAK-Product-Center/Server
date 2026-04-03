@@ -331,23 +331,23 @@ public class OAuthApi {
                 new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), name), status);
     }
 
-    class OpoenIdConfigufation {
+    public static class OpenIdConfiguration {
         public String authorization_endpoint;
         public String token_endpoint;
     }
 
     @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
     @RequestMapping(value = "/login/.well-known/openid-configuration", method = RequestMethod.GET)
-    public OpoenIdConfigufation getOpenIdConfiguration() {
-        OpoenIdConfigufation opoenIdConfigufation = new OpoenIdConfigufation();
+    public OpenIdConfiguration getOpenIdConfiguration() {
+        OpenIdConfiguration openIdConfiguration = new OpenIdConfiguration();
         Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
         if (!knownConfigs.isEmpty()) {
             Iterator<Map.Entry<String, Oauth.AuthServer>> entrySet = knownConfigs.entrySet().iterator();
             Oauth.AuthServer authServer  =  entrySet.next().getValue();
-            opoenIdConfigufation.authorization_endpoint = authServer.getAuthEndpoint();
-            opoenIdConfigufation.token_endpoint = authServer.getTokenEndpoint();
+            openIdConfiguration.authorization_endpoint = authServer.getAuthEndpoint();
+            openIdConfiguration.token_endpoint = authServer.getTokenEndpoint();
         }
-        return opoenIdConfigufation;
+        return openIdConfiguration;
     }
 
     @RequestMapping(value = "/logout", method = { RequestMethod.GET, RequestMethod.POST })
@@ -418,7 +418,7 @@ public class OAuthApi {
                     Oauth.AuthServer manualConfig = OAuthUtils.processTrustedAuthServerConfig(config);
                     knownConfigs.add(manualConfig);
                 } catch (Exception e) {
-                    System.out.println(e.getMessage());
+                    logger.error("exception calling processTrustedAuthServerConfig", e);
                 }
 
             }

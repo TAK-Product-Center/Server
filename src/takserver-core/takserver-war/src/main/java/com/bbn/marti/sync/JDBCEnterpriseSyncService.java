@@ -1038,6 +1038,9 @@ public class JDBCEnterpriseSyncService implements EnterpriseSyncService {
 													+ f.toString()
 													+ " and a minimum or maximum time.");
 								}
+							} else if (f == Metadata.Field.Name) {
+								sqlQuery.append("r." + f.toString() + " ~* ? ");
+								queryParameters.add(constraint);
 							} else {
 								sqlQuery.append("r." + f.toString() + " ~ ? ");
 								queryParameters.add(constraint);

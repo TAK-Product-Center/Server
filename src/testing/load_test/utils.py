@@ -2,8 +2,11 @@ import contextlib
 import tempfile
 
 import math
-from OpenSSL import crypto
-from lxml import etree
+from cryptography.hazmat.primitives.serialization import pkcs12, Encoding, PrivateFormat, NoEncryption
+from cryptography.hazmat.primitives import serialization
+import tempfile
+from contextlib import contextmanager
+import xml.etree.ElementTree as ET
 from requests import Session
 from requests.adapters import HTTPAdapter
 
@@ -38,51 +41,138 @@ def delete(*args, **kwargs):
 ##### This allows us to use PKCS#12 cert files #####################
 @contextlib.contextmanager
 def p12_to_pem(p12_path, p12_password):
-    """ Decrypts the .p12 file to be used with requests. """
-    with tempfile.NamedTemporaryFile(suffix='.pem') as t_pem:
-        f_pem = open(t_pem.name, 'wb')
-        p12_data = open(p12_path, 'rb').read()
-        p12 = crypto.load_pkcs12(p12_data, p12_password)
-        f_pem.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, p12.get_privatekey()))
-        f_pem.write(crypto.dump_certificate(crypto.FILETYPE_PEM, p12.get_certificate()))
-        ca = p12.get_ca_certificates()
-        if ca is not None:
-            for cert in ca:
-                f_pem.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
-        f_pem.close()
+    """Decrypts the .p12 file and yields a .pem file path."""
+    with open(p12_path, 'rb') as f:
+        p12_data = f.read()
+
+    private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
+        p12_data,
+        p12_password.encode() if p12_password else None,
+    )
+
+    with tempfile.NamedTemporaryFile(suffix='.pem', delete=False) as t_pem:
+        if private_key:
+            t_pem.write(
+                private_key.private_bytes(
+                    encoding=Encoding.PEM,
+                    format=PrivateFormat.TraditionalOpenSSL,
+                    encryption_algorithm=NoEncryption()
+                )
+            )
+
+        if certificate:
+            t_pem.write(
+                certificate.public_bytes(Encoding.PEM)
+            )
+
+        if additional_certs:
+            for cert in additional_certs:
+                t_pem.write(cert.public_bytes(Encoding.PEM))
+
+        t_pem.flush()
         yield t_pem.name
 
 ########## End PKCS#12 helpers ####################################
 
-
-def is_sa_message(message):
-    root = etree.fromstring(message)
-    details = root.find("detail")
-    for c in details.getchildren():
-        if c.tag == "contact":
-            return True
-    return False
-
-
 def mission_change(message):
-    root = etree.fromstring(message)
+    root = ET.fromstring(message)
     details = root.find("detail")
-    for c in details.getchildren():
+
+    if details is None:
+        return False, False
+
+    for c in details:
         if c.tag == "mission":
             change_type = c.attrib.get("type")
             mission_name = c.attrib.get("name")
-            file_hashes = list()
-            for mission_changes in c.getchildren():
-                for mission_change in mission_changes.getchildren():
-                    for detail in mission_change.getchildren():
+            file_hashes = []
+
+            for mission_changes in c:
+                for mission_change in mission_changes:
+                    for detail in mission_change:
                         if detail.tag == "contentResource" and detail.find("filename") is not None:
-                            file_hashes.append(detail.find("hash").text)
+                            hash_elem = detail.find("hash")
+                            if hash_elem is not None and hash_elem.text:
+                                file_hashes.append(hash_elem.text)
+
             if file_hashes:
                 return "download_mission_files", file_hashes
 
             if change_type in {"CHANGE", "CREATE", "INVITE", "DELETE"}:
                 return change_type, mission_name
 
+    return False, False
+
+
+def is_sa_message(message):
+    root = ET.fromstring(message)
+    details = root.find("detail")
+    if details is not None:
+        for c in details:
+            if c.tag == "contact":
+                return True
+    return False
+
+
+def extract_mission_change(detail_obj, is_proto: bool = False):
+    """
+    Unified logic to detect mission change events.
+    Returns tuple: (action_type: str or False, data: Any or False)
+    """
+    if is_proto:
+        # Proto path (already using xmlDetail string)
+        try:
+            xml_details = ET.fromstring("<detail>" + detail_obj.xmlDetail + "</detail>")
+        except Exception:
+            return False, False
+    else:
+        # XML path
+        xml_details = detail_obj  # already an Element
+
+    for elem in xml_details:
+        if elem.tag == "_flow-tags_":
+            continue
+
+        if elem.tag == "mission":
+            change_type = elem.attrib.get("type")
+            name = elem.attrib.get("name")
+            file_hashes = []
+
+            mission_changes = elem.find("MissionChanges")
+            if mission_changes is not None:
+                for change in mission_changes.findall("MissionChange"):
+                    for res in change.findall("contentResource"):
+                        hash_elem = res.find("hash")
+                        if hash_elem is not None and hash_elem.text:
+                            file_hashes.append(hash_elem.text)
+
+            if file_hashes:
+                return "download_mission_files", file_hashes
+
+            if change_type in {"CHANGE", "CREATE", "INVITE", "DELETE"}:
+                return change_type, name
+
+    return False, False
+
+def extract_fileshare(detail_obj, is_proto: bool = False):
+    """
+    Unified fileshare detection.
+    Returns (hash: str or False, filename: str or False)
+    """
+    if is_proto:
+        try:
+            root = ET.fromstring("<details>" + detail_obj.xmlDetail + "</details>")
+        except Exception:
+            return False, False
+    else:
+        root = detail_obj  # XML detail element
+
+    for elem in root:
+        if elem.tag == "fileshare":
+            return (
+                elem.attrib.get("sha256"),
+                elem.attrib.get("filename")
+            )
     return False, False
 
 

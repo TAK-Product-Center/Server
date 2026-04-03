@@ -91,14 +91,17 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                     return;
                 }
             } catch (Exception e) {
-            	logger.info("Cannot parse claims", e);
+            	logger.error("Cannot parse claims", e);
                 clearAuth(response, request);
                 return;
             }
 
             if (claims != null && isAuthorized(claims)) {
                 setAuthentication(token, request);
-            } else if (claims != null) {            	
+            } else if (claims != null) {   
+            	if(logger.isTraceEnabled()) {
+            		logger.trace("Token does not have the proper claims to be admin authorized.");
+            	}
                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
                 return;
             }
@@ -110,11 +113,29 @@ public class JwtTokenFilter extends OncePerRequestFilter {
     // Check if token has required claim and value
     private boolean isAuthorized(Claims claims) {
         Object authClaim = claims.get(fedHubConfig.getKeycloakClaimName());
+        
+        if(logger.isTraceEnabled()) {
+        	logger.trace("Keycloak Claim Name For Admin Grant: " + fedHubConfig.getKeycloakClaimName());
+        	logger.trace("Expected Keycloak Claim Value For Admin Grant: " + fedHubConfig.getKeycloakAdminClaimValue());
+        }
 
         if (authClaim instanceof ArrayList<?> list) {
+        	if(logger.isTraceEnabled()) {
+        		logger.trace("Claim Name Found With Values:");
+        		list.forEach(logger::trace);
+        	}
+        	
             return list.contains(fedHubConfig.getKeycloakAdminClaimValue());
         } else if (authClaim instanceof String s) {
+        	if(logger.isTraceEnabled()) {
+        		logger.trace("Claim Name Found With Value: " + s);
+        	}
+  
             return s.equals(fedHubConfig.getKeycloakAdminClaimValue());
+        } else {
+        	if(logger.isTraceEnabled()) {
+        		logger.trace("Claim Name Not Found On Token");
+        	}
         }
         return false;
     }

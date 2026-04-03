@@ -318,7 +318,8 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 
 		String loginUrl = "/login";
 		Oauth oauthConfig = config.getAuth().getOauth();
-		if (oauthConfig != null && !oauthConfig.isUseTakServerLoginPage() && !oauthConfig.getAuthServer().isEmpty()) {
+		if (oauthConfig != null && !oauthConfig.isUseTakServerLoginPage() &&
+				(!oauthConfig.getAuthServer().isEmpty() || !oauthConfig.getOpenIdDiscoveryConfiguration().isEmpty())) {
 			loginUrl = "/login/auth";
 		}
 

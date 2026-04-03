@@ -10,22 +10,28 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 @ComponentScan("tak.server.federation.hub.ui")
 public class WebMvcConfig implements WebMvcConfigurer {
+	
+	private final String basePath;
+	
+	public WebMvcConfig(FederationHubUIConfig config) {
+		basePath = config.getBaseHref();
+	}
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/**")
+        registry.addResourceHandler(basePath + "**")
                 .addResourceLocations("/");
     }
 
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
-    	registry.addViewController("/{path:[^\\.]*}")
-        	.setViewName("forward:/index.html");
+        registry.addViewController(basePath + "{path:[^\\.]*}")
+                .setViewName("forward:" + basePath + "index.html");
 
-    	registry.addViewController("/**/{path:[^\\.]*}")
-        	.setViewName("forward:/index.html");
-
+        registry.addViewController(basePath + "**/{path:[^\\.]*}")
+                .setViewName("forward:" + basePath + "index.html");
     }
+
     
     @Override
     public void configurePathMatch(PathMatchConfigurer configurer) {

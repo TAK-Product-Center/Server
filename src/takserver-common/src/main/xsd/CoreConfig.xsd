@@ -11,6 +11,7 @@
     <xs:complexType>
       <xs:all>
         <xs:element ref="network" minOccurs="1"/>
+        <xs:element ref="cookie" minOccurs="0"/>
         <xs:element ref="auth" minOccurs="1"/>
         <xs:element ref="submission" minOccurs="1"/>
         <xs:element ref="subscription" minOccurs="1"/>
@@ -45,11 +46,11 @@
       <xs:annotation>
         <xs:documentation>Networking</xs:documentation>
       </xs:annotation>
-      <xs:sequence> 
+      <xs:sequence>
       	<xs:element ref="filter" minOccurs="0" maxOccurs="1" />
       	<xs:element type="input" name="input" minOccurs="0" maxOccurs="unbounded" />
       	<xs:element type="dataFeed" name="datafeed" minOccurs="0" maxOccurs="unbounded" />
-      	
+
       	<xs:element name="connector" minOccurs="0" maxOccurs="unbounded">
           <xs:complexType>
             <xs:annotation>
@@ -79,7 +80,7 @@
             <xs:attribute name="truststore" type="xs:string" use="optional"/>
             <xs:attribute name="truststoreFile" type="xs:string" use="optional"/>
             <xs:attribute name="truststorePass" type="xs:string" use="optional"/>
-            <xs:attribute name="enableAdminUI" type="xs:boolean" default="true"/>			
+            <xs:attribute name="enableAdminUI" type="xs:boolean" default="true"/>
             <xs:attribute name="enableWebtak" type="xs:boolean" default="true"/>
             <xs:attribute name="enableNonAdminUI" type="xs:boolean" default="true"/>
             <xs:attribute name="allowOrigins" type="xs:string" default=""/>
@@ -134,6 +135,11 @@
           <xs:documentation>Set tomcat idle threads to configured max.</xs:documentation>
         </xs:annotation>
       </xs:attribute>
+      <xs:attribute name="tomcatMaxConnections" type="xs:int" default="25000">
+        <xs:annotation>
+          <xs:documentation>Max simultaneous socket connections Tomcat will allow.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
       <xs:attribute name="tomcatMaxPool" type="xs:int" default="-1">
        <xs:annotation>
           <xs:documentation>Explicity set the size for Tomcat service thread pool. multiplier for autodetected ignite thread pool size. The optimal value varies based on system capabilities (CPU core count).</xs:documentation>
@@ -163,12 +169,73 @@
       <xs:attribute name="reportTimeoutCheckIntervalSeconds" type="xs:int" default="60"/>
       <xs:attribute name="alwaysArchiveMissionCot" type="xs:boolean" default="false"/>
       <xs:attribute name="MissionCreateGroupsRegex" type="xs:string" use="optional"/>
-      <xs:attribute name="MissionDeleteRequiresOwner" type="xs:boolean" default="false"/>
-      <xs:attribute name="MissionUseGroupsForContents" type="xs:boolean" default="false"/>
-      <xs:attribute name="MissionAllowGroupChange" type="xs:boolean" default="false"/>
-      <xs:attribute name="MissionStrictUidMissionMembership" type="xs:boolean" default="true"/>
-      <xs:attribute name="MissionBrokerUidAddsFromApi" type="xs:boolean" default="true"/>
-      <xs:attribute name="disableBroadcastMapItems" type="xs:boolean" default="false"/>
+      <xs:attribute name="MissionDeleteRequiresOwner" type="xs:boolean" default="false">
+        <xs:annotation>
+          <xs:documentation>
+            Limits the deletion of missions to users with the MISSION_OWNER role.
+          </xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="MissionUseGroupsForContents" type="xs:boolean" default="false">
+        <xs:annotation>
+          <xs:documentation>
+            This option affects the groups that get assigned to mission content.
+            By default, TAK server will apply the User's groups to mission content.
+            With this enabled, TAK Server will apply the Mission's groups to mission content.
+            This provides additional protections for mission data and improves collaboration for
+            mission subscribers without common groups.
+          </xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="MissionAllowGroupChange" type="xs:boolean" default="false">
+        <xs:annotation>
+          <xs:documentation>
+            Allows users to update groups for existing missions, to include mission content.
+          </xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="MissionStrictUidMissionMembership" type="xs:boolean" default="true">
+        <xs:annotation>
+          <xs:documentation>
+            Prevents mission map items from being added to other missions or being broadcast.
+            This locks down mission map items to only being accessed from the mission context.
+          </xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="MissionBrokerUidAddsFromApi" type="xs:boolean" default="true">
+        <xs:annotation>
+          <xs:documentation>
+            Enables delivery of mission map items to subscribers when the client uses the API service to add map items.
+            This happens automatically when map items are added to the mission via the Messaging service.
+          </xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="disableBroadcastMapItems" type="xs:boolean" default="false">
+        <xs:annotation>
+          <xs:documentation>
+            Adds a filter in messaging submission pipeline to prevent broadcasting of map items.
+            The filter will drop any messages that have an archive detail, but are missing a dest detail.
+          </xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="cookie">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Cookie</xs:documentation>
+      </xs:annotation>
+      <xs:attribute name="customDomainEnabled" type="xs:boolean" default="false">
+        <xs:annotation>
+          <xs:documentation>Enable using custom domain for the access_token cookie, defined in customDomain attribute</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="customDomain" type="xs:string" default="">
+        <xs:annotation>
+          <xs:documentation>Define custom domain used for the access_token cookie</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
     </xs:complexType>
   </xs:element>
 
@@ -349,6 +416,7 @@
       <xs:attribute name="websocketMaxBinaryMessageBufferSize" type="xs:int" default="65536"/>
       <xs:attribute name="websocketMaxSessionIdleTimeout" type="xs:long" default="-1"/>
       <xs:attribute name="websocketSendTimeoutMs" type="xs:int" default="5000"/>
+      <xs:attribute name="websocketCompression" type="xs:boolean" default="false"/>
       <xs:attribute name="missionUidLimit" type="xs:int" default="8192"/>
       <xs:attribute name="missionContentLimit" type="xs:int" default="4096"/>
       <xs:attribute name="missionConcurrentDownloadLimit" type="xs:int"/>
@@ -452,7 +520,7 @@
       <xs:attribute name="dbConnectionMaxLifetimeMs" type="xs:int" default="600000"/>
       <xs:attribute name="dbConnectionMaxIdleMs" type="xs:int" default="10000"/>
       <xs:attribute name="poolScaleFactor" type="xs:int" default="200"/>
-      
+
     </xs:complexType>
   </xs:element>
 
@@ -711,8 +779,12 @@
       <xs:attribute name="scopeClaim" type="xs:string" default="scope"/>
       <xs:attribute name="webtakScope" type="xs:string" />
       <xs:attribute name="groupprefix" type="xs:string" default=""/>
+      <xs:attribute name="groupNameExtractorRegex" type="xs:string" />
       <xs:attribute name="allowUriQueryParameter" type="xs:boolean" default="false"/>
       <xs:attribute name="allowAccessTokenRetrieval" type="xs:boolean" default="false"/>
+      <xs:attribute name="adminTokenClaimName" type="xs:string"/>
+      <xs:attribute name="adminTokenClaimValue" type="xs:string"/>
+      
     </xs:complexType>
   </xs:element>
 
@@ -769,7 +841,7 @@
       <xs:attribute name="text" type="xs:string" default=""/>
     </xs:complexType>
   </xs:element>
-  
+
   <xs:element name="contact-api">
     <xs:complexType>
       <xs:annotation>
@@ -855,9 +927,10 @@
       </xs:sequence>
       <xs:attribute name="minAltitude" type="xs:double"/>
       <xs:attribute name="maxAltitude" type="xs:double"/>
+      <xs:attribute name="filterTAKClients" type="xs:boolean" default="false"/>
     </xs:complexType>
   </xs:element>
-  
+
   <xs:element name="qos">
     <xs:complexType>
       <xs:annotation>
@@ -870,7 +943,7 @@
         </xs:all>
     </xs:complexType>
   </xs:element>
-  
+
   <xs:element name="deliveryRateLimiter">
     <xs:complexType>
       <xs:annotation>
@@ -921,7 +994,7 @@
         <xs:attribute name="messageLimitPerInterval" type="xs:int"/>
   	</xs:complexType>
   </xs:element>
-  
+
   <xs:element name="connection">
     <xs:complexType>
       <xs:annotation>
@@ -1054,7 +1127,7 @@
             <xs:attribute name="tls" type="xs:boolean" default="true"/>
           </xs:complexType>
         </xs:element>
-        
+
         <xs:element name="mission-disruption-tolerance" minOccurs="0" maxOccurs="1">
           <xs:annotation>
             <xs:documentation>Set mission disruption tolerance interval on a per-mission basis</xs:documentation>
@@ -1088,13 +1161,13 @@
                     <xs:documentation>Name of the local group to which federated traffic from the specified federate will be assigned.</xs:documentation>
                   </xs:annotation>
                 </xs:element>
-               
+
                 <xs:element name="outboundGroup" type="xs:string" minOccurs="0" maxOccurs="unbounded">
                   <xs:annotation>
                     <xs:documentation>Name of a local group whose traffic will be shared with the specified federate.</xs:documentation>
                   </xs:annotation>
                 </xs:element>
-               
+
                 <xs:element name="missionFederateDefault" type="xs:boolean" minOccurs="0" maxOccurs="1" default="true">
                   <xs:annotation>
                     <xs:documentation>This value will be applied for new missions as well as missions whose federation value are not specifically set in the mission lists</xs:documentation>
@@ -1150,32 +1223,32 @@
                 <xs:annotation>
                   <xs:documentation>If true, remote groups are automatically mapped to local groups for this federate.</xs:documentation>
                 </xs:annotation>
-              </xs:attribute>	
+              </xs:attribute>
               <xs:attribute name="maxHops" type="xs:int" default="-1">
                 <xs:annotation>
                   <xs:documentation>How many hops a federate message can make</xs:documentation>
                 </xs:annotation>
-              </xs:attribute>	  
+              </xs:attribute>
               <xs:attribute name="useGroupHopLimiting"  type="xs:boolean" default="false">
                 <xs:annotation>
                   <xs:documentation>If individual group hop limiting should be used over max hop limiting</xs:documentation>
                 </xs:annotation>
-              </xs:attribute>	
+              </xs:attribute>
               <xs:attribute name="fallbackWhenNoGroupMappings" type="xs:boolean" default="false">
                 <xs:annotation>
                   <xs:documentation>How many hops a federate message can make</xs:documentation>
                 </xs:annotation>
-              </xs:attribute>	 
+              </xs:attribute>
               <xs:attribute name="tokenFederate" type="xs:boolean" use="optional" default="false">
 				<xs:annotation>
 				  <xs:documentation>If this federate represents a Federate Token</xs:documentation>
 				</xs:annotation>
-			  </xs:attribute>  
+			  </xs:attribute>
 			  <xs:attribute name="tokenExpiration" type="xs:long" use="optional">
 				<xs:annotation>
 				  <xs:documentation>Token Expiration MS</xs:documentation>
 				</xs:annotation>
-			  </xs:attribute>           	
+			  </xs:attribute>
             </xs:complexType>
           </xs:element>
         </xs:sequence>
@@ -1208,7 +1281,7 @@
                 <xs:annotation>
                   <xs:documentation>The fingerprint of the issuing authority for the Federate CA</xs:documentation>
                 </xs:annotation>
-              </xs:attribute>	
+              </xs:attribute>
               <xs:attribute name="maxHops" type="xs:int" default="-1"/>
               <xs:attribute name="allowTokenAuth" type="xs:boolean" default="false"/>
               <xs:attribute name="tokenAuthDuration" type="xs:long" default="-1"/>
@@ -1310,7 +1383,7 @@
 
     </xs:complexType>
   </xs:element>
-  
+
   <xs:element name="plugins">
     <xs:complexType>
       <xs:annotation>
@@ -1337,7 +1410,7 @@
       
     </xs:complexType>
   </xs:element>
-  
+
   <xs:element name="cluster">
     <xs:complexType>
       <xs:annotation>
@@ -1374,7 +1447,7 @@
     <xs:attribute name="privateGroup" type="xs:boolean" default="false" />
     <xs:attribute name="group" type="xs:string" default="" />
   </xs:complexType>
-  
+
 <!--   <xs:element name="filter">
     <xs:complexType>
       <xs:annotation>
@@ -1395,7 +1468,7 @@
     </xs:complexType>
   </xs:element> -->
 <!--   <xs:element name="filter"> -->
-  
+
 	<xs:complexType name="input">
 		<xs:annotation>
 			<xs:documentation>Network Input</xs:documentation>
@@ -1435,10 +1508,10 @@
         <xs:attribute name="binaryPayloadWebsocketOnly" type="xs:boolean"
             default="false" />
         <xs:attribute name="quicConnectionTimeoutSeconds" type="xs:long"
-            default="90" />
+            default="30" />
         <xs:attribute name="takServerHost" type="xs:string"/>
 	</xs:complexType>
-	
+
 	<xs:complexType name="dataFeed">
       <xs:complexContent>
         <xs:extension base="input">
@@ -1452,7 +1525,7 @@
         </xs:extension>
        </xs:complexContent>
     </xs:complexType>
-          
+
   <xs:element name="email">
     <xs:complexType>
       <xs:annotation>
@@ -1487,7 +1560,7 @@
       <xs:attribute name="mission" type="xs:string" />
     </xs:complexType>
   </xs:element>
-  
+
   <xs:element name="vbm">
     <xs:complexType>
       <xs:attribute name="enabled" type="xs:boolean" default="false"/>

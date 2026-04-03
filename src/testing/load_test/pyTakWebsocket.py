@@ -17,6 +17,8 @@ import zmq.asyncio as azmq
 
 from multiprocessing import Process, Pool
 
+from mission_handlers import read_mission_thread_zmq
+
 
 class PyTAKWebsocket:
 
@@ -28,6 +30,8 @@ class PyTAKWebsocket:
                  uid=None,
                  self_sa_delta=None,
                  mission_config=None,
+                 ping=False,
+                 ping_interval=1000,
                  data_dict=None):
 
         self.certfile = certfile
@@ -41,6 +45,10 @@ class PyTAKWebsocket:
         self.uid = uid or CotProtoMessage().uid
         self.self_sa_delta = self_sa_delta
         self.last_sa_write = time.time() - self.self_sa_delta
+
+        self.ping = ping
+        self.ping_interval = ping_interval # in ms
+        self.last_ping_write = time.time()*1000 + self.ping_interval # in ms
 
         if mission_config is not None:
             self.mission_config = mission_config
@@ -79,10 +87,18 @@ class PyTAKWebsocket:
             self.data_dict[self.uid] = connection_data
 
     async def send_self_sa(self, websocket):
+        self.location = (random.uniform(-75, 75), random.uniform(-170, 170))
+
         self_sa_message = CotProtoMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]))
         self_sa_message.add_callsign_detail(group_name="Cyan", platform="PyTAKWebsocketProto")
+
         await websocket.send(self_sa_message.serialize())
         self.last_sa_write = time.time()
+
+    async def send_ping(self, websocket):
+        ping_message = CotProtoMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]), type="t-x-c-t")
+        await websocket.send(ping_message.serialize())
+        self.last_ping_write = time.time()*1000 # in ms
 
     async def send_mission_cot(self, websocket):
         for mission in self.data_sync_sess.missions_subscribed:
@@ -127,6 +143,10 @@ class PyTAKWebsocket:
                 return "mission_cot"
             if self.data_sync_sess.ready_to_request():
                 return "data_sync"
+
+            if (now * 1000 - self.last_ping_write) > self.ping_interval: # in ms
+                return "ping"
+
             await asyncio.sleep(0.5)
 
     async def write_handler(self, websocket):
@@ -138,6 +158,8 @@ class PyTAKWebsocket:
                 await self.send_mission_cot(websocket)
             # elif write_action == "data_sync":
             #     self.data_sync_sess.make_requests()
+            elif write_action == "ping":
+                await self.send_ping(websocket)
             await asyncio.sleep(0.1)
             connection_data = self.data_dict[self.uid]
             connection_data['write'] += 1
@@ -150,7 +172,7 @@ class PyTAKWebsocket:
                 self.data_sync_sess.get("https://{host}:{port}/".format(host=self.address[0], port=self.address[1]))
                 session_cookie = "JSESSIONID=" + dict(self.data_sync_sess.session.cookies).get("JSESSIONID")
                 async with websockets.connect(self.uri, ssl=self.ssl_context,
-                                              extra_headers={"cookie": session_cookie}) as ws:
+                                              additional_headers={"cookie": session_cookie}) as ws:
                     connection_data = self.data_dict[self.uid]
                     connection_data['connected'] = True
                     self.data_dict[self.uid] = connection_data
@@ -161,10 +183,10 @@ class PyTAKWebsocket:
                         self.read_socket = context.socket(zmq.PUSH)
                         port = self.read_socket.bind_to_random_port('tcp://*')
                         data_sync_port = self.data_sync_sess.port
-                        POOL_SIZE = 3
+                        POOL_SIZE = 1
                         self.read_pool = Pool(POOL_SIZE)
                         for i in range(POOL_SIZE):
-                            self.read_pool.apply_async(read_thread_zmq, args=(port, data_sync_port))
+                            self.read_pool.apply_async(read_mission_thread_zmq, args=(port, data_sync_port, True))
                         await asyncio.sleep(1)
                     
                     # get list of recent client connect / disconnect events
@@ -191,38 +213,7 @@ class PyTAKWebsocket:
             connection_data['connected'] = False
             self.data_dict[self.uid] = connection_data
             print(self.uid, "retry #", times_connected)
-            await asyncio.sleep(0.5)
-
-
-def read_thread_zmq(port: int, data_sync_port):
-    context = zmq.Context()
-    socket = context.socket(zmq.PULL)
-    data_sync_sock = context.socket(zmq.PUSH)
-    addr = 'tcp://localhost:' + str(port)
-    data_sync_addr = 'tcp://localhost:' + str(data_sync_port)
-    socket.connect(addr)
-    data_sync_sock.connect(data_sync_addr)
-
-    try:
-        while True:
-            data = socket.recv()
-            proto_message = CotProtoMessage(msg=data)
-            if proto_message.is_sa():
-                continue
-
-            change_type, change_data = proto_message.mission_change()
-            if change_type:
-                send_data = {'req_type': change_type, 'req_data': change_data}
-                data_sync_sock.send_json(send_data, flags=zmq.NOBLOCK)
-
-            fileshare_data = proto_message.fileshare()
-            if fileshare_data:
-                send_data = {'req_type': 'download_file', 'req_data': fileshare_data}
-                data_sync_sock.send_json(send_data, flags=zmq.NOBLOCK)
-
-    except Exception as e:
-        print("read_thread error: " + str(type(e)) + " -> " + str(e.args))
-        raise e
+            await asyncio.sleep(5)
 
 
 class PyTAKWebsocketProcess(multiprocessing.Process):

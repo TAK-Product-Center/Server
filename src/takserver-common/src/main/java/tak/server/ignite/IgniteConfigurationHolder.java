@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.IgniteLogger;
+import org.apache.ignite.configuration.BinaryConfiguration;
 import org.apache.ignite.configuration.ClientConnectorConfiguration;
 import org.apache.ignite.configuration.DataPageEvictionMode;
 import org.apache.ignite.configuration.DataRegionConfiguration;
@@ -314,7 +315,7 @@ public class IgniteConfigurationHolder {
 			clusterConf.setClientMode(true);
 			clusterConf.setUserAttributes(Collections.singletonMap(Constants.TAK_PROFILE_KEY, igniteProfile));
 			clusterConf.setMetricsLogFrequency(takIgniteConfiguration.getMetricsLogFrequency());
-			
+
 			return clusterConf;
 
 		} else {

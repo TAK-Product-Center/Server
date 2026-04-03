@@ -49,11 +49,15 @@ public class DistributedRetentionPolicyConfig implements RetentionPolicyConfig, 
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
         try {
             File file = new File(RETENTION_POLICY);
-            Map<String, Integer> map = retentionPolicy().getDataRetentionMap();
+            RetentionPolicy currentPolicy = retentionPolicy();
+            Map<String, Integer> map = currentPolicy.getDataRetentionMap();
             map.putAll(policyMap);
 
             // make a copy of the object for writing
-            mapper.writeValue(file, new RetentionPolicy(map));
+            RetentionPolicy newPolicy = new RetentionPolicy(map);
+            newPolicy.setRetentionSettings(currentPolicy.getRetentionSettings());
+            
+            mapper.writeValue(file, newPolicy);
             logger.info("writing new policy " + policyMap);
         } catch (IOException e) {
             logger.error(" Exception saving retention policy for " + policyMap);

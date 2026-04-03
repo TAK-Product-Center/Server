@@ -7,6 +7,8 @@ public class FederationHubUIConfig {
 
     public static final String AUTH_USER_FILE_DEFAULT = "/opt/tak/federation-hub/authorized_users.yml";
     
+    private String baseHref = "/";
+    
     private String keystoreType = "JKS";
     private String keystoreFile = "";
     private String keystorePassword;
@@ -36,9 +38,18 @@ public class FederationHubUIConfig {
     
     private boolean enableFlowIndicators = true;
 
-    public String getKeystoreType() {
+    
+    public String getBaseHref() {
+		return baseHref;
+	}
+	public void setBaseHref(String baseHref) {
+		this.baseHref = baseHref;
+	}
+	
+	public String getKeystoreType() {
         return keystoreType;
     }
+	
     public void setKeystoreType(String keystoreType) {
         this.keystoreType = keystoreType;
     }
@@ -178,7 +189,7 @@ public class FederationHubUIConfig {
 	}
 	@Override
 	public String toString() {
-		return "FederationHubUIConfig [keystoreType=" + keystoreType + ", keystoreFile="
+		return "FederationHubUIConfig [baseHref=" + baseHref + ", keystoreType=" + keystoreType + ", keystoreFile="
 				+ keystoreFile + ", truststoreType=" + truststoreType + ", truststoreFile=" + truststoreFile
 				+ ", keyAlias=" + keyAlias + ", authUsers=" + authUsers + ", port=" + port + ", allowOauth="
 				+ allowOauth + ", oauthPort=" + oauthPort + ", keycloakServerName=" + keycloakServerName

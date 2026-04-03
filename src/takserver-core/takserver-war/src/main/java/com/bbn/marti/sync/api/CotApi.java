@@ -179,7 +179,7 @@ public class CotApi extends BaseRestController {
     }
 
     // Get multiple CoT events given a list of UIDs
-    @RequestMapping(value = "/cot", method = RequestMethod.GET)
+    @RequestMapping(value = "/cot", method = { RequestMethod.GET, RequestMethod.POST })
     Callable<ResponseEntity<String>> getCotEvents(@RequestBody @NotNull Set<String> uids) {
     	
     	final String sessionId = requestHolder.sessionId();

@@ -75,6 +75,7 @@ import com.atakmap.Tak.ROL;
 import com.atakmap.Tak.ServerHealth;
 import com.atakmap.Tak.Subscription;
 import com.bbn.cot.filter.DataFeedFilter;
+import com.bbn.cot.filter.StreamingEndpointRewriteFilter;
 import com.bbn.marti.config.Configuration;
 import com.bbn.marti.config.Federation;
 import com.bbn.marti.config.Federation.Federate;
@@ -2154,7 +2155,13 @@ public class FederationServer {
 					}
 
 					if (!federationManager.getFederate(serverFederateMap.get(getCurrentSessionId())).isArchive()) {
-						cot.setContextValue(Constants.ARCHIVE_EVENT_KEY, Boolean.FALSE);
+						// only skip archiving this message is it's not destined for a mission or if
+						// alwaysArchiveMissionCot is not set
+						if (cot.getContext(StreamingEndpointRewriteFilter.EXPLICIT_MISSION_KEY) == null ||
+								!CoreConfigFacade.getInstance().getRemoteConfiguration().getNetwork()
+										.isAlwaysArchiveMissionCot()) {
+							cot.setContextValue(Constants.ARCHIVE_EVENT_KEY, Boolean.FALSE);
+						}
 					}
 
 				} else {

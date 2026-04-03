@@ -229,6 +229,9 @@ public class Group implements Node, Comparable<Group>, Serializable {
     	cp.setBitpos(getBitpos());
     	cp.setCreated(getCreated());
     	cp.setType(getType());
+        cp.setDescription(getDescription());
+        cp.setDistinguishedName(getDistinguishedName());
+        cp.setActive(getActive());
     	return cp;
     }
     

@@ -23,6 +23,8 @@ from utils import p12_to_pem
 
 import stats
 
+from mission_handlers import read_mission_thread_zmq
+
 class PyTAKStreamingCot:
 
     def __init__(self,
@@ -116,6 +118,7 @@ class PyTAKStreamingCot:
                 self.arr[stats.MESSAGES_RECEIVED_INDEX] += 1
             # deal with pong messages here, not send it to read_socket
             cot_message = CotMessage(msg=data)
+
             if cot_message.is_pong():
                 # print("~~~Streaming cot: Received a pong message")
                 self.arr[stats.MESSAGES_PONG_COUNT_INDEX] += 1
@@ -130,10 +133,12 @@ class PyTAKStreamingCot:
             self.data_dict[self.uid] = connection_data
                 
     async def send_self_sa(self, writer):
-        self.logger.debug("Client sends self_sa message")
+        self.location = (random.uniform(-75, 75), random.uniform(-170, 170))
+
         self_sa_message = CotMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]))
-        self_sa_message.add_callsign_detail(group_name="Red", platform="PyTAKStreamingCot")
-        writer.write(self_sa_message.to_string())
+        self_sa_message.add_callsign_detail(group_name="Green", platform="PyTAKStreamingCot")
+        
+        writer.write(self_sa_message.to_string().encode('utf-8'))
         await writer.drain()
         self.last_sa_write = time.time()
 
@@ -168,14 +173,14 @@ class PyTAKStreamingCot:
             if self.mission_cot_count[mission] == 0 or send_only_new_tracks:
                 dest_attr = {"mission": mission}
                 mission_cot.add_sub_detail("marti", "dest", dest_attr)
-            writer.write(mission_cot.to_string())
+            writer.write(mission_cot.to_string().encode('utf-8'))
             await writer.drain()
             self.mission_cot_count[mission] += 1
         self.did_mission_write = True
 
     async def send_ping(self, writer):
         ping_message = CotMessage(uid=self.uid, lat=str(self.location[0]), lon=str(self.location[1]), type="t-x-c-t")
-        writer.write(ping_message.to_string())
+        writer.write(ping_message.to_string().encode('utf-8'))
         # print(f"sending Ping: {ping_message.to_string()}")
         await writer.drain()
         self.last_ping_write = time.time()*1000 # in ms
@@ -275,13 +280,12 @@ class PyTAKStreamingCot:
                     self.read_socket = context.socket(zmq.PUSH)
                     port = self.read_socket.bind_to_random_port('tcp://*')
                     data_sync_port = self.data_sync_sess.port
-                    POOL_SIZE = 3
+                    POOL_SIZE = 1
                     self.read_pool = Pool(POOL_SIZE)
                     for i in range(POOL_SIZE):
-                        self.read_pool.apply_async(read_thread_zmq, args=(port, data_sync_port))
+                        self.read_pool.apply_async(read_mission_thread_zmq, args=(port, data_sync_port, False))
                     await asyncio.sleep(1)
                     
-                self.data_sync_sess.get_client_endpoints()
                 read_task = asyncio.ensure_future(self.read_handler(reader))
                 write_task = asyncio.ensure_future(self.write_handler(writer))
 
@@ -316,39 +320,6 @@ class PyTAKStreamingCot:
                 self.data_dict[self.uid] = connection_data
                 self.logger.error("retry # %d" % times_connected)
                 await asyncio.sleep(1)
-
-
-def read_thread_zmq(port: int, data_sync_port):
-    context = zmq.Context()
-    socket = context.socket(zmq.PULL)
-    data_sync_sock = context.socket(zmq.PUSH)
-    addr = 'tcp://localhost:' + str(port)
-    data_sync_addr = 'tcp://localhost:' + str(data_sync_port)
-    socket.connect(addr)
-    data_sync_sock.connect(data_sync_addr)
-
-    try:
-        while True:
-            data = socket.recv()
-            cot_message = CotMessage(msg=data)
-
-            if cot_message.is_sa():
-                continue
-
-            change_type, change_data = cot_message.mission_change()
-            if change_type:
-                send_data = {'req_type': change_type, 'req_data': change_data}
-                data_sync_sock.send_json(send_data, flags=zmq.NOBLOCK)
-
-            fileshare_data = cot_message.fileshare()
-            if fileshare_data:
-                send_data = {'req_type': 'download_file', 'req_data': fileshare_data}
-                data_sync_sock.send_json(send_data, flags=zmq.NOBLOCK)
-
-    except Exception as e:
-        print("read_thread_zmq error: " + str(type(e)) + " -> " + str(e.args))
-        raise e
-
 
 class PyTAKStreamingCotProcess(multiprocessing.Process):
     def __init__(self, address=None, uid=None, cert=None, password=None, self_sa_delta=5.0,

@@ -29,9 +29,11 @@ import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.boot.web.embedded.jetty.JettyServerCustomizer;
 import org.springframework.boot.web.embedded.jetty.JettyServletWebServerFactory;
 import org.springframework.boot.web.server.ErrorPage;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -257,5 +259,21 @@ public class FederationHubUIServer {
         }
         Runtime.getRuntime().addShutdownHook(new Thread(authFileWatcher::stop));
         return authFileWatcher;
+    }
+    @Bean
+    public FilterRegistrationBean<BaseHrefFilter> baseHrefFilterRegistration(FederationHubUIConfig fedHubConfig) {
+        FilterRegistrationBean<BaseHrefFilter> registrationBean = null;
+    	try {
+    		BaseHrefFilter baseHrefFilter = new BaseHrefFilter(fedHubConfig);
+        	
+        	registrationBean = new FilterRegistrationBean<>();
+            registrationBean.setFilter(baseHrefFilter);
+            registrationBean.addUrlPatterns("/*");
+            registrationBean.setOrder(Ordered.HIGHEST_PRECEDENCE);
+    	} catch (Exception e) {
+			logger.error("err", e);
+		}
+
+        return registrationBean;
     }
 }

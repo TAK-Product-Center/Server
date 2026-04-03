@@ -10,8 +10,8 @@ import org.apache.ignite.lang.IgniteBiPredicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bbn.marti.config.Oauth;
 import com.bbn.marti.config.Input;
+import com.bbn.marti.config.Oauth;
 import com.bbn.marti.groups.GroupFederationUtil;
 import com.bbn.marti.nio.channel.base.AbstractBroadcastingChannelHandler;
 import com.bbn.marti.nio.netty.handlers.NioNettyTlsServerHandler;
@@ -175,9 +175,13 @@ public class NioWebSocketHandler extends NioNettyTlsServerHandler {
         				// parse and broadcast the message
         				TakMessage takMessage = TakMessage.parseFrom(eventBytes);
         				CotEventContainer cotEventContainer = StreamingProtoBufHelper.proto2cot(takMessage);
-
-        				if (isNotDOSLimited(cotEventContainer) && isNotReadLimited(cotEventContainer))
+        				
+        				AbstractBroadcastingChannelHandler.totalBytesRead.getAndAdd(eventBytes.length);
+        				AbstractBroadcastingChannelHandler.totalNumberOfReads.getAndIncrement();
+        				
+        				if (isNotDOSLimited(cotEventContainer) && isNotReadLimited(cotEventContainer)) {
         					protocolListeners.forEach(listener -> listener.onDataReceived(cotEventContainer, channelHandler, protocol));
+        				}
 
         			}
 				} catch (Exception e) {

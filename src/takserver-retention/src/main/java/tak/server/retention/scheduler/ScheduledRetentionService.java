@@ -1,5 +1,6 @@
 package tak.server.retention.scheduler;
 
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,7 +52,12 @@ public class ScheduledRetentionService implements Runnable{
 // TODO this is the mission service -> need to rename for clarity
             retentionQueryService.deleteMissionByTtl(retentionPolicy.getDataRetentionMap().get(MISSIONS));
 
-            localQueryService.deleteFilesByTtl(retentionPolicy.getDataRetentionMap().get(FILES));
+            List<String> fileExemptKeywords = null;
+            if (retentionPolicy.getRetentionSettings() != null && retentionPolicy.getRetentionSettings().containsKey(FILES)) {
+                fileExemptKeywords = retentionPolicy.getRetentionSettings().get(FILES).getExemptKeywords();
+            }
+            localQueryService.deleteFilesByTtl(retentionPolicy.getDataRetentionMap().get(FILES), fileExemptKeywords);
+
             localQueryService.deleteCotByTtl(retentionPolicy.getDataRetentionMap().get(COT));
             localQueryService.deleteGeoChatByTtl(retentionPolicy.getDataRetentionMap().get(GEO_CHAT));
             // delete geo chat messages from legacy cot_router table

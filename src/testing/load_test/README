@@ -1,4 +1,4 @@
-The load tests are fairly easy to run. They require python 3.6.1+ to run. In order to make sure you have the right dependencies, use the python pip utility and the requirements.txt file to
+The load tests are fairly easy to run. They require python 3.11.4+ to run. In order to make sure you have the right dependencies, use the python pip utility and the requirements.txt file to
 
 pip install -r requirements.txt
 

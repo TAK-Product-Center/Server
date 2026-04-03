@@ -1,4 +1,4 @@
-import cgi
+from email.message import Message
 import json
 import multiprocessing
 import os
@@ -61,9 +61,6 @@ class MissionApiSession:
                 try:
                     return self.session.request(*args, **kwargs)
                 except SSL.Error as e: # not really sure why this happens, but it seems to be maybe that the temp file isn't yet available?
-                    # print(e)
-                    # print(self.uid, "SSL error, I think its a timing thing?", args, kwargs)
-                    # print("trying again")
                     exc = e
                     sslErrorRetry += 1
                     time.sleep(0.1)
@@ -133,12 +130,8 @@ class MissionApiSession:
         
         cep_url = self.base_url + "api/clientEndPoints"
         
-        #print("client endpoints url: " + cep_url)
-
         response = self.get(cep_url)
         
-        #print(("clientEndPoints response: ", response.text))
-
         if response.status_code != 200:
             print(("ERROR: ", response.text))
             return
@@ -168,13 +161,12 @@ class MissionApiSession:
             query_params['description'] = description
 
         response = self.put(self.base_mission_api + mission_name, params=query_params)
-        #pprint(query_params)
+
         if response.status_code == 201:
             self.all_missions[mission_name] = response.json()['data']
             self.missions_created[mission_name] = response.json()['data']
 
         elif 300 > response.status_code >= 200:
-            #print(response.status_code, "Mission already exists")
             ret_value = False
             self.all_missions[mission_name] = response.json()['data']
 
@@ -242,11 +234,26 @@ class MissionApiSession:
     ########### End Mission Information/Subscription #####################
 
     ############## Enterprise Sync #############################################
+
+    def parse_content_disposition(header_value):
+        msg = Message()
+        msg['content-disposition'] = header_value
+
+        # Get the main value, e.g. 'attachment'
+        value = msg.get_param(header='content-disposition')
+
+        # Get params as list of tuples, skip first which is the main value
+        params_list = msg.get_params(header='content-disposition')[1:]
+        params = dict(params_list)
+
+        return value, params
+
     def download_file(self, file_hash, filename=None, save=False):
         params = {"hash": file_hash}
         response = self.get(self.base_sync_api + "content", params=params)
 
         if filename is None:
+            header_value = response.headers['Content-Disposition']
             value, params = cgi.parse_header(response.headers['Content-Disposition'])
 
             filename = params['filename']
@@ -293,10 +300,7 @@ class MissionApiSession:
         headers = {"Content-Type": content_type}
 
         try:
-            #pprint(params)
-            #pprint(headers)
             response = self.post(self.base_sync_api + "upload", params=params, files=files, headers=headers)
-            #print(response.status_code, response.request.url, response.content)
         except requests.exceptions.ConnectionError:
             "File {} too big to upload. Limit is 200mb".format(upload_file_name)
             return
@@ -304,7 +308,6 @@ class MissionApiSession:
             if response.status_code == 200:
                 self.file_hash_map[upload_file_name] = str(response.json()['Hash'])
 
-        #print(self.file_hash_map)
         return response
 
     def upload_size_file(self,
@@ -315,7 +318,6 @@ class MissionApiSession:
         with NamedTemporaryFile() as f_object:
             f_file = f_object.file
             f_file.write(os.urandom(size))
-            #print((f_file.tell() / 1000000))
             f_file.seek(0)
             keywords = ["size_file"]
             self.upload_file(file_name,
@@ -512,10 +514,8 @@ class MissionApiSetupProcess(multiprocessing.Process):
         self.uid = "Init Process"
 
     def run(self):
-        print("starting init")
         try:
             self.setup_session.initialize_takserver(self.config_dict)
-            print("init started")
             if self.lock:
                 self.lock.release()
             while True:

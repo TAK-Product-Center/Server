@@ -16,6 +16,7 @@ import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,6 +32,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
@@ -271,6 +274,20 @@ public class JwtUtils {
                     rsaKeys.add(key);
                     rsaPublicKeys.addAll(rsaKeys);
                     publicKeyCache.asMap().put(authServer.getName(), rsaKeys);
+                } else if (issuer.toLowerCase().endsWith(".crt")) {
+                    byte[] keyBytes = Files.readAllBytes(filepathToKey);
+                    CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                    InputStream is = new ByteArrayInputStream(keyBytes);
+                    X509Certificate cert = (X509Certificate) cf.generateCertificate(is);
+
+                    PublicKey publicKey = cert.getPublicKey();
+                    if (!(publicKey instanceof RSAPublicKey)) {
+                        logger.error("Public key in .crt is not RSA for issuer: " + issuer);
+                    } else {
+                        rsaKeys.add((RSAPublicKey) publicKey);
+                        rsaPublicKeys.addAll(rsaKeys);
+                        publicKeyCache.asMap().put(authServer.getName(), rsaKeys);
+                    }
                 } else {
                     logger.error("found unsupported issuer: " + issuer);
                 }

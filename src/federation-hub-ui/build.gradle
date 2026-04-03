@@ -90,8 +90,6 @@ bootWar.dependsOn deployToWebapp
 
 dependencies {
 
-  implementation group: 'commons-fileupload', name: 'commons-fileupload', version: commons_fileupload_version
-
   // this is pulled in via spring-boot-logging-starter, only including explicitly here in order to exclude log4j
   api ("org.springframework.boot:spring-boot-starter-logging:$spring_boot_version") {
     exclude group: 'org.apache.logging.log4j', module: 'log4j-to-slf4j'
@@ -164,7 +162,7 @@ dependencies {
     exclude group: "com.vaadin.external.google", module:"android-json"
   }
 
-  
+  //implementation group: 'commons-fileupload', name: 'commons-fileupload', version: commons_fileupload_version
   implementation group: 'com.squareup.okhttp3', name: 'okhttp', version: okhttp3_version
 
   testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: logback_version

@@ -4,9 +4,8 @@ import java.net.InetSocketAddress;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import io.micrometer.core.instrument.Metrics;
-
 import org.apache.ignite.Ignite;
+import org.apache.ignite.binary.BinaryObject;
 import org.apache.ignite.cluster.ClusterGroup;
 import org.apache.ignite.events.DiscoveryEvent;
 import org.apache.ignite.events.EventType;
@@ -23,17 +22,17 @@ import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator.OverflowStrategy;
 
-import com.bbn.marti.remote.groups.Direction;
 import com.bbn.cluster.ClusterGroupDefinition;
+import com.bbn.marti.remote.config.CoreConfigFacade;
+import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.groups.GroupManager;
 import com.bbn.marti.remote.util.RemoteUtil;
+import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.service.Resources;
 import com.bbn.marti.service.SubscriptionManager;
-import com.bbn.marti.service.WebsocketMessagingBroker.WebsocketMessageTransporter;
-import com.bbn.marti.remote.util.SpringContextBeanForApi;
 
+import io.micrometer.core.instrument.Metrics;
 import tak.server.Constants;
-import com.bbn.marti.remote.config.CoreConfigFacade;
 import tak.server.ignite.IgniteHolder;
 import tak.server.ignite.IgniteReconnectEventHandler;
 import tak.server.qos.MessageDeliveryStrategy;
@@ -71,96 +70,45 @@ public class TakProtoWebSocketHandler extends BinaryWebSocketHandler {
 		}
 
 		IgniteReconnectEventHandler.registerListener(() -> {
-
 			Resources.tcpProcessor.execute(() -> {
-				ignite().message(
-						ignite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME))
-						.localListen("websocket-write-listener", (nodeId, message) -> {
-							if (message instanceof WebsocketMessageTransporter) {
-								final WebsocketMessageTransporter wmt = (WebsocketMessageTransporter) message;
-								final BinaryMessage binaryMessage = new BinaryMessage(wmt.message);
+			    ignite().message(
+			            ignite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME))
+			            .localListen("websocket-write-listener", (nodeId, message) -> {
+			            	Resources.messageSendExecutor.submit(() -> {
+			            		try {
+					                if (message instanceof BinaryObject obj) {
+										byte[] payload = obj.field("payload");
+										String publisherId = obj.field("publisherId");
+										String messageType = obj.field("messageType");
+										String[] connectionIds = obj.field("connectionIds");
+					                    
+					                    for (String id : connectionIds) {
+										    WebSocketSession session = websocketMap.get(id);
+										    if (session == null) continue;
 
-								Resources.messageSendExecutor.submit(() -> {
-									((WebsocketMessageTransporter) message).websocketConnectionIds.parallelStream()
-											.forEach(id -> {
-												try {
-													WebSocketSession session = websocketMap.get(id);
+										    if (!mds().isAllowed(messageType, publisherId, id)) continue;
 
-													if (session != null && binaryMessage != null) {
-
-														if (mds().isAllowed(wmt.messageType, wmt.publisherId, id)) {
-															session.sendMessage(binaryMessage);
-															Metrics.counter(
-																	Constants.METRIC_MESSAGE_WRITE_COUNT_WEBSOCKET,
-																	"takserver", "api").increment();
-														}
-													}
-												} catch (Exception e) {
-													if (logger.isDebugEnabled()) {
-														logger.debug(
-																"Error submitting message to websocket via ignite write listener",
-																e);
-													}
-												}
-											});
-								});
-							}
-
-							return true;
-						});
+										    try {
+										        session.sendMessage(new BinaryMessage(payload));
+										        Metrics.counter(Constants.METRIC_MESSAGE_WRITE_COUNT_WEBSOCKET, "takserver", "api").increment();
+										    } catch (Exception e) {
+										    	if (logger.isDebugEnabled()) {
+										    		logger.debug("Error sending message to websocket", e);
+										    	}
+										    }
+										}
+					                }
+				            	} catch (Exception e) {
+									logger.error("Error handling websocket message from messaging node", e);
+								}
+			            	});
+			            	
+			                return true;
+			            });
 			});
 		});
 	}
-
-	@Override
-	public void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws Exception {
-
-		try {		
-			Metrics.counter(Constants.METRIC_MESSAGE_READ_COUNT, "takserver", "messaging").increment();
-			
-			String inVector = RemoteUtil.getInstance()
-					.bitVectorToString(RemoteUtil.getInstance()
-							.getBitVectorForGroups(groupManager().getGroupsByConnectionId(websocketSessionIdMap.get(hashCode(session))), Direction.IN));
-
-			String outVector = RemoteUtil.getInstance()
-					.bitVectorToString(RemoteUtil.getInstance()
-							.getBitVectorForGroups(groupManager().getGroupsByConnectionId(websocketSessionIdMap.get(hashCode(session))), Direction.OUT));
-
-			if (!websocketGroupVectorMap.get(hashCode(session)).equals(inVector + outVector)) {
-				ClusterGroup clusterGroup = ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite());
-				clusterGroup = clusterGroup.forNodeId(UUID.fromString(websocketMessagingMap.get(hashCode(session))));
-
-				ignite().services(clusterGroup)
-						.serviceProxy(Constants.DISTRIBUTED_SUBSCRIPTION_MANAGER, SubscriptionManager.class, false)
-						.updateWebsocketSubscription(inVector, outVector, hashCode(session));
-				
-				websocketGroupVectorMap.put(hashCode(session), inVector + outVector);
-			}
-			
-			ignite().message(
-					ignite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME))
-					.send("websocket-read-listener-" + hashCode(session), message.getPayload().array());
-
-		} catch (Exception e) {
-			if (logger.isTraceEnabled()) {
-				logger.trace("handleBinaryMessage ERROR " + e);
-			}
-			throw e;
-		}
-	}
-
-	@Override
-	public void handleTextMessage(WebSocketSession session, TextMessage message) {
-
-		try {
-			session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Text messages not supported"));
-		} catch (Exception e) {
-			if (logger.isTraceEnabled()) {
-				logger.trace("Error closing connection", e);
-			}
-		}
-	}
-
+	
 	@Override
 	public void afterConnectionEstablished(WebSocketSession session) throws Exception {
 
@@ -197,12 +145,60 @@ public class TakProtoWebSocketHandler extends BinaryWebSocketHandler {
 			}
 			
 			websocketMessagingMap.put(hashCode(session), handlingNode);
-
 		} catch (Exception e) {
 			if (logger.isTraceEnabled()) {
 				logger.trace("afterConnectionEstablished ERROR " + e);
 			}
+
 			throw e;
+		}
+	}
+
+	@Override
+	public void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws Exception {
+		try {		
+			Metrics.counter(Constants.METRIC_MESSAGE_READ_COUNT, "takserver", "messaging").increment();
+			
+			String inVector = RemoteUtil.getInstance()
+					.bitVectorToString(RemoteUtil.getInstance()
+							.getBitVectorForGroups(groupManager().getGroupsByConnectionId(websocketSessionIdMap.get(hashCode(session))), Direction.IN));
+
+			String outVector = RemoteUtil.getInstance()
+					.bitVectorToString(RemoteUtil.getInstance()
+							.getBitVectorForGroups(groupManager().getGroupsByConnectionId(websocketSessionIdMap.get(hashCode(session))), Direction.OUT));
+
+			if (!websocketGroupVectorMap.get(hashCode(session)).equals(inVector + outVector)) {
+				ClusterGroup clusterGroup = ClusterGroupDefinition.getMessagingClusterDeploymentGroup(ignite());
+				clusterGroup = clusterGroup.forNodeId(UUID.fromString(websocketMessagingMap.get(hashCode(session))));
+
+				ignite().services(clusterGroup)
+						.serviceProxy(Constants.DISTRIBUTED_SUBSCRIPTION_MANAGER, SubscriptionManager.class, false)
+						.updateWebsocketSubscription(inVector, outVector, hashCode(session));
+				
+				websocketGroupVectorMap.put(hashCode(session), inVector + outVector);
+			}
+
+			ignite().message(
+					ignite().cluster().forAttribute(Constants.TAK_PROFILE_KEY, Constants.MESSAGING_PROFILE_NAME))
+					.send("websocket-read-listener-" + hashCode(session), message.getPayload().array());
+
+		} catch (Exception e) {
+			if (logger.isTraceEnabled()) {
+				logger.trace("handleBinaryMessage ERROR " + e);
+			}
+			throw e;
+		}
+	}
+
+	@Override
+	public void handleTextMessage(WebSocketSession session, TextMessage message) {
+
+		try {
+			session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Text messages not supported"));
+		} catch (Exception e) {
+			if (logger.isTraceEnabled()) {
+				logger.trace("Error closing connection", e);
+			}
 		}
 	}
 
@@ -212,6 +208,7 @@ public class TakProtoWebSocketHandler extends BinaryWebSocketHandler {
 		if (logger.isTraceEnabled()) {
 			logger.trace("handleTransportError" + hashCode(session));
 		}
+
 		removeWebSocketSubscription(session);
 	}
 
@@ -249,6 +246,8 @@ public class TakProtoWebSocketHandler extends BinaryWebSocketHandler {
 
 		websocketMap.remove(hashcode);
 		websocketMessagingMap.remove(hashcode);
+		websocketGroupVectorMap.remove(hashcode);
+		websocketSessionIdMap.remove(hashcode);
 	}
 
 	Ignite ignite = null;
@@ -273,7 +272,7 @@ public class TakProtoWebSocketHandler extends BinaryWebSocketHandler {
 			public boolean apply(DiscoveryEvent event) {
 				// only react to api nodes, this will only ever be called in the cluster
 				if (Constants.MESSAGING_PROFILE_NAME.equals(event.eventNode().attribute(Constants.TAK_PROFILE_KEY))) {
-					websocketMessagingMap.entrySet().parallelStream().forEach(e -> {
+					websocketMessagingMap.entrySet().stream().forEach(e -> {
 						if (UUID.fromString(e.getValue()).equals(event.eventNode().id())) {
 							removeWebSocketSubscription(e.getKey());
 						}

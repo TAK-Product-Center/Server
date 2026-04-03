@@ -1,5 +1,6 @@
 package tak.server.federation.hub.ui;
 
+import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -25,6 +26,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.FilterSecurityInterceptor;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -63,11 +65,18 @@ public class SecurityConfig {
 					&& request.getLocalPort() == fedHubConfig.getOauthPort();
 		}
 	};
+	
+	private RequestMatcher mtlsPortMatch = new RequestMatcher() {
+		@Override
+		public boolean matches(HttpServletRequest request) {
+			return request.getLocalPort() == fedHubConfig.getPort();
+		}
+	};
 
 	@Bean
 	@Order(1)
 	public SecurityFilterChain mtlsChain(HttpSecurity http) throws Exception {
-	    http.securityMatcher(request -> request.getLocalPort() == fedHubConfig.getPort());
+	    http.securityMatcher(mtlsPortMatch);
 
 	    http.csrf().disable();
 	    http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.ALWAYS);
@@ -91,8 +100,11 @@ public class SecurityConfig {
 	@Order(2)
 	public SecurityFilterChain oauthChain(HttpSecurity http) throws Exception {
 
-	    http.securityMatcher(oauthPortMatch);
-
+		http.securityMatchers(sm -> sm
+			    .requestMatchers(oauthPortMatch)    
+			    .requestMatchers("/api/**")
+			);
+		
 	    http.csrf().disable();
 	    http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
 
@@ -105,14 +117,29 @@ public class SecurityConfig {
 
 	    http.addFilterBefore(new JwtTokenFilter(fedHubConfig, jwtUtil), UsernamePasswordAuthenticationFilter.class);
 
-	    http.exceptionHandling()
-	        .authenticationEntryPoint((req, res, ex) -> {
-	            if (req.getRequestURI().startsWith(req.getContextPath() + "/api")) {
-	                res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
-	            } else {
-	                res.sendRedirect("/login");
-	            }
-	        });
+	    
+	    http.exceptionHandling(eh -> eh
+	    	    .authenticationEntryPoint((req, res, ex) -> {
+	    	    	// due to a bug with jetty, aviod using res.sendError and manually write the error instead
+	    	        if (req.getRequestURI().startsWith("/api") || req.getServletPath().startsWith("/api")) {
+	    	            res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+	    	            res.setContentType("text/plain;charset=UTF-8");
+	    	            res.setCharacterEncoding("UTF-8");
+	    	            try (var writer = res.getWriter()) {
+	    	                writer.write("Unauthorized");
+	    	                writer.flush();
+	    	            } catch (IOException e) {
+	    	                logger.error("Failed to write 401 response", e);
+	    	            }
+	    	        } else {
+	    	            try {
+	    	                res.sendRedirect("/login");
+	    	            } catch (IOException e) {
+	    	                logger.error("Redirect failed", e);
+	    	            }
+	    	        }
+	    	    }));
+	    	
 
 	    return http.build();
 	}

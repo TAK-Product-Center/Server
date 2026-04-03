@@ -37,7 +37,7 @@ COPY tak/security/rpms/signatures /opt/signatures
 RUN rm -f /etc/yum.repos.d/Rocky-Linux-PowerTools.repo
 
 COPY tak/security/*.rpm .
-# Install EPEL 8 repo
+# Install EPEL 9 repo
 RUN rpm -Uvh epel-release-latest-9.noarch.rpm
 
 # addin
@@ -96,6 +96,9 @@ RUN dnf install -y --disableplugin=subscription-manager --nodocs   --exclude='op
 # RUN echo "fips.provider.10=JdkLDAP" >> $JAVA_HOME/conf/security/java.security
 # RUN echo "fips.provider.11=JdkSASL" >> $JAVA_HOME/conf/security/java.security
 # RUN echo "fips.provider.12=SunPKCS11" >> $JAVA_HOME/conf/security/java.security
+
+# Uncomment to include local copy of amazon-efs-utils
+#RUN  rpm -ivh amazon-efs-utils-*.rpm
 
 RUN useradd -g 0 -u 1001 tak \
     && usermod -a -G root tak

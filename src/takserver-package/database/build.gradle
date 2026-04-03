@@ -76,6 +76,7 @@ export tak_full_version=''' + takversion + '''-''' + takrelease + '''
 chown root:root /opt/tak/db-utils/pg_hba.conf
 chmod 600 /opt/tak/db-utils/pg_hba.conf
 
+
 chmod 544 /opt/tak/db-utils/*.sh
 chmod 500 /opt/tak/db-utils/clear-old-data.sh
 chmod 500 /opt/tak/db-utils/clear-old-data.sql
@@ -126,6 +127,7 @@ ospackage {
     summary = _summary
 
     preInstall modified_preinstall_script
+    preUninstall _preuninstall_script
     postInstall postinstall_script_db
     postUninstall _postuninstall_script
 

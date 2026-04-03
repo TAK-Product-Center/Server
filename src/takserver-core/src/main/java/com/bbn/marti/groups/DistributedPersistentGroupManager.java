@@ -268,8 +268,11 @@ public class DistributedPersistentGroupManager implements GroupManager, Service 
         }
         
         Group storedGroup = hydrateGroup(group);
-        
-        storedGroup.addNeighbor(user);
+
+        // dont track group neighbors for transient web requests since users accumulate through active sessions
+        if (user.getConnectionType() != ConnectionType.WEB) {
+            storedGroup.addNeighbor(user);
+        }
         
         NavigableSet<Group> userGroups = groupStore().getUserGroupMap().get(user);
         
