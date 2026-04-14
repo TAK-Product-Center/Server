@@ -489,7 +489,12 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         try {
             SearchControls controls = getGroupSearchControls(chain);
             controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-            results = ctx.search("", searchFilter, controls);
+            // chain=true searches groupBaseRDN for group objects containing the user
+            // chain=false searches userBaseRDN for the user object to read its memberOf attribute
+            String searchBase = chain
+                    ? (conf.getGroupBaseRDN() != null ? conf.getGroupBaseRDN() : "")
+                    : (conf.getUserBaseRDN() != null ? conf.getUserBaseRDN() : "");
+            results = ctx.search(searchBase, searchFilter, controls);
 
             if (chain) {
                 // process ldap search results
@@ -503,6 +508,14 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         	if (logger.isDebugEnabled()) {
         		logger.debug("ignoring LDAP referral");
         	}
+        } catch (javax.naming.NameNotFoundException e) {
+            if (chain) {
+                logger.error("LDAP group search failed: groupBaseRDN '{}' does not exist in the LDAP directory. " +
+                        "Check the groupBaseRDN value in CoreConfig.xml.", conf.getGroupBaseRDN());
+            } else {
+                logger.error("LDAP user search failed: userBaseRDN '{}' does not exist in the LDAP directory. " +
+                        "Check the userBaseRDN value in CoreConfig.xml.", conf.getUserBaseRDN());
+            }
         } catch (NamingException e) {
         	if (logger.isDebugEnabled()) {
         		logger.debug("exception getting user info", e);
