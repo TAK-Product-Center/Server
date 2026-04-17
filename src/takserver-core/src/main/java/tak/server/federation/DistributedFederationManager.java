@@ -2413,9 +2413,21 @@ public class DistributedFederationManager implements FederationManager, Service 
 			} else if (sub instanceof FigFederateSubscription) {
 				FigFederateSubscription figSub = (FigFederateSubscription) sub;
 				if (update.getId().equals(figSub.getFederate().getId())) {
-					figSub.getFigClient().getRolCall().setMaxFederateHops(update.getMaxHops());
-					figSub.getClientCallHolder().setMaxFederateHops(update.getMaxHops());
-					figSub.getGroupsCallHolder().setMaxFederateHops(update.getMaxHops());
+					if (figSub.getFigClient().getRolCall() != null) {
+						figSub.getFigClient().getRolCall().setMaxFederateHops(update.getMaxHops());
+					} else {
+						logger.warn("updateFederateDetails: getRolCall() is null for federate {} - ROL stream not yet established, skipping maxHops update", update.getId());
+					}
+					if (figSub.getClientCallHolder() != null) {
+						figSub.getClientCallHolder().setMaxFederateHops(update.getMaxHops());
+					} else {
+						logger.warn("updateFederateDetails: getClientCallHolder() is null for federate {} - client event stream not yet established, skipping maxHops update", update.getId());
+					}
+					if (figSub.getGroupsCallHolder() != null) {
+						figSub.getGroupsCallHolder().setMaxFederateHops(update.getMaxHops());
+					} else {
+						logger.warn("updateFederateDetails: getGroupsCallHolder() is null for federate {} - group stream not yet established, skipping maxHops update", update.getId());
+					}
 				}
 			}
 		});

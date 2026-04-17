@@ -129,7 +129,7 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         ldapUrl = conf.getUrl();
         userString = conf.getUserstring();
 
-        groupPrefix = conf.getGroupprefix().toLowerCase();
+        groupPrefix = Strings.nullToEmpty(conf.getGroupprefix()).toLowerCase();
         readOnlyGroup = conf.getReadOnlyGroup();
         readGroupSuffix = conf.getReadGroupSuffix();
         writeGroupSuffix = conf.getWriteGroupSuffix();
@@ -262,6 +262,27 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
 
             String groupName = info.getValue();
             groupNames.add(groupName);
+        }
+
+        // When matchGroupInChain=false the LDAP query reads the memberOf back-link from the
+        // user object, which contains only direct group memberships but spans the entire
+        // directory.  groupBaseRDN narrows the results to a specific OU.  Chain search
+        // (matchGroupInChain=true) already scopes the LDAP query to groupBaseRDN via the
+        // transitive OID, so no extra filter is needed in that path.
+        final String groupBaseRDN = getConf().getGroupBaseRDN();
+        if (!Strings.isNullOrEmpty(groupBaseRDN) && !conf.isMatchGroupInChain()) {
+            Set<String> ouFiltered = new ConcurrentSkipListSet<>();
+            final String groupBaseRDNLower = groupBaseRDN.toLowerCase(Locale.ENGLISH);
+            for (String groupName : groupNames) {
+                if (groupName.toLowerCase(Locale.ENGLISH).contains(groupBaseRDNLower)) {
+                    ouFiltered.add(groupName);
+                } else {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("skipping group outside groupBaseRDN: " + groupName);
+                    }
+                }
+            }
+            groupNames = ouFiltered;
         }
 
         Set<String> filtered = applyGroupPrefixFilter(groupNames, groupPrefix);
@@ -489,7 +510,12 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         try {
             SearchControls controls = getGroupSearchControls(chain);
             controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-            results = ctx.search("", searchFilter, controls);
+            // chain=true searches groupBaseRDN for group objects containing the user
+            // chain=false searches userBaseRDN for the user object to read its memberOf attribute
+            String searchBase = chain
+                    ? (conf.getGroupBaseRDN() != null ? conf.getGroupBaseRDN() : "")
+                    : (conf.getUserBaseRDN() != null ? conf.getUserBaseRDN() : "");
+            results = ctx.search(searchBase, searchFilter, controls);
 
             if (chain) {
                 // process ldap search results
@@ -503,6 +529,14 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         	if (logger.isDebugEnabled()) {
         		logger.debug("ignoring LDAP referral");
         	}
+        } catch (javax.naming.NameNotFoundException e) {
+            if (chain) {
+                logger.error("LDAP group search failed: groupBaseRDN '{}' does not exist in the LDAP directory. " +
+                        "Check the groupBaseRDN value in CoreConfig.xml.", conf.getGroupBaseRDN());
+            } else {
+                logger.error("LDAP user search failed: userBaseRDN '{}' does not exist in the LDAP directory. " +
+                        "Check the userBaseRDN value in CoreConfig.xml.", conf.getUserBaseRDN());
+            }
         } catch (NamingException e) {
         	if (logger.isDebugEnabled()) {
         		logger.debug("exception getting user info", e);
@@ -520,21 +554,29 @@ public class LdapAuthenticator extends AbstractAuthenticator implements Serializ
         if (!conf.isMatchGroupInChain()) {
         	if (logger.isDebugEnabled())  {
         		logger.debug("getting user info using AD approach");
+        		logger.debug("connected to ldap: " + ctx);
         	}
-            // For AD, use the sAMAccountName
+            // Read the user's memberOf attribute directly.  AD populates memberOf with
+            // only the groups where the user is a direct member, so no extra verification
+            // is required.  groupBaseRDN scoping is applied downstream in
+            // getGroupNamesFromSearchResults when matchGroupInChain=false.
         	EqualsFilter filter = new EqualsFilter(conf.getNameAttrAD(), userId);
             searchFilter = filter.toString();
         } else {
         	if (logger.isDebugEnabled()) {
         		logger.debug("getting user info using AD chain approach");
+        		logger.debug("connected to ldap: " + ctx);
         	}
             String distinguishedName = getDistinguishedName(ctx, userId, conf.getNameAttrAD());
+            if (distinguishedName == null) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("could not resolve distinguished name for user: " + userId);
+                }
+                return new ConcurrentHashMap<>();
+            }
+            // Transitive membership: the recursive matching OID follows nested groups.
             EqualsFilter filter = new EqualsFilter("member:1.2.840.113556.1.4.1941:", distinguishedName);
             searchFilter = filter.toString();
-        }
-        
-        if (logger.isDebugEnabled()) {
-        	logger.debug("connected to ldap: " + ctx);        	
         }
 
         return getGroupInfoBySearch(ctx, searchFilter, conf.isMatchGroupInChain());
