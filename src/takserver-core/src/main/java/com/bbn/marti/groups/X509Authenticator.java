@@ -317,6 +317,18 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
 
                             boolean readOnly = false;
                             if (!groupInfo.isEmpty()) {
+                                // Grant ROLE_ADMIN if the user is a member of the configured adminGroup
+                                if (!Strings.isNullOrEmpty(ldapConf.getAdminGroup())) {
+                                    Set<String> groupNames = LdapAuthenticator.getInstance()
+                                            .getGroupNamesFromSearchResults(groupInfo);
+                                    if (groupNames.contains(ldapConf.getAdminGroup())) {
+                                        if (logger.isDebugEnabled()) {
+                                            logger.debug("adding ROLE_ADMIN for user {} (member of adminGroup)", username);
+                                        }
+                                        user.getAuthorities().add("ROLE_ADMIN");
+                                    }
+                                }
+
                                 if (useGroupCache) {
                                     // extract the set of group names from the ldap search results
                                     Set<String> groupNames = LdapAuthenticator.getInstance().
