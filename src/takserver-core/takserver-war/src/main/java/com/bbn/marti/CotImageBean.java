@@ -2,6 +2,8 @@
 
 package com.bbn.marti;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -196,7 +198,7 @@ public class CotImageBean implements Serializable {
 
 	private boolean hasSubElementNamed(String detailText, String elementName) {
 		try {
-			Document cotDoc = DocumentHelper.parseText(detailText);
+			Document cotDoc = SecureSaxReader.parseText(detailText);
 			Element detailElement = cotDoc.getRootElement();
 			return detailElement.element(elementName) != null;
 		} catch (Exception e) {
@@ -314,7 +316,7 @@ public class CotImageBean implements Serializable {
 		pointE.addAttribute("lon", Double.toString(lon));
 
 		String detailStr = results.getString("detail");
-		Document detailDoc = DocumentHelper.parseText(detailStr);
+		Document detailDoc = SecureSaxReader.parseText(detailStr);
 		eventE.add(detailDoc.getRootElement());
 
 		return event;

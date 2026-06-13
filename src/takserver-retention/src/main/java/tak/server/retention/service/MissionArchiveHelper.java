@@ -1,5 +1,7 @@
 package tak.server.retention.service;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -171,7 +173,7 @@ public class MissionArchiveHelper {
 			
 			MissionPackageManifest manifest = null;
 			try {
-				SAXReader reader = new SAXReader();
+				SAXReader reader = SecureSaxReader.newReader();
 				Document doc = reader.read(new ByteArrayInputStream(files.get("MANIFEST/manifest.xml")));
 				
 				if (doc == null) {

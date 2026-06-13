@@ -2,6 +2,8 @@
 
 package com.bbn.marti.util;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
@@ -385,7 +387,7 @@ public class KmlUtils {
     public static Feature buildRangeAndBearing(CotElement qr, Document kmlDoc) {
         try {
 
-            org.dom4j.Document doc = DocumentHelper.parseText(qr.detailtext);
+            org.dom4j.Document doc = SecureSaxReader.parseText(qr.detailtext);
             if (doc == null) {
                 return null;
             }

@@ -1,5 +1,7 @@
 package com.bbn.marti;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -175,7 +177,7 @@ public class TracksKMLServlet extends EsapiServlet {
 			}			
 
 			XPath geoPointSrcExpression = DocumentHelper.createXPath("/detail/precisionlocation/@geopointsrc");
-			Document doc = DocumentHelper.parseText(cotTrack.detailtext);
+			Document doc = SecureSaxReader.parseText(cotTrack.detailtext);
 			String geopointsrc = (String) geoPointSrcExpression.valueOf(doc);
 
 			String how = null;

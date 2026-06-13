@@ -25,6 +25,7 @@ import com.atakmap.Tak.FederatedEvent;
 import com.atakmap.Tak.GeoEvent;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.util.DateUtil;
+import com.bbn.marti.remote.util.SecureSaxReader;
 import com.bbn.marti.service.DistributedSubscriptionManager;
 import com.bbn.marti.util.CommonUtil;
 import com.google.common.base.Strings;
@@ -277,7 +278,7 @@ public class ProtoBufHelper {
 
 		if (!Strings.isNullOrEmpty(geo.getOther())) {
 			try {
-				Document otherDoc = DocumentHelper.parseText(geo.getOther());
+				Document otherDoc = SecureSaxReader.parseText(geo.getOther());
 				detailE = otherDoc.getRootElement();
 
 				detailE.addElement("track")

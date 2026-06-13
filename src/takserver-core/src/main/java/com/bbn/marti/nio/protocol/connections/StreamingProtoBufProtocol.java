@@ -1,5 +1,7 @@
 package com.bbn.marti.nio.protocol.connections;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.io.ByteArrayInputStream;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
@@ -183,7 +185,7 @@ public class StreamingProtoBufProtocol extends AbstractBroadcastingProtocol<CotE
                     data.getUid() + ".cot", url, dataXml.length(), new String[]{});
 
             // convert the fileTransfer message to protobuf
-            SAXReader reader = new SAXReader();
+            SAXReader reader = SecureSaxReader.newReader();
             Document doc = reader.read(new ByteArrayInputStream(fileTransferXml.getBytes()));
             CotEventContainer container = new CotEventContainer(doc);
             TakMessage takMessage = StreamingProtoBufHelper.cot2protoBuf(container);

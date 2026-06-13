@@ -1,5 +1,7 @@
 package com.bbn.marti.sync.service;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.io.ByteArrayOutputStream;
 import java.rmi.RemoteException;
 import java.security.PrivateKey;
@@ -664,7 +666,7 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 			if (path != null) {
 				try {
-					if (DocumentHelper.parseText(cotElement.detailtext).selectNodes(
+					if (SecureSaxReader.parseText(cotElement.detailtext).selectNodes(
 							"/detail/marti/dest[@path=\"" + path + "\"]").isEmpty()) {
 						continue;
 					}

@@ -2,6 +2,8 @@
 
 package com.bbn.marti.service.kml;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
@@ -182,7 +184,7 @@ public class KMLServiceImpl implements KMLService {
 		org.dom4j.Document doc = null;
 
 		try {
-			doc = DocumentHelper.parseText(detailText);
+			doc = SecureSaxReader.parseText(detailText);
 		} catch (Exception e) {
 			logger.warn("exception parsing detail field from CoT data", e);
 		}

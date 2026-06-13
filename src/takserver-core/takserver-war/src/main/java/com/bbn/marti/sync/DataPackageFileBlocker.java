@@ -1,5 +1,7 @@
 package com.bbn.marti.sync;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -225,7 +227,7 @@ public class DataPackageFileBlocker {
             ByteArrayOutputStream bout = new ByteArrayOutputStream();
             StreamResult result = new StreamResult(bout);
 
-            SAXReader reader = new SAXReader();
+            SAXReader reader = SecureSaxReader.newReader();
 
             Document doc = null;
 
