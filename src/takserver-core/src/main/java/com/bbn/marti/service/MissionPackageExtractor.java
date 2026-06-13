@@ -1,5 +1,7 @@
 package com.bbn.marti.service;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -194,7 +196,7 @@ public class MissionPackageExtractor {
 	}
 
 	private void setRealMissionPackageFlag(byte[] data)  {
-		SAXReader reader = new SAXReader();
+		SAXReader reader = SecureSaxReader.newReader();
 		Document doc = null;
 		try {
 			doc = reader.read(new ByteArrayInputStream(data));

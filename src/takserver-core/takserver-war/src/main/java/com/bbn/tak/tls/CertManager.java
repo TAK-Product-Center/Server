@@ -6,10 +6,12 @@ import static com.bbn.tak.tls.Constants.CERTBITS;
 import static com.bbn.tak.tls.Constants.KEY_TYPE;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertificateException;
@@ -43,6 +45,16 @@ public class CertManager {
     }
 
     public enum CERTTYPE { CA, SERVER, CLIENT };
+
+    // CSPRNG for certificate serial numbers. Serials must be unpredictable and carry
+    // >= 64 bits of entropy (CA/Browser Forum BR 7.1) so they cannot be guessed or forced
+    // to collide (which would undermine serial-keyed revocation, i.e. CRL/OCSP).
+    private static final SecureRandom serialRandom = new SecureRandom();
+
+    private static BigInteger nextSerialNumber() {
+        // 64 random bits, always non-negative (BigInteger(numBits, rnd) yields [0, 2^64)).
+        return new BigInteger(64, serialRandom);
+    }
 
     public CertManager() throws NoSuchProviderException, NoSuchAlgorithmException {
 
@@ -93,8 +105,7 @@ public class CertManager {
         X509CertInfo info = new X509CertInfo();
         info.set(X509CertInfo.VALIDITY, new CertificateValidity(
                 notBefore, notAfter));
-        info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(
-                new java.util.Random().nextInt() & 0x7fffffff));
+        info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(nextSerialNumber()));
         info.set(X509CertInfo.VERSION,
                 new CertificateVersion(CertificateVersion.V3));
         info.set(X509CertInfo.ALGORITHM_ID,

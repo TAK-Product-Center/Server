@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.bbn.marti.remote.util.DateUtil;
+import com.bbn.marti.remote.util.SecureSaxReader;
 
 import atakmap.commoncommo.protobuf.v1.ContactOuterClass.Contact;
 import atakmap.commoncommo.protobuf.v1.Cotevent.CotEvent;
@@ -433,7 +434,7 @@ public class StreamingProtoBufHelper {
 	private static ThreadLocal<SAXReader> reader =
 		    new ThreadLocal<SAXReader>() {
 		        @Override public SAXReader initialValue() {
-		            return new SAXReader();
+		            return SecureSaxReader.newReader();
 		        }
 		    };
 

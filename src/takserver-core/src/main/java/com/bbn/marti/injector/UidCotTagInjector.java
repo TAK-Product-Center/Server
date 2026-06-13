@@ -1,5 +1,7 @@
 package com.bbn.marti.injector;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.io.Serializable;
 import java.rmi.RemoteException;
 import java.util.Collection;
@@ -61,7 +63,7 @@ public class UidCotTagInjector implements Injector<RemoteSubscription, CotEventC
     }
 
     public boolean addInjector(UidInject uidInject) throws DocumentException {
-        Document document = DocumentHelper.parseText(uidInject.getToInject());
+        Document document = SecureSaxReader.parseText(uidInject.getToInject());
 
         Element element = document.getRootElement();
 
@@ -297,7 +299,7 @@ public class UidCotTagInjector implements Injector<RemoteSubscription, CotEventC
     protected Element getElementToInject(String toInject) {
         
         try {
-            Document document = DocumentHelper.parseText(padToInject(toInject));
+            Document document = SecureSaxReader.parseText(padToInject(toInject));
             return document.getRootElement();
         } catch (DocumentException e) {
             throw new TakException(e);

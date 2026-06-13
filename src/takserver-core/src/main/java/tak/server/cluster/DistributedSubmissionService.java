@@ -1,5 +1,7 @@
 package tak.server.cluster;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import static java.util.Objects.requireNonNull;
 
 import java.io.ByteArrayInputStream;
@@ -121,7 +123,7 @@ public class DistributedSubmissionService implements SubmissionInterface {
 			
 			// insert mission-guid dest that is more specific, instead
 			String dest = "<dest mission-guid=\"" + missionGuid.toString() + "\"/>";
-			SAXReader reader = new SAXReader();
+			SAXReader reader = SecureSaxReader.newReader();
 			Document doc = reader.read(new ByteArrayInputStream(dest.getBytes(StandardCharsets.UTF_8)));
 			Element missionDestElem = DocumentHelper.makeElement(cot.getDocument(), "/event/detail/marti/");
 			missionDestElem.add(doc.getRootElement());

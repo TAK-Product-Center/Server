@@ -2,6 +2,8 @@
 
 package com.bbn.marti.service;
 
+import com.bbn.marti.remote.util.SecureSaxReader;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -1775,7 +1777,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 
 	private static void addMissionXml(Document document, String xml) {
 		try {
-			SAXReader reader = new SAXReader();
+			SAXReader reader = SecureSaxReader.newReader();
 			Document xmlDoc = reader.read(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
 			Element missionElem = DocumentHelper.makeElement(document, missionXPath);
 			missionElem.add(xmlDoc.getRootElement());
@@ -1786,7 +1788,7 @@ public class DistributedSubscriptionManager implements SubscriptionManager, org.
 
 	private static void addMissionChangeContentXml(Document document, String xml) {
 		try {
-			SAXReader reader = new SAXReader();
+			SAXReader reader = SecureSaxReader.newReader();
 			Document xmlDoc = reader.read(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
 			Element missionElem = DocumentHelper.makeElement(document, missionContentXPath);
 			missionElem.add(xmlDoc.getRootElement());
