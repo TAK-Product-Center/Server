@@ -5,7 +5,6 @@ import java.util.Date;
 import java.util.UUID;
 
 import javax.crypto.spec.SecretKeySpec;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +33,10 @@ public class MissionTokenUtils {
 
     private void setPrivateKey(PrivateKey privateKey) {
         this.privateKey = privateKey;
-        secretKeySpec = new SecretKeySpec(privateKey.getEncoded(), privateKey.getAlgorithm());
+        // Derive a dedicated HMAC-SHA384 key rather than signing with the raw RSA private-key
+        // DER bytes (an asymmetric-key-as-symmetric-secret anti-pattern). Verification in
+        // JwtUtils.parseMissionTokenClaims uses the same derivation.
+        secretKeySpec = JwtUtils.deriveHmacKey(privateKey);
     }
 
     private MissionTokenUtils(PrivateKey privateKey)  {
@@ -61,7 +63,7 @@ public class MissionTokenUtils {
                     .setIssuedAt(now)
                     .setSubject(tokenType.name())
                     .setIssuer(issuer)
-                    .signWith(SignatureAlgorithm.HS256, secretKeySpec)
+                    .signWith(SignatureAlgorithm.HS384, secretKeySpec)
                     .claim(tokenType.name(), id)
                     .claim(MISSION_NAME_CLAIM, missionName)
             		.claim(MISSION_GUID_CLAIM, missionGuid.toString());

@@ -9,13 +9,19 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.SignatureException;
+import io.jsonwebtoken.SigningKeyResolver;
+import io.jsonwebtoken.SigningKeyResolverAdapter;
 import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -178,22 +184,62 @@ public class JwtUtils {
     public PublicKey getPublicKey() { return publicKey; }
     public PrivateKey getPrivateKey() { return privateKey; }
 
+    // SHA-384 (FIPS 198-1 approved, CNSA/Suite-B minimum) for mission-token HMAC and key derivation.
+    private static final String HMAC_SHA384 = "HmacSHA384";
+
+    // Domain-separation label used to derive a dedicated symmetric key from asymmetric key material.
+    private static final byte[] MISSION_TOKEN_HMAC_LABEL =
+            "TAKServer-MissionToken-HMAC-Key-v1".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+    /**
+     * Verify that the token's declared algorithm matches the algorithm we expect for the
+     * configured key, rejecting anything else. This is what defeats key/algorithm-confusion
+     * attacks (e.g. an attacker re-signing a token as HS256 using a published RSA public key
+     * as the HMAC secret): the legacy {@code setSigningKey(Key)} API selects the verification
+     * algorithm from the attacker-controlled {@code alg} header, so we must pin it ourselves.
+     */
+    private static void requireAlgorithm(JwsHeader header, SignatureAlgorithm expected) {
+        if (!expected.getValue().equals(header.getAlgorithm())) {
+            throw new SignatureException("Unexpected JWT signature algorithm '" + header.getAlgorithm()
+                    + "'; expected '" + expected.getValue() + "'");
+        }
+    }
+
+    /** A resolver that pins the verification algorithm and returns a fixed key. */
+    private static SigningKeyResolver pinnedResolver(SignatureAlgorithm expected, Key key) {
+        return new SigningKeyResolverAdapter() {
+            @Override
+            public Key resolveSigningKey(JwsHeader header, Claims claims) {
+                requireAlgorithm(header, expected);
+                return key;
+            }
+        };
+    }
+
+    /**
+     * Derive a dedicated 384-bit HMAC key from key material using HMAC-SHA384 as a PRF/KDF.
+     * The derivation is deterministic (so peers sharing the same keystore can verify each
+     * other's mission tokens) while ensuring the raw private-key DER bytes are never used
+     * directly as the symmetric signing secret.
+     */
+    public static SecretKeySpec deriveHmacKey(Key keyMaterial) {
+        try {
+            Mac mac = Mac.getInstance(HMAC_SHA384);
+            mac.init(new SecretKeySpec(keyMaterial.getEncoded(), HMAC_SHA384));
+            return new SecretKeySpec(mac.doFinal(MISSION_TOKEN_HMAC_LABEL), HMAC_SHA384);
+        } catch (Exception e) {
+            throw new IllegalStateException("unable to derive HMAC key for mission tokens", e);
+        }
+    }
+
     private JwtParser getParser(SignatureAlgorithm signatureAlgorithm, Key key) {
 
         JwtParser parser = null;
         if (signatureAlgorithm == SignatureAlgorithm.RS256) {
             parser = jwtRsaParser.get();
             if (parser == null) {
-                parser = Jwts.parser();
-                parser.setSigningKey(key);
+                parser = Jwts.parser().setSigningKeyResolver(pinnedResolver(SignatureAlgorithm.RS256, key));
                 jwtRsaParser.set(parser);
-            }
-        } else if (signatureAlgorithm == SignatureAlgorithm.HS256) {
-            parser = jwtHmacParser.get();
-            if (parser == null) {
-                parser = Jwts.parser();
-                parser.setSigningKey(key.getEncoded());
-                jwtHmacParser.set(parser);
             }
         }
 
@@ -315,7 +361,8 @@ public class JwtUtils {
         List<RSAPublicKey> rsaPublicKeys = getExternalVerifiers();
         if (rsaPublicKeys != null) {
             for (RSAPublicKey rsaPublicKey : rsaPublicKeys) {
-                jwtParsers.add(Jwts.parser().setSigningKey(rsaPublicKey));
+                jwtParsers.add(Jwts.parser().setSigningKeyResolver(
+                        pinnedResolver(SignatureAlgorithm.RS256, rsaPublicKey)));
             }
         }
         return jwtParsers;
@@ -357,13 +404,17 @@ public class JwtUtils {
     public Claims parseMissionTokenClaims(String token) {
         List<JwtParser> jwtParsers = new ArrayList<>();
 
-        jwtParsers.add(getParser(SignatureAlgorithm.HS256, privateKey));
+        // Mission tokens are HMAC-signed with a key derived from the TLS private key (see
+        // MissionTokenUtils). Pin HS384 and use the same derived key for verification.
+        jwtParsers.add(Jwts.parser().setSigningKeyResolver(
+                pinnedResolver(SignatureAlgorithm.HS384, deriveHmacKey(privateKey))));
 
         try {
             for (MissionTls missionTls : CoreConfigFacade.getInstance().getRemoteConfiguration().getSecurity().getMissionTls()) {
                 KeyPair keyPair = loadKeyPair(
                         missionTls.getKeystore(), missionTls.getKeystoreFile(), missionTls.getKeystorePass());
-                jwtParsers.add(Jwts.parser().setSigningKey(keyPair.getPrivate().getEncoded()));
+                jwtParsers.add(Jwts.parser().setSigningKeyResolver(
+                        pinnedResolver(SignatureAlgorithm.HS384, deriveHmacKey(keyPair.getPrivate()))));
             }
         } catch (Exception e) {
             logger.error("exception adding missionTls keystores", e);
