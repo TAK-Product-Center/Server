@@ -764,6 +764,57 @@
               <xs:attribute name="accessTokenName" type="xs:string" default="access_token"/>
               <xs:attribute name="refreshTokenName" type="xs:string" default="refresh_token"/>
               <xs:attribute name="trustAllCerts" type="xs:boolean" default="false"/>
+              <!-- OIDC (Phase 1). All optional; absent means the pre-existing behaviour. -->
+              <xs:attribute name="issuer" type="xs:string">
+                <xs:annotation>
+                  <xs:documentation>Expected iss value. When set, the discovery document's issuer must match it and every
+                    token's iss claim must equal it. When unset, the discovery document's issuer is used.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="audience" type="xs:string">
+                <xs:annotation>
+                  <xs:documentation>Comma-separated aud (or azp) values accepted from this provider. Defaults to clientId
+                    plus androidClientId. A token naming none of them is rejected.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="androidClientId" type="xs:string">
+                <xs:annotation>
+                  <xs:documentation>Public client id used by ATAK (Authorization Code with PKCE, no secret). Published to
+                    clients on /login/.well-known/openid-configuration.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="scopes" type="xs:string" default="openid profile">
+                <xs:annotation>
+                  <xs:documentation>Scopes requested at the authorization endpoint. Add the scope that carries the groups
+                    claim (for example "groups") for providers that require it.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="usePkce" type="xs:boolean" default="true">
+                <xs:annotation>
+                  <xs:documentation>Send code_challenge (S256) on the browser flow.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="truststore" type="xs:string">
+                <xs:annotation>
+                  <xs:documentation>Keystore type (JKS or PKCS12) holding the CA that signed the provider's TLS certificate.
+                    Mirrors ldapsTruststore. When unset the JVM default trust store is used.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
+              <xs:attribute name="truststoreFile" type="xs:string"/>
+              <xs:attribute name="truststorePass" type="xs:string"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="groupMapping" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:annotation>
+              <xs:documentation>OIDC (Phase 1). Maps one value of the groups claim to one TAK group. When at least one
+                groupMapping is configured, only mapped values grant access; an unmapped identity is denied unless
+                defaultGroup is set. When none is configured, the pre-existing pass-through by name applies.
+                Repeat the element to map one claim value to several groups.</xs:documentation>
+            </xs:annotation>
+            <xs:attribute name="claimValue" type="xs:string" use="required"/>
+            <xs:attribute name="group" type="xs:string" use="required"/>
+            <xs:attribute name="access" type="oidcGroupAccess" default="both"/>
           </xs:complexType>
         </xs:element>
       </xs:sequence>
@@ -784,9 +835,38 @@
       <xs:attribute name="allowAccessTokenRetrieval" type="xs:boolean" default="false"/>
       <xs:attribute name="adminTokenClaimName" type="xs:string"/>
       <xs:attribute name="adminTokenClaimValue" type="xs:string"/>
-      
+      <!-- OIDC (Phase 1) -->
+      <xs:attribute name="defaultGroup" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TAK group granted to an OIDC identity whose claims map to no group. Unset means deny.
+            Never set this to an administrative group.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="identityKey" type="oidcIdentityKey" default="issuerSubject">
+        <xs:annotation>
+          <xs:documentation>How an external OIDC token selects the TAK user. issuerSubject keys on iss plus sub
+            (recommended; display claims never select a user). usernameClaim keeps the pre-existing resolution
+            (usernameClaim, then email) for installations that depend on it.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="externalAuthClockSkewSeconds" type="xs:int" default="60"/>
     </xs:complexType>
   </xs:element>
+
+  <xs:simpleType name="oidcGroupAccess">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="in"/>
+      <xs:enumeration value="out"/>
+      <xs:enumeration value="both"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="oidcIdentityKey">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="issuerSubject"/>
+      <xs:enumeration value="usernameClaim"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <xs:element name="filter">
     <xs:complexType>
