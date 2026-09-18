@@ -278,6 +278,9 @@ dependencies {
 
   implementation group: 'org.springframework.security', name: 'spring-security-oauth2-authorization-server', version: spring_security_oauth2_authorization_server_version
   implementation group: 'org.springframework.security', name: 'spring-security-oauth2-core', version: spring_security_version
+  // tak.server.oidc: NimbusJwtDecoder and the JWT validators. Already on the classpath transitively through the
+  // authorization server; declared so the OIDC code does not depend on that module's dependency graph.
+  implementation group: 'org.springframework.security', name: 'spring-security-oauth2-jose', version: spring_security_version
 }
 
 clean {
