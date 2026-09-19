@@ -195,12 +195,18 @@ for TAK Product Center separately (no issuer or audience check, anonymous fallba
 
 ## 8. Evidence
 
+Heads: Server `2861249` (eleven commits on upstream `5187abd`), ATAK `f0d1d8e` (three commits on `9f6893d`). Evidence files are in the delivered archive.
+
 | Claim | Evidence |
 |---|---|
-| Builds from upstream `5187abd` with Gradle 8.10.2, JDK 17 | `qa/gradle/02-compileJava.txt` |
-| 110 unit tests in `tak.server.oidc` | `qa/gradle/05-test-oidc-review-fixes.txt` |
-| The suite fails when the checks are removed | `qa/mutation-runs.md` (11 mutants), `qa/mutation-runs-2.md` (11 mutants, 10 killed, the hole closed) |
-| Independent review of the branch | `qa/fleet/C-review-1.md` (17 findings, addressed in commit `eee2a66`), round two pending |
-| Browser login, group mapping, deny, replay, planted tokens against a live IdP | PENDING: `qa/e2e/run-e2e.sh` against the local Keycloak runtime |
+| Builds from upstream `5187abd` with Gradle 8.10.2, JDK 17; war boots and serves 8443 and 8446 | `qa/gradle/08a-compile-v02-packet1.txt`, `qa/e2e/v02-probes.md` (war built from `2861249`) |
+| 130 unit tests in `tak.server.oidc`, 0 failures | `qa/gradle/09-test-oidc-v02-packet2a.txt` and the JUnit XML totals recorded in `qa/mutation-runs-4.md` |
+| The suite fails when the checks are removed | `qa/mutation-runs.md` (11), `qa/mutation-runs-2.md` (11, one hole closed), `qa/mutation-runs-3.md` (6), `qa/mutation-runs-4.md` (5): 33 planted defects, 32 caught, the miss closed |
+| Independent reviews | Round one `qa/reviews/server-review-round-1.md` (fixed in `eee2a66`); round two `qa/reviews/server-review-round-2.md` (fixed in `2805d00`, remaining items listed there); round three, three reviewers, `review-v02/` with per-finding dispositions in `REVIEW-DISPOSITIONS.md` |
+| Browser login with PKCE, nonce and single-use state; bearer path; deny by default; admin only by mapping; planted tokens rejected; no token in the log; enrollment and certificate connection with mapped groups; well-known carries `scopes` as an array and `android_redirect` | `qa/e2e/e2e-results-2861249.md`: 29 checks, 29 pass, against the war built from `2861249` and a local Keycloak |
+| Fail closed when the IdP is down at boot: OIDC certificate refused with audit `reason=provider-unavailable`; `/login/auth` answers 503 with a plain message; recovery after the IdP returns | `qa/e2e/v02-probes.md` |
+| `trustAllCerts="true"` on an enabled provider refused at registration | `qa/e2e/v02-probes.md` (if present) and `OidcProviderConfigTest` |
 | Same flow against IDCommand | PENDING: needs two registered applications on a tenant |
-| ATAK on a device | PENDING: needs an Android build |
+| Second provider under the same build (AC-8), route-blocked run (AC-7), legacy configuration run (AC-1) | PENDING |
+| ATAK on a device | PENDING: 77 JVM tests and 11 mutants on the core; no APK built; Android-only classes verified by reading, not by compilation |
+| Browser callback edges (IdP `error=` responses, 4xx instead of 500, access token audience fallback, session lifetime) | PENDING: next server packet, see `REVIEW-DISPOSITIONS.md` |
