@@ -23,6 +23,10 @@ import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBElement;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.annotation.XmlAccessType;
+import jakarta.xml.bind.annotation.XmlAccessorType;
+import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlType;
 import javax.xml.namespace.QName;
 
 import org.slf4j.Logger;
@@ -75,6 +79,25 @@ public class CertManagerApi extends BaseRestController {
 
     }
 
+    @XmlAccessorType(XmlAccessType.FIELD)
+    @XmlType(name = "certificateConfigResponse", propOrder = {"identity"})
+    public static class CertificateConfigResponse extends CertificateConfig {
+        @XmlElement(name = "identity", namespace = "http://bbn.com/marti/xml/config", required = true)
+        private String identity;
+
+        public CertificateConfigResponse() {
+        }
+
+        public CertificateConfigResponse(CertificateConfig config, String identity) {
+            setNameEntries(config.getNameEntries());
+            this.identity = identity;
+        }
+
+        public String getIdentity() {
+            return identity;
+        }
+    }
+
     public static final Logger logger = LoggerFactory.getLogger(CertManagerApi.class);
 
     @Autowired
@@ -101,7 +124,7 @@ public class CertManagerApi extends BaseRestController {
 
     static {
         try {
-            jaxbContext = JAXBContext.newInstance(CertificateConfig.class);
+            jaxbContext = JAXBContext.newInstance(CertificateConfigResponse.class);
         } catch (JAXBException e) {
             logger.warn("exception creating CertificateConfig deserialization context", e);
         }
@@ -284,7 +307,9 @@ public class CertManagerApi extends BaseRestController {
 
             // create a root node (not present in the xsd generated classes)
             QName qName = new QName("com.bbn.marti.config", "certificateConfig");
-            JAXBElement<CertificateConfig> root = new JAXBElement<>(qName, CertificateConfig.class, config);
+            CertificateConfigResponse configResponse = new CertificateConfigResponse(config, getHttpUser());
+            JAXBElement<CertificateConfigResponse> root = new JAXBElement<>(qName,
+                    CertificateConfigResponse.class, configResponse);
 
             // serialize and return the certificate configuration
             marshaller.marshal(root, writer);

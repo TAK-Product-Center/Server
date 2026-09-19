@@ -8,14 +8,14 @@ loginControllers.controller('loginController', ['$scope', '$location', 'loginSer
         $scope.showLogin = true;
         $scope.showError = false;
         $scope.externalAuth = false;
-        $scope.externalAuthName = null;
+        $scope.externalAuthTitle = null;
 
         $scope.getConfig = async function() {
             loginService.config.get(
                 function(apiResponse) {
                     console.log(apiResponse);
                     $scope.externalAuth = true;
-                    $scope.externalAuthName = apiResponse.data;
+                    $scope.externalAuthTitle = apiResponse.data;
                 },
                 function() { $scope.showRmiError = true; });
         }

@@ -1,9 +1,12 @@
 package tak.server.oidc;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLContext;
@@ -16,7 +19,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.client.OkHttp3ClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
+import okhttp3.FormBody;
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 /**
  * The HTTP client TAK Server uses to talk to an OIDC provider (discovery, JWKS, token endpoint).
@@ -29,16 +36,56 @@ import okhttp3.OkHttpClient;
  * Hostname verification is never disabled except by {@code trustAllCerts}. Redirects are not followed: a
  * discovery or token endpoint that redirects is misconfigured, and following it would let a plaintext hop in.
  */
-final class OidcHttp {
+public final class OidcHttp {
 
     private static final Logger logger = LoggerFactory.getLogger(OidcHttp.class);
 
     private static final long TIMEOUT_SECONDS = 10;
+    private static final long MAX_TOKEN_RESPONSE_BYTES = 64 * 1024;
 
     private OidcHttp() {
     }
 
+    /** One HTTP response, body bounded, never logged by this class. */
+    public static final class FormResponse {
+        public final int status;
+        public final String body;
+
+        FormResponse(int status, String body) {
+            this.status = status;
+            this.body = body;
+        }
+    }
+
+    /**
+     * POSTs a form to the token endpoint through the provider's own OkHttp client. Spring's {@code RestTemplate}
+     * logs request bodies at DEBUG, which would put the authorization code, the client secret and the PKCE
+     * verifier in the server log (T8). OkHttp logs nothing unless an interceptor is added, and none is.
+     */
+    public static FormResponse postForm(OkHttpClient client, String url, Map<String, String> fields) throws IOException {
+        FormBody.Builder form = new FormBody.Builder();
+        for (Map.Entry<String, String> e : fields.entrySet()) {
+            if (e.getValue() != null) {
+                form.add(e.getKey(), e.getValue());
+            }
+        }
+        Request request = new Request.Builder().url(url).post(form.build())
+                .header("Accept", "application/json").build();
+        try (Response response = client.newCall(request).execute()) {
+            ResponseBody body = response.body();
+            String text = body == null ? "" : new String(body.source().readByteArray(), StandardCharsets.UTF_8);
+            if (text.length() > MAX_TOKEN_RESPONSE_BYTES) {
+                throw new IOException("token response larger than " + MAX_TOKEN_RESPONSE_BYTES + " bytes");
+            }
+            return new FormResponse(response.code(), text);
+        }
+    }
+
     static RestTemplate restTemplate(OidcProviderConfig p) {
+        return new RestTemplate(new OkHttp3ClientHttpRequestFactory(okHttpClient(p)));
+    }
+
+    static OkHttpClient okHttpClient(OidcProviderConfig p) {
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
                 .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -69,7 +116,7 @@ final class OidcHttp {
             SSLContext ctx = sslContext(new TrustManager[] { tm });
             builder.sslSocketFactory(ctx.getSocketFactory(), tm);
         }
-        return new RestTemplate(new OkHttp3ClientHttpRequestFactory(builder.build()));
+        return builder.build();
     }
 
     private static SSLContext sslContext(TrustManager[] managers) {

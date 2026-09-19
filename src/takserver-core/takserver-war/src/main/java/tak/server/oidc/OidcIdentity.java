@@ -1,8 +1,9 @@
 package tak.server.oidc;
 
-import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -43,31 +44,40 @@ public final class OidcIdentity {
         return subject;
     }
 
+    /** Prefix of every OIDC identity key; reserves the namespace so no file, LDAP or cert user can collide. */
+    public static final String KEY_PREFIX = "oidc-";
+
     /**
-     * The stable TAK-side key for this identity: {@code sub} qualified by the whole issuer (R-04). Two IdPs
-     * with the same subject, or one user whose email changes, never collide.
+     * The stable TAK-side key for this identity (R-04): {@code oidc-} followed by 40 lower-case hex characters of
+     * SHA-256 over the exact issuer and exact subject, length-delimited.
      *
-     * Form: {@code <sub>@<host>[:<port>][_<path segment>[_<path segment>...]]}. The issuer path is kept because
-     * real issuers carry one (IDCommand: {@code https://host/idp}; Keycloak: {@code https://host/realms/x}) and two
-     * issuers on one host must not collapse into one identity. An underscore separates host from path: a hostname
-     * cannot contain one, so the split is unambiguous. Every character is inside TAK's {@code MartiSafeString}
-     * set and legal in a certificate CN, which is where this string ends up on the ATAK path.
+     * Why a digest and not {@code sub@issuer}: the issuer is a URL with a path (IDCommand: {@code /idp}; Keycloak:
+     * {@code /realms/x}) and the subject is free text, and this key becomes a TAK username, a certificate CN (64
+     * characters at most), a group-cache key that TAK lower-cases, and an audit field. A readable encoding either
+     * collides (two issuers whose paths differ only in the separator; two subjects differing only in case) or
+     * leaks characters TAK's validators refuse. The digest is exact, bounded (45 characters), case-stable and
+     * inside {@code MartiSafeString}. The audit line carries issuer and subject in clear beside it, and the
+     * display name (preferred_username) is what people see.
      */
     public String getIdentityKey() {
-        URI uri = URI.create(issuer.trim());
-        StringBuilder key = new StringBuilder(subject).append('@');
-        String host = uri.getHost() == null ? uri.getRawAuthority() : uri.getHost();
-        key.append(host == null ? "" : host.toLowerCase(Locale.ENGLISH));
-        if (uri.getPort() >= 0) {
-            key.append(':').append(uri.getPort());
-        }
-        String path = uri.getPath() == null ? "" : uri.getPath();
-        for (String segment : path.split("/")) {
-            if (!segment.isEmpty()) {
-                key.append('_').append(segment);
+        try {
+            MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+            byte[] issuerBytes = issuer.getBytes(StandardCharsets.UTF_8);
+            byte[] subjectBytes = subject.getBytes(StandardCharsets.UTF_8);
+            sha256.update(Integer.toString(issuerBytes.length).getBytes(StandardCharsets.US_ASCII));
+            sha256.update((byte) ':');
+            sha256.update(issuerBytes);
+            sha256.update((byte) ':');
+            sha256.update(subjectBytes);
+            byte[] digest = sha256.digest();
+            StringBuilder hex = new StringBuilder(KEY_PREFIX);
+            for (int i = 0; i < 20; i++) {
+                hex.append(Character.forDigit((digest[i] >> 4) & 0xF, 16)).append(Character.forDigit(digest[i] & 0xF, 16));
             }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
         }
-        return key.toString();
     }
 
     /** A claim by name, or null. Callers must treat values as untrusted display data. */

@@ -154,7 +154,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
 				token = user.getToken();
 				claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256, user.getCert() != null);
 				if (claims == null) {
-					throw new InvalidBearerTokenException("Unable to parse claims from token : " + token);
+					throw new InvalidBearerTokenException("Unable to parse claims from token"); // token not logged (T8)
 				}
 			}
 

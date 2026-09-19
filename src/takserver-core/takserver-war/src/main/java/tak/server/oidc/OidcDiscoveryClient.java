@@ -38,6 +38,11 @@ public final class OidcDiscoveryClient {
      *                                  field and never contains a secret
      */
     public static OidcProviderConfig discover(Oauth.OpenIdDiscoveryConfiguration cfg, RestOperations rest) {
+        return discover(cfg, rest, 60);
+    }
+
+    /** @param clockSkewSeconds the server-wide externalAuthClockSkewSeconds, applied to every token from this provider */
+    public static OidcProviderConfig discover(Oauth.OpenIdDiscoveryConfiguration cfg, RestOperations rest, int clockSkewSeconds) {
         String uri = OidcProviderConfig.https(cfg.getName(), "configurationUri", cfg.getConfigurationUri());
         ResponseEntity<String> response;
         try {
@@ -50,11 +55,15 @@ public final class OidcDiscoveryClient {
             throw new IllegalArgumentException("oidc provider '" + cfg.getName() + "': discovery returned HTTP "
                     + response.getStatusCode().value());
         }
-        return parse(cfg, response.getBody());
+        return parse(cfg, response.getBody(), clockSkewSeconds);
     }
 
     /** Builds the provider from configuration plus a discovery document. Static so tests can plant defects. */
     public static OidcProviderConfig parse(Oauth.OpenIdDiscoveryConfiguration cfg, String discoveryJson) {
+        return parse(cfg, discoveryJson, 60);
+    }
+
+    public static OidcProviderConfig parse(Oauth.OpenIdDiscoveryConfiguration cfg, String discoveryJson, int clockSkewSeconds) {
         JsonNode doc;
         try {
             doc = JSON.readTree(discoveryJson);
@@ -87,6 +96,7 @@ public final class OidcDiscoveryClient {
                 .audience(cfg.getAudience())
                 .scopes(cfg.getScopes())
                 .usePkce(cfg.isUsePkce())
+                .clockSkewSeconds(clockSkewSeconds)
                 .truststore(cfg.getTruststore(), cfg.getTruststoreFile(), cfg.getTruststorePass())
                 .trustAllCerts(cfg.isTrustAllCerts())
                 .accessTokenName(cfg.getAccessTokenName())

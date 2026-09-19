@@ -65,6 +65,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import tak.server.Constants;
 import tak.server.oidc.AuthorizationRequestStore;
 import tak.server.oidc.OidcAuditEvent;
+import tak.server.oidc.OidcHttp;
 import tak.server.oidc.OidcIdentity;
 import tak.server.oidc.OidcProvider;
 import tak.server.oidc.OidcProviderConfig;
@@ -246,6 +247,10 @@ public class OAuthApi {
 
             // validate the request state
             if (!sha256(stateCookie).equals(state)) {
+                if (!OidcProviderRegistry.getInstance().isEmpty()) {
+                    OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, "-", "-", null, request.getLocalPort(),
+                            OidcValidationException.Reason.STATE);
+                }
                 throw new IllegalStateException("state did not match request!");
             }
 
@@ -284,7 +289,7 @@ public class OAuthApi {
                 Claims claims = JwtUtils.getInstance().parseClaims(
                         access_token, SignatureAlgorithm.RS256, false);
                 if (claims == null) {
-                    throw new InvalidBearerTokenException("Unable to parse claims from token : " + access_token);
+                    throw new InvalidBearerTokenException("Unable to parse claims from token"); // token not logged (T8)
                 }
 
                 if (!AuthCookieUtils.userHasWebtakAccess(oauthConf, claims)) {
@@ -493,33 +498,39 @@ public class OAuthApi {
         }
         OidcProviderConfig cfg = provider.getConfig();
 
-        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-        body.add("grant_type", "authorization_code");
-        body.add("code", code);
-        body.add("client_id", cfg.getWebClientId());
-        if (cfg.getWebClientSecret() != null) {
-            body.add("client_secret", cfg.getWebClientSecret());
-        }
-        body.add("redirect_uri", cfg.getRedirectUri());
-        if (pending.getCodeVerifier() != null) {
-            body.add("code_verifier", pending.getCodeVerifier());
-        }
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        ResponseEntity<String> tokenResponse;
+        // The code exchange goes through OkHttp directly, not RestTemplate: RestTemplate logs request bodies at
+        // DEBUG, and this body carries the code, the client secret and the PKCE verifier (T8).
+        Map<String, String> form = new LinkedHashMap<>();
+        form.put("grant_type", "authorization_code");
+        form.put("code", code);
+        form.put("client_id", cfg.getWebClientId());
+        form.put("client_secret", cfg.getWebClientSecret());
+        form.put("redirect_uri", cfg.getRedirectUri());
+        form.put("code_verifier", pending.getCodeVerifier());
+        OidcHttp.FormResponse tokenResponse;
         try {
-            tokenResponse = provider.getRest().exchange(cfg.getTokenEndpoint(), HttpMethod.POST,
-                    new HttpEntity<>(body, headers), String.class);
-        } catch (RuntimeException e) {
+            tokenResponse = OidcHttp.postForm(provider.getHttp(), cfg.getTokenEndpoint(), form);
+        } catch (Exception e) {
+            OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, cfg.getName(), cfg.getIssuer(), null, port,
+                    OidcValidationException.Reason.EXCHANGE);
             // The exception text from the HTTP client can include the response body; never let it near a log.
             throw new IllegalStateException("token endpoint call failed: " + e.getClass().getSimpleName());
         }
-        if (tokenResponse.getStatusCode() != HttpStatus.OK || tokenResponse.getBody() == null) {
-            throw new IllegalStateException("token endpoint returned " + tokenResponse.getStatusCode().value());
+        if (tokenResponse.status != 200 || tokenResponse.body.isEmpty()) {
+            OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, cfg.getName(), cfg.getIssuer(), null, port,
+                    OidcValidationException.Reason.EXCHANGE);
+            throw new IllegalStateException("token endpoint returned " + tokenResponse.status);
         }
-        JsonNode json = JSON.readTree(tokenResponse.getBody());
-        String idToken = text(json, "id_token");
+        JsonNode json;
+        try {
+            json = JSON.readTree(tokenResponse.body);
+        } catch (Exception e) {
+            json = null;
+        }
+        String idToken = json == null ? null : text(json, "id_token");
         if (idToken == null) {
+            OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, cfg.getName(), cfg.getIssuer(), null, port,
+                    OidcValidationException.Reason.EXCHANGE);
             throw new IllegalStateException("token response carries no id_token");
         }
 
@@ -545,16 +556,25 @@ public class OAuthApi {
             throw new IllegalStateException("id_token nonce does not match the authorization request");
         }
 
+        // The session credential: the access token when it is a JWT from this provider (so groups and scopes
+        // read the same way as on the bearer port), else the ID token. Whichever it is, the identity TAK acts
+        // on from here is the credential's, and it must be the same subject the nonce-checked ID token proved.
         String accessToken = text(json, cfg.getAccessTokenName());
         String credential = idToken;
+        OidcIdentity credentialIdentity = identity;
         if (accessToken != null && registry.providerFor(accessToken) == provider) {
             try {
-                provider.validate(accessToken, false);
+                credentialIdentity = provider.validate(accessToken, false);
                 credential = accessToken;
             } catch (OidcValidationException e) {
                 OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, cfg.getName(), cfg.getIssuer(), identity.getSubject(),
                         port, e.getReason());
                 throw new IllegalStateException("access_token rejected: " + e.getReason());
+            }
+            if (!identity.getSubject().equals(credentialIdentity.getSubject())) {
+                OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, cfg.getName(), cfg.getIssuer(), identity.getSubject(),
+                        port, OidcValidationException.Reason.CLAIMS);
+                throw new IllegalStateException("access_token subject differs from the id_token subject");
             }
         }
 
@@ -569,13 +589,13 @@ public class OAuthApi {
         response.setHeader("Cache-Control", "must-revalidate, max-age=0, no-cache, no-store");
         response.setDateHeader("Expires", 0);
 
-        OidcAuditEvent.allow(OidcAuditEvent.Surface.BROWSER, identity, registry.takUsername(identity), port,
-                Collections.emptySet(), false, "callback");
+        // No ALLOW line here: authorization (group mapping) has not happened yet. The first request the browser
+        // makes with the cookie runs the authenticator, which writes the ALLOW or DENY line with the groups.
 
         String redirect = "/Marti/login/redirect.html";
         Oauth oauthConf = getOuathConfig();
         if (oauthConf != null && oauthConf.getWebtakScope() != null
-                && !AuthCookieUtils.userHasWebtakAccess(oauthConf, identity.getClaims())) {
+                && !AuthCookieUtils.userHasWebtakAccess(oauthConf, credentialIdentity.getClaims())) {
             redirect = "/Marti/login/webtak-role-error.html";
         }
         return new ModelAndView(new InternalResourceView(redirect));
@@ -625,21 +645,16 @@ public class OAuthApi {
         if (getOuathConfig() != null &&
                 getOuathConfig().getOpenIdDiscoveryConfiguration() != null &&
                 !getOuathConfig().getOpenIdDiscoveryConfiguration().isEmpty()) {
+            // OIDC (Phase 1): every <openIdDiscoveryConfiguration> is resolved by OidcProviderRegistry on Nimbus
+            // (expected issuer kept, https enforced, any JWKS key type). The pre-existing conversion
+            // (OAuthUtils.processTrustedAuthServerConfig: RSA-only JWKS, scopes_supported required, issuer
+            // discarded, http accepted) no longer runs for them, unconditionally: a provider the registry refused
+            // must stay refused rather than fall back to the weaker path.
             List<Oauth.OpenIdDiscoveryConfiguration> trustedConfigs = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getOpenIdDiscoveryConfiguration();
-            OidcProviderRegistry registry = OidcProviderRegistry.getInstance();
-            for (Oauth.OpenIdDiscoveryConfiguration config : trustedConfigs) {
-                if (!registry.isEmpty()) {
-                    // OIDC (Phase 1): discovery providers are resolved by the registry on Nimbus; the code below
-                    // (RSA-only JWKS conversion, scopes_supported required) must not run for them.
-                    continue;
-                }
-                try {
-                    Oauth.AuthServer manualConfig = OAuthUtils.processTrustedAuthServerConfig(config);
-                    knownConfigs.add(manualConfig);
-                } catch (Exception e) {
-                    logger.error("exception calling processTrustedAuthServerConfig", e);
-                }
-
+            if (OidcProviderRegistry.getInstance().isEmpty() && !trustedConfigs.isEmpty()) {
+                logger.error("{} openIdDiscoveryConfiguration element(s) configured and none registered; "
+                        + "external login is disabled until discovery succeeds (see earlier 'NOT registered' lines)",
+                        trustedConfigs.size());
             }
         }
         return knownConfigs;

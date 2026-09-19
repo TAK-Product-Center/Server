@@ -2,7 +2,6 @@ package com.bbn.marti.jwt;
 
 import com.bbn.marti.config.MissionTls;
 import com.bbn.marti.config.Oauth;
-import com.bbn.marti.oauth.OAuthUtils;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -41,6 +40,8 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import tak.server.oidc.OidcProviderRegistry;
 
 public class JwtUtils {
 
@@ -232,13 +233,13 @@ public class JwtUtils {
                 }
             }
 
+            OidcProviderRegistry oidcProviders = OidcProviderRegistry.getInstance();
             for (Oauth.OpenIdDiscoveryConfiguration serverConfiguration : oAuth.getOpenIdDiscoveryConfiguration()) {
-                if (publicKeyCache.asMap().get(serverConfiguration.getName()) == null) {
-                    Oauth.AuthServer authServer = OAuthUtils.processTrustedAuthServerConfig(serverConfiguration);
-                    resolveAndCachePublicKeyDetails(authServer, rsaPublicKeys, publicKeyCache);
-                } else {
-                    rsaPublicKeys.addAll( publicKeyCache.asMap().get(serverConfiguration.getName()) );
+                if (oidcProviders.byName(serverConfiguration.getName()) != null) {
+                    continue;
                 }
+                logger.debug("Skipping unregistered OIDC provider '{}' in legacy external verifier path",
+                        serverConfiguration.getName());
             }
 
             return rsaPublicKeys;

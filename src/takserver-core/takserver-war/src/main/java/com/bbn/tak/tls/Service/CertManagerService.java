@@ -183,10 +183,27 @@ public class CertManagerService {
                 // is the user authenticating to the enrollment endpoint via OAuth?
                 if (token != null && takServerCAConfig.isUseTokenExpiration()) {
                     // set the certificate expiration to match the token expiration
-                    Claims claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256, false);
-                    Integer exp = (Integer)claims.get("exp");
-                    if (exp != null) {
-                        notAfter = new Date(exp.longValue() * 1000);
+                    tak.server.oidc.OidcProvider oidcProvider = tak.server.oidc.OidcProviderRegistry.getInstance().providerFor(token);
+                    if (oidcProvider != null) {
+                        // OIDC (Phase 1): an external assertion is read through its provider's validator, never
+                        // through the RSA-only legacy parser (which cannot parse an EC-signed token). It was
+                        // already verified to authenticate this request; a failure here is still a failure.
+                        try {
+                            Object exp = oidcProvider.validate(token, false).getClaim("exp");
+                            if (exp instanceof java.time.Instant) {
+                                notAfter = Date.from((java.time.Instant) exp);
+                            } else if (exp instanceof Number) {
+                                notAfter = new Date(((Number) exp).longValue() * 1000);
+                            }
+                        } catch (tak.server.oidc.OidcValidationException e) {
+                            throw new IllegalStateException("enrollment assertion rejected: " + e.getReason());
+                        }
+                    } else {
+                        Claims claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256, false);
+                        Integer exp = claims == null ? null : (Integer) claims.get("exp");
+                        if (exp != null) {
+                            notAfter = new Date(exp.longValue() * 1000);
+                        }
                     }
                 }
 

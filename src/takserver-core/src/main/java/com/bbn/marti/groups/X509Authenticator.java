@@ -50,6 +50,7 @@ import com.bbn.tak.tls.TakCert;
 import com.bbn.tak.tls.repository.TakCertRepository;
 
 import tak.server.cache.ActiveGroupCacheHelper;
+import tak.server.oidc.OidcProviderRegistry;
 
 
 /*
@@ -132,8 +133,12 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
             String certFingerprint = RemoteUtil.getInstance().getCertSHA256Fingerprint(user.getCert());
 
         	TakCert cert = null;
+            // OIDC (Phase 1): when an external provider is configured, the certificate record is always consulted,
+            // so a certificate issued on an OIDC enrollment is recognised by its stored assertion below.
+            boolean oidcConfigured = !OidcProviderRegistry.getInstance().isEmpty();
             if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509CheckRevocation() ||
-                    CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509TokenAuth()) {
+                    CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509TokenAuth() ||
+                    oidcConfigured) {
                 cert = takCertRepository.findOneByHash(certFingerprint);
                 if (cert != null && cert.getRevocationDate() != null) {
                     throw new RevokedException("Attempt to use revoked certificate : " +
@@ -141,14 +146,21 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                 }
             }
 
-            if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509TokenAuth() &&
+            // A certificate enrolled with an external OIDC assertion takes the OIDC path regardless of
+            // x509tokenAuth: its groups are the mapping of the assertion it was issued against, refreshed by
+            // re-enrollment (gap analysis decision 4), never the file, LDAP or anonymous fallbacks below (T9).
+            boolean oidcEnrolled = oidcConfigured && cert != null && cert.token != null && cert.token.length() > 0
+                    && OidcProviderRegistry.getInstance().providerFor(cert.token) != null;
+
+            if ((CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509TokenAuth() || oidcEnrolled) &&
                     cert != null && cert.token != null && cert.token.length() > 0) {
                 user.setToken(cert.token);
                 try {
                     groupManager.authenticate("oauth", user);
                 } catch (InvalidBearerTokenException | JwtException e) {
                     if (logger.isDebugEnabled()) {
-                        logger.debug("{} {} ", e.getMessage(), cert.token);
+                        // the stored token is a credential; it is not logged (T8)
+                        logger.debug("stored enrollment token rejected for {}: {}", cert.getSubjectDn(), e.getMessage());
                     }
                     throw new TakException();
                 }

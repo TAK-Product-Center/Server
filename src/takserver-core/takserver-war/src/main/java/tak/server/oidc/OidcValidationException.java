@@ -31,7 +31,9 @@ public final class OidcValidationException extends Exception {
         /** The ID token's nonce is missing or is not the one issued with the authorization request (T6). */
         NONCE,
         /** The browser callback's state is unknown, expired, or already consumed (T7). */
-        STATE
+        STATE,
+        /** The code exchange with the token endpoint failed or returned no usable ID token. */
+        EXCHANGE
     }
 
     private final Reason reason;

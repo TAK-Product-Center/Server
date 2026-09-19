@@ -196,6 +196,7 @@ import tak.server.ignite.IgniteConfigurationHolder;
 import tak.server.ignite.IgniteHolder;
 import tak.server.ignite.grid.SubscriptionManagerProxyHandler;
 import tak.server.messaging.MessageConverter;
+import tak.server.oidc.OidcProviderRegistry;
 import tak.server.profile.ProfileTracker;
 import tak.server.util.ActiveProfiles;
 import tak.server.util.DataSourceUtils;
@@ -318,8 +319,11 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 
 		String loginUrl = "/login";
 		Oauth oauthConfig = config.getAuth().getOauth();
-		if (oauthConfig != null && !oauthConfig.isUseTakServerLoginPage() &&
-				(!oauthConfig.getAuthServer().isEmpty() || !oauthConfig.getOpenIdDiscoveryConfiguration().isEmpty())) {
+		boolean hasExternalAuthConfig = oauthConfig != null &&
+				(!oauthConfig.getAuthServer().isEmpty() || !oauthConfig.getOpenIdDiscoveryConfiguration().isEmpty());
+		boolean oidcRegistryEmpty = oauthConfig == null || OidcProviderRegistry.getInstance().isEmpty();
+		if (oauthConfig != null && shouldRedirectToExternalLogin(oauthConfig.isUseTakServerLoginPage(),
+				hasExternalAuthConfig, oidcRegistryEmpty)) {
 			loginUrl = "/login/auth";
 		}
 
@@ -398,6 +402,11 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		}
 		
 		return factory;
+	}
+
+	public static boolean shouldRedirectToExternalLogin(boolean useTakServerLoginPage,
+			boolean hasExternalAuthConfig, boolean oidcRegistryEmpty) {
+		return !useTakServerLoginPage && hasExternalAuthConfig && oidcRegistryEmpty;
 	}
 
 	private Connector configureConnector(Network.Connector coreConnector) {

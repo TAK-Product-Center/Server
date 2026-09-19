@@ -10,8 +10,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.base.Strings;
 
 import com.bbn.marti.config.Oauth;
@@ -40,7 +40,7 @@ public final class OidcProviderRegistry {
     private static final int REQUEST_MAX = 10_000;
 
     private static final Object LOCK = new Object();
-    private static volatile Cache<String, Generation> cache;
+    private static volatile LoadingCache<String, Generation> cache;
     private static final AuthorizationRequestStore REQUESTS = new AuthorizationRequestStore(REQUEST_TTL, REQUEST_MAX);
 
     /** One resolved snapshot of the configuration. Immutable. */
@@ -73,9 +73,14 @@ public final class OidcProviderRegistry {
         this.gen = gen;
     }
 
-    /** The current registry; rebuilt when the configuration cache expires. */
+    /**
+     * The current registry. The first call builds it (one discovery fetch per provider). After
+     * {@code oAuthConfigurationsCacheSeconds} the next call still returns the current generation and triggers a
+     * rebuild in the background (Caffeine refreshAfterWrite), so authentication never waits on discovery once
+     * the server is up (review finding 15). A rebuild that fails keeps the previous generation.
+     */
     public static OidcProviderRegistry getInstance() {
-        Cache<String, Generation> c = cache;
+        LoadingCache<String, Generation> c = cache;
         if (c == null) {
             synchronized (LOCK) {
                 if (cache == null) {
@@ -86,13 +91,12 @@ public final class OidcProviderRegistry {
                     } catch (Exception e) {
                         logger.debug("using default oidc registry cache lifetime", e);
                     }
-                    cache = Caffeine.newBuilder().expireAfterWrite(seconds, TimeUnit.SECONDS).build();
+                    cache = Caffeine.newBuilder().refreshAfterWrite(seconds, TimeUnit.SECONDS).build(key -> build());
                 }
                 c = cache;
             }
         }
-        Generation g = c.get("oidc", key -> build());
-        return new OidcProviderRegistry(g);
+        return new OidcProviderRegistry(c.get("oidc"));
     }
 
     /** Drops the cached generation so the next call rebuilds. For tests and config reloads. */
@@ -116,14 +120,22 @@ public final class OidcProviderRegistry {
         }
         List<OidcProvider> providers = new ArrayList<>();
         if (oauth != null && oauth.getOpenIdDiscoveryConfiguration() != null) {
+            int skewSeconds = oauth.getExternalAuthClockSkewSeconds();
+            Duration jwksTtl = null;
+            try {
+                jwksTtl = Duration.ofSeconds(CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer()
+                        .getQueue().getOAuthPublicKeyCacheSeconds());
+            } catch (Exception e) {
+                logger.debug("using the default JWKS cache lifetime", e);
+            }
             for (Oauth.OpenIdDiscoveryConfiguration cfg : oauth.getOpenIdDiscoveryConfiguration()) {
                 try {
                     // A bootstrap client for discovery: trust settings come from the same config block.
                     OidcProviderConfig bootstrap = bootstrapTrust(cfg);
-                    OidcProviderConfig resolved = OidcDiscoveryClient.discover(cfg, OidcHttp.restTemplate(bootstrap));
-                    providers.add(new OidcProvider(resolved, OidcHttp.restTemplate(resolved)));
-                    logger.info("oidc provider '{}' registered: issuer={} audiences={} pkce={}", resolved.getName(),
-                            resolved.getIssuer(), resolved.getAudiences(), resolved.isUsePkce());
+                    OidcProviderConfig resolved = OidcDiscoveryClient.discover(cfg, OidcHttp.restTemplate(bootstrap), skewSeconds);
+                    providers.add(new OidcProvider(resolved, OidcHttp.okHttpClient(resolved), jwksTtl));
+                    logger.info("oidc provider '{}' registered: issuer={} audiences={} pkce={} skew={}s", resolved.getName(),
+                            resolved.getIssuer(), resolved.getAudiences(), resolved.isUsePkce(), skewSeconds);
                 } catch (Exception e) {
                     logger.error("oidc provider '{}' NOT registered: {}", cfg.getName(), e.getMessage());
                 }
@@ -151,6 +163,7 @@ public final class OidcProviderRegistry {
     static GroupMapper mapperFor(Oauth oauth) {
         List<GroupMappingRule> rules = new ArrayList<>();
         String defaultGroup = null;
+        boolean legacyPassthrough = false;
         GroupMapper.LegacySettings legacy = GroupMapper.LegacySettings.defaults();
         if (oauth != null) {
             if (oauth.getGroupMapping() != null) {
@@ -159,12 +172,14 @@ public final class OidcProviderRegistry {
                 }
             }
             defaultGroup = oauth.getDefaultGroup();
+            legacyPassthrough = oauth.isLegacyGroupPassthrough();
             legacy = new GroupMapper.LegacySettings(oauth.getGroupprefix(), oauth.getGroupNameExtractorRegex(),
                     oauth.getReadOnlyGroup(), oauth.getReadGroupSuffix(), oauth.getWriteGroupSuffix());
         }
-        // Legacy pass-through stays available when no mapping is configured, so an unchanged upstream
-        // configuration keeps its group behaviour; only the anonymous and directory fallbacks are gone.
-        return new GroupMapper(rules, defaultGroup, true, legacy);
+        // Deny by default (R-09): with no groupMapping and no defaultGroup an identity gets nothing. Pass-through
+        // by name is opt-in through legacyGroupPassthrough for installations that relied on it before Phase 1
+        // (review finding 3: deleting the last mapping must not widen access).
+        return new GroupMapper(rules, defaultGroup, legacyPassthrough, legacy);
     }
 
     private static GroupMappingRule.Access access(OidcGroupAccess a) {

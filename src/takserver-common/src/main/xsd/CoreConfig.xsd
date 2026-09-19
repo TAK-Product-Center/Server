@@ -850,6 +850,14 @@
         </xs:annotation>
       </xs:attribute>
       <xs:attribute name="externalAuthClockSkewSeconds" type="xs:int" default="60"/>
+      <xs:attribute name="legacyGroupPassthrough" type="xs:boolean" default="false">
+        <xs:annotation>
+          <xs:documentation>Only for installations that used an external IdP before Phase 1 and relied on claim
+            values being TAK group names. When true and no groupMapping is configured, claim values pass through
+            by name as before (prefix filter, regex, _READ/_WRITE suffixes). When false (default), an identity
+            whose claims match no groupMapping is denied unless defaultGroup is set (R-09).</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
     </xs:complexType>
   </xs:element>
 

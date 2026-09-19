@@ -1,6 +1,9 @@
 package tak.server.oidc;
 
+import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,18 +24,30 @@ import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimNames;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.RequestEntity;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
-import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.JwtValidationException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
+import com.nimbusds.jose.JOSEObjectType;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
+import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier;
+import com.nimbusds.jose.proc.JWSVerificationKeySelector;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jose.util.Resource;
+import com.nimbusds.jose.util.ResourceRetriever;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.jwt.SignedJWT;
+import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 
 import tak.server.oidc.OidcValidationException.Reason;
 
@@ -61,6 +76,10 @@ public final class OidcTokenValidator {
         private final Set<String> audiences;
         private final Duration clockSkew;
         private final Set<SignatureAlgorithm> algorithms;
+        private final Duration jwksCacheTtl;
+
+        /** Default JWKS lifetime when the operator has not set oAuthPublicKeyCacheSeconds: 12 hours, as upstream. */
+        public static final Duration DEFAULT_JWKS_TTL = Duration.ofHours(12);
 
         /**
          * @param providerName operator-facing name, used in audit events
@@ -74,6 +93,14 @@ public final class OidcTokenValidator {
          */
         public Settings(String providerName, String issuer, String jwksUri, Collection<String> audiences,
                 Duration clockSkew, Collection<SignatureAlgorithm> algorithms) {
+            this(providerName, issuer, jwksUri, audiences, clockSkew, algorithms, null);
+        }
+
+        /** @param jwksCacheTtl how long a fetched key set is served before a background refresh; null = 12 h */
+        public Settings(String providerName, String issuer, String jwksUri, Collection<String> audiences,
+                Duration clockSkew, Collection<SignatureAlgorithm> algorithms, Duration jwksCacheTtl) {
+            this.jwksCacheTtl = (jwksCacheTtl == null || jwksCacheTtl.isZero() || jwksCacheTtl.isNegative())
+                    ? DEFAULT_JWKS_TTL : jwksCacheTtl;
             this.providerName = (providerName == null || providerName.isEmpty()) ? "oidc" : providerName;
             this.issuer = requireHttps("issuer", issuer);
             this.jwksUri = requireHttps("jwksUri", jwksUri);
@@ -149,6 +176,10 @@ public final class OidcTokenValidator {
         public Set<SignatureAlgorithm> getAlgorithms() {
             return algorithms;
         }
+
+        public Duration getJwksCacheTtl() {
+            return jwksCacheTtl;
+        }
     }
 
     /** The only algorithms ever accepted. No HMAC family, so a public key can never be used as a secret. */
@@ -172,28 +203,129 @@ public final class OidcTokenValidator {
      * @param rest the HTTP client used to fetch the JWKS. Production passes one whose SSL context trusts the
      *             tactical CA; tests pass a stub that serves a canned JWKS.
      */
+    /** Minimum interval between two JWKS refreshes triggered by unknown key ids (T5, T19). */
+    static final Duration JWKS_REFRESH_RATE_LIMIT = Duration.ofSeconds(30);
+    /** Time allowed for one JWKS fetch. */
+    static final Duration JWKS_FETCH_TIMEOUT = Duration.ofSeconds(10);
+
     public OidcTokenValidator(Settings settings, RestOperations rest) {
         this.settings = settings;
-        this.decoder = build(settings, rest, true);
-        this.decoderIgnoringTime = build(settings, rest, false);
+        // One key source for both decoders: one cache, one rate limiter, one fetch per rotation.
+        JWKSource<SecurityContext> keys = keySource(settings, rest);
+        this.decoder = build(settings, keys, true);
+        this.decoderIgnoringTime = build(settings, keys, false);
     }
 
-    private static JwtDecoder build(Settings settings, RestOperations rest, boolean enforceTime) {
-        NimbusJwtDecoder nimbus = NimbusJwtDecoder.withJwkSetUri(settings.jwksUri)
-                .jwsAlgorithms(algs -> {
-                    algs.clear();
-                    algs.addAll(settings.algorithms);
-                })
-                .restOperations(rest)
+    /**
+     * The provider's published keys, fetched from {@code jwks_uri} only. Cached for the configured lifetime,
+     * refreshed early in the background, and, on an unknown key id, refetched at most once per
+     * {@link #JWKS_REFRESH_RATE_LIMIT}: a stream of junk tokens with fresh {@code kid}s cannot turn TAK Server
+     * into a request generator against the IdP (T19). A failed refresh does not serve stale keys forever:
+     * outage tolerance is off, so after the cache lifetime a provider that has gone away fails closed.
+     */
+    private static JWKSource<SecurityContext> keySource(Settings settings, RestOperations rest) {
+        URL url;
+        try {
+            url = new URI(settings.jwksUri).toURL();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("oidc provider '" + settings.providerName + "': jwks_uri is not a URL", e);
+        }
+        return JWKSourceBuilder.create(url, new RestResourceRetriever(rest))
+                .cache(settings.jwksCacheTtl.toMillis(), JWKS_FETCH_TIMEOUT.toMillis())
+                .refreshAheadCache(true)
+                .rateLimited(JWKS_REFRESH_RATE_LIMIT.toMillis())
+                .retrying(false)
+                .outageTolerant(false)
                 .build();
+    }
+
+    private static JwtDecoder build(Settings settings, JWKSource<SecurityContext> keys, boolean enforceTime) {
+        Set<JWSAlgorithm> algs = new LinkedHashSet<>();
+        for (SignatureAlgorithm a : settings.algorithms) {
+            algs.add(JWSAlgorithm.parse(a.getName()));
+        }
+        DefaultJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
+        // "JWT", RFC 9068 "at+jwt", or no typ. Anything else (for example a logout token) is not an assertion.
+        processor.setJWSTypeVerifier(new DefaultJOSEObjectTypeVerifier<>(
+                JOSEObjectType.JWT, new JOSEObjectType("at+jwt"), null));
+        processor.setJWSKeySelector(new JWSVerificationKeySelector<>(algs, keys));
+        // Claims are checked by the Spring validators below, with stable reason codes; Nimbus's default
+        // verifier would reject expired tokens with a message the reason classifier does not see.
+        processor.setJWTClaimsSetVerifier((claims, context) -> { });
+        NimbusJwtDecoder nimbus = new NimbusJwtDecoder(processor);
+
         List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
         if (enforceTime) {
+            validators.add(new RequiredExpiryValidator());
             validators.add(new JwtTimestampValidator(settings.clockSkew));
         }
-        validators.add(new JwtIssuerValidator(settings.issuer));
+        validators.add(new ExactIssuerValidator(settings.issuer));
         validators.add(new AudienceValidator(settings.audiences));
         nimbus.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
         return nimbus;
+    }
+
+    /** Fetches the JWKS through the caller's HTTP client (truststore-aware in production, a stub in tests). */
+    static final class RestResourceRetriever implements ResourceRetriever {
+        private final RestOperations rest;
+
+        RestResourceRetriever(RestOperations rest) {
+            this.rest = rest;
+        }
+
+        @Override
+        public Resource retrieveResource(URL url) throws IOException {
+            try {
+                ResponseEntity<String> response = rest.exchange(
+                        RequestEntity.get(url.toURI()).header(HttpHeaders.ACCEPT, "application/json").build(),
+                        String.class);
+                if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                    throw new IOException("jwks fetch returned HTTP " + response.getStatusCode().value());
+                }
+                return new Resource(response.getBody(), response.getHeaders().getFirst(HttpHeaders.CONTENT_TYPE));
+            } catch (URISyntaxException e) {
+                throw new IOException("jwks_uri is not a URI", e);
+            } catch (RuntimeException e) {
+                // The client's message can carry a response body; the class name is enough for the audit trail.
+                throw new IOException("jwks fetch failed: " + e.getClass().getSimpleName(), e);
+            }
+        }
+    }
+
+    /** {@code exp} must be present. Spring's timestamp validator skips a token that has none. */
+    static final class RequiredExpiryValidator implements OAuth2TokenValidator<Jwt> {
+        @Override
+        public OAuth2TokenValidatorResult validate(Jwt jwt) {
+            if (jwt.getExpiresAt() == null) {
+                return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token",
+                        "The exp claim is required and is missing", null));
+            }
+            return OAuth2TokenValidatorResult.success();
+        }
+    }
+
+    /**
+     * {@code iss} must equal the configured issuer as a string. Spring's {@code JwtIssuerValidator} compares
+     * after converting through {@code java.net.URL}, which trims whitespace and lower-cases the scheme; the
+     * routing in {@code OidcProviderRegistry} compares the raw claim, and validation must agree with it.
+     */
+    static final class ExactIssuerValidator implements OAuth2TokenValidator<Jwt> {
+        private final String issuer;
+
+        ExactIssuerValidator(String issuer) {
+            this.issuer = issuer;
+        }
+
+        @Override
+        public OAuth2TokenValidatorResult validate(Jwt jwt) {
+            Object iss = jwt.getClaims().get(JwtClaimNames.ISS);
+            String raw = iss instanceof URL ? iss.toString() : (iss == null ? null : String.valueOf(iss));
+            if (raw == null || !raw.equals(issuer)) {
+                return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token",
+                        "The iss claim is not the configured issuer", null));
+            }
+            return OAuth2TokenValidatorResult.success();
+        }
     }
 
     public Settings getSettings() {
@@ -231,6 +363,20 @@ public final class OidcTokenValidator {
             throw new OidcValidationException(classifyBad(e), scrub(e.getMessage()), e);
         } catch (JwtException e) {
             throw new OidcValidationException(classifyOther(e), scrub(e.getMessage()), e);
+        }
+
+        // Exact issuer equality on the raw claim. Spring converts iss through java.net.URL before its validators
+        // see it (scheme lower-cased, whitespace trimmed), so the converted value can equal the configured issuer
+        // when the signed string does not. The signature was verified over these same bytes, so re-reading the
+        // raw claim after decode is sound.
+        String rawIssuer;
+        try {
+            rawIssuer = JWTParser.parse(token).getJWTClaimsSet().getIssuer();
+        } catch (java.text.ParseException e) {
+            throw new OidcValidationException(Reason.MALFORMED, "claims not parseable");
+        }
+        if (rawIssuer == null || !rawIssuer.equals(settings.issuer)) {
+            throw new OidcValidationException(Reason.ISS, "iss claim is not the configured issuer");
         }
 
         String sub = jwt.getSubject();
@@ -287,7 +433,7 @@ public final class OidcTokenValidator {
         // The first failing validator decides the reason; the order is timestamp, issuer, audience.
         for (OAuth2Error error : e.getErrors()) {
             String d = error.getDescription() == null ? "" : error.getDescription();
-            if (d.contains("expired")) {
+            if (d.contains("expired") || d.contains("exp claim")) {
                 return Reason.EXP;
             }
             if (d.contains("used before")) {
@@ -308,9 +454,16 @@ public final class OidcTokenValidator {
         if (m.contains("Unsecured") || m.contains("plain")) {
             return Reason.ALG;
         }
+        if (m.contains("Could not coerce") && m.contains("URI")) {
+            // Spring could not turn the iss (or another URL-typed) claim into a URL: not our issuer.
+            return Reason.ISS;
+        }
         if (m.contains("Unsupported JWS algorithm") || m.contains("Unsupported algorithm")
                 || m.contains("algorithm not accepted")) {
             return Reason.ALG;
+        }
+        if (m.contains("typ") && m.contains("not allowed")) {
+            return Reason.MALFORMED;
         }
         if (m.contains("no matching key")) {
             // Nimbus reports an unknown kid and an alg/key mismatch with the same message; both mean the
@@ -328,7 +481,13 @@ public final class OidcTokenValidator {
 
     private static Reason classifyOther(JwtException e) {
         // A JwtException that is not a BadJwtException comes from the key source (fetch, TLS, bad document),
-        // not from the token. Fail closed and say so.
+        // not from the token. Fail closed and say so. One special case: a refresh refused by the rate limiter
+        // means "unknown key id, and no refetch allowed yet", which is the token's problem, not the IdP's.
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t.getClass().getSimpleName().contains("RateLimit")) {
+                return Reason.KID;
+            }
+        }
         return Reason.JWKS;
     }
 

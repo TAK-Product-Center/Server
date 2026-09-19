@@ -138,7 +138,7 @@ public class OidcTokenValidatorTest {
         OidcIdentity id = validator(stub).validate(signGood(goodClaims().build()));
         assertEquals(ISSUER, id.getIssuer());
         assertEquals("alice", id.getSubject());
-        assertEquals("alice@idp.test_realms_tak", id.getIdentityKey());
+        assertTrue(id.getIdentityKey(), id.getIdentityKey().matches("^oidc-[0-9a-f]{40}$"));
         assertEquals("test-idp", id.getProviderName());
         assertEquals("alice", id.getStringClaim("preferred_username", null));
         assertEquals(Arrays.asList("tak_ops"), id.getClaim("groups"));
@@ -270,6 +270,78 @@ public class OidcTokenValidatorTest {
                 stub.fetches.get() - before <= 1);
     }
 
+    /** T19: a stream of tokens with fresh unknown kids is rate limited to a bounded number of JWKS fetches. */
+    @Test
+    public void unknownKeyIdSpamCannotDriveRepeatedJwksFetches() throws Exception {
+        JwksStub stub = new JwksStub(jwksJson, false);
+        OidcTokenValidator v = validator(stub);
+        v.validate(signGood(goodClaims().build()));
+        int before = stub.fetches.get();
+        for (int i = 0; i < 50; i++) {
+            expectReject(v, sign(providerKey, JWSAlgorithm.RS256, "spam-" + i, goodClaims().build()), Reason.KID);
+        }
+        assertTrue(stub.fetches.get() >= before);
+        int refetches = stub.fetches.get() - before;
+        assertTrue("50 junk tokens caused " + refetches + " JWKS fetches; the limit is one per 30 s (T19)",
+                refetches <= 1);
+    }
+
+    /** A token with no exp is not "never expiring", it is rejected (review finding 5). */
+    @Test
+    public void missingExpiryIsRejected() throws Exception {
+        JWTClaimsSet claims = goodClaims().expirationTime(null).build();
+        expectReject(validator(new JwksStub(jwksJson, false)), signGood(claims), Reason.EXP);
+    }
+
+    /** ignoreTime waives exp and nbf only; a missing exp is still fine there because the certificate is the credential. */
+    @Test
+    public void ignoreTimeStillEnforcesIssuerAndAudience() throws Exception {
+        OidcTokenValidator v = validator(new JwksStub(jwksJson, false));
+        long past = System.currentTimeMillis() - 3600_000;
+        Date issued = new Date(past - 600_000);
+        JWTClaimsSet expired = goodClaims().issueTime(issued).expirationTime(new Date(past)).build();
+        assertEquals("alice", v.validate(signGood(expired), true).getSubject());
+        try {
+            v.validate(signGood(goodClaims().issuer("https://evil.test/realms/tak").issueTime(issued).expirationTime(new Date(past)).build()), true);
+            fail("wrong issuer must be rejected even with ignoreTime");
+        } catch (OidcValidationException e) {
+            assertEquals(Reason.ISS, e.getReason());
+        }
+        try {
+            v.validate(signGood(goodClaims().audience("other").issueTime(issued).expirationTime(new Date(past)).build()), true);
+            fail("wrong audience must be rejected even with ignoreTime");
+        } catch (OidcValidationException e) {
+            assertEquals(Reason.AUD, e.getReason());
+        }
+    }
+
+    /** RFC 9068 access tokens carry typ=at+jwt; they are assertions too. */
+    @Test
+    public void rfc9068AccessTokenTypeIsAccepted() throws Exception {
+        SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("k1")
+                .type(new com.nimbusds.jose.JOSEObjectType("at+jwt")).build(), goodClaims().build());
+        jwt.sign(new RSASSASigner(providerKey));
+        assertEquals("alice", validator(new JwksStub(jwksJson, false)).validate(jwt.serialize()).getSubject());
+    }
+
+    /** An unrelated JOSE type (a logout token, say) is not an assertion. */
+    @Test
+    public void otherJoseTypesAreRejected() throws Exception {
+        SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("k1")
+                .type(new com.nimbusds.jose.JOSEObjectType("logout+jwt")).build(), goodClaims().build());
+        jwt.sign(new RSASSASigner(providerKey));
+        expectReject(validator(new JwksStub(jwksJson, false)), jwt.serialize(), Reason.MALFORMED, Reason.SIG, Reason.ALG);
+    }
+
+    /** Issuer equality is on the raw string: a padded or re-cased issuer is a different issuer (review finding 11). */
+    @Test
+    public void issuerIsComparedExactlyNotAsANormalisedUrl() throws Exception {
+        OidcTokenValidator v = validator(new JwksStub(jwksJson, false));
+        expectReject(v, signGood(goodClaims().issuer(" " + ISSUER).build()), Reason.ISS);
+        expectReject(v, signGood(goodClaims().issuer("HTTPS://idp.test/realms/tak").build()), Reason.ISS);
+        expectReject(v, signGood(goodClaims().issuer(ISSUER + "/").build()), Reason.ISS);
+    }
+
     @Test
     public void unreachableJwksFailsClosed() throws Exception {
         expectReject(validator(new JwksStub(jwksJson, true)), signGood(goodClaims().build()), Reason.JWKS);
@@ -324,15 +396,15 @@ public class OidcTokenValidatorTest {
         }
     }
 
-    /** R-04: the key is iss+sub, whole issuer. Two realms on one host are two identities (IDCOMMAND-FACTS). */
+    /** R-04: the key is a digest of iss+sub, whole issuer. Two realms on one host are two identities. */
     @Test
-    public void identityKeyKeepsHostPortAndPath() {
+    public void identityKeyIsExactOverIssuerAndSubject() {
         OidcIdentity id = new OidcIdentity("p", "https://idp.tactical.local:8443/realms/ops", "u-42", Collections.emptyMap());
-        assertEquals("u-42@idp.tactical.local:8443_realms_ops", id.getIdentityKey());
         OidcIdentity other = new OidcIdentity("p", "https://idp.tactical.local:8443/realms/dev", "u-42", Collections.emptyMap());
         assertFalse(id.getIdentityKey().equals(other.getIdentityKey()));
-        OidcIdentity idc = new OidcIdentity("p", "https://lastwall.idcommand.lastwall.com/idp", "u-42", Collections.emptyMap());
-        assertEquals("u-42@lastwall.idcommand.lastwall.com_idp", idc.getIdentityKey());
+        OidcIdentity same = new OidcIdentity("q", "https://idp.tactical.local:8443/realms/ops", "u-42", Collections.emptyMap());
+        assertEquals("provider name is not part of the identity", id.getIdentityKey(), same.getIdentityKey());
         assertTrue(id.toString().contains(id.getIdentityKey()));
+        assertFalse("no claims in toString", id.toString().contains("realms"));
     }
 }
