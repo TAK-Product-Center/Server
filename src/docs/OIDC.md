@@ -45,7 +45,7 @@ Everything lives under `<auth><oauth>` in CoreConfig.xml. Only the attributes be
 |---|---|---|
 | `enabled` | The Phase 1 switch. `false` (default): the element behaves exactly as before this change. `true`: everything in this document applies to it | `false` |
 | `configurationUri` | The provider's discovery document. Must be `https`. IDCommand publishes it under the issuer path: `https://<host>/idp/.well-known/openid-configuration`. Keycloak: `https://<host>/realms/<realm>/.well-known/openid-configuration` | required |
-| `issuer` | Expected `iss`. When set, the discovery document's `issuer` must equal it exactly and every token's `iss` must equal it exactly. Pin it. | discovered value |
+| `issuer` | Expected `iss`. Required on an `enabled="true"` element: the discovery document's `issuer` must equal it exactly, every token's `iss` must equal it exactly, and it is how TAK recognises an OIDC-enrolled certificate while the provider is unreachable (section 2). An enabled element without it is refused at startup | required when enabled |
 | `clientId`, `secret` | The confidential web client TAK uses for the browser flow | required |
 | `redirectUri` | Registered at the IdP exactly as written, including the port | required |
 | `androidClientId` | The public client ATAK uses (Authorization Code with PKCE, no secret). Published to clients on `/login/.well-known/openid-configuration` | none |
@@ -53,7 +53,7 @@ Everything lives under `<auth><oauth>` in CoreConfig.xml. Only the attributes be
 | `scopes` | Requested at the authorization endpoint. Include the scope that carries your groups claim if the IdP needs one | `openid profile` |
 | `usePkce` | Send `code_challenge` (S256) on the browser flow | `true` |
 | `truststore`, `truststoreFile`, `truststorePass` | The CA that signed the IdP's TLS certificate. Mirrors `ldapsTruststoreFile`. Unset means the JVM default trust store | unset |
-| `trustAllCerts` | Pre-existing. Disables certificate and hostname verification for the IdP connection; logged as WARN at startup. Do not use outside a lab | `false` |
+| `trustAllCerts` | Pre-existing attribute. Refused on an `enabled="true"` element: startup logs an error naming the field and the provider is unavailable until it is removed (review v02 M1). A lab IdP with a private CA sets `truststore` and `truststoreFile` to that CA instead; the flag keeps its meaning on elements without `enabled="true"` | `false` |
 | `<groupMapping claimValue group access>` | One value of the groups claim maps to one TAK group; `access` is `in`, `out` or `both`. Repeat the element to map one value to several groups | none |
 | `defaultGroup` (on `<oauth>`) | TAK group granted when nothing maps. Unset means deny. Never an administrative group | unset |
 | `legacyGroupPassthrough` (on `<oauth>`) | Only for installations that used an external IdP before this change and relied on claim values being TAK group names | `false` |
@@ -63,9 +63,19 @@ Everything lives under `<auth><oauth>` in CoreConfig.xml. Only the attributes be
 | `groupsClaim`, `usernameClaim`, `scopeClaim`, `webtakScope` | Pre-existing | |
 
 Startup refuses, with the field named in the log, any non-`https` endpoint (configured or discovered), an
-empty audience, a discovered issuer that differs from the pinned one, a `truststore` without a
-`truststoreFile`, and a clock skew outside 0 to 300. A provider that fails discovery is not registered: tokens
-from it are rejected, the other authenticators are unaffected, and the log carries one `NOT registered` line.
+empty audience, a missing or mismatching pinned issuer, `trustAllCerts="true"`, a `truststore` without a
+`truststoreFile`, and a clock skew outside 0 to 300.
+
+Fail closed, for every surface including certificates: an enabled provider whose discovery has not succeeded is
+"configured but unavailable", never "not configured". While it is unavailable, bearer tokens and browser logins
+that name it are rejected, `/login/auth` and `/login/.well-known/openid-configuration` answer `503` with
+`Retry-After` (the legacy flow never runs in its place), and a certificate enrolled through it is refused with an
+audit line `outcome=DENY surface=CERT reason=provider-unavailable` rather than routed to the file, LDAP or
+anonymous paths. The log carries one `NOT registered` line per failed provider and discovery is retried in the
+background every 60 s. A provider that resolved once keeps its last good resolution across a failed refresh. The
+other authenticators (file, LDAP, legacy certificates, legacy `authServer`) are unaffected throughout. A malformed
+`<groupMapping>` (for example `group=""`) is logged and denies every OIDC identity; it does not stop the other
+authenticators.
 
 ## 2. What the server does (BUILT, unit tested; integration PENDING until section 8 says otherwise)
 
@@ -100,8 +110,19 @@ replay-the-assertion semantics; a certificate-bound grant snapshot (schema chang
 decision for the project owner. `useTokenExpiration="true"` on the CA config caps the certificate lifetime at the
 assertion's `exp`; when that value cannot be read, signing is refused rather than defaulted.
 
+R-13 caveat: the TAK transport is unchanged, but OIDC-enrolled devices now depend on the IdP being reachable from
+TAK Server. Re-verifying the stored assertion needs the provider's JWKS (cached for `oAuthPublicKeyCacheSeconds`,
+refreshed ahead of expiry), and a certificate is refused outright while its provider is configured but not
+resolved. A prolonged IdP outage therefore denies OIDC-enrolled devices on 8089 and 8443; file, LDAP and
+legacy-PKI certificates are not affected. Plan the IdP's availability with the data plane in mind, or keep a
+legacy enrollment path for devices that must connect through an IdP outage.
+
 Discovery: fetched at startup and re-fetched every `oAuthConfigurationsCacheSeconds` (minimum 60 s) in the
-background; a generation that cannot be refreshed expires after four periods. JWKS cached for
+background. A refresh that fails for one provider keeps that provider's previous resolution; a refresh that can
+resolve nothing keeps the whole previous generation; a cold start that can resolve nothing publishes a
+"configured but unavailable" generation (section 1) and retries every 60 s. A generation that cannot be refreshed
+expires after four periods, so a replacement configuration that never resolves cannot keep old grants alive
+indefinitely. JWKS cached for
 `oAuthPublicKeyCacheSeconds` (minimum 60 s) with refresh-ahead; an unknown key id triggers a refetch limited to
 two per 30 s window per provider generation.
 

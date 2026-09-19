@@ -83,6 +83,20 @@ public class OidcProviderConfigTest {
         }
     }
 
+    /** Review v02 M1: trustAllCerts on a Phase 1 provider is a startup error naming the field, not a warning. */
+    @Test
+    public void m1TrustAllCertsRefusesConstructionAndNamesTheField() {
+        try {
+            validBuilder().trustAllCerts(true).build();
+            fail("trustAllCerts=true must be refused");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage(), e.getMessage().contains("trustAllCerts"));
+            assertTrue(e.getMessage(), e.getMessage().contains("M1"));
+            assertTrue(e.getMessage(), e.getMessage().contains("truststoreFile"));
+        }
+        assertFalse(validBuilder().build().isTrustAllCerts());
+    }
+
     @Test
     public void r15AudienceDefaultsToWebAndAndroidClientIds() {
         assertEquals(new LinkedHashSet<>(Arrays.asList("tak-web", "atak-civ")),

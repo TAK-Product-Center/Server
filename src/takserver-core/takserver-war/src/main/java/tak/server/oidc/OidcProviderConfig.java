@@ -138,7 +138,14 @@ public final class OidcProviderConfig {
             throw new IllegalArgumentException("oidc provider '" + this.name
                     + "': truststore and truststoreFile must be set together");
         }
-        this.trustAllCerts = b.trustAllCerts;
+        if (b.trustAllCerts) {
+            // One flag would turn a LAN position into token minting: an attacker answering the IdP's name serves
+            // its own discovery document and JWKS and every check downstream passes (review v02 M1, T16/T24).
+            throw new IllegalArgumentException("oidc provider '" + this.name + "': trustAllCerts=\"true\" is refused on an"
+                    + " enabled=\"true\" provider (M1); set truststore and truststoreFile to the CA that signed the IdP"
+                    + " certificate instead");
+        }
+        this.trustAllCerts = false;
         this.accessTokenName = b.accessTokenName;
         this.refreshTokenName = b.refreshTokenName;
     }

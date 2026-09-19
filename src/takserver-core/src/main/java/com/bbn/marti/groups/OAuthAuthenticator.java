@@ -116,17 +116,30 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
 	@Override
 	public void authenticate(@NotNull User user, @NotNull AuthCallback cb) {
 
-		AuthResult authResult = auth(user);
+		AuthResult authResult = auth(user, false);
 
 		cb.authenticationReturned(user, authResult.getAuthStatus());
 	}
 
 	@Override
 	public AuthResult authenticate(User user) {
-		return auth(user);
+		return auth(user, false);
 	}
 
-	private AuthResult auth(User user) {
+	/**
+	 * OIDC (Phase 1): the certificate route re-reading the assertion TAK stored at enrollment. The only entry
+	 * point on which expiry is waived, and only when the user also carries the certificate (review v02 F-07).
+	 */
+	public AuthResult authenticateStoredAssertion(User user) {
+		return auth(user, true);
+	}
+
+	/** Expiry is waived only for a stored assertion presented with its certificate; never inferred from the certificate alone. */
+	public static boolean expiryWaived(User user, boolean storedAssertion) {
+		return storedAssertion && user != null && user.getCert() != null;
+	}
+
+	private AuthResult auth(User user, boolean storedAssertion) {
 
 		AuthStatus authStatus = AuthStatus.SUCCESS;
 		try {
@@ -145,7 +158,7 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
 					externalToken = user.getToken();
 				}
 				if (provider != null) {
-					return authenticateExternal(user, externalToken, provider, registry);
+					return authenticateExternal(user, externalToken, provider, registry, storedAssertion);
 				}
 			}
 
@@ -431,14 +444,17 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
 	 * anonymous session. Every outcome writes one audit line.
 	 *
 	 * Expiry is waived in exactly one case: a certificate connection re-reading the token TAK stored at
-	 * enrollment ({@code X509Authenticator}, {@code x509tokenAuth}). There the certificate is the credential and
-	 * the token is the group snapshot it was issued against; signature, issuer and audience are still enforced.
+	 * enrollment, which arrives through {@link #authenticateStoredAssertion(User)} with {@code storedAssertion}
+	 * set and the certificate on the user. There the certificate is the credential and the token is the group
+	 * snapshot it was issued against; signature, issuer and audience are still enforced. A bearer request that
+	 * happens to carry a client certificate does not qualify (review v02 F-07).
 	 */
-	private AuthResult authenticateExternal(User user, String token, OidcProvider provider, OidcProviderRegistry registry) {
+	private AuthResult authenticateExternal(User user, String token, OidcProvider provider, OidcProviderRegistry registry,
+			boolean storedAssertion) {
 
 		HttpServletRequest request = ThreadLocalRequestHolder.getRequest();
 		int port = request == null ? -1 : request.getLocalPort();
-		boolean storedEnrollmentToken = user.getCert() != null;
+		boolean storedEnrollmentToken = expiryWaived(user, storedAssertion);
 		OidcAuditEvent.Surface surface = storedEnrollmentToken ? OidcAuditEvent.Surface.CERT : OidcAuditEvent.Surface.BEARER;
 
 		OidcIdentity identity;

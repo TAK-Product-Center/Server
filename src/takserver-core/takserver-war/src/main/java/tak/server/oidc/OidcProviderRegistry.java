@@ -3,13 +3,16 @@ package tak.server.oidc;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.base.Strings;
@@ -25,11 +28,24 @@ import com.bbn.marti.remote.config.CoreConfigFacade;
  *
  * Built lazily on first use and rebuilt after {@code oAuthConfigurationsCacheSeconds} (the same operator
  * setting {@code OAuthApi} already honours), so a discovery document change or a JWKS rotation is picked up
- * without a restart. A provider whose discovery fails is logged and left out: tokens from it are then unknown
- * and rejected. Nothing here falls open.
+ * without a restart.
  *
- * With no {@code <openIdDiscoveryConfiguration>} elements the registry is empty and every caller takes its
- * pre-Phase-1 path unchanged (R-01).
+ * Two views, kept apart on purpose (review v02 H1/F-01):
+ * <ul>
+ * <li><b>configured</b>: an {@code <openIdDiscoveryConfiguration enabled="true">} exists in CoreConfig. Derived
+ * from configuration alone, never from the network. Callers that decide <em>whether</em> a credential is an OIDC
+ * credential, or whether the legacy login flow may run, branch on this view.</li>
+ * <li><b>live</b>: the providers whose discovery succeeded, or whose last good resolution was retained across a
+ * failed refresh. Callers that <em>verify</em> a credential use this view.</li>
+ * </ul>
+ * A provider that is configured but not live is "unavailable": everything that names it is refused. Nothing here
+ * falls open, and an unavailable provider is never silently equivalent to an absent one.
+ *
+ * With no {@code <openIdDiscoveryConfiguration enabled="true">} the registry is not configured and every caller
+ * takes its pre-Phase-1 path unchanged (R-01).
+ *
+ * One {@code OidcProviderRegistry} instance wraps exactly one generation. Read {@link #getInstance()} once per
+ * decision and use that instance for every lookup in the decision (review v02 F-10).
  */
 public final class OidcProviderRegistry {
 
@@ -39,9 +55,18 @@ public final class OidcProviderRegistry {
     private static final Duration REQUEST_TTL = Duration.ofMinutes(10);
     private static final int REQUEST_MAX = 10_000;
 
+    /** While a configured provider is unavailable, discovery is retried in the background this often. */
+    public static final long RETRY_SECONDS = 60;
+
     private static final Object LOCK = new Object();
     private static volatile LoadingCache<String, Generation> cache;
+    private static volatile long nextRetryAtMillis;
     private static final AuthorizationRequestStore REQUESTS = new AuthorizationRequestStore(REQUEST_TTL, REQUEST_MAX);
+
+    /** How one enabled configuration element becomes a live provider. Production does discovery; tests stub it. */
+    interface Discovery {
+        OidcProvider discover(Oauth.OpenIdDiscoveryConfiguration cfg) throws Exception;
+    }
 
     /** One resolved snapshot of the configuration. Immutable. */
     static final class Generation {
@@ -53,6 +78,12 @@ public final class OidcProviderRegistry {
         final String adminClaimValue;
         final OidcIdentityKey identityKey;
         final Oauth oauth;
+        /** Names of the enabled elements (the configured view). */
+        final Set<String> configuredNames;
+        /** Pinned {@code issuer} attributes of the enabled elements plus the issuers of the live providers. */
+        final Set<String> configuredIssuers;
+        /** Enabled elements with no live provider in this generation. */
+        final List<String> unavailable;
 
         Generation(List<OidcProvider> providers, GroupMapper mapper, Oauth oauth) {
             this.providers = Collections.unmodifiableList(providers);
@@ -64,12 +95,47 @@ public final class OidcProviderRegistry {
             this.adminClaimValue = oauth == null ? null : oauth.getAdminTokenClaimValue();
             this.identityKey = oauth == null || oauth.getIdentityKey() == null
                     ? OidcIdentityKey.ISSUER_SUBJECT : oauth.getIdentityKey();
+            Set<String> names = new LinkedHashSet<>();
+            Set<String> issuers = new LinkedHashSet<>();
+            List<String> missing = new ArrayList<>();
+            for (Oauth.OpenIdDiscoveryConfiguration cfg : phase1Entries(oauth)) {
+                names.add(cfg.getName());
+                if (!Strings.isNullOrEmpty(cfg.getIssuer())) {
+                    issuers.add(cfg.getIssuer().trim());
+                }
+                if (find(cfg.getName()) == null) {
+                    missing.add(cfg.getName());
+                }
+            }
+            for (OidcProvider p : this.providers) {
+                issuers.add(p.getIssuer());
+            }
+            this.configuredNames = Collections.unmodifiableSet(names);
+            this.configuredIssuers = Collections.unmodifiableSet(issuers);
+            this.unavailable = Collections.unmodifiableList(missing);
+        }
+
+        OidcProvider find(String name) {
+            for (OidcProvider p : providers) {
+                if (p.getName().equals(name)) {
+                    return p;
+                }
+            }
+            return null;
+        }
+
+        boolean configured() {
+            return !configuredNames.isEmpty() || !providers.isEmpty();
+        }
+
+        boolean degraded() {
+            return !unavailable.isEmpty();
         }
     }
 
     private final Generation gen;
 
-    private OidcProviderRegistry(Generation gen) {
+    OidcProviderRegistry(Generation gen) {
         this.gen = gen;
     }
 
@@ -77,7 +143,14 @@ public final class OidcProviderRegistry {
      * The current registry. The first call builds it (one discovery fetch per provider). After
      * {@code oAuthConfigurationsCacheSeconds} the next call still returns the current generation and triggers a
      * rebuild in the background (Caffeine refreshAfterWrite), so authentication never waits on discovery once
-     * the server is up (review finding 15). A rebuild that fails keeps the previous generation.
+     * the server is up (review finding 15).
+     *
+     * Availability semantics (review v02 H1/F-01): a refresh that cannot resolve an enabled provider keeps that
+     * provider's last good resolution; a refresh that can build nothing throws inside the loader so Caffeine keeps
+     * the previous generation; a cold start that can build nothing publishes a generation that is configured but
+     * has no live provider, and discovery is retried in the background every {@link #RETRY_SECONDS} until it
+     * succeeds. The four-period expiry still applies, so a replacement configuration that never resolves cannot
+     * keep old grants alive indefinitely (review round two, 19, 22).
      */
     public static OidcProviderRegistry getInstance() {
         LoadingCache<String, Generation> c = cache;
@@ -91,66 +164,147 @@ public final class OidcProviderRegistry {
                     } catch (Exception e) {
                         logger.debug("using default oidc registry cache lifetime", e);
                     }
-                    // Refresh no more often than once a minute (a zero or tiny value must not disable the registry or
-                    // hammer discovery); a generation that cannot be refreshed dies after four periods so a broken
-                    // replacement configuration cannot keep old grants alive indefinitely (review round two, 19, 22).
-                    long refresh = Math.max(60, seconds);
-                    cache = Caffeine.newBuilder()
-                            .refreshAfterWrite(refresh, TimeUnit.SECONDS)
-                            .expireAfterWrite(refresh * 4, TimeUnit.SECONDS)
-                            .build(key -> build());
+                    cache = newCache(seconds);
                 }
                 c = cache;
             }
         }
-        return new OidcProviderRegistry(c.get("oidc"));
+        Generation g = c.get("oidc");
+        if (g.degraded()) {
+            long now = System.currentTimeMillis();
+            if (now >= nextRetryAtMillis) {
+                nextRetryAtMillis = now + RETRY_SECONDS * 1000;
+                // Asynchronous: the caller keeps this generation; a successful rebuild replaces it.
+                c.refresh("oidc");
+            }
+        }
+        return new OidcProviderRegistry(g);
+    }
+
+    private static LoadingCache<String, Generation> newCache(long seconds) {
+        // Refresh no more often than once a minute (a zero or tiny value must not disable the registry or
+        // hammer discovery); a generation that cannot be refreshed dies after four periods.
+        long refresh = Math.max(60, seconds);
+        return Caffeine.newBuilder()
+                .refreshAfterWrite(refresh, TimeUnit.SECONDS)
+                .expireAfterWrite(refresh * 4, TimeUnit.SECONDS)
+                .build(new CacheLoader<String, Generation>() {
+                    @Override
+                    public Generation load(String key) {
+                        return build(null);
+                    }
+
+                    @Override
+                    public Generation reload(String key, Generation previous) {
+                        return build(previous);
+                    }
+                });
     }
 
     /** Drops the cached generation so the next call rebuilds. For tests and config reloads. */
     public static void reset() {
         synchronized (LOCK) {
             cache = null;
+            nextRetryAtMillis = 0;
+        }
+    }
+
+    /** Package-private, tests only: publish {@code gen} as the current generation without discovery. */
+    static void install(Generation gen) {
+        synchronized (LOCK) {
+            LoadingCache<String, Generation> c = newCache(RETRY_SECONDS);
+            c.put("oidc", gen);
+            cache = c;
+            nextRetryAtMillis = Long.MAX_VALUE;
         }
     }
 
     /** Package-private: build from an explicit Oauth block, no CoreConfig. Discovery is supplied by the caller. */
     static Generation build(Oauth oauth, List<OidcProvider> providers) {
-        return new Generation(providers, mapperFor(oauth), oauth);
+        return new Generation(providers, safeMapper(oauth), oauth);
     }
 
-    private static Generation build() {
+    private static Generation build(Generation previous) {
         Oauth oauth = null;
         try {
             oauth = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth();
         } catch (Exception e) {
             logger.debug("no oauth configuration", e);
         }
+        int skewSeconds = oauth == null ? 60 : oauth.getExternalAuthClockSkewSeconds();
+        Duration jwksTtl = null;
+        try {
+            // Nimbus needs the lifetime to exceed refresh-ahead plus fetch timeout (40 s); clamp to a minute.
+            long ttl = CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer()
+                    .getQueue().getOAuthPublicKeyCacheSeconds();
+            jwksTtl = Duration.ofSeconds(Math.max(60, ttl));
+        } catch (Exception e) {
+            logger.debug("using the default JWKS cache lifetime", e);
+        }
+        return build(oauth, previous, productionDiscovery(skewSeconds, jwksTtl));
+    }
+
+    /** Production discovery: bootstrap trust from the element, fetch the document, build the provider. */
+    static Discovery productionDiscovery(int skewSeconds, Duration jwksTtl) {
+        return cfg -> {
+            // A bootstrap client for discovery: trust settings come from the same config block.
+            OidcProviderConfig bootstrap = bootstrapTrust(cfg);
+            OidcProviderConfig resolved = OidcDiscoveryClient.discover(cfg, OidcHttp.restTemplate(bootstrap), skewSeconds);
+            OidcProvider provider = new OidcProvider(resolved, OidcHttp.okHttpClient(resolved), jwksTtl);
+            logger.info("oidc provider '{}' registered: issuer={} audiences={} pkce={} skew={}s", resolved.getName(),
+                    resolved.getIssuer(), resolved.getAudiences(), resolved.isUsePkce(), skewSeconds);
+            return provider;
+        };
+    }
+
+    /**
+     * Package-private: one generation from an Oauth block, the previous generation (null on cold start) and a
+     * discovery function. Per enabled element: a successful discovery is the new provider; a failed discovery
+     * keeps the previous generation's provider of the same name when there is one, otherwise the element is
+     * unavailable. Each failure is one ERROR line. When nothing could be built and there is a previous generation,
+     * this throws so the Caffeine loader keeps that generation (review v02 H1/F-01).
+     *
+     * A malformed {@code <groupMapping>} does not abort the build: the generation is published with a deny-all
+     * mapper so the error is confined to OIDC identities instead of every authenticator (review v02 F-03).
+     */
+    static Generation build(Oauth oauth, Generation previous, Discovery discovery) {
+        GroupMapper mapper = safeMapper(oauth);
         List<OidcProvider> providers = new ArrayList<>();
-        if (oauth != null && oauth.getOpenIdDiscoveryConfiguration() != null) {
-            int skewSeconds = oauth.getExternalAuthClockSkewSeconds();
-            Duration jwksTtl = null;
+        List<Oauth.OpenIdDiscoveryConfiguration> enabled = phase1Entries(oauth);
+        for (Oauth.OpenIdDiscoveryConfiguration cfg : enabled) {
             try {
-                // Nimbus needs the lifetime to exceed refresh-ahead plus fetch timeout (40 s); clamp to a minute.
-                long ttl = CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer()
-                        .getQueue().getOAuthPublicKeyCacheSeconds();
-                jwksTtl = Duration.ofSeconds(Math.max(60, ttl));
+                if (Strings.isNullOrEmpty(cfg.getIssuer()) || cfg.getIssuer().trim().isEmpty()) {
+                    // Without a pinned issuer a certificate enrolled with this provider cannot be recognised while
+                    // the provider is unreachable, and the certificate path could not fail closed (review v02 H1).
+                    throw new IllegalArgumentException("issuer is required on an enabled=\"true\" provider");
+                }
+                providers.add(discovery.discover(cfg));
             } catch (Exception e) {
-                logger.debug("using the default JWKS cache lifetime", e);
-            }
-            for (Oauth.OpenIdDiscoveryConfiguration cfg : phase1Entries(oauth)) {
-                try {
-                    // A bootstrap client for discovery: trust settings come from the same config block.
-                    OidcProviderConfig bootstrap = bootstrapTrust(cfg);
-                    OidcProviderConfig resolved = OidcDiscoveryClient.discover(cfg, OidcHttp.restTemplate(bootstrap), skewSeconds);
-                    providers.add(new OidcProvider(resolved, OidcHttp.okHttpClient(resolved), jwksTtl));
-                    logger.info("oidc provider '{}' registered: issuer={} audiences={} pkce={} skew={}s", resolved.getName(),
-                            resolved.getIssuer(), resolved.getAudiences(), resolved.isUsePkce(), skewSeconds);
-                } catch (Exception e) {
-                    logger.error("oidc provider '{}' NOT registered: {}", cfg.getName(), e.getMessage());
+                OidcProvider last = previous == null ? null : previous.find(cfg.getName());
+                if (last != null) {
+                    providers.add(last);
+                    logger.error("oidc provider '{}' refresh failed: {}; keeping the previous resolution (issuer={})",
+                            cfg.getName(), e.getMessage(), last.getIssuer());
+                } else {
+                    logger.error("oidc provider '{}' NOT registered, unavailable until discovery succeeds: {}",
+                            cfg.getName(), e.getMessage());
                 }
             }
         }
-        return new Generation(providers, mapperFor(oauth), oauth);
+        if (!enabled.isEmpty() && providers.isEmpty() && previous != null) {
+            throw new IllegalStateException("no enabled oidc provider could be resolved; keeping the previous generation");
+        }
+        return new Generation(providers, mapper, oauth);
+    }
+
+    /** The mapper for {@code oauth}, or a deny-all mapper when the configuration is malformed (review v02 F-03). */
+    static GroupMapper safeMapper(Oauth oauth) {
+        try {
+            return mapperFor(oauth);
+        } catch (IllegalArgumentException e) {
+            logger.error("oidc <groupMapping> is invalid ({}): every OIDC identity is denied until it is fixed", e.getMessage());
+            return new GroupMapper(Collections.emptyList(), null, false, GroupMapper.LegacySettings.defaults());
+        }
     }
 
     /**
@@ -225,8 +379,36 @@ public final class OidcProviderRegistry {
         }
     }
 
-    // ---- lookups ------------------------------------------------------------------------------
+    // ---- configured view (from CoreConfig, independent of discovery) ----------------------------
 
+    /** True when an {@code enabled="true"} discovery element exists, whether or not it resolved. */
+    public boolean isConfigured() {
+        return gen.configured();
+    }
+
+    /** Configured but nothing live: every OIDC credential is refused and the legacy flows must not run. */
+    public boolean isUnavailable() {
+        return gen.configured() && gen.providers.isEmpty();
+    }
+
+    /** Names of the enabled elements that have no live provider in this generation. */
+    public List<String> unavailableProviders() {
+        return gen.unavailable;
+    }
+
+    /** The pinned issuers of the enabled elements plus the issuers of the live providers. Exact strings. */
+    public Set<String> configuredIssuers() {
+        return gen.configuredIssuers;
+    }
+
+    /** Whether {@code iss} names a configured provider, live or not. Exact string equality. */
+    public boolean isConfiguredIssuer(String iss) {
+        return iss != null && gen.configuredIssuers.contains(iss);
+    }
+
+    // ---- live view -----------------------------------------------------------------------------
+
+    /** No live provider. Not the same as {@link #isConfigured()} being false; see the class comment. */
     public boolean isEmpty() {
         return gen.providers.isEmpty();
     }

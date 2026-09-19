@@ -52,10 +52,13 @@ public class OidcAuditEventTest {
                 String.class, int.class, Reason.class);
         Method denyNoMapping = OidcAuditEvent.class.getDeclaredMethod("denyNoMapping", Surface.class,
                 OidcIdentity.class, String.class, int.class);
+        Method denyUnavailable = OidcAuditEvent.class.getDeclaredMethod("denyProviderUnavailable", Surface.class,
+                String.class, int.class);
 
         assertTrue(Modifier.isPublic(allow.getModifiers()) && Modifier.isStatic(allow.getModifiers()));
         assertTrue(Modifier.isPublic(deny.getModifiers()) && Modifier.isStatic(deny.getModifiers()));
         assertTrue(Modifier.isPublic(denyNoMapping.getModifiers()) && Modifier.isStatic(denyNoMapping.getModifiers()));
+        assertTrue(Modifier.isPublic(denyUnavailable.getModifiers()) && Modifier.isStatic(denyUnavailable.getModifiers()));
 
         int publicMethods = 0;
         for (Method method : OidcAuditEvent.class.getDeclaredMethods()) {
@@ -70,6 +73,6 @@ public class OidcAuditEventTest {
                 assertFalse(method + " exposes a header-like parameter", name.contains("header"));
             }
         }
-        assertEquals("only the three pinned logging entry points are public", 3, publicMethods);
+        assertEquals("only the four pinned logging entry points are public", 4, publicMethods);
     }
 }

@@ -321,9 +321,11 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		Oauth oauthConfig = config.getAuth().getOauth();
 		boolean hasExternalAuthConfig = oauthConfig != null &&
 				(!oauthConfig.getAuthServer().isEmpty() || !oauthConfig.getOpenIdDiscoveryConfiguration().isEmpty());
-		boolean oidcRegistryEmpty = oauthConfig == null || OidcProviderRegistry.getInstance().isEmpty();
+		// OIDC (Phase 1): branch on configuration, not on whether discovery succeeded at boot, so an IdP that is
+		// not yet up cannot pin the legacy redirect for the life of the process (review v02 F-01).
+		boolean oidcConfigured = oauthConfig != null && OidcProviderRegistry.getInstance().isConfigured();
 		if (oauthConfig != null && shouldRedirectToExternalLogin(oauthConfig.isUseTakServerLoginPage(),
-				hasExternalAuthConfig, oidcRegistryEmpty)) {
+				hasExternalAuthConfig, !oidcConfigured)) {
 			loginUrl = "/login/auth";
 		}
 
@@ -404,9 +406,13 @@ public class ServerConfiguration extends SpringBootServletInitializer  {
 		return factory;
 	}
 
+	/**
+	 * The pre-existing redirect to the legacy external login runs only when no Phase 1 provider is configured;
+	 * {@code noOidcConfigured} is the configured view, never the live registry.
+	 */
 	public static boolean shouldRedirectToExternalLogin(boolean useTakServerLoginPage,
-			boolean hasExternalAuthConfig, boolean oidcRegistryEmpty) {
-		return !useTakServerLoginPage && hasExternalAuthConfig && oidcRegistryEmpty;
+			boolean hasExternalAuthConfig, boolean noOidcConfigured) {
+		return !useTakServerLoginPage && hasExternalAuthConfig && noOidcConfigured;
 	}
 
 	private Connector configureConnector(Network.Connector coreConnector) {

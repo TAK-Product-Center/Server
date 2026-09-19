@@ -88,10 +88,15 @@ public class OAuthApi {
     @RequestMapping(value = "/login/auth", method = RequestMethod.GET)
     public void handleAuthRequest(HttpServletRequest request, HttpServletResponse response) {
         try {
-            // OIDC (Phase 1): a registered discovery provider takes the hardened flow. Without one, the
-            // pre-existing flow below runs unchanged.
+            // OIDC (Phase 1): a configured discovery provider takes the hardened flow; while it is configured but
+            // not resolvable the answer is an explicit 503, never the pre-existing flow (review v02 F-01). Without
+            // a configured provider the pre-existing flow below runs unchanged.
             OidcProviderRegistry registry = OidcProviderRegistry.getInstance();
-            if (!registry.isEmpty()) {
+            if (registry.isConfigured()) {
+                if (registry.first() == null) {
+                    sendProviderUnavailable(response);
+                    return;
+                }
                 handleOidcAuthRequest(registry, request, response);
                 return;
             }
@@ -388,11 +393,20 @@ public class OAuthApi {
 
     @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
     @RequestMapping(value = "/login/.well-known/openid-configuration", method = RequestMethod.GET)
-    public OpenIdConfiguration getOpenIdConfiguration() {
+    public ResponseEntity<OpenIdConfiguration> getOpenIdConfiguration() {
         OpenIdConfiguration openIdConfiguration = new OpenIdConfiguration();
         OidcProviderRegistry registry = OidcProviderRegistry.getInstance();
-        if (!registry.isEmpty()) {
-            OidcProviderConfig cfg = registry.first().getConfig();
+        // OIDC (Phase 1): configured decides the branch; configured but unresolved is a 503, never the legacy
+        // document (review v02 F-01).
+        if (registry.isConfigured()) {
+            OidcProvider provider = registry.first();
+            if (provider == null) {
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .header("Cache-Control", "no-store")
+                        .header("Retry-After", String.valueOf(OidcProviderRegistry.RETRY_SECONDS))
+                        .build();
+            }
+            OidcProviderConfig cfg = provider.getConfig();
             openIdConfiguration.authorization_endpoint = cfg.getAuthorizationEndpoint();
             openIdConfiguration.token_endpoint = cfg.getTokenEndpoint();
             openIdConfiguration.issuer = cfg.getIssuer();
@@ -400,7 +414,7 @@ public class OAuthApi {
             openIdConfiguration.scopes = cfg.getScopes();
             openIdConfiguration.android_redirect = "scheme";
             openIdConfiguration.code_challenge_methods_supported = new String[] { "S256" };
-            return openIdConfiguration;
+            return ResponseEntity.ok(openIdConfiguration);
         }
         Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
         if (!knownConfigs.isEmpty()) {
@@ -409,7 +423,7 @@ public class OAuthApi {
             openIdConfiguration.authorization_endpoint = authServer.getAuthEndpoint();
             openIdConfiguration.token_endpoint = authServer.getTokenEndpoint();
         }
-        return openIdConfiguration;
+        return ResponseEntity.ok(openIdConfiguration);
     }
 
     @RequestMapping(value = "/logout", method = { RequestMethod.GET, RequestMethod.POST })
@@ -445,6 +459,19 @@ public class OAuthApi {
      * server-side registration of the state so the callback can consume it exactly once (T6, T7). The cookie
      * binding upstream already had is kept: the browser presents the raw value, the IdP echoes its SHA-256.
      */
+    /** Shown to a browser while the configured provider is unavailable. Plain text, no stack trace, not cached. */
+    static final String PROVIDER_UNAVAILABLE_MESSAGE = "Single sign-on is temporarily unavailable: TAK Server cannot"
+            + " reach the identity provider. Try again in a minute, or contact your administrator.";
+
+    private static void sendProviderUnavailable(HttpServletResponse response) throws java.io.IOException {
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Retry-After", String.valueOf(OidcProviderRegistry.RETRY_SECONDS));
+        response.setContentType("text/plain;charset=UTF-8");
+        response.getWriter().write(PROVIDER_UNAVAILABLE_MESSAGE);
+        response.flushBuffer();
+    }
+
     private void handleOidcAuthRequest(OidcProviderRegistry registry, HttpServletRequest request,
             HttpServletResponse response) throws Exception {
         OidcProvider provider = registry.first();

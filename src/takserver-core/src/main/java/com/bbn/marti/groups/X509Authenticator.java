@@ -14,6 +14,8 @@ import javax.naming.NamingException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import com.google.common.base.Strings;
 
 import io.jsonwebtoken.JwtException;
@@ -44,13 +46,17 @@ import com.bbn.marti.service.Resources;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.util.CommonUtil;
+import com.bbn.marti.util.spring.ThreadLocalRequestHolder;
 import com.bbn.marti.xml.bindings.Role;
 import com.bbn.marti.xml.bindings.UserAuthenticationFile;
 import com.bbn.tak.tls.TakCert;
 import com.bbn.tak.tls.repository.TakCertRepository;
 
 import tak.server.cache.ActiveGroupCacheHelper;
+import tak.server.oidc.OidcAuditEvent;
+import tak.server.oidc.OidcProvider;
 import tak.server.oidc.OidcProviderRegistry;
+import tak.server.oidc.OidcTokenValidator;
 
 
 /*
@@ -133,9 +139,12 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
             String certFingerprint = RemoteUtil.getInstance().getCertSHA256Fingerprint(user.getCert());
 
         	TakCert cert = null;
-            // OIDC (Phase 1): when an external provider is configured, the certificate record is always consulted,
-            // so a certificate issued on an OIDC enrollment is recognised by its stored assertion below.
-            boolean oidcConfigured = !OidcProviderRegistry.getInstance().isEmpty();
+            // OIDC (Phase 1): one registry snapshot per decision (review v02 F-10). "Configured" comes from
+            // CoreConfig, not from whether discovery succeeded, so an IdP outage cannot make an OIDC-enrolled
+            // certificate look like a legacy one (review v02 H1/F-01). When configured, the certificate record is
+            // always consulted so the stored assertion below is seen.
+            OidcProviderRegistry oidc = OidcProviderRegistry.getInstance();
+            boolean oidcConfigured = oidc.isConfigured();
             if (CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509CheckRevocation() ||
                     CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509TokenAuth() ||
                     oidcConfigured) {
@@ -149,15 +158,33 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
             // A certificate enrolled with an external OIDC assertion takes the OIDC path regardless of
             // x509tokenAuth: its groups are the mapping of the assertion it was issued against, refreshed by
             // re-enrollment (gap analysis decision 4), never the file, LDAP or anonymous fallbacks below (T9).
-            boolean oidcEnrolled = oidcConfigured && cert != null && cert.token != null && cert.token.length() > 0
-                    && OidcProviderRegistry.getInstance().providerFor(cert.token) != null;
+            // The assertion's issuer decides: a configured issuer with no live provider is a refusal, never a
+            // fall-through to the legacy branches (fail closed).
+            OidcProvider oidcProvider = null;
+            if (oidcConfigured && cert != null && !Strings.isNullOrEmpty(cert.token)) {
+                String issuer = OidcTokenValidator.peekIssuer(cert.token);
+                if (oidc.isConfiguredIssuer(issuer)) {
+                    oidcProvider = oidc.byIssuer(issuer);
+                    if (oidcProvider == null) {
+                        HttpServletRequest request = ThreadLocalRequestHolder.getRequest();
+                        OidcAuditEvent.denyProviderUnavailable(OidcAuditEvent.Surface.CERT, issuer,
+                                request == null ? -1 : request.getLocalPort());
+                        throw new TakException("certificate enrolled with OIDC provider " + issuer
+                                + " refused: the provider is configured but not available (discovery has not succeeded)");
+                    }
+                }
+            }
+            boolean oidcEnrolled = oidcProvider != null;
 
             if ((CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509TokenAuth() || oidcEnrolled) &&
                     cert != null && cert.token != null && cert.token.length() > 0) {
                 user.setToken(cert.token);
                 AuthResult delegated;
                 try {
-                    delegated = groupManager.authenticate("oauth", user);
+                    // The OIDC route names the stored assertion explicitly (review v02 F-07); the legacy
+                    // x509tokenAuth route is unchanged.
+                    delegated = oidcEnrolled ? OAuthAuthenticator.getInstance().authenticateStoredAssertion(user)
+                            : groupManager.authenticate("oauth", user);
                 } catch (InvalidBearerTokenException | JwtException e) {
                     if (logger.isDebugEnabled()) {
                         // the stored token is a credential; it is not logged (T8)

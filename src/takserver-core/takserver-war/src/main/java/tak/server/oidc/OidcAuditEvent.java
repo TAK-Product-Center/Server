@@ -23,7 +23,8 @@ import com.bbn.marti.remote.groups.Group;
  * port=&lt;localPort&gt; groups=[name:IN,name:OUT,...] admin=true|false reason=&lt;code&gt;
  * </pre>
  * {@code reason} on ALLOW is the mapper's reason ({@code mapping}, {@code legacy}, {@code default-group}); on DENY
- * it is the validator's {@link OidcValidationException.Reason} in lower case or {@code no-mapping}.
+ * it is the validator's {@link OidcValidationException.Reason} in lower case, {@code no-mapping}, or
+ * {@code provider-unavailable} (a configured provider with no live registration).
  */
 public final class OidcAuditEvent {
 
@@ -57,6 +58,16 @@ public final class OidcAuditEvent {
     public static void denyNoMapping(Surface surface, OidcIdentity identity, String takUser, int port) {
         AUDIT.warn(format("DENY", surface, identity.getProviderName(), identity.getIssuer(), identity.getSubject(),
                 takUser, port, Collections.emptySet(), false, "no-mapping"));
+    }
+
+    /**
+     * The credential names a configured provider that has no live registration (discovery has not succeeded), so
+     * it cannot be verified and is refused rather than routed to a legacy path (review v02 H1). No subject: the
+     * assertion was not parsed beyond its issuer.
+     */
+    public static void denyProviderUnavailable(Surface surface, String issuer, int port) {
+        AUDIT.warn(format("DENY", surface, null, issuer, null, null, port, Collections.emptySet(), false,
+                "provider-unavailable"));
     }
 
     /** Package-private so the test can pin the schema without a logger. */
