@@ -278,6 +278,7 @@ public final class OidcProviderRegistry {
                     // the provider is unreachable, and the certificate path could not fail closed (review v02 H1).
                     throw new IllegalArgumentException("issuer is required on an enabled=\"true\" provider");
                 }
+                refuseUsernameClaimOnEnabled(oauth);
                 providers.add(discovery.discover(cfg));
             } catch (Exception e) {
                 OidcProvider last = previous == null ? null : previous.find(cfg.getName());
@@ -295,6 +296,20 @@ public final class OidcProviderRegistry {
             throw new IllegalStateException("no enabled oidc provider could be resolved; keeping the previous generation");
         }
         return new Generation(providers, mapper, oauth);
+    }
+
+    /**
+     * {@code identityKey="usernameClaim"} on {@code <oauth>} is refused for every {@code enabled="true"} provider
+     * (review v02 M2, Astra rank 5): R-04 requires the TAK user to be keyed on iss plus sub, and a display claim
+     * would let one IdP account impersonate another. Elements without {@code enabled="true"} never reach this
+     * check, so legacy installations keep the mode.
+     */
+    static void refuseUsernameClaimOnEnabled(Oauth oauth) {
+        if (oauth != null && oauth.getIdentityKey() == OidcIdentityKey.USERNAME_CLAIM) {
+            throw new IllegalArgumentException("identityKey=\"usernameClaim\" on <oauth> is refused on an enabled=\"true\""
+                    + " provider (M2): R-04 requires the TAK user to be keyed on iss plus sub; set"
+                    + " identityKey=\"issuerSubject\" or remove the attribute");
+        }
     }
 
     /** The mapper for {@code oauth}, or a deny-all mapper when the configuration is malformed (review v02 F-03). */

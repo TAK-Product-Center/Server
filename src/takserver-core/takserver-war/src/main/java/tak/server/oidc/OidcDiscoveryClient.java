@@ -95,6 +95,7 @@ public final class OidcDiscoveryClient {
                 .androidClientId(cfg.getAndroidClientId())
                 .audience(cfg.getAudience())
                 .scopes(cfg.getScopes())
+                .androidRedirect(cfg.getAndroidRedirect())
                 .usePkce(cfg.isUsePkce())
                 .clockSkewSeconds(clockSkewSeconds)
                 .truststore(cfg.getTruststore(), cfg.getTruststoreFile(), cfg.getTruststorePass())

@@ -4,6 +4,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -31,6 +32,8 @@ public final class OidcProviderConfig {
     private final String androidClientId;      // nullable
     private final Set<String> audiences;
     private final String scopes;
+    private final List<String> scopeTokens;
+    private final String androidRedirect;   // "scheme" or "loopback" (D2)
     private final boolean usePkce;
     private final Duration clockSkew;
     private final String truststoreType;       // nullable
@@ -54,6 +57,7 @@ public final class OidcProviderConfig {
         private String androidClientId;
         private String audience;
         private String scopes = "openid profile";
+        private String androidRedirect = ANDROID_REDIRECT_SCHEME;
         private boolean usePkce = true;
         private int clockSkewSeconds = 60;
         private String truststoreType;
@@ -77,6 +81,8 @@ public final class OidcProviderConfig {
         /** Comma-separated accepted aud/azp values; null or empty means clientId plus androidClientId. */
         public Builder audience(String v) { this.audience = v; return this; }
         public Builder scopes(String v) { if (v != null && !v.trim().isEmpty()) { this.scopes = v.trim(); } return this; }
+        /** Redirect shape ATAK is told to use: {@code scheme} (default) or {@code loopback}; null or blank keeps the default. */
+        public Builder androidRedirect(String v) { if (v != null && !v.trim().isEmpty()) { this.androidRedirect = v.trim(); } return this; }
         public Builder usePkce(boolean v) { this.usePkce = v; return this; }
         public Builder clockSkewSeconds(int v) { this.clockSkewSeconds = v; return this; }
         public Builder truststore(String type, String file, String password) {
@@ -122,9 +128,17 @@ public final class OidcProviderConfig {
         }
         this.audiences = Collections.unmodifiableSet(auds);
         this.scopes = b.scopes;
-        if (!this.scopes.contains("openid")) {
-            throw new IllegalArgumentException("oidc provider '" + this.name + "': scopes must include openid");
+        this.scopeTokens = scopeTokens(this.scopes);
+        // Exact token, not a substring: "not-openid" or "openidx" is a misconfiguration, not an OIDC request
+        // (review v02, openid parse).
+        if (!this.scopeTokens.contains("openid")) {
+            throw new IllegalArgumentException("oidc provider '" + this.name + "': scopes must include the token openid");
         }
+        if (!ANDROID_REDIRECT_SCHEME.equals(b.androidRedirect) && !ANDROID_REDIRECT_LOOPBACK.equals(b.androidRedirect)) {
+            throw new IllegalArgumentException("oidc provider '" + this.name + "': androidRedirect must be \""
+                    + ANDROID_REDIRECT_SCHEME + "\" or \"" + ANDROID_REDIRECT_LOOPBACK + "\" (D2), got \"" + b.androidRedirect + "\"");
+        }
+        this.androidRedirect = b.androidRedirect;
         this.usePkce = b.usePkce;
         if (b.clockSkewSeconds < 0 || b.clockSkewSeconds > 300) {
             throw new IllegalArgumentException("oidc provider '" + this.name
@@ -148,6 +162,23 @@ public final class OidcProviderConfig {
         this.trustAllCerts = false;
         this.accessTokenName = b.accessTokenName;
         this.refreshTokenName = b.refreshTokenName;
+    }
+
+    public static final String ANDROID_REDIRECT_SCHEME = "scheme";
+    public static final String ANDROID_REDIRECT_LOOPBACK = "loopback";
+
+    /** The space-delimited scope string split into its exact tokens, in order, without blanks. */
+    public static List<String> scopeTokens(String scopes) {
+        List<String> out = new java.util.ArrayList<>();
+        if (scopes == null) {
+            return out;
+        }
+        for (String t : scopes.trim().split("\\s+")) {
+            if (!t.isEmpty()) {
+                out.add(t);
+            }
+        }
+        return Collections.unmodifiableList(out);
     }
 
     private static String required(String field, String value) {
@@ -194,6 +225,9 @@ public final class OidcProviderConfig {
     public String getAndroidClientId() { return androidClientId; }
     public Set<String> getAudiences() { return audiences; }
     public String getScopes() { return scopes; }
+    /** The scope tokens as ATAK receives them on the well-known document (a JSON array, D2). */
+    public List<String> getScopeTokens() { return scopeTokens; }
+    public String getAndroidRedirect() { return androidRedirect; }
     public boolean isUsePkce() { return usePkce; }
     public Duration getClockSkew() { return clockSkew; }
     public String getTruststoreType() { return truststoreType; }

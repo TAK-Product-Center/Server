@@ -199,15 +199,11 @@ public class CertManagerService {
                             throw new IllegalStateException("enrollment assertion rejected: " + e.getReason());
                         }
                     } else {
-                        // TAK's own token (or a legacy authServer token). If it cannot be read, refuse rather than
-                        // fall back to the default lifetime: with useTokenExpiration the operator asked for the
-                        // certificate to die with the assertion (review round two, item 21).
+                        // TAK's own token (or a legacy authServer token): upstream behaviour, an unreadable exp
+                        // keeps the default lifetime. Only an OIDC assertion refuses here (review v02 F-05).
                         Claims claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256, false);
                         Integer exp = claims == null ? null : (Integer) claims.get("exp");
-                        if (exp == null) {
-                            throw new IllegalStateException("useTokenExpiration is set and the assertion's exp cannot be read");
-                        }
-                        notAfter = new Date(exp.longValue() * 1000);
+                        notAfter = tak.server.oidc.OidcTokenGate.notAfter(exp == null ? null : exp.longValue(), false, notAfter);
                     }
                 }
 

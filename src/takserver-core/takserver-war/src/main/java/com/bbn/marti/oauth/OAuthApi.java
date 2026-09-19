@@ -383,12 +383,25 @@ public class OAuthApi {
         public String issuer;
         /** The public client id ATAK uses (Authorization Code with PKCE, no secret). */
         public String android_client_id;
-        /** Scopes to request; includes the scope that carries the groups claim when the IdP needs one. */
-        public String scopes;
+        /** Scope tokens to request, one per element; includes the scope that carries the groups claim when the IdP needs one. */
+        public String[] scopes;
         /** Redirect shape ATAK should use: "scheme" (private-use URI scheme) or "loopback" (RFC 8252 7.3). */
         public String android_redirect;
         /** TAK always sends S256; advisory for the client. */
         public String[] code_challenge_methods_supported;
+    }
+
+    /** The well-known document for one resolved provider (pure; review v02 D2: scopes is an array of exact tokens). */
+    public static OpenIdConfiguration openIdConfiguration(OidcProviderConfig cfg) {
+        OpenIdConfiguration openIdConfiguration = new OpenIdConfiguration();
+        openIdConfiguration.authorization_endpoint = cfg.getAuthorizationEndpoint();
+        openIdConfiguration.token_endpoint = cfg.getTokenEndpoint();
+        openIdConfiguration.issuer = cfg.getIssuer();
+        openIdConfiguration.android_client_id = cfg.getAndroidClientId();
+        openIdConfiguration.scopes = cfg.getScopeTokens().toArray(new String[0]);
+        openIdConfiguration.android_redirect = cfg.getAndroidRedirect();
+        openIdConfiguration.code_challenge_methods_supported = new String[] { "S256" };
+        return openIdConfiguration;
     }
 
     @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
@@ -406,15 +419,7 @@ public class OAuthApi {
                         .header("Retry-After", String.valueOf(OidcProviderRegistry.RETRY_SECONDS))
                         .build();
             }
-            OidcProviderConfig cfg = provider.getConfig();
-            openIdConfiguration.authorization_endpoint = cfg.getAuthorizationEndpoint();
-            openIdConfiguration.token_endpoint = cfg.getTokenEndpoint();
-            openIdConfiguration.issuer = cfg.getIssuer();
-            openIdConfiguration.android_client_id = cfg.getAndroidClientId();
-            openIdConfiguration.scopes = cfg.getScopes();
-            openIdConfiguration.android_redirect = "scheme";
-            openIdConfiguration.code_challenge_methods_supported = new String[] { "S256" };
-            return ResponseEntity.ok(openIdConfiguration);
+            return ResponseEntity.ok(openIdConfiguration(provider.getConfig()));
         }
         Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
         if (!knownConfigs.isEmpty()) {

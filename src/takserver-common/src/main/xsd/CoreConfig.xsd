@@ -797,6 +797,14 @@
                     claim (for example "groups") for providers that require it.</xs:documentation>
                 </xs:annotation>
               </xs:attribute>
+              <xs:attribute name="androidRedirect" type="xs:string" default="scheme">
+                <xs:annotation>
+                  <xs:documentation>Redirect shape ATAK uses, published as android_redirect on
+                    /login/.well-known/openid-configuration: "scheme" (private-use URI scheme, default) or "loopback"
+                    (RFC 8252 section 7.3 listener on 127.0.0.1). Any other value refuses registration of the
+                    provider. IDCommand's Admin Portal accepts only loopback for a public client.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
               <xs:attribute name="usePkce" type="xs:boolean" default="true">
                 <xs:annotation>
                   <xs:documentation>Send code_challenge (S256) on the browser flow.</xs:documentation>
@@ -854,7 +862,8 @@
         <xs:annotation>
           <xs:documentation>How an external OIDC token selects the TAK user. issuerSubject keys on iss plus sub
             (recommended; display claims never select a user). usernameClaim keeps the pre-existing resolution
-            (usernameClaim, then email) for installations that depend on it.</xs:documentation>
+            (usernameClaim, then email) for installations that depend on it, and is refused when any
+            openIdDiscoveryConfiguration has enabled="true" (R-04 requires iss plus sub).</xs:documentation>
         </xs:annotation>
       </xs:attribute>
       <xs:attribute name="externalAuthClockSkewSeconds" type="xs:int" default="60"/>

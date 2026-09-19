@@ -174,7 +174,8 @@ public class CertManagerApi extends BaseRestController {
 
             // OIDC (Phase 1): a certificate issued to a bearer-authenticated caller carries the assertion it was
             // issued against, exactly as signClient does, so a later certificate connection is recognised as an OIDC
-            // enrollment and never falls to the file, LDAP or anonymous paths (review round two, item 27).
+            // enrollment and never falls to the file, LDAP or anonymous paths (review round two, item 27). Only an
+            // OIDC-issued token is kept; a legacy token is not stored, as upstream (review v02 F-05).
             String callerToken = null;
             try {
                 Object principal = org.springframework.security.core.context.SecurityContextHolder.getContext()
@@ -185,6 +186,8 @@ public class CertManagerApi extends BaseRestController {
             } catch (Exception e) {
                 logger.debug("no token on the principal for makeClientKeyStore", e);
             }
+            final tak.server.oidc.OidcProviderRegistry registry = tak.server.oidc.OidcProviderRegistry.getInstance();
+            callerToken = tak.server.oidc.OidcTokenGate.tokenToStore(callerToken, t -> registry.providerFor(t) != null);
             TakCert takCert = new TakCert(cert, signingCertChain,
                     getHttpUser(), cn, new Date(), clientUid, callerToken);
             takCertRepository.save(takCert);
