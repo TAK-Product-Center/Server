@@ -27,7 +27,11 @@ public final class OidcValidationException extends Exception {
         /** The provider's JWKS could not be fetched (network, TLS, or a bad document). */
         JWKS,
         /** A required identity claim (sub) is missing. */
-        CLAIMS
+        CLAIMS,
+        /** The ID token's nonce is missing or is not the one issued with the authorization request (T6). */
+        NONCE,
+        /** The browser callback's state is unknown, expired, or already consumed (T7). */
+        STATE
     }
 
     private final Reason reason;

@@ -161,6 +161,7 @@ public final class OidcTokenValidator {
 
     private final Settings settings;
     private final JwtDecoder decoder;
+    private final JwtDecoder decoderIgnoringTime;
 
     /** Production constructor: JWKS fetched with a default RestTemplate (caller supplies a truststore-aware one). */
     public OidcTokenValidator(Settings settings) {
@@ -173,6 +174,11 @@ public final class OidcTokenValidator {
      */
     public OidcTokenValidator(Settings settings, RestOperations rest) {
         this.settings = settings;
+        this.decoder = build(settings, rest, true);
+        this.decoderIgnoringTime = build(settings, rest, false);
+    }
+
+    private static JwtDecoder build(Settings settings, RestOperations rest, boolean enforceTime) {
         NimbusJwtDecoder nimbus = NimbusJwtDecoder.withJwkSetUri(settings.jwksUri)
                 .jwsAlgorithms(algs -> {
                     algs.clear();
@@ -180,11 +186,14 @@ public final class OidcTokenValidator {
                 })
                 .restOperations(rest)
                 .build();
-        nimbus.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                new JwtTimestampValidator(settings.clockSkew),
-                new JwtIssuerValidator(settings.issuer),
-                new AudienceValidator(settings.audiences)));
-        this.decoder = nimbus;
+        List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+        if (enforceTime) {
+            validators.add(new JwtTimestampValidator(settings.clockSkew));
+        }
+        validators.add(new JwtIssuerValidator(settings.issuer));
+        validators.add(new AudienceValidator(settings.audiences));
+        nimbus.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
+        return nimbus;
     }
 
     public Settings getSettings() {
@@ -196,13 +205,26 @@ public final class OidcTokenValidator {
      * @throws OidcValidationException with a stable reason when the token is rejected for any cause
      */
     public OidcIdentity validate(String token) throws OidcValidationException {
+        return validate(token, false);
+    }
+
+    /**
+     * @param ignoreTime when true, {@code exp} and {@code nbf} are not enforced. Signature, algorithm, issuer,
+     *                   audience and {@code sub} still are. Used only for the token a certificate client presented
+     *                   at enrollment and TAK stored with the certificate: the certificate is the credential there
+     *                   and the token is the group snapshot it was issued against (gap analysis decision 4). Never
+     *                   for a token presented by a client.
+     * @return the identity the token proves
+     * @throws OidcValidationException with a stable reason when the token is rejected for any cause
+     */
+    public OidcIdentity validate(String token, boolean ignoreTime) throws OidcValidationException {
         if (token == null || token.isEmpty()) {
             throw new OidcValidationException(Reason.MALFORMED, "empty token");
         }
         rejectUnpermittedAlgorithm(token);
         Jwt jwt;
         try {
-            jwt = decoder.decode(token);
+            jwt = (ignoreTime ? decoderIgnoringTime : decoder).decode(token);
         } catch (JwtValidationException e) {
             throw new OidcValidationException(classifyValidation(e), describe(e), e);
         } catch (BadJwtException e) {
@@ -217,6 +239,22 @@ public final class OidcTokenValidator {
         }
         Map<String, Object> claims = new HashMap<>(jwt.getClaims());
         return new OidcIdentity(settings.providerName, settings.issuer, sub, claims);
+    }
+
+    /**
+     * The unverified {@code iss} claim of a compact JWT, or null when the input is not a JWT or carries none.
+     * For routing a token to the provider that will verify it, nothing else: the value is attacker-controlled
+     * until {@link #validate} has run against that provider's keys.
+     */
+    public static String peekIssuer(String token) {
+        if (token == null || token.isEmpty()) {
+            return null;
+        }
+        try {
+            return JWTParser.parse(token).getJWTClaimsSet().getIssuer();
+        } catch (java.text.ParseException e) {
+            return null;
+        }
     }
 
     /**

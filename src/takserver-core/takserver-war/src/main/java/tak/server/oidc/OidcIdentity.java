@@ -1,6 +1,8 @@
 package tak.server.oidc;
 
+import java.net.URI;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -42,17 +44,30 @@ public final class OidcIdentity {
     }
 
     /**
-     * The stable TAK-side key for this identity: {@code sub} qualified by the issuer host. Two IdPs
-     * with the same subject, or one user whose email changes, never collide. Safe for use as a TAK
-     * username: no whitespace, no characters outside the issuer host and the subject.
+     * The stable TAK-side key for this identity: {@code sub} qualified by the whole issuer (R-04). Two IdPs
+     * with the same subject, or one user whose email changes, never collide.
+     *
+     * Form: {@code <sub>@<host>[:<port>][_<path segment>[_<path segment>...]]}. The issuer path is kept because
+     * real issuers carry one (IDCommand: {@code https://host/idp}; Keycloak: {@code https://host/realms/x}) and two
+     * issuers on one host must not collapse into one identity. An underscore separates host from path: a hostname
+     * cannot contain one, so the split is unambiguous. Every character is inside TAK's {@code MartiSafeString}
+     * set and legal in a certificate CN, which is where this string ends up on the ATAK path.
      */
     public String getIdentityKey() {
-        String host = issuer.replaceFirst("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
-        int slash = host.indexOf('/');
-        if (slash >= 0) {
-            host = host.substring(0, slash);
+        URI uri = URI.create(issuer.trim());
+        StringBuilder key = new StringBuilder(subject).append('@');
+        String host = uri.getHost() == null ? uri.getRawAuthority() : uri.getHost();
+        key.append(host == null ? "" : host.toLowerCase(Locale.ENGLISH));
+        if (uri.getPort() >= 0) {
+            key.append(':').append(uri.getPort());
         }
-        return subject + "@" + host;
+        String path = uri.getPath() == null ? "" : uri.getPath();
+        for (String segment : path.split("/")) {
+            if (!segment.isEmpty()) {
+                key.append('_').append(segment);
+            }
+        }
+        return key.toString();
     }
 
     /** A claim by name, or null. Callers must treat values as untrusted display data. */

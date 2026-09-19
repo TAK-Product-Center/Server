@@ -138,7 +138,7 @@ public class OidcTokenValidatorTest {
         OidcIdentity id = validator(stub).validate(signGood(goodClaims().build()));
         assertEquals(ISSUER, id.getIssuer());
         assertEquals("alice", id.getSubject());
-        assertEquals("alice@idp.test", id.getIdentityKey());
+        assertEquals("alice@idp.test_realms_tak", id.getIdentityKey());
         assertEquals("test-idp", id.getProviderName());
         assertEquals("alice", id.getStringClaim("preferred_username", null));
         assertEquals(Arrays.asList("tak_ops"), id.getClaim("groups"));
@@ -324,10 +324,15 @@ public class OidcTokenValidatorTest {
         }
     }
 
+    /** R-04: the key is iss+sub, whole issuer. Two realms on one host are two identities (IDCOMMAND-FACTS). */
     @Test
-    public void identityKeyStripsSchemeAndPath() {
+    public void identityKeyKeepsHostPortAndPath() {
         OidcIdentity id = new OidcIdentity("p", "https://idp.tactical.local:8443/realms/ops", "u-42", Collections.emptyMap());
-        assertEquals("u-42@idp.tactical.local:8443", id.getIdentityKey());
-        assertFalse(id.toString().contains("realms"));
+        assertEquals("u-42@idp.tactical.local:8443_realms_ops", id.getIdentityKey());
+        OidcIdentity other = new OidcIdentity("p", "https://idp.tactical.local:8443/realms/dev", "u-42", Collections.emptyMap());
+        assertFalse(id.getIdentityKey().equals(other.getIdentityKey()));
+        OidcIdentity idc = new OidcIdentity("p", "https://lastwall.idcommand.lastwall.com/idp", "u-42", Collections.emptyMap());
+        assertEquals("u-42@lastwall.idcommand.lastwall.com_idp", idc.getIdentityKey());
+        assertTrue(id.toString().contains(id.getIdentityKey()));
     }
 }

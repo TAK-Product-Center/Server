@@ -60,7 +60,17 @@ import com.bbn.marti.config.Oauth;
 import com.bbn.marti.cot.search.model.ApiResponse;
 import com.bbn.marti.util.spring.MartiSocketUserDetailsImpl;
 import com.bbn.security.web.MartiValidatorConstants;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import tak.server.Constants;
+import tak.server.oidc.AuthorizationRequestStore;
+import tak.server.oidc.OidcAuditEvent;
+import tak.server.oidc.OidcIdentity;
+import tak.server.oidc.OidcProvider;
+import tak.server.oidc.OidcProviderConfig;
+import tak.server.oidc.OidcProviderRegistry;
+import tak.server.oidc.OidcValidationException;
+import tak.server.oidc.Pkce;
 
 
 @RestController
@@ -77,6 +87,14 @@ public class OAuthApi {
     @RequestMapping(value = "/login/auth", method = RequestMethod.GET)
     public void handleAuthRequest(HttpServletRequest request, HttpServletResponse response) {
         try {
+            // OIDC (Phase 1): a registered discovery provider takes the hardened flow. Without one, the
+            // pre-existing flow below runs unchanged.
+            OidcProviderRegistry registry = OidcProviderRegistry.getInstance();
+            if (!registry.isEmpty()) {
+                handleOidcAuthRequest(registry, request, response);
+                return;
+            }
+
             // get the auth server config.
             Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
             if (knownConfigs == null) {
@@ -235,6 +253,12 @@ public class OAuthApi {
             response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
                     "state", stateCookie, 0, false, request.isSecure()).toString());
 
+            // OIDC (Phase 1)
+            OidcProviderRegistry registry = OidcProviderRegistry.getInstance();
+            if (!registry.isEmpty()) {
+                return handleOidcRedirect(registry, code, state, request, response);
+            }
+
             // get the auth server config
             Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
             if (knownConfigs.isEmpty()) {
@@ -319,27 +343,60 @@ public class OAuthApi {
         String name = null;
         HttpStatus status = HttpStatus.NOT_FOUND;
 
-        Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
-        if (!knownConfigs.isEmpty()) {
-            Iterator<Map.Entry<String, Oauth.AuthServer>> entrySet = knownConfigs.entrySet().iterator();
-            Oauth.AuthServer authServer  =  entrySet.next().getValue();
-            name = authServer.getName();
+        OidcProviderRegistry registry = OidcProviderRegistry.getInstance();
+        if (!registry.isEmpty()) {
+            name = registry.first().getName();
             status = HttpStatus.OK;
+        } else {
+            Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
+            if (!knownConfigs.isEmpty()) {
+                Iterator<Map.Entry<String, Oauth.AuthServer>> entrySet = knownConfigs.entrySet().iterator();
+                Oauth.AuthServer authServer  =  entrySet.next().getValue();
+                name = authServer.getName();
+                status = HttpStatus.OK;
+            }
         }
 
         return new ResponseEntity<ApiResponse<String>>(
                 new ApiResponse<String>(Constants.API_VERSION, String.class.getName(), name), status);
     }
 
+    /**
+     * What a TAK client needs to start the SSO flow against the configured IdP without typing an issuer URL
+     * (v0.2 AN-10). Additive: the two pre-existing fields keep their meaning; the rest are null when no
+     * discovery provider is configured.
+     */
     public static class OpenIdConfiguration {
         public String authorization_endpoint;
         public String token_endpoint;
+        /** The IdP's issuer; the client fetches {@code <issuer>/.well-known/openid-configuration} to confirm. */
+        public String issuer;
+        /** The public client id ATAK uses (Authorization Code with PKCE, no secret). */
+        public String android_client_id;
+        /** Scopes to request; includes the scope that carries the groups claim when the IdP needs one. */
+        public String scopes;
+        /** Redirect shape ATAK should use: "scheme" (private-use URI scheme) or "loopback" (RFC 8252 7.3). */
+        public String android_redirect;
+        /** TAK always sends S256; advisory for the client. */
+        public String[] code_challenge_methods_supported;
     }
 
     @PreAuthorize("hasRole('ROLE_NO_CLIENT_CERT')")
     @RequestMapping(value = "/login/.well-known/openid-configuration", method = RequestMethod.GET)
     public OpenIdConfiguration getOpenIdConfiguration() {
         OpenIdConfiguration openIdConfiguration = new OpenIdConfiguration();
+        OidcProviderRegistry registry = OidcProviderRegistry.getInstance();
+        if (!registry.isEmpty()) {
+            OidcProviderConfig cfg = registry.first().getConfig();
+            openIdConfiguration.authorization_endpoint = cfg.getAuthorizationEndpoint();
+            openIdConfiguration.token_endpoint = cfg.getTokenEndpoint();
+            openIdConfiguration.issuer = cfg.getIssuer();
+            openIdConfiguration.android_client_id = cfg.getAndroidClientId();
+            openIdConfiguration.scopes = cfg.getScopes();
+            openIdConfiguration.android_redirect = "scheme";
+            openIdConfiguration.code_challenge_methods_supported = new String[] { "S256" };
+            return openIdConfiguration;
+        }
         Map<String, Oauth.AuthServer> knownConfigs = getAuthServerConfig().asMap();
         if (!knownConfigs.isEmpty()) {
             Iterator<Map.Entry<String, Oauth.AuthServer>> entrySet = knownConfigs.entrySet().iterator();
@@ -371,6 +428,162 @@ public class OAuthApi {
         String token = ((MartiSocketUserDetailsImpl) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal()).getToken();
         return new ApiResponse<String>(Constants.API_VERSION, String.class.getSimpleName(), token);
+    }
+
+    // ---- OIDC (Phase 1) -----------------------------------------------------------------------------
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    /**
+     * Authorization request for a registered provider. Adds to the pre-existing flow: a nonce (bound to this
+     * request, checked on the ID token), PKCE S256 (verifier kept server-side, never sent to the browser), and
+     * server-side registration of the state so the callback can consume it exactly once (T6, T7). The cookie
+     * binding upstream already had is kept: the browser presents the raw value, the IdP echoes its SHA-256.
+     */
+    private void handleOidcAuthRequest(OidcProviderRegistry registry, HttpServletRequest request,
+            HttpServletResponse response) throws Exception {
+        OidcProvider provider = registry.first();
+        OidcProviderConfig cfg = provider.getConfig();
+
+        String cookieState = AuthorizationRequestStore.newToken();
+        String state = sha256(cookieState);
+        String nonce = AuthorizationRequestStore.newToken();
+        String verifier = cfg.isUsePkce() ? Pkce.newVerifier() : null;
+        registry.requestStore().issue(state, verifier, nonce, cfg.getName());
+
+        response.addHeader(HttpHeaders.SET_COOKIE, AuthCookieUtils.createCookie(
+                "state", cookieState, -1, false, request.isSecure()).toString());
+
+        UriComponentsBuilder uri = UriComponentsBuilder.fromUriString(cfg.getAuthorizationEndpoint())
+                .queryParam("response_type", "code")
+                .queryParam("client_id", cfg.getWebClientId())
+                .queryParam("redirect_uri", cfg.getRedirectUri())
+                .queryParam("scope", cfg.getScopes())
+                .queryParam("state", state)
+                .queryParam("nonce", nonce);
+        if (verifier != null) {
+            uri.queryParam("code_challenge", Pkce.challengeS256(verifier))
+               .queryParam("code_challenge_method", "S256");
+        }
+
+        response.setHeader("Cache-Control", "no-store");
+        response.sendRedirect(uri.build().encode().toUriString());
+    }
+
+    /**
+     * The callback. Order matters: the state is consumed before any network call, so a replayed callback costs
+     * nothing (T7); the ID token is validated (signature, issuer, audience, expiry, nonce) as the authentication
+     * event; only then is a session credential set. The credential TAK keeps in the cookie is the access token
+     * when it is a JWT from this provider (upstream behaviour, so groups and scopes read the same way), otherwise
+     * the ID token. The authenticator re-validates whichever it is on every request.
+     */
+    private ModelAndView handleOidcRedirect(OidcProviderRegistry registry, String code, String state,
+            HttpServletRequest request, HttpServletResponse response) throws Exception {
+        int port = request.getLocalPort();
+
+        AuthorizationRequestStore.PendingRequest pending = registry.requestStore().consume(state);
+        if (pending == null) {
+            OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, "-", "-", null, port,
+                    OidcValidationException.Reason.STATE);
+            throw new IllegalStateException("authorization request state is unknown, expired or already used");
+        }
+        OidcProvider provider = registry.byName(pending.getProviderName());
+        if (provider == null) {
+            throw new IllegalStateException("provider for this authorization request is no longer configured");
+        }
+        OidcProviderConfig cfg = provider.getConfig();
+
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("grant_type", "authorization_code");
+        body.add("code", code);
+        body.add("client_id", cfg.getWebClientId());
+        if (cfg.getWebClientSecret() != null) {
+            body.add("client_secret", cfg.getWebClientSecret());
+        }
+        body.add("redirect_uri", cfg.getRedirectUri());
+        if (pending.getCodeVerifier() != null) {
+            body.add("code_verifier", pending.getCodeVerifier());
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        ResponseEntity<String> tokenResponse;
+        try {
+            tokenResponse = provider.getRest().exchange(cfg.getTokenEndpoint(), HttpMethod.POST,
+                    new HttpEntity<>(body, headers), String.class);
+        } catch (RuntimeException e) {
+            // The exception text from the HTTP client can include the response body; never let it near a log.
+            throw new IllegalStateException("token endpoint call failed: " + e.getClass().getSimpleName());
+        }
+        if (tokenResponse.getStatusCode() != HttpStatus.OK || tokenResponse.getBody() == null) {
+            throw new IllegalStateException("token endpoint returned " + tokenResponse.getStatusCode().value());
+        }
+        JsonNode json = JSON.readTree(tokenResponse.getBody());
+        String idToken = text(json, "id_token");
+        if (idToken == null) {
+            throw new IllegalStateException("token response carries no id_token");
+        }
+
+        OidcIdentity identity;
+        try {
+            identity = provider.validate(idToken, false);
+        } catch (OidcValidationException e) {
+            OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, cfg.getName(), cfg.getIssuer(), null, port, e.getReason());
+            throw new IllegalStateException("id_token rejected: " + e.getReason());
+        }
+        // The ID token must be for the web client specifically, not merely for some configured audience.
+        Object aud = identity.getClaim("aud");
+        boolean forWebClient = aud instanceof Collection<?> ? ((Collection<?>) aud).contains(cfg.getWebClientId())
+                : cfg.getWebClientId().equals(aud);
+        if (!forWebClient) {
+            OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, cfg.getName(), cfg.getIssuer(), identity.getSubject(),
+                    port, OidcValidationException.Reason.AUD);
+            throw new IllegalStateException("id_token audience is not the web client");
+        }
+        if (!pending.getNonce().equals(identity.getStringClaim("nonce", null))) {
+            OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, cfg.getName(), cfg.getIssuer(), identity.getSubject(),
+                    port, OidcValidationException.Reason.NONCE);
+            throw new IllegalStateException("id_token nonce does not match the authorization request");
+        }
+
+        String accessToken = text(json, cfg.getAccessTokenName());
+        String credential = idToken;
+        if (accessToken != null && registry.providerFor(accessToken) == provider) {
+            try {
+                provider.validate(accessToken, false);
+                credential = accessToken;
+            } catch (OidcValidationException e) {
+                OidcAuditEvent.deny(OidcAuditEvent.Surface.BROWSER, cfg.getName(), cfg.getIssuer(), identity.getSubject(),
+                        port, e.getReason());
+                throw new IllegalStateException("access_token rejected: " + e.getReason());
+            }
+        }
+
+        for (ResponseCookie cookie : AuthCookieUtils.createCookiesWithMaxSize(
+                OAuth2TokenType.ACCESS_TOKEN.getValue(), credential, -1, true, request.isSecure())) {
+            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        }
+        String refreshToken = text(json, cfg.getRefreshTokenName());
+        if (refreshToken != null) {
+            request.getSession().setAttribute(cfg.getRefreshTokenName(), refreshToken);
+        }
+        response.setHeader("Cache-Control", "must-revalidate, max-age=0, no-cache, no-store");
+        response.setDateHeader("Expires", 0);
+
+        OidcAuditEvent.allow(OidcAuditEvent.Surface.BROWSER, identity, registry.takUsername(identity), port,
+                Collections.emptySet(), false, "callback");
+
+        String redirect = "/Marti/login/redirect.html";
+        Oauth oauthConf = getOuathConfig();
+        if (oauthConf != null && oauthConf.getWebtakScope() != null
+                && !AuthCookieUtils.userHasWebtakAccess(oauthConf, identity.getClaims())) {
+            redirect = "/Marti/login/webtak-role-error.html";
+        }
+        return new ModelAndView(new InternalResourceView(redirect));
+    }
+
+    private static String text(JsonNode node, String field) {
+        JsonNode n = node == null || field == null ? null : node.get(field);
+        return (n == null || !n.isTextual() || n.asText().isEmpty()) ? null : n.asText();
     }
 
     private Oauth getOuathConfig() {
@@ -413,7 +626,13 @@ public class OAuthApi {
                 getOuathConfig().getOpenIdDiscoveryConfiguration() != null &&
                 !getOuathConfig().getOpenIdDiscoveryConfiguration().isEmpty()) {
             List<Oauth.OpenIdDiscoveryConfiguration> trustedConfigs = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getOpenIdDiscoveryConfiguration();
+            OidcProviderRegistry registry = OidcProviderRegistry.getInstance();
             for (Oauth.OpenIdDiscoveryConfiguration config : trustedConfigs) {
+                if (!registry.isEmpty()) {
+                    // OIDC (Phase 1): discovery providers are resolved by the registry on Nimbus; the code below
+                    // (RSA-only JWKS conversion, scopes_supported required) must not run for them.
+                    continue;
+                }
                 try {
                     Oauth.AuthServer manualConfig = OAuthUtils.processTrustedAuthServerConfig(config);
                     knownConfigs.add(manualConfig);

@@ -8,7 +8,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import org.owasp.esapi.Validator;
 import org.owasp.esapi.errors.ValidationException;
 import org.slf4j.Logger;
@@ -174,18 +176,40 @@ public class AuthCookieUtils {
     }
 
     public static boolean userHasWebtakAccess(Oauth oauthConfig, Claims claims) {
-        boolean userHasWebtakAccess = true;
-        if (oauthConfig != null
-                && oauthConfig.getWebtakScope() != null
-                && claims.get(oauthConfig.getScopeClaim()) != null) {
-            if (claims.get(oauthConfig.getScopeClaim()) instanceof String) {
-                userHasWebtakAccess = ((String) claims.get(oauthConfig.getScopeClaim()))
-                        .contains(oauthConfig.getWebtakScope());
-            } else {
-                userHasWebtakAccess = ((ArrayList<String>) claims.get(oauthConfig.getScopeClaim()))
-                        .contains(oauthConfig.getWebtakScope());
-            }
+        return userHasWebtakAccess(oauthConfig, (Map<String, Object>) claims);
+    }
+
+    /**
+     * The WebTAK scope gate (T22). When {@code webtakScope} is configured: the scope claim must be present and
+     * must contain the configured scope as a whole token. Upstream returned true when the claim was missing and
+     * matched substrings ("not-webtak" satisfied "webtak"); both are closed here. When no {@code webtakScope}
+     * is configured the gate is open, as before.
+     */
+    public static boolean userHasWebtakAccess(Oauth oauthConfig, Map<String, Object> claims) {
+        if (oauthConfig == null || oauthConfig.getWebtakScope() == null) {
+            return true;
         }
-        return userHasWebtakAccess;
+        String required = oauthConfig.getWebtakScope().trim();
+        if (required.isEmpty()) {
+            return true;
+        }
+        Object scope = claims == null ? null : claims.get(oauthConfig.getScopeClaim());
+        if (scope instanceof String) {
+            for (String s : ((String) scope).trim().split("[\\s,]+")) {
+                if (s.equals(required)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (scope instanceof Collection<?>) {
+            for (Object o : (Collection<?>) scope) {
+                if (o != null && required.equals(o.toString().trim())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return false;
     }
 }
