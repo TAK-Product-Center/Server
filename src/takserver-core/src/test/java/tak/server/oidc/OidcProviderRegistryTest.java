@@ -217,4 +217,21 @@ public class OidcProviderRegistryTest {
                 result.getGroups());
         assertEquals("legacy", result.getReason());
     }
+
+    /** R-01: a discovery element without enabled="true" is not a Phase 1 provider; the old path keeps it. */
+    @Test
+    public void r01OnlyEnabledDiscoveryEntriesArePhase1Providers() {
+        Oauth oauth = new Oauth();
+        Oauth.OpenIdDiscoveryConfiguration legacy = new Oauth.OpenIdDiscoveryConfiguration();
+        legacy.setName("legacy");
+        Oauth.OpenIdDiscoveryConfiguration phase1 = new Oauth.OpenIdDiscoveryConfiguration();
+        phase1.setName("phase1");
+        phase1.setEnabled(true);
+        oauth.getOpenIdDiscoveryConfiguration().add(legacy);
+        oauth.getOpenIdDiscoveryConfiguration().add(phase1);
+        assertEquals(1, OidcProviderRegistry.phase1Entries(oauth).size());
+        assertEquals("phase1", OidcProviderRegistry.phase1Entries(oauth).get(0).getName());
+        assertTrue(OidcProviderRegistry.phase1Entries(new Oauth()).isEmpty());
+        assertTrue(OidcProviderRegistry.phase1Entries(null).isEmpty());
+    }
 }

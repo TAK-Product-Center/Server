@@ -2,6 +2,7 @@ package com.bbn.marti.jwt;
 
 import com.bbn.marti.config.MissionTls;
 import com.bbn.marti.config.Oauth;
+import com.bbn.marti.oauth.OAuthUtils;
 import com.bbn.marti.remote.CoreConfig;
 import com.bbn.marti.remote.config.CoreConfigFacade;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -41,7 +42,6 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import tak.server.oidc.OidcProviderRegistry;
 
 public class JwtUtils {
 
@@ -233,13 +233,20 @@ public class JwtUtils {
                 }
             }
 
-            OidcProviderRegistry oidcProviders = OidcProviderRegistry.getInstance();
             for (Oauth.OpenIdDiscoveryConfiguration serverConfiguration : oAuth.getOpenIdDiscoveryConfiguration()) {
-                if (oidcProviders.byName(serverConfiguration.getName()) != null) {
+                if (serverConfiguration.isEnabled()) {
+                    // OIDC (Phase 1): verified by OidcProviderRegistry; its keys never enter this pool, registered
+                    // or not, so a provider the registry refused cannot fall back to the weaker path.
+                    logger.debug("Skipping Phase 1 OIDC provider '{}' in the legacy external verifier path",
+                            serverConfiguration.getName());
                     continue;
                 }
-                logger.debug("Skipping unregistered OIDC provider '{}' in legacy external verifier path",
-                        serverConfiguration.getName());
+                if (publicKeyCache.asMap().get(serverConfiguration.getName()) == null) {
+                    Oauth.AuthServer authServer = OAuthUtils.processTrustedAuthServerConfig(serverConfiguration);
+                    resolveAndCachePublicKeyDetails(authServer, rsaPublicKeys, publicKeyCache);
+                } else {
+                    rsaPublicKeys.addAll( publicKeyCache.asMap().get(serverConfiguration.getName()) );
+                }
             }
 
             return rsaPublicKeys;

@@ -765,6 +765,14 @@
               <xs:attribute name="refreshTokenName" type="xs:string" default="refresh_token"/>
               <xs:attribute name="trustAllCerts" type="xs:boolean" default="false"/>
               <!-- OIDC (Phase 1). All optional; absent means the pre-existing behaviour. -->
+              <xs:attribute name="enabled" type="xs:boolean" default="false">
+                <xs:annotation>
+                  <xs:documentation>The Phase 1 switch (R-01). false, the default: this element behaves exactly as before
+                    Phase 1. true: the provider is resolved by discovery on Nimbus, tokens are validated for issuer,
+                    audience, expiry and algorithm, identities are keyed on iss+sub, groups come only from groupMapping
+                    (deny by default), and the login page keeps the existing choices beside Sign in with SSO.</xs:documentation>
+                </xs:annotation>
+              </xs:attribute>
               <xs:attribute name="issuer" type="xs:string">
                 <xs:annotation>
                   <xs:documentation>Expected iss value. When set, the discovery document's issuer must match it and every

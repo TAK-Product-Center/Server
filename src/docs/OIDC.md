@@ -2,8 +2,8 @@
 
 TAK Server can authenticate WebTAK, the web admin UI and ATAK Civ against a standards-compliant OpenID Connect
 provider on the same host or tactical LAN, with no route to the Internet. OIDC is a second, optional
-authentication path: LDAP, file and certificate authentication are unchanged, and with no `<openIdDiscoveryConfiguration>`
-element in CoreConfig nothing in this document is active.
+authentication path: LDAP, file and certificate authentication are unchanged, and nothing in this document is
+active until an `<openIdDiscoveryConfiguration>` element carries `enabled="true"` (R-01: optional, off by default).
 
 Each section states BUILT (code and tests exist on this branch) or PENDING (not yet proven at that terminus).
 
@@ -23,6 +23,7 @@ Everything lives under `<auth><oauth>` in CoreConfig.xml. Only the attributes be
          useTakServerLoginPage="true">
     <openIdDiscoveryConfiguration
         name="idp"
+        enabled="true"
         configurationUri="https://idp.tactical.local/idp/.well-known/openid-configuration"
         issuer="https://idp.tactical.local/idp"
         clientId="e5130a25-9a34-481d-b330-d02487a3105b"
@@ -42,6 +43,7 @@ Everything lives under `<auth><oauth>` in CoreConfig.xml. Only the attributes be
 
 | Attribute | Meaning | Default |
 |---|---|---|
+| `enabled` | The Phase 1 switch. `false` (default): the element behaves exactly as before this change. `true`: everything in this document applies to it | `false` |
 | `configurationUri` | The provider's discovery document. Must be `https`. IDCommand publishes it under the issuer path: `https://<host>/idp/.well-known/openid-configuration`. Keycloak: `https://<host>/realms/<realm>/.well-known/openid-configuration` | required |
 | `issuer` | Expected `iss`. When set, the discovery document's `issuer` must equal it exactly and every token's `iss` must equal it exactly. Pin it. | discovered value |
 | `clientId`, `secret` | The confidential web client TAK uses for the browser flow | required |
@@ -160,11 +162,14 @@ messages. This box has no Android SDK, so the APK has not been built or run.
 
 ## 7. Legacy behaviour (R-01)
 
-With no `<openIdDiscoveryConfiguration>`: identical to upstream. With one, three pre-existing behaviours change
-because they were defects: tokens from the provider are checked for issuer and audience (they were not), a
-user with no mapped group is denied instead of being placed in the anonymous group, and the WebTAK scope gate
-matches whole tokens and denies a missing claim. An installation that relied on claim values passing through
-as TAK group names sets `legacyGroupPassthrough="true"` for the old mapping behaviour.
+Without `enabled="true"` on a discovery element: identical to upstream, including an existing
+`<openIdDiscoveryConfiguration>` (it keeps the pre-existing discovery, key pooling, name pass-through, anonymous
+fallback and scope gate). With `enabled="true"`: tokens from that provider are checked for issuer and audience,
+an identity with no mapped group is denied instead of being placed in the anonymous group, and the WebTAK scope
+gate matches whole tokens and denies a missing claim. An installation that relied on claim values passing
+through as TAK group names sets `legacyGroupPassthrough="true"` for the old mapping behaviour. Three upstream
+defects on the legacy path are left as they are so the legacy path stays regression-equivalent; they are listed
+for TAK Product Center separately (no issuer or audience check, anonymous fallback, substring scope match).
 
 ## 8. Evidence
 

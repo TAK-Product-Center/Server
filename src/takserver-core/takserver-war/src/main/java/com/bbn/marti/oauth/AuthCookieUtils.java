@@ -175,8 +175,21 @@ public class AuthCookieUtils {
         response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
     }
 
+    /** Pre-existing path (TAK's own tokens, legacy authServer tokens): behaviour unchanged (R-01). */
     public static boolean userHasWebtakAccess(Oauth oauthConfig, Claims claims) {
-        return userHasWebtakAccess(oauthConfig, (Map<String, Object>) claims);
+        boolean userHasWebtakAccess = true;
+        if (oauthConfig != null
+                && oauthConfig.getWebtakScope() != null
+                && claims.get(oauthConfig.getScopeClaim()) != null) {
+            if (claims.get(oauthConfig.getScopeClaim()) instanceof String) {
+                userHasWebtakAccess = ((String) claims.get(oauthConfig.getScopeClaim()))
+                        .contains(oauthConfig.getWebtakScope());
+            } else {
+                userHasWebtakAccess = ((ArrayList<String>) claims.get(oauthConfig.getScopeClaim()))
+                        .contains(oauthConfig.getWebtakScope());
+            }
+        }
+        return userHasWebtakAccess;
     }
 
     /**

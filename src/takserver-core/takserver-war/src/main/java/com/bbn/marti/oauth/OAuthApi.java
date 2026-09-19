@@ -645,16 +645,26 @@ public class OAuthApi {
         if (getOuathConfig() != null &&
                 getOuathConfig().getOpenIdDiscoveryConfiguration() != null &&
                 !getOuathConfig().getOpenIdDiscoveryConfiguration().isEmpty()) {
-            // OIDC (Phase 1): every <openIdDiscoveryConfiguration> is resolved by OidcProviderRegistry on Nimbus
-            // (expected issuer kept, https enforced, any JWKS key type). The pre-existing conversion
-            // (OAuthUtils.processTrustedAuthServerConfig: RSA-only JWKS, scopes_supported required, issuer
-            // discarded, http accepted) no longer runs for them, unconditionally: a provider the registry refused
-            // must stay refused rather than fall back to the weaker path.
+            // OIDC (Phase 1): an <openIdDiscoveryConfiguration enabled="true"> is resolved by OidcProviderRegistry
+            // on Nimbus and never by the pre-existing conversion below; one the registry refused stays refused. An
+            // element without enabled="true" keeps the pre-existing conversion exactly (R-01).
             List<Oauth.OpenIdDiscoveryConfiguration> trustedConfigs = CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().getOauth().getOpenIdDiscoveryConfiguration();
-            if (OidcProviderRegistry.getInstance().isEmpty() && !trustedConfigs.isEmpty()) {
-                logger.error("{} openIdDiscoveryConfiguration element(s) configured and none registered; "
-                        + "external login is disabled until discovery succeeds (see earlier 'NOT registered' lines)",
-                        trustedConfigs.size());
+            int enabled = 0;
+            for (Oauth.OpenIdDiscoveryConfiguration config : trustedConfigs) {
+                if (config.isEnabled()) {
+                    enabled++;
+                    continue;
+                }
+                try {
+                    Oauth.AuthServer manualConfig = OAuthUtils.processTrustedAuthServerConfig(config);
+                    knownConfigs.add(manualConfig);
+                } catch (Exception e) {
+                    logger.error("exception calling processTrustedAuthServerConfig", e);
+                }
+            }
+            if (enabled > 0 && OidcProviderRegistry.getInstance().isEmpty()) {
+                logger.error("{} openIdDiscoveryConfiguration element(s) enabled for Phase 1 and none registered; "
+                        + "external login is disabled until discovery succeeds (see earlier 'NOT registered' lines)", enabled);
             }
         }
         return knownConfigs;

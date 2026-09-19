@@ -137,7 +137,7 @@ public final class OidcProviderRegistry {
             } catch (Exception e) {
                 logger.debug("using the default JWKS cache lifetime", e);
             }
-            for (Oauth.OpenIdDiscoveryConfiguration cfg : oauth.getOpenIdDiscoveryConfiguration()) {
+            for (Oauth.OpenIdDiscoveryConfiguration cfg : phase1Entries(oauth)) {
                 try {
                     // A bootstrap client for discovery: trust settings come from the same config block.
                     OidcProviderConfig bootstrap = bootstrapTrust(cfg);
@@ -167,6 +167,26 @@ public final class OidcProviderRegistry {
                 .truststore(cfg.getTruststore(), cfg.getTruststoreFile(), cfg.getTruststorePass())
                 .trustAllCerts(cfg.isTrustAllCerts())
                 .build();
+    }
+
+    /**
+     * The discovery elements Phase 1 owns: those with {@code enabled="true"} (R-01). Every other element keeps its
+     * pre-Phase-1 behaviour in every caller (registry, JwtUtils, OAuthApi), so an unchanged configuration is
+     * regression-equivalent to upstream.
+     */
+    static List<Oauth.OpenIdDiscoveryConfiguration> phase1Entries(Oauth oauth) {
+        List<Oauth.OpenIdDiscoveryConfiguration> out = new ArrayList<>();
+        if (oauth == null || oauth.getOpenIdDiscoveryConfiguration() == null) {
+            return out;
+        }
+        for (Oauth.OpenIdDiscoveryConfiguration cfg : oauth.getOpenIdDiscoveryConfiguration()) {
+            if (cfg.isEnabled()) {
+                out.add(cfg);
+            } else {
+                logger.info("oidc provider '{}' has no enabled=\"true\": pre-existing behaviour applies", cfg.getName());
+            }
+        }
+        return out;
     }
 
     static GroupMapper mapperFor(Oauth oauth) {
