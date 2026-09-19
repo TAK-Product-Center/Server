@@ -145,11 +145,13 @@ public class OidcTokenValidatorTest {
         assertEquals(1, stub.fetches.get());
     }
 
+    /** T1 (review round two, item 8): azp names our client, not the resource; it does not stand in for aud. */
     @Test
-    public void azpAloneSatisfiesAudience() throws Exception {
+    public void azpAloneDoesNotSatisfyAudience() throws Exception {
         JWTClaimsSet claims = goodClaims().audience(Collections.emptyList()).claim("azp", "atak-civ").build();
-        OidcIdentity id = validator(new JwksStub(jwksJson, false)).validate(signGood(claims));
-        assertEquals("alice", id.getSubject());
+        expectReject(validator(new JwksStub(jwksJson, false)), signGood(claims), Reason.AUD);
+        JWTClaimsSet other = goodClaims().audience("other-resource").claim("azp", "atak-civ").build();
+        expectReject(validator(new JwksStub(jwksJson, false)), signGood(other), Reason.AUD);
     }
 
     @Test

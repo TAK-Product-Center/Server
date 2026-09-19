@@ -188,7 +188,7 @@ public final class OidcTokenValidator {
             SignatureAlgorithm.PS256, SignatureAlgorithm.PS384, SignatureAlgorithm.PS512,
             SignatureAlgorithm.ES256, SignatureAlgorithm.ES384, SignatureAlgorithm.ES512));
 
-    private static final String AUD_ERROR_MARKER = "aud/azp";
+    private static final String AUD_ERROR_MARKER = "aud";
 
     private final Settings settings;
     private final JwtDecoder decoder;
@@ -259,7 +259,9 @@ public final class OidcTokenValidator {
             validators.add(new RequiredExpiryValidator());
             validators.add(new JwtTimestampValidator(settings.clockSkew));
         }
-        validators.add(new ExactIssuerValidator(settings.issuer));
+        // Issuer equality is checked on the raw signed claim after decode (see validate); Spring's converted
+        // claim is not used for it, so an issuer spelled with an upper-case scheme is neither accepted nor
+        // wrongly rejected on the converted form.
         validators.add(new AudienceValidator(settings.audiences));
         nimbus.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
         return nimbus;
@@ -304,29 +306,6 @@ public final class OidcTokenValidator {
         }
     }
 
-    /**
-     * {@code iss} must equal the configured issuer as a string. Spring's {@code JwtIssuerValidator} compares
-     * after converting through {@code java.net.URL}, which trims whitespace and lower-cases the scheme; the
-     * routing in {@code OidcProviderRegistry} compares the raw claim, and validation must agree with it.
-     */
-    static final class ExactIssuerValidator implements OAuth2TokenValidator<Jwt> {
-        private final String issuer;
-
-        ExactIssuerValidator(String issuer) {
-            this.issuer = issuer;
-        }
-
-        @Override
-        public OAuth2TokenValidatorResult validate(Jwt jwt) {
-            Object iss = jwt.getClaims().get(JwtClaimNames.ISS);
-            String raw = iss instanceof URL ? iss.toString() : (iss == null ? null : String.valueOf(iss));
-            if (raw == null || !raw.equals(issuer)) {
-                return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token",
-                        "The iss claim is not the configured issuer", null));
-            }
-            return OAuth2TokenValidatorResult.success();
-        }
-    }
 
     public Settings getSettings() {
         return settings;
@@ -512,9 +491,10 @@ public final class OidcTokenValidator {
     // ---- audience -------------------------------------------------------------------------------
 
     /**
-     * Accepts a token whose {@code aud} contains a configured audience, or whose {@code azp} is one
-     * (OIDC Core 1.0 section 2: {@code azp} names the party the token was issued to). A token with neither
-     * is rejected (T1).
+     * Accepts a token whose {@code aud} contains a configured audience. {@code azp} alone is not enough: it names
+     * the client the token was issued to, not the resource it may be presented to, and a token minted for
+     * another resource must not open TAK just because our client asked for it (T1; review round two, item 8).
+     * Keycloak operators add an audience mapper (docs/OIDC.md); IDCommand's ID token carries the client id in aud.
      */
     static final class AudienceValidator implements OAuth2TokenValidator<Jwt> {
         private final Set<String> accepted;
@@ -532,10 +512,6 @@ public final class OidcTokenValidator {
                         return OAuth2TokenValidatorResult.success();
                     }
                 }
-            }
-            Object azp = jwt.getClaim("azp");
-            if (azp instanceof String && accepted.contains((String) azp)) {
-                return OAuth2TokenValidatorResult.success();
             }
             return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token",
                     "The " + AUD_ERROR_MARKER + " claim does not name a configured audience", null));

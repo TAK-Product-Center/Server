@@ -47,7 +47,7 @@ Everything lives under `<auth><oauth>` in CoreConfig.xml. Only the attributes be
 | `clientId`, `secret` | The confidential web client TAK uses for the browser flow | required |
 | `redirectUri` | Registered at the IdP exactly as written, including the port | required |
 | `androidClientId` | The public client ATAK uses (Authorization Code with PKCE, no secret). Published to clients on `/login/.well-known/openid-configuration` | none |
-| `audience` | Comma-separated `aud` (or `azp`) values a token must carry. A token naming none of them is rejected | `clientId` plus `androidClientId` |
+| `audience` | Comma-separated values; a token's `aud` must contain one of them (`azp` alone does not count). Keycloak operators add an audience mapper; IDCommand's ID token carries the client id | `clientId` plus `androidClientId` |
 | `scopes` | Requested at the authorization endpoint. Include the scope that carries your groups claim if the IdP needs one | `openid profile` |
 | `usePkce` | Send `code_challenge` (S256) on the browser flow | `true` |
 | `truststore`, `truststoreFile`, `truststorePass` | The CA that signed the IdP's TLS certificate. Mirrors `ldapsTruststoreFile`. Unset means the JVM default trust store | unset |
@@ -76,8 +76,8 @@ the ID token. Every later request re-validates that credential.
 
 Bearer (`Authorization: Bearer`, port 8446, and the session cookie): a JWT whose `iss` is a registered provider is
 validated by that provider only: signature against its JWKS, permitted asymmetric algorithms only (`none` and HMAC
-are refused before any key lookup), `exp` required and enforced, `iss` exact, `aud` or `azp` in the configured
-audiences, `sub` present. It never reaches the LDAP, file or anonymous fallbacks.
+are refused before any key lookup), `exp` required and enforced, `iss` exact on the signed claim, `aud` containing a configured audience, `sub`
+present. It never reaches the LDAP, file or anonymous fallbacks.
 
 Identity: the TAK username is `oidc-` plus 40 hex characters of SHA-256 over the exact issuer and subject. It
 is stable across email or display-name changes, distinct across issuers, safe as a certificate CN, and
@@ -89,14 +89,19 @@ Groups: the configured groups claim (array, or a space or comma separated string
 
 WebTAK gate: when `webtakScope` is configured, the scope claim must be present and contain it as a whole token.
 
-Certificates: a certificate issued on an OIDC enrollment carries the enrollment assertion; on every certificate
-connection its groups are the mapping of that assertion (signature, issuer and audience re-verified; expiry
-waived because the certificate is the credential). Groups change at re-enrollment. `useTokenExpiration="true"`
-on the CA config caps the certificate lifetime at the assertion's `exp` for operators who want cert
-lifetime bound to token lifetime instead.
+Certificates: a certificate issued on an OIDC enrollment (`signClient`, `signClient/v2` or `makeClientKeyStore`)
+stores the enrollment assertion; on every certificate connection that assertion is re-verified (signature,
+issuer, audience; expiry waived because the certificate is the credential) and mapped with the mapping rules in
+force at connection time, so a mapping change applies to certificate clients without re-enrollment and a signing
+key rotation at the IdP invalidates certificates enrolled under the old key until they re-enroll. This is the
+replay-the-assertion semantics; a certificate-bound grant snapshot (schema change) is the alternative and is a
+decision for the project owner. `useTokenExpiration="true"` on the CA config caps the certificate lifetime at the
+assertion's `exp`; when that value cannot be read, signing is refused rather than defaulted.
 
-Discovery: fetched at startup and re-fetched every `oAuthConfigurationsCacheSeconds` in the background; JWKS
-cached for `oAuthPublicKeyCacheSeconds` and refetched at most once per 30 s when an unknown key id appears.
+Discovery: fetched at startup and re-fetched every `oAuthConfigurationsCacheSeconds` (minimum 60 s) in the
+background; a generation that cannot be refreshed expires after four periods. JWKS cached for
+`oAuthPublicKeyCacheSeconds` (minimum 60 s) with refresh-ahead; an unknown key id triggers a refetch limited to
+two per 30 s window per provider generation.
 
 ## 3. Audit (BUILT)
 
@@ -118,8 +123,9 @@ re-reading its enrollment assertion). `reason` on DENY: `iss`, `aud`, `exp`, `nb
 In the Admin Portal, Applications, create two OIDC applications:
 
 - Web: Client Type Confidential, Allowed Flow Types Authorization Code, Require PKCE on, Client Authentication
-  Method Client Secret Basic, Allowed Redirect URI exactly `https://<tak-host>:8443/login/redirect`. Copy the
-  client id (a UUID) and secret into `clientId` and `secret`.
+  Method Client Secret Post (TAK sends `client_secret` in the token request body, as upstream did), Allowed
+  Redirect URI exactly `https://<tak-host>:8443/login/redirect`. Copy the client id (a UUID) and secret into
+  `clientId` and `secret`.
 - ATAK: Client Type Public, Authorization Code, Require PKCE on, Accept Plain Code Challenges off, Allowed
   Redirect URI as the ATAK build registers it (section 6). Copy the client id into `androidClientId`.
 

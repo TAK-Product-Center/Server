@@ -172,8 +172,21 @@ public class CertManagerApi extends BaseRestController {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
 
+            // OIDC (Phase 1): a certificate issued to a bearer-authenticated caller carries the assertion it was
+            // issued against, exactly as signClient does, so a later certificate connection is recognised as an OIDC
+            // enrollment and never falls to the file, LDAP or anonymous paths (review round two, item 27).
+            String callerToken = null;
+            try {
+                Object principal = org.springframework.security.core.context.SecurityContextHolder.getContext()
+                        .getAuthentication().getPrincipal();
+                if (principal instanceof com.bbn.marti.util.spring.MartiSocketUserDetailsImpl) {
+                    callerToken = ((com.bbn.marti.util.spring.MartiSocketUserDetailsImpl) principal).getToken();
+                }
+            } catch (Exception e) {
+                logger.debug("no token on the principal for makeClientKeyStore", e);
+            }
             TakCert takCert = new TakCert(cert, signingCertChain,
-                    getHttpUser(), cn, new Date(), clientUid, null);
+                    getHttpUser(), cn, new Date(), clientUid, callerToken);
             takCertRepository.save(takCert);
 
             return new ResponseEntity<byte[]>(result, headers, HttpStatus.OK);

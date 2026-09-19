@@ -73,11 +73,16 @@ public final class OidcHttp {
                 .header("Accept", "application/json").build();
         try (Response response = client.newCall(request).execute()) {
             ResponseBody body = response.body();
-            String text = body == null ? "" : new String(body.source().readByteArray(), StandardCharsets.UTF_8);
-            if (text.length() > MAX_TOKEN_RESPONSE_BYTES) {
+            if (body == null) {
+                return new FormResponse(response.code(), "");
+            }
+            // Bound the body before materialising it: read at most the limit plus one byte.
+            okio.BufferedSource source = body.source();
+            if (source.request(MAX_TOKEN_RESPONSE_BYTES + 1)) {
                 throw new IOException("token response larger than " + MAX_TOKEN_RESPONSE_BYTES + " bytes");
             }
-            return new FormResponse(response.code(), text);
+            byte[] bytes = source.readByteArray();
+            return new FormResponse(response.code(), new String(bytes, StandardCharsets.UTF_8));
         }
     }
 
@@ -89,6 +94,7 @@ public final class OidcHttp {
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
                 .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .callTimeout(3 * TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .followRedirects(false)
                 .followSslRedirects(false);
 

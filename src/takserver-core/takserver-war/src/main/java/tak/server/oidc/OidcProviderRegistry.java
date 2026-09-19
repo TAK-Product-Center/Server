@@ -91,7 +91,14 @@ public final class OidcProviderRegistry {
                     } catch (Exception e) {
                         logger.debug("using default oidc registry cache lifetime", e);
                     }
-                    cache = Caffeine.newBuilder().refreshAfterWrite(seconds, TimeUnit.SECONDS).build(key -> build());
+                    // Refresh no more often than once a minute (a zero or tiny value must not disable the registry or
+                    // hammer discovery); a generation that cannot be refreshed dies after four periods so a broken
+                    // replacement configuration cannot keep old grants alive indefinitely (review round two, 19, 22).
+                    long refresh = Math.max(60, seconds);
+                    cache = Caffeine.newBuilder()
+                            .refreshAfterWrite(refresh, TimeUnit.SECONDS)
+                            .expireAfterWrite(refresh * 4, TimeUnit.SECONDS)
+                            .build(key -> build());
                 }
                 c = cache;
             }
@@ -123,8 +130,10 @@ public final class OidcProviderRegistry {
             int skewSeconds = oauth.getExternalAuthClockSkewSeconds();
             Duration jwksTtl = null;
             try {
-                jwksTtl = Duration.ofSeconds(CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer()
-                        .getQueue().getOAuthPublicKeyCacheSeconds());
+                // Nimbus needs the lifetime to exceed refresh-ahead plus fetch timeout (40 s); clamp to a minute.
+                long ttl = CoreConfigFacade.getInstance().getRemoteConfiguration().getBuffer()
+                        .getQueue().getOAuthPublicKeyCacheSeconds();
+                jwksTtl = Duration.ofSeconds(Math.max(60, ttl));
             } catch (Exception e) {
                 logger.debug("using the default JWKS cache lifetime", e);
             }

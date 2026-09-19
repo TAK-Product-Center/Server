@@ -155,8 +155,9 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
             if ((CoreConfigFacade.getInstance().getRemoteConfiguration().getAuth().isX509TokenAuth() || oidcEnrolled) &&
                     cert != null && cert.token != null && cert.token.length() > 0) {
                 user.setToken(cert.token);
+                AuthResult delegated;
                 try {
-                    groupManager.authenticate("oauth", user);
+                    delegated = groupManager.authenticate("oauth", user);
                 } catch (InvalidBearerTokenException | JwtException e) {
                     if (logger.isDebugEnabled()) {
                         // the stored token is a credential; it is not logged (T8)
@@ -164,8 +165,16 @@ public class X509Authenticator extends AbstractAuthenticator implements Serializ
                     }
                     throw new TakException();
                 }
+                // The delegated result is the decision: a failure is a failure, and the returned user (rebuilt with
+                // the OIDC identity, its groups and its port roles, WebTAK scope included) replaces the caller's.
+                if (delegated == null || delegated.getAuthStatus() != AuthStatus.SUCCESS || delegated.getUser() == null) {
+                    throw new TakException("stored enrollment token did not authenticate");
+                }
+                user = delegated.getUser();
 
-                if (input == null) {
+                if (input == null && !oidcEnrolled) {
+                    // legacy x509tokenAuth path: pre-existing behaviour. The OIDC path set its roles from the
+                    // assertion's WebTAK scope inside the authenticator and must not be widened here.
                     AuthenticatorUtil.setUserRolesBasedOnRequestPort(user, logger, true);
                 }
 
