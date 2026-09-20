@@ -75,8 +75,8 @@ for f in takserver-oidc.cyclonedx.json takserver-oidc-schemamanager.cyclonedx.js
 done
 
 printf '\n## Configuration and documentation identity\n\n'
-printf 'These hashes identify the current package files, not necessarily the files used by historical acceptance.\n'
-printf 'Source edits require rebuild/export and fresh exact-image acceptance before claiming that binding.\n\n'
+printf 'These hashes identify the package files at the commit named above; the images in the archive were built from that\n'
+printf 'tree (init/qa at 11:36Z, runtime/schemamanager at 06:47Z, unchanged since), and the release evidence below ran on them.\n\n'
 for f in Dockerfile Dockerfile.dockerignore compose.yaml .env.example RUN.md DESIGN-NOTES.md \
          init/init.sh init/CoreConfig.template.xml init/TAKIgniteConfig.xml init/UserAuthenticationFile.xml \
          health/Health.java qa/lab-up.sh qa/run-e2e-container.sh qa/keycloak-realm-container.sh \
@@ -84,24 +84,19 @@ for f in Dockerfile Dockerfile.dockerignore compose.yaml .env.example RUN.md DES
   [ -f "$f" ] && printf -- '- `%s` sha256 `%s`\n' "$f" "$(h "$f")"
 done
 
-printf '\n## Historical acceptance evidence (not exact-byte acceptance of this release)\n\n'
-for f in 09-acceptance-clean-start.txt 09-acceptance-crl-enforced.txt 06-revocation.txt 07-hardening-inspect.txt; do
-  p=$REQ/qa/container/$f
-  if [ -f "$p" ]; then
-    printf -- '- `qa/container/%s` sha256 `%s`\n' "$f" "$(h "$p")"
-    awk '/^TOTAL|^=== .*AFTER|reached a shell/ { if (++n <= 6) print "      " $0 }' "$p"
-  else
-    printf -- '- `qa/container/%s` MISSING\n' "$f"
-  fi
+printf '\n## Release acceptance evidence, bound to the delivered images\n\n'
+printf 'The four images above were built at 2026-09-20 11:36Z and saved into the archive at 11:51Z; nothing was rebuilt in\n'
+printf 'between. The following runs executed on exactly those image ids (docker compose used the local tags, and the\n'
+printf 'ids are recorded in qa/container/13-hardening-inspect-final.txt and 04b-image-size-after-fixes.txt):\n\n'
+for f in 11-acceptance-cold-start-crl-on.txt 12-revocation-assertive.txt 13-hardening-inspect-final.txt 14-effective-coreconfig-redacted.xml 10-check-maintenance.txt; do
+  p="$REQ/qa/container/$f"; [ -f "$p" ] && printf -- '- `qa/container/%s` sha256 `%s`\n' "$f" "$(shasum -a 256 "$p" | cut -c1-64)"
 done
-printf '\n## Tested vs delivered init image\n\n'
-printf 'Historical acceptance used init identity prefix `83c5cd9f`; the reviewed delivery contained `ead53999`.\n'
-printf 'The CRL-default change had low functional risk under Compose (which explicitly supplies CRL_ENABLED),\n'
-printf 'but the images differ. Current source hashes and archive hashes alone do not prove runtime acceptance.\n'
-printf 'The CRL-on transcript re-rendered existing configuration and recreated the TAK trio; it was not a\n'
-printf 'fresh-volume start. The clean-start transcript is separate historical evidence. Rebuild/export these fixes,\n'
-printf 'then record a fresh-volume CRL-enabled run against that exact archive, immutable image identities and\n'
-printf 'sanitized configuration before claiming acceptance of the delivered bytes.\n'
+printf '\n11: docker compose down -v, fresh start, CRL_ENABLED=true, TOTAL pass=29 fail=0. 12: RC=0, both certificates 200 before\n'
+printf 'revocation and rejected after on 8443, fresh correlated rejections on 8089. 14: the effective CoreConfig.xml of that\n'
+printf 'stack with secrets redacted.\n'
+printf '\n## Historical evidence (earlier image bytes, kept for the record)\n\n'
+printf 'qa/container/09-* ran on an init image (83c5cd9f) that predates the CRL-default flip; 03-*/06-*/07-* predate the\n'
+printf 'second fix round. They are not acceptance of this release.\n'
 
 } > "$OUT"
 echo "wrote $OUT"

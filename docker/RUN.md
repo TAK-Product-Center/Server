@@ -334,8 +334,10 @@ status proves none of this. This is not an inspection of every existing applicat
     enforcement evidence is on the connector that matters. Deferred: identify the context and either configure it or
     silence the warning.
 
-12. **Tested versus delivered init image.** Historical acceptance used init identity prefix `83c5cd9f`; the reviewed
-    delivery contained `ead53999`. The CRL-default flip was low functional risk under Compose because Compose
-    supplies `CRL_ENABLED`, but those are different bytes. The CRL-on transcript reused existing volumes. These
-    source fixes have not been rebuilt, exported or accepted in containers; a fresh-volume run with CRLs enabled
-    against the exact rebuilt archive, immutable image identities and sanitized configuration remains outstanding.
+12. **Tested versus delivered bytes, resolved for this release.** Earlier transcripts (`09-*`) ran on an init image
+    (`83c5cd9f`) that differs from the delivered one; they are historical evidence only. The release evidence is
+    `qa/container/11-acceptance-cold-start-crl-on.txt`: `docker compose down -v`, then a fresh start with
+    `CRL_ENABLED=true` and 29 of 29 checks, executed on the four image ids listed in `RELEASE-MANIFEST.md` (built
+    2026-09-20 11:36Z, before the run; `docker save` of those same ids at 11:51Z produced the delivered archive).
+    `12-revocation-assertive.txt` (RC=0) and `13-hardening-inspect-final.txt` ran on the same stack, and
+    `14-effective-coreconfig-redacted.xml` is the configuration those runs used, with secrets redacted.

@@ -78,8 +78,9 @@ need operator recovery; startup's artifact-existence gate is not a key/store con
 
 `update-oidc` is full `CoreConfig.xml` regeneration, not an OAuth-only edit. The init image has no python3 XML editor.
 A timestamped backup is saved, but unrelated manual XML changes are replaced; review and restore custom settings
-before restarting. Historical tested init (`83c5cd9f…`) differs from reviewed delivered init (`ead53999…`), and the
-CRL-on transcript reused volumes. Current source changes still need rebuild/export and exact-image cold acceptance.
+before restarting. The `09-*` transcripts ran on an earlier init image and are historical; the release evidence is the fresh-volume
+CRL-on run (`11-*`), the assertive revocation proof (`12-*`) and the hardening inspection (`13-*`), all executed on the
+exact image ids that were then saved into the delivered archive (see RELEASE-MANIFEST.md).
 Runtime archive measurements are 390,366,742 B compressed layer blobs and 561,752,576 B uncompressed layer tar data;
 engine `.Size` was incorrectly labeled unpacked in earlier documentation. Hardening inspection is engine configuration
 evidence, not a complete inspection of existing processes' effective privileges.
