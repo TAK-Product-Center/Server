@@ -82,6 +82,7 @@ services:
       CERT_ORGANIZATION: ${CERT_ORGANIZATION:-Lastwall}
       CERT_ORGANIZATIONAL_UNIT: ${CERT_ORGANIZATIONAL_UNIT:-TAKOIDC}
       CERT_PASS: ${CERT_PASS:-atakatak}
+      CRL_ENABLED: ${CRL_ENABLED:-true}
       DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-cot}
       DB_USERNAME: ${DB_USERNAME:-martiuser}
       DB_PASSWORD: ${DB_PASSWORD:-}

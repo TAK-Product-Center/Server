@@ -103,8 +103,13 @@ Import `admin.p12` into the browser and open `https://<host>:8443`.
 
 ### Revocation
 
-`CoreConfig.xml` configures both CRLs, `certs/files/ca.crl` and `certs/files/intermediate-ca.crl`, and both exist
-from bootstrap. Online enrolment signs with the intermediate CA, so that is the default:
+CRL enforcement is ON by default (`CRL_ENABLED=true`). `CoreConfig.xml` lists two `<crl>` entries: first a PEM bundle
+`certs/files/ca-chain.crl` (root CRL then intermediate CRL), then `certs/files/intermediate-ca.crl`. The bundle exists
+because of an upstream TAK defect: `ServerConfiguration` hands the web connector (8443) only the FIRST `<crl>` entry
+(`crls.get(0)`), while Tomcat reads every CRL inside that one file; the messaging connector (8089) loads one CRL per
+entry. With the two CRLs listed separately, every certificate issued by the intermediate CA failed on 8443 with an
+undetermined revocation status. The init container regenerates the bundle at bootstrap and after every revocation.
+Online enrolment signs with the intermediate CA, so that is the default:
 
 ```
 docker compose run --rm takinit revoke alice                 # intermediate CA, the online signer
@@ -114,8 +119,10 @@ docker compose up -d --force-recreate takserver-config takserver-messaging takse
 
 The subcommand passes base names to upstream's `revokeCert.sh` the way that script expects, checks that the CRL was
 actually rewritten and that it contains a revoked serial, then repairs ownership. The recreate is required: TAK reads
-the CRLs when it builds the TLS context. Evidence that a revoked certificate is then rejected on 8089 and 8443 is in
-`qa/container/06-revocation.txt`.
+the CRLs when it builds the TLS context. Evidence: `qa/container/09-acceptance-crl-enforced.txt` (29/29 on a clean start
+with enforcement on) and `qa/container/06-revocation.txt` (a root-issued and an intermediate-issued certificate both
+accepted on 8443 and 8089 before revocation, both rejected on 8443 after, and the messaging log recording
+`Connection rejected for revoked client certificate` for both on 8089).
 
 The admin API's own revoke endpoint still cannot regenerate the CRL from inside the distroless runtime, because it
 shells out to `revokeCert.sh`. Use the command above; see gap 3 in section 9.
@@ -208,9 +215,12 @@ effect, because the config microservice reads the file at start and distributes 
 
 | | `takserver-oidc` | `schemamanager` | `init` | `qa` |
 |---|---|---|---|---|
-| compressed content (`docker image ls` CONTENT SIZE) | see `qa/container/04-image-size-and-layers.txt` | | | |
-| unpacked layer sum (`docker history`) | | | | |
-| local storage (`docker image ls` DISK USAGE) | | | | |
+| compressed content (`docker image ls` CONTENT SIZE) | 390 MB | 141 MB | 67.1 MB | 22.1 MB |
+| unpacked layer sum (`docker image inspect .Size`) | 390,388,451 B (39 layers) | 141,267,313 B (37) | 67,074,489 B (5) | 22,072,154 B (3) |
+| local storage (`docker image ls` DISK USAGE, shared base layers counted per image) | 957 MB | 438 MB | 263 MB | 82.8 MB |
+
+Delivered tarball (`docker save`, all four images, shared layers once): 534,628,352 bytes. Measured 2026-09-20T11:14Z,
+`qa/container/04b-image-size-after-fixes.txt`.
 
 The exact current numbers are in `qa/container/04-image-size-and-layers.txt` and `RELEASE-MANIFEST.md`; they are
 reproduced there rather than here so that this file cannot drift from the measurement. Note that content size,
@@ -250,7 +260,7 @@ status proves none of this and is not offered as proof of it.
    container build only.* The Angular 19 metrics dashboard **is** built and is in the image.
 3. **The admin API's revoke endpoint cannot regenerate the CRL.** It shells out to `revokeCert.sh`, which needs bash
    and openssl, and the failure is swallowed by the calling code. Use `docker compose run --rm takinit revoke`
-   (section 4), which is tested. Deferred fix: a sidecar or an API change.
+   (section 4), which is tested end to end (`qa/container/06-revocation.txt`). Deferred fix: a sidecar or an API change.
 4. **The whole PKI lives on the shared `takdata` volume**, owned by the runtime uid, so every TAK process can read
    the root CA key and the intermediate signing key. `0700` on `certs/files` does not isolate processes that share a
    uid. Deferred: split the root CA and the exported admin key out of the runtime mounts, keep only the online
@@ -267,3 +277,12 @@ status proves none of this and is not offered as proof of it.
    target. The removal recipe is not one line, because the builder copies it unconditionally.
 8. **Federation, clustering, retention and the plugin manager** are not configured or started. See `DESIGN-NOTES.md`.
 9. **Kubernetes translation is stated as design analysis, not a tested claim.** No Pod spec was applied anywhere.
+10. **Upstream loads only the first `<crl>` entry on the web connector** (`ServerConfiguration.java:346`, `crls.get(0)`).
+    Worked around with the PEM bundle described in section 4; the upstream fix would be to hand Tomcat every entry. Worth a
+    merge request of its own.
+11. **`takserver-messaging.log` still prints `TLS enabled, but no certificate revocation lists, and OSCP is not enabled`
+    at each start** (six times over the day's runs) even though the 8089 input demonstrably enforces the CRLs
+    (`06-revocation.txt`, section 4b). The line comes from a second `SSLConfig` instance built by the services-deployment
+    worker, most likely the federation or a secondary input context that carries no `<crl>`. Not diagnosed further; the
+    enforcement evidence is on the connector that matters. Deferred: identify the context and either configure it or
+    silence the warning.

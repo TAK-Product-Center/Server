@@ -59,6 +59,14 @@ fix_ownership() {
 	return 0
 }
 
+# Tomcat (8443, the web connector) is handed ONLY the first <crl> entry (ServerConfiguration.java:346
+# crls.get(0)), and reads every CRL inside that one file (SSLUtilBase.generateCRLs). The messaging path
+# (SSLConfig.initTrust) loads one CRL per entry. So the first entry is a PEM bundle of both CRLs, root first,
+# and the intermediate stays as a second entry for messaging. Regenerate the bundle whenever either source changes.
+refresh_crl_bundle() {
+	( cd "$CERTS_DIR/files" && cat ca.crl intermediate-ca.crl > ca-chain.crl.tmp && mv -f ca-chain.crl.tmp ca-chain.crl )
+}
+
 xml_escape() {
 	printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g'
 }
@@ -121,6 +129,7 @@ cmd_certs() {
 	# makeCert.sh normally write them; these calls repair an interrupted bootstrap.
 	[ -s "$CERTS_DIR/files/ca.crl" ]              || regen_crl root
 	[ -s "$CERTS_DIR/files/intermediate-ca.crl" ] || regen_crl intermediate-ca
+	refresh_crl_bundle
 
 	export_for_other_containers
 	mkdir -p "$TAK_DIR/logs"
@@ -179,6 +188,14 @@ render_config() { # writes $TAK_DIR/CoreConfig.xml
 	subst __CERT_PASS__                  "$cert_pass"
 	subst __CERT_ORGANIZATION__          "${CERT_ORGANIZATION:-TAK}"
 	subst __CERT_ORGANIZATIONAL_UNIT__   "${CERT_ORGANIZATIONAL_UNIT:-TAKOIDC}"
+
+	# CRL enforcement is generated and maintained unconditionally (both CRLs always exist and the revoke
+	# subcommand always updates them) but it is only CONFIGURED when CRL_ENABLED=true. Turning it on in this lab
+	# made TAK reject valid enrolment certificates on the 8443 client-certificate connector; see the named gap in
+	# RUN.md section 9. The files are ready, so enabling it is a one-line change once that is understood.
+	if [ "${CRL_ENABLED:-true}" != "true" ]; then
+		sed -i "/<!--CRL-START-->/,/<!--CRL-END-->/d" "$RENDER"
+	fi
 
 	if [ "${OIDC_ENABLED:-false}" = "true" ]; then
 		secret="$(read_secret OIDC_CLIENT_SECRET)"
@@ -286,6 +303,7 @@ cmd_revoke() {
 	( cd "$CERTS_DIR" && ./revokeCert.sh "$name" "$cakey" "$cacert" )
 	[ -s "$crl" ] || die "revokeCert.sh did not write $crl"
 	openssl crl -in "$crl" -noout -text | grep -q "Serial Number" || die "$crl has no revoked entry"
+	refresh_crl_bundle
 	fix_ownership
 	log "revoked $name against the $which CA; CRL now:"
 	openssl crl -in "$crl" -noout -text | sed -n '1,40p'
@@ -300,7 +318,7 @@ cmd_verify() {
 		[ -f "$TAK_DIR/$f" ] || { echo "MISSING $TAK_DIR/$f"; missing=1; }
 	done
 	for f in ca.pem ca-do-not-share.key truststore-root.jks fed-truststore.jks takserver.jks takserver.p12 \
-	         intermediate-ca.pem intermediate-ca.key intermediate-ca-signing.jks ca.crl intermediate-ca.crl \
+	         intermediate-ca.pem intermediate-ca.key intermediate-ca-signing.jks ca.crl intermediate-ca.crl ca-chain.crl \
 	         "${ADMIN_CN:-admin}.pem" "${ADMIN_CN:-admin}.p12" "${SERVER_CN:-takserver}.pem"; do
 		[ -f "$CERTS_DIR/files/$f" ] || { echo "MISSING $CERTS_DIR/files/$f"; missing=1; }
 	done

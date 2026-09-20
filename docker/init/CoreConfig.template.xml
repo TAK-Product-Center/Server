@@ -76,10 +76,16 @@
               enrollment signs with the intermediate CA, so a certificate revoked through the admin API or through
               the takinit revoke subcommand lands in intermediate-ca.crl; certificates issued
               directly by the root CA (the admin certificate, server certificates) land in ca.crl.
+              The FIRST entry is a PEM bundle of both CRLs (root first): the web connector on 8443 is handed only
+              the first entry (ServerConfiguration crls.get(0)) but reads every CRL inside that file, while the
+              messaging connector loads one CRL per entry. Without the bundle, intermediate-issued client
+              certificates fail on 8443 with an undetermined revocation status.
               TAK reads these when the TLS context is built, so recreate the three TAK containers after a revocation.
             -->
-            <crl _name="root-ca" crlFile="certs/files/ca.crl"/>
+            <!--CRL-START-->
+            <crl _name="ca-chain" crlFile="certs/files/ca-chain.crl"/>
             <crl _name="intermediate-ca" crlFile="certs/files/intermediate-ca.crl"/>
+            <!--CRL-END-->
         </tls>
     </security>
 </Configuration>
