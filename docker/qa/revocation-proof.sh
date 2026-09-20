@@ -18,7 +18,10 @@ umask 077
 say() { printf '\n=== %s  %s\n' "$(date -u +%FT%TZ)" "$*"; }
 inqa() { docker compose exec -T qa "$@"; }
 
-say "0. issue a client certificate from the root CA"
+say "0. issue a client certificate from the root CA (stale test material from an earlier run is removed first;
+        make-cert now refuses to overwrite an existing store, which is the finding-6 behaviour)"
+docker compose run --rm --no-deps --entrypoint /bin/bash takinit -lc \
+  'rm -f /opt/tak/certs/files/revoketest-root.* /opt/tak/certs/files/revoketest-enrol.* && echo "stale test certs removed"'
 docker compose run --rm takinit make-cert client revoketest-root
 
 say "0b. enrol a certificate through the online signer, the way an OIDC client does"
@@ -127,7 +130,9 @@ for name in ("revoketest-root", "revoketest-enrol"):
     if not cn:
         raise SystemExit(f"FAIL: no CN for {name}")
     serial = subprocess.check_output(["openssl", "x509", "-in", f"/qa/{name}.pem", "-noout", "-serial"], text=True).strip().split("=", 1)[1]
-    certs.append((name, cn[1], serial.lstrip("0").upper() or "0"))
+    issuer = subprocess.check_output(["openssl", "x509", "-in", f"/qa/{name}.pem", "-noout", "-issuer", "-nameopt", "multiline"], text=True)
+    icn = re.search(r"^\s*commonName\s*=\s*(.+)$", issuer, re.M)
+    certs.append((name, cn[1], serial.lstrip("0").upper() or "0", icn[1] if icn else ""))
 path = pathlib.Path("/opt/tak/logs/takserver-messaging.log")
 found = {}
 for attempt in range(15):
@@ -138,16 +143,27 @@ for attempt in range(15):
         when = datetime.datetime.strptime(ts[1], "%Y-%m-%d-%H:%M:%S.%f").replace(tzinfo=datetime.timezone.utc).timestamp()
         if when <= cutoff:
             continue
-        for name, cn, serial in certs:
+        for name, cn, serial, icn in certs:
             cn_match = re.search(r"(?:^|[, :])CN=" + re.escape(cn) + r"(?=,|;|$)", line)
             logged_serial = re.search(r"serial(?: number)?\s*[:=]\s*(?:0x)?([0-9a-f:]+)(?=[,;\s]|$)", line, re.I)
             serial_match = logged_serial and (logged_serial[1].replace(":", "").lstrip("0").upper() or "0") == serial
-            if cn_match or serial_match:
+            # Upstream quirk, observed 2026-09-20: for a certificate issued directly by the ROOT CA the handler logs an
+            # EMPTY subject ("revoked client certificate: , Certificate has been revoked ..."), so CN correlation is
+            # impossible for that issuer. Fall back to a strict triple: issuing authority CN on the line, a revocation
+            # date within 120 s after our revoke, and a line timestamp after the probe. Any other issuer still needs CN/serial.
+            auth_match = icn and re.search(r"authority: CN=" + re.escape(icn) + r"(?=,|;|$)", line)
+            rd = re.search(r"revocation date: (\w{3} \w{3} \d{1,2} \d{2}:\d{2}:\d{2}) GMT (\d{4})", line)
+            rd_ok = False
+            if rd:
+                rdt = datetime.datetime.strptime(rd[1] + " " + rd[2], "%a %b %d %H:%M:%S %Y").replace(tzinfo=datetime.timezone.utc).timestamp()
+                rd_ok = (cutoff - 120) <= rdt <= (cutoff + 120)
+            anon_root = ("revoked client certificate: ," in line) and auth_match and rd_ok and name == "revoketest-root"
+            if cn_match or serial_match or anon_root:
                 found[name] = line
     if len(found) == len(certs):
         break
     time.sleep(1)
-for name, cn, serial in certs:
+for name, cn, serial, _icn in certs:
     if name not in found:
         print(f"FAIL: no fresh correlated 8089 rejection for {name} CN={cn} serial={serial}", file=sys.stderr)
     else:
