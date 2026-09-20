@@ -1,0 +1,233 @@
+# TAK Server 5.7-RELEASE-14 with OIDC SSO, minimal-footprint containers.
+#
+#   docker compose up -d                       the server: db, one-shot init, schema, three TAK processes
+#   docker compose --profile acceptance up -d  adds the Keycloak lab IdP and the e2e runner
+#
+# Shape note. TAK runs three JVMs from one war (config, messaging, api) and they find each other over Ignite using a
+# single configured host address, which is both the discovery target and the local bind. They therefore have to share
+# one network namespace. takserver-config owns the namespace and publishes the ports; the other two join it. This is
+# the same arrangement as the containers of one Kubernetes Pod.
+
+name: takserver-oidc
+
+x-takserver: &takserver
+  image: ${TAK_IMAGE:-takserver-oidc:5.7-RELEASE-14}
+  build:
+    context: ${TAK_SOURCE_DIR:-..}
+    dockerfile: docker/Dockerfile
+    target: takserver
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=16m
+  volumes:
+    - takdata:/opt/tak
+  stop_grace_period: 45s
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+
+  db:
+    image: postgis/postgis:15-3.4-alpine@sha256:d96be3a9c16d44e22d34d5c7b6e85be8875addf672672c6cd38171ea6055a94a
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-cot}
+      POSTGRES_USER: ${DB_USERNAME:-martiuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USERNAME:-martiuser}", "-d", "${DB_NAME:-cot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_READ_SEARCH, FOWNER, SETGID, SETUID]
+    security_opt: ["no-new-privileges:true"]
+    networks: [tak]
+    mem_limit: ${DB_MEM:-512m}
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # One shot. Generates the CA and the server, admin and intermediate certificates, renders CoreConfig.xml from the
+  # template, and hands the volume to uid 65532. Idempotent: an existing CA or CoreConfig.xml is left alone.
+  takinit:
+    image: ${TAKINIT_IMAGE:-takserver-oidc-init:5.7-RELEASE-14}
+    build:
+      context: ${TAK_SOURCE_DIR:-..}
+      dockerfile: docker/Dockerfile
+      target: takinit
+    restart: "no"
+    environment:
+      CA_NAME: ${CA_NAME:-TAK-CONTAINER-CA}
+      SERVER_CN: ${SERVER_CN:-takserver-config}
+      ADMIN_CN: ${ADMIN_CN:-admin}
+      EXTRA_SERVER_CERTS: ${EXTRA_SERVER_CERTS:-}
+      CERT_STATE: ${CERT_STATE:-State}
+      CERT_CITY: ${CERT_CITY:-City}
+      CERT_ORGANIZATION: ${CERT_ORGANIZATION:-Lastwall}
+      CERT_ORGANIZATIONAL_UNIT: ${CERT_ORGANIZATIONAL_UNIT:-TAKOIDC}
+      CERT_PASS: ${CERT_PASS:-atakatak}
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-cot}
+      DB_USERNAME: ${DB_USERNAME:-martiuser}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      DB_POOL: ${DB_POOL:-16}
+      TOMCAT_MAX_POOL: ${TOMCAT_MAX_POOL:-64}
+      OIDC_ENABLED: ${OIDC_ENABLED:-false}
+      OIDC_NAME: ${OIDC_NAME:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      OIDC_CONFIGURATION_URI: ${OIDC_CONFIGURATION_URI:-}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
+      OIDC_ANDROID_CLIENT_ID: ${OIDC_ANDROID_CLIENT_ID:-}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid profile groups}
+      OIDC_GROUP_MAPPINGS: ${OIDC_GROUP_MAPPINGS:-}
+      OIDC_ADMIN_CLAIM_NAME: ${OIDC_ADMIN_CLAIM_NAME:-groups}
+      OIDC_ADMIN_CLAIM_VALUE: ${OIDC_ADMIN_CLAIM_VALUE:-tak_admin}
+      OIDC_TRUSTSTORE_FILE: ${OIDC_TRUSTSTORE_FILE:-certs/files/truststore-root.p12}
+    volumes:
+      - takdata:/opt/tak
+      - idpcerts:/opt/idp-certs
+    networks: [tak]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # One shot. Applies the flyway migrations, then exits. No JDK inside the database image.
+  schemamanager:
+    image: ${SCHEMAMANAGER_IMAGE:-takserver-oidc-schemamanager:5.7-RELEASE-14}
+    build:
+      context: ${TAK_SOURCE_DIR:-..}
+      dockerfile: docker/Dockerfile
+      target: schemamanager
+    restart: "no"
+    command: ["upgrade"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+    volumes:
+      - takdata:/opt/tak:ro
+    depends_on:
+      db: { condition: service_healthy }
+      takinit: { condition: service_completed_successfully }
+    networks: [tak]
+    mem_limit: 384m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  takserver-config:
+    <<: *takserver
+    command: ["-Xmx${CONFIG_HEAP:-384}m", "-Dspring.profiles.active=config,consolelog", "-jar", "/opt/takserver/takserver.war"]
+    depends_on:
+      schemamanager: { condition: service_completed_successfully }
+    networks: [tak]
+    ports:
+      - "${BIND_ADDR:-0.0.0.0}:8089:8089"
+      - "${BIND_ADDR:-0.0.0.0}:8443:8443"
+      - "${BIND_ADDR:-0.0.0.0}:8446:8446"
+    mem_limit: ${CONFIG_MEM:-768m}
+    healthcheck:
+      test: ["CMD", "java", "-XX:TieredStopAtLevel=1", "-Xmx32m", "-cp", "/opt/takserver/health", "Health",
+             "log:/opt/tak/logs/takserver-config.log=Started TAK Server config Microservice"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 30s
+
+  # Deliberately service_started, not service_healthy. The config process is an Ignite CLIENT and messaging is the
+  # Ignite server (IgniteConfigurationHolder: "in standalone, messaging always needs to be the ignite server"), so
+  # waiting for config to report healthy before starting messaging deadlocks the stack.
+  takserver-messaging:
+    <<: *takserver
+    command: ["-Xmx${MESSAGING_HEAP:-640}m", "-Dspring.profiles.active=messaging,consolelog", "-jar", "/opt/takserver/takserver.war"]
+    network_mode: "service:takserver-config"
+    depends_on:
+      takserver-config: { condition: service_started }
+    mem_limit: ${MESSAGING_MEM:-1400m}
+    healthcheck:
+      test: ["CMD", "java", "-XX:TieredStopAtLevel=1", "-Xmx32m", "-cp", "/opt/takserver/health", "Health",
+             "tcp:127.0.0.1:8089"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 45s
+
+  takserver-api:
+    <<: *takserver
+    command: ["-Xmx${API_HEAP:-640}m", "-Dkeystore.pkcs12.legacy", "-Dspring.profiles.active=api,consolelog", "-jar", "/opt/takserver/takserver.war"]
+    network_mode: "service:takserver-config"
+    depends_on:
+      takserver-messaging: { condition: service_healthy }
+    mem_limit: ${API_MEM:-1400m}
+    healthcheck:
+      test: ["CMD", "java", "-XX:TieredStopAtLevel=1", "-Xmx32m", "-cp", "/opt/takserver/health", "Health",
+             "tcp:127.0.0.1:8443", "tcp:127.0.0.1:8446"]
+      interval: 15s
+      timeout: 10s
+      retries: 60
+      start_period: 60s
+
+  ############################################################################ acceptance profile, not for production
+  idp:
+    profiles: ["acceptance"]
+    image: quay.io/keycloak/keycloak:26.4@sha256:9409c59bdfb65dbffa20b11e6f18b8abb9281d480c7ca402f51ed3d5977e6007
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --https-port=8843
+      - --http-enabled=false
+      - --https-certificate-file=/opt/idp-certs/idp.pem
+      - --https-certificate-key-file=/opt/idp-certs/idp.nopass.key
+      - --hostname=https://idp:8843
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?set KC_ADMIN_PASSWORD in .env}
+    volumes:
+      - idpcerts:/opt/idp-certs:ro
+    depends_on:
+      takinit: { condition: service_completed_successfully }
+    networks: [tak]
+    mem_limit: ${IDP_MEM:-1024m}
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8843"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+
+  qa:
+    profiles: ["acceptance"]
+    image: ${QA_IMAGE:-takserver-oidc-qa:5.7-RELEASE-14}
+    build:
+      context: ${TAK_SOURCE_DIR:-..}
+      dockerfile: docker/Dockerfile
+      target: qa
+    command: ["sleep", "infinity"]
+    volumes:
+      - takdata:/opt/tak:ro
+      - ${QA_SCRIPT_DIR:-./qa}:/qa
+    depends_on:
+      takserver-api: { condition: service_healthy }
+    networks: [tak]
+    mem_limit: 256m
+
+volumes:
+  takdata:
+  pgdata:
+  idpcerts:
+
+networks:
+  tak:
+    driver: bridge

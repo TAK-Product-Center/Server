@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TAK Server CoreConfig for the minimal-footprint container.
+
+  Rendered once into the takdata volume by docker/init/init.sh. Every __PLACEHOLDER__ comes from an environment
+  variable in compose.yaml (see RUN.md). Federation is omitted on purpose: the container publishes 8089, 8443 and
+  8446 only. Keystores are JKS, exactly as upstream's cert scripts produce them.
+-->
+<Configuration xmlns="http://bbn.com/marti/xml/config"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:schemaLocation="CoreConfig.xsd">
+    <network tomcatMaxPool="__TOMCAT_MAX_POOL__" esyncEnableCache="1" multicastTTL="5">
+        <input _name="stdssl" protocol="tls" port="8089" coreVersion="2"/>
+        <connector port="8443" _name="https"/>
+        <connector port="8446" clientAuth="false" _name="cert_https"/>
+    </network>
+    <auth default="file" x509groups="true" x509addAnonymous="false">
+        <File location="UserAuthenticationFile.xml"/>
+        <!--OIDC-START-->
+        <oauth groupsClaim="__OIDC_GROUPS_CLAIM__" usernameClaim="__OIDC_USERNAME_CLAIM__"
+               adminTokenClaimName="__OIDC_ADMIN_CLAIM_NAME__" adminTokenClaimValue="__OIDC_ADMIN_CLAIM_VALUE__"
+               identityKey="__OIDC_IDENTITY_KEY__" useTakServerLoginPage="__OIDC_USE_TAK_LOGIN_PAGE__">
+            <openIdDiscoveryConfiguration name="__OIDC_NAME__" enabled="true"
+                clientId="__OIDC_CLIENT_ID__" secret="__OIDC_CLIENT_SECRET__"
+                redirectUri="__OIDC_REDIRECT_URI__"
+                configurationUri="__OIDC_CONFIGURATION_URI__"
+                issuer="__OIDC_ISSUER__"
+                audience="__OIDC_AUDIENCE__"
+                androidClientId="__OIDC_ANDROID_CLIENT_ID__"
+                scopes="__OIDC_SCOPES__"
+                usePkce="true"
+                truststore="__OIDC_TRUSTSTORE_TYPE__" truststoreFile="__OIDC_TRUSTSTORE_FILE__" truststorePass="__OIDC_TRUSTSTORE_PASS__"/>
+            <!--OIDC-GROUPMAPPING-->
+        </oauth>
+        <!--OIDC-END-->
+    </auth>
+    <submission ignoreStaleMessages="false" validateXml="false"/>
+    <subscription reloadPersistent="false"/>
+    <repository enable="true" numDbConnections="__DB_POOL__" primaryKeyBatchSize="500" insertionBatchSize="500">
+        <connection url="__DB_URL__" username="__DB_USERNAME__" password="__DB_PASSWORD__"/>
+    </repository>
+    <repeater enable="true" periodMillis="3000" staleDelayMillis="15000">
+        <repeatableType initiate-test="/event/detail/emergency[@type='911 Alert']" cancel-test="/event/detail/emergency[@cancel='true']" _name="911"/>
+        <repeatableType initiate-test="/event/detail/emergency[@type='Ring The Bell']" cancel-test="/event/detail/emergency[@cancel='true']" _name="RingTheBell"/>
+        <repeatableType initiate-test="/event/detail/emergency[@type='Geo-fence Breached']" cancel-test="/event/detail/emergency[@cancel='true']" _name="GeoFenceBreach"/>
+        <repeatableType initiate-test="/event/detail/emergency[@type='Troops In Contact']" cancel-test="/event/detail/emergency[@cancel='true']" _name="TroopsInContact"/>
+    </repeater>
+    <dissemination smartRetry="false"/>
+    <filter>
+        <flowtag enable="false" text=""/>
+        <streamingbroker enable="true"/>
+        <scrubber enable="false" action="overwrite"/>
+        <qos enabled="false"/>
+    </filter>
+    <buffer>
+        <latestSA enable="true"/>
+        <queue missionUidLimit="2048" missionContentLimit="2048"/>
+    </buffer>
+    <certificateSigning CA="TAKServer">
+        <certificateConfig>
+            <nameEntries>
+                <nameEntry name="O" value="__CERT_ORGANIZATION__"/>
+                <nameEntry name="OU" value="__CERT_ORGANIZATIONAL_UNIT__"/>
+            </nameEntries>
+        </certificateConfig>
+        <TAKServerCAConfig keystore="JKS" keystoreFile="certs/files/intermediate-ca-signing.jks"
+                           keystorePass="__CERT_PASS__" validityDays="30" signatureAlg="SHA256WithRSA"/>
+    </certificateSigning>
+    <security>
+        <tls context="TLSv1.2" keymanager="SunX509"
+             keystore="JKS" keystoreFile="certs/files/takserver.jks" keystorePass="__CERT_PASS__"
+             truststore="JKS" truststoreFile="certs/files/truststore-root.jks" truststorePass="__CERT_PASS__"/>
+    </security>
+</Configuration>

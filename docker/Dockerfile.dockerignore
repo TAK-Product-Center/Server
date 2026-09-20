@@ -1,0 +1,6 @@
+# Keep the build context to the sources and the git metadata the root build.gradle needs (grgit reads .git and the
+# tags to derive the version). Only local build outputs are excluded.
+**/build/
+**/.gradle/
+.idea/
+*.iml
