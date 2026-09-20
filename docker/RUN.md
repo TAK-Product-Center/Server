@@ -20,8 +20,8 @@ docker load -i takserver-oidc.oci.tar
 docker image ls | grep takserver-oidc
 ```
 
-`RELEASE-MANIFEST.md` binds these bytes to the acceptance run: it carries the image digests, the file hashes of the
-compose file, the init files and the documentation, and the acceptance transcript the digests were produced against.
+`RELEASE-MANIFEST.md` records artifact identities and historical acceptance transcripts. It does not establish
+exact-byte acceptance of the current files: see the tested-versus-delivered init image note in section 9.
 
 ## 2. Configure
 
@@ -48,6 +48,10 @@ secret at `/run/secrets/oidc_client_secret`, and the value never appears in `doc
 `CoreConfig.xml` contains the database password and the client secret in clear text; the init container writes it
 `0600` owned by uid 65532 with `umask 077`, and `certs/files` is `0700`. To rotate: change the value (or the file),
 run `docker compose run --rm takconfig update-oidc` for the client secret, then recreate the three TAK containers.
+**Despite its name, `update-oidc` regenerates ALL of `CoreConfig.xml` from the template and current environment.**
+It saves a timestamped backup but replaces manual connector, auth, repository and other XML edits. The init image
+has no python3 XML editor; review the full generated configuration and restore any required customizations before
+recreating the TAK containers. Keep every required setting available during regeneration, including DB credentials.
 Build contexts exclude `.env`, `.env.*`, `certs/files/` and any key material (`docker/Dockerfile.dockerignore`).
 
 ## 3. First start
@@ -56,8 +60,10 @@ Build contexts exclude `.env`, `.env.*`, `certs/files/` and any key material (`d
 
 1. `db`, to healthy.
 2. `takinit` (`certs`): the CA, the server certificate, the `intermediate-ca` online signer, an `admin` client
-   certificate, the two CRLs, and any `EXTRA_SERVER_CERTS`. Each artifact is checked individually, so an interrupted
-   bootstrap repairs itself; existing key material is never regenerated.
+   certificate, the two CRLs, and any `EXTRA_SERVER_CERTS`. `need_cert` checks only whether each PEM exists.
+   A missing PEM triggers issuance; an existing PEM with missing JKS/P12/signing stores requires operator recovery.
+   Startup verification checks artifact existence, not key matching or store usability. Restore missing companions
+   from a known-good backup or repair that certificate deliberately; do not delete the CA or database to recover.
 3. `takconfig` (`config`): renders `CoreConfig.xml`, then `verify` fails the start if any artifact is missing, any
    template token survived, or the OIDC client secret is empty.
 4. `schemamanager`: flyway migrations, then exits.
@@ -82,7 +88,8 @@ the `tak.server.oidc.audit` logger and an `outcome=` field.
 ## 4. Certificates and the admin enrolment
 
 All certificate work goes through the init image, which has bash, openssl and keytool and which exports the variables
-upstream's scripts require. Never override its entrypoint; use the subcommands.
+upstream's scripts require. Use the named subcommands for issuance and revocation. The explicit truststore
+import below uses its own strict shell and ownership repair.
 
 ```
 docker compose run --rm takinit make-cert client alice      # issue a client certificate
@@ -109,20 +116,29 @@ because of an upstream TAK defect: `ServerConfiguration` hands the web connector
 (`crls.get(0)`), while Tomcat reads every CRL inside that one file; the messaging connector (8089) loads one CRL per
 entry. With the two CRLs listed separately, every certificate issued by the intermediate CA failed on 8443 with an
 undetermined revocation status. The init container regenerates the bundle at bootstrap and after every revocation.
-Online enrolment signs with the intermediate CA, so that is the default:
+Online enrolment signs with the intermediate CA. `revoke` derives the issuer from the named certificate; an
+optional CA argument must match:
 
 ```
-docker compose run --rm takinit revoke alice                 # intermediate CA, the online signer
+docker compose run --rm takinit revoke alice                 # auto-detects root for the make-cert example above
 docker compose run --rm takinit revoke admin root            # certificates the root CA issued directly
 docker compose up -d --force-recreate takserver-config takserver-messaging takserver-api
 ```
 
-The subcommand passes base names to upstream's `revokeCert.sh` the way that script expects, checks that the CRL was
-actually rewritten and that it contains a revoked serial, then repairs ownership. The recreate is required: TAK reads
-the CRLs when it builds the TLS context. Evidence: `qa/container/09-acceptance-crl-enforced.txt` (29/29 on a clean start
-with enforcement on) and `qa/container/06-revocation.txt` (a root-issued and an intermediate-issued certificate both
-accepted on 8443 and 8089 before revocation, both rejected on 8443 after, and the messaging log recording
-`Connection rejected for revoked client certificate` for both on 8089).
+The subcommand compares the certificate issuer with each CA subject, verifies the certificate signature, and
+uses `crl-index-root.txt` or `crl-index-intermediate-ca.txt` through a copied OpenSSL configuration. It verifies the
+CRL signature and the exact requested serial before reporting success. A nonempty legacy shared `crl_index.txt`
+blocks creation of a missing issuer index: migrate its records only after checking each original certificate's
+issuer and signature. Do not copy the shared index to both CAs or discard revoked records. The recreate is required:
+TAK reads the CRLs when it builds the TLS context.
+
+Historical evidence: `qa/container/09-acceptance-crl-enforced.txt` reports 29/29 after re-rendering existing
+configuration and recreating the TAK trio, **not a fresh-volume start**. `qa/container/06-revocation.txt` shows both
+issuers accepted on 8443 before and rejected afterward, with fresh 8089 rejection lines. Its client-side handshake
+output does not establish pre-revocation 8089 application acceptance. The revised `qa/revocation-proof.sh` requires
+HTTP 200 before and non-200 after for both certificates, plus fresh 8089 rejection lines carrying each CN or serial.
+An anonymous rejection line fails this gate, including the historical root rejection with an empty subject.
+These revised maintenance and assertion paths have not been run in containers in this fix round.
 
 The admin API's own revoke endpoint still cannot regenerate the CRL from inside the distroless runtime, because it
 shells out to `revokeCert.sh`. Use the command above; see gap 3 in section 9.
@@ -153,37 +169,65 @@ default only trusts IdP certificates issued by this TAK CA. For an external IdP,
 container can read:
 
 ```
-# 1. fetch the chain
-openssl s_client -showcerts -connect idp.example.com:443 </dev/null 2>/dev/null \
-  | openssl crl2pkcs7 -nocrl -certfile /dev/stdin | openssl pkcs7 -print_certs -out idp-chain.pem
-# 2. build a JKS from it, inside the init image, which has keytool
-docker compose cp idp-chain.pem takinit:/tmp/idp-chain.pem
-docker compose run --rm --no-deps --entrypoint keytool takinit \
-  -importcert -noprompt -trustcacerts -alias idp -file /tmp/idp-chain.pem \
-  -keystore /opt/tak/certs/files/idp-truststore.jks -storepass "$CERT_PASS"
-# 3. point CoreConfig at it and re-render
-OIDC_TRUSTSTORE_FILE=certs/files/idp-truststore.jks docker compose run --rm takconfig update-oidc
+# 1. Obtain idp-chain.pem from your IdP administrator and verify its CA fingerprints out of band.
+# It must contain the PEM CA certificates you intend to trust, not just an unverified server leaf.
+# 2. Build a JKS in ONE container with the chain bind-mounted into that same container.
+# Replace an existing store only as a deliberate trust rotation; this recipe refuses to overwrite it.
+docker compose run --rm --no-deps \
+  -v "$PWD/idp-chain.pem:/tmp/idp-chain.pem:ro" --entrypoint /bin/bash takinit -s <<'IDPSTORE'
+  set -euo pipefail
+  umask 077
+  store=/opt/tak/certs/files/idp-truststore.jks
+  [ ! -e "$store" ] || { echo "truststore already exists" >&2; exit 1; }
+  pass=${CERT_PASS:-atakatak}
+  if [ -n "${CERT_PASS_FILE:-}" ]; then pass=$(cat "$CERT_PASS_FILE"); fi
+  work=$(mktemp -d)
+  trap 'rm -rf "$work"' EXIT
+  awk -v dir="$work" '/-----BEGIN CERTIFICATE-----/ { n++; file=dir "/ca-" n ".pem" }
+    file { print > file }
+    /-----END CERTIFICATE-----/ { close(file); file="" }
+    END { if (n == 0 || file != "") exit 1 }' /tmp/idp-chain.pem
+  for cert in "$work"/ca-*.pem; do
+    keytool -importcert -noprompt -trustcacerts -storetype JKS \
+      -alias "$(basename "$cert" .pem)" -file "$cert" \
+      -keystore "$work/idp.jks" -storepass "$pass"
+  done
+  keytool -list -storetype JKS -keystore "$work/idp.jks" -storepass "$pass"
+  cp "$work/idp.jks" "$store"
+  chown 65532:65532 "$store"
+  chmod 600 "$store"
+IDPSTORE
+# 3. Set OIDC_TRUSTSTORE_TYPE=JKS and OIDC_TRUSTSTORE_FILE=certs/files/idp-truststore.jks
+# in .env; set OIDC_TRUSTSTORE_PASS to that store password. Then FULLY regenerate (see above):
+docker compose run --rm takconfig update-oidc
 docker compose up -d --force-recreate takserver-config takserver-messaging takserver-api
 ```
 
 ## 6. Acceptance lab (never outside a lab)
 
-One command, cold, from a clean engine:
+After loading the images, run from this directory (host tools: Docker Compose, jq and curl):
 
 ```
 ./qa/lab-up.sh --clean
 ```
 
+If `.env` is absent, the launcher copies `.env.example` with private permissions. Whether `.env` is new or already
+copied, it exports lab overrides for this run: OIDC and CRLs enabled, issuer/discovery at `https://idp:8843/realms/tak`,
+redirect at `https://takserver-config:8446/login/redirect`, audiences `tak-web,atak-civ,probe`, lab group mappings,
+and the TAK-root JKS. It provisions and passes the confidential secret automatically. Existing `.env` files are not
+rewritten with these overrides. The example passwords and users are lab-only. `--clean` deletes the existing lab
+volumes, CA and database. The revised launcher targets the 29-check suite; this fix round did not run cold acceptance.
+
 It does the whole ordering the dependencies actually require: certificates first (the IdP needs one from this CA),
 then the database and Keycloak, then realm provisioning (which is what produces the confidential client secret),
 then `CoreConfig.xml` rendered with that secret, then schema and the three TAK processes, then `verify`, then the
-29-check acceptance suite with the correct container DNS URLs, audiences and the probe secret. It waits for real
-readiness at every step and exits non-zero with logs if anything stalls. It needs `docker compose`, `jq` and `curl`
+29-check acceptance suite with container DNS URLs, audiences and the probe secret. It waits for Compose
+health checks (log/TCP checks with the limitations below) and exits non-zero with logs if anything stalls. It needs `docker compose`, `jq` and `curl`
 on the host; everything else runs in containers, and the runner image is in the tarball.
 
-`qa/run-e2e-container.sh` differs from the phase 1 host script in exactly two lines, both about which connector a
-probe talks to, never about what it asserts: a `TAK_CERT` variable, and check 8d using it. Diff it against
-`requests/2026-09-18-tak-oidc-sso-phase1/qa/e2e/run-e2e-v02.sh`.
+`qa/run-e2e-container.sh` uses 8446 for the SSO/bearer path and a separate `TAK_CERT` connector for check 8d.
+Its replay assertion accepts only HTTP 400/401/403; HTTP 500 fails. QA runs `sleep infinity` in the lab and the
+launcher executes the suite inside it. Stop it with `docker compose --profile acceptance stop qa` when finished.
 
 ## 7. Ports, and where they are published
 
@@ -215,22 +259,24 @@ effect, because the config microservice reads the file at start and distributes 
 
 | | `takserver-oidc` | `schemamanager` | `init` | `qa` |
 |---|---|---|---|---|
-| compressed content (`docker image ls` CONTENT SIZE) | 390 MB | 141 MB | 67.1 MB | 22.1 MB |
-| unpacked layer sum (`docker image inspect .Size`) | 390,388,451 B (39 layers) | 141,267,313 B (37) | 67,074,489 B (5) | 22,072,154 B (3) |
+| compressed layer blobs (runtime: archive inspection; others: engine content display) | 390,366,742 B | 141 MB | 67.1 MB | 22.1 MB |
+| uncompressed layer tar data (archive inspection) | 561,752,576 B | not measured | not measured | not measured |
 | local storage (`docker image ls` DISK USAGE, shared base layers counted per image) | 957 MB | 438 MB | 263 MB | 82.8 MB |
 
 Delivered tarball (`docker save`, all four images, shared layers once): 534,628,352 bytes. Measured 2026-09-20T11:14Z,
 `qa/container/04b-image-size-after-fixes.txt`.
 
-The exact current numbers are in `qa/container/04-image-size-and-layers.txt` and `RELEASE-MANIFEST.md`; they are
-reproduced there rather than here so that this file cannot drift from the measurement. Note that content size,
-unpacked layer sum and local storage are three different quantities and the earlier revision of this document
-conflated them.
+These are historical measurements of the reviewed archive, not measurements of images rebuilt with these fixes.
+The runtime compressed/uncompressed totals were corrected by hostile review 2. Uncompressed layer tar bytes include
+tar metadata and overwritten layer entries; they are not the merged root filesystem size. Engine `.Size` was not a
+valid unpacked-size measurement on this engine. The manifest generator measures archive blobs and decompressed tar
+streams separately; local storage is an engine-specific quantity and shared layers must not be summed as unique usage.
 
 SBOM (syft, CycloneDX JSON, in `delivery/`) with per-image counts in `qa/container/05-sbom-summary.txt`.
 **The two distroless images contain no shell, no package manager and no editor**, and their SBOMs show only the
 distroless base packages plus Java archives. The init and qa images are alpine and do contain `busybox`, `bash` and
-`apk-tools`; that is the point of them, and they are one-shot containers that are not running while TAK serves.
+`apk-tools`. Init/config are one-shot commands, including maintenance runs while TAK serves; QA remains running
+with `sleep infinity` in the acceptance lab until stopped.
 
 ### Hardening, per service
 
@@ -240,12 +286,12 @@ distroless base packages plus Java archives. The init and qa images are alpine a
 | `schemamanager` | 65532 nonroot | read-only | all dropped | yes | tmpfs `/tmp` (volume is `:ro`) |
 | `takinit` / `takconfig` | 0 (it chowns the volume) | writable | all dropped, then CHOWN, DAC_OVERRIDE, FOWNER, FSETID | yes | `/opt/tak`, `/opt/idp-certs`, tmpfs `/tmp` |
 | `db` | postgres image default | writable | all dropped, then CHOWN, DAC_READ_SEARCH, FOWNER, SETGID, SETUID | yes | `pgdata` volume |
-| `idp`, `qa` | image default | writable | image default | no | lab only, not delivered configuration |
+| `idp`, `qa` | image default | writable | image default | no | acceptance profile in delivered Compose |
 
 `/tmp` is a tmpfs and is writable in the TAK containers; the `/opt/tak` volume is the only writable **persistent**
-path. Effective runtime evidence (user, capability sets, mounts, security options, read-only flag) is archived in
+path. Engine-configuration evidence (configured user, capabilities, mounts, security options, read-only flag) is archived in
 `qa/container/07-hardening-inspect.txt`, taken with `docker inspect` from the running clean-start stack. A `healthy`
-status proves none of this and is not offered as proof of it.
+status proves none of this. This is not an inspection of every existing application process's effective UID/capabilities.
 
 ### Named gaps
 
@@ -260,7 +306,8 @@ status proves none of this and is not offered as proof of it.
    container build only.* The Angular 19 metrics dashboard **is** built and is in the image.
 3. **The admin API's revoke endpoint cannot regenerate the CRL.** It shells out to `revokeCert.sh`, which needs bash
    and openssl, and the failure is swallowed by the calling code. Use `docker compose run --rm takinit revoke`
-   (section 4), which is tested end to end (`qa/container/06-revocation.txt`). Deferred fix: a sidecar or an API change.
+   (section 4). The transcript covers the earlier helper; the revised helper still needs a container run.
+   Deferred fix for the admin endpoint: a sidecar or an API change.
 4. **The whole PKI lives on the shared `takdata` volume**, owned by the runtime uid, so every TAK process can read
    the root CA key and the intermediate signing key. `0700` on `certs/files` does not isolate processes that share a
    uid. Deferred: split the root CA and the exported admin key out of the runtime mounts, keep only the online
@@ -286,3 +333,9 @@ status proves none of this and is not offered as proof of it.
     worker, most likely the federation or a secondary input context that carries no `<crl>`. Not diagnosed further; the
     enforcement evidence is on the connector that matters. Deferred: identify the context and either configure it or
     silence the warning.
+
+12. **Tested versus delivered init image.** Historical acceptance used init identity prefix `83c5cd9f`; the reviewed
+    delivery contained `ead53999`. The CRL-default flip was low functional risk under Compose because Compose
+    supplies `CRL_ENABLED`, but those are different bytes. The CRL-on transcript reused existing volumes. These
+    source fixes have not been rebuilt, exported or accepted in containers; a fresh-volume run with CRLs enabled
+    against the exact rebuilt archive, immutable image identities and sanitized configuration remains outstanding.

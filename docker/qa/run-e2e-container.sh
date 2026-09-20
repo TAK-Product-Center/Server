@@ -148,7 +148,7 @@ code=$(curl -sk -b "$jar" -o "$WORK/body" -w '%{http_code}' "$TAK/Marti/api/grou
 groups=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(sorted({g.get("name") for g in d.get("data",[])}))' "$WORK/body" 2>/dev/null)
 result "7d session cookie reaches TAK with the mapped groups" $([ "$groups" = "['Operations']" ] && echo 0 || echo 1) "http=$code groups=$groups"
 code=$(curl -sk -c "$WORK/jar2" -b "$jar" -o /dev/null -w '%{http_code}' "$cb")
-result "7e replayed callback is rejected (T7)" $([ "$code" = 500 ] || [ "$code" = 400 ] || [ "$code" = 401 ] && echo 0 || echo 1) "http=$code"
+result "7e replayed callback is rejected (T7)" $([ "$code" = 400 ] || [ "$code" = 401 ] || [ "$code" = 403 ] && echo 0 || echo 1) "http=$code"
 audit_tail
 
 # ---- 8. Bearer enrollment then a certificate connection (test 4 server half, T21, decision 4) ---------------

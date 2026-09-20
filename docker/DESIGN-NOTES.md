@@ -1,7 +1,7 @@
 # Design notes for the minimal-footprint TAK Server container
 
-Written while building it. Every claim here was checked against this branch (`lastwall/oidc-phase1`, head `c0851d5`)
-or against a run on the box. Where a choice has a cost, the cost is stated.
+Design analysis and historical build observations from `lastwall/oidc-phase1` (source baseline `c0851d5`).
+This is not a claim of current runtime verification; RUN.md records the remaining evidence limits.
 
 ## 1. Why three containers and one network namespace
 
@@ -41,12 +41,13 @@ What that costs, precisely:
   `CertManagerAdminApi` (takserver-war, around line 285) runs `./revokeCert.sh` with `/opt/tak/certs` as the working
   directory, and `revokeCert.sh` needs `/bin/bash` and `openssl`. In this image that call fails, and the failure is
   swallowed by the surrounding catch, so the database record is marked revoked and the CRL file is not updated.
-  **Workaround:** run the script in the init image, which has bash and openssl and mounts the same volume:
-  `docker compose run --rm --entrypoint /bin/bash takinit -lc 'cd /opt/tak/certs && ./revokeCert.sh <cert> <cakey> <cacert>'`
-  Do not assume revocation is complete until the CRL has been regenerated.
+  **Maintenance path:** `docker compose run --rm takinit revoke <cert> [root|intermediate]` establishes the cert
+  environment, validates the issuer and certificate signature, uses a per-issuer revocation index, and checks the
+  requested serial in that CA's signed CRL. Recreate all three TAK containers afterward; see RUN.md section 4.
+  The revised helper has not been run in a container during this fix round.
 - **`configureInDocker.sh` is not used at all.** The three JVM invocations it performs are three compose services.
 
-The war lives at `/opt/takserver/takserver.war` and the working directory is `/opt/tak`, the only writable path.
+The war lives at `/opt/takserver/takserver.war` and the working directory is `/opt/tak`, the writable persistent volume; `/tmp` is also writable tmpfs.
 That is safe with this war: it is launched through Spring Boot's `PropertiesLauncher`, relative `loader.path` entries
 are resolved inside the archive as well as against `loader.home`, and libraries that need unpacking go to
 `java.io.tmpdir`, which is set to `/opt/tak`. TAK's own relative paths (`CoreConfig.xml`, `certs/files/...`, `logs/...`,
@@ -67,9 +68,21 @@ That was wrong, for two independent reasons:
    when it is saved. Hand-written PKCS12 paths work at boot and then fail the first time an administrator saves those
    settings from the web UI.
 
-So the init image runs upstream's `makeRootCa.sh` and `makeCert.sh` verbatim and needs `keytool`. It carries
-`openjdk17-jre-headless`. This is a one-shot image that never runs while the server is running, and it does not affect
-the size of the runtime image, which is the number that matters.
+The init image carries `openjdk17-jre-headless` for keytool. The wrapper makes upstream's expected-failure provider
+probe conditional, then runs certificate scripts with `bash -e -o pipefail` and checks issued stores before success.
+Init/config are one-shot commands that can also run for maintenance while TAK serves. The lab QA service remains
+running with `sleep infinity`. Both images contribute to deployment footprint even though they are separate from runtime.
+
+Bootstrap recovery is limited: `need_cert` checks PEM existence only. Missing companion stores with an existing PEM
+need operator recovery; startup's artifact-existence gate is not a key/store consistency check.
+
+`update-oidc` is full `CoreConfig.xml` regeneration, not an OAuth-only edit. The init image has no python3 XML editor.
+A timestamped backup is saved, but unrelated manual XML changes are replaced; review and restore custom settings
+before restarting. Historical tested init (`83c5cd9f…`) differs from reviewed delivered init (`ead53999…`), and the
+CRL-on transcript reused volumes. Current source changes still need rebuild/export and exact-image cold acceptance.
+Runtime archive measurements are 390,366,742 B compressed layer blobs and 561,752,576 B uncompressed layer tar data;
+engine `.Size` was incorrectly labeled unpacked in earlier documentation. Hardening inspection is engine configuration
+evidence, not a complete inspection of existing processes' effective privileges.
 
 ## 4. What is deliberately not in the configuration
 

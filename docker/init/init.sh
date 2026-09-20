@@ -6,13 +6,13 @@
 # it happens through named subcommands so that nothing depends on an operator overriding the entrypoint and losing
 # the environment the upstream cert scripts require.
 #
-#   init            bootstrap: certificates, then CoreConfig.xml. Default. Idempotent and self-repairing.
+#   init            bootstrap: certificates, then CoreConfig.xml. Generates certificates whose PEM is absent.
 #   certs           certificates only. Run this before the IdP exists, so the IdP can be issued a certificate.
 #   config          render CoreConfig.xml only. Refuses to overwrite an existing one unless FORCE=1.
-#   update-oidc     rewrite the <oauth> block of the persisted CoreConfig.xml from the current environment.
+#   update-oidc     FULL CoreConfig.xml regeneration from the template and current environment; backs up old XML.
 #   make-cert T N   upstream makeCert.sh with the environment it needs. T is server, client or ca.
 #   revoke N [CA]   revoke certificate N and regenerate the CRL of its issuing CA. CA is root or intermediate
-#                   (default intermediate, which is what online enrollment signs with).
+#                   (auto-detected from the certificate issuer when omitted).
 #   verify          check the complete artifact set and the permissions, exit non zero on anything missing.
 #
 set -euo pipefail
@@ -34,7 +34,7 @@ read_secret() { # $1 variable name -> echoes the value
 	eval "file=\${$file_var:-}"
 	if [ -n "$file" ]; then
 		[ -r "$file" ] || die "$file_var points at $file which is not readable"
-		val=$(cat "$file")
+		val=$(cat "$file") || die "cannot read $file_var"
 	else
 		eval "val=\${$name:-}"
 	fi
@@ -47,14 +47,15 @@ export_cert_env() {
 	export CITY="${CERT_CITY:-City}"
 	export ORGANIZATION="${CERT_ORGANIZATION:-TAK}"
 	export ORGANIZATIONAL_UNIT="${CERT_ORGANIZATIONAL_UNIT:-TAKOIDC}"
-	export CAPASS="$(read_secret CERT_PASS)"
+	CAPASS=$(read_secret CERT_PASS)
+	export CAPASS
 	[ -n "$CAPASS" ] || { CAPASS=atakatak; export CAPASS; }
 	export PASS="$CAPASS"
 }
 
 fix_ownership() {
 	chown -R "$TAK_UID:$TAK_GID" "$TAK_DIR"
-	chmod 700 "$CERTS_DIR/files" 2>/dev/null || true
+	if [ -d "$CERTS_DIR/files" ]; then chmod 700 "$CERTS_DIR/files"; fi
 	[ -f "$TAK_DIR/CoreConfig.xml" ] && chmod 600 "$TAK_DIR/CoreConfig.xml"
 	return 0
 }
@@ -77,6 +78,45 @@ subst() { # $1 placeholder token, $2 raw value -> substituted into $RENDER, XML 
 	sed -i "s|$1|$value|g" "$RENDER"
 }
 
+# Upstream probes provider support with an expected failing grep and does not enable errexit.
+# Convert only that known probe to a conditional, then run every real operation with -e/pipefail.
+# Supply "n" to the CA promotion prompt: maintenance must never replace the root implicitly.
+run_cert_script() (
+	local script="$1" tmp
+	shift
+	cd "$CERTS_DIR"
+	tmp=$(mktemp "$CERTS_DIR/.strict-cert.XXXXXX")
+	trap 'rm -f "$tmp"' EXIT
+	awk '
+	/^openssl list -providers / {
+	    print "if " $0 "; then :; else"; probe++; next
+	}
+	/^if \[ \$\? -ne 0 \] ; then/ { conditional++; next }
+	{ print }
+	END { if (probe != 1 || conditional != 1) exit 1 }
+	' "$script" > "$tmp"
+	bash -e -o pipefail "$tmp" "$@" <<< n
+)
+
+validate_cert_name() {
+	[[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || die "certificate name must be a base name, not a path"
+}
+
+verify_issued_cert() {
+	local type="$1" name="$2" stem="$2" f
+	if [ "$type" = ca ]; then stem="$name-signing"; fi
+	for f in "$name.pem" "$name.key" "$stem.p12" "$stem.jks"; do
+		[ -s "$CERTS_DIR/files/$f" ] || die "issuance did not produce $f"
+	done
+	openssl x509 -in "$CERTS_DIR/files/$name.pem" -noout >/dev/null
+	# Upstream uses legacy PKCS12 encryption under OpenSSL 3.
+	openssl pkcs12 -legacy -in "$CERTS_DIR/files/$stem.p12" -passin env:PASS -noout >/dev/null
+	keytool -list -keystore "$CERTS_DIR/files/$stem.jks" -storepass "$PASS" -alias "$name" >/dev/null
+	if [ "$type" = ca ]; then
+		keytool -list -keystore "$CERTS_DIR/files/truststore-$name.jks" -storepass "$CAPASS" >/dev/null
+	fi
+}
+
 ############################################################################### certificates
 cmd_certs() {
 	mkdir -p "$CERTS_DIR"
@@ -86,7 +126,7 @@ cmd_certs() {
 		log "generating the certificate authority"
 		cp "$SRC_DIR"/certs/* "$CERTS_DIR/"
 		chmod +x "$CERTS_DIR"/*.sh
-		( cd "$CERTS_DIR" && ./makeRootCa.sh --ca-name "${CA_NAME:-TAK-CONTAINER-CA}" )
+		run_cert_script makeRootCa.sh --ca-name "${CA_NAME:-TAK-CONTAINER-CA}"
 	else
 		log "certificate authority already present"
 		# an interrupted bootstrap can leave the scripts missing; restore them without touching key material
@@ -96,25 +136,33 @@ cmd_certs() {
 		chmod +x "$CERTS_DIR"/*.sh
 	fi
 
-	# Each of these is checked individually, so an interrupted bootstrap repairs itself instead of being skipped
-	# because ca.pem happened to exist.
+	# need_cert checks PEM existence only. Missing companion stores with an existing PEM
+	# require operator recovery; verify blocks startup but does not repair those stores.
 	need_cert() { [ -f "$CERTS_DIR/files/$1.pem" ] || return 0; return 1; }
 	if need_cert "${SERVER_CN:-takserver}"; then
 		log "issuing server certificate ${SERVER_CN:-takserver}"
-		( cd "$CERTS_DIR" && ./makeCert.sh server "${SERVER_CN:-takserver}" )
+		validate_cert_name "${SERVER_CN:-takserver}"
+		run_cert_script makeCert.sh server "${SERVER_CN:-takserver}"
+		verify_issued_cert server "${SERVER_CN:-takserver}"
 	fi
 	if need_cert intermediate-ca; then
 		log "issuing the intermediate signing CA"
-		( cd "$CERTS_DIR" && ./makeCert.sh ca intermediate-ca )
+		validate_cert_name "intermediate-ca"
+		run_cert_script makeCert.sh ca "intermediate-ca"
+		verify_issued_cert ca "intermediate-ca"
 	fi
 	if need_cert "${ADMIN_CN:-admin}"; then
 		log "issuing admin client certificate ${ADMIN_CN:-admin}"
-		( cd "$CERTS_DIR" && ./makeCert.sh client "${ADMIN_CN:-admin}" )
+		validate_cert_name "${ADMIN_CN:-admin}"
+		run_cert_script makeCert.sh client "${ADMIN_CN:-admin}"
+		verify_issued_cert client "${ADMIN_CN:-admin}"
 	fi
 	for extra in ${EXTRA_SERVER_CERTS:-}; do
 		if need_cert "$extra"; then
 			log "issuing extra server certificate $extra"
-			( cd "$CERTS_DIR" && ./makeCert.sh server "$extra" )
+			validate_cert_name "$extra"
+			run_cert_script makeCert.sh server "$extra"
+			verify_issued_cert server "$extra"
 		fi
 		[ -f "$CERTS_DIR/files/$extra.nopass.key" ] || \
 			openssl rsa -in "$CERTS_DIR/files/$extra.key" -passin "pass:$CAPASS" \
@@ -125,10 +173,10 @@ cmd_certs() {
 	cp -f "$CERTS_DIR/files/${SERVER_CN:-takserver}.jks" "$CERTS_DIR/files/takserver.jks"
 	cp -f "$CERTS_DIR/files/${SERVER_CN:-takserver}.p12" "$CERTS_DIR/files/takserver.p12"
 
-	# CoreConfig references both CRLs, so both have to exist before TAK starts, even when empty. makeRootCa.sh and
-	# makeCert.sh normally write them; these calls repair an interrupted bootstrap.
-	[ -s "$CERTS_DIR/files/ca.crl" ]              || regen_crl root
-	[ -s "$CERTS_DIR/files/intermediate-ca.crl" ] || regen_crl intermediate-ca
+	# Rebuild from isolated indexes even if upstream generated an initial CRL using its shared config.
+	# A legacy shared index must be migrated before this can proceed.
+	regen_crl root
+	regen_crl intermediate-ca
 	refresh_crl_bundle
 
 	export_for_other_containers
@@ -137,18 +185,48 @@ cmd_certs() {
 	log "certificates ready"
 }
 
-# config.cfg sets dir = . and database = $dir/crl_index.txt, and upstream's scripts always run openssl from
-# certs/files with -config ../config.cfg. Doing it from certs/ instead is what produces
-# "Problem with index file: ./crl_index.txt". Same working directory as upstream, same relative config path.
-regen_crl() { # $1: root, or the base name of the issuing CA (intermediate-ca)
-	local ca="$1" keyfile certfile out
-	if [ "$ca" = ca ] || [ "$ca" = root ]; then keyfile=ca-do-not-share.key; certfile=ca.pem; out=ca.crl
-	else keyfile="$ca.key"; certfile="$ca.pem"; out="$ca.crl"; fi
+# Never reuse the shared upstream index for a different issuer. Old nonempty shared
+# indexes cannot be split safely by subject alone; require an audited migration first.
+ca_config() ( # root or intermediate-ca -> config path relative to certs/files
+	set -e
+	local ca="$1" index="crl-index-$1.txt" cfg="crl-$1.cfg"
 	(
 		cd "$CERTS_DIR/files"
-		touch crl_index.txt crl_index.txt.attr
-		grep -q unique_subject crl_index.txt.attr || echo "unique_subject = no" >> crl_index.txt.attr
-		openssl ca -config ../config.cfg -gencrl -keyfile "$keyfile" -key "$CAPASS" -cert "$certfile" -out "$out"
+		if [ ! -f "$index" ]; then
+			[ ! -s crl_index.txt ] || die "legacy shared revocation index is nonempty; migrate verified issuer-specific records to $index before maintenance"
+			: > "$index"
+		fi
+		printf 'unique_subject = no\n' > "$index.attr"
+		awk -v db="$index" '
+		/^[[:space:]]*database[[:space:]]*=/ { print "database = $dir/" db; n++; next }
+		{ print }
+		END { if (n != 1) exit 1 }
+		' ../config.cfg > "$cfg.tmp"
+		mv "$cfg.tmp" "$cfg"
+	)
+	printf '%s' "$cfg"
+)
+
+verify_crl() {
+    local result
+    result=$(openssl crl -in "$1" -noout -verify -CAfile "$2" 2>&1) || die "CRL verification command failed"
+    # Some OpenSSL releases print a verification failure without returning failure.
+    [ "$result" = "verify OK" ] || die "CRL signature verification failed: $result"
+}
+
+regen_crl() { # root or intermediate-ca
+	local ca="$1" keyfile certfile out cfg
+	case "$ca" in
+		root) keyfile=ca-do-not-share.key; certfile=ca.pem; out=ca.crl ;;
+		intermediate-ca) keyfile=intermediate-ca.key; certfile=intermediate-ca.pem; out=intermediate-ca.crl ;;
+		*) die "unsupported CRL issuer $ca" ;;
+	esac
+	cfg=$(ca_config "$ca")
+	(
+		cd "$CERTS_DIR/files"
+		openssl ca -config "$cfg" -gencrl -keyfile "$keyfile" -passin env:CAPASS -cert "$certfile" -out "$out.tmp"
+		verify_crl "$out.tmp" "$certfile"
+		mv "$out.tmp" "$out"
 	)
 	log "regenerated certs/files/$out"
 }
@@ -164,8 +242,8 @@ export_for_other_containers() {
 	cp -f "$CERTS_DIR/files/ca.pem" /opt/idp-certs/ca.pem
 	cp -f "$CERTS_DIR/files/truststore-root.jks" /opt/idp-certs/truststore-root.jks
 	chown -R "${IDP_UID:-1000}:${IDP_GID:-0}" /opt/idp-certs
-	chmod 640 /opt/idp-certs/*.key 2>/dev/null || true
-	chmod 644 /opt/idp-certs/*.pem /opt/idp-certs/*.jks 2>/dev/null || true
+	for f in /opt/idp-certs/*.key; do [ ! -e "$f" ] || chmod 640 "$f"; done
+	for f in /opt/idp-certs/*.pem /opt/idp-certs/*.jks; do [ ! -e "$f" ] || chmod 644 "$f"; done
 }
 
 ############################################################################### CoreConfig.xml
@@ -189,10 +267,7 @@ render_config() { # writes $TAK_DIR/CoreConfig.xml
 	subst __CERT_ORGANIZATION__          "${CERT_ORGANIZATION:-TAK}"
 	subst __CERT_ORGANIZATIONAL_UNIT__   "${CERT_ORGANIZATIONAL_UNIT:-TAKOIDC}"
 
-	# CRL enforcement is generated and maintained unconditionally (both CRLs always exist and the revoke
-	# subcommand always updates them) but it is only CONFIGURED when CRL_ENABLED=true. Turning it on in this lab
-	# made TAK reject valid enrolment certificates on the 8443 client-certificate connector; see the named gap in
-	# RUN.md section 9. The files are ready, so enabling it is a one-line change once that is understood.
+	# The first configured CRL is the root/intermediate bundle required by the web connector.
 	if [ "${CRL_ENABLED:-true}" != "true" ]; then
 		sed -i "/<!--CRL-START-->/,/<!--CRL-END-->/d" "$RENDER"
 	fi
@@ -269,7 +344,7 @@ cmd_config() {
 cmd_update_oidc() {
 	[ -f "$TAK_DIR/CoreConfig.xml" ] || die "no CoreConfig.xml to update; run 'config' first"
 	cp -f "$TAK_DIR/CoreConfig.xml" "$TAK_DIR/CoreConfig.xml.bak.$(date -u +%Y%m%dT%H%M%SZ)"
-	log "rewriting CoreConfig.xml from the current environment"
+	log "FULL regeneration of CoreConfig.xml from the template and current environment; unrelated manual XML edits are replaced (backup saved)"
 	render_config
 	fix_ownership
 	log "CoreConfig.xml updated. The config microservice reads it at start and distributes it over Ignite, so run:"
@@ -278,35 +353,58 @@ cmd_update_oidc() {
 
 ############################################################################### maintenance
 cmd_make_cert() {
-	[ $# -ge 2 ] || die "usage: make-cert <server|client|ca> <name>"
+	[ $# -eq 2 ] || die "usage: make-cert <server|client|ca> <name>"
+	case "$1" in server|client|ca) ;; *) die "unsupported certificate type $1" ;; esac
+	validate_cert_name "$2"
 	export_cert_env
-	( cd "$CERTS_DIR" && ./makeCert.sh "$1" "$2" )
-	[ -f "$CERTS_DIR/files/$2.pem" ] || die "makeCert.sh did not produce files/$2.pem"
+	run_cert_script makeCert.sh "$1" "$2"
+	verify_issued_cert "$1" "$2"
 	fix_ownership
 	log "issued $1 certificate $2"
 }
 
-# Finding 2. revokeCert.sh takes base names, not paths, changes into files/ itself and appends the extensions. It
-# also needs PASS from cert-metadata.sh. Both are handled here, and the CA defaults to the intermediate, which is
-# what online enrollment signs with.
 cmd_revoke() {
-	[ $# -ge 1 ] || die "usage: revoke <certificate-name> [root|intermediate]"
-	local name="$1" which="${2:-intermediate}" cakey cacert crl
+	[ $# -ge 1 ] && [ $# -le 2 ] || die "usage: revoke <certificate-name> [root|intermediate]"
+	local name="$1" which="${2:-}" issuer subject candidate matches=0 detected=""
+	local cakey cacert crl cfg serial crl_text
+	validate_cert_name "$name"
 	export_cert_env
+	issuer=$(openssl x509 -in "$CERTS_DIR/files/$name.pem" -noout -issuer -nameopt RFC2253)
+	issuer=${issuer#issuer=}
+	for candidate in root intermediate; do
+		if [ "$candidate" = root ]; then cacert=ca; else cacert=intermediate-ca; fi
+		subject=$(openssl x509 -in "$CERTS_DIR/files/$cacert.pem" -noout -subject -nameopt RFC2253)
+		if [ "$issuer" = "${subject#subject=}" ]; then
+			detected="$candidate"; matches=$((matches+1))
+		fi
+	done
+	[ "$matches" = 1 ] || die "certificate issuer does not identify exactly one configured CA"
+	[ -z "$which" ] || [ "$which" = "$detected" ] || die "requested CA $which mismatches certificate issuer $detected"
+	which="$detected"
 	case "$which" in
-		root) cakey=ca-do-not-share; cacert=ca; crl="$CERTS_DIR/files/ca.crl" ;;
-		intermediate) cakey=intermediate-ca; cacert=intermediate-ca; crl="$CERTS_DIR/files/intermediate-ca.crl" ;;
-		*) die "second argument must be root or intermediate" ;;
+		root) cakey=ca-do-not-share; cacert=ca; crl=ca.crl; candidate=root ;;
+		intermediate) cakey=intermediate-ca; cacert=intermediate-ca; crl=intermediate-ca.crl; candidate=intermediate-ca ;;
 	esac
-	[ -f "$CERTS_DIR/files/$name.pem" ] || die "files/$name.pem does not exist"
-	[ -f "$CERTS_DIR/files/$cakey.key" ] || die "files/$cakey.key does not exist"
-	( cd "$CERTS_DIR" && ./revokeCert.sh "$name" "$cakey" "$cacert" )
-	[ -s "$crl" ] || die "revokeCert.sh did not write $crl"
-	openssl crl -in "$crl" -noout -text | grep -q "Serial Number" || die "$crl has no revoked entry"
+	# Check the signature too: a matching issuer DN alone is insufficient.
+	openssl verify -no_check_time -partial_chain -trusted "$CERTS_DIR/files/$cacert.pem" "$CERTS_DIR/files/$name.pem"
+	serial=$(openssl x509 -in "$CERTS_DIR/files/$name.pem" -noout -serial)
+	serial=${serial#serial=}
+	cfg=$(ca_config "$candidate")
+	(
+		cd "$CERTS_DIR/files"
+		openssl ca -config "$cfg" -revoke "$name.pem" -keyfile "$cakey.key" -passin env:CAPASS -cert "$cacert.pem"
+	)
+	regen_crl "$candidate"
+	verify_crl "$CERTS_DIR/files/$crl" "$CERTS_DIR/files/$cacert.pem"
+	crl_text=$(openssl crl -in "$CERTS_DIR/files/$crl" -noout -text)
+	printf '%s\n' "$crl_text" | awk -v wanted="$serial" '
+	function norm(s) { s=toupper(s); gsub(/:/,"",s); sub(/^0+/,"",s); return s }
+	/Serial Number:/ { if (norm($NF) == norm(wanted)) found=1 }
+	END { exit !found }
+	' || die "requested serial $serial absent from $crl"
 	refresh_crl_bundle
 	fix_ownership
-	log "revoked $name against the $which CA; CRL now:"
-	openssl crl -in "$crl" -noout -text | sed -n '1,40p'
+	log "revoked $name serial $serial against the $which CA; verified signed CRL $crl"
 	log "TAK reads the CRL when the TLS context is built, so run:"
 	log "  docker compose up -d --force-recreate takserver-config takserver-messaging takserver-api"
 }

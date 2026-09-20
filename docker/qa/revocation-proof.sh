@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Proves that revocation actually revokes: a client certificate is accepted on 8089 and 8443, then revoked with the
-# init image's maintenance subcommand, then rejected on both after the TAK containers pick up the new CRL.
+# Asserts HTTP 200 before and non-200 after revocation for both issuers on 8443,
+# plus fresh, identity-correlated rejection logs on 8089. Pre-revoke 8089 application acceptance is not asserted.
 #
 # Two certificates are exercised, because TAK has two issuers:
 #   revoketest-root  issued by the root CA with makeCert.sh, revoked against ca.crl
@@ -9,12 +9,12 @@
 #                    what every OIDC enrolment produces, revoked against intermediate-ca.crl
 #
 # Run after the lab is up: ./qa/revocation-proof.sh
-set -uo pipefail
+set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH=/opt/homebrew/bin:$PATH
 set -a; . ./.env; . ./.env.secrets; set +a
 
-CP="${CERT_PASS:-atakatak}"
+umask 077
 say() { printf '\n=== %s  %s\n' "$(date -u +%FT%TZ)" "$*"; }
 inqa() { docker compose exec -T qa "$@"; }
 
@@ -22,19 +22,19 @@ say "0. issue a client certificate from the root CA"
 docker compose run --rm takinit make-cert client revoketest-root
 
 say "0b. enrol a certificate through the online signer, the way an OIDC client does"
-inqa bash -c '
-set -e
-TOK=$(curl -sk -X POST "https://idp:8843/realms/tak/protocol/openid-connect/token" \
-  -d grant_type=password -d client_id=probe -d client_secret="'"$PROBE_CLIENT_SECRET"'" \
+docker compose exec -T -e PROBE_CLIENT_SECRET -e CERT_ORGANIZATION -e CERT_ORGANIZATIONAL_UNIT qa bash -c '
+set -euo pipefail
+TOK=$(curl -skf -X POST "https://idp:8843/realms/tak/protocol/openid-connect/token" \
+  -d grant_type=password -d client_id=probe -d client_secret="$PROBE_CLIENT_SECRET" \
   -d username=alice -d password=alice -d scope="openid profile groups" \
   | python3 -c "import json,sys;print(json.load(sys.stdin)[\"access_token\"])")
-IDENT=$(curl -sk -H "Authorization: Bearer $TOK" https://takserver-config:8446/Marti/api/tls/config \
+IDENT=$(curl -skf -H "Authorization: Bearer $TOK" https://takserver-config:8446/Marti/api/tls/config \
   | python3 -c "import re,sys;m=re.search(r\"<identity>([^<]+)</identity>\",sys.stdin.read());print(m.group(1))")
 echo "enrolment identity: $IDENT"
 openssl req -new -newkey rsa:2048 -nodes -keyout /tmp/enrol.key -out /tmp/enrol.csr \
-  -subj "/CN=$IDENT/O='"${CERT_ORGANIZATION:-Lastwall}"'/OU='"${CERT_ORGANIZATIONAL_UNIT:-TAKOIDC}"'" >/dev/null 2>&1
+  -subj "/CN=$IDENT/O=${CERT_ORGANIZATION:-Lastwall}/OU=${CERT_ORGANIZATIONAL_UNIT:-TAKOIDC}" >/dev/null 2>&1
 B64=$(openssl req -in /tmp/enrol.csr -outform DER | base64 | tr -d "\n")
-curl -sk -H "Authorization: Bearer $TOK" -H "Content-Type: text/plain" -H "Accept: application/json" \
+curl -skf -H "Authorization: Bearer $TOK" -H "Content-Type: text/plain" -H "Accept: application/json" \
   --data-binary "$B64" "https://takserver-config:8446/Marti/api/tls/signClient/v2?clientUid=revproof&version=2" \
   > /tmp/signed.json
 python3 - <<PY
@@ -46,65 +46,113 @@ openssl x509 -inform DER -in /tmp/enrol.der -out /tmp/enrol.pem
 echo "issued by: $(openssl x509 -in /tmp/enrol.pem -noout -issuer)"
 echo "subject  : $(openssl x509 -in /tmp/enrol.pem -noout -subject)"
 echo "serial   : $(openssl x509 -in /tmp/enrol.pem -noout -serial)"
-cp /tmp/enrol.pem /tmp/enrol.key /qa/ 2>/dev/null || true
+cp /tmp/enrol.pem /tmp/enrol.key /qa/
 '
 # the revoke subcommand works on files in the certs volume, so put the enrolled certificate there under a name
-docker compose cp qa:/qa/enrol.pem ./qa/revoketest-enrol.pem
-docker compose cp ./qa/revoketest-enrol.pem takinit:/tmp/revoketest-enrol.pem 2>/dev/null || true
+inqa cp /qa/enrol.pem /qa/revoketest-enrol.pem
 docker compose run --rm --no-deps --entrypoint /bin/bash -v "$PWD/qa:/hostqa" takinit -lc \
   'cp /hostqa/revoketest-enrol.pem /opt/tak/certs/files/revoketest-enrol.pem && chown 65532:65532 /opt/tak/certs/files/revoketest-enrol.pem && echo stored'
 
-probe() { # $1 label, $2 cert base in the qa container
-	say "PROBE $1"
-	inqa bash -c '
-	set +e
-	C=$1
-	echo "--- 8443 (client certificate web connector)"
-	curl -sk --cert /qa/'"$2"'.pem --key /qa/'"$2"'.key -o /dev/null \
-	     -w "    http=%{http_code} curl_exit=%{exitcode}\n" https://takserver-config:8443/Marti/api/version
-	echo "    curl exit: $?"
-	echo "--- 8089 (TLS input)"
-	echo | openssl s_client -connect takserver-config:8089 -cert /qa/'"$2"'.pem -key /qa/'"$2"'.key \
-	     -cert_chain /qa/intermediate-ca.pem -CAfile /qa/ca.pem -verify_return_error 2>&1 | grep -E "Verify return code|alert|handshake|Cipher is|SSL handshake has read" | head -5
-	' _ "$1"
+probe() { # phase (before/after), certificate basename
+    say "PROBE $1 $2"
+    inqa bash -s -- "$1" "$2" <<'PROBE'
+set -euo pipefail
+phase=$1; cert=$2
+rc=0
+code=$(curl -sk --max-time 20 --cert "/qa/$cert.pem" --key "/qa/$cert.key" \
+    -o /dev/null -w '%{http_code}' https://takserver-config:8443/Marti/api/version) || rc=$?
+printf '8443 %s %s http=%s curl_exit=%s\n' "$phase" "$cert" "$code" "$rc"
+if [ "$phase" = before ]; then
+    [ "$rc" = 0 ] && [ "$code" = 200 ] || { echo 'FAIL: expected HTTP 200 before revocation'; exit 1; }
+else
+    [[ "$code" =~ ^[0-9]{3}$ ]] && [ "$code" != 200 ] || { echo 'FAIL: expected rejection after revocation'; exit 1; }
+    # Only TLS/connection-closed failures are expected for a 000 response, not missing keys/DNS/timeouts.
+    if [ "$code" = 000 ]; then
+        case "$rc" in 35|52|55|56) ;; *) echo "FAIL: unrelated curl failure $rc"; exit 1 ;; esac
+    fi
+fi
+# A client-side TLS handshake alone cannot prove 8089 application acceptance/rejection.
+# Exercise that connector; the post-revocation gate below requires correlated server evidence.
+rc=0
+timeout 20 openssl s_client -connect takserver-config:8089 -cert "/qa/$cert.pem" \
+    -key "/qa/$cert.key" -cert_chain /qa/intermediate-ca.pem -CAfile /qa/ca.pem \
+    -verify_return_error </dev/null > "/qa/$cert-$phase-8089.txt" 2>&1 || rc=$?
+printf '8089 probe exit=%s (server log assertion follows after revocation)\n' "$rc"
+case "$rc" in 0|1) ;; *) echo 'FAIL: 8089 probe could not complete'; exit 1 ;; esac
+PROBE
 }
 
 # make both certificates, their keys and the CA chain available to the runner. Always go through the init image:
 # `docker compose cp takinit:` only works while a takinit container exists, and a partial copy (pem without key)
 # produced a proof that failed BEFORE revocation on 2026-09-20 and therefore proved nothing.
-docker compose run --rm --no-deps --entrypoint /bin/bash -v "$PWD/qa:/hostqa" takinit -lc \
-  'cd /opt/tak/certs/files && cp revoketest-root.pem ca.pem intermediate-ca.pem /hostqa/ && openssl pkey -in revoketest-root.key -passin pass:"${CAPASS:-atakatak}" -out /hostqa/revoketest-root.key && chmod 644 /hostqa/revoketest-root.* /hostqa/ca.pem /hostqa/intermediate-ca.pem && echo exported'
-for f in revoketest-root.pem revoketest-root.key ca.pem intermediate-ca.pem revoketest-enrol.pem; do
-	docker compose cp "./qa/$f" "qa:/qa/$f"
-done
-docker compose cp ./qa/enrol.key qa:/qa/revoketest-enrol.key 2>/dev/null || true
+docker compose run --rm --no-deps --entrypoint /bin/bash -v "$PWD/qa:/hostqa" takinit -ec \
+  'cd /opt/tak/certs/files && cp revoketest-root.pem ca.pem intermediate-ca.pem /hostqa/ && openssl pkey -in revoketest-root.key -passin pass:"${CERT_PASS:-atakatak}" -out /hostqa/revoketest-root.key && chmod 600 /hostqa/revoketest-root.* /hostqa/ca.pem /hostqa/intermediate-ca.pem && echo exported'
+# /qa is the host qa directory bind-mounted by Compose; the exported files are already visible.
+inqa cp /qa/enrol.key /qa/revoketest-enrol.key
 # TAK's trust anchor is the root; an intermediate-issued leaf must be presented WITH the intermediate, exactly as the
 # acceptance suite's check 8d does (leaf + ca chain), otherwise the handshake fails for a reason that is not revocation.
-inqa bash -c 'cat /qa/revoketest-enrol.pem /qa/intermediate-ca.pem > /qa/revoketest-enrol-chain.pem; cp /qa/revoketest-enrol-chain.pem /qa/revoketest-enrol.pem; chmod 600 /qa/*.key; echo chain built'
+inqa bash -e -o pipefail -c 'cat /qa/revoketest-enrol.pem /qa/intermediate-ca.pem > /qa/revoketest-enrol-chain.pem; cp /qa/revoketest-enrol-chain.pem /qa/revoketest-enrol.pem; chmod 600 /qa/*.key; echo chain built'
 
 say "1. BEFORE revocation"
-probe "root-CA certificate BEFORE" revoketest-root
-probe "enrolment certificate BEFORE" revoketest-enrol
+probe before revoketest-root
+probe before revoketest-enrol
 
 say "2. revoke both"
 docker compose run --rm takinit revoke revoketest-root root
 docker compose run --rm takinit revoke revoketest-enrol intermediate
+REVOKE_TIME=$(inqa python3 -c 'import time; print(time.time())')
+printf 'Revoke completed at epoch=%s UTC\n' "$REVOKE_TIME"
 
 say "3. recreate the TAK containers so the TLS context rebuilds with the new CRLs"
 docker compose up -d --force-recreate takserver-config takserver-messaging takserver-api
 n=0; until docker compose ps --format '{{.Service}} {{.Status}}' | grep -q 'takserver-api.*(healthy)'; do
 	sleep 15; n=$((n+1)); [ $n -lt 240 ] || { echo "api did not come back"; exit 1; }
-	[ $((n % 8)) -eq 0 ] && echo "  waiting, $((n*15))s"
+	if [ $((n % 8)) -eq 0 ]; then echo "  waiting, $((n*15))s"; fi
 done
 
 say "4. AFTER revocation"
-probe "root-CA certificate AFTER" revoketest-root
-probe "enrolment certificate AFTER" revoketest-enrol
+probe after revoketest-root
+probe after revoketest-enrol
 
-say "4b. server-side evidence: revocation rejections in the TAK logs (messaging = 8089, api = 8443)"
-docker compose run --rm --no-deps --entrypoint /bin/bash takinit -lc \
-  'grep -h -i "rejected for revoked\|CertificateRevokedException\|revocation status" /opt/tak/logs/takserver-messaging.log /opt/tak/logs/takserver-api.log 2>/dev/null | tail -8'
-
-say "5. CRL contents"
-docker compose run --rm --no-deps --entrypoint /bin/bash takinit -lc \
-  'for c in ca intermediate-ca; do echo "--- $c.crl"; openssl crl -in /opt/tak/certs/files/$c.crl -noout -text | grep -A3 "Revoked Certificate" | head -20; done'
+say "4b. assert fresh 8089 revocation rejections for each certificate"
+# The lab JVM log timestamps are UTC. Require a timestamp strictly after revocation
+# and the exact CN or serial on the rejection line; an anonymous root rejection is insufficient.
+inqa python3 - "$REVOKE_TIME" <<'PYLOG'
+import datetime, pathlib, re, subprocess, sys, time
+cutoff = float(sys.argv[1])
+certs = []
+for name in ("revoketest-root", "revoketest-enrol"):
+    subject = subprocess.check_output(["openssl", "x509", "-in", f"/qa/{name}.pem", "-noout", "-subject", "-nameopt", "multiline"], text=True)
+    cn = re.search(r"^\s*commonName\s*=\s*(.+)$", subject, re.M)
+    if not cn:
+        raise SystemExit(f"FAIL: no CN for {name}")
+    serial = subprocess.check_output(["openssl", "x509", "-in", f"/qa/{name}.pem", "-noout", "-serial"], text=True).strip().split("=", 1)[1]
+    certs.append((name, cn[1], serial.lstrip("0").upper() or "0"))
+path = pathlib.Path("/opt/tak/logs/takserver-messaging.log")
+found = {}
+for attempt in range(15):
+    for line in path.read_text(errors="replace").splitlines():
+        ts = re.match(r"^(\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d+)", line)
+        if not ts or "Connection rejected for revoked client certificate" not in line or "Local port: 8089" not in line:
+            continue
+        when = datetime.datetime.strptime(ts[1], "%Y-%m-%d-%H:%M:%S.%f").replace(tzinfo=datetime.timezone.utc).timestamp()
+        if when <= cutoff:
+            continue
+        for name, cn, serial in certs:
+            cn_match = re.search(r"(?:^|[, :])CN=" + re.escape(cn) + r"(?=,|;|$)", line)
+            logged_serial = re.search(r"serial(?: number)?\s*[:=]\s*(?:0x)?([0-9a-f:]+)(?=[,;\s]|$)", line, re.I)
+            serial_match = logged_serial and (logged_serial[1].replace(":", "").lstrip("0").upper() or "0") == serial
+            if cn_match or serial_match:
+                found[name] = line
+    if len(found) == len(certs):
+        break
+    time.sleep(1)
+for name, cn, serial in certs:
+    if name not in found:
+        print(f"FAIL: no fresh correlated 8089 rejection for {name} CN={cn} serial={serial}", file=sys.stderr)
+    else:
+        print("PASS:", name, found[name])
+if len(found) != len(certs):
+    raise SystemExit(1)
+PYLOG
+say "PASS: both HTTP before/after assertions and both fresh correlated 8089 rejections"

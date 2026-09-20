@@ -1,12 +1,12 @@
 #!/bin/bash
-# Effective runtime hardening evidence, read from the running containers rather than from the compose file.
+# Engine-configuration evidence and new diagnostic-process observations; not existing process credentials.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH=/opt/homebrew/bin:$PATH
 
-printf '# Effective hardening, %s\n' "$(date -u +%FT%TZ)"
-printf '# docker inspect on the running clean-start stack. Compose intent is in compose.yaml; this is what the\n'
-printf '# engine actually applied.\n\n'
+printf '# Engine hardening configuration, %s\n' "$(date -u +%FT%TZ)"
+printf '# docker inspect on the available stack. Compose intent is in compose.yaml; this records the\n'
+printf '# engine configuration, not a full audit of existing processes.\n\n'
 
 for svc in takserver-config takserver-messaging takserver-api schemamanager takinit takconfig db idp qa; do
 	cid=$(docker compose ps -aq "$svc" 2>/dev/null | head -1)
@@ -29,13 +29,13 @@ for svc in takserver-config takserver-messaging takserver-api schemamanager taki
 	docker inspect "$cid" --format '{{range .Mounts}}     {{.Type}} {{.Name}}{{.Source}} -> {{.Destination}} rw={{.RW}}
 {{end}}'
 	if [ "$(docker inspect "$cid" --format '{{.State.Status}}')" = running ]; then
-		printf '   effective id : '
+		printf '   new exec id  : '
 		docker exec "$cid" id 2>/dev/null || docker exec "$cid" java -XshowSettings:properties -version 2>&1 | grep -m1 'user.name' || echo '(no shell and no id in this image)'
 	fi
 	printf '\n'
 done
 
-printf '## uid seen by the distroless TAK processes (no shell, so the JVM reports it)\n'
+printf '## identity properties of a newly executed diagnostic JVM (not the serving JVM)\n'
 cid=$(docker compose ps -aq takserver-api | head -1)
 [ -n "$cid" ] && docker inspect "$cid" --format '   Config.User = {{.Config.User}}' 
 docker compose exec -T takserver-api java -XshowSettings:properties -version 2>&1 | grep -E 'user.name|user.home|java.io.tmpdir' | sed 's/^/   /'

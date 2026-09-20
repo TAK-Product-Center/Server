@@ -25,10 +25,29 @@ step() { printf '\n=== %s  %s\n' "$(date -u +%FT%TZ)" "$*"; }
 need() { command -v "$1" >/dev/null || { echo "missing required host tool: $1" >&2; exit 2; }; }
 need docker; need jq; need curl
 
+# Create a private lab env when absent; also turn a copied example into the lab configuration.
+# Existing files are not rewritten: exported lab settings take precedence for this invocation.
+if [ ! -f .env ]; then
+    (umask 077; cp .env.example .env)
+fi
 set -a; . ./.env; set +a
+export OIDC_ENABLED=true CRL_ENABLED=true OIDC_NAME=idp
+export OIDC_CLIENT_ID=tak-web OIDC_ANDROID_CLIENT_ID=atak-civ
+export OIDC_ISSUER=https://idp:8843/realms/tak
+export OIDC_CONFIGURATION_URI=https://idp:8843/realms/tak/.well-known/openid-configuration
+export OIDC_REDIRECT_URI=https://takserver-config:8446/login/redirect
+export OIDC_AUDIENCE=tak-web,atak-civ,probe
+export OIDC_SCOPES="openid profile groups"
+export OIDC_GROUP_MAPPINGS=tak_ops:Operations:both,tak_admin:Operations
+export OIDC_ADMIN_CLAIM_NAME=groups OIDC_ADMIN_CLAIM_VALUE=tak_admin
+export OIDC_TRUSTSTORE_TYPE=JKS OIDC_TRUSTSTORE_FILE=certs/files/truststore-root.jks
+export OIDC_TRUSTSTORE_PASS="${CERT_PASS:-atakatak}"
+export KCURL=https://idp:8843 REDIRECT_URI="$OIDC_REDIRECT_URI"
+# A stale file-secret override must not defeat the newly provisioned lab secret.
+export OIDC_CLIENT_SECRET_FILE=
 : "${DB_PASSWORD:?set DB_PASSWORD in .env}"
 : "${KC_ADMIN_PASSWORD:?set KC_ADMIN_PASSWORD in .env}"
-export EXTRA_SERVER_CERTS="${EXTRA_SERVER_CERTS:-idp}"
+export EXTRA_SERVER_CERTS="idp ${EXTRA_SERVER_CERTS:-}"
 
 if [ "$CLEAN" = 1 ]; then
 	step "down -v (destroys the CA, the configuration and the database)"
@@ -60,7 +79,7 @@ docker compose up -d takserver-api
 n=0; until docker compose ps --format '{{.Service}} {{.Status}}' | grep -q 'takserver-api.*(healthy)'; do
 	sleep 15; n=$((n+1))
 	[ $n -lt 240 ] || { echo "takserver-api never became healthy"; docker compose logs takserver-api | tail -40; exit 1; }
-	[ $((n % 8)) -eq 0 ] && echo "  still waiting, $((n*15))s"
+	if [ $((n % 8)) -eq 0 ]; then echo "  still waiting, $((n*15))s"; fi
 done
 echo "takserver-api healthy"
 docker compose run --rm --no-deps takconfig verify

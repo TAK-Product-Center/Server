@@ -58,7 +58,7 @@ services:
 
   # One shot, certificates only. Split from the configuration render on purpose (finding 1): the IdP needs a
   # certificate from this CA before it can exist, and CoreConfig cannot be rendered until the IdP has issued the
-  # confidential client secret. Self-repairing: each artifact is checked individually, not inferred from ca.pem.
+  # confidential client secret. Missing PEMs trigger issuance; existing PEMs with missing stores need operator recovery.
   takinit:
     image: ${TAKINIT_IMAGE:-takserver-oidc-init:5.7-RELEASE-14}
     build:
@@ -122,7 +122,7 @@ services:
 
   # One shot, CoreConfig.xml only. Refuses to run with OIDC_ENABLED=true and an empty client secret, so a server
   # that cannot complete the authorization code exchange never starts in the first place. Use
-  # "docker compose run --rm takconfig update-oidc" to rewrite it later, then recreate the three TAK containers.
+  # "docker compose run --rm takconfig update-oidc" for FULL XML regeneration (manual edits replaced), then recreate the TAK trio.
   takconfig:
     extends:
       service: takinit
