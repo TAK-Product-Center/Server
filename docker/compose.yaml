@@ -56,8 +56,9 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
-  # One shot. Generates the CA and the server, admin and intermediate certificates, renders CoreConfig.xml from the
-  # template, and hands the volume to uid 65532. Idempotent: an existing CA or CoreConfig.xml is left alone.
+  # One shot, certificates only. Split from the configuration render on purpose (finding 1): the IdP needs a
+  # certificate from this CA before it can exist, and CoreConfig cannot be rendered until the IdP has issued the
+  # confidential client secret. Self-repairing: each artifact is checked individually, not inferred from ca.pem.
   takinit:
     image: ${TAKINIT_IMAGE:-takserver-oidc-init:5.7-RELEASE-14}
     build:
@@ -65,6 +66,12 @@ services:
       dockerfile: docker/Dockerfile
       target: takinit
     restart: "no"
+    # Finding 10. It has to run as uid 0 because it chowns the volume to 65532, but nothing else is granted.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, FSETID]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
     environment:
       CA_NAME: ${CA_NAME:-TAK-CONTAINER-CA}
       SERVER_CN: ${SERVER_CN:-takserver-config}
@@ -77,7 +84,7 @@ services:
       CERT_PASS: ${CERT_PASS:-atakatak}
       DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-cot}
       DB_USERNAME: ${DB_USERNAME:-martiuser}
-      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      DB_PASSWORD: ${DB_PASSWORD:-}
       DB_POOL: ${DB_POOL:-16}
       TOMCAT_MAX_POOL: ${TOMCAT_MAX_POOL:-64}
       OIDC_ENABLED: ${OIDC_ENABLED:-false}
@@ -93,7 +100,17 @@ services:
       OIDC_GROUP_MAPPINGS: ${OIDC_GROUP_MAPPINGS:-}
       OIDC_ADMIN_CLAIM_NAME: ${OIDC_ADMIN_CLAIM_NAME:-groups}
       OIDC_ADMIN_CLAIM_VALUE: ${OIDC_ADMIN_CLAIM_VALUE:-tak_admin}
-      OIDC_TRUSTSTORE_FILE: ${OIDC_TRUSTSTORE_FILE:-certs/files/truststore-root.p12}
+      # Finding 7. Type, name and password are all configurable and all default to the JKS the init container
+      # builds from the TAK root CA. RUN.md section 5 gives the commands for an external IdP chain.
+      OIDC_TRUSTSTORE_TYPE: ${OIDC_TRUSTSTORE_TYPE:-JKS}
+      OIDC_TRUSTSTORE_FILE: ${OIDC_TRUSTSTORE_FILE:-certs/files/truststore-root.jks}
+      OIDC_TRUSTSTORE_PASS: ${OIDC_TRUSTSTORE_PASS:-}
+      # Finding 4. A _FILE variant wins over the plain variable, so a secret can arrive as a mounted file instead
+      # of an environment entry that docker inspect prints. Point these at /run/secrets/... to use compose secrets.
+      DB_PASSWORD_FILE: ${DB_PASSWORD_FILE:-}
+      OIDC_CLIENT_SECRET_FILE: ${OIDC_CLIENT_SECRET_FILE:-}
+      CERT_PASS_FILE: ${CERT_PASS_FILE:-}
+    command: ["certs"]
     volumes:
       - takdata:/opt/tak
       - idpcerts:/opt/idp-certs
@@ -101,6 +118,16 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+  # One shot, CoreConfig.xml only. Refuses to run with OIDC_ENABLED=true and an empty client secret, so a server
+  # that cannot complete the authorization code exchange never starts in the first place. Use
+  # "docker compose run --rm takconfig update-oidc" to rewrite it later, then recreate the three TAK containers.
+  takconfig:
+    extends:
+      service: takinit
+    command: ["config"]
+    depends_on:
+      takinit: { condition: service_completed_successfully }
 
   # One shot. Applies the flyway migrations, then exits. No JDK inside the database image.
   schemamanager:
@@ -120,7 +147,7 @@ services:
       - takdata:/opt/tak:ro
     depends_on:
       db: { condition: service_healthy }
-      takinit: { condition: service_completed_successfully }
+      takconfig: { condition: service_completed_successfully }
     networks: [tak]
     mem_limit: 384m
     logging:
@@ -134,9 +161,13 @@ services:
       schemamanager: { condition: service_completed_successfully }
     networks: [tak]
     ports:
-      - "${BIND_ADDR:-0.0.0.0}:8089:8089"
-      - "${BIND_ADDR:-0.0.0.0}:8443:8443"
-      - "${BIND_ADDR:-0.0.0.0}:8446:8446"
+      # Finding 9. Loopback by default. 8446 accepts connections without a client certificate on purpose, so
+      # publishing it on every interface has to be a deliberate act: set BIND_ADDR in .env and put an ingress
+      # control in front of it. 8089 is the TLS client-certificate input, 8443 the client-certificate web
+      # connector, 8446 the SSO/bearer connector.
+      - "${BIND_ADDR:-127.0.0.1}:8089:8089"
+      - "${BIND_ADDR:-127.0.0.1}:8443:8443"
+      - "${BIND_ADDR:-127.0.0.1}:8446:8446"
     mem_limit: ${CONFIG_MEM:-768m}
     healthcheck:
       test: ["CMD", "java", "-XX:TieredStopAtLevel=1", "-Xmx32m", "-cp", "/opt/takserver/health", "Health",
@@ -214,6 +245,8 @@ services:
       context: ${TAK_SOURCE_DIR:-..}
       dockerfile: docker/Dockerfile
       target: qa
+    # Finding 5. This image is in the delivered tarball, so the acceptance profile runs from a docker load with no
+    # source tree. The build stanza above is only for rebuilding it from the repository.
     command: ["sleep", "infinity"]
     volumes:
       - takdata:/opt/tak:ro
