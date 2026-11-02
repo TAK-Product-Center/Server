@@ -1,0 +1,15 @@
+# Keep the build context to the sources and the git metadata the root build.gradle needs (grgit reads .git and the
+# tags to derive the version). Local build outputs and anything secret are excluded.
+**/build/
+**/.gradle/
+.idea/
+*.iml
+# Finding 4: never let operator secrets or private key material enter a build context.
+docker/.env
+docker/.env.*
+docker/**/*.key
+docker/**/*.p12
+docker/**/*.jks
+**/certs/files/
+**/secrets/
+# (src/takserver-package/resources/takserver-public-gpg.key is a public key and is deliberately NOT matched here)

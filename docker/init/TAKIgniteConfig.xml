@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Ignite settings for the container. The three TAK processes share one network namespace (compose
+  network_mode: "service:takserver-config"), so 127.0.0.1 is the correct discovery address and the correct local
+  bind address; IgniteConfigurationHolder uses the single igniteHost attribute for both.
+  The off-heap cache is pinned instead of autodetected (the default is 99 percent of the messaging heap).
+-->
+<TAKIgniteConfiguration xmlns="http://bbn.com/marti/xml/config"
+                        igniteHost="127.0.0.1"
+                        igniteMulticast="false"
+                        igniteNonMulticastDiscoveryPort="47500"
+                        igniteNonMulticastDiscoveryPortCount="10"
+                        igniteCommunicationPort="47100"
+                        igniteCommunicationPortCount="10"
+                        cacheOffHeapInitialSizeBytes="67108864"
+                        cacheOffHeapMaxSizeBytes="268435456"/>

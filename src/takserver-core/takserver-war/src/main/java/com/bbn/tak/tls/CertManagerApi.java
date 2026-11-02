@@ -23,6 +23,10 @@ import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBElement;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.annotation.XmlAccessType;
+import jakarta.xml.bind.annotation.XmlAccessorType;
+import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlType;
 import javax.xml.namespace.QName;
 
 import org.slf4j.Logger;
@@ -75,6 +79,25 @@ public class CertManagerApi extends BaseRestController {
 
     }
 
+    @XmlAccessorType(XmlAccessType.FIELD)
+    @XmlType(name = "certificateConfigResponse", propOrder = {"identity"})
+    public static class CertificateConfigResponse extends CertificateConfig {
+        @XmlElement(name = "identity", namespace = "http://bbn.com/marti/xml/config", required = true)
+        private String identity;
+
+        public CertificateConfigResponse() {
+        }
+
+        public CertificateConfigResponse(CertificateConfig config, String identity) {
+            setNameEntries(config.getNameEntries());
+            this.identity = identity;
+        }
+
+        public String getIdentity() {
+            return identity;
+        }
+    }
+
     public static final Logger logger = LoggerFactory.getLogger(CertManagerApi.class);
 
     @Autowired
@@ -101,7 +124,7 @@ public class CertManagerApi extends BaseRestController {
 
     static {
         try {
-            jaxbContext = JAXBContext.newInstance(CertificateConfig.class);
+            jaxbContext = JAXBContext.newInstance(CertificateConfigResponse.class);
         } catch (JAXBException e) {
             logger.warn("exception creating CertificateConfig deserialization context", e);
         }
@@ -149,8 +172,24 @@ public class CertManagerApi extends BaseRestController {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
 
+            // OIDC (Phase 1): a certificate issued to a bearer-authenticated caller carries the assertion it was
+            // issued against, exactly as signClient does, so a later certificate connection is recognised as an OIDC
+            // enrollment and never falls to the file, LDAP or anonymous paths (review round two, item 27). Only an
+            // OIDC-issued token is kept; a legacy token is not stored, as upstream (review v02 F-05).
+            String callerToken = null;
+            try {
+                Object principal = org.springframework.security.core.context.SecurityContextHolder.getContext()
+                        .getAuthentication().getPrincipal();
+                if (principal instanceof com.bbn.marti.util.spring.MartiSocketUserDetailsImpl) {
+                    callerToken = ((com.bbn.marti.util.spring.MartiSocketUserDetailsImpl) principal).getToken();
+                }
+            } catch (Exception e) {
+                logger.debug("no token on the principal for makeClientKeyStore", e);
+            }
+            final tak.server.oidc.OidcProviderRegistry registry = tak.server.oidc.OidcProviderRegistry.getInstance();
+            callerToken = tak.server.oidc.OidcTokenGate.tokenToStore(callerToken, t -> registry.providerFor(t) != null);
             TakCert takCert = new TakCert(cert, signingCertChain,
-                    getHttpUser(), cn, new Date(), clientUid, null);
+                    getHttpUser(), cn, new Date(), clientUid, callerToken);
             takCertRepository.save(takCert);
 
             return new ResponseEntity<byte[]>(result, headers, HttpStatus.OK);
@@ -284,7 +323,9 @@ public class CertManagerApi extends BaseRestController {
 
             // create a root node (not present in the xsd generated classes)
             QName qName = new QName("com.bbn.marti.config", "certificateConfig");
-            JAXBElement<CertificateConfig> root = new JAXBElement<>(qName, CertificateConfig.class, config);
+            CertificateConfigResponse configResponse = new CertificateConfigResponse(config, getHttpUser());
+            JAXBElement<CertificateConfigResponse> root = new JAXBElement<>(qName,
+                    CertificateConfigResponse.class, configResponse);
 
             // serialize and return the certificate configuration
             marshaller.marshal(root, writer);

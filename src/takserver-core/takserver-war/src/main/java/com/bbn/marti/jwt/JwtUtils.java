@@ -42,6 +42,7 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+
 public class JwtUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtUtils.class);
@@ -233,6 +234,13 @@ public class JwtUtils {
             }
 
             for (Oauth.OpenIdDiscoveryConfiguration serverConfiguration : oAuth.getOpenIdDiscoveryConfiguration()) {
+                if (serverConfiguration.isEnabled()) {
+                    // OIDC (Phase 1): verified by OidcProviderRegistry; its keys never enter this pool, registered
+                    // or not, so a provider the registry refused cannot fall back to the weaker path.
+                    logger.debug("Skipping Phase 1 OIDC provider '{}' in the legacy external verifier path",
+                            serverConfiguration.getName());
+                    continue;
+                }
                 if (publicKeyCache.asMap().get(serverConfiguration.getName()) == null) {
                     Oauth.AuthServer authServer = OAuthUtils.processTrustedAuthServerConfig(serverConfiguration);
                     resolveAndCachePublicKeyDetails(authServer, rsaPublicKeys, publicKeyCache);

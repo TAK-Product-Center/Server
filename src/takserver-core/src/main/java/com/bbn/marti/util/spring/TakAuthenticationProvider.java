@@ -158,7 +158,8 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
         user.setToken(token);
         
         if (logger.isTraceEnabled()) {
-        	logger.trace(user.toString());
+            // Never the user object: its token field can be a bearer assertion (review v02 D3).
+            logger.trace("authenticating user={} connectionId={} token={}", username, connectionId, describeToken(token));
         }
 
         AuthResult authResult = new AuthResult(AuthStatus.FAILURE, user);
@@ -231,11 +232,40 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
         return loadedUser;
     }
     
+    /** Debug line for an attempt; the token itself never appears (review v02 D3). */
+    public static void logAuthenticationAttempt(Authentication authentication) {
+        if (logger.isDebugEnabled()) {
+            logger.debug("martiAuth authentication: " + describeAuthentication(authentication));
+        }
+    }
+
+    /** Type of the authentication and a safe description of its principal: a String principal is a bearer token. */
+    public static String describeAuthentication(Authentication authentication) {
+        if (authentication == null) {
+            return "null";
+        }
+        Object principal = authentication.getPrincipal();
+        String p;
+        if (principal == null) {
+            p = "null";
+        } else if (principal instanceof String) {
+            p = describeToken((String) principal);
+        } else if (principal instanceof java.security.cert.X509Certificate) {
+            p = "X509Certificate[" + ((java.security.cert.X509Certificate) principal).getSubjectX500Principal().getName() + "]";
+        } else {
+            p = principal.getClass().getSimpleName();
+        }
+        return authentication.getClass().getSimpleName() + "[principal=" + p + "]";
+    }
+
+    /** Type plus length only. */
+    public static String describeToken(String token) {
+        return token == null ? "none" : "bearer(len=" + token.length() + ")";
+    }
+
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
-    	if (logger.isDebugEnabled()) {
-    		logger.debug("martiAuth authentication: " + authentication);
-    	}
+    	logAuthenticationAttempt(authentication);
         
         try {
             User coreUser = null;
@@ -258,7 +288,7 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
 
             if (coreUser != null) {
             	if (logger.isDebugEnabled()) {
-            		logger.debug("auth success - core user: " + coreUser);
+            		logger.debug("auth success - core user: " + (coreUser.getId() == null ? coreUser.getName() : coreUser.getId()));
             	}
 
                 UserDetails userDetails = new MartiSocketUserDetailsImpl(coreUser);
@@ -266,7 +296,7 @@ public class TakAuthenticationProvider extends AbstractUserDetailsAuthentication
             }
 
             if (logger.isDebugEnabled()) {
-            	logger.debug("auth for user " + authentication.getPrincipal() + " unsuccessful.");
+            	logger.debug("auth for " + describeAuthentication(authentication) + " unsuccessful.");
             }
 
         }  catch (RemoteLookupFailureException e) {

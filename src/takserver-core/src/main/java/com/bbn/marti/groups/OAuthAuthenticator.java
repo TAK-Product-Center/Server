@@ -45,6 +45,12 @@ import com.bbn.marti.service.Resources;
 import com.bbn.marti.util.spring.ThreadLocalRequestHolder;
 import com.bbn.marti.xml.bindings.UserAuthenticationFile;
 import tak.server.cache.ActiveGroupCacheHelper;
+import tak.server.oidc.MappingResult;
+import tak.server.oidc.OidcAuditEvent;
+import tak.server.oidc.OidcIdentity;
+import tak.server.oidc.OidcProvider;
+import tak.server.oidc.OidcProviderRegistry;
+import tak.server.oidc.OidcValidationException;
 
 /*
  *
@@ -110,29 +116,58 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
 	@Override
 	public void authenticate(@NotNull User user, @NotNull AuthCallback cb) {
 
-		AuthResult authResult = auth(user);
+		AuthResult authResult = auth(user, false);
 
 		cb.authenticationReturned(user, authResult.getAuthStatus());
 	}
 
 	@Override
 	public AuthResult authenticate(User user) {
-		return auth(user);
+		return auth(user, false);
 	}
 
-	private AuthResult auth(User user) {
+	/**
+	 * OIDC (Phase 1): the certificate route re-reading the assertion TAK stored at enrollment. The only entry
+	 * point on which expiry is waived, and only when the user also carries the certificate (review v02 F-07).
+	 */
+	public AuthResult authenticateStoredAssertion(User user) {
+		return auth(user, true);
+	}
+
+	/** Expiry is waived only for a stored assertion presented with its certificate; never inferred from the certificate alone. */
+	public static boolean expiryWaived(User user, boolean storedAssertion) {
+		return storedAssertion && user != null && user.getCert() != null;
+	}
+
+	private AuthResult auth(User user, boolean storedAssertion) {
 
 		AuthStatus authStatus = AuthStatus.SUCCESS;
 		try {
 
 			String token = user.getName();
 
+			// OIDC (Phase 1): a token whose issuer is a registered external provider is verified by that provider's
+			// validator, mapped by configuration, audited, and never falls through to the directory, file or
+			// anonymous paths below. Everything else (TAK's own tokens, legacy authServer keys) is unchanged.
+			OidcProviderRegistry registry = OidcProviderRegistry.getInstance();
+			if (!registry.isEmpty()) {
+				OidcProvider provider = registry.providerFor(token);
+				String externalToken = token;
+				if (provider == null && !Strings.isNullOrEmpty(user.getToken())) {
+					provider = registry.providerFor(user.getToken());
+					externalToken = user.getToken();
+				}
+				if (provider != null) {
+					return authenticateExternal(user, externalToken, provider, registry, storedAssertion);
+				}
+			}
+
 			Claims claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256, user.getCert() != null);
 			if (claims == null) {
 				token = user.getToken();
 				claims = JwtUtils.getInstance().parseClaims(token, SignatureAlgorithm.RS256, user.getCert() != null);
 				if (claims == null) {
-					throw new InvalidBearerTokenException("Unable to parse claims from token : " + token);
+					throw new InvalidBearerTokenException("Unable to parse claims from token"); // token not logged (T8)
 				}
 			}
 
@@ -400,6 +435,107 @@ public class OAuthAuthenticator extends AbstractAuthenticator implements Seriali
 		}
 
 		return new AuthResult(authStatus, user);
+	}
+
+	/**
+	 * The OIDC path. Validation (signature, algorithm, issuer, audience, expiry) is the provider's validator;
+	 * the identity key is iss+sub; groups come only from the configured mapping (or the legacy pass-through when
+	 * none is configured); admin only from the explicit admin claim; a result with no group is a denial, not an
+	 * anonymous session. Every outcome writes one audit line.
+	 *
+	 * Expiry is waived in exactly one case: a certificate connection re-reading the token TAK stored at
+	 * enrollment, which arrives through {@link #authenticateStoredAssertion(User)} with {@code storedAssertion}
+	 * set and the certificate on the user. There the certificate is the credential and the token is the group
+	 * snapshot it was issued against; signature, issuer and audience are still enforced. A bearer request that
+	 * happens to carry a client certificate does not qualify (review v02 F-07).
+	 */
+	private AuthResult authenticateExternal(User user, String token, OidcProvider provider, OidcProviderRegistry registry,
+			boolean storedAssertion) {
+
+		HttpServletRequest request = ThreadLocalRequestHolder.getRequest();
+		int port = request == null ? -1 : request.getLocalPort();
+		boolean storedEnrollmentToken = expiryWaived(user, storedAssertion);
+		OidcAuditEvent.Surface surface = storedEnrollmentToken ? OidcAuditEvent.Surface.CERT : OidcAuditEvent.Surface.BEARER;
+
+		OidcIdentity identity;
+		try {
+			identity = provider.validate(token, storedEnrollmentToken);
+		} catch (OidcValidationException e) {
+			OidcAuditEvent.deny(surface, provider.getName(), provider.getIssuer(), null, port, e.getReason());
+			throw new InvalidBearerTokenException("oidc token rejected: " + e.getReason());
+		}
+
+		String username = registry.takUsername(identity);
+		if (Strings.isNullOrEmpty(username)) {
+			OidcAuditEvent.deny(surface, provider.getName(), provider.getIssuer(), identity.getSubject(), port,
+					OidcValidationException.Reason.CLAIMS);
+			throw new InvalidBearerTokenException("oidc token rejected: no username");
+		}
+
+		if (user instanceof AuthenticatedUser) {
+			AuthenticatedUser auser = (AuthenticatedUser) user;
+			user = new AuthenticatedUser(username, auser.getConnectionId(), auser.getAddress(), auser.getCert(),
+					username, "", "", auser.getConnectionType()); // no password or uid
+			user.setToken(token);
+		}
+
+		// classification, as for any other token
+		Object country = identity.getClaim("country");
+		Object classification = identity.getClaim("classification");
+		if (country instanceof String && classification instanceof ArrayList<?>) {
+			@SuppressWarnings("unchecked")
+			ArrayList<String> classificationList = (ArrayList<String>) classification;
+			@SuppressWarnings("unchecked")
+			ArrayList<String> accms = identity.getClaim("accms") instanceof ArrayList<?>
+					? (ArrayList<String>) identity.getClaim("accms") : null;
+			@SuppressWarnings("unchecked")
+			ArrayList<String> sciControls = identity.getClaim("sciControls") instanceof ArrayList<?>
+					? (ArrayList<String>) identity.getClaim("sciControls") : null;
+			groupManager.setClassificationForUser(user,
+					new UserClassification((String) country, classificationList, accms, sciControls));
+		}
+
+		boolean admin = registry.hasAdminClaim(identity);
+		MappingResult result = registry.groupMapper().map(identity.getClaim(registry.groupsClaim()), admin);
+		if (!result.isAllowed()) {
+			OidcAuditEvent.denyNoMapping(surface, identity, username, port);
+			throw new InvalidBearerTokenException("oidc identity has no permitted group mapping");
+		}
+
+		if (admin) {
+			user.getAuthorities().add("ROLE_ADMIN");
+		}
+
+		Set<Group> groups = new ConcurrentSkipListSet<>();
+		for (Group group : result.getGroups()) {
+			groups.add(groupManager.hydrateGroup(group));
+		}
+
+		boolean useGroupCache = oauthConf != null && oauthConf.isOauthUseGroupCache();
+		// same exception as the pre-existing path: the enrollment profile is fetched before channel selection
+		if (request != null && request.getRequestURI().equals("/Marti/api/tls/profile/enrollment")) {
+			useGroupCache = false;
+		}
+
+		if (useGroupCache) {
+			if (activeGroupCacheHelper.assignGroupsCheckCache(groups, user, username)) {
+				try {
+					DistributedSubscriptionManager.getInstance().sendGroupsUpdatedMessage(username, null);
+				} catch (Exception e) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("exception calling sendGroupsUpdatedMessage!", e);
+					}
+				}
+			}
+		} else {
+			groupManager.updateGroups(user, groups);
+		}
+
+		boolean userHasWebtakAccess = AuthCookieUtils.userHasWebtakAccess(oauthConf, identity.getClaims());
+		AuthenticatorUtil.setUserRolesBasedOnRequestPort(user, logger, userHasWebtakAccess);
+
+		OidcAuditEvent.allow(surface, identity, username, port, groups, admin, result.getReason());
+		return new AuthResult(AuthStatus.SUCCESS, user);
 	}
 
 	private boolean hasAdminTokenClaim(Claims claims) {
