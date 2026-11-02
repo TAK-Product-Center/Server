@@ -5,6 +5,7 @@
 ## Signed-off-by
 
 - _Add the copyright date, your name, and email address here. (PLEASE KEEP THIS LINE)_
+- 2026-11-02 Trevor Nelson trevor@lastwall.com
 
 ## Note for U.S. Federal Employees
 
