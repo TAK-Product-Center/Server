@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Empty file-auth store. Certificate identities are added with UserManager (see RUN.md, "admin enrolment");
+  OIDC identities never appear here.
+-->
+<UserAuthenticationFile xmlns="http://bbn.com/marti/xml/bindings">
+</UserAuthenticationFile>
