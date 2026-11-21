@@ -182,6 +182,11 @@ public class MissionServiceDefaultImpl implements MissionService {
 
 	private static final Logger logger = LoggerFactory.getLogger(MissionServiceDefaultImpl.class);
 
+	private static final List<String> SORTABLE_MISSION_COLUMNS = Arrays.asList(
+			"id", "create_time", "last_edited", "name", "creatoruid", "groups", "description",
+			"chatroom", "base_layer", "bbox", "path", "classification", "tool", "password_hash",
+			"expiration", "bounding_polygon", "invite_only", "guid");
+
 	private final DataSource dataSource;
 
 	private final MissionRepository missionRepository;
@@ -3414,11 +3419,22 @@ public class MissionServiceDefaultImpl implements MissionService {
 	}
 
 	private List<Mission> getMissionsByUidWithSort(boolean passwordProtected, boolean defaultRole, int limit, int offset, String sort, Boolean ascending, String uidFilter, String groupVector) {
+		String sortColumn = null;
+		for (String allowed : SORTABLE_MISSION_COLUMNS) {
+			if (allowed.equals(sort)) {
+				sortColumn = allowed;
+				break;
+			}
+		}
+		if (sortColumn == null) {
+			throw new IllegalArgumentException("invalid sort column");
+		}
+
 		String sql = "select id, create_time, last_edited, name, creatoruid, groups, description, chatroom, base_layer, bbox, path, classification, tool, password_hash, expiration, bounding_polygon, invite_only, guid "
 				+ "from mission inner join mission_uid on mission.id = mission_uid.mission_id where invite_only = false and "
 				+ "((:passwordProtected = false and password_hash is null) or :passwordProtected = true) "
 				+ "and ((:defaultRole = false and (default_role_id is null or default_role_id = 2)) or :defaultRole = true) "
-				+ "and uid like CONCAT('%', :uid, '%') AND " + RemoteUtil.GROUP_CLAUSE + "order by " + sort;
+				+ "and uid like CONCAT('%', :uid, '%') AND " + RemoteUtil.GROUP_CLAUSE + "order by " + sortColumn;
 		if (ascending) {
 			sql = sql + " asc ";
 		} else {
